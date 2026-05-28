@@ -1,0 +1,127 @@
+import { create } from 'zustand'
+import type {
+  VaultEntryStored,
+  VaultMeta,
+  VaultSecret
+} from '@shared/types'
+import { hapticMedium, hapticWarning } from '../lib/haptics'
+
+interface VaultStore {
+  meta: VaultMeta | null
+  unlocked: boolean
+  entries: VaultEntryStored[]
+  initStatus: 'idle' | 'loading' | 'ready'
+  refreshMeta: () => Promise<void>
+  unlock: (master: string) => Promise<{ ok: true } | { ok: false; error: string }>
+  createWithMaster: (
+    master: string
+  ) => Promise<{ ok: true } | { ok: false; error: string }>
+  lock: () => Promise<void>
+  loadEntries: () => Promise<void>
+  // Encrypt + store a credential secret
+  addEntry: (input: {
+    title: string
+    url?: string
+    username?: string
+    secret: VaultSecret
+  }) => Promise<VaultEntryStored | null>
+  updateEntry: (
+    id: string,
+    input: {
+      title?: string
+      url?: string | null
+      username?: string | null
+      secret?: VaultSecret
+    }
+  ) => Promise<void>
+  removeEntry: (id: string) => Promise<void>
+  // Decrypt and return the secret blob for an entry — caller holds the plaintext briefly
+  reveal: (id: string) => Promise<VaultSecret | null>
+}
+
+export const useVaultStore = create<VaultStore>((set, get) => ({
+  meta: null,
+  unlocked: false,
+  entries: [],
+  initStatus: 'idle',
+  refreshMeta: async () => {
+    set({ initStatus: 'loading' })
+    const [meta, unlocked] = await Promise.all([
+      window.api.vault.meta(),
+      window.api.vault.isUnlocked()
+    ])
+    set({ meta, unlocked, initStatus: 'ready' })
+    if (unlocked) await get().loadEntries()
+  },
+  unlock: async (master) => {
+    const result = await window.api.vault.unlock(master)
+    if (result.ok) {
+      set({ unlocked: true })
+      hapticMedium()
+      await get().loadEntries()
+    } else {
+      hapticWarning()
+    }
+    return result
+  },
+  createWithMaster: async (master) => {
+    const result = await window.api.vault.create(master)
+    if (result.ok) {
+      const meta = await window.api.vault.meta()
+      set({ meta, unlocked: true, entries: [] })
+    }
+    return result
+  },
+  lock: async () => {
+    await window.api.vault.lock()
+    set({ unlocked: false, entries: [] })
+  },
+  loadEntries: async () => {
+    const entries = await window.api.vault.listEntries()
+    set({ entries })
+  },
+  addEntry: async (input) => {
+    const enc = await window.api.vault.encrypt(JSON.stringify(input.secret))
+    if (!enc) return null
+    const created = await window.api.vault.createEntry({
+      title: input.title,
+      url: input.url ?? null,
+      username: input.username ?? null,
+      iv: enc.iv,
+      ciphertext: enc.ciphertext
+    })
+    if (!created) return null
+    set({ entries: [...get().entries, created] })
+    return created
+  },
+  updateEntry: async (id, input) => {
+    const patch: Parameters<typeof window.api.vault.updateEntry>[1] = {}
+    if (input.title !== undefined) patch.title = input.title
+    if (input.url !== undefined) patch.url = input.url
+    if (input.username !== undefined) patch.username = input.username
+    if (input.secret !== undefined) {
+      const enc = await window.api.vault.encrypt(JSON.stringify(input.secret))
+      if (!enc) return
+      patch.iv = enc.iv
+      patch.ciphertext = enc.ciphertext
+    }
+    const updated = await window.api.vault.updateEntry(id, patch)
+    if (!updated) return
+    set({ entries: get().entries.map((e) => (e.id === id ? updated : e)) })
+  },
+  removeEntry: async (id) => {
+    await window.api.vault.deleteEntry(id)
+    set({ entries: get().entries.filter((e) => e.id !== id) })
+  },
+  reveal: async (id) => {
+    const entry = get().entries.find((e) => e.id === id)
+    if (!entry) return null
+    const plain = await window.api.vault.decrypt(entry.iv, entry.ciphertext)
+    if (plain == null) return null
+    try {
+      return JSON.parse(plain) as VaultSecret
+    } catch {
+      return null
+    }
+  }
+}))

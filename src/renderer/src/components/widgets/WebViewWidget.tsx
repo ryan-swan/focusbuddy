@@ -1,0 +1,501 @@
+import { useEffect, useRef, useState } from 'react'
+import type { Widget } from '@shared/types'
+import WidgetFrame from './WidgetFrame'
+import { useWidgetStore } from '../../stores/widgets'
+import { useConnectedAppsStore } from '../../stores/connectedApps'
+import { useVaultStore } from '../../stores/vault'
+import { catalogFor } from '../../lib/widgetCatalog'
+import { registerWebview, unregisterWebviewByWidgetId } from '../../lib/webviewRegistry'
+import { autofillWebview } from '../../lib/vaultAutofill'
+import Icon from '../Icon'
+
+function hostnameOf(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '')
+  } catch {
+    return url
+  }
+}
+
+function normalizeUrl(input: string): string | null {
+  let url = input.trim()
+  if (!url) return null
+  if (!/^https?:\/\//i.test(url)) url = `https://${url}`
+  try {
+    new URL(url)
+    return url
+  } catch {
+    return null
+  }
+}
+
+interface Props {
+  widget: Widget
+  inline?: boolean
+}
+
+export default function WebViewWidget({ widget, inline = false }: Props): JSX.Element {
+  const update = useWidgetStore((s) => s.update)
+  const create = useWidgetStore((s) => s.create)
+  const focusOn = useWidgetStore((s) => s.focusOn)
+  const isActive = useWidgetStore((s) => s.activeWidgetId === widget.id)
+  const webviewRef = useRef<HTMLElement | null>(null)
+  const entry = catalogFor(widget.kind)
+  const placeholder = entry?.urlPlaceholder ?? 'https://…'
+  const [editing, setEditing] = useState(!widget.content)
+  const [draft, setDraft] = useState(widget.content)
+  // Live preview shown in the header — tracks the CURRENT page while navigating.
+  const [livePreview, setLivePreview] = useState<{ url: string; title: string } | null>(null)
+  // Last URL we persisted into widget.content — avoids redundant DB writes on rapid navs
+  const lastPersistedUrl = useRef<string>(widget.content)
+  // ── webviewSrc — the URL we tell the <webview> element to load ─────────────
+  // CRITICAL: this is intentionally NOT derived from widget.content. Binding
+  // src={widget.content} causes the webview to reload on every navigation,
+  // because persistNavUrl writes the post-nav URL back to widget.content →
+  // React re-renders the <webview> with a new src attribute → Electron
+  // treats that as a load request → reload kills mid-sign-in POSTs.
+  //
+  // Instead, webviewSrc is only updated when the URL change is EXTERNAL to
+  // this webview: the user typed a new URL in the edit form, or a sibling
+  // widget instance (e.g. focus-mode swap) wrote a different URL. The
+  // webview navigates organically for everything else.
+  const [webviewSrc, setWebviewSrc] = useState(widget.content)
+  const headerLabel = (() => {
+    const previewTitle = livePreview?.title
+    const previewHost = livePreview ? hostnameOf(livePreview.url) : ''
+    if (previewTitle) return previewTitle
+    if (previewHost) return previewHost
+    if (widget.title) return widget.title
+    if (widget.content) return hostnameOf(widget.content)
+    return entry?.label ?? 'browser'
+  })()
+
+  // Full reset when the widget instance itself changes (different widget id —
+  // e.g. focus-mode mounts a fresh sibling for the same content). Notably we
+  // do NOT include widget.content here: that would refire on every persistNavUrl
+  // write and reset state mid-navigation.
+  useEffect(() => {
+    setDraft(widget.content)
+    setEditing(!widget.content)
+    lastPersistedUrl.current = widget.content
+    setWebviewSrc(widget.content)
+    setLivePreview(null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [widget.id])
+
+  // External-sync: widget.content changed but it wasn't from THIS webview's
+  // own navigation (lastPersistedUrl tracks our own writes). Cases that fire
+  // this branch: the focus-mode sibling wrote a new URL while we were
+  // mounted, or the user explicitly edited the URL via the form (commit()
+  // also sets lastPersistedUrl so we don't double-load there).
+  useEffect(() => {
+    if (widget.content === lastPersistedUrl.current) return
+    // Genuine external change — sync to webview + adopt as our new baseline.
+    lastPersistedUrl.current = widget.content
+    setWebviewSrc(widget.content)
+    setDraft(widget.content)
+  }, [widget.content])
+
+  // Safety-net flush on unmount: if the last nav event didn't fire (rare) or the user
+  // closes focus mode mid-load, read the webview's getURL() and commit it.
+  useEffect(() => {
+    const wvAtMount = webviewRef.current
+    return () => {
+      try {
+        const finalUrl =
+          (wvAtMount as unknown as { getURL?: () => string } | null)?.getURL?.() ?? ''
+        const finalTitle =
+          (wvAtMount as unknown as { getTitle?: () => string } | null)?.getTitle?.() ?? ''
+        if (
+          finalUrl &&
+          /^https?:\/\//i.test(finalUrl) &&
+          finalUrl !== lastPersistedUrl.current
+        ) {
+          lastPersistedUrl.current = finalUrl
+          void update(widget.id, {
+            content: finalUrl,
+            title: finalTitle || hostnameOf(finalUrl)
+          })
+        }
+      } catch {
+        // Element already detached; best effort
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [widget.id])
+
+  // Persist the latest URL into widget.content so the next mount (incl. focus-mode
+  // expand) loads where you left off. NO debounce — saves are tiny and racing the user
+  // clicking "expand" is worse than 3 extra writes during a redirect chain.
+  function persistNavUrl(url: string, title: string): void {
+    if (!/^https?:\/\//i.test(url)) return
+    if (url === lastPersistedUrl.current) return
+    setLivePreview({ url, title })
+    lastPersistedUrl.current = url
+    void update(widget.id, {
+      content: url,
+      title: title || hostnameOf(url)
+    })
+  }
+
+  // Allow popups (OAuth, window.open). We do NOT intercept new-window in the
+  // renderer because doing so kills `window.opener`, which OAuth providers use
+  // to post the auth callback back to the parent page. The main process owns
+  // popup routing via setWindowOpenHandler:
+  //   - disposition='new-window' / has features → open as a real native popup
+  //     window sharing this webview's session (OAuth flows work).
+  //   - target=_blank link clicks → main forwards the URL via IPC, we spawn a
+  //     new canvas widget below.
+  useEffect(() => {
+    if (editing) return
+    const wv = webviewRef.current
+    if (!wv) return
+    wv.setAttribute('allowpopups', '')
+  }, [editing])
+
+  // Spawn a canvas widget for target=_blank links that originated from this
+  // webview's webContents. We compare webContentsId so a link click in one
+  // browser widget doesn't spawn duplicates across every other browser widget.
+  useEffect(() => {
+    if (editing) return
+    const off = window.api.webview.onLinkClicked(({ sourceWebContentsId, url }) => {
+      const wv = webviewRef.current
+      if (!wv) return
+      let myId = -1
+      try {
+        myId = (wv as unknown as { getWebContentsId: () => number }).getWebContentsId()
+      } catch {
+        return
+      }
+      if (myId !== sourceWebContentsId) return
+      if (!url || !/^https?:\/\//i.test(url)) return
+      void create({
+        taskId: widget.taskId,
+        kind: 'webview',
+        title: '',
+        content: url,
+        x: widget.x + 40,
+        y: widget.y + 40,
+        width: 560,
+        height: 400,
+        color: null,
+        sourceAppId: widget.sourceAppId
+      })
+    })
+    return off
+  }, [editing, widget.id, widget.taskId, widget.x, widget.y, widget.sourceAppId, create])
+
+  // Register this webview's webContentsId so the host renderer can look it up
+  // when the main process forwards a context-menu action.
+  useEffect(() => {
+    if (editing) return
+    const wv = webviewRef.current
+    if (!wv) return
+
+    function handleDomReady(): void {
+      try {
+        const id = (wv as unknown as { getWebContentsId: () => number }).getWebContentsId()
+        registerWebview(id, widget.id, wv as HTMLElement)
+      } catch {
+        // webview not yet attached
+      }
+    }
+
+    wv.addEventListener('dom-ready', handleDomReady as EventListener)
+    return () => {
+      wv.removeEventListener('dom-ready', handleDomReady as EventListener)
+      unregisterWebviewByWidgetId(widget.id)
+    }
+  }, [editing, widget.id])
+
+  // Record navigation events into the browsing history so the create/edit dialog
+  // can suggest "Recent pages" the user has actually used for similar tasks.
+  useEffect(() => {
+    if (editing) return
+    const wv = webviewRef.current
+    if (!wv) return
+
+    function handleNav(e: Event): void {
+      const ev = e as Event & { url?: string; isMainFrame?: boolean }
+      if (ev.isMainFrame === false) return
+      const url = ev.url ?? (wv as unknown as { getURL?: () => string }).getURL?.()
+      if (!url || !/^https?:\/\//i.test(url)) return
+      let title = ''
+      try {
+        title = (wv as unknown as { getTitle?: () => string }).getTitle?.() ?? ''
+      } catch {
+        // pre-attach race — title fills in via did-finish-load
+      }
+      void window.api.history.record(url, title, widget.taskId)
+      let host = ''
+      try {
+        host = new URL(url).hostname.replace(/^www\./, '')
+      } catch {
+        // ignore
+      }
+      void window.api.trail.record({
+        taskId: widget.taskId,
+        kind: 'browser_nav',
+        payload: { url, title, host, widgetId: widget.id }
+      })
+      // Persist the latest URL back to the widget so re-opening goes to where the user
+      // actually was, not the original URL.
+      persistNavUrl(url, title)
+    }
+
+    wv.addEventListener('did-navigate', handleNav as EventListener)
+    wv.addEventListener('did-navigate-in-page', handleNav as EventListener)
+    wv.addEventListener('did-finish-load', handleNav as EventListener)
+    wv.addEventListener('did-redirect-navigation', handleNav as EventListener)
+    return () => {
+      wv.removeEventListener('did-navigate', handleNav as EventListener)
+      wv.removeEventListener('did-navigate-in-page', handleNav as EventListener)
+      wv.removeEventListener('did-finish-load', handleNav as EventListener)
+      wv.removeEventListener('did-redirect-navigation', handleNav as EventListener)
+    }
+  }, [editing, widget.id, widget.taskId])
+
+  // When webviewSrc actually changes (via commit() or external sync), call
+  // loadURL explicitly. Just updating the src attribute on a mounted <webview>
+  // isn't always sufficient in Electron — loadURL is the reliable trigger.
+  // This effect ONLY fires on the deliberate sync points, never on internal
+  // navigation, so no refresh loop is possible.
+  useEffect(() => {
+    if (editing) return
+    const wv = webviewRef.current
+    if (!wv) return
+    if (!webviewSrc || !/^https?:\/\//i.test(webviewSrc)) return
+    try {
+      const current = (wv as unknown as { getURL?: () => string }).getURL?.() ?? ''
+      if (current === webviewSrc) return
+      ;(wv as unknown as { loadURL: (url: string) => void }).loadURL(webviewSrc)
+    } catch {
+      // Webview not yet attached — initial render's src attribute will load.
+    }
+  }, [webviewSrc, editing])
+
+  function commit(): void {
+    const url = normalizeUrl(draft)
+    if (!url) return
+    setDraft(url)
+    // User-initiated URL change. Mark as our write (so the external-sync
+    // useEffect skips it) AND drive the webview load via webviewSrc.
+    lastPersistedUrl.current = url
+    setWebviewSrc(url)
+    void update(widget.id, { content: url, title: hostnameOf(url) })
+    setEditing(false)
+  }
+
+  // ── Connected App binding ─────────────────────────────────────────────────
+  // If this widget was dragged from a Connected App OR has been pinned to one,
+  // share that app's session partition + auto-fill its vault credentials.
+  const apps = useConnectedAppsStore((s) => s.apps)
+  const touchApp = useConnectedAppsStore((s) => s.touch)
+  const createApp = useConnectedAppsStore((s) => s.create)
+  const vaultEntries = useVaultStore((s) => s.entries)
+  const vaultUnlocked = useVaultStore((s) => s.unlocked)
+  const sourceApp = widget.sourceAppId
+    ? apps.find((a) => a.id === widget.sourceAppId) ?? null
+    : null
+  const partition = sourceApp
+    ? `persist:connectedapp-${sourceApp.id}`
+    : 'persist:webview-default'
+
+  // Bump the connected app's usage when this widget is first focused — signals
+  // the Favourites sort that the user is actively working with it.
+  const bumpedFocusFor = useRef<string | null>(null)
+  useEffect(() => {
+    if (!sourceApp) return
+    if (!isActive) return
+    if (bumpedFocusFor.current === sourceApp.id) return
+    bumpedFocusFor.current = sourceApp.id
+    void touchApp(sourceApp.id)
+  }, [isActive, sourceApp, touchApp])
+
+  // Vault auto-fill: when the page settles and we have a bound vault entry,
+  // inject credentials. Only fire once per load (tracked via the URL ref) so
+  // we don't refill a half-submitted form on every sub-frame did-finish-load.
+  const autofilledForUrl = useRef<string>('')
+  useEffect(() => {
+    if (editing) return
+    if (!sourceApp) return
+    if (!sourceApp.autofillEnabled) return
+    if (!sourceApp.vaultEntryId) return
+    if (!vaultUnlocked) return
+    const wv = webviewRef.current
+    if (!wv) return
+    const entry = vaultEntries.find((e) => e.id === sourceApp.vaultEntryId) ?? null
+    if (!entry) return
+
+    function onFinish(): void {
+      try {
+        const url =
+          (wv as unknown as { getURL?: () => string } | null)?.getURL?.() ?? ''
+        if (!url || url === autofilledForUrl.current) return
+        autofilledForUrl.current = url
+        void autofillWebview(wv as HTMLElement | null, entry)
+      } catch {
+        // ignore
+      }
+    }
+    wv.addEventListener('did-finish-load', onFinish as EventListener)
+    return () => {
+      wv.removeEventListener('did-finish-load', onFinish as EventListener)
+    }
+  }, [editing, sourceApp, vaultEntries, vaultUnlocked])
+
+  // ── "Pin this site" handler ───────────────────────────────────────────────
+  // One-click promotion from a freeform browser widget to a Connected App.
+  // Re-uses the existing connected app if the hostname already matches one we
+  // know about (no duplicates), otherwise creates a new app from the current
+  // URL + title. The widget's sourceAppId then drives partition + autofill.
+  const [pinning, setPinning] = useState(false)
+  async function handlePinToApps(): Promise<void> {
+    if (pinning || sourceApp || !widget.content) return
+    setPinning(true)
+    try {
+      let host = ''
+      try {
+        host = new URL(widget.content).hostname.replace(/^www\./, '')
+      } catch {
+        return
+      }
+      const existing = await window.api.connectedApps.findByHostname(host)
+      if (existing) {
+        await update(widget.id, { sourceAppId: existing.id })
+        void touchApp(existing.id)
+        return
+      }
+      const wv = webviewRef.current
+      let title = ''
+      try {
+        title =
+          (wv as unknown as { getTitle?: () => string } | null)?.getTitle?.() ?? ''
+      } catch {
+        // ignore
+      }
+      const app = await createApp({
+        title: title || host,
+        url: widget.content,
+        icon: 'apps',
+        color: null
+      })
+      await update(widget.id, { sourceAppId: app.id })
+      void touchApp(app.id)
+    } finally {
+      setPinning(false)
+    }
+  }
+
+  // In inline (focus modal) mode the modal already provides isolation, so always interactive.
+  const showOverlay = !inline && !editing && !isActive
+
+  const body = (
+    <div className="h-full w-full bg-white relative">
+      {editing ? (
+        <form
+          onSubmit={(e) => {
+            e.preventDefault()
+            commit()
+          }}
+          className="h-full w-full flex flex-col items-stretch justify-center gap-2 p-4"
+        >
+          <label className="text-xs uppercase tracking-wider text-stone-500 flex items-center gap-1.5">
+            <Icon name={entry?.icon ?? 'public'} size={16} className="text-stone-600" />
+            {entry?.label ?? 'URL'}
+          </label>
+          <input
+            autoFocus
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            placeholder={placeholder}
+            className="bg-white border border-stone-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-stone-700 focus:ring-2 focus:ring-stone-200"
+          />
+          <p className="text-[11px] text-stone-600">
+            {entry?.hint ?? 'Renders inside a focused browser tab — no other tabs allowed.'}
+          </p>
+          <div className="flex justify-end gap-2 pt-1">
+            <button type="submit" className="btn-primary">
+              <Icon name="open_in_new" size={14} />
+              <span>Load</span>
+            </button>
+          </div>
+        </form>
+      ) : (
+        <>
+          <webview
+            ref={webviewRef}
+            src={webviewSrc}
+            partition={partition}
+            style={{ width: '100%', height: '100%', display: 'inline-flex' }}
+          />
+          {showOverlay && (
+            <div
+              onClick={(e) => {
+                e.stopPropagation()
+                focusOn(widget.id)
+              }}
+              className="absolute inset-0 cursor-pointer group bg-transparent"
+              title="Click to interact — scroll pans the canvas while not active"
+            >
+              <div className="absolute bottom-2 left-1/2 -translate-x-1/2 px-2.5 py-1 rounded-full bg-stone-900/80 backdrop-blur text-[11px] text-stone-50 shadow flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">
+                <Icon name="touch_app" size={12} />
+                <span>Click to interact</span>
+              </div>
+            </div>
+          )}
+          {!editing && (
+            <div className="absolute top-1 right-1 flex items-center gap-1 z-10">
+              {!sourceApp && widget.content && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    void handlePinToApps()
+                  }}
+                  disabled={pinning}
+                  title="Pin this site to Connected Apps (shares session + enables vault auto-fill)"
+                  className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded bg-white/90 border border-stone-300 hover:bg-stone-100 text-stone-700 disabled:opacity-60"
+                >
+                  <Icon name="push_pin" size={11} />
+                  <span>{pinning ? 'pinning…' : 'pin to apps'}</span>
+                </button>
+              )}
+              {sourceApp && (
+                <span
+                  title={`Linked to "${sourceApp.title}" — session + auto-fill shared`}
+                  className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded bg-white/90 border border-stone-300 text-stone-700"
+                >
+                  <Icon name="link" size={11} />
+                  <span className="truncate max-w-[120px]">{sourceApp.title}</span>
+                </span>
+              )}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setEditing(true)
+                }}
+                title="Change URL"
+                className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded bg-white/90 border border-stone-300 hover:bg-stone-100 text-stone-700"
+              >
+                <Icon name="edit" size={11} />
+                <span>edit</span>
+              </button>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  )
+
+  if (inline) return body
+
+  return (
+    <WidgetFrame
+      widget={widget}
+      headerLabel={`${entry?.label ?? 'Browser'} · ${headerLabel}`}
+      headerAccent="bg-stone-300/60"
+    >
+      {body}
+    </WidgetFrame>
+  )
+}

@@ -1,0 +1,1595 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useNodeStore } from '../stores/nodes'
+import { useWidgetStore } from '../stores/widgets'
+import { useTemplateStore } from '../stores/templates'
+import { useConnectedAppsStore } from '../stores/connectedApps'
+import { CONNECTED_APP_DRAG_MIME } from './Sidebar'
+import StickyWidget from './widgets/StickyWidget'
+import WebViewWidget from './widgets/WebViewWidget'
+import NoteWidget from './widgets/NoteWidget'
+import MarkdownWidget from './widgets/MarkdownWidget'
+import TaskLinkWidget from './widgets/TaskLinkWidget'
+import LocalAppLauncherWidget from './widgets/LocalAppLauncherWidget'
+import FileWidget from './widgets/FileWidget'
+import FieldWidget from './widgets/FieldWidget'
+import PageWidget from './widgets/PageWidget'
+import TableWidget from './widgets/TableWidget'
+import CalculatorWidget from './widgets/CalculatorWidget'
+import ColorWidget from './widgets/ColorWidget'
+import ImageWidget from './widgets/ImageWidget'
+import VideoWidget from './widgets/VideoWidget'
+import TimerWidget from './widgets/TimerWidget'
+import SectionWidget from './widgets/SectionWidget'
+import WidgetPalette from './WidgetPalette'
+import WidgetDock from './WidgetDock'
+import WidgetFocusMode from './WidgetFocusMode'
+import ExtensionPrompt from './ExtensionPrompt'
+import ResumeModal from './ResumeModal'
+import AISetupDialog from './AISetupDialog'
+import AiBuilderDialog from './AiBuilderDialog'
+import type { AiBuildSuggestion } from '@shared/types'
+import LoadMeter from './LoadMeter'
+import CanvasContextMenu, { type CtxMenuItem } from './CanvasContextMenu'
+import FloatingToolbar, { type ToolbarAction } from './FloatingToolbar'
+import Icon from './Icon'
+import { useChatStore } from '../stores/chat'
+import { useFocusSessionStore } from '../stores/focusSession'
+import { chimeIn, futuristicPowerOn } from '../lib/audioBeep'
+import type { WidgetSuggestion } from '@shared/types'
+import {
+  CATEGORIES,
+  DRAG_MIME,
+  WIDGET_CATALOG,
+  catalogFor,
+  type WidgetCatalogEntry,
+  type WidgetCategory
+} from '../lib/widgetCatalog'
+import {
+  computeSectionFrame,
+  effectiveLayout,
+  SECTION_PADDING
+} from '../lib/sectionGeometry'
+import { lookupWebview } from '../lib/webviewRegistry'
+import { PinLayoutContext, computeZonePinPositions } from '../lib/pinLayout'
+import LinkOverlay from './LinkOverlay'
+import { useLinksStore } from '../stores/links'
+import { LinkDragContext } from '../lib/linkDragContext'
+import type {
+  ContextMenuPayload,
+  SectionLayout,
+  Widget,
+  WidgetDraft,
+  WidgetKind
+} from '@shared/types'
+
+const CATEGORY_ICON: Record<WidgetCategory, string> = {
+  Notes: 'sticky_note_2',
+  Web: 'public',
+  Files: 'folder',
+  Tools: 'build',
+  Comms: 'mail',
+  Layout: 'crop_free'
+}
+
+const CATEGORY_COLOR: Record<WidgetCategory, string> = {
+  Notes: '#f59e0b',
+  Web: '#3b82f6',
+  Files: '#10b981',
+  Tools: '#8b5cf6',
+  Comms: '#ec4899',
+  Layout: '#737373'
+}
+
+const WEB_KINDS: WidgetKind[] = ['webview', 'pdf', 'gdoc', 'gsheet', 'gslide', 'email']
+const isWebKind = (k: WidgetKind): boolean => WEB_KINDS.includes(k)
+
+function renderWidget(w: Widget): JSX.Element | null {
+  switch (w.kind) {
+    case 'sticky':
+      return <StickyWidget widget={w} />
+    case 'note':
+      return <NoteWidget widget={w} />
+    case 'markdown':
+      return <MarkdownWidget widget={w} />
+    case 'task-link':
+      return <TaskLinkWidget widget={w} />
+    case 'local-app-launcher':
+      return <LocalAppLauncherWidget widget={w} />
+    case 'file':
+      return <FileWidget widget={w} />
+    case 'field':
+      return <FieldWidget widget={w} />
+    case 'page':
+      return <PageWidget widget={w} />
+    case 'table':
+      return <TableWidget widget={w} />
+    case 'calculator':
+      return <CalculatorWidget widget={w} />
+    case 'color':
+      return <ColorWidget widget={w} />
+    case 'image':
+      return <ImageWidget widget={w} />
+    case 'video':
+      return <VideoWidget widget={w} />
+    case 'timer':
+      return <TimerWidget widget={w} />
+    case 'section':
+      return <SectionWidget widget={w} renderChild={renderWidget} />
+    case 'webview':
+    case 'pdf':
+    case 'gdoc':
+    case 'gsheet':
+    case 'gslide':
+    case 'email':
+      return <WebViewWidget widget={w} />
+    default:
+      return null
+  }
+}
+
+const STATUS_META: Record<
+  'open' | 'in_progress' | 'done' | 'parked',
+  { label: string; icon: string; next: 'open' | 'in_progress' | 'done' | 'parked' }
+> = {
+  open: { label: 'Start', icon: 'play_arrow', next: 'in_progress' },
+  in_progress: { label: 'Done', icon: 'check', next: 'done' },
+  done: { label: 'Reopen', icon: 'refresh', next: 'open' },
+  parked: { label: 'Resume', icon: 'play_arrow', next: 'open' }
+}
+
+export default function Canvas(): JSX.Element {
+  const activeTaskId = useNodeStore((s) => s.activeTaskId)
+  const nodes = useNodeStore((s) => s.nodes)
+  const updateNode = useNodeStore((s) => s.update)
+  const widgets = useWidgetStore((s) => s.widgets)
+  const focusedId = useWidgetStore((s) => s.focusedWidgetId)
+  const activeId = useWidgetStore((s) => s.activeWidgetId)
+  const setActive = useWidgetStore((s) => s.setActive)
+  const focusOn = useWidgetStore((s) => s.focusOn)
+  const centerToken = useWidgetStore((s) => s.centerToken)
+  const layoutVersion = useWidgetStore((s) => s.layoutVersion)
+  const zoom = useWidgetStore((s) => s.zoom)
+  const panX = useWidgetStore((s) => s.panX)
+  const panY = useWidgetStore((s) => s.panY)
+  const setZoom = useWidgetStore((s) => s.setZoom)
+  const panBy = useWidgetStore((s) => s.panBy)
+  const zoomTowardPoint = useWidgetStore((s) => s.zoomTowardPoint)
+  const resetView = useWidgetStore((s) => s.resetView)
+  const loadForTask = useWidgetStore((s) => s.loadForTask)
+  const clearWidgets = useWidgetStore((s) => s.clear)
+  const createWidget = useWidgetStore((s) => s.create)
+  const updateWidget = useWidgetStore((s) => s.update)
+  const bumpLayoutVersion = useWidgetStore((s) => s.bumpLayoutVersion)
+  const saveTemplate = useTemplateStore((s) => s.saveFromTask)
+  const dropRef = useRef<HTMLDivElement | null>(null)
+  const setPan = useWidgetStore((s) => s.setPan)
+  const [savingTemplate, setSavingTemplate] = useState(false)
+  const [paletteOpen, setPaletteOpen] = useState(true)
+  const [animatingPan, setAnimatingPan] = useState(false)
+  const [, setNowTick] = useState(0) // for the running-task clock
+  const [snoozeUntil, setSnoozeUntil] = useState<number>(0)
+  const [showResume, setShowResume] = useState(false)
+  const [showAISetup, setShowAISetup] = useState(false)
+  // AI Builder: free-form "describe what you want" prompt that returns
+  // suggested widgets (pages, tables, fields). Independent of the existing
+  // AI Setup (which is task-context-driven and uses the older suggestion
+  // format).
+  const [showAiBuilder, setShowAiBuilder] = useState(false)
+  const welcomedTasksRef = useRef<Set<string>>(new Set())
+  const [ctxMenu, setCtxMenu] = useState<{
+    screenX: number
+    screenY: number
+    canvasX: number
+    canvasY: number
+  } | null>(null)
+
+  const activeTask = activeTaskId ? nodes.find((n) => n.id === activeTaskId) ?? null : null
+
+  // Spatial-link state — load per task, mirror the widgets pattern. The
+  // overlay reads this store; Canvas owns the link-arm gesture.
+  //
+  // Gesture state is split into two pieces:
+  //   - linkSourceId: the widget the user "armed" the link from. Only set
+  //     on arm start / cleared on arm end. Drives the banner + the install
+  //     of the global mouse/keyboard listeners.
+  //   - ghostCursor: world-space cursor position. Updated on every
+  //     mousemove. Only this triggers ghost-line re-renders, so the
+  //     listener-install effect doesn't churn on every cursor frame.
+  const loadLinksForTask = useLinksStore((s) => s.loadForTask)
+  const clearLinks = useLinksStore((s) => s.clear)
+  const createLink = useLinksStore((s) => s.create)
+  const [linkSourceId, setLinkSourceId] = useState<string | null>(null)
+  const [ghostCursor, setGhostCursor] = useState<{ x: number; y: number } | null>(null)
+
+  useEffect(() => {
+    if (activeTaskId) void loadForTask(activeTaskId)
+    else clearWidgets()
+  }, [activeTaskId, loadForTask, clearWidgets])
+
+  useEffect(() => {
+    if (activeTaskId) void loadLinksForTask(activeTaskId)
+    else clearLinks()
+  }, [activeTaskId, loadLinksForTask, clearLinks])
+
+  // Imperative controller exposed via context to WidgetFrame / SectionWidget.
+  // The .start() call is what arms the link gesture — it's invoked from a
+  // widget header button's onClick handler. We keep this on a ref so the
+  // identity is stable across renders.
+  const linkDragController = useRef({
+    start: (sourceWidgetId: string): void => {
+      setLinkSourceId(sourceWidgetId)
+      setGhostCursor(null) // appears on first mousemove
+    }
+  }).current
+
+  // While armed: mousemove updates ghost cursor, click capture-phase
+  // completes/cancels, Esc cancels. Listeners install ONCE per arm session
+  // (deps key on linkSourceId, not on ghostCursor) so they don't churn on
+  // every cursor frame.
+  useEffect(() => {
+    if (!linkSourceId) return
+    // Stable reference for the duration of this arm session — TypeScript
+    // can't narrow `linkSourceId` inside the nested handlers below, so we
+    // pin it locally.
+    const sourceId: string = linkSourceId
+    function onMove(e: MouseEvent): void {
+      if (!dropRef.current) return
+      const rect = dropRef.current.getBoundingClientRect()
+      // Canvas-pane-relative screen coords — same space the LinkOverlay
+      // SVG renders in, so no further conversion needed.
+      setGhostCursor({ x: e.clientX - rect.left, y: e.clientY - rect.top })
+    }
+    function endArm(): void {
+      setLinkSourceId(null)
+      setGhostCursor(null)
+    }
+    function onClickCapture(e: MouseEvent): void {
+      const target = e.target as HTMLElement | null
+      // The banner + its cancel button are tagged with data-link-skip so
+      // their clicks don't complete the gesture.
+      if (target?.closest('[data-link-skip]')) return
+      const widgetEl = target?.closest('[data-widget-id]') as HTMLElement | null
+      const toId = widgetEl?.dataset.widgetId ?? null
+      // Click on the same source widget, on a pinned/child widget, or on
+      // bare canvas → cancel without creating.
+      if (!toId || toId === sourceId || !activeTaskId) {
+        endArm()
+        return
+      }
+      const ws = useWidgetStore.getState().widgets
+      const from = ws.find((w) => w.id === sourceId)
+      const to = ws.find((w) => w.id === toId)
+      if (!from || !to) {
+        endArm()
+        return
+      }
+      if (from.pinned || to.pinned) {
+        endArm()
+        return
+      }
+      if (from.parentSectionId !== null || to.parentSectionId !== null) {
+        endArm()
+        return
+      }
+      void createLink(sourceId, toId, activeTaskId)
+      endArm()
+    }
+    function onKey(e: KeyboardEvent): void {
+      if (e.key === 'Escape') endArm()
+    }
+    window.addEventListener('mousemove', onMove)
+    // Capture phase — fires BEFORE the widget's own onClick activator.
+    // Otherwise the activation handler could swallow the click via
+    // stopPropagation and the completion would never reach us.
+    window.addEventListener('click', onClickCapture, true)
+    window.addEventListener('keydown', onKey)
+    return () => {
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('click', onClickCapture, true)
+      window.removeEventListener('keydown', onKey)
+    }
+  }, [linkSourceId, panX, panY, zoom, activeTaskId, createLink])
+
+  // Proactive welcome: when a task transitions to in_progress for the first time this session,
+  // and the user hasn't already started a chat about it, the AI opens with a 1-2 sentence hello + first step.
+  useEffect(() => {
+    if (!activeTask) return
+    if (activeTask.status !== 'in_progress') return
+    if (welcomedTasksRef.current.has(activeTask.id)) return
+    welcomedTasksRef.current.add(activeTask.id)
+    void useChatStore.getState().sendProactiveWelcome(activeTask.id)
+  }, [activeTask?.id, activeTask?.status])
+
+  // Re-render every second while a task is in progress (drives the title-bar clock)
+  useEffect(() => {
+    if (!activeTask) return
+    if (activeTask.status !== 'in_progress') return
+    if (!activeTask.estimateMinutes) return
+    const id = window.setInterval(() => setNowTick((t) => t + 1), 1000)
+    return () => window.clearInterval(id)
+  }, [activeTask?.status, activeTask?.estimateMinutes, activeTask?.id])
+
+  // Receive context-menu actions from main process (right-click inside webview)
+  useEffect(() => {
+    const off = window.api.contextMenu.onAction((payload: ContextMenuPayload) => {
+      void handleContextMenu(payload)
+    })
+    return off
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTaskId, panX, panY, zoom])
+
+  async function handleContextMenu(payload: ContextMenuPayload): Promise<void> {
+    if (!activeTaskId || !dropRef.current) return
+    const entry = lookupWebview(payload.webContentsId)
+    if (!entry) return
+    const wvRect = entry.el.getBoundingClientRect()
+    const canvasRect = dropRef.current.getBoundingClientRect()
+    const screenX = wvRect.left + payload.x
+    const screenY = wvRect.top + payload.y
+    const canvasX = (screenX - canvasRect.left - panX) / zoom
+    const canvasY = (screenY - canvasRect.top - panY) / zoom
+    const baseX = Math.round(canvasX + 20)
+    const baseY = Math.round(canvasY + 20)
+    const common: Pick<WidgetDraft, 'taskId' | 'x' | 'y'> = {
+      taskId: activeTaskId,
+      x: baseX,
+      y: baseY
+    }
+    switch (payload.action) {
+      case 'createStickyFromSelection':
+        if (!payload.selectionText) return
+        await createWidget({
+          ...common,
+          kind: 'sticky',
+          content: payload.selectionText,
+          width: 280,
+          height: 220,
+          color: '#fef08a'
+        })
+        return
+      case 'createNoteFromSelection':
+        if (!payload.selectionText) return
+        await createWidget({
+          ...common,
+          kind: 'note',
+          content: payload.selectionText,
+          width: 380,
+          height: 300,
+          color: null
+        })
+        return
+      case 'openLinkInNewBrowser':
+        if (!payload.linkURL) return
+        await createWidget({
+          ...common,
+          kind: 'webview',
+          content: payload.linkURL,
+          width: 560,
+          height: 400,
+          color: null
+        })
+        return
+      case 'saveImageToCanvas':
+        if (!payload.srcURL) return
+        await createWidget({
+          ...common,
+          kind: 'image',
+          content: payload.srcURL,
+          width: 360,
+          height: 280,
+          color: null
+        })
+        return
+      case 'saveVideoToCanvas':
+        if (!payload.srcURL) return
+        await createWidget({
+          ...common,
+          kind: 'video',
+          content: payload.srcURL,
+          width: 480,
+          height: 320,
+          color: null
+        })
+        return
+    }
+  }
+
+  // Auto-center on the active widget when a click triggers requestCenter()
+  useEffect(() => {
+    if (centerToken === 0) return
+    if (!activeId || !dropRef.current) return
+    const w = widgets.find((x) => x.id === activeId)
+    if (!w) return
+
+    let cx = w.x
+    let cy = w.y
+    let cw = w.width
+    let ch = w.height
+
+    if (w.parentSectionId) {
+      // Child of a section: its stored x/y are relative. Translate to canvas coords.
+      const parent = widgets.find((p) => p.id === w.parentSectionId)
+      if (parent) {
+        const parentLayout = effectiveLayout(parent.layout)
+        if (parentLayout === 'free') {
+          cx = parent.x + SECTION_PADDING + w.x
+          cy = parent.y + SECTION_PADDING + w.y
+        } else {
+          // In non-free layouts, child positions are computed; fall back to centering on the section itself
+          const siblings = widgets.filter((c) => c.parentSectionId === parent.id)
+          const frame = computeSectionFrame(siblings, parentLayout)
+          cx = parent.x
+          cy = parent.y
+          cw = frame.width
+          ch = frame.height
+        }
+      }
+    } else if (w.kind === 'section') {
+      // Sections: stored width/height can lag actual; use computed frame
+      const children = widgets.filter((c) => c.parentSectionId === w.id)
+      const frame = computeSectionFrame(children, effectiveLayout(w.layout))
+      cw = frame.width
+      ch = frame.height
+    }
+
+    const rect = dropRef.current.getBoundingClientRect()
+    const targetX = rect.width / 2 - (cx + cw / 2) * zoom
+    const targetY = rect.height / 2 - (cy + ch / 2) * zoom
+    setAnimatingPan(true)
+    setPan(targetX, targetY)
+    const t = window.setTimeout(() => setAnimatingPan(false), 280)
+    return () => window.clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [centerToken])
+
+  function centerOnHome(): void {
+    if (!dropRef.current) return
+    const canvasItems = widgets.filter((w) => !w.pinned && !w.parentSectionId)
+    if (canvasItems.length === 0) {
+      resetView()
+      return
+    }
+    let minX = Infinity
+    let minY = Infinity
+    let maxX = -Infinity
+    let maxY = -Infinity
+    for (const w of canvasItems) {
+      let width = w.width
+      let height = w.height
+      if (w.kind === 'section') {
+        const sChildren = widgets.filter((c) => c.parentSectionId === w.id)
+        const frame = computeSectionFrame(sChildren, effectiveLayout(w.layout))
+        width = frame.width
+        height = frame.height
+      }
+      minX = Math.min(minX, w.x)
+      minY = Math.min(minY, w.y)
+      maxX = Math.max(maxX, w.x + width)
+      maxY = Math.max(maxY, w.y + height)
+    }
+    const bbW = Math.max(1, maxX - minX)
+    const bbH = Math.max(1, maxY - minY)
+    const rect = dropRef.current.getBoundingClientRect()
+    const PAD = 60
+    const zoomX = (rect.width - 2 * PAD) / bbW
+    const zoomY = (rect.height - 2 * PAD) / bbH
+    const newZoom = Math.max(0.25, Math.min(zoomX, zoomY, 1))
+    const bbCenterX = minX + bbW / 2
+    const bbCenterY = minY + bbH / 2
+    const targetPanX = rect.width / 2 - bbCenterX * newZoom
+    const targetPanY = rect.height / 2 - bbCenterY * newZoom
+    setAnimatingPan(true)
+    setZoom(newZoom)
+    setPan(targetPanX, targetPanY)
+    window.setTimeout(() => setAnimatingPan(false), 280)
+  }
+
+  // Keyboard: Cmd+] zoom in, Cmd+[ zoom out, Cmd+0 reset, Cmd+H home, Esc deactivate widget
+  useEffect(() => {
+    function onKey(e: KeyboardEvent): void {
+      if (e.key === 'Escape' && activeId !== null) {
+        setActive(null)
+        return
+      }
+      if (!(e.metaKey || e.ctrlKey)) return
+      if (e.key === ']') {
+        e.preventDefault()
+        setZoom(zoom + 0.1)
+      } else if (e.key === '[') {
+        e.preventDefault()
+        setZoom(zoom - 0.1)
+      } else if (e.key === '0') {
+        e.preventDefault()
+        resetView()
+      } else if (e.key === 'h' || e.key === 'H') {
+        e.preventDefault()
+        centerOnHome()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [zoom, setZoom, resetView, activeId, setActive, widgets])
+
+  const screenToCanvas = useCallback(
+    (screenX: number, screenY: number): { x: number; y: number } => {
+      return { x: (screenX - panX) / zoom, y: (screenY - panY) / zoom }
+    },
+    [panX, panY, zoom]
+  )
+
+  function handleWheel(e: React.WheelEvent<HTMLDivElement>): void {
+    // If an active widget contains the wheel target, leave it alone — its content scrolls
+    if (activeId !== null) {
+      const target = e.target as HTMLElement
+      if (target.closest(`[data-widget-id="${activeId}"]`)) return
+    }
+    // ⌘/Ctrl + wheel = zoom toward cursor; otherwise pan (works for trackpad swipe)
+    if (e.ctrlKey || e.metaKey) {
+      e.preventDefault()
+      const rect = e.currentTarget.getBoundingClientRect()
+      const factor = Math.exp(-e.deltaY * 0.005)
+      const cursorX = e.clientX - rect.left
+      const cursorY = e.clientY - rect.top
+      zoomTowardPoint(zoom * factor, cursorX, cursorY)
+    } else {
+      e.preventDefault()
+      panBy(-e.deltaX, -e.deltaY)
+    }
+  }
+
+  function handleCanvasClick(e: React.MouseEvent<HTMLDivElement>): void {
+    // Clicks on bare-canvas areas (not on a widget) deactivate the active widget
+    const target = e.target as HTMLElement
+    if (target.dataset.bareCanvas !== undefined && activeId !== null) {
+      setActive(null)
+    }
+  }
+
+  function handleCanvasContextMenu(e: React.MouseEvent<HTMLDivElement>): void {
+    const target = e.target as HTMLElement
+    // Only open our menu on bare-canvas clicks; widgets/webviews handle their own context menus
+    if (target.dataset.bareCanvas === undefined) return
+    e.preventDefault()
+    const rect = dropRef.current?.getBoundingClientRect()
+    if (!rect) return
+    const canvasPt = screenToCanvas(e.clientX - rect.left, e.clientY - rect.top)
+    setCtxMenu({
+      screenX: e.clientX,
+      screenY: e.clientY,
+      canvasX: canvasPt.x,
+      canvasY: canvasPt.y
+    })
+  }
+
+  async function placeWidgetAtCanvas(
+    entry: WidgetCatalogEntry,
+    canvasX: number,
+    canvasY: number
+  ): Promise<void> {
+    if (!activeTaskId) return
+    await createWidget({
+      taskId: activeTaskId,
+      kind: entry.kind,
+      content: entry.defaultContent,
+      x: Math.round(canvasX - entry.defaultWidth / 2),
+      y: Math.round(canvasY - 20),
+      width: entry.defaultWidth,
+      height: entry.defaultHeight,
+      color: entry.kind === 'sticky' ? '#fef08a' : null
+    })
+  }
+
+  async function groupByType(useStacks: boolean): Promise<void> {
+    if (!activeTaskId) return
+    const topLevel = widgets.filter(
+      (w) => !w.parentSectionId && w.kind !== 'section' && !w.pinned
+    )
+    if (topLevel.length === 0) return
+    const byKind = new Map<WidgetKind, Widget[]>()
+    for (const w of topLevel) {
+      const list = byKind.get(w.kind) ?? []
+      list.push(w)
+      byKind.set(w.kind, list)
+    }
+    const layout: SectionLayout = useStacks ? 'stacks' : 'grid'
+    const PADDING = 80
+    const GAP = 40
+
+    // Pre-compute frames for each new section
+    const newSections: Array<{
+      items: Widget[]
+      frame: { width: number; height: number }
+      color: string
+      title: string
+    }> = []
+    for (const [kind, items] of byKind) {
+      if (items.length === 0) continue
+      const entry = catalogFor(kind)
+      const cat: WidgetCategory = entry?.category ?? 'Notes'
+      const synthetic: Widget[] = items.map((w) => ({
+        ...w,
+        parentSectionId: 'tmp',
+        x: 0,
+        y: 0
+      }))
+      const frame = computeSectionFrame(synthetic, layout)
+      newSections.push({
+        items,
+        frame,
+        color: CATEGORY_COLOR[cat],
+        title: entry?.label ?? kind
+      })
+    }
+    if (newSections.length === 0) return
+
+    // Place new sections BELOW existing sections (avoid overlap with anything already on canvas)
+    const existingSections = widgets.filter((w) => w.kind === 'section' && !w.pinned)
+    let startY = PADDING
+    if (existingSections.length > 0) {
+      const existingBottom = existingSections.reduce((maxY, s) => {
+        const sChildren = widgets.filter((c) => c.parentSectionId === s.id)
+        const sFrame = computeSectionFrame(sChildren, effectiveLayout(s.layout))
+        return Math.max(maxY, s.y + sFrame.height)
+      }, 0)
+      startY = existingBottom + GAP
+    }
+
+    // Flex-wrap using visible canvas width as the row limit
+    const rect = dropRef.current?.getBoundingClientRect()
+    const visibleW = rect ? rect.width / zoom : 1800
+    const ROW_LIMIT_X = PADDING + visibleW
+    let cursorX = PADDING
+    let cursorY = startY
+    let rowMaxH = 0
+
+    for (const ns of newSections) {
+      if (cursorX !== PADDING && cursorX + ns.frame.width > ROW_LIMIT_X) {
+        cursorX = PADDING
+        cursorY += rowMaxH + GAP
+        rowMaxH = 0
+      }
+      const section = await createWidget({
+        taskId: activeTaskId,
+        kind: 'section',
+        title: ns.title,
+        content: '',
+        x: cursorX,
+        y: cursorY,
+        width: ns.frame.width,
+        height: ns.frame.height,
+        color: ns.color
+      })
+      await updateWidget(section.id, { layout })
+      for (const w of ns.items) {
+        await updateWidget(w.id, { parentSectionId: section.id, x: 0, y: 0 })
+      }
+      cursorX += ns.frame.width + GAP
+      rowMaxH = Math.max(rowMaxH, ns.frame.height)
+    }
+    bumpLayoutVersion()
+  }
+
+  function buildCtxMenu(): CtxMenuItem[] {
+    if (!ctxMenu || !activeTaskId) return []
+    const cx = ctxMenu.canvasX
+    const cy = ctxMenu.canvasY
+    const addWidget: CtxMenuItem = {
+      label: 'Add widget',
+      icon: 'add',
+      children: CATEGORIES.map((cat) => ({
+        label: cat,
+        icon: CATEGORY_ICON[cat],
+        children: WIDGET_CATALOG.filter((e) => e.category === cat).map((entry) => ({
+          label: entry.label,
+          icon: entry.icon,
+          onClick: () => void placeWidgetAtCanvas(entry, cx, cy)
+        }))
+      }))
+    }
+    const arrange: CtxMenuItem = {
+      label: 'Auto-arrange',
+      icon: 'view_module',
+      children: [
+        {
+          label: 'Group by type',
+          icon: 'workspaces',
+          onClick: () => void groupByType(false)
+        },
+        {
+          label: 'Stack by type',
+          icon: 'layers',
+          onClick: () => void groupByType(true)
+        },
+        {
+          label: 'Clean up (Tidy)',
+          icon: 'grid_view',
+          onClick: () => void handleAutoArrange()
+        }
+      ]
+    }
+    return [
+      addWidget,
+      { separator: true },
+      arrange,
+      { separator: true },
+      {
+        label: 'Home — fit all to view',
+        icon: 'home',
+        shortcut: '⌘H',
+        onClick: () => centerOnHome()
+      },
+      {
+        label: 'Reset view',
+        icon: 'center_focus_strong',
+        shortcut: '⌘0',
+        onClick: () => resetView()
+      }
+    ]
+  }
+
+  async function placeWidget(entry: WidgetCatalogEntry, x: number, y: number): Promise<void> {
+    if (!activeTaskId) return
+    await createWidget({
+      taskId: activeTaskId,
+      kind: entry.kind,
+      content: entry.defaultContent,
+      x: Math.round(x),
+      y: Math.round(y),
+      width: entry.defaultWidth,
+      height: entry.defaultHeight,
+      color: entry.kind === 'sticky' ? '#fef08a' : null
+    })
+  }
+
+  function handleClickAdd(entry: WidgetCatalogEntry): void {
+    const rect = dropRef.current?.getBoundingClientRect()
+    if (!rect) {
+      void placeWidget(entry, 80, 80)
+      return
+    }
+    const screenCenterX = rect.width / 2
+    const screenCenterY = rect.height / 2
+    const center = screenToCanvas(screenCenterX, screenCenterY)
+    const jitter = (): number => (Math.random() - 0.5) * 80
+    void placeWidget(entry, center.x - entry.defaultWidth / 2 + jitter(), center.y - entry.defaultHeight / 2 + jitter())
+  }
+
+  function handleDragOver(e: React.DragEvent<HTMLDivElement>): void {
+    const types = Array.from(e.dataTransfer.types)
+    if (
+      types.includes(DRAG_MIME) ||
+      types.includes('text/fb-task-link') ||
+      types.includes(CONNECTED_APP_DRAG_MIME) ||
+      types.includes('Files')
+    ) {
+      e.preventDefault()
+      e.dataTransfer.dropEffect = 'copy'
+    }
+  }
+
+  async function handleDrop(e: React.DragEvent<HTMLDivElement>): Promise<void> {
+    // OS file drop (drag from Finder) — spawn one file widget per dropped file.
+    // We use ingestBuffer because Electron 32+ stripped File.path; reading via
+    // arrayBuffer is the supported path and works for any file size up to the
+    // renderer's memory budget.
+    if (e.dataTransfer.files.length > 0 && activeTaskId) {
+      e.preventDefault()
+      const rect = e.currentTarget.getBoundingClientRect()
+      const cursor = screenToCanvas(e.clientX - rect.left, e.clientY - rect.top)
+      const entry = catalogFor('file')
+      const width = entry?.defaultWidth ?? 360
+      const height = entry?.defaultHeight ?? 280
+      let offset = 0
+      const filesArray = Array.from(e.dataTransfer.files)
+      for (const f of filesArray) {
+        const buffer = await f.arrayBuffer()
+        const ingested = await window.api.files.ingestBuffer({
+          buffer,
+          originalName: f.name,
+          mimeType: f.type || 'application/octet-stream'
+        })
+        await createWidget({
+          taskId: activeTaskId,
+          kind: 'file',
+          title: f.name,
+          content: ingested.id,
+          x: Math.round(cursor.x - width / 2 + offset),
+          y: Math.round(cursor.y - 20 + offset),
+          width,
+          height,
+          color: null
+        })
+        offset += 24 // cascade subsequent drops slightly so they don't stack exactly
+      }
+      return
+    }
+    // Dragged Connected App from sidebar → spawn a webview widget bound to it.
+    // Bound widgets share the app's session partition (so logged-in cookies
+    // persist between full-pane view and canvas widget) and inherit its vault
+    // auto-fill binding.
+    const connectedAppId = e.dataTransfer.getData(CONNECTED_APP_DRAG_MIME)
+    if (connectedAppId && activeTaskId) {
+      e.preventDefault()
+      const appsState = useConnectedAppsStore.getState()
+      const app = appsState.apps.find((a) => a.id === connectedAppId) ?? null
+      if (!app) return
+      // Local apps can't render inside a <webview> — spawn a launcher tile
+      // instead. Web apps get the existing webview widget with session sharing.
+      const kind = app.kind === 'local' ? 'local-app-launcher' : 'webview'
+      const entry = catalogFor(kind)
+      const width = entry?.defaultWidth ?? (kind === 'local-app-launcher' ? 200 : 560)
+      const height = entry?.defaultHeight ?? (kind === 'local-app-launcher' ? 120 : 400)
+      const rect = e.currentTarget.getBoundingClientRect()
+      const cursor = screenToCanvas(e.clientX - rect.left, e.clientY - rect.top)
+      await createWidget({
+        taskId: activeTaskId,
+        kind,
+        title: app.title,
+        content: kind === 'webview' ? app.url : '',
+        x: Math.round(cursor.x - width / 2),
+        y: Math.round(cursor.y - 20),
+        width,
+        height,
+        color: null,
+        sourceAppId: app.id
+      })
+      void appsState.touch(app.id)
+      return
+    }
+    // Dragged task from sidebar → spawn a task-link widget
+    const taskId = e.dataTransfer.getData('text/fb-task-link')
+    if (taskId && activeTaskId && taskId !== activeTaskId) {
+      e.preventDefault()
+      const entry = catalogFor('task-link')
+      if (!entry) return
+      const rect = e.currentTarget.getBoundingClientRect()
+      const cursor = screenToCanvas(e.clientX - rect.left, e.clientY - rect.top)
+      await createWidget({
+        taskId: activeTaskId,
+        kind: 'task-link',
+        title: '',
+        content: taskId,
+        x: Math.round(cursor.x - entry.defaultWidth / 2),
+        y: Math.round(cursor.y - 20),
+        width: entry.defaultWidth,
+        height: entry.defaultHeight,
+        color: null
+      })
+      return
+    }
+    // Standard palette → widget drop
+    const kind = e.dataTransfer.getData(DRAG_MIME) as WidgetKind
+    if (!kind) return
+    e.preventDefault()
+    const entry = catalogFor(kind)
+    if (!entry) return
+    const rect = e.currentTarget.getBoundingClientRect()
+    const cursor = screenToCanvas(e.clientX - rect.left, e.clientY - rect.top)
+    void placeWidget(entry, cursor.x - entry.defaultWidth / 2, cursor.y - 20)
+  }
+
+  async function handleSaveTemplate(): Promise<void> {
+    if (!activeTaskId || widgets.length === 0 || savingTemplate) return
+    const suggested = activeTask?.title ? `${activeTask.title} template` : 'Untitled template'
+    const name = prompt('Template name:', suggested)
+    if (!name || !name.trim()) return
+    setSavingTemplate(true)
+    try {
+      await saveTemplate(activeTaskId, name.trim())
+    } finally {
+      setSavingTemplate(false)
+    }
+  }
+
+  // AI Builder accept path. Distinct from handleAISetupAccept because each
+  // suggestion can carry a richer payload (table schema, Tiptap doc, field
+  // def) that needs translating into the corresponding storage layer before
+  // the widget can be spawned.
+  async function handleAiBuilderAccept(suggestions: AiBuildSuggestion[]): Promise<void> {
+    if (!activeTaskId || !dropRef.current) return
+    const rect = dropRef.current.getBoundingClientRect()
+    const visibleW = rect.width / zoom
+    const PADDING = 60
+    const GAP = 24
+    const existing = widgets.filter((w) => !w.pinned && !w.parentSectionId)
+    const startBelow = existing.reduce((maxY, w) => {
+      let h = w.height
+      if (w.kind === 'section') {
+        const ch = widgets.filter((c) => c.parentSectionId === w.id)
+        const fr = computeSectionFrame(ch, effectiveLayout(w.layout))
+        h = fr.height
+      }
+      return Math.max(maxY, w.y + h)
+    }, 0)
+    let cursorX = PADDING
+    let cursorY = existing.length > 0 ? startBelow + 40 : PADDING
+    let rowMaxH = 0
+    for (const s of suggestions) {
+      const entry = catalogFor(s.kind)
+      const w = entry?.defaultWidth ?? 300
+      const h = entry?.defaultHeight ?? 200
+      if (cursorX !== PADDING && cursorX + w > PADDING + visibleW) {
+        cursorX = PADDING
+        cursorY += rowMaxH + GAP
+        rowMaxH = 0
+      }
+      // Per-kind translation: turn the suggestion's payload into the
+      // widget.content + any backing entity (e.g. fb_tables row).
+      let content = s.content ?? ''
+      let title = s.title || ''
+      if (s.kind === 'table' && s.tableSchema) {
+        // Provision the backing table now so widget.content is the table id.
+        // The AI returned columns in the shared FieldDefinition shape; we
+        // trust the structure but the IPC layer would defensively reject
+        // unknown column types.
+        try {
+          const created = await window.api.tables.create({
+            taskId: activeTaskId,
+            title: s.title || 'Untitled',
+            schema: {
+              columns: s.tableSchema.columns.map((c) => ({
+                id: c.id,
+                type: c.type,
+                label: c.label,
+                config: c.config
+              })) as never
+            }
+          })
+          content = created.id
+        } catch {
+          // Fall through: spawn an empty table widget that will auto-
+          // provision its own schema on first render.
+          content = ''
+        }
+      } else if (s.kind === 'page' && s.pageContent) {
+        // Tiptap stores its content as a JSON object; we serialize so the
+        // existing widget.content string field can carry it.
+        content = JSON.stringify(s.pageContent)
+      } else if (s.kind === 'field' && s.fieldDef) {
+        // The FieldWidget reads content as `{ def, value }` JSON; we wrap
+        // the AI-provided def with a defaultValue for its type. Type isn't
+        // fully validated here — the FieldWidget's switch will gracefully
+        // show "unsupported field" if the AI returns a type we don't render.
+        content = JSON.stringify({
+          def: s.fieldDef,
+          // We can't import defaultValue from @shared/fields without making
+          // Canvas.tsx aware of every field type — but the FieldWidget
+          // handles a null/missing value by substituting the default itself.
+          value: null
+        })
+        title = s.fieldDef.label || s.title
+      }
+      await createWidget({
+        taskId: activeTaskId,
+        kind: s.kind,
+        title,
+        content,
+        x: Math.round(cursorX),
+        y: Math.round(cursorY),
+        width: w,
+        height: h,
+        color: s.kind === 'sticky' ? '#fef08a' : null
+      })
+      cursorX += w + GAP
+      rowMaxH = Math.max(rowMaxH, h)
+    }
+    chimeIn()
+    bumpLayoutVersion()
+    setTimeout(() => centerOnHome(), 100)
+  }
+
+  async function handleAISetupAccept(suggestions: WidgetSuggestion[]): Promise<void> {
+    if (!activeTaskId || !dropRef.current) return
+    const rect = dropRef.current.getBoundingClientRect()
+    const visibleW = rect.width / zoom
+    const PADDING = 60
+    const GAP = 24
+    // Find a starting Y below existing canvas content so we don't overlap
+    const existing = widgets.filter((w) => !w.pinned && !w.parentSectionId)
+    const startBelow = existing.reduce((maxY, w) => {
+      let h = w.height
+      if (w.kind === 'section') {
+        const ch = widgets.filter((c) => c.parentSectionId === w.id)
+        const fr = computeSectionFrame(ch, effectiveLayout(w.layout))
+        h = fr.height
+      }
+      return Math.max(maxY, w.y + h)
+    }, 0)
+    let cursorX = PADDING
+    let cursorY = existing.length > 0 ? startBelow + 40 : PADDING
+    let rowMaxH = 0
+    for (const s of suggestions) {
+      const entry = catalogFor(s.kind)
+      const w = entry?.defaultWidth ?? 300
+      const h = entry?.defaultHeight ?? 200
+      if (cursorX !== PADDING && cursorX + w > PADDING + visibleW) {
+        cursorX = PADDING
+        cursorY += rowMaxH + GAP
+        rowMaxH = 0
+      }
+      await createWidget({
+        taskId: activeTaskId,
+        kind: s.kind,
+        title: s.title || '',
+        content: s.content || (entry?.defaultContent ?? ''),
+        x: Math.round(cursorX),
+        y: Math.round(cursorY),
+        width: w,
+        height: h,
+        color: s.kind === 'sticky' ? '#fef08a' : null
+      })
+      cursorX += w + GAP
+      rowMaxH = Math.max(rowMaxH, h)
+    }
+    chimeIn()
+    bumpLayoutVersion()
+    // Pan/zoom so the freshly spawned widgets land in view
+    setTimeout(() => centerOnHome(), 100)
+  }
+
+  async function handleAutoArrange(): Promise<void> {
+    if (widgets.length === 0 || !dropRef.current) return
+    const rect = dropRef.current.getBoundingClientRect()
+    const visibleW = rect.width / zoom
+    const PADDING = 60
+    const GAP = 40
+    const catOrder: Record<WidgetCategory, number> = {
+      Notes: 0,
+      Web: 1,
+      Files: 2,
+      Tools: 3,
+      Comms: 4,
+      Layout: 5
+    }
+
+    type LayoutItem = {
+      id: string
+      w: number
+      h: number
+      catRank: number
+      createdAt: number
+    }
+    const items: LayoutItem[] = []
+    for (const w of widgets) {
+      if (w.pinned) continue
+      if (w.parentSectionId) continue
+      let width = w.width
+      let height = w.height
+      if (w.kind === 'section') {
+        const sChildren = widgets.filter((c) => c.parentSectionId === w.id)
+        const frame = computeSectionFrame(sChildren, effectiveLayout(w.layout))
+        width = frame.width
+        height = frame.height
+      }
+      items.push({
+        id: w.id,
+        w: width,
+        h: height,
+        catRank: catOrder[catalogFor(w.kind)?.category ?? 'Notes'],
+        createdAt: w.createdAt
+      })
+    }
+    if (items.length === 0) return
+
+    items.sort((a, b) => a.catRank - b.catRank || a.createdAt - b.createdAt)
+
+    let cursorX = PADDING
+    let cursorY = PADDING
+    let rowMaxH = 0
+    const positions = new Map<string, { x: number; y: number }>()
+    for (const item of items) {
+      if (cursorX !== PADDING && cursorX + item.w > PADDING + visibleW) {
+        cursorX = PADDING
+        cursorY += rowMaxH + GAP
+        rowMaxH = 0
+      }
+      positions.set(item.id, { x: Math.round(cursorX), y: Math.round(cursorY) })
+      cursorX += item.w + GAP
+      rowMaxH = Math.max(rowMaxH, item.h)
+    }
+    for (const [id, pos] of positions) {
+      await updateWidget(id, { x: pos.x, y: pos.y })
+    }
+    bumpLayoutVersion()
+  }
+
+  if (!activeTask) {
+    return (
+      <>
+        <div className="h-full flex items-center justify-center desk-paper">
+          <div className="text-center max-w-md px-6">
+            <Icon name="desk" size={48} className="text-stone-400 dark:text-stone-500 mb-3" />
+            <h2 className="text-xl font-semibold text-stone-900 dark:text-stone-100 mb-2">Your desk is clear</h2>
+            <p className="text-stone-600 dark:text-stone-300 text-sm leading-relaxed">
+              Pick a task from the left to bring it to the desk — its sticky notes, browser windows
+              and tools will appear here.
+            </p>
+          </div>
+        </div>
+        <WidgetFocusMode />
+      </>
+    )
+  }
+
+  const status = STATUS_META[activeTask.status]
+  const zoomPct = Math.round(zoom * 100)
+
+  // Task time tracking
+  const totalEstimateMin =
+    (activeTask.estimateMinutes ?? 0) + (activeTask.extensionsMinutes ?? 0)
+  const isTracked =
+    activeTask.status === 'in_progress' &&
+    !!activeTask.estimateMinutes &&
+    !!activeTask.startedAt
+  const elapsedMs =
+    isTracked && activeTask.startedAt ? Date.now() - activeTask.startedAt : 0
+  const elapsedMin = elapsedMs / 60000
+  const remainingMin = isTracked ? totalEstimateMin - elapsedMin : 0
+  const isOverdue = isTracked && remainingMin < 0
+  const showExtensionPrompt = isOverdue && Date.now() > snoozeUntil
+
+  function fmtMin(min: number): string {
+    const abs = Math.abs(min)
+    const m = Math.floor(abs)
+    const s = Math.floor((abs - m) * 60)
+    const sign = min < 0 ? '-' : ''
+    return `${sign}${m}:${s.toString().padStart(2, '0')}`
+  }
+
+  return (
+    <>
+      <div className="h-full flex flex-col">
+        <div className="px-4 py-2.5 border-b border-[color:var(--glass-chrome-border)] fb-glass-chrome flex items-center gap-2">
+          <Icon name="task_alt" size={18} className="text-stone-700 dark:text-stone-300" />
+          <h2 className="text-sm font-semibold text-stone-900 dark:text-stone-100 truncate flex-1">
+            {activeTask.title}
+          </h2>
+          <div className="hidden md:flex items-center gap-3 text-[11px] text-stone-500 dark:text-stone-400">
+            <span className="flex items-center gap-1" title="Priority">
+              <Icon name="priority_high" size={14} />
+              {activeTask.priority}
+            </span>
+            <span className="flex items-center gap-1" title="Interest / Novelty">
+              <Icon name="bolt" size={14} />
+              {activeTask.interest}
+            </span>
+            <span className="flex items-center gap-1" title="Importance">
+              <Icon name="flag" size={14} />
+              {activeTask.importance}
+            </span>
+          </div>
+
+          {isTracked && (
+            <div
+              className={`flex items-center gap-1 px-2 py-0.5 rounded border text-[11px] font-mono ${
+                isOverdue
+                  ? 'border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-400 animate-pulse'
+                  : remainingMin < 5
+                    ? 'border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-400'
+                    : 'border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-800 text-stone-700 dark:text-stone-300'
+              }`}
+              title={`${Math.floor(elapsedMin)} of ${totalEstimateMin} min elapsed`}
+            >
+              <Icon name={isOverdue ? 'alarm' : 'timer'} size={14} />
+              <span>{fmtMin(remainingMin)}</span>
+            </div>
+          )}
+
+          {/* Zoom controls */}
+          <div className="flex items-center gap-0.5 px-1 border border-stone-300 dark:border-stone-600 rounded">
+            <button
+              onClick={() => setZoom(zoom - 0.1)}
+              className="icon-btn !h-6 !w-6"
+              title="Zoom out (⌘[)"
+            >
+              <Icon name="remove" size={14} />
+            </button>
+            <button
+              onClick={resetView}
+              className="text-[11px] text-stone-700 dark:text-stone-300 font-mono px-1.5 min-w-[42px] hover:text-stone-900 dark:hover:text-stone-100"
+              title="Reset view (⌘0)"
+            >
+              {zoomPct}%
+            </button>
+            <button
+              onClick={() => setZoom(zoom + 0.1)}
+              className="icon-btn !h-6 !w-6"
+              title="Zoom in (⌘])"
+            >
+              <Icon name="add" size={14} />
+            </button>
+          </div>
+
+          <LoadMeter />
+          <button
+            onClick={() => void handleAutoArrange()}
+            disabled={widgets.length === 0}
+            className="btn-ghost"
+            title="Lay widgets out in tidy rows by category"
+          >
+            <Icon name="grid_view" size={14} />
+            <span>Tidy</span>
+          </button>
+          <button
+            onClick={() => void updateNode(activeTask.id, { status: status.next })}
+            className="btn-ghost"
+            title={`Mark as ${status.next.replace('_', ' ')}`}
+          >
+            <Icon name={status.icon} size={14} />
+            <span>{status.label}</span>
+          </button>
+          <button
+            onClick={() => setShowAiBuilder(true)}
+            className="btn-ghost"
+            title="Describe what you want to build — AI suggests pages, tables, fields, files"
+          >
+            <Icon name="auto_fix_high" size={14} className="text-accent" />
+            <span>Build with AI</span>
+          </button>
+          <button
+            onClick={() => setShowAISetup(true)}
+            className="btn-ghost"
+            title="Let the AI suggest widgets you need to start this task"
+          >
+            <Icon name="auto_awesome" size={14} className="text-accent" />
+            <span>AI Setup</span>
+          </button>
+          <FivePromiseButton taskId={activeTask.id} />
+          <button
+            onClick={() => setShowResume(true)}
+            className={`btn-ghost ${activeTask.resumeMarkdown ? '!text-stone-900' : ''}`}
+            title={
+              activeTask.resumeMarkdown
+                ? 'View / regenerate your handoff document'
+                : 'Generate a handoff document to resume this task later'
+            }
+          >
+            <Icon
+              name="description"
+              size={14}
+              filled={!!activeTask.resumeMarkdown}
+              className={activeTask.resumeMarkdown ? 'text-amber-600' : ''}
+            />
+            <span>Resume</span>
+          </button>
+          <button
+            onClick={() => void handleSaveTemplate()}
+            disabled={widgets.length === 0 || savingTemplate}
+            className="btn-ghost"
+            title="Save this workspace layout as a reusable template"
+          >
+            <Icon name="bookmark_add" size={14} />
+            <span>{savingTemplate ? 'Saving…' : 'Save template'}</span>
+          </button>
+          <button
+            onClick={() => setPaletteOpen((v) => !v)}
+            className="icon-btn"
+            title={paletteOpen ? 'Hide palette' : 'Show palette'}
+          >
+            <Icon name={paletteOpen ? 'unfold_less' : 'unfold_more'} size={16} />
+          </button>
+        </div>
+
+        {paletteOpen && <WidgetPalette onAdd={handleClickAdd} disabled={!activeTaskId} />}
+
+        <div
+          ref={dropRef}
+          data-bare-canvas
+          data-canvas-surface="true"
+          onDragOver={handleDragOver}
+          onDrop={handleDrop}
+          onWheel={handleWheel}
+          onClick={handleCanvasClick}
+          onContextMenu={handleCanvasContextMenu}
+          className="flex-1 relative overflow-hidden desk-paper"
+          style={{ overscrollBehavior: 'none' }}
+        >
+          {widgets.length === 0 && (
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <p className="text-sm text-stone-500">
+                Drag a tool from the palette above onto the desk.
+              </p>
+            </div>
+          )}
+          <LinkDragContext.Provider value={linkDragController}>
+          <div
+            data-bare-canvas
+            className={`absolute top-0 left-0 will-change-transform ${
+              animatingPan ? 'transition-transform duration-[280ms] ease-out' : ''
+            }`}
+            style={{
+              transform: `translate(${panX}px, ${panY}px) scale(${zoom})`,
+              transformOrigin: '0 0'
+            }}
+          >
+            {/* Sections first (render behind non-section widgets). Sections render their own children. */}
+            {widgets.map((w) => {
+              if (w.archived) return null
+              if (w.pinned || w.kind !== 'section') return null
+              return (
+                <div key={`${w.id}-${layoutVersion}`}>{renderWidget(w)}</div>
+              )
+            })}
+            {widgets.map((w) => {
+              if (w.archived) return null
+              if (w.pinned || w.kind === 'section') return null
+              if (w.parentSectionId !== null) return null // owned by a section, rendered inside it
+              // For web kinds, fully UNMOUNT the focused widget so its unmount-flush
+              // commits the latest URL before focus mode's separate WebViewWidget mounts.
+              if (focusedId === w.id && isWebKind(w.kind)) return null
+              return (
+                <div key={`${w.id}-${layoutVersion}`}>
+                  {renderWidget(w)}
+                </div>
+              )
+            })}
+          </div>
+          {/* Spatial-link overlay renders in screen-space, OUTSIDE the
+              transformed container. It reads each linked widget's actual
+              rendered position via getBoundingClientRect on every frame
+              during a drag, so lines can never visually detach from the
+              widget they're attached to. Pinned widgets and section
+              children are excluded from linking in v1. */}
+          <LinkOverlay
+            ghost={
+              linkSourceId && ghostCursor
+                ? {
+                    fromWidgetId: linkSourceId,
+                    cursorScreenX: ghostCursor.x,
+                    cursorScreenY: ghostCursor.y
+                  }
+                : null
+            }
+          />
+          </LinkDragContext.Provider>
+          {/* Pinned-widget layer: screen-space, in front of the transformed canvas.
+              Zone-pinned widgets have their position computed here and provided
+              via PinLayoutContext so any nested WidgetFrame can look up its
+              docked rect without prop-drilling through every widget kind. */}
+          <PinnedLayer
+            widgets={widgets}
+            layoutVersion={layoutVersion}
+            focusedId={focusedId}
+            renderWidget={renderWidget}
+          />
+          <FloatingToolbar
+            actions={(() => {
+              // Quick-jump buttons for every section currently on the canvas
+              const sections = widgets.filter((w) => w.kind === 'section' && !w.pinned)
+              const sectionJumps: ToolbarAction[] = sections.map((s, idx) => {
+                const entry = WIDGET_CATALOG.find((e) => e.label === s.title)
+                return {
+                  icon: entry?.icon ?? 'crop_free',
+                  label: s.title || 'Section',
+                  color: s.color ?? undefined,
+                  onClick: () => focusOn(s.id),
+                  separatorAfter: idx === sections.length - 1
+                }
+              })
+              const staticActions: ToolbarAction[] = [
+                {
+                  icon: 'layers',
+                  label: 'Stack by type',
+                  onClick: () => void groupByType(true)
+                },
+                {
+                  icon: 'grid_view',
+                  label: 'Tile by type',
+                  onClick: () => void groupByType(false),
+                  separatorAfter: true
+                },
+                {
+                  icon: 'auto_fix_high',
+                  label: 'Clean up',
+                  onClick: () => void handleAutoArrange(),
+                  separatorAfter: true
+                },
+                {
+                  icon: 'home',
+                  label: 'Home',
+                  shortcut: '⌘H',
+                  onClick: () => centerOnHome()
+                },
+                {
+                  icon: 'center_focus_strong',
+                  label: 'Reset view',
+                  shortcut: '⌘0',
+                  onClick: () => resetView()
+                }
+              ]
+              return [...sectionJumps, ...staticActions]
+            })()}
+          />
+          {activeId && !linkSourceId && (
+            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 px-2.5 py-1 rounded-full bg-stone-900/85 backdrop-blur text-[11px] text-stone-50 shadow flex items-center gap-1.5 pointer-events-none">
+              <span className="h-1.5 w-1.5 rounded-full bg-blue-400 animate-pulse" />
+              <span>Widget active · click outside or press Esc to pan canvas</span>
+            </div>
+          )}
+          {linkSourceId && (() => {
+            const src = widgets.find((w) => w.id === linkSourceId)
+            const label = src?.title || src?.kind || 'widget'
+            return (
+              <div
+                data-link-skip
+                className="absolute top-3 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded-full text-[11px] shadow-lg flex items-center gap-2 z-40"
+                style={{
+                  backgroundColor: 'rgb(var(--accent))',
+                  color: 'white'
+                }}
+              >
+                <Icon name="hub" size={13} />
+                <span>
+                  Linking from <strong className="font-semibold">{label}</strong> · click another widget to connect
+                </span>
+                <button
+                  data-link-skip
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setLinkSourceId(null)
+                    setGhostCursor(null)
+                  }}
+                  className="ml-1 inline-flex items-center justify-center h-4 w-4 rounded-full hover:bg-white/20"
+                  aria-label="Cancel linking"
+                  title="Cancel (Esc)"
+                >
+                  <Icon name="close" size={11} />
+                </button>
+              </div>
+            )
+          })()}
+        </div>
+
+        <WidgetDock />
+      </div>
+      <WidgetFocusMode />
+      {showResume && activeTask && (
+        <ResumeModal task={activeTask} onClose={() => setShowResume(false)} />
+      )}
+      {showAISetup && activeTask && (
+        <AISetupDialog
+          task={activeTask}
+          onClose={() => setShowAISetup(false)}
+          onAccept={handleAISetupAccept}
+        />
+      )}
+      {showAiBuilder && (
+        <AiBuilderDialog
+          taskId={activeTaskId ?? null}
+          onClose={() => setShowAiBuilder(false)}
+          onAccept={handleAiBuilderAccept}
+        />
+      )}
+      {ctxMenu && (
+        <CanvasContextMenu
+          x={ctxMenu.screenX}
+          y={ctxMenu.screenY}
+          items={buildCtxMenu()}
+          onClose={() => setCtxMenu(null)}
+        />
+      )}
+      {showExtensionPrompt && (
+        <ExtensionPrompt
+          task={activeTask}
+          elapsedMin={elapsedMin}
+          totalEstimateMin={totalEstimateMin}
+          onExtend={(min) => {
+            void updateNode(activeTask.id, {
+              extensionsMinutes: (activeTask.extensionsMinutes ?? 0) + min
+            })
+            setSnoozeUntil(0)
+          }}
+          onMarkDone={() => {
+            void updateNode(activeTask.id, { status: 'done' })
+            setSnoozeUntil(0)
+          }}
+          onSnooze={() => setSnoozeUntil(Date.now() + 5 * 60 * 1000)}
+        />
+      )}
+    </>
+  )
+}
+
+function FivePromiseButton({ taskId }: { taskId: string }): JSX.Element {
+  const active = useFocusSessionStore((s) => s.active)
+  const start = useFocusSessionStore((s) => s.start)
+  const isOnThisTask = active?.taskId === taskId
+  if (isOnThisTask) {
+    return (
+      <span
+        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium text-accent cursor-default"
+        title="5-Minute Promise running — see the pill at top of canvas"
+      >
+        <Icon name="bolt" size={14} filled />
+        <span>In session</span>
+      </span>
+    )
+  }
+  return (
+    <button
+      onClick={() => {
+        // Fire chime on user gesture (autoplay-friendly) then start the session
+        futuristicPowerOn()
+        void start(taskId, 5 * 60, '5min')
+      }}
+      className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium text-white transition-all hover:brightness-110"
+      style={{ backgroundColor: 'rgb(var(--accent))' }}
+      title="The 5-Minute Promise: just five minutes, no commitment past that. The most-evidence-backed ADHD initiation technique."
+    >
+      <Icon name="bolt" size={14} />
+      <span>Just 5 min</span>
+    </button>
+  )
+}
+
+// ── Pinned-widget layer ─────────────────────────────────────────────────────
+// Lives screen-space above the transformed canvas. Tracks its own bounding
+// box (the main pane minus the canvas chrome) via ResizeObserver, then
+// computes zone-pin positions for any widget with a pinnedZone set. The
+// computed positions are dropped into a Map provided via PinLayoutContext so
+// the deeply-nested WidgetFrame inside each pinned widget can read its own
+// zone rect without prop-drilling through every widget kind.
+
+function PinnedLayer({
+  widgets,
+  layoutVersion,
+  focusedId,
+  renderWidget
+}: {
+  widgets: Widget[]
+  layoutVersion: number
+  focusedId: string | null
+  renderWidget: (w: Widget) => JSX.Element | null
+}): JSX.Element {
+  const layerRef = useRef<HTMLDivElement | null>(null)
+  const [bounds, setBounds] = useState({ width: 0, height: 0 })
+  useEffect(() => {
+    const el = layerRef.current
+    if (!el) return
+    const ro = new ResizeObserver((entries) => {
+      const r = entries[0]?.contentRect
+      if (r) setBounds({ width: r.width, height: r.height })
+    })
+    ro.observe(el)
+    // Prime with initial size — ResizeObserver fires async on first observe.
+    const rect = el.getBoundingClientRect()
+    setBounds({ width: rect.width, height: rect.height })
+    return () => ro.disconnect()
+  }, [])
+
+  // Compute zone-pin positions every render. Cheap — just iterates pinned
+  // widgets. Map identity matters for memo so use useMemo across deps that
+  // genuinely affect output.
+  const zonePositions = useMemo(
+    () => computeZonePinPositions(widgets, bounds),
+    [widgets, bounds]
+  )
+
+  return (
+    <PinLayoutContext.Provider value={zonePositions}>
+      <div
+        ref={layerRef}
+        className="absolute inset-0 z-30 pointer-events-none"
+        data-pinned-layer
+      >
+        {widgets.map((w) => {
+          if (w.archived) return null
+          if (!w.pinned || w.kind !== 'section') return null
+          return (
+            <div key={`${w.id}-pin-${layoutVersion}`}>{renderWidget(w)}</div>
+          )
+        })}
+        {widgets.map((w) => {
+          if (w.archived) return null
+          if (!w.pinned || w.kind === 'section') return null
+          if (w.parentSectionId !== null) return null
+          if (focusedId === w.id && isWebKind(w.kind)) return null
+          return (
+            <div key={`${w.id}-pin-${layoutVersion}`}>{renderWidget(w)}</div>
+          )
+        })}
+      </div>
+    </PinLayoutContext.Provider>
+  )
+}

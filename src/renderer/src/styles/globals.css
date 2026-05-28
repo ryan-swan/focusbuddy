@@ -1,0 +1,783 @@
+/* @import must come BEFORE all other CSS rules (including @tailwind directives).
+   Premium 2026 design tokens — OKLCH palette, spring easings, light-aware
+   shadows, Liquid Glass surfaces, refined type system. See tokens.css for the
+   full taxonomy. */
+@import './tokens.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  font-family: var(--font-sans);
+  font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11', 'ss01';
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  color: var(--ink-100);
+  /* Accent is set at runtime by lib/theme.ts; these are sensible defaults */
+  --accent: 124 58 237;
+  --accent-hover: 109 40 217;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+body {
+  background: #fafaf9;
+  transition: background-color 200ms ease;
+}
+
+.dark body {
+  background: #1c1917;
+  color: #f5f5f4;
+}
+
+/* Kept for backward compatibility — the App root used this class during the
+ * punch-through experiment. With the new screenshot-based mirror it just
+ * carries the layout sizing. */
+.fb-app-shell {
+  height: 100%;
+}
+
+.material-symbols-outlined {
+  font-family: 'Material Symbols Outlined', sans-serif;
+  font-weight: normal;
+  font-style: normal;
+  display: inline-block;
+  text-transform: none;
+  letter-spacing: normal;
+  word-wrap: normal;
+  white-space: nowrap;
+  direction: ltr;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: 'liga';
+}
+
+@layer components {
+  .sticky-note {
+    @apply relative rounded-sm p-4 shadow-md;
+    box-shadow:
+      0 1px 1px rgba(0, 0, 0, 0.05),
+      0 4px 8px rgba(0, 0, 0, 0.08),
+      inset 0 0 0 1px rgba(0, 0, 0, 0.02);
+  }
+  .axis-dot {
+    @apply inline-block h-2.5 w-2.5 rounded-full border border-stone-400/40 dark:border-stone-500/50 transition-colors;
+  }
+  .axis-dot-filled {
+    @apply bg-stone-900 dark:bg-stone-100;
+  }
+  .axis-dot-empty {
+    @apply bg-transparent;
+  }
+  .desk-paper {
+    position: relative; /* anchor the ::before time-of-day overlay to this container */
+    isolation: isolate; /* trap the ::before stacking context so z-index:-1 stays inside */
+    background-color: #fbf7ee;
+    background-image:
+      radial-gradient(circle at 20% 20%, rgba(184, 137, 63, 0.05) 0%, transparent 60%),
+      radial-gradient(circle at 80% 80%, rgba(184, 137, 63, 0.04) 0%, transparent 60%),
+      radial-gradient(rgba(120, 100, 80, 0.08) 1px, transparent 1px);
+    background-size:
+      auto,
+      auto,
+      18px 18px;
+  }
+  /* `.no-tod` modifier — suppresses ambient overlays (time-of-day ::before AND the
+     Futuristic flowing accent-beam ::after) on surfaces where they bleed through
+     semi-transparent cards. Only the Canvas keeps these ambient effects. */
+  .desk-paper.no-tod::before,
+  .desk-paper.no-tod::after {
+    display: none !important;
+  }
+  /* Time-of-Day Anchoring — ambient hue + traveling sun glow.
+     CSS variables on :root are updated every minute by lib/timeOfDay.ts.
+     z-index: -1 + parent `isolation: isolate` keeps the overlay behind ALL content
+     (widgets on Canvas, cards on Dashboard, etc.) but inside the desk-paper bounds. */
+  .desk-paper::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: -1;
+    background:
+      radial-gradient(
+        circle at var(--tod-sun-x, 50%) -8%,
+        hsla(var(--tod-hue, 45), 85%, 65%, var(--tod-sun-opacity, 0)) 0%,
+        hsla(var(--tod-hue, 45), 80%, 55%, calc(var(--tod-sun-opacity, 0) * 0.4)) 8%,
+        transparent 22%
+      ),
+      linear-gradient(
+        180deg,
+        hsla(var(--tod-hue, 45), 70%, 55%, calc(0.08 * var(--tod-warmth, 0.5))) 0%,
+        transparent 38%,
+        transparent 72%,
+        hsla(var(--tod-hue, 45), 55%, 35%, calc(0.05 + 0.04 * (1 - var(--tod-warmth, 0.5)))) 100%
+      );
+    transition: background 120s linear;
+  }
+  .dark .desk-paper {
+    background-color: #0c0a09;
+    background-image:
+      radial-gradient(circle at 20% 20%, rgba(184, 137, 63, 0.04) 0%, transparent 60%),
+      radial-gradient(circle at 80% 80%, rgba(124, 58, 237, 0.04) 0%, transparent 60%),
+      radial-gradient(rgba(168, 162, 158, 0.06) 1px, transparent 1px);
+    background-size:
+      auto,
+      auto,
+      18px 18px;
+    filter: none;
+  }
+  .dark .desk-paper::before {
+    background:
+      radial-gradient(
+        circle at var(--tod-sun-x, 50%) -8%,
+        hsla(var(--tod-hue, 45), 80%, 55%, calc(var(--tod-sun-opacity, 0) * 0.55)) 0%,
+        hsla(var(--tod-hue, 45), 70%, 45%, calc(var(--tod-sun-opacity, 0) * 0.25)) 10%,
+        transparent 25%
+      ),
+      linear-gradient(
+        180deg,
+        hsla(var(--tod-hue, 45), 50%, 35%, calc(0.14 + 0.10 * (1 - var(--tod-warmth, 0.5)))) 0%,
+        transparent 45%,
+        transparent 72%,
+        hsla(var(--tod-hue, 45), 45%, 25%, 0.16) 100%
+      );
+  }
+  .futuristic .desk-paper::before {
+    /* In futuristic mode the aurora dominates; soften the ToD overlay so it complements without competing. */
+    opacity: 0.55;
+  }
+  .futuristic .desk-paper {
+    background:
+      radial-gradient(ellipse at 20% 30%, rgba(34, 211, 238, 0.18) 0%, transparent 55%),
+      radial-gradient(ellipse at 80% 70%, rgba(167, 139, 250, 0.14) 0%, transparent 55%),
+      radial-gradient(ellipse at 50% 100%, rgba(56, 189, 248, 0.10) 0%, transparent 60%),
+      linear-gradient(135deg, #050714 0%, #0a0e1a 30%, #1a0b2e 65%, #0a0e1a 100%);
+    background-size:
+      220% 220%,
+      220% 220%,
+      100% 220%,
+      100% 100%;
+    animation: futuristic-aurora 32s ease-in-out infinite;
+    filter: none;
+  }
+  .futuristic .desk-paper::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: linear-gradient(
+      105deg,
+      transparent 0%,
+      transparent 35%,
+      rgb(var(--accent) / 0.35) 49%,
+      rgb(var(--accent) / 0.6) 50%,
+      rgb(var(--accent) / 0.35) 51%,
+      transparent 65%,
+      transparent 100%
+    );
+    background-size: 240% 100%;
+    background-repeat: no-repeat;
+    animation: futuristic-flow 9s linear infinite;
+    mix-blend-mode: screen;
+    opacity: 0.85;
+  }
+  .chip-btn {
+    @apply inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border text-xs transition-colors select-none;
+  }
+  .chip-active {
+    @apply border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-800 text-stone-900 dark:text-stone-100 hover:bg-stone-100 dark:hover:bg-stone-700 hover:border-stone-400 dark:hover:border-stone-500 shadow-sm cursor-grab active:cursor-grabbing;
+  }
+  .chip-disabled {
+    @apply border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800/50 text-stone-400 dark:text-stone-600 cursor-not-allowed;
+  }
+  /* Primary action — accent fill with spring micro-press, inset highlight for
+     a sense of being a physical key, and an accent-tinted shadow that
+     intensifies on hover. */
+  .btn-primary {
+    @apply inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-white text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed;
+    background-color: rgb(var(--accent));
+    transition-property: transform, box-shadow, background-color;
+    transition-duration: var(--dur-quick);
+    transition-timing-function: var(--ease-spring-crisp);
+    box-shadow:
+      0 1px 2px rgb(var(--accent) / 0.25),
+      0 4px 12px -2px rgb(var(--accent) / 0.30),
+      inset 0 1px 0 oklch(100% 0 0 / 0.20);
+  }
+  .btn-primary:hover:not(:disabled) {
+    background-color: rgb(var(--accent-hover));
+    transform: translateY(-1px);
+    box-shadow:
+      0 2px 4px rgb(var(--accent) / 0.30),
+      0 8px 20px -4px rgb(var(--accent) / 0.40),
+      inset 0 1px 0 oklch(100% 0 0 / 0.25);
+  }
+  .btn-primary:active:not(:disabled) {
+    transform: translateY(0);
+    transition-duration: var(--dur-instant);
+  }
+  .btn-ghost {
+    @apply inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-stone-600 dark:text-stone-400 text-xs hover:bg-stone-100/70 dark:hover:bg-stone-800/70 hover:text-stone-900 dark:hover:text-stone-100;
+    transition: background-color var(--dur-quick) var(--ease-spring-crisp),
+      color var(--dur-quick) var(--ease-spring-crisp),
+      transform var(--dur-quick) var(--ease-spring-crisp);
+  }
+  .btn-ghost:active:not(:disabled) {
+    transform: scale(0.97);
+  }
+  .icon-btn {
+    @apply inline-flex items-center justify-center h-6 w-6 rounded text-stone-500 dark:text-stone-400 hover:bg-stone-100/70 dark:hover:bg-stone-800/70 hover:text-stone-900 dark:hover:text-stone-100;
+    transition: background-color var(--dur-quick) var(--ease-spring-crisp),
+      color var(--dur-quick) var(--ease-spring-crisp),
+      transform var(--dur-quick) var(--ease-spring-crisp);
+  }
+  .icon-btn:active:not(:disabled) {
+    transform: scale(0.92);
+  }
+  .widget-glow {
+    box-shadow:
+      0 0 0 2px rgb(var(--accent) / 0.65),
+      0 0 28px rgb(var(--accent) / 0.32),
+      0 6px 16px rgba(0, 0, 0, 0.12);
+  }
+  .section-receive-pulse {
+    animation: section-receive 420ms ease-out;
+  }
+}
+
+@keyframes section-receive {
+  0% {
+    transform: scale(1);
+  }
+  45% {
+    transform: scale(1.03);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes futuristic-aurora {
+  0%,
+  100% {
+    background-position:
+      0% 50%,
+      100% 50%,
+      50% 100%,
+      center;
+  }
+  50% {
+    background-position:
+      100% 50%,
+      0% 50%,
+      50% 0%,
+      center;
+  }
+}
+
+@keyframes futuristic-flow {
+  0% {
+    background-position: -140% 50%;
+  }
+  100% {
+    background-position: 240% 50%;
+  }
+}
+
+@keyframes futuristic-pulse {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 1px rgb(var(--accent) / 0.9),
+      0 0 12px rgb(var(--accent) / 0.7),
+      0 0 32px rgb(var(--accent) / 0.5),
+      0 0 64px rgb(var(--accent) / 0.25);
+  }
+  50% {
+    box-shadow:
+      0 0 0 1px rgb(var(--accent) / 1),
+      0 0 20px rgb(var(--accent) / 0.95),
+      0 0 56px rgb(var(--accent) / 0.7),
+      0 0 110px rgb(var(--accent) / 0.4);
+  }
+}
+
+.futuristic body {
+  background: #050714;
+}
+
+.futuristic .widget-glow {
+  animation: futuristic-pulse 2.5s ease-in-out infinite;
+}
+
+.futuristic body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+  background: repeating-linear-gradient(
+    180deg,
+    transparent 0px,
+    transparent 2px,
+    rgba(34, 211, 238, 0.018) 3px,
+    transparent 4px
+  );
+}
+
+/* Futuristic chrome accents — soft cyan/violet glow on panel borders */
+.futuristic header {
+  border-color: rgba(99, 102, 241, 0.25) !important;
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.85), rgba(15, 23, 42, 0.7)) !important;
+}
+.futuristic aside {
+  background: rgba(10, 14, 26, 0.6) !important;
+  backdrop-filter: blur(14px);
+  border-color: rgba(99, 102, 241, 0.18) !important;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   ATELIER theme — the premium flagship.
+   ──────────────────────────────────────────────────────────────────────────
+   Deep ink-blue room with a warm overhead vignette. Cream paper canvas
+   inside. Heritage gold edges. Restrained, candlelit, no bright color
+   anywhere. Wins the cascade by living after .dark .desk-paper and any
+   other theme-specific rules above. Uses !important sparingly only where
+   it's competing with the .dark theme's own background rules.
+   ────────────────────────────────────────────────────────────────────────── */
+
+.atelier body {
+  /* Subtle radial vignette — warm cream in the upper-middle, deep navy edges.
+     Gives a sense of overhead candlelight without animating anything. */
+  background:
+    radial-gradient(
+      ellipse 80% 60% at 50% 0%,
+      oklch(24% 0.034 250) 0%,
+      oklch(15% 0.030 250) 60%
+    ) !important;
+}
+
+.atelier header {
+  background: oklch(20% 0.028 250 / 0.65) !important;
+  backdrop-filter: saturate(160%) blur(24px);
+  -webkit-backdrop-filter: saturate(160%) blur(24px);
+  border-color: rgb(var(--accent) / 0.12) !important;
+  box-shadow: inset 0 1px 0 rgb(var(--accent) / 0.08);
+}
+
+.atelier aside {
+  background: oklch(18% 0.028 250 / 0.72) !important;
+  backdrop-filter: saturate(160%) blur(24px);
+  -webkit-backdrop-filter: saturate(160%) blur(24px);
+  border-color: rgb(var(--accent) / 0.12) !important;
+  box-shadow: inset 0 1px 0 rgb(var(--accent) / 0.06);
+}
+
+/* The desk paper itself — warm cream tablet floating on the navy ground.
+   Override the .dark .desk-paper rules entirely. */
+.atelier .desk-paper {
+  background-color: oklch(94% 0.020 80) !important;  /* warm cream paper */
+  background-image:
+    /* Faint paper grain — circles at low alpha mimic woven texture without
+       being a literal noise pattern (which reads as cheap) */
+    radial-gradient(
+      circle at 25% 25%,
+      oklch(80% 0.08 80 / 0.04) 0%,
+      transparent 50%
+    ),
+    radial-gradient(
+      circle at 75% 75%,
+      oklch(80% 0.08 80 / 0.03) 0%,
+      transparent 50%
+    ) !important;
+  background-size: auto, auto !important;
+  filter: none !important;
+}
+
+/* Suppress all time-of-day + accent-beam overlays inside Atelier. Atelier is
+   timeless — no day cycle, no ambient streaks. */
+.atelier .desk-paper::before,
+.atelier .desk-paper::after {
+  display: none !important;
+}
+
+/* Widget chrome in Atelier — warm cream paper with gold-foil hairlines.
+   The widgets sit as paper cards on the desk. */
+.atelier [data-widget-id] {
+  background: oklch(96% 0.015 80) !important;
+  border-color: oklch(78% 0.045 80) !important;
+}
+.atelier [data-widget-id]:hover {
+  border-color: rgb(var(--accent) / 0.4) !important;
+}
+
+/* Widget BODIES in Atelier — the divs inside the frame (PageWidget,
+   TableWidget, FileWidget, etc.) each have their own bg class (typically
+   `bg-white dark:bg-stone-900`). Atelier inherits .dark, so the dark variant
+   wins by default and the cream frame surrounds a stone-900 interior. We
+   override that here: any utility-class background inside an Atelier widget
+   becomes warm cream, and text snaps to dark ink so it's readable.
+
+   Surgical selectors (only descendants of [data-widget-id]) so we don't
+   recolor every form input + dialog input on the planet. */
+.atelier [data-widget-id] [class*="bg-white"],
+.atelier [data-widget-id] [class*="dark:bg-stone-900"],
+.atelier [data-widget-id] [class*="dark:bg-stone-800"] {
+  background-color: oklch(96% 0.015 80) !important;
+}
+.atelier [data-widget-id] [class*="dark:bg-stone-800/40"],
+.atelier [data-widget-id] [class*="dark:bg-stone-900/95"] {
+  background-color: oklch(94% 0.018 80) !important;
+}
+.atelier [data-widget-id] [class*="dark:text-stone-100"],
+.atelier [data-widget-id] [class*="dark:text-stone-200"],
+.atelier [data-widget-id] [class*="dark:text-stone-300"] {
+  color: oklch(22% 0.024 250) !important;
+}
+.atelier [data-widget-id] [class*="dark:text-stone-400"],
+.atelier [data-widget-id] [class*="dark:text-stone-500"] {
+  color: oklch(40% 0.020 250) !important;
+}
+/* Borders inside Atelier widgets are gold hairlines, not stone */
+.atelier [data-widget-id] [class*="dark:border-stone-700"],
+.atelier [data-widget-id] [class*="dark:border-stone-800"] {
+  border-color: oklch(82% 0.040 80) !important;
+}
+/* Hover states inside Atelier widgets — subtle gold tint */
+.atelier [data-widget-id] [class*="dark:hover:bg-stone-800"]:hover {
+  background-color: oklch(92% 0.022 80) !important;
+}
+
+/* Titlebar wordmark in Atelier — heritage gold, not white */
+.atelier header h1 {
+  color: rgb(var(--accent)) !important;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-size: 11px !important;
+  font-weight: 500 !important;
+}
+
+/* Glass surface re-tuning for Atelier — slightly warmer fill, gold borders */
+.atelier .fb-glass-chrome {
+  background-color: oklch(20% 0.028 250 / 0.72) !important;
+  border-color: rgb(var(--accent) / 0.12) !important;
+}
+.atelier .fb-glass-panel {
+  background-color: oklch(22% 0.026 250 / 0.80) !important;
+  border-color: rgb(var(--accent) / 0.18) !important;
+}
+.atelier .fb-glass-pillow {
+  background-color: oklch(24% 0.024 250 / 0.86) !important;
+  border-color: rgb(var(--accent) / 0.22) !important;
+  box-shadow:
+    0 4px 8px oklch(0% 0 0 / 0.7),
+    0 16px 40px -4px oklch(0% 0 0 / 0.6),
+    0 32px 80px -16px rgb(var(--accent) / 0.20),
+    inset 0 1px 0 rgb(var(--accent) / 0.15) !important;
+}
+
+/* Rendered Markdown — used by MarkdownWidget's preview mode */
+.md-rendered {
+  font-size: 13px;
+  line-height: 1.55;
+}
+.md-rendered > * + * {
+  margin-top: 0.6em;
+}
+.md-rendered h1,
+.md-rendered h2,
+.md-rendered h3,
+.md-rendered h4 {
+  font-weight: 600;
+  line-height: 1.25;
+  margin-top: 1em;
+  margin-bottom: 0.3em;
+}
+.md-rendered h1 {
+  font-size: 1.55em;
+  border-bottom: 1px solid rgba(120, 113, 108, 0.25);
+  padding-bottom: 0.2em;
+}
+.md-rendered h2 {
+  font-size: 1.3em;
+}
+.md-rendered h3 {
+  font-size: 1.12em;
+}
+.md-rendered h4 {
+  font-size: 1em;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: rgb(120 113 108);
+}
+.dark .md-rendered h4 {
+  color: rgb(168 162 158);
+}
+.md-rendered p {
+  margin: 0.4em 0;
+}
+.md-rendered strong {
+  font-weight: 600;
+}
+.md-rendered em {
+  font-style: italic;
+}
+.md-rendered del {
+  text-decoration: line-through;
+  opacity: 0.75;
+}
+.md-rendered ul,
+.md-rendered ol {
+  padding-left: 1.4em;
+  margin: 0.4em 0;
+}
+.md-rendered ul {
+  list-style: disc;
+}
+.md-rendered ol {
+  list-style: decimal;
+}
+.md-rendered li {
+  margin: 0.18em 0;
+}
+.md-rendered li > input[type='checkbox'] {
+  margin-right: 0.4em;
+  vertical-align: middle;
+  accent-color: rgb(var(--accent));
+}
+.md-rendered li:has(> input[type='checkbox']) {
+  list-style: none;
+  margin-left: -1.25em;
+}
+.md-rendered blockquote {
+  border-left: 3px solid rgb(var(--accent) / 0.5);
+  padding: 0.1em 0.9em;
+  color: rgb(87 83 78);
+  background: rgb(245 245 244 / 0.6);
+  border-radius: 4px;
+  font-style: italic;
+}
+.dark .md-rendered blockquote {
+  color: rgb(214 211 209);
+  background: rgb(28 25 23 / 0.5);
+}
+.md-rendered pre {
+  background: rgb(245 245 244);
+  border: 1px solid rgb(231 229 228);
+  padding: 0.6em 0.85em;
+  border-radius: 6px;
+  overflow-x: auto;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.dark .md-rendered pre {
+  background: rgb(28 25 23);
+  border-color: rgb(68 64 60);
+}
+.md-rendered pre code {
+  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+}
+.md-rendered hr {
+  border: none;
+  border-top: 1px solid rgb(231 229 228);
+  margin: 1em 0;
+}
+.dark .md-rendered hr {
+  border-top-color: rgb(68 64 60);
+}
+.md-rendered table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  margin: 0.6em 0;
+}
+.md-rendered th,
+.md-rendered td {
+  border: 1px solid rgb(231 229 228);
+  padding: 0.35em 0.55em;
+  text-align: left;
+  vertical-align: top;
+}
+.dark .md-rendered th,
+.dark .md-rendered td {
+  border-color: rgb(68 64 60);
+}
+.md-rendered th {
+  background: rgb(250 250 249);
+  font-weight: 600;
+}
+.dark .md-rendered th {
+  background: rgb(41 37 36);
+}
+.md-rendered img {
+  max-width: 100%;
+  border-radius: 6px;
+}
+
+/* Tiptap editor — built on top of .md-rendered visuals */
+.tiptap-editor .ProseMirror {
+  outline: none;
+  min-height: 100%;
+}
+.tiptap-editor .ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: rgb(168 162 158);
+  font-style: italic;
+  pointer-events: none;
+  height: 0;
+}
+.dark .tiptap-editor .ProseMirror p.is-editor-empty:first-child::before {
+  color: rgb(120 113 108);
+}
+.tiptap-editor .ProseMirror > *:first-child {
+  margin-top: 0;
+}
+.tiptap-editor .ProseMirror ::selection {
+  background: rgb(var(--accent) / 0.25);
+}
+/* Task list checkbox alignment when authored by Tiptap (different DOM than markdown task list) */
+.tiptap-editor .ProseMirror ul[data-type='taskList'] {
+  list-style: none;
+  padding-left: 0;
+}
+.tiptap-editor .ProseMirror ul[data-type='taskList'] li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5em;
+}
+.tiptap-editor .ProseMirror ul[data-type='taskList'] li > label {
+  flex-shrink: 0;
+  margin-top: 0.18em;
+  user-select: none;
+}
+.tiptap-editor .ProseMirror ul[data-type='taskList'] li > label input[type='checkbox'] {
+  accent-color: rgb(var(--accent));
+  cursor: pointer;
+}
+.tiptap-editor .ProseMirror ul[data-type='taskList'] li > div {
+  flex: 1;
+  min-width: 0;
+}
+.tiptap-editor .ProseMirror ul[data-type='taskList'] li[data-checked='true'] > div {
+  text-decoration: line-through;
+  color: rgb(168 162 158);
+}
+.dark .tiptap-editor .ProseMirror ul[data-type='taskList'] li[data-checked='true'] > div {
+  color: rgb(120 113 108);
+}
+
+/* Focus Session (5-Minute Promise) — dims the shell so the canvas feels held in spotlight.
+   Triggered by adding `focus-session-active` to <html> from FocusSessionOverlay. */
+.focus-session-active aside,
+.focus-session-active header,
+.focus-session-active footer {
+  opacity: 0.28;
+  transition: opacity 700ms cubic-bezier(0.22, 1, 0.36, 1),
+    filter 700ms cubic-bezier(0.22, 1, 0.36, 1);
+  filter: saturate(0.45) blur(0.5px);
+}
+.focus-session-active aside:hover,
+.focus-session-active header:hover,
+.focus-session-active footer:hover {
+  opacity: 0.85;
+  filter: saturate(1) blur(0);
+}
+.focus-session-active .desk-paper {
+  box-shadow: inset 0 0 0 2px rgb(var(--accent) / 0.55),
+    inset 0 0 80px rgb(var(--accent) / 0.16),
+    inset 0 0 200px rgb(var(--accent) / 0.10);
+  animation: focus-session-pulse 5.5s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+/* Cinematic vignette around the canvas during focus sessions — darkens the
+   edges so the active work feels held in a pool of light, the way a stage
+   light isolates a performer. Layered via a ::after so we don't disturb
+   the existing ::before time-of-day overlay. */
+.focus-session-active .desk-paper::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse 70% 70% at 50% 50%,
+    transparent 0%,
+    transparent 50%,
+    rgba(0, 0, 0, 0.22) 100%
+  );
+  z-index: 1;
+  animation: focus-vignette-breath 8s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+@keyframes focus-vignette-breath {
+  0%, 100% {
+    opacity: 0.7;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px) translateX(-50%);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) translateX(-50%);
+  }
+}
+
+@keyframes focus-session-pulse {
+  0%,
+  100% {
+    box-shadow: inset 0 0 0 2px rgb(var(--accent) / 0.45),
+      inset 0 0 80px rgb(var(--accent) / 0.14),
+      inset 0 0 200px rgb(var(--accent) / 0.10);
+  }
+  50% {
+    box-shadow: inset 0 0 0 2px rgb(var(--accent) / 0.72),
+      inset 0 0 120px rgb(var(--accent) / 0.22),
+      inset 0 0 240px rgb(var(--accent) / 0.15);
+  }
+}
+
+.titlebar-drag {
+  -webkit-app-region: drag;
+}
+.titlebar-nodrag {
+  -webkit-app-region: no-drag;
+}
+
+.react-resizable-handle {
+  z-index: 10;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(120, 113, 108, 0.25);
+  border-radius: 5px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(120, 113, 108, 0.5);
+}
+.dark ::-webkit-scrollbar-thumb {
+  background: rgba(168, 162, 158, 0.2);
+}
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: rgba(168, 162, 158, 0.4);
+}
