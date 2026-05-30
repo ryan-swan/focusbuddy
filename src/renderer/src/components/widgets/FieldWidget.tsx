@@ -99,18 +99,24 @@ export default function FieldWidget({ widget, inline = false }: Props): JSX.Elem
   if (!state) {
     const body = (
       <div className="h-full w-full bg-stone-50 dark:bg-stone-900 p-3 overflow-y-auto">
-        <div className="text-[11px] uppercase tracking-wider text-stone-500 dark:text-stone-400 mb-2">
-          Field type
+        <div className="flex items-center gap-1.5 mb-3">
+          <Icon name="tune" size={14} className="text-accent shrink-0" />
+          <div className="text-[11px] uppercase tracking-wider font-semibold text-stone-600 dark:text-stone-300">
+            Pick a field type
+          </div>
         </div>
+        <p className="text-[11px] text-stone-500 dark:text-stone-400 mb-3 leading-snug">
+          Choose what this widget captures — once set, you can type its label and enter a value.
+        </p>
         <div className="grid grid-cols-2 gap-1.5">
           {(Object.keys(FIELD_TYPE_LABELS) as FieldType[]).map((t) => (
             <button
               key={t}
               onClick={() => void chooseType(t)}
-              className="inline-flex items-center gap-1.5 px-2 py-1.5 rounded border border-stone-200 dark:border-stone-700 hover:border-accent hover:bg-accent/5 text-left"
+              className="inline-flex items-center gap-1.5 px-2 py-2 rounded-md border border-stone-200 dark:border-stone-700 hover:border-accent hover:bg-accent/5 text-left transition-colors"
             >
-              <Icon name={FIELD_TYPE_ICONS[t]} size={14} className="text-accent" />
-              <span className="text-[11px] text-stone-700 dark:text-stone-200">
+              <Icon name={FIELD_TYPE_ICONS[t]} size={15} className="text-accent shrink-0" />
+              <span className="text-[12px] text-stone-700 dark:text-stone-200 leading-tight">
                 {FIELD_TYPE_LABELS[t]}
               </span>
             </button>
@@ -127,21 +133,27 @@ export default function FieldWidget({ widget, inline = false }: Props): JSX.Elem
   }
 
   const body = (
-    <div className="h-full w-full bg-white dark:bg-stone-900 p-3 flex flex-col gap-2 overflow-y-auto">
-      <div className="flex items-center gap-1.5">
+    <div className="h-full w-full bg-white dark:bg-stone-900 p-3 flex flex-col gap-2.5 overflow-y-auto">
+      <div className="flex items-center gap-1.5 pb-1.5 border-b border-stone-100 dark:border-stone-800">
         <Icon
           name={FIELD_TYPE_ICONS[state.def.type]}
-          size={14}
-          className="text-stone-500 dark:text-stone-400 shrink-0"
+          size={15}
+          className="text-accent shrink-0"
         />
         <input
           value={state.def.label}
           onChange={(e) => void updateLabel(e.target.value)}
           placeholder="Field label"
-          className="flex-1 bg-transparent text-[12px] font-medium text-stone-800 dark:text-stone-100 outline-none"
+          className="flex-1 bg-transparent text-[13px] font-semibold text-stone-800 dark:text-stone-100 outline-none placeholder-stone-300 dark:placeholder-stone-600"
         />
+        <span className="text-[9px] uppercase tracking-wider text-stone-400 dark:text-stone-500">
+          {FIELD_TYPE_LABELS[state.def.type]}
+        </span>
       </div>
 
+      <div className="text-[10px] uppercase tracking-wider text-stone-400 dark:text-stone-500">
+        Value
+      </div>
       <div className="flex-1">
         <FieldEditor
           def={state.def}

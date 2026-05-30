@@ -44,6 +44,22 @@ export default function WebViewWidget({ widget, inline = false }: Props): JSX.El
   const placeholder = entry?.urlPlaceholder ?? 'https://…'
   const [editing, setEditing] = useState(!widget.content)
   const [draft, setDraft] = useState(widget.content)
+  // ── Browser-toolbar state ─────────────────────────────────────────────────
+  // canGoBack / canGoForward feed the back+forward button enabled state.
+  // We update them from the webview's `did-navigate*` events because
+  // canGoBack()/canGoForward() are imperative calls that have to be re-
+  // queried after every navigation.
+  const [canGoBack, setCanGoBack] = useState(false)
+  const [canGoForward, setCanGoForward] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
+  // currentUrl is the address shown in the toolbar's URL bar. It tracks
+  // the LIVE webview URL (updated from `did-navigate*`) so it always
+  // reflects where the user actually is — including in-page hash changes.
+  const [currentUrl, setCurrentUrl] = useState(widget.content)
+  // urlDraft is the inline edit buffer for the URL bar. We only commit
+  // (call loadURL) on Enter or blur, so transient typing doesn't navigate.
+  const [urlDraft, setUrlDraft] = useState('')
+  const [urlEditing, setUrlEditing] = useState(false)
   // Live preview shown in the header — tracks the CURRENT page while navigating.
   const [livePreview, setLivePreview] = useState<{ url: string; title: string } | null>(null)
   // Last URL we persisted into widget.content — avoids redundant DB writes on rapid navs
@@ -241,17 +257,39 @@ export default function WebViewWidget({ widget, inline = false }: Props): JSX.El
       // Persist the latest URL back to the widget so re-opening goes to where the user
       // actually was, not the original URL.
       persistNavUrl(url, title)
+      // Drive the toolbar's URL bar + back/forward enabled state. We re-
+      // query the imperative canGoBack/canGoForward after every nav
+      // because they're only meaningful relative to the current history.
+      setCurrentUrl(url)
+      try {
+        type NavQuery = { canGoBack?: () => boolean; canGoForward?: () => boolean }
+        const q = wv as unknown as NavQuery
+        setCanGoBack(q.canGoBack?.() ?? false)
+        setCanGoForward(q.canGoForward?.() ?? false)
+      } catch {
+        // ignore
+      }
+    }
+    function handleLoadStart(): void {
+      setIsLoading(true)
+    }
+    function handleLoadStop(): void {
+      setIsLoading(false)
     }
 
     wv.addEventListener('did-navigate', handleNav as EventListener)
     wv.addEventListener('did-navigate-in-page', handleNav as EventListener)
     wv.addEventListener('did-finish-load', handleNav as EventListener)
     wv.addEventListener('did-redirect-navigation', handleNav as EventListener)
+    wv.addEventListener('did-start-loading', handleLoadStart as EventListener)
+    wv.addEventListener('did-stop-loading', handleLoadStop as EventListener)
     return () => {
       wv.removeEventListener('did-navigate', handleNav as EventListener)
       wv.removeEventListener('did-navigate-in-page', handleNav as EventListener)
       wv.removeEventListener('did-finish-load', handleNav as EventListener)
       wv.removeEventListener('did-redirect-navigation', handleNav as EventListener)
+      wv.removeEventListener('did-start-loading', handleLoadStart as EventListener)
+      wv.removeEventListener('did-stop-loading', handleLoadStop as EventListener)
     }
   }, [editing, widget.id, widget.taskId])
 
@@ -390,8 +428,38 @@ export default function WebViewWidget({ widget, inline = false }: Props): JSX.El
   // In inline (focus modal) mode the modal already provides isolation, so always interactive.
   const showOverlay = !inline && !editing && !isActive
 
+  function navBack(): void {
+    const wv = webviewRef.current as unknown as { goBack?: () => void } | null
+    wv?.goBack?.()
+  }
+  function navForward(): void {
+    const wv = webviewRef.current as unknown as { goForward?: () => void } | null
+    wv?.goForward?.()
+  }
+  function navReload(): void {
+    const wv = webviewRef.current as unknown as { reload?: () => void } | null
+    wv?.reload?.()
+  }
+  function navStop(): void {
+    const wv = webviewRef.current as unknown as { stop?: () => void } | null
+    wv?.stop?.()
+  }
+  function commitUrlBar(): void {
+    setUrlEditing(false)
+    const next = normalizeUrl(urlDraft.trim())
+    if (!next || next === currentUrl) return
+    const wv = webviewRef.current as unknown as { loadURL?: (u: string) => void } | null
+    if (wv?.loadURL) {
+      try {
+        wv.loadURL(next)
+      } catch {
+        // bad URL, give up silently — input keeps the user's text via urlDraft
+      }
+    }
+  }
+
   const body = (
-    <div className="h-full w-full bg-white relative">
+    <div className="h-full w-full bg-white relative flex flex-col">
       {editing ? (
         <form
           onSubmit={(e) => {
@@ -423,6 +491,70 @@ export default function WebViewWidget({ widget, inline = false }: Props): JSX.El
         </form>
       ) : (
         <>
+          {/* Browser-chrome toolbar — back/forward/reload/stop + URL bar.
+              Lives above the webview content in a flex column so the
+              webview area shrinks to the remaining height. */}
+          <div className="shrink-0 flex items-center gap-1 px-1.5 py-1 border-b border-stone-200 bg-stone-50/80">
+            <button
+              onClick={navBack}
+              disabled={!canGoBack}
+              className="h-6 w-6 inline-flex items-center justify-center rounded text-stone-600 hover:bg-stone-200 disabled:text-stone-300 disabled:hover:bg-transparent disabled:cursor-not-allowed"
+              title="Back"
+              aria-label="Go back"
+            >
+              <Icon name="arrow_back" size={14} />
+            </button>
+            <button
+              onClick={navForward}
+              disabled={!canGoForward}
+              className="h-6 w-6 inline-flex items-center justify-center rounded text-stone-600 hover:bg-stone-200 disabled:text-stone-300 disabled:hover:bg-transparent disabled:cursor-not-allowed"
+              title="Forward"
+              aria-label="Go forward"
+            >
+              <Icon name="arrow_forward" size={14} />
+            </button>
+            <button
+              onClick={isLoading ? navStop : navReload}
+              className="h-6 w-6 inline-flex items-center justify-center rounded text-stone-600 hover:bg-stone-200"
+              title={isLoading ? 'Stop loading' : 'Reload'}
+              aria-label={isLoading ? 'Stop loading' : 'Reload'}
+            >
+              <Icon name={isLoading ? 'close' : 'refresh'} size={14} />
+            </button>
+            <div className="flex-1 min-w-0">
+              <input
+                value={urlEditing ? urlDraft : currentUrl}
+                onFocus={(e) => {
+                  setUrlDraft(currentUrl)
+                  setUrlEditing(true)
+                  // Select all so the user can type a fresh URL without
+                  // first deleting the old one.
+                  e.currentTarget.select()
+                }}
+                onChange={(e) => setUrlDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    commitUrlBar()
+                  } else if (e.key === 'Escape') {
+                    e.preventDefault()
+                    setUrlEditing(false)
+                    setUrlDraft('')
+                    ;(e.target as HTMLInputElement).blur()
+                  }
+                }}
+                onBlur={() => {
+                  if (urlEditing) commitUrlBar()
+                }}
+                onMouseDown={(e) => e.stopPropagation()}
+                spellCheck={false}
+                placeholder="https://…"
+                className="w-full h-6 px-2 text-[11px] rounded bg-white border border-stone-200 focus:border-stone-400 focus:outline-none text-stone-800 truncate"
+                title={currentUrl}
+              />
+            </div>
+          </div>
+          <div className="flex-1 relative min-h-0">
           <webview
             ref={webviewRef}
             src={webviewSrc}
@@ -474,7 +606,7 @@ export default function WebViewWidget({ widget, inline = false }: Props): JSX.El
                   e.stopPropagation()
                   setEditing(true)
                 }}
-                title="Change URL"
+                title="Change URL (full form)"
                 className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded bg-white/90 border border-stone-300 hover:bg-stone-100 text-stone-700"
               >
                 <Icon name="edit" size={11} />
@@ -482,6 +614,7 @@ export default function WebViewWidget({ widget, inline = false }: Props): JSX.El
               </button>
             </div>
           )}
+          </div>
         </>
       )}
     </div>
@@ -489,11 +622,46 @@ export default function WebViewWidget({ widget, inline = false }: Props): JSX.El
 
   if (inline) return body
 
+  // Build the kind-specific context menu extras. WidgetFrame's generic menu
+  // (Make-this-a-task / Duplicate / Bring-to-front / Archive) sits beneath
+  // these; we surface webview-only actions like "Pin to Apps" and "Reload"
+  // at the top so they're a single right-click away.
+  const headerMenuExtras: { label: string; icon: string; onClick: () => void }[] = []
+  // Pin to Apps — only meaningful for a freeform widget with a URL that
+  // isn't already bound to a Connected App. Once bound, the entry stays
+  // hidden because re-pinning would be a no-op.
+  if (!sourceApp && widget.content) {
+    headerMenuExtras.push({
+      label: 'Pin to Apps',
+      icon: 'push_pin',
+      onClick: () => void handlePinToApps()
+    })
+  }
+  // Reload — duplicates the toolbar button so it's reachable when the user
+  // is already in a right-click context.
+  headerMenuExtras.push({
+    label: 'Reload',
+    icon: 'refresh',
+    onClick: () => {
+      const wv = webviewRef.current as unknown as { reload?: () => void } | null
+      wv?.reload?.()
+    }
+  })
+  // Change URL (full form) — same path as the existing "edit" button in
+  // the top-right cluster. Useful when the user wants the hint-rich form
+  // instead of the inline URL bar.
+  headerMenuExtras.push({
+    label: 'Change URL…',
+    icon: 'edit',
+    onClick: () => setEditing(true)
+  })
+
   return (
     <WidgetFrame
       widget={widget}
       headerLabel={`${entry?.label ?? 'Browser'} · ${headerLabel}`}
       headerAccent="bg-stone-300/60"
+      headerMenuExtras={headerMenuExtras}
     >
       {body}
     </WidgetFrame>

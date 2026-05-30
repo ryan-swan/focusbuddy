@@ -8,6 +8,7 @@ export const DEFAULT_LAYOUT: DashboardCardKind[] = [
   'quick-start',
   'stats',
   'today-tasks',
+  'folders',
   'recent-activity'
   // 'garden' deprecated — left in the type union for backward compatibility with
   // existing user layouts but removed from default + palette in Dashboard.tsx

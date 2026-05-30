@@ -176,6 +176,41 @@ CREATE INDEX IF NOT EXISTS idx_widget_links_task ON widget_links(task_id);
 CREATE INDEX IF NOT EXISTS idx_widget_links_source ON widget_links(source_widget_id);
 CREATE INDEX IF NOT EXISTS idx_widget_links_target ON widget_links(target_widget_id);
 
+-- ── Outgoing share links ────────────────────────────────────────────────────
+-- Each row is a link the local user minted to share one of their folders /
+-- tasks / widgets. Tokens are opaque and URL-safe. revoked=1 soft-deletes
+-- (server stops resolving but the row stays so the share-manager UI can
+-- still surface the audit trail).
+CREATE TABLE IF NOT EXISTS share_links (
+  id TEXT PRIMARY KEY,
+  token TEXT NOT NULL UNIQUE,
+  kind TEXT NOT NULL CHECK (kind IN ('folder', 'task', 'widget')),
+  entity_id TEXT NOT NULL,
+  label TEXT NOT NULL DEFAULT '',
+  scope TEXT NOT NULL DEFAULT 'view' CHECK (scope IN ('view', 'copy')),
+  created_at INTEGER NOT NULL,
+  expires_at INTEGER,
+  view_count INTEGER NOT NULL DEFAULT 0,
+  revoked INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_share_links_entity ON share_links(kind, entity_id);
+CREATE INDEX IF NOT EXISTS idx_share_links_created ON share_links(created_at DESC);
+
+-- ── Incoming shared items (Shared with me) ──────────────────────────────────
+-- v1 these get inserted when the user accepts a share invite. Production
+-- will sync from the server. snapshot is the read-only view of the
+-- entity at acceptance time so the user can browse it even offline.
+CREATE TABLE IF NOT EXISTS shared_with_me (
+  id TEXT PRIMARY KEY,
+  token TEXT NOT NULL UNIQUE,
+  kind TEXT NOT NULL CHECK (kind IN ('folder', 'task', 'widget')),
+  snapshot_json TEXT NOT NULL DEFAULT '{}',
+  from_handle TEXT NOT NULL DEFAULT '',
+  accepted_at INTEGER NOT NULL,
+  scope TEXT NOT NULL DEFAULT 'view' CHECK (scope IN ('view', 'copy'))
+);
+CREATE INDEX IF NOT EXISTS idx_shared_with_me_accepted ON shared_with_me(accepted_at DESC);
+
 CREATE INDEX IF NOT EXISTS idx_nodes_parent ON nodes(parent_id);
 CREATE INDEX IF NOT EXISTS idx_nodes_kind ON nodes(kind);
 CREATE INDEX IF NOT EXISTS idx_widgets_task ON widgets(task_id);
@@ -221,6 +256,9 @@ export function getDb(): Database.Database {
   ensureColumn(db, 'nodes', 'resume_markdown', 'TEXT')
   ensureColumn(db, 'nodes', 'resume_updated_at', 'INTEGER')
   ensureColumn(db, 'nodes', 'due_date', 'INTEGER')
+  // Soft-archive flag for nodes — separate from task `status` so folders
+  // can be put away without messing with the work-state of their tasks.
+  ensureColumn(db, 'nodes', 'archived', 'INTEGER NOT NULL DEFAULT 0')
   ensureColumn(db, 'widgets', 'archived', 'INTEGER NOT NULL DEFAULT 0')
   // Connected-app linkage: when a Connected App is dragged to the canvas, the
   // resulting webview widget shares that app's session partition + auto-fill binding.

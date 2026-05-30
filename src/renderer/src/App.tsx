@@ -17,6 +17,8 @@ import HyperfocusGuardian from './components/HyperfocusGuardian'
 import PreTaskBridge from './components/PreTaskBridge'
 import SmartStackModal from './components/SmartStackModal'
 import CursorSpotlight from './components/CursorSpotlight'
+import PeerBodyDoubleDialog from './components/PeerBodyDoubleDialog'
+import { usePeerBodyDoubleStore } from './stores/peerBodyDouble'
 import { useNodeStore } from './stores/nodes'
 import { useTemplateStore } from './stores/templates'
 import { applyTheme, loadTheme, useTheme } from './lib/theme'
@@ -45,6 +47,12 @@ export default function App(): JSX.Element {
   const [chatCollapsed, setChatCollapsed] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState<{ x: number; y: number } | null>(null)
   const [smartStackOpen, setSmartStackOpen] = useState(false)
+  // Peer body double — controlled HERE rather than inside its own
+  // component so the dialog can be summoned from anywhere (button in
+  // chrome, future keyboard shortcut, future "you've been stuck for 20
+  // minutes — try a body double?" nudge) without losing state.
+  const [bodyDoubleOpen, setBodyDoubleOpen] = useState(false)
+  const peerStatus = usePeerBodyDoubleStore((s) => s.status)
   const settingsBtnRef = useRef<HTMLButtonElement | null>(null)
   const activeTaskId = useNodeStore((s) => s.activeTaskId)
   const unsectionedCount = useWidgetStore(
@@ -146,6 +154,37 @@ export default function App(): JSX.Element {
             <Icon name="hub" size={16} filled={canSmartStack} />
           </button>
           <button
+            onClick={() => setBodyDoubleOpen(true)}
+            className="icon-btn relative"
+            title={
+              peerStatus === 'idle'
+                ? 'Body double — pair with someone to feel less alone while you work'
+                : peerStatus === 'looking'
+                  ? 'Body double — searching for a partner…'
+                  : peerStatus === 'matched'
+                    ? 'Body double — partner found, click to greet'
+                    : 'Body double — session active, click to open panel'
+            }
+            aria-label="Body double"
+          >
+            <Icon
+              name="diversity_3"
+              size={16}
+              filled={peerStatus !== 'idle'}
+              className={peerStatus !== 'idle' ? 'text-accent' : ''}
+            />
+            {/* Presence dot when a session is active */}
+            {peerStatus === 'connected' && (
+              <span className="absolute top-1 right-1 inline-flex h-1.5 w-1.5">
+                <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-70 animate-ping" />
+                <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
+              </span>
+            )}
+            {peerStatus === 'matched' && (
+              <span className="absolute top-1 right-1 h-1.5 w-1.5 rounded-full bg-accent" />
+            )}
+          </button>
+          <button
             ref={settingsBtnRef}
             onClick={toggleSettings}
             className="icon-btn"
@@ -202,6 +241,9 @@ export default function App(): JSX.Element {
       <PreTaskBridge />
       <CursorSpotlight />
       {smartStackOpen && <SmartStackModal onClose={() => setSmartStackOpen(false)} />}
+      {bodyDoubleOpen && (
+        <PeerBodyDoubleDialog onClose={() => setBodyDoubleOpen(false)} />
+      )}
 
       {settingsOpen && (
         <SettingsPanel

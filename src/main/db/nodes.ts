@@ -22,6 +22,7 @@ interface NodeRow {
   resume_markdown: string | null
   resume_updated_at: number | null
   due_date: number | null
+  archived: number | null
 }
 
 function rowToNode(row: NodeRow): FbNode {
@@ -44,7 +45,8 @@ function rowToNode(row: NodeRow): FbNode {
     extensionsMinutes: row.extensions_minutes ?? 0,
     resumeMarkdown: row.resume_markdown,
     resumeUpdatedAt: row.resume_updated_at,
-    dueDate: row.due_date
+    dueDate: row.due_date,
+    archived: row.archived === 1
   }
 }
 
@@ -124,6 +126,10 @@ export function updateNode(id: string, patch: NodePatch): FbNode | null {
       fields.push(`${col} = @${key}`)
       params[key] = patch[key]
     }
+  }
+  if (patch.archived !== undefined) {
+    fields.push('archived = @archived')
+    params.archived = patch.archived ? 1 : 0
   }
   if (patch.status === 'in_progress' && existing.status !== 'in_progress') {
     fields.push('started_at = @now')

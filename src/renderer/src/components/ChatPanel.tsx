@@ -371,10 +371,18 @@ function ProposalCards({
     null
   )
 
-  async function applyOne(p: ActionProposal): Promise<void> {
+  // resolvedIds threads newly-created entity ids (today: tables) through a
+  // batch so a follow-up proposal (today: add-table-row) can reference what
+  // an earlier one created via "$<proposalId>" symbolic refs. The map is
+  // scoped to the lifetime of a single applyAll() loop so a later batch
+  // doesn't accidentally pick up stale resolutions.
+  async function applyOne(
+    p: ActionProposal,
+    resolvedIds?: Map<string, string>
+  ): Promise<void> {
     if (busy) return
     setBusy(p.id)
-    const result = await applyProposal(p, { activeTaskId })
+    const result = await applyProposal(p, { activeTaskId, resolvedIds })
     setBusy(null)
     setToast({ id: p.id, ok: result.ok, message: result.message })
     // Only remove from the list if it succeeded. Failures stay so the user
@@ -386,9 +394,12 @@ function ProposalCards({
 
   async function applyAll(): Promise<void> {
     if (busy) return
+    const resolvedIds = new Map<string, string>()
     for (const p of proposals) {
-      // Sequential so error messages from one don't get clobbered by the next.
-      await applyOne(p)
+      // Sequential so error messages from one don't get clobbered by the
+      // next, AND so symbolic-id refs resolve in order (create-table must
+      // run before its add-table-row siblings).
+      await applyOne(p, resolvedIds)
     }
   }
 

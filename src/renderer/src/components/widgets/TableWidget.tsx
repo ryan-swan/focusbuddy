@@ -12,6 +12,7 @@ import { useTablesStore } from '../../stores/tables'
 import { useWidgetStore } from '../../stores/widgets'
 import FieldEditor from '../fields/FieldEditor'
 import RelationConfigEditor from '../fields/RelationConfigEditor'
+import { coerceCellValue } from '../../lib/actionExecutor'
 import Icon from '../Icon'
 
 interface Props {
@@ -78,6 +79,36 @@ export default function TableWidget({ widget, inline = false }: Props): JSX.Elem
     })()
   }, [tableId, ensureTable, ensureRows, createTable, updateWidget, widget.id, widget.taskId, widget.title])
 
+  // ── In-table AI assistant state ─────────────────────────────────────────
+  // These useState hooks MUST live above the `if (!table) return …` early
+  // exit below. Hooks must be called in the same order every render — if
+  // they sit below a conditional return, the first render (when `table` is
+  // still null) calls fewer hooks than later renders, which throws "Rendered
+  // more hooks than during the previous render" and blanks the app.
+  const [aiOpen, setAiOpen] = useState(false)
+  const [aiPrompt, setAiPrompt] = useState('')
+  const [aiCount, setAiCount] = useState(5)
+  // When true, the AI is asked to generate as many rows as the prompt
+  // naturally implies (no fixed N). The renderer signals this to the
+  // backend by passing count=0 — main treats 0 as the "auto" sentinel.
+  const [aiAutoCount, setAiAutoCount] = useState(false)
+  const [aiBusy, setAiBusy] = useState(false)
+  const [aiStaged, setAiStaged] = useState<Array<Record<string, unknown>> | null>(null)
+  // The AI may also propose new columns to fit the prompt. We surface
+  // those FIRST as a separate decision — the user reviews + applies the
+  // schema additions, THEN sees the row preview and decides about rows
+  // independently. Two-step staging makes accidental wholesale apply less
+  // likely and gives the user agency over what the AI changes.
+  const [aiStagedColumns, setAiStagedColumns] = useState<Array<{
+    label: string
+    type: string
+    options?: string[]
+  }> | null>(null)
+  // Tracks which staged columns the user has approved + applied. Once
+  // applied we hide the column panel and reveal the row preview.
+  const [columnsApplied, setColumnsApplied] = useState(false)
+  const [aiError, setAiError] = useState<string | null>(null)
+
   if (!table) {
     const body = (
       <div className="h-full w-full flex items-center justify-center text-[11px] text-stone-500">
@@ -139,26 +170,160 @@ export default function TableWidget({ widget, inline = false }: Props): JSX.Elem
     void updateTable(table!.id, { title })
   }
 
+  // ── In-table AI assistant handlers ──────────────────────────────────────
+  // State for these lives above the `if (!table)` early return so the hook
+  // call order stays constant. The handlers themselves use `table` which is
+  // guaranteed non-null at this point because of the early-return guard.
+
+  async function runAi(): Promise<void> {
+    if (!aiPrompt.trim() || aiBusy || !table) return
+    setAiBusy(true)
+    setAiError(null)
+    // Reset prior staging so a re-run can't conflate yesterday's columns
+    // with today's rows.
+    setAiStaged(null)
+    setAiStagedColumns(null)
+    setColumnsApplied(false)
+    try {
+      // count=0 signals the backend's "auto" mode.
+      const requestedCount = aiAutoCount ? 0 : aiCount
+      const resp = await window.api.ai.suggestTableRows(
+        table.id,
+        aiPrompt,
+        requestedCount
+      )
+      if (!resp.ok) {
+        setAiError(resp.error ?? 'AI request failed.')
+        return
+      }
+      if (!resp.rows || resp.rows.length === 0) {
+        setAiError('AI returned no rows.')
+        return
+      }
+      setAiStaged(resp.rows)
+      // Filter out columns whose label already exists in the current
+      // schema (the AI sometimes echoes existing columns). This makes the
+      // "add N columns" count match reality.
+      const fresh = (resp.columnsToAdd ?? []).filter((c) => {
+        const lc = c.label.toLowerCase().trim()
+        return !table.schema.columns.some(
+          (existing) => existing.label.toLowerCase().trim() === lc
+        )
+      })
+      setAiStagedColumns(fresh.length > 0 ? fresh : null)
+      // If no new columns are proposed we go straight to row staging.
+      if (fresh.length === 0) setColumnsApplied(true)
+    } finally {
+      setAiBusy(false)
+    }
+  }
+
+  function rejectAi(): void {
+    setAiStaged(null)
+    setAiStagedColumns(null)
+    setColumnsApplied(false)
+    setAiError(null)
+  }
+
+  // Phase 1 — user approves the schema additions. After this fires the
+  // table actually gains the new columns and the row preview becomes the
+  // active decision.
+  async function applyColumns(): Promise<void> {
+    if (!aiStagedColumns || !table) return
+    const palette = [
+      '#ef4444', '#f97316', '#eab308', '#22c55e',
+      '#06b6d4', '#3b82f6', '#a855f7', '#ec4899'
+    ]
+    const newCols: FieldDefinition[] = aiStagedColumns.map((c) => {
+      const id = `c-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
+      let config: unknown = defaultConfig(c.type as FieldType) as never
+      if (
+        (c.type === 'single-select' || c.type === 'multi-select') &&
+        Array.isArray(c.options)
+      ) {
+        config = {
+          options: c.options.map((label, oi) => ({
+            id: `o-${Date.now().toString(36)}-${oi}`,
+            label,
+            color: palette[oi % palette.length]
+          }))
+        }
+      }
+      return {
+        id,
+        type: c.type,
+        label: c.label,
+        config
+      } as FieldDefinition
+    })
+    const nextSchema: TableSchema = {
+      columns: [...table.schema.columns, ...newCols]
+    }
+    await setSchema(table.id, nextSchema)
+    setColumnsApplied(true)
+  }
+
+  // Phase 2 — user approves the row preview. Inserts the rows using the
+  // post-column-addition schema for coercion.
+  async function applyRows(): Promise<void> {
+    if (!aiStaged || !table) return
+    const byKey = new Map<string, FieldDefinition>()
+    for (const col of table.schema.columns) {
+      byKey.set(col.id, col)
+      byKey.set(col.label.toLowerCase().trim(), col)
+    }
+    for (const aiRow of aiStaged) {
+      const cells: Record<string, unknown> = {}
+      for (const [key, raw] of Object.entries(aiRow)) {
+        const col =
+          byKey.get(key) ?? byKey.get(key.toLowerCase().trim()) ?? null
+        if (!col) continue
+        cells[col.id] = coerceCellValue(col.type, raw, col.config)
+      }
+      if (Object.keys(cells).length > 0) {
+        await addRow(table.id, cells)
+      }
+    }
+    setAiStaged(null)
+    setAiStagedColumns(null)
+    setColumnsApplied(false)
+    setAiPrompt('')
+    setAiOpen(false)
+  }
+
   const body = (
-    <div className="h-full w-full bg-white dark:bg-stone-900 overflow-auto">
+    <div className="h-full w-full bg-white dark:bg-stone-900 overflow-auto relative">
       {/* Title row */}
-      <div className="sticky top-0 z-10 px-3 py-2 bg-white/95 dark:bg-stone-900/95 border-b border-stone-200 dark:border-stone-700 flex items-center gap-1">
-        <Icon name="table_chart" size={14} className="text-accent" />
+      <div className="sticky top-0 z-10 px-3 py-2 bg-white/95 dark:bg-stone-900/95 border-b border-stone-200 dark:border-stone-700 flex items-center gap-1.5">
+        <Icon name="table_chart" size={15} className="text-accent shrink-0" />
         <input
           value={table.title}
           onChange={(e) => renameTable(e.target.value)}
-          className="flex-1 bg-transparent text-[13px] font-medium text-stone-800 dark:text-stone-100 outline-none"
+          placeholder="Untitled table"
+          className="flex-1 bg-transparent text-[14px] font-semibold text-stone-800 dark:text-stone-100 outline-none placeholder-stone-300 dark:placeholder-stone-600"
         />
-        <span className="text-[10px] text-stone-400">
+        <span className="text-[11px] text-stone-400 dark:text-stone-500 font-medium tabular-nums">
           {rows.length} {rows.length === 1 ? 'row' : 'rows'}
         </span>
+        <button
+          onClick={() => setAiOpen((v) => !v)}
+          className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium transition-colors ${
+            aiOpen
+              ? 'bg-accent text-white'
+              : 'text-accent hover:bg-accent/10'
+          }`}
+          title="AI assistant — describe rows to generate, preview, then apply"
+        >
+          <Icon name="auto_awesome" size={12} />
+          <span>AI</span>
+        </button>
       </div>
 
-      <div className="text-[11px]">
+      <div className="text-[12px]">
         <table className="w-full border-collapse">
           <thead>
-            <tr className="border-b border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800/40">
-              <th className="w-6 px-1 py-1" />
+            <tr className="border-b border-stone-300 dark:border-stone-600 bg-stone-100/70 dark:bg-stone-800/60">
+              <th className="w-8 px-1 py-1.5" />
               {table.schema.columns.map((col) => (
                 <ColumnHeader
                   key={col.id}
@@ -169,31 +334,48 @@ export default function TableWidget({ widget, inline = false }: Props): JSX.Elem
                   onSetConfig={(c) => setColumnConfig(col.id, c)}
                 />
               ))}
-              <th className="w-8 px-1 py-1">
+              <th className="w-10 px-1 py-1.5">
                 <ColumnAdder onAdd={addColumn} />
               </th>
             </tr>
           </thead>
           <tbody>
-            {rows.map((row) => (
+            {rows.length === 0 && (
+              <tr>
+                <td
+                  colSpan={table.schema.columns.length + 2}
+                  className="py-8 text-center text-[12px] text-stone-400 dark:text-stone-500"
+                >
+                  <div className="flex flex-col items-center gap-1">
+                    <Icon name="table_rows" size={20} className="text-stone-300 dark:text-stone-600" />
+                    <span>No rows yet — click <strong className="text-stone-600 dark:text-stone-300">Add row</strong> below or use the <strong className="text-accent">AI</strong> button to generate some.</span>
+                  </div>
+                </td>
+              </tr>
+            )}
+            {rows.map((row, idx) => (
               <tr
                 key={row.id}
-                className="border-b border-stone-100 dark:border-stone-800 hover:bg-stone-50/50 dark:hover:bg-stone-800/30 group"
+                className={`border-b border-stone-200 dark:border-stone-700 group ${
+                  idx % 2 === 0
+                    ? 'bg-white dark:bg-stone-900'
+                    : 'bg-stone-50/60 dark:bg-stone-800/30'
+                } hover:bg-accent/[0.04] dark:hover:bg-accent/[0.08]`}
               >
-                <td className="w-6 px-1 py-1 text-center">
+                <td className="w-8 px-1 py-1 text-center border-r border-stone-200 dark:border-stone-700">
                   <button
                     onClick={() => void deleteRow(row.id)}
-                    className="opacity-0 group-hover:opacity-100 text-stone-400 hover:text-red-600"
+                    className="text-stone-300 dark:text-stone-600 hover:text-red-600 transition-colors"
                     title="Delete row"
                   >
-                    <Icon name="delete" size={11} />
+                    <Icon name="delete" size={13} />
                   </button>
                 </td>
                 {table.schema.columns.map((col) => (
                   <td
                     key={col.id}
-                    className="border-r border-stone-100 dark:border-stone-800 align-top"
-                    style={{ minWidth: 120 }}
+                    className="border-r border-stone-200 dark:border-stone-700 align-top"
+                    style={{ minWidth: 140 }}
                   >
                     <FieldEditor
                       def={col}
@@ -203,17 +385,17 @@ export default function TableWidget({ widget, inline = false }: Props): JSX.Elem
                     />
                   </td>
                 ))}
-                <td />
+                <td className="border-r border-stone-200 dark:border-stone-700" />
               </tr>
             ))}
             {/* Add-row footer */}
             <tr>
-              <td colSpan={table.schema.columns.length + 2} className="p-1">
+              <td colSpan={table.schema.columns.length + 2} className="p-1.5 border-t border-stone-200 dark:border-stone-700">
                 <button
                   onClick={() => void addRow(table.id)}
-                  className="inline-flex items-center gap-1 text-[11px] px-2 py-1 text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-100"
+                  className="w-full inline-flex items-center justify-center gap-1 text-[12px] py-1.5 rounded text-stone-500 dark:text-stone-400 hover:text-accent hover:bg-accent/5 transition-colors"
                 >
-                  <Icon name="add" size={12} />
+                  <Icon name="add" size={14} />
                   <span>Add row</span>
                 </button>
               </td>
@@ -221,6 +403,237 @@ export default function TableWidget({ widget, inline = false }: Props): JSX.Elem
           </tbody>
         </table>
       </div>
+
+      {aiOpen && (
+        <div className="absolute bottom-2 left-2 right-2 z-50 rounded-lg border border-accent bg-white dark:bg-stone-900 shadow-xl p-3 max-h-[70%] flex flex-col gap-2">
+          <div className="flex items-center gap-1.5">
+            <Icon name="auto_awesome" size={13} className="text-accent" />
+            <span className="text-[10px] uppercase tracking-wider font-semibold text-accent">
+              AI assistant — generate rows
+            </span>
+            <button
+              onClick={() => {
+                setAiOpen(false)
+                rejectAi()
+              }}
+              className="ml-auto h-5 w-5 rounded inline-flex items-center justify-center text-stone-400 hover:bg-stone-100 dark:hover:bg-stone-800"
+              aria-label="Close"
+            >
+              <Icon name="close" size={12} />
+            </button>
+          </div>
+          <textarea
+            autoFocus
+            value={aiPrompt}
+            onChange={(e) => setAiPrompt(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                e.preventDefault()
+                void runAi()
+              }
+            }}
+            placeholder='e.g. "Add 5 fictional podcast episodes about climate tech"'
+            rows={2}
+            className="w-full text-[13px] px-2.5 py-1.5 bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-md resize-none focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
+          />
+          <div className="flex items-center gap-2 text-[11px] flex-wrap">
+            <label className="text-stone-500 dark:text-stone-400">Rows:</label>
+            <label className="inline-flex items-center gap-1 cursor-pointer text-stone-700 dark:text-stone-200">
+              <input
+                type="checkbox"
+                checked={aiAutoCount}
+                onChange={(e) => setAiAutoCount(e.target.checked)}
+                className="accent-accent"
+              />
+              <span>As many as needed</span>
+            </label>
+            {!aiAutoCount && (
+              <>
+                <span className="text-stone-300 dark:text-stone-600">·</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={20}
+                  value={aiCount}
+                  onChange={(e) =>
+                    setAiCount(Math.max(1, Math.min(20, parseInt(e.target.value) || 1)))
+                  }
+                  className="w-14 px-2 py-0.5 bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded text-stone-800 dark:text-stone-100 focus:outline-none focus:border-accent"
+                />
+                <span className="text-stone-400 dark:text-stone-500">fixed</span>
+              </>
+            )}
+          </div>
+          {aiError && (
+            <div className="text-[11px] text-amber-700 dark:text-amber-400">
+              {aiError}
+            </div>
+          )}
+          {/* STAGE 1 — column staging. Visible until the user either
+              applies the new columns OR runAi returned no proposed columns
+              (columnsApplied auto-set true). Includes its own Apply/Skip
+              buttons so the schema decision is explicit and separate from
+              the row decision. */}
+          {aiStagedColumns && aiStagedColumns.length > 0 && !columnsApplied && (
+            <div className="rounded-md border-2 border-accent bg-accent/[0.06] p-2 space-y-2">
+              <div className="flex items-center gap-2">
+                <span className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-accent text-white text-[10px] font-bold">1</span>
+                <div className="text-[11px] uppercase tracking-wider text-accent font-semibold">
+                  Step 1 — Approve {aiStagedColumns.length} new {aiStagedColumns.length === 1 ? 'column' : 'columns'}
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-1">
+                {aiStagedColumns.map((c, i) => (
+                  <span
+                    key={i}
+                    className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-white dark:bg-stone-800 border border-accent/40 text-[11px] text-stone-700 dark:text-stone-200"
+                    title={
+                      c.options && c.options.length > 0
+                        ? `Options: ${c.options.join(', ')}`
+                        : c.type
+                    }
+                  >
+                    <Icon name="view_column" size={11} className="text-accent" />
+                    <strong className="text-stone-800 dark:text-stone-100">{c.label}</strong>
+                    <span className="text-stone-400 dark:text-stone-500">{c.type}</span>
+                  </span>
+                ))}
+              </div>
+              <div className="text-[10px] text-stone-500 dark:text-stone-400">
+                Adding these will update your table's schema. Rows preview unlocks once you decide.
+              </div>
+              <div className="flex justify-end gap-1.5">
+                <button
+                  onClick={() => {
+                    // Skip column additions and proceed straight to row
+                    // preview. We don't drop them from aiStagedColumns
+                    // entirely (so the user can still see "AI suggested")
+                    // but mark columnsApplied so the UI moves on.
+                    setAiStagedColumns(null)
+                    setColumnsApplied(true)
+                  }}
+                  className="text-[11px] px-3 py-1 rounded text-stone-600 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800"
+                >
+                  Skip
+                </button>
+                <button
+                  onClick={() => void applyColumns()}
+                  className="text-[11px] px-3 py-1 rounded bg-accent text-white hover:brightness-110 inline-flex items-center gap-1"
+                >
+                  <Icon name="check" size={11} />
+                  Add {aiStagedColumns.length} {aiStagedColumns.length === 1 ? 'column' : 'columns'}
+                </button>
+              </div>
+            </div>
+          )}
+          {/* STAGE 2 — row preview. Only renders once the schema decision
+              is locked in (either applied columns or explicitly skipped),
+              so the user is making one decision at a time. */}
+          {aiStaged && aiStaged.length > 0 && columnsApplied && (
+            <div className="flex-1 min-h-0 flex flex-col gap-1">
+              <div className="flex items-center gap-2">
+                <span className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-accent text-white text-[10px] font-bold">2</span>
+                <div className="text-[11px] uppercase tracking-wider text-accent font-semibold">
+                  Step 2 — Approve {aiStaged.length} {aiStaged.length === 1 ? 'row' : 'rows'}
+                </div>
+              </div>
+              <div className="flex-1 min-h-0 overflow-auto bg-stone-50 dark:bg-stone-800/60 border border-stone-200 dark:border-stone-700 rounded-md">
+                <table className="w-full text-[11px]">
+                  <thead className="bg-stone-100 dark:bg-stone-800 sticky top-0">
+                    <tr>
+                      {table.schema.columns.map((col) => (
+                        <th
+                          key={col.id}
+                          className="text-left px-2 py-1 font-medium text-stone-700 dark:text-stone-200 border-r border-stone-200 dark:border-stone-700"
+                        >
+                          {col.label}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {aiStaged.map((row, i) => (
+                      <tr
+                        key={i}
+                        className="border-b border-stone-200 dark:border-stone-700"
+                      >
+                        {table.schema.columns.map((col) => {
+                          const v =
+                            row[col.label] ??
+                            row[col.label.toLowerCase().trim()] ??
+                            row[col.id] ??
+                            ''
+                          const display = Array.isArray(v)
+                            ? v.join(', ')
+                            : typeof v === 'boolean'
+                              ? v ? '✓' : ''
+                              : String(v ?? '')
+                          return (
+                            <td
+                              key={col.id}
+                              className="px-2 py-1 text-stone-700 dark:text-stone-200 border-r border-stone-200 dark:border-stone-700 align-top max-w-[200px] truncate"
+                              title={display}
+                            >
+                              {display || <span className="text-stone-300 dark:text-stone-600">—</span>}
+                            </td>
+                          )
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+          <div className="flex justify-end gap-1.5">
+            {aiStaged && columnsApplied ? (
+              <>
+                <button
+                  onClick={rejectAi}
+                  className="text-[11px] px-3 py-1 rounded text-stone-600 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800"
+                >
+                  Discard
+                </button>
+                <button
+                  onClick={() => void runAi()}
+                  disabled={!aiPrompt.trim() || aiBusy}
+                  className="text-[11px] px-3 py-1 rounded text-stone-700 dark:text-stone-200 border border-stone-300 dark:border-stone-600 hover:bg-stone-100 dark:hover:bg-stone-800 disabled:opacity-50"
+                >
+                  {aiBusy ? 'Regenerating…' : 'Regenerate'}
+                </button>
+                <button
+                  onClick={() => void applyRows()}
+                  className="text-[11px] px-3 py-1 rounded bg-accent text-white hover:brightness-110 inline-flex items-center gap-1"
+                >
+                  <Icon name="check" size={11} />
+                  Add {aiStaged.length} {aiStaged.length === 1 ? 'row' : 'rows'}
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={() => void runAi()}
+                disabled={!aiPrompt.trim() || aiBusy}
+                className="text-[11px] px-3 py-1 rounded bg-accent text-white hover:brightness-110 disabled:opacity-50 inline-flex items-center gap-1"
+              >
+                {aiBusy ? (
+                  <>
+                    <Icon name="autorenew" size={11} className="animate-spin" />
+                    Drafting…
+                  </>
+                ) : (
+                  <>
+                    <Icon name="auto_awesome" size={11} />
+                    Draft
+                  </>
+                )}
+              </button>
+            )}
+          </div>
+          <div className="text-[9px] text-stone-400 dark:text-stone-500">
+            Cmd+Enter to draft · rows are previewed before they touch the table
+          </div>
+        </div>
+      )}
     </div>
   )
 

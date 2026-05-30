@@ -1,0 +1,305 @@
+import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
+import type {
+  ShareableKind,
+  ShareLink,
+  ShareScope
+} from '@shared/types'
+import { useSharesStore } from '../stores/shares'
+import { viewerUrlFor } from '../lib/shareTokens'
+import Icon from './Icon'
+
+// Universal share dialog — opens from a folder, task, or widget right-click.
+// One flow regardless of the entity kind: pick scope (view-only or
+// collaborator-copy), mint a link, copy it, see existing links + revoke.
+//
+// The link URL points at the future hosted viewer (`https://fb.app/share/…`).
+// In local-mock mode the URL won't resolve yet — there's an honest banner
+// telling the user that. Once the matching/viewer service ships, the SAME
+// links start working without any change to the dialog.
+
+interface Props {
+  kind: ShareableKind
+  entityId: string
+  // Display label cached at create-time. Used in the link list so revoked
+  // / renamed items still make sense.
+  label: string
+  onClose: () => void
+}
+
+export default function ShareDialog({
+  kind,
+  entityId,
+  label,
+  onClose
+}: Props): JSX.Element {
+  const createFor = useSharesStore((s) => s.createFor)
+  const revoke = useSharesStore((s) => s.revoke)
+  const remove = useSharesStore((s) => s.remove)
+  const refresh = useSharesStore((s) => s.refresh)
+  const outgoing = useSharesStore((s) =>
+    s.outgoing.filter((l) => l.kind === kind && l.entityId === entityId)
+  )
+
+  const [scope, setScope] = useState<ShareScope>('view')
+  const [busy, setBusy] = useState(false)
+  const [justCopiedId, setJustCopiedId] = useState<string | null>(null)
+  // The most recently minted link — surfaced prominently so the user sees
+  // what to copy without scrolling the existing-links list.
+  const [fresh, setFresh] = useState<ShareLink | null>(null)
+
+  useEffect(() => {
+    void refresh()
+  }, [refresh])
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent): void {
+      if (e.key === 'Escape') onClose()
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [onClose])
+
+  async function copyToClipboard(text: string, linkId: string): Promise<void> {
+    try {
+      await navigator.clipboard.writeText(text)
+      setJustCopiedId(linkId)
+      setTimeout(() => setJustCopiedId((id) => (id === linkId ? null : id)), 1800)
+    } catch {
+      // Clipboard write failed (rare on Electron) — fall back to prompt.
+      window.prompt('Copy this link manually:', text)
+    }
+  }
+
+  async function handleCreate(): Promise<void> {
+    if (busy) return
+    setBusy(true)
+    try {
+      const created = await createFor({ kind, entityId, label, scope })
+      setFresh(created)
+      // Auto-copy fresh links so the common path is one click → in
+      // clipboard. The success animation on the chip confirms it landed.
+      await copyToClipboard(viewerUrlFor(created.token), created.id)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const KIND_LABEL: Record<ShareableKind, string> = {
+    folder: 'folder',
+    task: 'task',
+    widget: 'desk item'
+  }
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[260] bg-stone-900/40 backdrop-blur-[2px] flex items-center justify-center"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onClose()
+      }}
+    >
+      <div
+        className="w-[460px] max-h-[80vh] rounded-lg bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-700 shadow-2xl flex flex-col"
+        onMouseDown={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center gap-2 px-4 py-3 border-b border-stone-200 dark:border-stone-700">
+          <div className="h-8 w-8 rounded-full bg-accent/10 inline-flex items-center justify-center">
+            <Icon name="share" size={16} className="text-accent" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h2 className="text-sm font-semibold text-stone-900 dark:text-stone-100">
+              Share this {KIND_LABEL[kind]}
+            </h2>
+            <p className="text-[11px] text-stone-500 dark:text-stone-400 truncate">
+              {label || '(untitled)'}
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className="h-7 w-7 rounded inline-flex items-center justify-center text-stone-400 hover:bg-stone-100 dark:hover:bg-stone-800"
+            aria-label="Close"
+          >
+            <Icon name="close" size={14} />
+          </button>
+        </div>
+
+        <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-3">
+          {/* Scope picker */}
+          <div>
+            <label className="block text-[10px] uppercase tracking-wider font-semibold text-stone-500 dark:text-stone-400 mb-1.5">
+              Permission
+            </label>
+            <div className="space-y-1.5">
+              <button
+                onClick={() => setScope('view')}
+                className={`w-full text-left p-2.5 rounded-md border-2 flex items-start gap-2.5 transition-colors ${
+                  scope === 'view'
+                    ? 'border-accent bg-accent/[0.06]'
+                    : 'border-stone-200 dark:border-stone-700 hover:border-stone-300 dark:hover:border-stone-600'
+                }`}
+              >
+                <Icon
+                  name="visibility"
+                  size={16}
+                  className={scope === 'view' ? 'text-accent mt-0.5 shrink-0' : 'text-stone-400 mt-0.5 shrink-0'}
+                />
+                <div className="flex-1 min-w-0">
+                  <div className={`text-[13px] font-medium ${scope === 'view' ? 'text-accent' : 'text-stone-800 dark:text-stone-100'}`}>
+                    View only
+                  </div>
+                  <div className="text-[11px] text-stone-500 dark:text-stone-400 leading-snug">
+                    Anyone with the link can see this {KIND_LABEL[kind]}. No sign-up needed to view.
+                  </div>
+                </div>
+              </button>
+              <button
+                onClick={() => setScope('copy')}
+                className={`w-full text-left p-2.5 rounded-md border-2 flex items-start gap-2.5 transition-colors ${
+                  scope === 'copy'
+                    ? 'border-accent bg-accent/[0.06]'
+                    : 'border-stone-200 dark:border-stone-700 hover:border-stone-300 dark:hover:border-stone-600'
+                }`}
+              >
+                <Icon
+                  name="content_copy"
+                  size={16}
+                  className={scope === 'copy' ? 'text-accent mt-0.5 shrink-0' : 'text-stone-400 mt-0.5 shrink-0'}
+                />
+                <div className="flex-1 min-w-0">
+                  <div className={`text-[13px] font-medium ${scope === 'copy' ? 'text-accent' : 'text-stone-800 dark:text-stone-100'}`}>
+                    View + add to their workspace
+                  </div>
+                  <div className="text-[11px] text-stone-500 dark:text-stone-400 leading-snug">
+                    Recipient can sign up and it appears in their <strong>Shared with me</strong> sidebar — they can copy it into their own workspace.
+                  </div>
+                </div>
+              </button>
+            </div>
+          </div>
+
+          {/* Generate + freshly-minted link surface */}
+          <button
+            onClick={() => void handleCreate()}
+            disabled={busy}
+            className="w-full text-[13px] py-2 rounded-md bg-accent text-white hover:brightness-110 disabled:opacity-60 inline-flex items-center justify-center gap-1.5 font-medium"
+          >
+            {busy ? (
+              <>
+                <Icon name="autorenew" size={13} className="animate-spin" />
+                Generating…
+              </>
+            ) : (
+              <>
+                <Icon name="link" size={13} />
+                Create link & copy
+              </>
+            )}
+          </button>
+
+          {fresh && (
+            <div className="rounded-md border-2 border-accent bg-accent/[0.06] p-2.5 space-y-1.5">
+              <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-accent font-semibold">
+                <Icon name="check_circle" size={11} />
+                Link ready{justCopiedId === fresh.id ? ' — copied!' : ''}
+              </div>
+              <div className="flex items-center gap-1.5">
+                <code className="flex-1 text-[11px] font-mono bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded px-2 py-1 truncate">
+                  {viewerUrlFor(fresh.token)}
+                </code>
+                <button
+                  onClick={() => void copyToClipboard(viewerUrlFor(fresh.token), fresh.id)}
+                  className="text-[11px] px-2 py-1 rounded text-stone-700 dark:text-stone-200 hover:bg-stone-100 dark:hover:bg-stone-800"
+                  title="Copy link"
+                >
+                  <Icon name="content_copy" size={12} />
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Existing links for this entity */}
+          {outgoing.length > 0 && (
+            <div>
+              <label className="block text-[10px] uppercase tracking-wider font-semibold text-stone-500 dark:text-stone-400 mb-1.5">
+                Existing links ({outgoing.length})
+              </label>
+              <div className="space-y-1">
+                {outgoing.map((link) => {
+                  const url = viewerUrlFor(link.token)
+                  return (
+                    <div
+                      key={link.id}
+                      className={`flex items-center gap-1.5 px-2 py-1.5 rounded-md border ${
+                        link.revoked
+                          ? 'border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800/40 opacity-60'
+                          : 'border-stone-200 dark:border-stone-700 hover:border-stone-300 dark:hover:border-stone-600'
+                      }`}
+                    >
+                      <Icon
+                        name={link.scope === 'view' ? 'visibility' : 'content_copy'}
+                        size={11}
+                        className="text-stone-400 shrink-0"
+                      />
+                      <code className="flex-1 text-[10px] font-mono text-stone-600 dark:text-stone-400 truncate">
+                        {url}
+                      </code>
+                      {link.revoked && (
+                        <span className="text-[9px] uppercase tracking-wider text-red-500 dark:text-red-400">
+                          revoked
+                        </span>
+                      )}
+                      {!link.revoked && link.viewCount > 0 && (
+                        <span className="text-[10px] text-stone-500 dark:text-stone-400 tabular-nums">
+                          {link.viewCount} views
+                        </span>
+                      )}
+                      {!link.revoked && (
+                        <button
+                          onClick={() => void copyToClipboard(url, link.id)}
+                          className="icon-btn !h-5 !w-5"
+                          title="Copy"
+                        >
+                          <Icon
+                            name={justCopiedId === link.id ? 'check' : 'content_copy'}
+                            size={11}
+                          />
+                        </button>
+                      )}
+                      {!link.revoked && (
+                        <button
+                          onClick={() => void revoke(link.id)}
+                          className="icon-btn !h-5 !w-5"
+                          title="Revoke — link stops working"
+                        >
+                          <Icon name="link_off" size={11} />
+                        </button>
+                      )}
+                      <button
+                        onClick={() => void remove(link.id)}
+                        className="icon-btn !h-5 !w-5 hover:!text-red-700"
+                        title="Delete this link"
+                      >
+                        <Icon name="delete" size={11} />
+                      </button>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Honesty banner about local-mock mode */}
+          <div className="text-[10px] text-stone-500 dark:text-stone-400 leading-relaxed bg-stone-50 dark:bg-stone-800/50 p-2 rounded">
+            <strong className="text-stone-700 dark:text-stone-200">v1 note:</strong>{' '}
+            The link points to the future hosted viewer. The token is real and
+            unique — once the FocusBuddy share service ships, the same link
+            will resolve. For now you can share it manually with someone using
+            FocusBuddy on the same network (they can paste it into{' '}
+            <em>Sidebar → Shared with me → Paste a share link</em>).
+          </div>
+        </div>
+      </div>
+    </div>,
+    document.body
+  )
+}

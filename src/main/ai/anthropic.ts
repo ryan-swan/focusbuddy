@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { getNode } from '../db/nodes'
 import { getWidget, listWidgetsByTask } from '../db/widgets'
+import { getTable } from '../db/tables'
 import { getRecentHistory } from '../db/browsing'
 import { getRecentActivity } from '../db/activity'
 import { markdownToTiptap } from './markdownToTiptap'
@@ -230,8 +231,8 @@ function buildSystemPrompt(taskId: string | null): string {
     '  { "kind": "create-widget", "widgetKind": "sticky"|"note"|"markdown"|"calculator"|"color"|"timer", "title": "...", "content": "...", "reason": "..." }\n' +
     '  { "kind": "create-page", "title": "Project brief", "sections": [{"heading":"Goals","body":"..."}], "reason": "..." }\n' +
     '  { "kind": "create-task", "title": "Q1 rebrand", "notes": "scope notes", "reason": "..." }\n' +
-    '  { "kind": "create-table", "title": "Episodes", "columns": [{"label":"Title","type":"text-short"},{"label":"Status","type":"single-select","options":["Draft","Recorded","Live"]}], "reason": "..." }\n' +
-    '  { "kind": "add-table-row", "tableId": "<from canvas summary>", "cells": {"Title":"Pilot","Status":"Draft"}, "reason": "..." }\n' +
+    '  { "kind": "create-table", "id": "tbl-1", "title": "Episodes", "columns": [{"label":"Title","type":"text-short"},{"label":"Status","type":"single-select","options":["Draft","Recorded","Live"]}], "reason": "..." }\n' +
+    '  { "kind": "add-table-row", "tableId": "$tbl-1", "cells": {"Title":"Pilot","Status":"Draft"}, "reason": "..." }\n' +
     '  { "kind": "create-field", "label": "Energy", "fieldType": "single-select", "options": ["Low","Med","High"], "reason": "..." }\n' +
     '  { "kind": "update-widget", "widgetId": "<from canvas summary>", "label": "the launch checklist", "title": "...", "content": "...", "reason": "..." }\n' +
     '  { "kind": "delete-widget", "widgetId": "<from canvas summary>", "label": "the empty sticky", "reason": "..." }\n' +
@@ -244,7 +245,8 @@ function buildSystemPrompt(taskId: string | null): string {
     '4. For todo lists: ALWAYS use "create-todo-list" — never a "create-widget" of kind "markdown" with bullets.\n' +
     '5. For Google Docs/Sheets/Slides or any URL: use "open-url", not "create-widget".\n' +
     '6. For Airtable-style record collections (clients, episodes, contacts, ideas with columns): use "create-table". Define columns up-front. Use "add-table-row" to insert specific rows after the table exists.\n' +
-    '7. For modifying existing widgets, use their id from the canvas summary (shown as `id=...`). Same for tableId.\n' +
+    '7. For modifying existing widgets, use their id from the canvas summary (shown as `id=...`). Same for an existing tableId.\n' +
+    '7a. To add rows to a table you are creating in the SAME response, the table does not have a real id yet. Give the create-table action an "id" field (e.g. "tbl-1"), then in sibling add-table-row actions set "tableId": "$tbl-1" (literal $ prefix + the matching id). The system resolves it at apply time. NEVER guess a uuid for a not-yet-created table.\n' +
     '8. Delete only on explicit user request, never speculatively.\n' +
     '9. "reply" should be short (1-2 sentences). Markdown is rendered. Don\'t list the widgets in reply — let the cards speak.\n\n' +
     'CORRECT for "set up a podcast launch workspace":\n' +
@@ -413,8 +415,15 @@ function parseChatJson(raw: string): {
             }>)
           : []
         if (!title || columns.length === 0) break
+        // The AI can suggest its own proposal id (e.g. "tbl-1") so that
+        // sibling add-table-row actions can reference it via "$tbl-1".
+        // Fall back to a generated id when the AI doesn't bother.
+        const proposedId =
+          typeof action.id === 'string' && action.id.trim().length > 0
+            ? (action.id as string)
+            : makeProposalId('tbl', i++)
         proposals.push({
-          id: makeProposalId('tbl', i++),
+          id: proposedId,
           kind: 'create-table',
           title,
           columns: columns as unknown as Extract<
@@ -428,6 +437,9 @@ function parseChatJson(raw: string): {
       case 'add-table-row': {
         const tableId = action.tableId as string
         const cells = action.cells as Record<string, string>
+        // Accept BOTH real uuids and "$<proposalId>" symbolic refs (the
+        // applyAddTableRow resolver handles the prefix). Refuse only when
+        // tableId is missing entirely.
         if (!tableId || !cells || typeof cells !== 'object') break
         proposals.push({
           id: makeProposalId('row', i++),
@@ -1230,6 +1242,203 @@ export async function regenerateLivingPage(
       ok: true,
       content: JSON.stringify(doc),
       generatedAt
+    }
+  } catch (e) {
+    return { ok: false, error: (e as Error).message }
+  }
+}
+
+// ── In-widget AI: Page content suggestion ────────────────────────────────────
+//
+// Lets a PageWidget surface an inline "AI assistant" that takes a free-form
+// prompt and returns Tiptap doc JSON ready to insert at the cursor. The
+// renderer stages the result for user approval before actually inserting it
+// into the editor — so the user sees what's about to land before it lands.
+
+export interface PageContentSuggestion {
+  ok: boolean
+  // Tiptap doc JSON — directly insertable via editor.commands.insertContent.
+  tiptapJson?: string
+  // Markdown preview for the renderer's staging panel — much cheaper to
+  // render with react-markdown than spinning up a hidden Tiptap instance.
+  markdown?: string
+  error?: string
+  needsApiKey?: boolean
+}
+
+export async function suggestPageContent(
+  prompt: string
+): Promise<PageContentSuggestion> {
+  const c = getClient()
+  if (!c) return { ok: false, needsApiKey: true, error: 'No ANTHROPIC_API_KEY' }
+  const trimmed = prompt.trim()
+  if (!trimmed) return { ok: false, error: 'Prompt is empty.' }
+
+  const system =
+    'You are an in-page AI assistant. The user is inside a Notion-style page widget and ' +
+    'wants you to draft content for them. The user will see your output first as a preview ' +
+    'and can choose to Insert or Discard — your job is to produce well-structured markdown ' +
+    'they will be happy to commit.\n\n' +
+    'OUTPUT RULES:\n' +
+    '  - Reply with raw markdown only. NO code fences. NO preamble.\n' +
+    '  - Start directly with the first heading or paragraph.\n' +
+    '  - Use ## for section headings, - for bullets, - [ ] for open todos, - [x] for done.\n' +
+    '  - Keep it tight — this lands inside a page, not as a standalone document.\n' +
+    '  - If the request is ambiguous, make a reasonable interpretation; do not ask back.'
+
+  try {
+    const resp = await c.messages.create({
+      model: resolveModel('living_page'),
+      max_tokens: 1500,
+      system,
+      messages: [{ role: 'user', content: trimmed }]
+    })
+    const text = resp.content
+      .filter((b) => b.type === 'text')
+      .map((b) => ('text' in b ? b.text : ''))
+      .join('\n')
+      .trim()
+    if (!text) return { ok: false, error: 'Empty response from model' }
+    const doc = markdownToTiptap(text)
+    return {
+      ok: true,
+      tiptapJson: JSON.stringify(doc),
+      markdown: text
+    }
+  } catch (e) {
+    return { ok: false, error: (e as Error).message }
+  }
+}
+
+// ── In-widget AI: Table row suggestion ───────────────────────────────────────
+//
+// Loads the target table's schema, asks the model for rows fitting that
+// schema, and returns them as cells keyed by column LABEL (the renderer's
+// add-row path coerces to typed values per column). The renderer stages the
+// result for approval before adding any rows.
+
+export interface TableRowsSuggestion {
+  ok: boolean
+  // Rows keyed by column label or column id — the existing coerceCellValue
+  // path in the renderer handles either via case-insensitive label match.
+  rows?: Array<Record<string, unknown>>
+  // Optional schema additions — the AI proposes these when the current
+  // schema doesn't cover what the prompt asks for. The renderer shows them
+  // in the preview and applies them BEFORE inserting rows. Each entry has
+  // a label, a field type, and (for select kinds) a list of option labels.
+  columnsToAdd?: Array<{
+    label: string
+    type: string
+    options?: string[]
+  }>
+  error?: string
+  needsApiKey?: boolean
+}
+
+export async function suggestTableRows(
+  tableId: string,
+  prompt: string,
+  count: number
+): Promise<TableRowsSuggestion> {
+  const c = getClient()
+  if (!c) return { ok: false, needsApiKey: true, error: 'No ANTHROPIC_API_KEY' }
+  const trimmed = prompt.trim()
+  if (!trimmed) return { ok: false, error: 'Prompt is empty.' }
+  const table = getTable(tableId)
+  if (!table) return { ok: false, error: 'Table not found.' }
+  // count === 0 means "auto — generate as many as the prompt naturally
+  // implies." We pass that intent into the prompt instead of clamping to a
+  // fixed number. Any positive value is bounded to a sane 1..20 range.
+  const auto = count === 0
+  const safeCount = auto ? 0 : Math.max(1, Math.min(20, Math.round(count)))
+
+  const schemaLines: string[] = []
+  for (const col of table.schema.columns) {
+    const cfg = col.config as { options?: Array<{ label: string }> } | undefined
+    const optStr =
+      cfg?.options && Array.isArray(cfg.options) && cfg.options.length > 0
+        ? ` (one of: ${cfg.options.map((o) => `"${o.label}"`).join(', ')})`
+        : ''
+    schemaLines.push(`  - "${col.label}" — ${col.type}${optStr}`)
+  }
+
+  // Detect "minimal scaffold" tables — the table widget auto-provisions a
+  // (Name, Done) pair when first dropped. If the user's prompt asks for
+  // something domain-specific (podcast episodes, contacts, workouts…),
+  // those two columns almost certainly aren't enough — the AI should
+  // ALWAYS propose what it actually needs.
+  const looksLikeScaffold =
+    table.schema.columns.length <= 2 &&
+    table.schema.columns.every((c) =>
+      ['Name', 'Done', 'Title', 'Status'].includes(c.label)
+    )
+
+  const system =
+    'You are an in-table AI assistant. The user wants you to populate a typed table from a ' +
+    'free-form prompt. You receive the table title, the CURRENT schema, and the prompt.\n\n' +
+    '═══════════ COLUMN DECISION (read this carefully) ═══════════\n' +
+    'BEFORE generating rows, decide whether the CURRENT schema actually fits the prompt.\n' +
+    '\n' +
+    'If the table looks like a generic empty scaffold (only Name/Done/Title/Status), the ' +
+    'user has NOT set up real columns yet — propose the columns the prompt obviously needs ' +
+    'via "columnsToAdd". This is the EXPECTED case for fresh tables.\n' +
+    '\n' +
+    'If the prompt clearly implies fields that are missing (e.g. "podcast episodes" needs ' +
+    'Title, Duration, Host, Status, Release Date, etc.; "contacts" needs Name, Email, ' +
+    'Company; "expenses" needs Date, Amount, Category, Notes), PROPOSE THEM. The user can ' +
+    'reject if not needed.\n' +
+    '\n' +
+    'Only skip "columnsToAdd" when the existing schema GENUINELY covers everything implied ' +
+    'by the prompt with no obvious gaps. When in doubt, propose.\n' +
+    '\n' +
+    '═══════════ OUTPUT RULES ═══════════\n' +
+    '  - Reply with a SINGLE JSON object: { "columnsToAdd": [...], "rows": [ {…} ] }. NO prose. NO code fences.\n' +
+    '  - "columnsToAdd" entries: { "label": "…", "type": "…", "options": ["…"]? }.\n' +
+    '  - Valid types: text-short, text-long, number, checkbox, single-select, multi-select, date.\n' +
+    '  - For single-select / multi-select columns YOU PROPOSE, you MUST include an "options" array of label strings.\n' +
+    '  - Each row\'s keys are column LABELS — existing schema labels OR labels of columns you proposed.\n' +
+    '  - You MUST populate cells for the columns you propose. A proposed column with no cell values in the rows defeats the point.\n' +
+    '  - For checkbox columns use true/false. For number, use a JSON number. For dates, ISO 8601 (YYYY-MM-DD).\n' +
+    '  - For single-select / multi-select the value MUST be one of the listed options. Multi-select takes an array.\n' +
+    '  - For text columns, keep values under 80 chars (unless column is "text-long").\n' +
+    (auto
+      ? '  - Generate as many rows as the prompt naturally implies — could be 3, could be 20. Use judgement, no fixed count.\n'
+      : `  - Generate exactly ${safeCount} row(s) unless the prompt clearly specifies a different count.\n`) +
+    (looksLikeScaffold
+      ? '\n⚠ The current schema is the default scaffold — you SHOULD propose columns unless the prompt explicitly asks to only use Name/Done.'
+      : '')
+
+  const user =
+    `Table: "${table.title}"\n\nCurrent columns:\n${schemaLines.join('\n')}\n\nPrompt: ${trimmed}\n\nReturn the JSON now:`
+
+  try {
+    const resp = await c.messages.create({
+      model: resolveModel('setup'),
+      max_tokens: 1500,
+      system,
+      messages: [{ role: 'user', content: user }]
+    })
+    const text = resp.content
+      .filter((b) => b.type === 'text')
+      .map((b) => ('text' in b ? b.text : ''))
+      .join('\n')
+      .trim()
+    if (!text) return { ok: false, error: 'Empty response from model' }
+    const json = extractJson(text)
+    if (!json) return { ok: false, error: 'Model did not return JSON' }
+    const parsed = JSON.parse(json) as {
+      rows?: Array<Record<string, unknown>>
+      columnsToAdd?: Array<{ label: string; type: string; options?: string[] }>
+    }
+    if (!Array.isArray(parsed.rows)) {
+      return { ok: false, error: 'Model JSON missing "rows" array' }
+    }
+    return {
+      ok: true,
+      rows: parsed.rows,
+      columnsToAdd: Array.isArray(parsed.columnsToAdd)
+        ? parsed.columnsToAdd
+        : undefined
     }
   } catch (e) {
     return { ok: false, error: (e as Error).message }

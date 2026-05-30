@@ -16,6 +16,16 @@ import {
 } from '../db/widgets'
 import { createLink, deleteLink, listLinksByTask } from '../db/widgetLinks'
 import {
+  acceptShare,
+  createShareLink,
+  deleteShareLink,
+  listAllShareLinks,
+  listShareLinksForEntity,
+  listSharedWithMe,
+  removeSharedItem,
+  revokeShareLink
+} from '../db/shares'
+import {
   createTemplateFromTask,
   deleteTemplate,
   listTemplates
@@ -96,7 +106,9 @@ import {
   proposeSmartStacks,
   regenerateLivingPage,
   sendChat,
+  suggestPageContent,
   suggestSetupWidgets,
+  suggestTableRows,
   summarizeRecentTrail
 } from '../ai/anthropic'
 import { getModelMode, setModelMode } from '../ai/modelRouting'
@@ -137,6 +149,46 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('widgets:bringToFront', (_e, id: string) => bringToFront(id))
 
   ipcMain.handle('widgetLinks:listByTask', (_e, taskId: string) => listLinksByTask(taskId))
+
+  // Share-link CRUD
+  ipcMain.handle('shares:listAll', () => listAllShareLinks())
+  ipcMain.handle(
+    'shares:listForEntity',
+    (_e, kind: 'folder' | 'task' | 'widget', entityId: string) =>
+      listShareLinksForEntity(kind, entityId)
+  )
+  ipcMain.handle(
+    'shares:create',
+    (
+      _e,
+      input: {
+        token: string
+        kind: 'folder' | 'task' | 'widget'
+        entityId: string
+        label: string
+        scope: 'view' | 'copy'
+        expiresAt: number | null
+      }
+    ) => createShareLink(input)
+  )
+  ipcMain.handle('shares:revoke', (_e, id: string) => revokeShareLink(id))
+  ipcMain.handle('shares:delete', (_e, id: string) => deleteShareLink(id))
+  // "Shared with me" inbox
+  ipcMain.handle('shares:inbox', () => listSharedWithMe())
+  ipcMain.handle(
+    'shares:accept',
+    (
+      _e,
+      input: {
+        token: string
+        kind: 'folder' | 'task' | 'widget'
+        snapshot: unknown
+        fromHandle: string
+        scope: 'view' | 'copy'
+      }
+    ) => acceptShare(input)
+  )
+  ipcMain.handle('shares:removeInbox', (_e, id: string) => removeSharedItem(id))
   ipcMain.handle(
     'widgetLinks:create',
     (_e, sourceWidgetId: string, targetWidgetId: string, taskId: string) =>
@@ -147,8 +199,13 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('templates:list', () => listTemplates())
   ipcMain.handle(
     'templates:createFromTask',
-    (_e, taskId: string, name: string, description?: string) =>
-      createTemplateFromTask(taskId, name, description)
+    (
+      _e,
+      taskId: string,
+      name: string,
+      description?: string,
+      widgetIds?: string[]
+    ) => createTemplateFromTask(taskId, name, description, widgetIds)
   )
   ipcMain.handle('templates:delete', (_e, id: string) => deleteTemplate(id))
 
@@ -166,6 +223,14 @@ export function registerIpcHandlers(): void {
   )
   ipcMain.handle('livingPage:regenerate', (_e, widgetId: string) =>
     regenerateLivingPage(widgetId)
+  )
+  ipcMain.handle('ai:suggestPageContent', (_e, prompt: string) =>
+    suggestPageContent(prompt)
+  )
+  ipcMain.handle(
+    'ai:suggestTableRows',
+    (_e, tableId: string, prompt: string, count: number) =>
+      suggestTableRows(tableId, prompt, count)
   )
 
   ipcMain.handle(

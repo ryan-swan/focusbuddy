@@ -10,6 +10,7 @@ import StatsCard from './StatsCard'
 import QuickStartCard from './QuickStartCard'
 import TodayTasksCard from './TodayTasksCard'
 import RecentActivityCard from './RecentActivityCard'
+import FoldersCard from './FoldersCard'
 import Icon from '../Icon'
 
 interface Props {
@@ -44,6 +45,11 @@ const CARD_META: Record<
     label: 'Recent Activity',
     icon: 'history',
     description: 'Last 24h of widget adds, browses, sessions, chats'
+  },
+  folders: {
+    label: 'Folders',
+    icon: 'folder_open',
+    description: 'Active / Closed / Archived folders — quick navigate, archive, restore'
   }
 }
 
@@ -321,6 +327,8 @@ function CardBody({
       return <TodayTasksCard taskIds={taskIds} nodes={nodes} />
     case 'recent-activity':
       return <RecentActivityCard taskIds={taskIds} />
+    case 'folders':
+      return <FoldersCard nodes={nodes} />
     default:
       return null
   }

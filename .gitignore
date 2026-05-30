@@ -27,3 +27,8 @@ LANDING-PAGE.md
 engagements/
 outputs/
 sources/
+
+# Dev-only mock assets — served via the fb-dev:// protocol in development.
+# Kept on disk locally but excluded from version control because the videos
+# are large (the working webcam placeholder alone is ~190 MB).
+Mock Videos/

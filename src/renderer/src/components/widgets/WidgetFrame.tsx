@@ -1,5 +1,9 @@
-import { useContext, useEffect, useRef, useState } from 'react'
+import { useContext, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Rnd } from 'react-rnd'
+import CanvasContextMenu, { type CtxMenuItem } from '../CanvasContextMenu'
+import MakeTaskDialog from '../MakeTaskDialog'
+import ShareDialog from '../ShareDialog'
 import type { PinZone, Widget } from '@shared/types'
 import { PIN_ZONE_ICONS, PIN_ZONE_LABELS } from '../../lib/pinLayout'
 import { useWidgetStore } from '../../stores/widgets'
@@ -29,6 +33,10 @@ interface Props {
   // the screen-space position based on the zone + neighbouring same-zone
   // pins and passes it down. Overrides the legacy pinnedScreenX/Y path.
   zonePosition?: { x: number; y: number; width: number; height: number }
+  // Extra context-menu items injected by the wrapping widget (e.g. the
+  // WebViewWidget passes "Pin to apps" here). Inserted at the top of the
+  // generic items so kind-specific actions are immediately discoverable.
+  headerMenuExtras?: CtxMenuItem[]
 }
 
 export default function WidgetFrame({
@@ -37,7 +45,8 @@ export default function WidgetFrame({
   headerLabel,
   headerAccent = 'bg-stone-200/70',
   draggableHandleClass = 'widget-handle',
-  zonePosition: zonePositionProp
+  zonePosition: zonePositionProp,
+  headerMenuExtras
 }: Props): JSX.Element {
   // Pull from the prop first (escape hatch for callers that want to drive
   // position explicitly), then fall back to the PinLayoutContext provided
@@ -48,15 +57,24 @@ export default function WidgetFrame({
   const update = useWidgetStore((s) => s.update)
   const remove = useWidgetStore((s) => s.remove)
   const bringToFront = useWidgetStore((s) => s.bringToFront)
+  const archive = useWidgetStore((s) => s.archive)
+  const createWidget = useWidgetStore((s) => s.create)
   const setFocused = useWidgetStore((s) => s.setFocused)
   const setActive = useWidgetStore((s) => s.setActive)
   const togglePin = useWidgetStore((s) => s.togglePin)
   const pinToZone = useWidgetStore((s) => s.pinToZone)
   const unpinWidget = useWidgetStore((s) => s.unpinWidget)
   const setHoveredSection = useWidgetStore((s) => s.setHoveredSection)
-  const focusOn = useWidgetStore((s) => s.focusOn)
   const setDragOverride = useWidgetStore((s) => s.setDragOverride)
+  const focusOn = useWidgetStore((s) => s.focusOn)
   const [pinPickerOpen, setPinPickerOpen] = useState(false)
+  const [expandPickerOpen, setExpandPickerOpen] = useState(false)
+  // Right-click on the widget header opens a small context menu with a
+  // "Make this a task" option. The menu is positioned at the cursor and
+  // closes on outside-click / Esc (handled by CanvasContextMenu).
+  const [headerCtxMenu, setHeaderCtxMenu] = useState<{ x: number; y: number } | null>(null)
+  const [makeTaskOpen, setMakeTaskOpen] = useState(false)
+  const [shareOpen, setShareOpen] = useState(false)
   const isActive = useWidgetStore((s) => s.activeWidgetId === widget.id)
   const zoom = useWidgetStore((s) => s.zoom)
   const allWidgets = useWidgetStore((s) => s.widgets)
@@ -67,6 +85,32 @@ export default function WidgetFrame({
   // things, cause the canvas to pan-center on the widget — making it look
   // like "the screen tracks away from where I dropped").
   const dragJustEnded = useRef(0)
+  // Ref into the Rnd instance — we use this to imperatively update Rnd's
+  // internal size + position state after a snap, instead of relying on a
+  // key-change re-mount. Re-mounting is fatal for <webview> children
+  // because Electron creates a fresh process and the URL fully reloads.
+  const rndRef = useRef<Rnd | null>(null)
+
+  // Imperatively push a new size + position into Rnd's internal state.
+  // Equivalent to what a key-change re-mount would do via the `default`
+  // prop, but without unmounting any children. This is the bridge that
+  // keeps webview state intact when a free widget snaps after drop /
+  // resize / enlarge.
+  function applyRndSizeAndPosition(w: number, h: number, x: number, y: number): void {
+    const rnd = rndRef.current
+    if (!rnd) return
+    type RndImperative = {
+      updateSize?: (s: { width: number; height: number }) => void
+      updatePosition?: (p: { x: number; y: number }) => void
+    }
+    const r = rnd as unknown as RndImperative
+    if (typeof r.updateSize === 'function') {
+      r.updateSize.call(rnd, { width: w, height: h })
+    }
+    if (typeof r.updatePosition === 'function') {
+      r.updatePosition.call(rnd, { x, y })
+    }
+  }
 
   const layoutCtx = useContext(SectionLayoutContext)
   const sectionLayout = layoutCtx ? layoutCtx.layout : 'free'
@@ -140,10 +184,14 @@ export default function WidgetFrame({
     const latestWidgets = useWidgetStore.getState().widgets
 
     // Whether the snap relocated the widget far enough that Rnd's internal
-    // drag-end position no longer matches the store. Used to (a) bump
-    // layoutVersion so Rnd re-mounts at the snapped position, and (b) pan
-    // the canvas so the widget remains visible after the snap.
-    const SNAP_THRESHOLD = 4
+    // drag-end position no longer matches the store. Used to bump
+    // layoutVersion so Rnd re-mounts at the snapped position. Raised from
+    // 4 → 12 so sub-pixel rounding doesn't trigger unnecessary remounts.
+    // We deliberately do NOT pan the camera on snap any more — that was
+    // hostile UX (the canvas would fly to centre on the widget you just
+    // dropped, defeating the user's spatial intuition). The widget's own
+    // `setActive` glow already signals "your widget landed here."
+    const SNAP_THRESHOLD = 12
     const snappedAway = (rawX: number, rawY: number, placedX: number, placedY: number): boolean =>
       Math.abs(rawX - placedX) > SNAP_THRESHOLD || Math.abs(rawY - placedY) > SNAP_THRESHOLD
 
@@ -171,8 +219,8 @@ export default function WidgetFrame({
         )
         chimeOut()
         // The store's `update` does an optimistic synchronous `set` first,
-        // then awaits the IPC. Calling bumpLayout()/focusOn() synchronously
-        // right after means the new render cycle picks up BOTH the snapped
+        // then awaits the IPC. Calling bumpLayout() synchronously right
+        // after means the new render cycle picks up BOTH the snapped
         // position AND the new key — so Rnd remounts at placed.x/y without
         // a flicker. Awaiting the IPC (.then) is too late: the widget is
         // visually stuck at the drop point for that 50-200ms window.
@@ -182,7 +230,6 @@ export default function WidgetFrame({
           y: placed.y
         })
         bumpLayout()
-        focusOn(widget.id)
       } else {
         // Moving within the same section. In free layout, snap away from
         // siblings (excluding self). In stack mode, allow overlap — that's
@@ -201,8 +248,9 @@ export default function WidgetFrame({
         const moved = snappedAway(rawX, rawY, placed.x, placed.y)
         void update(widget.id, { x: placed.x, y: placed.y })
         if (moved) {
-          bumpLayout()
-          focusOn(widget.id)
+          // Imperative update — no key change, no re-mount, so any
+          // webview child stays mounted with its current URL.
+          applyRndSizeAndPosition(widget.width, widget.height, placed.x, placed.y)
         }
       }
       return
@@ -240,7 +288,6 @@ export default function WidgetFrame({
           y: placed.y
         })
         bumpLayout()
-        focusOn(widget.id)
         return
       }
     }
@@ -260,14 +307,13 @@ export default function WidgetFrame({
     const moved = snappedAway(rawX, rawY, placed.x, placed.y)
     void update(widget.id, { x: placed.x, y: placed.y })
     if (moved) {
-      // Rnd is uncontrolled for free widgets — without a key change it
-      // would keep its internal drop-position and visually ignore the
-      // snap. Bumping layoutVersion forces a re-mount at placed.x/y.
-      bumpLayout()
-      // Pan the canvas so the widget remains visible at its snapped spot
-      // (the user dropped it somewhere overlapping; we want them to see
-      // where it actually ended up).
-      focusOn(widget.id)
+      // Rnd is uncontrolled for free widgets — without an update it would
+      // visually stay at the user's drop point and ignore the snap. We
+      // used to bumpLayout() to force a key-change re-mount, but that
+      // tears down any <webview> child (each Electron webview is its own
+      // process and a full URL reload kicks in on remount). Imperative
+      // updatePosition leaves children mounted.
+      applyRndSizeAndPosition(widget.width, widget.height, placed.x, placed.y)
     }
   }
 
@@ -292,6 +338,9 @@ export default function WidgetFrame({
 
   return (
     <Rnd
+      ref={(r) => {
+        rndRef.current = r as Rnd | null
+      }}
       default={
         useControlled
           ? undefined
@@ -358,13 +407,34 @@ export default function WidgetFrame({
         const newW = ref.offsetWidth
         const newH = ref.offsetHeight
         if (isChildOfSection) {
+          // Inside a section's free layout — snap the resized rect away
+          // from siblings the same way commitDrop does. Stack/grid/icons/
+          // list layouts auto-arrange children so resize either isn't
+          // permitted or the layout normalises afterwards.
+          const latestWidgets = useWidgetStore.getState().widgets
+          const siblings = latestWidgets.filter(
+            (w) => w.id !== widget.id && w.parentSectionId === widget.parentSectionId
+          )
+          const rawX = Math.max(0, Math.round(pos.x))
+          const rawY = Math.max(0, Math.round(pos.y))
+          const placed = findNonOverlapPosition(
+            { x: rawX, y: rawY, width: newW, height: newH },
+            siblings
+          )
           void update(widget.id, {
             width: newW,
             height: newH,
-            x: Math.max(0, Math.round(pos.x)),
-            y: Math.max(0, Math.round(pos.y))
+            x: placed.x,
+            y: placed.y
           })
+          if (Math.abs(rawX - placed.x) > 12 || Math.abs(rawY - placed.y) > 12) {
+            // Imperative — no re-mount, no webview reload.
+            applyRndSizeAndPosition(newW, newH, placed.x, placed.y)
+          }
         } else if (isPinned) {
+          // Pinned widgets live in screen-space and the pinned-layer auto-
+          // stacks zone-pinned siblings; free-position pins don't need
+          // overlap detection (the user explicitly chose the spot).
           void update(widget.id, {
             width: newW,
             height: newH,
@@ -372,29 +442,59 @@ export default function WidgetFrame({
             pinnedScreenY: Math.round(pos.y)
           })
         } else {
+          // Canvas-level resize. Same reverse-magnetic snap as a drop, so
+          // a resize that grows into another widget pushes off it instead
+          // of overlapping silently.
+          const latestWidgets = useWidgetStore.getState().widgets
+          const topLevelSiblings = latestWidgets.filter(
+            (w) => w.id !== widget.id && !w.pinned && !w.parentSectionId
+          )
+          const rawX = Math.round(pos.x)
+          const rawY = Math.round(pos.y)
+          const placed = findNonOverlapPosition(
+            { x: rawX, y: rawY, width: newW, height: newH },
+            effectiveSiblingsForCheck(topLevelSiblings, latestWidgets)
+          )
           void update(widget.id, {
             width: newW,
             height: newH,
-            x: Math.round(pos.x),
-            y: Math.round(pos.y)
+            x: placed.x,
+            y: placed.y
           })
+          if (Math.abs(rawX - placed.x) > 12 || Math.abs(rawY - placed.y) > 12) {
+            // Imperative — Rnd's internal state updates without a re-
+            // mount, so the webview child keeps its session + URL.
+            applyRndSizeAndPosition(newW, newH, placed.x, placed.y)
+          }
         }
       }}
     >
       <AgeHalo createdAt={widget.createdAt} variant="widget" />
       <div
         data-widget-id={widget.id}
-        onMouseDownCapture={() => setActive(widget.id)}
+        // No onMouseDownCapture here — that was setting `active` so early
+        // that the WebView overlay (showOverlay = !isActive) would unmount
+        // BEFORE the click event fired, robbing the overlay's onClick
+        // (which calls focusOn) of its chance to run. Result: clicking a
+        // browser would activate it but never centre the camera. Rnd's
+        // onDragStart still calls setActive at the start of a drag, so the
+        // active-glow-during-drag path is unaffected.
         onClick={(e) => {
           e.stopPropagation()
           // Suppress the click that fires immediately after a drag-end —
-          // react-rnd doesn't natively distinguish them.
+          // react-rnd doesn't natively distinguish them. A drop is NOT a
+          // request to centre the camera; the user just placed the widget
+          // and would be disoriented by a pan.
           if (performance.now() - dragJustEnded.current < 250) return
-          // Activate the widget but DON'T center the canvas on it. The user
-          // can already see the widget they just clicked — centering would
-          // pan the world for no benefit. Centering is now reserved for
-          // explicit BringMeBack + "open from outside the viewport" flows.
-          setActive(widget.id)
+          // Deliberate click → centre the camera on the widget. Pinned
+          // widgets are always visible (docked to a screen corner) so
+          // centering them would jump to whatever stale world-space coord
+          // they had before pinning — just activate them.
+          if (isPinned) {
+            setActive(widget.id)
+          } else {
+            focusOn(widget.id)
+          }
         }}
         className={`h-full w-full flex flex-col rounded-[12px] overflow-hidden border bg-white dark:bg-stone-900 fb-spring-snap ${
           isActive
@@ -418,6 +518,11 @@ export default function WidgetFrame({
       >
         <div
           className={`${draggableHandleClass} ${headerAccent} flex items-center justify-between px-2 py-1 cursor-move select-none border-b border-[color:var(--edge-soft)] backdrop-blur-sm`}
+          onContextMenu={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+            setHeaderCtxMenu({ x: e.clientX, y: e.clientY })
+          }}
         >
           <span className="text-[10px] uppercase tracking-[0.08em] font-medium text-stone-700 dark:text-stone-300 truncate flex items-center gap-1.5">
             {isActive && (
@@ -494,18 +599,45 @@ export default function WidgetFrame({
                 setOpen={setPinPickerOpen}
               />
             )}
-            <button
-              onMouseDown={(e) => e.stopPropagation()}
-              onClick={(e) => {
-                e.stopPropagation()
-                setFocused(widget.id)
+            <ExpandControl
+              open={expandPickerOpen}
+              setOpen={setExpandPickerOpen}
+              onFocusMode={() => setFocused(widget.id)}
+              onEnlargeOnDesk={() => {
+                // Grow the widget by 30% (capped at 1400 × 900) and run
+                // the result through the same reverse-magnetic snap a
+                // drop would — so an enlarge into a neighbour pushes off
+                // it instead of overlapping silently. Pinned + section-
+                // child widgets are out of scope here.
+                //
+                // Critically, we update Rnd's size + position via the
+                // imperative API (updateSize/updatePosition) rather than
+                // bumpLayout(). bumpLayout would force a key-change
+                // re-mount, which tears down any <webview> child — every
+                // Electron webview is its own process, and re-mount
+                // means a full URL reload (losing logged-in state).
+                if (isPinned || isChildOfSection) return
+                const MAX_W = 1400
+                const MAX_H = 900
+                const newW = Math.min(MAX_W, Math.round(widget.width * 1.3))
+                const newH = Math.min(MAX_H, Math.round(widget.height * 1.3))
+                const latest = useWidgetStore.getState().widgets
+                const siblings = latest.filter(
+                  (w) => w.id !== widget.id && !w.pinned && !w.parentSectionId
+                )
+                const placed = findNonOverlapPosition(
+                  { x: widget.x, y: widget.y, width: newW, height: newH },
+                  effectiveSiblingsForCheck(siblings, latest)
+                )
+                void update(widget.id, {
+                  width: newW,
+                  height: newH,
+                  x: placed.x,
+                  y: placed.y
+                })
+                applyRndSizeAndPosition(newW, newH, placed.x, placed.y)
               }}
-              className="h-5 w-5 rounded inline-flex items-center justify-center text-stone-500 hover:bg-stone-300/60 hover:text-stone-900"
-              aria-label="Focus widget"
-              title="Open in focus mode"
-            >
-              <Icon name="open_in_full" size={13} />
-            </button>
+            />
             <button
               onMouseDown={(e) => e.stopPropagation()}
               onClick={(e) => {
@@ -521,6 +653,102 @@ export default function WidgetFrame({
         </div>
         <div className="flex-1 min-h-0">{children}</div>
       </div>
+      {headerCtxMenu && (
+        <CanvasContextMenu
+          x={headerCtxMenu.x}
+          y={headerCtxMenu.y}
+          items={(() => {
+            const items: CtxMenuItem[] = []
+            // Kind-specific extras go first so they're discoverable at the
+            // top of the menu (e.g. "Pin to Apps" for a browser widget).
+            if (headerMenuExtras && headerMenuExtras.length > 0) {
+              items.push(...headerMenuExtras)
+              items.push({ separator: true })
+            }
+            items.push({
+              label: 'Make this a task…',
+              icon: 'task_alt',
+              onClick: () => setMakeTaskOpen(true)
+            })
+            items.push({
+              label: 'Share…',
+              icon: 'share',
+              onClick: () => setShareOpen(true)
+            })
+            items.push({ separator: true })
+            items.push({
+              label: 'Duplicate',
+              icon: 'content_copy',
+              onClick: () => {
+                // Clone the widget's metadata and offset it slightly so the
+                // copy is visible next to the original. Content is copied
+                // verbatim — page widgets get their own independent Tiptap
+                // doc, table widgets stay pointed at the same backing
+                // fb_tables row (two views of one dataset, which is the
+                // common intent for a quick duplicate).
+                void createWidget({
+                  taskId: widget.taskId,
+                  kind: widget.kind,
+                  title: widget.title,
+                  content: widget.content,
+                  x: widget.x + 30,
+                  y: widget.y + 30,
+                  width: widget.width,
+                  height: widget.height,
+                  color: widget.color,
+                  sourceAppId: widget.sourceAppId,
+                  mode: widget.mode
+                })
+              }
+            })
+            items.push({
+              label: 'Bring to front',
+              icon: 'flip_to_front',
+              onClick: () => {
+                void bringToFront(widget.id)
+              }
+            })
+            items.push({ separator: true })
+            items.push({
+              label: 'Archive',
+              icon: 'inventory_2',
+              onClick: () => {
+                // Soft-delete — recoverable from the Archive view. Distinct
+                // from the close-X button which (today) calls confirm()
+                // and is harsher.
+                void archive(widget.id)
+              }
+            })
+            return items
+          })()}
+          onClose={() => setHeaderCtxMenu(null)}
+        />
+      )}
+      {makeTaskOpen && (
+        <MakeTaskDialog
+          // Seed the task title from whatever the widget already has —
+          // its display title first, then a snippet of content if the
+          // title is blank, then the kind as a last resort.
+          seedTitle={
+            widget.title ||
+            (widget.content ? widget.content.replace(/\s+/g, ' ').slice(0, 80) : '') ||
+            widget.kind
+          }
+          // Pass the widget so the dialog can offer to clone it into the
+          // new task — a common follow-on intent ("I want to keep working
+          // on the same thing but as its own task").
+          sourceWidget={widget}
+          onClose={() => setMakeTaskOpen(false)}
+        />
+      )}
+      {shareOpen && (
+        <ShareDialog
+          kind="widget"
+          entityId={widget.id}
+          label={widget.title || widget.kind}
+          onClose={() => setShareOpen(false)}
+        />
+      )}
     </Rnd>
   )
 }
@@ -556,19 +784,66 @@ function PinControl({
   onPickZone,
   onUnpin
 }: PinControlProps): JSX.Element {
-  const ref = useRef<HTMLDivElement | null>(null)
+  // The popover is rendered via createPortal into document.body to escape
+  // the widget's stacking context — Rnd's outer div has a zIndex (set per-
+  // widget) which creates a stacking context that traps any in-tree popover
+  // behind sibling widgets with higher zIndex. The transform on the canvas
+  // parent traps it further. Portalling is the only fix; bumping z-index
+  // inside the widget's context never wins.
+  const buttonRef = useRef<HTMLButtonElement | null>(null)
+  const popoverRef = useRef<HTMLDivElement | null>(null)
+  const [popoverPos, setPopoverPos] = useState<{ top: number; right: number } | null>(null)
+
   useEffect(() => {
     if (!open) return
     function onDown(e: MouseEvent): void {
-      if (!ref.current?.contains(e.target as Node)) setOpen(false)
+      // Click-outside closes — but the popover is in a portal, so we have
+      // to check both the trigger button AND the portalled popover.
+      const inButton = buttonRef.current?.contains(e.target as Node)
+      const inPopover = popoverRef.current?.contains(e.target as Node)
+      if (!inButton && !inPopover) setOpen(false)
+    }
+    function onKey(e: KeyboardEvent): void {
+      if (e.key === 'Escape') setOpen(false)
+    }
+    // Close on scroll/resize too — the popover position is computed from
+    // the button's screen rect at open time, so any view change would
+    // visually detach it from the trigger. Cheaper than tracking the
+    // button position via rAF.
+    function onViewChange(): void {
+      setOpen(false)
     }
     document.addEventListener('mousedown', onDown)
-    return () => document.removeEventListener('mousedown', onDown)
+    document.addEventListener('keydown', onKey)
+    window.addEventListener('resize', onViewChange)
+    window.addEventListener('scroll', onViewChange, true)
+    return () => {
+      document.removeEventListener('mousedown', onDown)
+      document.removeEventListener('keydown', onKey)
+      window.removeEventListener('resize', onViewChange)
+      window.removeEventListener('scroll', onViewChange, true)
+    }
   }, [open, setOpen])
 
+  // Anchor the popover under the button's right edge. useLayoutEffect so the
+  // measurement happens after DOM mount but before paint — no flash at the
+  // wrong position.
+  useLayoutEffect(() => {
+    if (!open || !buttonRef.current) {
+      setPopoverPos(null)
+      return
+    }
+    const r = buttonRef.current.getBoundingClientRect()
+    setPopoverPos({
+      top: r.bottom + 6,
+      right: window.innerWidth - r.right
+    })
+  }, [open])
+
   return (
-    <div ref={ref} className="relative">
+    <>
       <button
+        ref={buttonRef}
         onMouseDown={(e) => e.stopPropagation()}
         onClick={(e) => {
           e.stopPropagation()
@@ -590,10 +865,17 @@ function PinControl({
       >
         <Icon name="push_pin" size={13} filled={isPinned} />
       </button>
-      {open && (
+      {open && popoverPos && createPortal(
         <div
+          ref={popoverRef}
           onMouseDown={(e) => e.stopPropagation()}
-          className="absolute right-0 top-full mt-1 z-50 w-44 rounded-md border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 shadow-lg p-2 cursor-default"
+          // Fixed positioning + portalled into document.body means stacking
+          // contexts of the canvas + widget tree no longer apply. z-[200]
+          // sits above pinned-layer (z-30), floating toolbar (z-20), and
+          // anything else in the canvas chrome, but below modal dialogs
+          // (typically z-[300]+).
+          className="fixed z-[200] w-44 rounded-md border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 shadow-xl p-2 cursor-default"
+          style={{ top: popoverPos.top, right: popoverPos.right }}
         >
           <div className="text-[10px] uppercase tracking-wider text-stone-500 dark:text-stone-400 mb-1.5">
             Pin to zone
@@ -604,7 +886,8 @@ function PinControl({
               return (
                 <button
                   key={z}
-                  onClick={() => {
+                  onClick={(e) => {
+                    e.stopPropagation()
                     onPickZone(z)
                     setOpen(false)
                   }}
@@ -622,7 +905,8 @@ function PinControl({
           </div>
           {isPinned && (
             <button
-              onClick={() => {
+              onClick={(e) => {
+                e.stopPropagation()
                 onUnpin()
                 setOpen(false)
               }}
@@ -632,8 +916,138 @@ function PinControl({
               <span>Unpin — return to canvas</span>
             </button>
           )}
-        </div>
+        </div>,
+        document.body
       )}
-    </div>
+    </>
+  )
+}
+
+// ── Expand control — open-in-focus-mode + enlarge-on-desk popover ──────────
+//
+// Closed state: a standard "open in full" icon. Click toggles a small
+// portalled popover with two options:
+//   1. "Larger on desk" — grows the widget in place via the parent's
+//      onEnlargeOnDesk callback. Useful when you want a roomier surface
+//      without losing canvas context.
+//   2. "Focus mode" — pushes the widget into the full-pane focus view
+//      via the parent's onFocusMode callback.
+//
+// Portalled into document.body to escape the widget's stacking context
+// (same reason as PinControl — sibling widgets with higher zIndex would
+// otherwise overlay the popover and swallow its clicks).
+
+interface ExpandControlProps {
+  open: boolean
+  setOpen: (v: boolean) => void
+  onFocusMode: () => void
+  onEnlargeOnDesk: () => void
+}
+
+function ExpandControl({
+  open,
+  setOpen,
+  onFocusMode,
+  onEnlargeOnDesk
+}: ExpandControlProps): JSX.Element {
+  const buttonRef = useRef<HTMLButtonElement | null>(null)
+  const popoverRef = useRef<HTMLDivElement | null>(null)
+  const [popoverPos, setPopoverPos] = useState<{ top: number; right: number } | null>(null)
+
+  useEffect(() => {
+    if (!open) return
+    function onDown(e: MouseEvent): void {
+      const inButton = buttonRef.current?.contains(e.target as Node)
+      const inPopover = popoverRef.current?.contains(e.target as Node)
+      if (!inButton && !inPopover) setOpen(false)
+    }
+    function onKey(e: KeyboardEvent): void {
+      if (e.key === 'Escape') setOpen(false)
+    }
+    function onViewChange(): void {
+      setOpen(false)
+    }
+    document.addEventListener('mousedown', onDown)
+    document.addEventListener('keydown', onKey)
+    window.addEventListener('resize', onViewChange)
+    window.addEventListener('scroll', onViewChange, true)
+    return () => {
+      document.removeEventListener('mousedown', onDown)
+      document.removeEventListener('keydown', onKey)
+      window.removeEventListener('resize', onViewChange)
+      window.removeEventListener('scroll', onViewChange, true)
+    }
+  }, [open, setOpen])
+
+  useLayoutEffect(() => {
+    if (!open || !buttonRef.current) {
+      setPopoverPos(null)
+      return
+    }
+    const r = buttonRef.current.getBoundingClientRect()
+    setPopoverPos({
+      top: r.bottom + 6,
+      right: window.innerWidth - r.right
+    })
+  }, [open])
+
+  return (
+    <>
+      <button
+        ref={buttonRef}
+        onMouseDown={(e) => e.stopPropagation()}
+        onClick={(e) => {
+          e.stopPropagation()
+          setOpen(!open)
+        }}
+        className="h-5 w-5 rounded inline-flex items-center justify-center text-stone-500 hover:bg-stone-300/60 hover:text-stone-900"
+        aria-label="Expand options"
+        title="Expand — bigger on desk or full focus mode"
+      >
+        <Icon name="open_in_full" size={13} />
+      </button>
+      {open && popoverPos && createPortal(
+        <div
+          ref={popoverRef}
+          onMouseDown={(e) => e.stopPropagation()}
+          className="fixed z-[200] w-48 rounded-md border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 shadow-xl p-1 cursor-default"
+          style={{ top: popoverPos.top, right: popoverPos.right }}
+        >
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              onEnlargeOnDesk()
+              setOpen(false)
+            }}
+            className="w-full flex items-start gap-2 px-2 py-1.5 rounded hover:bg-stone-100 dark:hover:bg-stone-800 text-left"
+          >
+            <Icon name="zoom_out_map" size={14} className="text-stone-500 mt-[1px] shrink-0" />
+            <div className="flex-1 min-w-0">
+              <div className="text-[12px] text-stone-800 dark:text-stone-100">Larger on desk</div>
+              <div className="text-[10px] text-stone-500 dark:text-stone-400 leading-tight">
+                Grow in place — keep canvas context
+              </div>
+            </div>
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              onFocusMode()
+              setOpen(false)
+            }}
+            className="w-full flex items-start gap-2 px-2 py-1.5 rounded hover:bg-stone-100 dark:hover:bg-stone-800 text-left"
+          >
+            <Icon name="open_in_full" size={14} className="text-stone-500 mt-[1px] shrink-0" />
+            <div className="flex-1 min-w-0">
+              <div className="text-[12px] text-stone-800 dark:text-stone-100">Focus mode</div>
+              <div className="text-[10px] text-stone-500 dark:text-stone-400 leading-tight">
+                Full pane — hide everything else
+              </div>
+            </div>
+          </button>
+        </div>,
+        document.body
+      )}
+    </>
   )
 }

@@ -50,17 +50,47 @@ export function createTemplate(draft: TemplateDraft): Template {
   return rowToTemplate(row)
 }
 
-export function createTemplateFromTask(taskId: string, name: string, description?: string): Template {
-  const widgets = listWidgetsByTask(taskId).map((w) => ({
-    kind: w.kind,
-    title: w.title,
-    content: w.content,
-    x: w.x,
-    y: w.y,
-    width: w.width,
-    height: w.height,
-    color: w.color
-  }))
+export function createTemplateFromTask(
+  taskId: string,
+  name: string,
+  description?: string,
+  // Optional explicit widget id allow-list. When omitted (legacy callers)
+  // every widget on the task gets included — that matches the previous
+  // behaviour. When supplied, ONLY those widget ids are kept, in their
+  // original order. Per-widget selection is the new SaveTemplateDialog's
+  // contract; the legacy "wholesale save" path still works.
+  widgetIds?: string[]
+): Template {
+  const allWidgets = listWidgetsByTask(taskId)
+  const keepSet = widgetIds ? new Set(widgetIds) : null
+  // Section children get included if EITHER the child is selected OR its
+  // parent section is selected — losing a section's children would leave
+  // empty containers in the template, which is rarely what the user wants.
+  // We compute the set of "kept by ancestry" widgets in one pass.
+  const keepByAncestry = new Set<string>()
+  if (keepSet) {
+    for (const w of allWidgets) {
+      if (keepSet.has(w.id)) keepByAncestry.add(w.id)
+    }
+    for (const w of allWidgets) {
+      if (w.parentSectionId && keepByAncestry.has(w.parentSectionId)) {
+        keepByAncestry.add(w.id)
+      }
+    }
+  }
+  const widgets = allWidgets
+    .filter((w) => !w.archived)
+    .filter((w) => (keepSet ? keepByAncestry.has(w.id) : true))
+    .map((w) => ({
+      kind: w.kind,
+      title: w.title,
+      content: w.content,
+      x: w.x,
+      y: w.y,
+      width: w.width,
+      height: w.height,
+      color: w.color
+    }))
   return createTemplate({
     name,
     description,

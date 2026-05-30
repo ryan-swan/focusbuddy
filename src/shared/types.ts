@@ -70,6 +70,12 @@ export interface FbNode {
   resumeMarkdown: string | null
   resumeUpdatedAt: number | null
   dueDate: number | null
+  // Soft-delete / "put away" flag for folders and tasks. Archived nodes
+  // are hidden from the main sidebar tree by default but remain
+  // recoverable via the dashboard's archived view. Task `status` is
+  // about the work itself (open / in_progress / done / parked); archived
+  // is about whether the node should be visible in day-to-day surfaces.
+  archived: boolean
 }
 
 export interface NodeDraft {
@@ -98,6 +104,7 @@ export interface NodePatch {
   resumeMarkdown?: string | null
   resumeUpdatedAt?: number | null
   dueDate?: number | null
+  archived?: boolean
 }
 
 export interface Widget {
@@ -361,12 +368,136 @@ export interface LivingPageRegenerateResponse {
   needsApiKey?: boolean
 }
 
+// AI-generated presence narration (the existing "you're not alone, your
+// pair-worker is still here" nudges). NOT the user-to-user body double
+// feature — that's the BodyDouble* types below. Kept separate so the AI
+// helper and the peer matching feature can evolve independently.
 export interface BodyDoubleResponse {
   ok: boolean
   skip?: boolean // model decided no presence ping is warranted right now
   line?: string
   error?: string
   needsApiKey?: boolean
+}
+
+// ── Peer-to-peer body double feature ────────────────────────────────────────
+//
+// User-to-user body doubling — Omegle-style random matching for ADHD-style
+// "I need someone working alongside me" sessions. Two strangers express an
+// interaction preference; a matching service pairs them when their
+// preferences are compatible; the session runs with whatever channels the
+// shared preference allows.
+
+// How much interaction the user wants during the session. Both partners
+// must agree on a mode (compatible matching only — see matcher logic).
+export type BodyDoubleMode =
+  | 'silent' // names + presence dot only; no chat, no audio
+  | 'greetings' // exchange one hello + "what are you working on", then quiet
+  | 'light' // text chat available, occasional progress pings welcome
+  | 'open' // full conversation; text + audio (when audio ships)
+
+// The handle shown to a partner — pseudonymous "FocusedFalcon" style names
+// generated client-side. No real identity, no auth. A user MAY choose a
+// persistent handle later via Settings; v1 generates a fresh one per
+// session for total deniability.
+export interface BodyDoublePartner {
+  handle: string
+  // Optional one-line context: "drafting Q3 brief", "studying for finals".
+  // Only shared when the agreed mode is >= greetings.
+  workingOn?: string | null
+  // Soft session start so the partner sees how long the OTHER user has
+  // been in the room — useful for "this person just arrived" cues.
+  joinedAt: number
+}
+
+// What the user puts on the matching queue.
+export interface BodyDoubleRequest {
+  mode: BodyDoubleMode
+  workingOn?: string | null
+  // Local handle — generated when the request is created. Tells the matcher
+  // who to introduce on the other side.
+  handle: string
+}
+
+// Status of the local user's session. Drives the UI: which panel renders,
+// whether the chat is active, whether we keep polling for partners.
+export type BodyDoubleStatus =
+  | 'idle' // no active intent
+  | 'looking' // in the matching queue, no partner yet
+  | 'matched' // partner found, exchanging intros
+  | 'connected' // session active
+  | 'ending' // one side is wrapping up
+
+export interface BodyDoubleChatMessage {
+  id: string
+  senderHandle: string // either local or partner; UI compares to know which side
+  text: string
+  ts: number
+}
+
+// ── Universal sharing (folders / tasks / widgets) ───────────────────────────
+//
+// Any user-owned entity in FocusBuddy can be shared via a token. The token
+// resolves to a read-only view (no auth required) or a "collaborator" copy
+// the recipient owns once they sign up. Same data model for folder, task,
+// and widget — the kind field discriminates so consumers pick the right
+// rendering.
+//
+// v1 generates tokens locally and stores them in the local DB. There's no
+// global address book; the token URL is the only way to reach the share
+// once distributed. When the production server lands, tokens get mirrored
+// up so the URL resolves to a hosted viewer; the renderer code path stays
+// identical.
+
+export type ShareableKind = 'folder' | 'task' | 'widget'
+
+// Permission level granted by the share. Two levels in v1 — keeping it
+// simple. "view" = read-only render. "copy" = recipient can sign up and
+// clone the item into their workspace.
+export type ShareScope = 'view' | 'copy'
+
+export interface ShareLink {
+  // Stable id (uuid) for revoking + tracking.
+  id: string
+  // Random opaque token used in the URL (e.g. fb.app/share/<token>).
+  // Distinct from id so id can be exposed to the owner while the token
+  // stays the address ring that controls access.
+  token: string
+  // What's being shared.
+  kind: ShareableKind
+  entityId: string
+  // Human-readable label for the share list ("Q3 brief", "Marketing
+  // folder"). Captured at create-time so revoked / renamed items still
+  // make sense in the share manager.
+  label: string
+  scope: ShareScope
+  // Audit fields.
+  createdAt: number
+  // null = never expires. Otherwise unix ms.
+  expiresAt: number | null
+  // Cached visit count for the share manager UI. Incremented by the server
+  // when the viewer URL is hit. In local-mock mode this stays 0.
+  viewCount: number
+  // Revoke = soft-delete. The token stops resolving and the share manager
+  // shows it as "Revoked" so the owner can audit who they shared with.
+  revoked: boolean
+}
+
+// Items shared WITH the current user — the "Shared with me" sidebar
+// section. v1 these are populated when the user accepts a share invite;
+// production will sync from the server on sign-in.
+export interface SharedItem {
+  id: string
+  token: string
+  kind: ShareableKind
+  // Cached snapshot of the shared content for offline viewing. For
+  // folders this is the folder + its task tree; for tasks it's the task
+  // + its widgets; for widgets it's the widget record.
+  snapshot: unknown
+  // Who shared it — pseudonymous handle until accounts ship.
+  fromHandle: string
+  acceptedAt: number
+  scope: ShareScope
 }
 
 export interface SmartStackGroup {
@@ -465,6 +596,7 @@ export type DashboardCardKind =
   | 'today-tasks'
   | 'recent-activity'
   | 'energy'
+  | 'folders'
 
 export interface DashboardLayout {
   dashboardKey: string // 'home' for the master dashboard, or a project node id

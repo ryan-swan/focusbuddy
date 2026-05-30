@@ -34,6 +34,10 @@ import type {
   VaultMeta,
   Widget,
   WidgetDraft,
+  ShareableKind,
+  ShareLink,
+  SharedItem,
+  ShareScope,
   WidgetLink,
   WidgetPatch
 } from '@shared/types'
@@ -86,6 +90,36 @@ const api = {
     delete: (id: string): Promise<boolean> =>
       ipcRenderer.invoke('widgetLinks:delete', id)
   },
+  shares: {
+    listAll: (): Promise<ShareLink[]> => ipcRenderer.invoke('shares:listAll'),
+    listForEntity: (
+      kind: ShareableKind,
+      entityId: string
+    ): Promise<ShareLink[]> =>
+      ipcRenderer.invoke('shares:listForEntity', kind, entityId),
+    create: (input: {
+      token: string
+      kind: ShareableKind
+      entityId: string
+      label: string
+      scope: ShareScope
+      expiresAt: number | null
+    }): Promise<ShareLink> => ipcRenderer.invoke('shares:create', input),
+    revoke: (id: string): Promise<boolean> =>
+      ipcRenderer.invoke('shares:revoke', id),
+    delete: (id: string): Promise<boolean> =>
+      ipcRenderer.invoke('shares:delete', id),
+    inbox: (): Promise<SharedItem[]> => ipcRenderer.invoke('shares:inbox'),
+    accept: (input: {
+      token: string
+      kind: ShareableKind
+      snapshot: unknown
+      fromHandle: string
+      scope: ShareScope
+    }): Promise<SharedItem> => ipcRenderer.invoke('shares:accept', input),
+    removeInbox: (id: string): Promise<boolean> =>
+      ipcRenderer.invoke('shares:removeInbox', id)
+  },
   chat: {
     send: (req: ChatRequest): Promise<ChatResponse> => ipcRenderer.invoke('chat:send', req),
     hasApiKey: (): Promise<boolean> => ipcRenderer.invoke('chat:hasApiKey'),
@@ -110,6 +144,32 @@ const api = {
   livingPage: {
     regenerate: (widgetId: string): Promise<LivingPageRegenerateResponse> =>
       ipcRenderer.invoke('livingPage:regenerate', widgetId)
+  },
+  ai: {
+    suggestPageContent: (
+      prompt: string
+    ): Promise<{
+      ok: boolean
+      tiptapJson?: string
+      markdown?: string
+      error?: string
+      needsApiKey?: boolean
+    }> => ipcRenderer.invoke('ai:suggestPageContent', prompt),
+    suggestTableRows: (
+      tableId: string,
+      prompt: string,
+      count: number
+    ): Promise<{
+      ok: boolean
+      rows?: Array<Record<string, unknown>>
+      columnsToAdd?: Array<{
+        label: string
+        type: string
+        options?: string[]
+      }>
+      error?: string
+      needsApiKey?: boolean
+    }> => ipcRenderer.invoke('ai:suggestTableRows', tableId, prompt, count)
   },
   history: {
     record: (url: string, title: string, taskId: string | null): Promise<void> =>
@@ -259,8 +319,19 @@ const api = {
   },
   templates: {
     list: (): Promise<Template[]> => ipcRenderer.invoke('templates:list'),
-    createFromTask: (taskId: string, name: string, description?: string): Promise<Template> =>
-      ipcRenderer.invoke('templates:createFromTask', taskId, name, description),
+    createFromTask: (
+      taskId: string,
+      name: string,
+      description?: string,
+      widgetIds?: string[]
+    ): Promise<Template> =>
+      ipcRenderer.invoke(
+        'templates:createFromTask',
+        taskId,
+        name,
+        description,
+        widgetIds
+      ),
     delete: (id: string): Promise<boolean> => ipcRenderer.invoke('templates:delete', id)
   },
   contextMenu: {

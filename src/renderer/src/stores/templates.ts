@@ -5,7 +5,16 @@ interface TemplateStore {
   templates: Template[]
   loading: boolean
   refresh: () => Promise<void>
-  saveFromTask: (taskId: string, name: string, description?: string) => Promise<Template>
+  // widgetIds is an optional allow-list — when supplied, the template
+  // includes only those widgets. When omitted, every (non-archived)
+  // widget on the task is saved (legacy behaviour, used by the no-frills
+  // toolbar button path).
+  saveFromTask: (
+    taskId: string,
+    name: string,
+    description?: string,
+    widgetIds?: string[]
+  ) => Promise<Template>
   remove: (id: string) => Promise<void>
 }
 
@@ -17,8 +26,13 @@ export const useTemplateStore = create<TemplateStore>((set, get) => ({
     const templates = await window.api.templates.list()
     set({ templates, loading: false })
   },
-  saveFromTask: async (taskId, name, description) => {
-    const t = await window.api.templates.createFromTask(taskId, name, description)
+  saveFromTask: async (taskId, name, description, widgetIds) => {
+    const t = await window.api.templates.createFromTask(
+      taskId,
+      name,
+      description,
+      widgetIds
+    )
     set({ templates: [t, ...get().templates] })
     return t
   },

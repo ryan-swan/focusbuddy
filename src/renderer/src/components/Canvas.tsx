@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNodeStore } from '../stores/nodes'
 import { useWidgetStore } from '../stores/widgets'
-import { useTemplateStore } from '../stores/templates'
 import { useConnectedAppsStore } from '../stores/connectedApps'
 import { CONNECTED_APP_DRAG_MIME } from './Sidebar'
 import StickyWidget from './widgets/StickyWidget'
@@ -26,6 +25,7 @@ import WidgetFocusMode from './WidgetFocusMode'
 import ExtensionPrompt from './ExtensionPrompt'
 import ResumeModal from './ResumeModal'
 import AISetupDialog from './AISetupDialog'
+import SaveTemplateDialog from './SaveTemplateDialog'
 import AiBuilderDialog from './AiBuilderDialog'
 import type { AiBuildSuggestion } from '@shared/types'
 import LoadMeter from './LoadMeter'
@@ -160,10 +160,19 @@ export default function Canvas(): JSX.Element {
   const createWidget = useWidgetStore((s) => s.create)
   const updateWidget = useWidgetStore((s) => s.update)
   const bumpLayoutVersion = useWidgetStore((s) => s.bumpLayoutVersion)
-  const saveTemplate = useTemplateStore((s) => s.saveFromTask)
   const dropRef = useRef<HTMLDivElement | null>(null)
   const setPan = useWidgetStore((s) => s.setPan)
-  const [savingTemplate, setSavingTemplate] = useState(false)
+  const [savingTemplate] = useState(false)
+  // Controls the SaveTemplateDialog. context distinguishes the toolbar
+  // entry point from the task-done auto-prompt so the dialog headline
+  // and the skip-button copy can adapt.
+  const [saveTemplateOpen, setSaveTemplateOpen] = useState<
+    null | { context: 'toolbar' | 'task-done' }
+  >(null)
+  // Track tasks we've already prompted about on done so re-clicking
+  // "Done → Reopen → Done" doesn't re-open the prompt in a loop. Reset
+  // when the task changes.
+  const promptedDoneRef = useRef<Set<string>>(new Set())
   const [paletteOpen, setPaletteOpen] = useState(true)
   const [animatingPan, setAnimatingPan] = useState(false)
   const [, setNowTick] = useState(0) // for the running-task clock
@@ -299,6 +308,47 @@ export default function Canvas(): JSX.Element {
     welcomedTasksRef.current.add(activeTask.id)
     void useChatStore.getState().sendProactiveWelcome(activeTask.id)
   }, [activeTask?.id, activeTask?.status])
+
+  // Task-done auto-prompt: when an active task transitions to `done`,
+  // ask whether to save its canvas as a template before the user moves
+  // on. The thinking is: most templates the user would EVER want to
+  // make are the ones for tasks they've JUST finished — they know what
+  // worked. Catching them at that moment is the maximum-leverage prompt.
+  //
+  // Guards:
+  //  - Only fire once per task per session (promptedDoneRef).
+  //  - Only fire if the task has ≥1 widget — empty desks can't template.
+  //  - Skip if another modal is already open (focus mode, AI setup, resume)
+  //    so we don't stack dialogs.
+  useEffect(() => {
+    if (!activeTask) return
+    if (activeTask.status !== 'done') return
+    if (promptedDoneRef.current.has(activeTask.id)) return
+    const haveWidgets = widgets.some(
+      (w) => w.taskId === activeTask.id && !w.archived
+    )
+    if (!haveWidgets) return
+    if (focusedId !== null || showResume || showAISetup || showAiBuilder) return
+    promptedDoneRef.current.add(activeTask.id)
+    setSaveTemplateOpen({ context: 'task-done' })
+  }, [
+    activeTask?.id,
+    activeTask?.status,
+    widgets,
+    focusedId,
+    showResume,
+    showAISetup,
+    showAiBuilder
+  ])
+
+  // Reset the "prompted on done" set when the active task changes — so
+  // a future Done → Reopen → Done flow on the SAME task isn't re-prompted
+  // this session, but a different task that gets done later still is.
+  // (We don't clear when same id stays active.)
+  useEffect(() => {
+    // Effect intentionally empty besides the ref-clear behaviour below —
+    // promptedDoneRef persists across re-renders by design.
+  }, [activeTaskId])
 
   // Re-render every second while a task is in progress (drives the title-bar clock)
   useEffect(() => {
@@ -869,17 +919,9 @@ export default function Canvas(): JSX.Element {
     void placeWidget(entry, cursor.x - entry.defaultWidth / 2, cursor.y - 20)
   }
 
-  async function handleSaveTemplate(): Promise<void> {
+  function handleSaveTemplate(): void {
     if (!activeTaskId || widgets.length === 0 || savingTemplate) return
-    const suggested = activeTask?.title ? `${activeTask.title} template` : 'Untitled template'
-    const name = prompt('Template name:', suggested)
-    if (!name || !name.trim()) return
-    setSavingTemplate(true)
-    try {
-      await saveTemplate(activeTaskId, name.trim())
-    } finally {
-      setSavingTemplate(false)
-    }
+    setSaveTemplateOpen({ context: 'toolbar' })
   }
 
   // AI Builder accept path. Distinct from handleAISetupAccept because each
@@ -1444,6 +1486,13 @@ export default function Canvas(): JSX.Element {
         <WidgetDock />
       </div>
       <WidgetFocusMode />
+      {saveTemplateOpen && activeTask && (
+        <SaveTemplateDialog
+          task={activeTask}
+          context={saveTemplateOpen.context}
+          onClose={() => setSaveTemplateOpen(null)}
+        />
+      )}
       {showResume && activeTask && (
         <ResumeModal task={activeTask} onClose={() => setShowResume(false)} />
       )}

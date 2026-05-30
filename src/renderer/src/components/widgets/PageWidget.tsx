@@ -41,6 +41,16 @@ export default function PageWidget({ widget, inline = false }: Props): JSX.Eleme
   const [aiOpen, setAiOpen] = useState(false)
   const [aiPrompt, setAiPrompt] = useState('')
   const [aiBusy, setAiBusy] = useState(false)
+  // Staged AI output — surfaces a preview panel that the user must Apply
+  // (insert into editor) or Reject (discard) before anything lands in the
+  // page. The TWO fields are kept independently because we render the
+  // preview from markdown (cheaper) but insert the Tiptap doc (correct
+  // structural fidelity into the editor).
+  const [aiStaged, setAiStaged] = useState<{
+    markdown: string
+    tiptapJson: string
+  } | null>(null)
+  const [aiError, setAiError] = useState<string | null>(null)
   const containerRef = useRef<HTMLDivElement | null>(null)
 
   // Living-mode local state
@@ -82,7 +92,7 @@ export default function PageWidget({ widget, inline = false }: Props): JSX.Eleme
         Placeholder.configure({
           placeholder: isLiving
             ? 'Living page — set a query above to populate this.'
-            : 'Type / for a menu, or just start writing…'
+            : 'Start writing… press / for blocks, or click AI draft above'
         })
       ],
       content: tryParseContent(widget.content),
@@ -218,27 +228,52 @@ export default function PageWidget({ widget, inline = false }: Props): JSX.Eleme
   async function runAiPrompt(): Promise<void> {
     if (!editor || !aiPrompt.trim() || aiBusy) return
     setAiBusy(true)
+    setAiError(null)
     try {
-      const response = await window.api.chat.send({
-        taskId: null,
-        messages: [{ role: 'user', content: aiPrompt, ts: Date.now() }]
+      const response = await window.api.ai.suggestPageContent(aiPrompt)
+      if (!response.ok) {
+        setAiError(response.error ?? 'AI request failed.')
+        return
+      }
+      if (!response.tiptapJson || !response.markdown) {
+        setAiError('Empty AI response.')
+        return
+      }
+      // Stage rather than insert — the user gets to see the proposal in a
+      // preview panel and either Apply (commits to the editor) or Reject.
+      setAiStaged({
+        markdown: response.markdown,
+        tiptapJson: response.tiptapJson
       })
-      const text = response.ok
-        ? response.message?.content ?? '(empty)'
-        : `Error: ${response.error ?? 'failed'}`
-      editor
-        .chain()
-        .focus()
-        .insertContent({
-          type: 'paragraph',
-          content: [{ type: 'text', text }]
-        })
-        .run()
-      setAiPrompt('')
-      setAiOpen(false)
     } finally {
       setAiBusy(false)
     }
+  }
+
+  function applyAiStaged(): void {
+    if (!editor || !aiStaged) return
+    try {
+      const doc = JSON.parse(aiStaged.tiptapJson) as { type: string; content?: unknown }
+      // The doc is a full Tiptap doc node — we strip the outer "doc"
+      // wrapper and insert its content nodes at the cursor so they merge
+      // into the user's current document instead of replacing it.
+      const inner = (doc.content as unknown[]) ?? []
+      if (inner.length === 0) {
+        setAiError('Generated content was empty.')
+        return
+      }
+      editor.chain().focus().insertContent(inner as never).run()
+      setAiStaged(null)
+      setAiPrompt('')
+      setAiOpen(false)
+    } catch {
+      setAiError('Could not parse AI output.')
+    }
+  }
+
+  function rejectAiStaged(): void {
+    setAiStaged(null)
+    setAiError(null)
   }
 
   const body = (
@@ -271,13 +306,29 @@ export default function PageWidget({ widget, inline = false }: Props): JSX.Eleme
         />
       )}
       {!isLiving && (
-        <div className="flex items-center justify-end px-2 py-1 border-b border-stone-200 dark:border-stone-700 bg-stone-50/60 dark:bg-stone-900/40 shrink-0">
+        <div className="flex items-center justify-end gap-1 px-2 py-1 border-b border-stone-200 dark:border-stone-700 bg-stone-50/60 dark:bg-stone-900/40 shrink-0">
+          <button
+            onClick={() => {
+              setAiOpen(true)
+              rejectAiStaged()
+            }}
+            className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium transition-colors ${
+              aiOpen
+                ? 'bg-accent text-white'
+                : 'text-accent hover:bg-accent/10'
+            }`}
+            title="AI assistant — draft content, preview, then insert"
+          >
+            <Icon name="auto_awesome" size={12} />
+            <span>AI draft</span>
+          </button>
+          <span className="w-px h-4 bg-stone-200 dark:bg-stone-700 mx-1" />
           <button
             onClick={() => void enableLivingMode()}
-            className="text-[10px] uppercase tracking-wider text-stone-500 hover:text-accent flex items-center gap-1"
+            className="text-[10px] uppercase tracking-wider text-stone-500 hover:text-accent flex items-center gap-1 px-1.5 py-1"
             title="Turn this page into a living summary that auto-updates from the rest of your canvas"
           >
-            <Icon name="auto_awesome" size={11} />
+            <Icon name="autorenew" size={11} />
             <span>Make living</span>
           </button>
         </div>
@@ -286,7 +337,7 @@ export default function PageWidget({ widget, inline = false }: Props): JSX.Eleme
           — they're hand-defined in globals.css. We don't have Tailwind's
           @tailwindcss/typography plugin installed, so `prose` classes would
           render as bare text (which is why this used to be blank). */}
-      <div className={`md-rendered tiptap-editor px-4 py-3 text-stone-900 dark:text-stone-100 min-h-[120px] flex-1 ${isLiving ? 'select-text' : ''}`}>
+      <div className={`md-rendered tiptap-editor px-5 py-4 text-stone-900 dark:text-stone-100 min-h-[140px] flex-1 text-[14px] leading-relaxed ${isLiving ? 'select-text' : ''}`}>
         <EditorContent editor={editor} />
       </div>
 
@@ -367,19 +418,25 @@ export default function PageWidget({ widget, inline = false }: Props): JSX.Eleme
       )}
 
       {aiOpen && (
-        <div className="absolute bottom-3 left-3 right-3 z-50 rounded-md border border-accent bg-white dark:bg-stone-900 shadow-lg p-2">
-          <div className="flex items-center gap-1 mb-1.5">
-            <Icon name="auto_awesome" size={12} className="text-accent" />
-            <span className="text-[10px] uppercase tracking-wider text-stone-500 dark:text-stone-400">
-              AI prompt
+        <div className="absolute bottom-3 left-3 right-3 z-50 rounded-lg border border-accent bg-white dark:bg-stone-900 shadow-xl p-3 max-h-[60%] flex flex-col gap-2">
+          <div className="flex items-center gap-1.5">
+            <Icon name="auto_awesome" size={13} className="text-accent" />
+            <span className="text-[10px] uppercase tracking-wider font-semibold text-accent">
+              AI assistant
             </span>
             <button
-              onClick={() => setAiOpen(false)}
-              className="ml-auto text-stone-400 hover:text-stone-700"
+              onClick={() => {
+                setAiOpen(false)
+                rejectAiStaged()
+              }}
+              className="ml-auto h-5 w-5 rounded inline-flex items-center justify-center text-stone-400 hover:bg-stone-100 dark:hover:bg-stone-800 hover:text-stone-700"
+              aria-label="Close"
             >
               <Icon name="close" size={12} />
             </button>
           </div>
+          {/* Prompt input — always visible so the user can revise the prompt
+              even after seeing a staged preview. */}
           <textarea
             autoFocus
             value={aiPrompt}
@@ -390,18 +447,75 @@ export default function PageWidget({ widget, inline = false }: Props): JSX.Eleme
                 void runAiPrompt()
               }
             }}
-            placeholder="Ask Claude to write or transform — press Cmd+Enter to run"
+            placeholder='Tell the AI what to draft — e.g. "Write a meeting agenda for…"'
             rows={2}
-            className="w-full text-[12px] px-2 py-1 bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded resize-none focus:outline-none focus:border-accent"
+            className="w-full text-[13px] px-2.5 py-1.5 bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-md resize-none focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
           />
-          <div className="flex justify-end mt-1">
-            <button
-              onClick={() => void runAiPrompt()}
-              disabled={!aiPrompt.trim() || aiBusy}
-              className="text-[11px] px-2 py-0.5 rounded bg-accent text-white disabled:opacity-50"
-            >
-              {aiBusy ? 'Thinking…' : 'Insert'}
-            </button>
+          {aiError && (
+            <div className="text-[11px] text-amber-700 dark:text-amber-400 px-1">
+              {aiError}
+            </div>
+          )}
+          {/* Staging preview — appears once the AI has returned content. The
+              user reviews then chooses Apply (insert into editor at cursor)
+              or Reject (discard). They can also re-prompt to regenerate. */}
+          {aiStaged && (
+            <div className="flex-1 min-h-0 flex flex-col gap-1.5">
+              <div className="text-[10px] uppercase tracking-wider text-stone-500 dark:text-stone-400 flex items-center gap-1">
+                <Icon name="visibility" size={11} />
+                <span>Preview — review before inserting</span>
+              </div>
+              <div className="flex-1 min-h-0 overflow-y-auto bg-stone-50 dark:bg-stone-800/60 border border-stone-200 dark:border-stone-700 rounded-md p-2.5 text-[12px] text-stone-800 dark:text-stone-100 whitespace-pre-wrap font-mono">
+                {aiStaged.markdown}
+              </div>
+            </div>
+          )}
+          <div className="flex justify-end gap-1.5">
+            {aiStaged ? (
+              <>
+                <button
+                  onClick={rejectAiStaged}
+                  className="text-[11px] px-3 py-1 rounded text-stone-600 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800"
+                >
+                  Discard
+                </button>
+                <button
+                  onClick={() => void runAiPrompt()}
+                  disabled={!aiPrompt.trim() || aiBusy}
+                  className="text-[11px] px-3 py-1 rounded text-stone-700 dark:text-stone-200 border border-stone-300 dark:border-stone-600 hover:bg-stone-100 dark:hover:bg-stone-800 disabled:opacity-50"
+                >
+                  {aiBusy ? 'Regenerating…' : 'Regenerate'}
+                </button>
+                <button
+                  onClick={applyAiStaged}
+                  className="text-[11px] px-3 py-1 rounded bg-accent text-white hover:brightness-110 inline-flex items-center gap-1"
+                >
+                  <Icon name="check" size={11} />
+                  Insert
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={() => void runAiPrompt()}
+                disabled={!aiPrompt.trim() || aiBusy}
+                className="text-[11px] px-3 py-1 rounded bg-accent text-white hover:brightness-110 disabled:opacity-50 inline-flex items-center gap-1"
+              >
+                {aiBusy ? (
+                  <>
+                    <Icon name="autorenew" size={11} className="animate-spin" />
+                    Drafting…
+                  </>
+                ) : (
+                  <>
+                    <Icon name="auto_awesome" size={11} />
+                    Draft
+                  </>
+                )}
+              </button>
+            )}
+          </div>
+          <div className="text-[9px] text-stone-400 dark:text-stone-500">
+            Cmd+Enter to draft · Esc to close · staged content never inserts without your approval
           </div>
         </div>
       )}

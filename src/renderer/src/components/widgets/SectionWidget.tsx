@@ -1,5 +1,8 @@
 import { useContext, useEffect, useRef, useState } from 'react'
 import { Rnd } from 'react-rnd'
+import CanvasContextMenu, { type CtxMenuItem } from '../CanvasContextMenu'
+import MakeTaskDialog from '../MakeTaskDialog'
+import ShareDialog from '../ShareDialog'
 import type { SectionLayout, Widget } from '@shared/types'
 import { useWidgetStore } from '../../stores/widgets'
 import { LinkDragContext } from '../../lib/linkDragContext'
@@ -51,8 +54,16 @@ export default function SectionWidget({
   const focusOn = useWidgetStore((s) => s.focusOn)
   const setDragOverride = useWidgetStore((s) => s.setDragOverride)
   const linkDrag = useContext(LinkDragContext)
+  // Suppress the click that browser dispatches immediately after a drag —
+  // dragging the section-handle ends in mouseup → click on the body. We
+  // don't want that click to fire focusOn (camera pan), which would
+  // immediately re-centre on the section the user just placed.
+  const dragJustEnded = useRef(0)
   const setFocused = useWidgetStore((s) => s.setFocused)
   const togglePin = useWidgetStore((s) => s.togglePin)
+  const archive = useWidgetStore((s) => s.archive)
+  const createWidget = useWidgetStore((s) => s.create)
+  const bringToFront = useWidgetStore((s) => s.bringToFront)
   const bumpLayout = useWidgetStore((s) => s.bumpLayoutVersion)
   const zoom = useWidgetStore((s) => s.zoom)
   const allWidgets = useWidgetStore((s) => s.widgets)
@@ -62,6 +73,12 @@ export default function SectionWidget({
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(widget.title || 'Section')
   const [receivedPulse, setReceivedPulse] = useState(false)
+  // Right-click on the section header opens "Make this a task" — same
+  // pattern as WidgetFrame so promoting a section to a task is reachable
+  // wherever the header is visible.
+  const [headerCtxMenu, setHeaderCtxMenu] = useState<{ x: number; y: number } | null>(null)
+  const [makeTaskOpen, setMakeTaskOpen] = useState(false)
+  const [shareOpen, setShareOpen] = useState(false)
   const rndRef = useRef<Rnd | null>(null)
   const prevChildCountRef = useRef(0)
   const lastAppliedSize = useRef<{ w: number; h: number }>({ w: 0, h: 0 })
@@ -170,15 +187,15 @@ export default function SectionWidget({
           effSiblings
         )
         void update(widget.id, { x: placed.x, y: placed.y })
-        const moved = Math.abs(rawX - placed.x) > 4 || Math.abs(rawY - placed.y) > 4
-        if (moved) {
-          // SectionWidget's Rnd is controlled (position prop) so it will
-          // visually follow the store update automatically — no need to
-          // remount. Pan the canvas so the user can see where the section
-          // ended up after the snap.
-          bumpLayout()
-          focusOn(widget.id)
-        }
+        // SectionWidget's Rnd is controlled (position prop) — the section
+        // and its children visually follow the store update automatically
+        // when widget.x/y change. We deliberately do NOT call bumpLayout
+        // here: that would change every widget's React key in the canvas,
+        // forcing all widgets (including any <webview>) to unmount and
+        // remount — every Electron webview would fully reload its URL.
+        // Mark the drag-end timestamp so the click event that follows
+        // doesn't run our onClick focusOn logic.
+        dragJustEnded.current = performance.now()
       }}
     >
       <AgeHalo createdAt={widget.createdAt} variant="section" />
@@ -186,7 +203,19 @@ export default function SectionWidget({
         data-widget-id={widget.id}
         onClick={(e) => {
           e.stopPropagation()
-          focusOn(widget.id)
+          // Suppress the synthetic click that fires immediately after a
+          // drag-end — otherwise dragging a section would re-centre the
+          // camera right after dropping it.
+          if (performance.now() - dragJustEnded.current < 250) return
+          // Deliberate click → bring the section into the centre. Pinned
+          // sections are docked to a corner and are always visible, so
+          // centering would jump to a stale world-space coord — just
+          // activate them.
+          if (isPinned) {
+            setActive(widget.id)
+          } else {
+            focusOn(widget.id)
+          }
         }}
         className={`h-full w-full relative ${receivedPulse ? 'section-receive-pulse' : ''}`}
       >
@@ -204,6 +233,11 @@ export default function SectionWidget({
         <div
           className="section-handle absolute top-0 left-3 -translate-y-1/2 px-2 py-0.5 rounded-md shadow flex items-center gap-1.5 cursor-move select-none flex-wrap max-w-[calc(100%-24px)]"
           style={{ backgroundColor: color }}
+          onContextMenu={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+            setHeaderCtxMenu({ x: e.clientX, y: e.clientY })
+          }}
         >
           {editing ? (
             <input
@@ -398,6 +432,92 @@ export default function SectionWidget({
           </div>
         </div>
       </div>
+      {headerCtxMenu && (
+        <CanvasContextMenu
+          x={headerCtxMenu.x}
+          y={headerCtxMenu.y}
+          items={(() => {
+            const items: CtxMenuItem[] = []
+            items.push({
+              label: 'Share section…',
+              icon: 'share',
+              onClick: () => setShareOpen(true)
+            })
+            items.push({
+              label: 'Make this a task…',
+              icon: 'task_alt',
+              onClick: () => setMakeTaskOpen(true)
+            })
+            items.push({ separator: true })
+            items.push({
+              label: 'Duplicate (empty)',
+              icon: 'content_copy',
+              onClick: () => {
+                // Duplicate the section container only — children stay in
+                // the original. Cloning children would imply moving them
+                // (children belong to one parent at a time) which is not
+                // what "duplicate" usually means. The new section opens
+                // empty so the user can drop different content into it.
+                void createWidget({
+                  taskId: widget.taskId,
+                  kind: 'section',
+                  title: widget.title ? `${widget.title} (copy)` : 'Section',
+                  content: '',
+                  x: widget.x + 30,
+                  y: widget.y + 30,
+                  width: widget.width,
+                  height: widget.height,
+                  color: widget.color
+                })
+              }
+            })
+            items.push({
+              label: 'Bring to front',
+              icon: 'flip_to_front',
+              onClick: () => {
+                void bringToFront(widget.id)
+              }
+            })
+            items.push({ separator: true })
+            items.push({
+              label: 'Archive (keep children on desk)',
+              icon: 'inventory_2',
+              onClick: () => {
+                // Eject children back to the canvas first, then archive
+                // the section. Otherwise archiving would also "lose" the
+                // children (they'd be invisible because their parent is
+                // archived, not because they were intentionally removed).
+                const childs = allWidgets.filter((c) => c.parentSectionId === widget.id)
+                for (const c of childs) {
+                  void update(c.id, {
+                    parentSectionId: null,
+                    x: Math.round(widget.x + SECTION_PADDING + c.x),
+                    y: Math.round(widget.y + SECTION_PADDING + c.y)
+                  })
+                }
+                void archive(widget.id)
+              }
+            })
+            return items
+          })()}
+          onClose={() => setHeaderCtxMenu(null)}
+        />
+      )}
+      {makeTaskOpen && (
+        <MakeTaskDialog
+          seedTitle={widget.title || 'Section'}
+          sourceWidget={widget}
+          onClose={() => setMakeTaskOpen(false)}
+        />
+      )}
+      {shareOpen && (
+        <ShareDialog
+          kind="widget"
+          entityId={widget.id}
+          label={widget.title || 'Section'}
+          onClose={() => setShareOpen(false)}
+        />
+      )}
     </Rnd>
   )
 }

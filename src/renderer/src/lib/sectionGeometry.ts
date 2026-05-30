@@ -147,7 +147,12 @@ export function findNonOverlapPosition(
     )
   const isClear = (pos: Rect): boolean => existing.every((e) => !overlaps(pos, e))
 
-  if (isClear(desired)) return { x: Math.max(0, desired.x), y: Math.max(0, desired.y) }
+  // The canvas is an infinite world — negative coordinates are legitimate
+  // (they represent space "above" or "left of" the origin once the user
+  // has panned). Clamping to (0, 0) caused a clear free-space drop at e.g.
+  // canvas-coord (-30, 400) to jump to (0, 400) — which fired the "moved"
+  // path and yanked the camera. Honour the user's intended position.
+  if (isClear(desired)) return { x: desired.x, y: desired.y }
 
   // Step 2 — collect every cardinal slot adjacent to a colliding widget and
   // pick the one closest to the actual drop point. We try all four sides of
@@ -174,7 +179,7 @@ export function findNonOverlapPosition(
   if (candidates.length > 0) {
     candidates.sort((a, b) => a.dist - b.dist)
     const best = candidates[0]
-    return { x: Math.max(0, best.x), y: Math.max(0, best.y) }
+    return { x: best.x, y: best.y }
   }
 
   // Step 3 — spiral outward from the drop. Step size scales with the widget
@@ -199,11 +204,11 @@ export function findNonOverlapPosition(
         width: desired.width,
         height: desired.height
       }
-      if (isClear(probe)) return { x: Math.max(0, probe.x), y: Math.max(0, probe.y) }
+      if (isClear(probe)) return { x: probe.x, y: probe.y }
     }
   }
 
   // Step 4 — stack below everything but keep the user's intended X.
   const maxBottom = Math.max(...existing.map((e) => e.y + e.height), 0)
-  return { x: Math.max(0, desired.x), y: maxBottom + gap }
+  return { x: desired.x, y: maxBottom + gap }
 }

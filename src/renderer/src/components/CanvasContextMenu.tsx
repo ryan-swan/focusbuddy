@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import Icon from './Icon'
 
 export interface CtxMenuItem {
@@ -39,17 +40,24 @@ export default function CanvasContextMenu({ x, y, items, onClose }: Props): JSX.
     }
   }, [onClose])
 
-  return (
+  // Portal to document.body so we escape any CSS transform stacking context
+  // higher up the tree. position:fixed is computed relative to the nearest
+  // transformed ancestor (not the viewport) — for menus opened from widget
+  // headers, the ancestor is the canvas's pan+zoomed container, so without
+  // portalling the menu lands at a transformed location instead of where
+  // the user clicked.
+  return createPortal(
     <div
       data-canvas-ctx-menu
-      className="fixed z-[100] bg-white dark:bg-stone-800 rounded-md shadow-2xl border border-stone-200 dark:border-stone-700 py-1 min-w-[210px] text-sm"
+      className="fixed z-[260] bg-white dark:bg-stone-800 rounded-md shadow-2xl border border-stone-200 dark:border-stone-700 py-1 min-w-[210px] text-sm"
       style={{ left: x, top: y }}
       onContextMenu={(e) => e.preventDefault()}
     >
       {items.map((item, i) => (
         <MenuItem key={i} item={item} onSelect={onClose} />
       ))}
-    </div>
+    </div>,
+    document.body
   )
 }
 

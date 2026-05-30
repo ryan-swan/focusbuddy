@@ -11,6 +11,9 @@ import { splitFavourites } from '../lib/connectedAppSort'
 import NewNodeDialog from './NewNodeDialog'
 import AISetupDialog from './AISetupDialog'
 import AddConnectedAppDialog from './AddConnectedAppDialog'
+import ShareDialog from './ShareDialog'
+import CanvasContextMenu, { type CtxMenuItem } from './CanvasContextMenu'
+import { useSharesStore } from '../stores/shares'
 import Icon from './Icon'
 
 // MIME used when dragging a Connected App row from the sidebar onto the canvas.
@@ -108,42 +111,10 @@ function renderConnectedAppRow(
   )
 }
 
-interface TreeItem {
-  node: FbNode
-  children: TreeItem[]
-  depth: number
-}
-
-function buildTree(nodes: FbNode[]): TreeItem[] {
-  const byParent = new Map<string | null, FbNode[]>()
-  for (const n of nodes) {
-    const list = byParent.get(n.parentId) ?? []
-    list.push(n)
-    byParent.set(n.parentId, list)
-  }
-  for (const list of byParent.values()) {
-    list.sort((a, b) => a.sortOrder - b.sortOrder || a.createdAt - b.createdAt)
-  }
-  const build = (parentId: string | null, depth: number): TreeItem[] =>
-    (byParent.get(parentId) ?? []).map((node) => ({
-      node,
-      depth,
-      children: build(node.id, depth + 1)
-    }))
-  return build(null, 0)
-}
-
-function flatten(items: TreeItem[], expanded: Record<string, boolean>): TreeItem[] {
-  const out: TreeItem[] = []
-  const walk = (list: TreeItem[]): void => {
-    for (const item of list) {
-      out.push(item)
-      if (expanded[item.node.id]) walk(item.children)
-    }
-  }
-  walk(items)
-  return out
-}
+// Tree helpers (buildTree / flatten) live in lib/nodeTree so the dashboard
+// FoldersCard and any future hierarchical surface can use the same
+// implementation. Local re-export to keep call sites here unchanged.
+import { buildTree, flatten, type TreeItem } from '../lib/nodeTree'
 
 interface Props {
   onCollapse?: () => void
@@ -293,8 +264,63 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
   const [projectsOpen, setProjectsOpen] = useState(true)
   const [appsOpen, setAppsOpen] = useState(true)
 
-  const tree = useMemo(() => buildTree(nodes), [nodes])
+  // Archived nodes are hidden from the day-to-day tree but still live in
+  // the database — the dashboard's archived view is where they surface.
+  // Filter at this level so every downstream use (tree, flat list,
+  // keyboard nav, drop targets) shares the same "what's visible" model.
+  const visibleNodes = useMemo(() => nodes.filter((n) => !n.archived), [nodes])
+
+  // Right-click context menu state for sidebar rows. Single state since
+  // only one menu can be open at a time. `node` is the row that was
+  // right-clicked; the menu items reference it directly.
+  const [rowCtxMenu, setRowCtxMenu] = useState<
+    | { x: number; y: number; node: FbNode }
+    | null
+  >(null)
+  // Share dialog state — opened from the row context menu.
+  const [shareTarget, setShareTarget] = useState<{
+    kind: 'folder' | 'task'
+    entityId: string
+    label: string
+  } | null>(null)
+
+  // Shared-with-me inbox — loaded once on mount, refreshed when items are
+  // accepted via the paste-link flow.
+  const sharedInbox = useSharesStore((s) => s.inbox)
+  const refreshShares = useSharesStore((s) => s.refresh)
+  const sharesLoaded = useSharesStore((s) => s.loaded)
+  const removeFromInbox = useSharesStore((s) => s.removeFromInbox)
+  const [sharedOpen, setSharedOpen] = useState(true)
+
+  useEffect(() => {
+    if (!sharesLoaded) void refreshShares()
+  }, [sharesLoaded, refreshShares])
+  const tree = useMemo(() => buildTree(visibleNodes), [visibleNodes])
   const flat = useMemo(() => flatten(tree, expanded), [tree, expanded])
+
+  // Roving-tabindex keyboard navigation per the WAI-ARIA Tree pattern.
+  // focusedNodeId is the single "tabbable" row; arrow keys move it without
+  // requiring a click. Keeps the sidebar fully usable for anyone who can't
+  // reliably hit a small chevron with a mouse (arthritis, tremor, motor-
+  // accessibility-needs in general).
+  const [focusedNodeId, setFocusedNodeId] = useState<string | null>(null)
+  const rowRefs = useRef<Map<string, HTMLDivElement>>(new Map())
+
+  // Programmatically focus the row when focusedNodeId changes (via arrow
+  // keys). Native click already focuses the row through tabIndex=0.
+  useEffect(() => {
+    if (!focusedNodeId) return
+    rowRefs.current.get(focusedNodeId)?.focus()
+  }, [focusedNodeId])
+
+  // The flat array reflects the current visible list. Memoised so the key
+  // handler can find a row's index in O(n) without re-allocating on every
+  // keystroke.
+  const flatIdById = useMemo(() => {
+    const m = new Map<string, number>()
+    flat.forEach((item, i) => m.set(item.node.id, i))
+    return m
+  }, [flat])
 
   function selectTask(id: string): void {
     setActive(id)
@@ -303,6 +329,110 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
 
   function selectProject(id: string): void {
     goProject(id)
+  }
+
+  function archiveNode(id: string): void {
+    void update(id, { archived: true })
+    // Move focus away from a soon-to-be-hidden row so the keyboard nav
+    // doesn't end up pointing at nothing.
+    if (focusedNodeId === id) setFocusedNodeId(null)
+  }
+
+  // Keyboard handler attached to each tree row. Implements the WAI-ARIA
+  // Tree pattern semantics: ↑/↓ to move focus, → to expand or descend,
+  // ← to collapse or jump to parent, Enter/Space to activate, Esc to
+  // unfocus, Home/End to jump to first/last visible row.
+  //
+  // This is the single most important keyboard-accessibility hook in the
+  // app — making the sidebar fully usable without a mouse means anyone
+  // with reduced fine-motor control can drive the whole workspace from
+  // arrow keys + a confirm-key alone.
+  function handleNodeKeyDown(
+    e: React.KeyboardEvent<HTMLDivElement>,
+    item: TreeItem
+  ): void {
+    const node = item.node
+    const isFolder = node.kind === 'folder'
+    const hasChildren = item.children.length > 0
+    const isExpanded = !!expanded[node.id]
+    const idx = flatIdById.get(node.id) ?? 0
+    switch (e.key) {
+      case 'ArrowDown': {
+        e.preventDefault()
+        const next = flat[Math.min(idx + 1, flat.length - 1)]
+        if (next) setFocusedNodeId(next.node.id)
+        break
+      }
+      case 'ArrowUp': {
+        e.preventDefault()
+        const prev = flat[Math.max(idx - 1, 0)]
+        if (prev) setFocusedNodeId(prev.node.id)
+        break
+      }
+      case 'ArrowRight': {
+        e.preventDefault()
+        // Two-step right-arrow per the ARIA pattern: collapsed folder
+        // expands on first press; subsequent press dives into the first
+        // child. Non-folder rows just no-op (consistent with screen-
+        // reader expectations).
+        if (isFolder && hasChildren) {
+          if (!isExpanded) {
+            toggleExpand(node.id)
+          } else {
+            setFocusedNodeId(flat[idx + 1]?.node.id ?? node.id)
+          }
+        }
+        break
+      }
+      case 'ArrowLeft': {
+        e.preventDefault()
+        // Mirror of right-arrow: expanded folder collapses; collapsed
+        // (or any non-folder) jumps focus to its parent row.
+        if (isFolder && isExpanded) {
+          toggleExpand(node.id)
+        } else if (node.parentId) {
+          setFocusedNodeId(node.parentId)
+        }
+        break
+      }
+      case 'Enter':
+      case ' ': {
+        e.preventDefault()
+        if (isFolder) {
+          if (hasChildren) toggleExpand(node.id)
+          selectProject(node.id)
+        } else {
+          selectTask(node.id)
+        }
+        break
+      }
+      case 'Escape': {
+        e.preventDefault()
+        setFocusedNodeId(null)
+        ;(e.currentTarget as HTMLElement).blur()
+        break
+      }
+      case 'Home': {
+        e.preventDefault()
+        if (flat.length > 0) setFocusedNodeId(flat[0].node.id)
+        break
+      }
+      case 'End': {
+        e.preventDefault()
+        if (flat.length > 0) setFocusedNodeId(flat[flat.length - 1].node.id)
+        break
+      }
+      case 'Delete':
+      case 'Backspace': {
+        // Cmd/Ctrl+Delete archives; plain Delete is reserved for input
+        // contexts (rename) so we don't trash a node on accidental keypress.
+        if (e.metaKey || e.ctrlKey) {
+          e.preventDefault()
+          archiveNode(node.id)
+        }
+        break
+      }
+    }
   }
 
   function viewIsActive(targetView: View): boolean {
@@ -425,6 +555,104 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
           </div>
         )}
 
+        {/* ── SHARED WITH ME — folders / tasks / widgets others sent you ─ */}
+        <SectionHeader
+          label="Shared with me"
+          open={sharedOpen}
+          onToggle={() => setSharedOpen((v) => !v)}
+          action={
+            <button
+              onClick={async (e) => {
+                e.stopPropagation()
+                // Paste a share link. v1: prompts for the token; future
+                // server-backed version will fetch the snapshot
+                // automatically. Accepted shares appear in this section.
+                const url = window.prompt(
+                  'Paste a share link:',
+                  'https://fb.app/share/…'
+                )
+                if (!url) return
+                const m = url.match(/\/share\/([a-z0-9]+)/i)
+                if (!m) {
+                  alert('That doesn\'t look like a FocusBuddy share link.')
+                  return
+                }
+                // The store's acceptByToken handles both modes — fetching
+                // the snapshot from the hosted service when configured, or
+                // inserting a placeholder in local-mock mode.
+                try {
+                  await useSharesStore.getState().acceptByToken(m[1])
+                } catch (err) {
+                  alert(`Could not accept share: ${(err as Error).message}`)
+                }
+              }}
+              className="icon-btn !h-5 !w-5"
+              title="Paste a share link"
+            >
+              <Icon name="content_paste" size={12} />
+            </button>
+          }
+        />
+        {sharedOpen && (
+          <div className="mb-2 px-2">
+            {sharedInbox.length === 0 ? (
+              <div className="text-[11px] text-stone-500 dark:text-stone-400 leading-relaxed px-2 py-2">
+                Items others share with you land here. Get a link from a
+                collaborator, then click the{' '}
+                <Icon
+                  name="content_paste"
+                  size={10}
+                  className="inline mb-0.5"
+                />{' '}
+                button above to paste it.
+              </div>
+            ) : (
+              <div role="list">
+                {sharedInbox.map((item) => {
+                  const snap = item.snapshot as { title?: string; kind?: string } | null
+                  const title = (snap && snap.title) || `Shared ${item.kind}`
+                  return (
+                    <div
+                      key={item.id}
+                      role="listitem"
+                      className="group flex items-center gap-1.5 px-2 py-1.5 rounded hover:bg-stone-100 dark:hover:bg-stone-800"
+                      title={`Shared by ${item.fromHandle}`}
+                    >
+                      <Icon
+                        name={
+                          item.kind === 'folder'
+                            ? 'folder_shared'
+                            : item.kind === 'task'
+                              ? 'assignment_ind'
+                              : 'widgets'
+                        }
+                        size={14}
+                        className="text-accent shrink-0"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="text-[12px] text-stone-800 dark:text-stone-100 truncate">
+                          {title}
+                        </div>
+                        <div className="text-[9px] text-stone-500 dark:text-stone-400 truncate font-mono">
+                          {item.fromHandle} ·{' '}
+                          {item.scope === 'copy' ? 'can copy' : 'view only'}
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => void removeFromInbox(item.id)}
+                        className="icon-btn !h-5 !w-5 opacity-0 group-hover:opacity-100"
+                        title="Remove from Shared with me"
+                      >
+                        <Icon name="close" size={11} />
+                      </button>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* ── PROJECTS — the tree we had before ────────────────────────── */}
         <SectionHeader
           label="Projects"
@@ -444,7 +672,7 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
           }
         />
         {projectsOpen && (
-          <div className="mb-2">
+          <div className="mb-2" role="tree" aria-label="Projects and tasks">
             {flat.length === 0 && (
               <div className="px-4 py-3 text-xs text-stone-500 dark:text-stone-400 leading-relaxed">
                 No projects yet.{' '}
@@ -469,9 +697,33 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
               const isDragging = draggingIdRef.current === node.id
               const isDropTarget = dropTarget?.id === node.id
               const dropPos = isDropTarget ? dropTarget.position : null
+              // Roving-tabindex: only the focused row is in the tab order.
+              // Every other row is reachable via arrow keys once focus is
+              // inside the tree, but not via Tab from outside (which would
+              // be n-keystrokes to skip past).
+              const isFocused = focusedNodeId === node.id
               return (
                 <div
                   key={node.id}
+                  ref={(el) => {
+                    if (el) rowRefs.current.set(node.id, el)
+                    else rowRefs.current.delete(node.id)
+                  }}
+                  role="treeitem"
+                  aria-level={depth + 1}
+                  aria-expanded={isFolder ? isOpen : undefined}
+                  aria-selected={isActive}
+                  tabIndex={
+                    // First row in the tree gets tabIndex 0 by default so
+                    // the user has an entry point; otherwise only the
+                    // explicitly focused row is tabbable.
+                    isFocused ||
+                    (focusedNodeId === null && flat[0]?.node.id === node.id)
+                      ? 0
+                      : -1
+                  }
+                  onFocus={() => setFocusedNodeId(node.id)}
+                  onKeyDown={(e) => handleNodeKeyDown(e, item)}
                   style={{
                     paddingLeft: `${depth * 14 + 8}px`,
                     borderTop:
@@ -487,12 +739,16 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
                     opacity: isDragging ? 0.4 : 1,
                     transition: 'border-color 80ms, background-color 80ms'
                   }}
-                  className={`relative group flex items-center pr-1.5 py-0.5 ${
+                  className={`relative group flex items-center pr-1.5 py-0.5 outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-inset focus-visible:bg-accent/[0.06] ${
                     isActive && !isDropTarget ? 'bg-stone-100/80 dark:bg-stone-800/60' : ''
                   }`}
                   onDragOver={(e) => handleRowDragOver(e, node)}
                   onDragLeave={(e) => handleRowDragLeave(e, node)}
                   onDrop={(e) => void handleRowDrop(e, node)}
+                  onContextMenu={(e) => {
+                    e.preventDefault()
+                    setRowCtxMenu({ x: e.clientX, y: e.clientY, node })
+                  }}
                 >
                   {isActive && (
                     <span className="absolute left-0 h-6 w-[3px] rounded-r bg-accent" />
@@ -512,8 +768,16 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
                     onDragEnd={handleRowDragEnd}
                     onClick={() => {
                       if (isRenaming) return
-                      if (isFolder) selectProject(node.id)
-                      else selectTask(node.id)
+                      if (isFolder) {
+                        // Folder rows now toggle expand AND navigate. The
+                        // caret-only path was tiny and hard to hit reliably;
+                        // putting both actions on the row makes the whole
+                        // folder a single fluid click target.
+                        if (hasChildren) toggleExpand(node.id)
+                        selectProject(node.id)
+                      } else {
+                        selectTask(node.id)
+                      }
                     }}
                     onDoubleClick={() => {
                       setRenamingId(node.id)
@@ -637,12 +901,19 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
                       <Icon name="edit" size={14} />
                     </button>
                     <button
+                      onClick={() => archiveNode(node.id)}
+                      title={`Archive ${isFolder ? 'folder' : 'task'} (Cmd+Delete) — recoverable from Home → Archived`}
+                      className="icon-btn"
+                    >
+                      <Icon name="inventory_2" size={14} />
+                    </button>
+                    <button
                       onClick={() => {
                         if (confirm(`Delete "${node.title}"? Children will be removed too.`)) {
                           void remove(node.id)
                         }
                       }}
-                      title="Delete"
+                      title="Delete permanently"
                       className="icon-btn hover:!text-red-700"
                     >
                       <Icon name="delete" size={14} />
@@ -767,6 +1038,48 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
         <AddConnectedAppDialog
           onClose={() => setAddAppOpen(false)}
           onAdded={(id) => goConnectedApp(id)}
+        />
+      )}
+      {rowCtxMenu && (
+        <CanvasContextMenu
+          x={rowCtxMenu.x}
+          y={rowCtxMenu.y}
+          items={[
+            {
+              label: 'Share…',
+              icon: 'share',
+              onClick: () => {
+                setShareTarget({
+                  kind: rowCtxMenu.node.kind === 'folder' ? 'folder' : 'task',
+                  entityId: rowCtxMenu.node.id,
+                  label: rowCtxMenu.node.title || '(untitled)'
+                })
+              }
+            },
+            { separator: true },
+            {
+              label: 'Rename',
+              icon: 'edit',
+              onClick: () => {
+                setRenamingId(rowCtxMenu.node.id)
+                setRenameText(rowCtxMenu.node.title)
+              }
+            },
+            {
+              label: 'Archive',
+              icon: 'inventory_2',
+              onClick: () => archiveNode(rowCtxMenu.node.id)
+            }
+          ] as CtxMenuItem[]}
+          onClose={() => setRowCtxMenu(null)}
+        />
+      )}
+      {shareTarget && (
+        <ShareDialog
+          kind={shareTarget.kind}
+          entityId={shareTarget.entityId}
+          label={shareTarget.label}
+          onClose={() => setShareTarget(null)}
         />
       )}
     </aside>

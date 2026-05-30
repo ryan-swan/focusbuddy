@@ -38,6 +38,22 @@ protocol.registerSchemesAsPrivileged([
       stream: true, // enables range requests for videos / PDFs
       bypassCSP: true
     }
+  },
+  // `fb-dev://` is a development-only protocol that serves files from the
+  // project's `Mock Videos/` directory (and could serve other mock assets
+  // later). It's registered unconditionally — same privilege set as
+  // fb-file so video streaming works — but the protocol.handle() below is
+  // only wired in dev. In a packaged build the scheme exists but never
+  // resolves, so production behaviour is safe.
+  {
+    scheme: 'fb-dev',
+    privileges: {
+      standard: true,
+      secure: true,
+      supportFetchAPI: true,
+      stream: true,
+      bypassCSP: true
+    }
   }
 ])
 
@@ -246,6 +262,51 @@ app.whenReady().then(() => {
       return new Response(`fb-file error: ${String(err)}`, { status: 500 })
     }
   })
+
+  // Dev-only mock asset protocol — serves files from the project's
+  // `Mock Videos/` directory so the body double dialog can use a stand-in
+  // video while WebRTC is being built. Only registered when running from
+  // a Vite dev server (process.env.ELECTRON_RENDERER_URL is the signal
+  // electron-vite uses). In a packaged build this handler isn't installed
+  // and fb-dev:// URLs fail gracefully.
+  if (process.env.ELECTRON_RENDERER_URL) {
+    protocol.handle('fb-dev', async (request) => {
+      try {
+        const url = new URL(request.url)
+        // host = subdir under the project root (e.g. `mock-videos`).
+        // pathname is the file relative to that subdir (e.g. `/working-webcam.mp4`).
+        const subdir = url.hostname
+        const relPath = decodeURIComponent(url.pathname).replace(/^\/+/, '')
+        // Whitelist exactly what dev can serve to avoid an accidental
+        // filesystem read-anything bug if this handler ever leaks.
+        const allowedSubdirs: Record<string, string> = {
+          'mock-videos': 'Mock Videos'
+        }
+        const mappedSubdir = allowedSubdirs[subdir]
+        if (!mappedSubdir) {
+          return new Response('Forbidden', { status: 403 })
+        }
+        // app.getAppPath() in dev returns the project root because
+        // electron-vite runs from there.
+        const root = app.getAppPath()
+        const onDisk = `${root}/${mappedSubdir}/${relPath}`
+        const response = await net.fetch(pathToFileURL(onDisk).toString())
+        const headers = new Headers(response.headers)
+        // Map common extensions to mime types so the renderer's <video>
+        // element picks the right codec path.
+        if (relPath.endsWith('.mp4')) headers.set('Content-Type', 'video/mp4')
+        else if (relPath.endsWith('.webm')) headers.set('Content-Type', 'video/webm')
+        headers.set('Cache-Control', 'no-cache')
+        return new Response(response.body, {
+          status: response.status,
+          statusText: response.statusText,
+          headers
+        })
+      } catch (err) {
+        return new Response(`fb-dev error: ${String(err)}`, { status: 500 })
+      }
+    })
+  }
 
   createCommandCenter()
   app.on('activate', () => {

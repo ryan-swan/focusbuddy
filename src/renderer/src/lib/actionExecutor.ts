@@ -38,10 +38,17 @@ export interface ApplyResult {
  * widgets need a parent task, focus sessions are bound to one. If the user is
  * in a non-task view (Home dashboard etc.), proposals that need a task fail
  * gracefully with a helpful message rather than silently doing nothing.
+ *
+ * `resolvedIds` is a shared map keyed by proposal.id → newly-created entity id
+ * (e.g. table id from a create-table). Lets a follow-up add-table-row in the
+ * same batch reference the table that was just created with a symbolic
+ * "$<proposalId>" instead of an id that doesn't exist yet. Pass the same map
+ * across an applyAll() loop; pass `undefined` (or omit) for one-off calls and
+ * symbolic refs will fail validation as before.
  */
 export async function applyProposal(
   proposal: ActionProposal,
-  ctx: { activeTaskId: string | null }
+  ctx: { activeTaskId: string | null; resolvedIds?: Map<string, string> }
 ): Promise<ApplyResult> {
   switch (proposal.kind) {
     case 'create-widget':
@@ -63,7 +70,7 @@ export async function applyProposal(
     case 'create-table':
       return applyCreateTable(proposal, ctx)
     case 'add-table-row':
-      return applyAddTableRow(proposal)
+      return applyAddTableRow(proposal, ctx)
     case 'create-field':
       return applyCreateField(proposal, ctx)
     default:
@@ -259,7 +266,7 @@ function buildSchemaFromAiColumns(
 
 async function applyCreateTable(
   p: Extract<ActionProposal, { kind: 'create-table' }>,
-  ctx: { activeTaskId: string | null }
+  ctx: { activeTaskId: string | null; resolvedIds?: Map<string, string> }
 ): Promise<ApplyResult> {
   if (!ctx.activeTaskId) {
     return { ok: false, message: 'Open a task first — tables need a canvas.' }
@@ -282,6 +289,14 @@ async function applyCreateTable(
     height: entry?.defaultHeight,
     color: null
   })
+  // Stash the new table id keyed by THIS proposal's id so a sibling
+  // add-table-row proposal can reference it via `tableId: "$<proposal.id>"`.
+  // Without this map, the AI has no way to point follow-up rows at a table
+  // it created in the same batch — the table didn't exist when the prompt
+  // was written.
+  if (ctx.resolvedIds) {
+    ctx.resolvedIds.set(p.id, table.id)
+  }
   return {
     ok: true,
     message: `Added table "${p.title}" (${schema.columns.length} columns)`
@@ -289,14 +304,30 @@ async function applyCreateTable(
 }
 
 async function applyAddTableRow(
-  p: Extract<ActionProposal, { kind: 'add-table-row' }>
+  p: Extract<ActionProposal, { kind: 'add-table-row' }>,
+  ctx: { resolvedIds?: Map<string, string> }
 ): Promise<ApplyResult> {
+  // Resolve symbolic "$<proposalId>" tableIds against the resolvedIds map
+  // populated by an earlier applyCreateTable. Plain ids fall through.
+  let tableId = p.tableId
+  if (tableId.startsWith('$')) {
+    const refKey = tableId.slice(1)
+    const resolved = ctx.resolvedIds?.get(refKey)
+    if (!resolved) {
+      return {
+        ok: false,
+        message:
+          'Row references a table that was not created in this batch (or the create-table action was rejected first).'
+      }
+    }
+    tableId = resolved
+  }
   // Resolve the table + its schema so we can map AI-provided column labels
   // (or ids) to actual column ids + coerce values to the right primitive.
   const tablesState = useTablesStore.getState()
-  const table = await tablesState.ensureTableLoaded(p.tableId)
+  const table = await tablesState.ensureTableLoaded(tableId)
   if (!table) {
-    return { ok: false, message: `No table with id ${p.tableId.slice(0, 8)}…` }
+    return { ok: false, message: `No table with id ${tableId.slice(0, 8)}…` }
   }
   // Build a label→column lookup (case-insensitive, trimmed) alongside the
   // direct id match so the AI can refer to columns by either.
@@ -324,7 +355,7 @@ async function applyAddTableRow(
           : 'No cell values provided.'
     }
   }
-  await tablesState.addRow(p.tableId, cells)
+  await tablesState.addRow(tableId, cells)
   return {
     ok: true,
     message: `Added row to "${table.title}"${unrecognised.length > 0 ? ` (skipped: ${unrecognised.join(', ')})` : ''}`
@@ -334,12 +365,36 @@ async function applyAddTableRow(
 // Best-effort coercion from the AI's string-only cells map to the typed value
 // each column expects. Falls back to defaultValue when parsing fails so we
 // never insert garbage that breaks the table widget's rendering.
-function coerceCellValue(
+export function coerceCellValue(
   type: string,
-  raw: string,
+  raw: unknown,
   config: unknown
 ): unknown {
-  const v = raw.trim()
+  // The chat-action path always sends strings (the AI's JSON schema is
+  // string-only). The in-widget AI path lets the model return native JSON
+  // types (boolean for checkbox, array for multi-select, number for
+  // number). Normalise both into the same code path: pre-handle the
+  // native types where they save a parse round-trip, then fall through to
+  // a string-coerced parse for everything else.
+  if (type === 'checkbox' && typeof raw === 'boolean') return raw
+  if (type === 'number' && typeof raw === 'number') {
+    return Number.isFinite(raw) ? raw : null
+  }
+  if (type === 'multi-select' && Array.isArray(raw)) {
+    const opts =
+      (config as { options?: Array<{ id: string; label: string }> }).options ?? []
+    const matchOne = (input: string): string | null => {
+      const lc = input.toLowerCase().trim()
+      const byLabel = opts.find((o) => o.label.toLowerCase().trim() === lc)
+      if (byLabel) return byLabel.id
+      const byId = opts.find((o) => o.id === input)
+      return byId ? byId.id : null
+    }
+    return (raw as unknown[])
+      .map((p) => matchOne(String(p)))
+      .filter((x): x is string => x !== null)
+  }
+  const v = String(raw ?? '').trim()
   switch (type) {
     case 'text-short':
     case 'text-long':
