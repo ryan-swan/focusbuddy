@@ -48,6 +48,56 @@ export function chimeIn(): void {
   window.setTimeout(() => beep(880, 90, 0.11), 70)
 }
 
+// Stream Deck button feedback sounds — three flavours so users can dial
+// in the right feel. All very short (~40-90ms) so rapid presses don't
+// stack uncomfortably.
+export function streamDeckClick(
+  variant: 'click' | 'tick' | 'thunk' | 'silent' = 'click'
+): void {
+  if (variant === 'silent') return
+  if (!shouldPlay()) return
+  try {
+    const c = getCtx()
+    const now = c.currentTime
+    const osc = c.createOscillator()
+    const gain = c.createGain()
+    osc.connect(gain)
+    gain.connect(c.destination)
+    if (variant === 'click') {
+      // High snap — like a mechanical keyboard cap.
+      osc.type = 'square'
+      osc.frequency.setValueAtTime(2200, now)
+      osc.frequency.exponentialRampToValueAtTime(1400, now + 0.04)
+      gain.gain.setValueAtTime(0.0001, now)
+      gain.gain.exponentialRampToValueAtTime(effectiveVolume(0.08), now + 0.005)
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.06)
+      osc.start(now)
+      osc.stop(now + 0.08)
+    } else if (variant === 'tick') {
+      // Crisper, higher — like a UI tick / typewriter.
+      osc.type = 'triangle'
+      osc.frequency.setValueAtTime(3000, now)
+      gain.gain.setValueAtTime(0.0001, now)
+      gain.gain.exponentialRampToValueAtTime(effectiveVolume(0.05), now + 0.003)
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.035)
+      osc.start(now)
+      osc.stop(now + 0.05)
+    } else if (variant === 'thunk') {
+      // Lower, fuller — like a chunky button.
+      osc.type = 'sine'
+      osc.frequency.setValueAtTime(180, now)
+      osc.frequency.exponentialRampToValueAtTime(90, now + 0.08)
+      gain.gain.setValueAtTime(0.0001, now)
+      gain.gain.exponentialRampToValueAtTime(effectiveVolume(0.14), now + 0.005)
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.1)
+      osc.start(now)
+      osc.stop(now + 0.12)
+    }
+  } catch {
+    // ignore — AudioContext might be suspended
+  }
+}
+
 export function chimeOut(): void {
   beep(660, 70, 0.08)
   window.setTimeout(() => beep(440, 90, 0.08), 70)

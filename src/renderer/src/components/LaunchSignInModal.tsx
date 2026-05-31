@@ -1,0 +1,285 @@
+import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
+import { useAccountStore } from '../stores/account'
+import Icon from './Icon'
+
+// LaunchSignInModal — appears on app boot when the user isn't signed in
+// and hasn't recently skipped the modal.
+//
+// Two tabs:
+//   - Log in (default if cachedEmail exists)
+//   - Sign up
+//
+// Plus a calm "Continue without account" button so existing users who
+// were happy local-only aren't forced into an account. Their choice is
+// remembered for a week (see SKIP_TTL_MS) — after that, the modal
+// surfaces again because eventually most users want shares to sync.
+//
+// All auth goes through the signal server's /accounts/signup and
+// /accounts/login endpoints (see lib/accountClient.ts).
+
+const SKIP_TTL_MS = 7 * 24 * 60 * 60 * 1000 // one week
+
+export default function LaunchSignInModal(): JSX.Element | null {
+  const bootStatus = useAccountStore((s) => s.bootStatus)
+  const account = useAccountStore((s) => s.account)
+  const skippedAt = useAccountStore((s) => s.skippedAt)
+  const cachedEmail = useAccountStore((s) => s.cachedEmail)
+  const signupAction = useAccountStore((s) => s.signup)
+  const loginAction = useAccountStore((s) => s.login)
+  const setSkipped = useAccountStore((s) => s.setSkipped)
+  // Manually dismissed in this session — we don't want it to re-appear
+  // if some other state change fires after the user closed it.
+  const [dismissedThisSession, setDismissedThisSession] = useState(false)
+
+  const [mode, setMode] = useState<'login' | 'signup'>(
+    cachedEmail ? 'login' : 'signup'
+  )
+  // Pre-fill email from the cached value (so a returning user only types
+  // their password). Sync once cachedEmail is loaded.
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [handle, setHandle] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (cachedEmail && !email) {
+      setEmail(cachedEmail)
+      setMode('login')
+    }
+  }, [cachedEmail, email])
+
+  // Decide whether to render. Three reasons we don't:
+  //  - Account store hasn't finished booting (don't flash the modal).
+  //  - User is already signed in.
+  //  - User skipped recently (within SKIP_TTL_MS) — but skippedAt is
+  //    wiped on a successful sign-in, so this only blocks while they're
+  //    truly in the "no thanks" state.
+  //  - User dismissed in this session.
+  if (bootStatus !== 'ready') return null
+  if (account) return null
+  if (dismissedThisSession) return null
+  if (skippedAt && Date.now() - skippedAt < SKIP_TTL_MS) return null
+
+  async function handleSubmit(e: React.FormEvent): Promise<void> {
+    e.preventDefault()
+    if (busy) return
+    setBusy(true)
+    setError(null)
+    try {
+      const result =
+        mode === 'login'
+          ? await loginAction({
+              email: email.trim().toLowerCase(),
+              password
+            })
+          : await signupAction({
+              email: email.trim().toLowerCase(),
+              password,
+              handle: handle.trim() || null
+            })
+      if (result.ok) {
+        // Modal will unmount because `account` is now populated. No
+        // additional close needed.
+        return
+      }
+      if (result.code === 'EMAIL_EXISTS') {
+        setError('An account with that email exists. Switched you to log in.')
+        setMode('login')
+        return
+      }
+      if (result.code === 'NETWORK') {
+        setError(
+          'Could not reach the FocusBuddy server. You can continue without an account and try again later.'
+        )
+        return
+      }
+      setError(result.error)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function handleSkip(): Promise<void> {
+    await setSkipped(true)
+    setDismissedThisSession(true)
+  }
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[280] bg-black/60 backdrop-blur-md flex items-center justify-center p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Sign in to FocusBuddy"
+    >
+      <div
+        className="w-full max-w-md rounded-2xl p-6 fb-glass-chrome border border-white/[0.08] shadow-2xl"
+        style={{
+          background: 'rgba(20, 28, 48, 0.96)',
+          boxShadow:
+            'inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 0 0 1px rgba(139, 92, 246, 0.12), 0 24px 64px -12px rgba(139, 92, 246, 0.28), 0 32px 80px -16px rgba(0, 0, 0, 0.65)'
+        }}
+      >
+        <div className="flex items-center gap-3 mb-1">
+          <div
+            className="h-10 w-10 rounded-xl inline-flex items-center justify-center text-[20px] shrink-0"
+            style={{
+              background:
+                'linear-gradient(135deg, rgba(139, 92, 246, 0.25), rgba(99, 102, 241, 0.18))',
+              color: 'white'
+            }}
+          >
+            <Icon name="auto_awesome" size={18} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h2 className="text-[15px] font-semibold text-stone-100 tracking-[0.04em]">
+              {mode === 'login' ? 'Welcome back' : 'Sign in to FocusBuddy'}
+            </h2>
+            <p className="text-[11px] text-stone-400">
+              {mode === 'login'
+                ? 'Sign in to sync shared items across your devices.'
+                : 'Create an account to receive shares and sync across your devices.'}
+            </p>
+          </div>
+        </div>
+
+        {/* Mode toggle */}
+        <div className="mt-4 flex items-center gap-0.5 p-0.5 rounded-md bg-white/[0.03] border border-white/[0.06] w-fit">
+          <button
+            onClick={() => {
+              setMode('login')
+              setError(null)
+            }}
+            className={`px-3 py-1 rounded text-[11px] font-medium transition-colors ${
+              mode === 'login'
+                ? 'bg-accent/15 text-accent'
+                : 'text-stone-400 hover:text-stone-200'
+            }`}
+            type="button"
+          >
+            Log in
+          </button>
+          <button
+            onClick={() => {
+              setMode('signup')
+              setError(null)
+            }}
+            className={`px-3 py-1 rounded text-[11px] font-medium transition-colors ${
+              mode === 'signup'
+                ? 'bg-accent/15 text-accent'
+                : 'text-stone-400 hover:text-stone-200'
+            }`}
+            type="button"
+          >
+            Sign up
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="mt-4 space-y-3">
+          <div>
+            <label className="block text-[10px] uppercase tracking-wider text-stone-400 font-semibold mb-1">
+              Email
+            </label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              autoFocus
+              className="w-full px-3 py-2 rounded-md text-stone-100 placeholder:text-stone-500 focus:outline-none"
+              style={{
+                background: 'rgba(0,0,0,0.32)',
+                border: '1px solid rgba(255,255,255,0.08)'
+              }}
+              placeholder="you@example.com"
+              autoComplete="email"
+            />
+          </div>
+          {mode === 'signup' && (
+            <div>
+              <label className="block text-[10px] uppercase tracking-wider text-stone-400 font-semibold mb-1">
+                Display handle{' '}
+                <span className="text-stone-500 normal-case font-normal">
+                  (optional)
+                </span>
+              </label>
+              <input
+                type="text"
+                value={handle}
+                onChange={(e) => setHandle(e.target.value)}
+                placeholder="what your shares will say"
+                maxLength={32}
+                className="w-full px-3 py-2 rounded-md text-stone-100 placeholder:text-stone-500 focus:outline-none"
+                style={{
+                  background: 'rgba(0,0,0,0.32)',
+                  border: '1px solid rgba(255,255,255,0.08)'
+                }}
+              />
+            </div>
+          )}
+          <div>
+            <label className="block text-[10px] uppercase tracking-wider text-stone-400 font-semibold mb-1">
+              Password
+            </label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              minLength={mode === 'signup' ? 8 : undefined}
+              className="w-full px-3 py-2 rounded-md text-stone-100 placeholder:text-stone-500 focus:outline-none"
+              style={{
+                background: 'rgba(0,0,0,0.32)',
+                border: '1px solid rgba(255,255,255,0.08)'
+              }}
+              placeholder={mode === 'signup' ? 'at least 8 characters' : 'your password'}
+              autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+            />
+          </div>
+
+          {error && (
+            <div
+              className="text-[11px] px-3 py-2 rounded-md"
+              style={{
+                background: 'rgba(244,114,182,0.10)',
+                border: '1px solid rgba(244,114,182,0.25)',
+                color: 'rgb(251, 207, 232)'
+              }}
+            >
+              {error}
+            </div>
+          )}
+
+          <div className="pt-1 flex items-center justify-between gap-2">
+            <button
+              type="button"
+              onClick={() => void handleSkip()}
+              className="text-[11px] text-stone-400 hover:text-stone-100 transition-colors"
+              title="Use FocusBuddy locally without an account. You can sign in later from Settings."
+            >
+              Continue without account
+            </button>
+            <button
+              type="submit"
+              disabled={busy || !email || !password}
+              className="btn-primary !text-[12px] disabled:opacity-50"
+            >
+              {busy
+                ? 'Working…'
+                : mode === 'login'
+                  ? 'Log in'
+                  : 'Create account'}
+            </button>
+          </div>
+        </form>
+
+        <p className="mt-4 pt-3 border-t border-white/[0.04] text-[10px] text-stone-500 leading-relaxed">
+          Your local data stays on this device. Only the items you share — and
+          your email — touch our server. No telemetry, no tracking.
+        </p>
+      </div>
+    </div>,
+    document.body
+  )
+}

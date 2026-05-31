@@ -1,4 +1,4 @@
-import { ipcMain } from 'electron'
+import { ipcMain, BrowserWindow, type WebContents } from 'electron'
 import {
   createNode,
   deleteNode,
@@ -15,6 +15,22 @@ import {
   updateWidget
 } from '../db/widgets'
 import { createLink, deleteLink, listLinksByTask } from '../db/widgetLinks'
+import {
+  clearSession,
+  loadAccountState,
+  saveSession,
+  setCachedEmail,
+  setSkipped
+} from '../db/account'
+import {
+  executeAction,
+  openAccessibilitySettings,
+  openSettingsAppPlain,
+  revealAppBundleInFinder,
+  type ExecuteResult
+} from '../streamdeckActions'
+import { loadUniversalDeck, saveUniversalDeck } from '../db/speeddeck'
+import type { StreamDeckAction } from '@shared/streamdeck'
 import {
   acceptShare,
   createShareLink,
@@ -131,6 +147,25 @@ import type {
 } from '@shared/types'
 
 export function registerIpcHandlers(): void {
+  // ── Body-double cross-window relay ──────────────────────────────────────
+  // BroadcastChannel is per-renderer-process — fine for two browser tabs,
+  // useless for two Electron windows. The bridge below lets the local-mock
+  // matcher work across multiple FocusBuddy windows on the same machine:
+  // when one renderer sends a `fb:body-double-bus` message, main forwards
+  // it to every OTHER renderer. The wire format is whatever the matcher
+  // wants — main treats payloads as opaque blobs.
+  ipcMain.on('fb:body-double-bus', (event, payload: unknown) => {
+    for (const win of BrowserWindow.getAllWindows()) {
+      const wc: WebContents = win.webContents
+      if (wc.id === event.sender.id) continue
+      try {
+        wc.send('fb:body-double-bus', payload)
+      } catch {
+        // window may have closed mid-broadcast — ignore
+      }
+    }
+  })
+
   ipcMain.handle('nodes:list', () => listNodes())
   ipcMain.handle('nodes:get', (_e, id: string) => getNode(id))
   ipcMain.handle('nodes:create', (_e, draft: NodeDraft) => createNode(draft))
@@ -189,6 +224,83 @@ export function registerIpcHandlers(): void {
     ) => acceptShare(input)
   )
   ipcMain.handle('shares:removeInbox', (_e, id: string) => removeSharedItem(id))
+
+  // Account session — load/save/clear via main-process safeStorage. The
+  // renderer never sees the encryption key or the file path. Skipped is
+  // a separate boolean used by the launch modal to remember "user
+  // dismissed me" between launches.
+  ipcMain.handle('account:load', () => loadAccountState())
+  ipcMain.handle(
+    'account:saveSession',
+    (_e, input: { token: string; email: string | null }) =>
+      saveSession(input.token, input.email)
+  )
+  ipcMain.handle('account:clearSession', () => clearSession())
+  ipcMain.handle('account:setSkipped', (_e, skipped: boolean) => setSkipped(skipped))
+  ipcMain.handle('account:setCachedEmail', (_e, email: string | null) =>
+    setCachedEmail(email)
+  )
+
+  // Stream Deck — single execute endpoint takes any action (single or
+  // multi-step) and runs it. Returns {ok, error?} for the renderer to
+  // surface on the button.
+  ipcMain.handle(
+    'streamdeck:execute',
+    (_e, action: StreamDeckAction): Promise<ExecuteResult> => executeAction(action)
+  )
+  ipcMain.handle('streamdeck:openAccessibilitySettings', () =>
+    openAccessibilitySettings()
+  )
+  // Lets the renderer ask "are we trusted for accessibility right now?"
+  // Used so the dialog can stop nagging once the user has flipped the
+  // toggle in System Settings, without requiring a restart.
+  ipcMain.handle('streamdeck:checkAccessibility', () => {
+    if (process.platform !== 'darwin') return true
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { systemPreferences } = require('electron')
+      return systemPreferences.isTrustedAccessibilityClient(false)
+    } catch {
+      return false
+    }
+  })
+  // Triggers macOS's NATIVE accessibility permission prompt. This is the
+  // canonical way every Mac app gets accessibility — passing `true`
+  // makes macOS itself show the standard system dialog with a working
+  // "Open System Settings" button that goes to the exact right pane.
+  // No URL scheme guessing, no password manager hijack risk. The dialog
+  // only shows once per app launch and only if not already trusted, so
+  // the renderer should call this ONCE when the user clicks "Open
+  // System Settings" — after that, falls back to opening Settings
+  // manually if the user dismissed it.
+  ipcMain.handle('streamdeck:promptAccessibility', () => {
+    if (process.platform !== 'darwin') return true
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { systemPreferences } = require('electron')
+      return systemPreferences.isTrustedAccessibilityClient(true)
+    } catch {
+      return false
+    }
+  })
+  // Bulletproof: open System Settings (or System Preferences) by app
+  // name with NO URL scheme involved. No deep-linking, no password
+  // manager hijack, no pane id guessing. The user navigates manually
+  // using the modal's instructions.
+  ipcMain.handle('streamdeck:openSettingsApp', () => openSettingsAppPlain())
+  // Reveal the running app's .app bundle in Finder so the user can
+  // drag it into the Accessibility list. In dev mode this is
+  // Electron.app; in production it's FocusBuddy.app.
+  ipcMain.handle('streamdeck:revealAppInFinder', () => revealAppBundleInFinder())
+  // Universal SpeedDeck — same buttons across every task, every folder.
+  // The renderer reads on widget mount and writes on every edit; this
+  // way every SpeedDeck widget set to "Universal" scope shares the
+  // same persistent deck.
+  ipcMain.handle('speeddeck:loadUniversal', () => loadUniversalDeck())
+  ipcMain.handle('speeddeck:saveUniversal', (_e, json: string) =>
+    saveUniversalDeck(json)
+  )
+
   ipcMain.handle(
     'widgetLinks:create',
     (_e, sourceWidgetId: string, targetWidgetId: string, taskId: string) =>

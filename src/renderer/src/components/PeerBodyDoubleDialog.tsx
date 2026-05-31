@@ -94,6 +94,12 @@ export default function PeerBodyDoubleDialog({ onClose }: Props): JSX.Element {
   const [chatDraft, setChatDraft] = useState('')
   const chatScrollRef = useRef<HTMLDivElement | null>(null)
 
+  // Mock video state — if fb-dev:// can't serve the file (missing in
+  // production builds, missing on disk, codec issue), we render a calm
+  // gradient placeholder instead of a black void with no signal.
+  const [videoFailed, setVideoFailed] = useState(false)
+  const [videoReady, setVideoReady] = useState(false)
+
   // "Hold looking" floor — when the store transitions out of `looking`
   // sooner than MIN_LOOKING_MS, we render the looking UI for the
   // remainder. effectiveStatus is what the body switches on; the actual
@@ -458,15 +464,59 @@ export default function PeerBodyDoubleDialog({ onClose }: Props): JSX.Element {
                   visual frame stays identical so the eventual swap is
                   invisible to the user. Loops + muted + playsInline so it
                   feels present without competing for audio. */}
-              <div className="relative bg-black overflow-hidden" style={{ height: 200 }}>
-                <video
-                  src="fb-dev://mock-videos/working%20webcam.mp4"
-                  autoPlay
-                  loop
-                  muted
-                  playsInline
-                  className="w-full h-full object-cover"
-                />
+              <div className="relative bg-stone-900 overflow-hidden" style={{ height: 200 }}>
+                {!videoFailed ? (
+                  <video
+                    src="fb-dev://mock-videos/working-webcam.mp4"
+                    autoPlay
+                    loop
+                    muted
+                    playsInline
+                    onCanPlay={() => setVideoReady(true)}
+                    onError={(e) => {
+                      const el = e.currentTarget
+                      // eslint-disable-next-line no-console
+                      console.warn(
+                        '[PeerBodyDoubleDialog] mock video failed to load:',
+                        {
+                          src: el.currentSrc,
+                          error: el.error,
+                          networkState: el.networkState,
+                          readyState: el.readyState
+                        }
+                      )
+                      setVideoFailed(true)
+                    }}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  // Calm placeholder: a soft gradient + breathing dot so
+                  // the user still feels a "presence" even when the mock
+                  // asset can't be served. Identical chrome (handle pill,
+                  // mock badge) layers on top.
+                  <div className="absolute inset-0 bg-gradient-to-br from-stone-800 via-stone-900 to-stone-950 flex flex-col items-center justify-center gap-2">
+                    <div className="relative inline-flex items-center justify-center">
+                      <div className="absolute inset-0 rounded-full bg-emerald-400/30 animate-ping" />
+                      <div className="relative h-10 w-10 rounded-full bg-emerald-500/30 inline-flex items-center justify-center">
+                        <Icon name="diversity_3" size={20} className="text-emerald-200" />
+                      </div>
+                    </div>
+                    <div className="text-[11px] text-stone-300">
+                      {partner.handle} is here
+                    </div>
+                    <div className="text-[9px] text-stone-500">
+                      (live video lands when WebRTC ships)
+                    </div>
+                  </div>
+                )}
+                {!videoReady && !videoFailed && (
+                  <div className="absolute inset-0 bg-stone-900/60 flex items-center justify-center pointer-events-none">
+                    <div className="text-[11px] text-stone-300 inline-flex items-center gap-1.5">
+                      <Icon name="hourglass_empty" size={12} />
+                      Loading mock feed…
+                    </div>
+                  </div>
+                )}
                 {/* Partner handle overlay — matches the chrome of the
                     eventual WebRTC video element. */}
                 <div className="absolute bottom-2 left-2 inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-black/60 backdrop-blur text-[11px] text-white font-mono">

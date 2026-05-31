@@ -3,6 +3,8 @@ import type { ConnectedApp, FbNode, NodeKind, WidgetSuggestion } from '@shared/t
 import { useNodeStore } from '../stores/nodes'
 import { useWidgetStore } from '../stores/widgets'
 import { useConnectedAppsStore } from '../stores/connectedApps'
+import { useTemplateStore } from '../stores/templates'
+import SyncIndicator from './SyncIndicator'
 import { useViewStore, type View } from '../stores/view'
 import { chimeOut } from '../lib/audioBeep'
 import { catalogFor } from '../lib/widgetCatalog'
@@ -291,10 +293,57 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
   const sharesLoaded = useSharesStore((s) => s.loaded)
   const removeFromInbox = useSharesStore((s) => s.removeFromInbox)
   const [sharedOpen, setSharedOpen] = useState(true)
+  const [templatesOpen, setTemplatesOpen] = useState(true)
+
+  const templates = useTemplateStore((s) => s.templates)
 
   useEffect(() => {
     if (!sharesLoaded) void refreshShares()
   }, [sharesLoaded, refreshShares])
+
+  // Hook for the CommandCenter pill: "New" button dispatches a global
+  // event so any sidebar mount can respond by opening the new-node
+  // dialog. This avoids prop-drilling the dialog setter from App down
+  // into the sidebar; either works, but the event keeps App.tsx lean.
+  useEffect(() => {
+    function onCmd(): void {
+      setDialog({ mode: 'create', parentId: null, kind: 'folder' })
+    }
+    window.addEventListener('fb:command-new-task', onCmd)
+    return () => window.removeEventListener('fb:command-new-task', onCmd)
+  }, [])
+
+  async function applyTemplateToActiveTask(templateId: string): Promise<void> {
+    // Templates are applied by spawning their saved widgets on the
+    // currently-active task's canvas. If there's no active task, the user
+    // gets a polite hint instead of a silent no-op.
+    const activeTaskId = useNodeStore.getState().activeTaskId
+    if (!activeTaskId) {
+      window.alert('Open a task first — templates apply to the active task.')
+      return
+    }
+    const tpl = templates.find((t) => t.id === templateId)
+    if (!tpl) return
+    // Spawn each widget at its stored position. The template was saved
+    // from a real task layout, so the relative coordinates already make
+    // sense as a group. Future enhancement: detect collisions with
+    // existing widgets and offset the whole template.
+    for (const w of tpl.widgets) {
+      await createWidget({
+        taskId: activeTaskId,
+        kind: w.kind,
+        title: w.title,
+        content: w.content,
+        x: w.x,
+        y: w.y,
+        width: w.width,
+        height: w.height,
+        color: w.color
+      })
+    }
+    bumpLayout()
+    chimeIn()
+  }
   const tree = useMemo(() => buildTree(visibleNodes), [visibleNodes])
   const flat = useMemo(() => flatten(tree, expanded), [tree, expanded])
 
@@ -487,8 +536,9 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
     <aside className="h-full flex flex-col fb-glass-chrome border-r border-[color:var(--glass-chrome-border)]">
       {/* Header — collapse toggle + master "New" */}
       <div className="px-3 py-3 border-b border-stone-200 dark:border-stone-700 flex items-center justify-between gap-2">
-        <h2 className="text-[13px] font-semibold tracking-tight text-stone-900 dark:text-stone-100 uppercase">
-          FocusBuddy
+        <h2 className="text-[12px] font-semibold tracking-[0.18em] text-stone-900 dark:text-stone-100 inline-flex items-center gap-1.5">
+          <Icon name="auto_awesome" size={13} className="text-accent" />
+          <span>FOCUSBUDDY</span>
         </h2>
         <div className="flex items-center gap-1">
           <button
@@ -925,6 +975,52 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
           </div>
         )}
 
+        {/* ── TEMPLATES ─────────────────────────────────────────────────── */}
+        <SectionHeader
+          label="Templates"
+          open={templatesOpen}
+          onToggle={() => setTemplatesOpen((v) => !v)}
+        />
+        {templatesOpen && (
+          <div className="mb-2 px-2">
+            {templates.length === 0 ? (
+              <div className="text-[11px] text-stone-500 dark:text-stone-400 leading-relaxed px-2 py-2">
+                Save a task's layout as a template from its toolbar — it'll
+                appear here, droppable on any new task to skip the setup.
+              </div>
+            ) : (
+              <div role="list">
+                {templates.map((tpl) => (
+                  <button
+                    key={tpl.id}
+                    onClick={() => void applyTemplateToActiveTask(tpl.id)}
+                    className="group w-full flex items-center gap-1.5 px-2 py-1.5 rounded hover:bg-stone-100 dark:hover:bg-stone-800 text-left"
+                    title={
+                      tpl.description
+                        ? `${tpl.description}\n\nClick to apply to the active task.`
+                        : 'Apply to active task'
+                    }
+                  >
+                    <Icon
+                      name="layers"
+                      size={14}
+                      className="text-accent shrink-0"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[12px] text-stone-800 dark:text-stone-100 truncate">
+                        {tpl.name}
+                      </div>
+                      <div className="text-[9px] text-stone-500 dark:text-stone-400">
+                        {tpl.widgets.length} widget{tpl.widgets.length === 1 ? '' : 's'}
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* ── CONNECTED APPS ────────────────────────────────────────────── */}
         <SectionHeader
           label="Connected Apps"
@@ -1011,6 +1107,10 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
           </div>
         )}
       </div>
+
+      {/* Footer — sync indicator. Stays pinned to the bottom of the
+          sidebar regardless of scroll position above. */}
+      <SyncIndicator />
 
       {dialog && dialog.mode === 'create' && (
         <NewNodeDialog

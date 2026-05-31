@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type {
   ShareableKind,
@@ -6,7 +6,15 @@ import type {
   ShareScope
 } from '@shared/types'
 import { useSharesStore } from '../stores/shares'
+import { useNodeStore } from '../stores/nodes'
+import { useWidgetStore } from '../stores/widgets'
 import { viewerUrlFor } from '../lib/shareTokens'
+import {
+  buildFolderSnapshot,
+  buildTaskSnapshot,
+  buildWidgetSnapshot,
+  generateAnonymousHandle
+} from '../lib/shareSnapshot'
 import Icon from './Icon'
 
 // Universal share dialog — opens from a folder, task, or widget right-click.
@@ -37,8 +45,16 @@ export default function ShareDialog({
   const revoke = useSharesStore((s) => s.revoke)
   const remove = useSharesStore((s) => s.remove)
   const refresh = useSharesStore((s) => s.refresh)
-  const outgoing = useSharesStore((s) =>
-    s.outgoing.filter((l) => l.kind === kind && l.entityId === entityId)
+  // CRITICAL: subscribe to the FULL outgoing array (stable ref while the
+  // array itself is unchanged) and derive the filtered subset with
+  // useMemo. The previous code did the .filter INSIDE the selector,
+  // which returned a NEW ARRAY every render → Zustand's default Object.is
+  // equality always failed → React saw the value as constantly changing
+  // → re-render → re-fire effects → "Maximum update depth exceeded".
+  const allOutgoing = useSharesStore((s) => s.outgoing)
+  const outgoing = useMemo(
+    () => allOutgoing.filter((l) => l.kind === kind && l.entityId === entityId),
+    [allOutgoing, kind, entityId]
   )
 
   const [scope, setScope] = useState<ShareScope>('view')
@@ -48,17 +64,35 @@ export default function ShareDialog({
   // what to copy without scrolling the existing-links list.
   const [fresh, setFresh] = useState<ShareLink | null>(null)
 
+  // Refresh shares once on mount. Sidebar already loads them when the
+  // app boots, so this is a "catch up if something else minted a link
+  // outside the sidebar's lifecycle" guard. Using a ref-once guard so
+  // the effect can't re-fire on parent re-renders (which was part of
+  // the previous infinite-loop chain).
+  const didRefreshRef = useRef(false)
   useEffect(() => {
+    if (didRefreshRef.current) return
+    didRefreshRef.current = true
     void refresh()
-  }, [refresh])
+    // refresh is a stable Zustand action ref; we DON'T put it in deps
+    // because we want this to fire exactly once per mount regardless of
+    // any selector instability further up the tree.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
+  // Esc closes — stabilise onClose with a ref so the listener doesn't
+  // re-bind on every parent re-render.
+  const onCloseRef = useRef(onClose)
+  useEffect(() => {
+    onCloseRef.current = onClose
+  }, [onClose])
   useEffect(() => {
     function onKey(e: KeyboardEvent): void {
-      if (e.key === 'Escape') onClose()
+      if (e.key === 'Escape') onCloseRef.current()
     }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
-  }, [onClose])
+  }, [])
 
   async function copyToClipboard(text: string, linkId: string): Promise<void> {
     try {
@@ -75,7 +109,40 @@ export default function ShareDialog({
     if (busy) return
     setBusy(true)
     try {
-      const created = await createFor({ kind, entityId, label, scope })
+      // Build the snapshot — this is what the viewer page will render and
+      // what the recipient sees. For a folder, walks descendants + each
+      // task's widgets. For a task, pulls its widgets. For a widget, just
+      // the widget itself. Tables get their schema + rows inlined.
+      const fromHandle = generateAnonymousHandle()
+      let snapshot: unknown = undefined
+      try {
+        if (kind === 'folder') {
+          const nodes = useNodeStore.getState().nodes
+          const node = nodes.find((n) => n.id === entityId)
+          if (node) snapshot = await buildFolderSnapshot(node, nodes, fromHandle)
+        } else if (kind === 'task') {
+          const nodes = useNodeStore.getState().nodes
+          const node = nodes.find((n) => n.id === entityId)
+          if (node) snapshot = await buildTaskSnapshot(node, fromHandle)
+        } else if (kind === 'widget') {
+          const widgets = useWidgetStore.getState().widgets
+          const widget = widgets.find((w) => w.id === entityId)
+          if (widget) snapshot = await buildWidgetSnapshot(widget, fromHandle)
+        }
+      } catch {
+        // Snapshot building failed (e.g. an IPC error fetching widgets).
+        // We still mint the share record locally — the user gets a URL,
+        // and the snapshot push to the server will simply be skipped.
+        snapshot = undefined
+      }
+      const created = await createFor({
+        kind,
+        entityId,
+        label,
+        scope,
+        snapshot,
+        fromHandle
+      })
       setFresh(created)
       // Auto-copy fresh links so the common path is one click → in
       // clipboard. The success animation on the chip confirms it landed.

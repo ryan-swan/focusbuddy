@@ -274,6 +274,16 @@
     var(--shadow-inset-highlight);
 }
 
+/* Softer glass treatment for dashboard cards — composes with Tailwind's
+   bg-white/85 dark:bg-stone-900/85 backdrop-blur. Adds the inset highlight
+   that distinguishes a glass surface from a plain card. Used by
+   WorkspaceProgressCard, WorkspaceHealthCard, and any other 2.0-era card. */
+.fb-glass-soft {
+  box-shadow:
+    0 1px 2px 0 rgb(0 0 0 / 0.04),
+    var(--shadow-inset-highlight);
+}
+
 /* Hairline borders — true 1px even on retina, with subpixel separation */
 .fb-hairline {
   border: 1px solid var(--edge-soft);

@@ -11,6 +11,11 @@ import QuickStartCard from './QuickStartCard'
 import TodayTasksCard from './TodayTasksCard'
 import RecentActivityCard from './RecentActivityCard'
 import FoldersCard from './FoldersCard'
+import WorkspaceProgressCard from './WorkspaceProgressCard'
+import WorkspaceHealthCard from './WorkspaceHealthCard'
+import FocusSessionCard from './FocusSessionCard'
+import AIAssistantCard from './AIAssistantCard'
+import RecentNotesCard from './RecentNotesCard'
 import Icon from '../Icon'
 
 interface Props {
@@ -18,6 +23,14 @@ interface Props {
   title: string
   icon: string
   subtitle?: string
+  // When true, the Dashboard skips rendering its own header bar — useful
+  // when a parent view (e.g. ProjectDashboard) renders its own workspace
+  // header above us.
+  hideHeader?: boolean
+  // When set, only render cards whose kind is in this set. Used by the
+  // WorkspaceHeader tabs (Tasks / Notes / Files / Activity) to filter the
+  // dashboard down to a relevant subset. null = no filter (default).
+  cardFilter?: Set<DashboardCardKind> | null
 }
 
 // 'garden' and 'energy' deprecated from the UI — see POSITIONING.md §11.5 (dopamine
@@ -50,6 +63,31 @@ const CARD_META: Record<
     label: 'Folders',
     icon: 'folder_open',
     description: 'Active / Closed / Archived folders — quick navigate, archive, restore'
+  },
+  'workspace-progress': {
+    label: 'This Week',
+    icon: 'trending_up',
+    description: 'Completion ring + weekly delta + focus minutes — momentum at a glance'
+  },
+  'workspace-health': {
+    label: 'Workspace Health',
+    icon: 'health_and_safety',
+    description: 'Local heuristics + optional AI analysis — surfaces stale folders, overdue tasks, momentum signals'
+  },
+  'focus-session': {
+    label: 'Focus Session',
+    icon: 'hourglass_empty',
+    description: 'Big 25:00 timer with one-tap start — runs the existing focus session engine'
+  },
+  'ai-assistant': {
+    label: 'AI Assistant',
+    icon: 'auto_awesome',
+    description: 'Quick-ask card with one-tap suggestions and free-form chat — uses your Anthropic key'
+  },
+  'recent-notes': {
+    label: 'Recent Notes',
+    icon: 'sticky_note_2',
+    description: 'Last six edited sticky / note / page widgets across the workspace'
   }
 }
 
@@ -58,7 +96,14 @@ function dashboardKeyOf(scope: DashboardScope): string {
   return scope.kind === 'global' ? 'home' : scope.projectId
 }
 
-export default function Dashboard({ scope, title, icon, subtitle }: Props): JSX.Element {
+export default function Dashboard({
+  scope,
+  title,
+  icon,
+  subtitle,
+  hideHeader,
+  cardFilter
+}: Props): JSX.Element {
   const nodes = useNodeStore((s) => s.nodes)
   const taskIds = useMemo(() => taskIdsInScope(nodes, scope), [nodes, scope])
 
@@ -75,10 +120,14 @@ export default function Dashboard({ scope, title, icon, subtitle }: Props): JSX.
   const cardIdsRaw =
     layoutFromStore && layoutFromStore.length > 0 ? layoutFromStore : DEFAULT_LAYOUT
   // Filter out deprecated kinds so saved layouts containing 'garden' don't crash
-  const cardIds = cardIdsRaw.filter(
+  const cardIdsAll = cardIdsRaw.filter(
     (c): c is Exclude<DashboardCardKind, 'garden' | 'energy'> =>
       c !== 'garden' && c !== 'energy'
   )
+  // Apply tab-driven filter from the parent (Workspace Header tabs).
+  const cardIds = cardFilter
+    ? cardIdsAll.filter((c) => cardFilter.has(c))
+    : cardIdsAll
 
   // Garden was deprecated — exclude it everywhere
   type ActiveCard = Exclude<DashboardCardKind, 'garden' | 'energy'>
@@ -124,7 +173,8 @@ export default function Dashboard({ scope, title, icon, subtitle }: Props): JSX.
   return (
     <div className="h-full overflow-auto desk-paper no-tod">
       <div className="max-w-5xl mx-auto px-6 py-6 space-y-4">
-        {/* Header */}
+        {/* Header — suppressed when the parent view renders its own */}
+        {!hideHeader && (
         <div className="flex items-center gap-3 mb-2">
           <div className="inline-flex items-center justify-center h-10 w-10 rounded-xl bg-white/80 dark:bg-stone-900/80 border border-stone-200 dark:border-stone-700 shadow-sm shrink-0">
             <Icon name={icon} size={20} className="text-accent" />
@@ -163,6 +213,7 @@ export default function Dashboard({ scope, title, icon, subtitle }: Props): JSX.
             </button>
           </div>
         </div>
+        )}
 
         {/* Cards (in order) */}
         {cardIds.map((cardId) => {
@@ -329,6 +380,16 @@ function CardBody({
       return <RecentActivityCard taskIds={taskIds} />
     case 'folders':
       return <FoldersCard nodes={nodes} />
+    case 'workspace-progress':
+      return <WorkspaceProgressCard taskIds={taskIds} nodes={nodes} />
+    case 'workspace-health':
+      return <WorkspaceHealthCard taskIds={taskIds} nodes={nodes} />
+    case 'focus-session':
+      return <FocusSessionCard nodes={nodes} />
+    case 'ai-assistant':
+      return <AIAssistantCard />
+    case 'recent-notes':
+      return <RecentNotesCard taskIds={taskIds} />
     default:
       return null
   }

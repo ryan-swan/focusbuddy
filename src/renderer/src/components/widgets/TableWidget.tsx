@@ -1,6 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import type { Widget } from '@shared/types'
-import type { FieldDefinition, FieldType, TableSchema } from '@shared/fields'
+import type {
+  FieldDefinition,
+  FieldType,
+  TableSchema,
+  TableViewConfig,
+  TableViewMode
+} from '@shared/fields'
 import {
   FIELD_TYPE_ICONS,
   FIELD_TYPE_LABELS,
@@ -14,6 +20,17 @@ import FieldEditor from '../fields/FieldEditor'
 import RelationConfigEditor from '../fields/RelationConfigEditor'
 import { coerceCellValue } from '../../lib/actionExecutor'
 import Icon from '../Icon'
+import { ListView, CardsView, KanbanView, CalendarView, GanttView } from './TableViews'
+
+// All available views with the icon + label that drive the switcher pill.
+const VIEW_OPTIONS: Array<{ id: TableViewMode; label: string; icon: string }> = [
+  { id: 'table', label: 'Table', icon: 'table_chart' },
+  { id: 'list', label: 'List', icon: 'view_list' },
+  { id: 'cards', label: 'Cards', icon: 'view_module' },
+  { id: 'kanban', label: 'Kanban', icon: 'view_kanban' },
+  { id: 'calendar', label: 'Calendar', icon: 'calendar_month' },
+  { id: 'gantt', label: 'Gantt', icon: 'timeline' }
+]
 
 interface Props {
   widget: Widget
@@ -132,6 +149,7 @@ export default function TableWidget({ widget, inline = false }: Props): JSX.Elem
       config: defaultConfig(type) as never
     } as FieldDefinition
     const next: TableSchema = {
+      ...table!.schema,
       columns: [...table!.schema.columns, def]
     }
     void setSchema(table!.id, next)
@@ -139,6 +157,7 @@ export default function TableWidget({ widget, inline = false }: Props): JSX.Elem
 
   function removeColumn(columnId: string): void {
     const next: TableSchema = {
+      ...table!.schema,
       columns: table!.schema.columns.filter((c) => c.id !== columnId)
     }
     void setSchema(table!.id, next)
@@ -146,6 +165,7 @@ export default function TableWidget({ widget, inline = false }: Props): JSX.Elem
 
   function renameColumn(columnId: string, label: string): void {
     const next: TableSchema = {
+      ...table!.schema,
       columns: table!.schema.columns.map((c) =>
         c.id === columnId ? ({ ...c, label } as FieldDefinition) : c
       )
@@ -155,10 +175,21 @@ export default function TableWidget({ widget, inline = false }: Props): JSX.Elem
 
   function setColumnConfig(columnId: string, config: unknown): void {
     const next: TableSchema = {
+      ...table!.schema,
       columns: table!.schema.columns.map((c) =>
         c.id === columnId ? ({ ...c, config } as FieldDefinition) : c
       )
     }
+    void setSchema(table!.id, next)
+  }
+
+  function setViewMode(mode: TableViewMode): void {
+    const next: TableSchema = { ...table!.schema, viewMode: mode }
+    void setSchema(table!.id, next)
+  }
+
+  function setViewConfig(viewConfig: TableViewConfig): void {
+    const next: TableSchema = { ...table!.schema, viewConfig }
     void setSchema(table!.id, next)
   }
 
@@ -291,11 +322,15 @@ export default function TableWidget({ widget, inline = false }: Props): JSX.Elem
     setAiOpen(false)
   }
 
+  const viewMode: TableViewMode = table.schema.viewMode ?? 'table'
+  const viewConfig: TableViewConfig = table.schema.viewConfig ?? {}
+  const currentViewMeta = VIEW_OPTIONS.find((v) => v.id === viewMode) ?? VIEW_OPTIONS[0]
+
   const body = (
     <div className="h-full w-full bg-white dark:bg-stone-900 overflow-auto relative">
       {/* Title row */}
       <div className="sticky top-0 z-10 px-3 py-2 bg-white/95 dark:bg-stone-900/95 border-b border-stone-200 dark:border-stone-700 flex items-center gap-1.5">
-        <Icon name="table_chart" size={15} className="text-accent shrink-0" />
+        <Icon name={currentViewMeta.icon} size={15} className="text-accent shrink-0" />
         <input
           value={table.title}
           onChange={(e) => renameTable(e.target.value)}
@@ -318,7 +353,92 @@ export default function TableWidget({ widget, inline = false }: Props): JSX.Elem
           <span>AI</span>
         </button>
       </div>
+      {/* View switcher — pill of six view options. The active view is
+          highlighted; clicking switches without losing data. Each non-
+          table view uses TableSchema.viewConfig to remember which column
+          drives its grouping (kanban lanes / calendar date / etc.). */}
+      <div className="sticky top-[44px] z-[9] px-2.5 py-1.5 border-b border-stone-200 dark:border-stone-700 bg-stone-50/60 dark:bg-stone-900/60 flex items-center gap-0.5 overflow-x-auto">
+        {VIEW_OPTIONS.map((v) => {
+          const active = v.id === viewMode
+          return (
+            <button
+              key={v.id}
+              onClick={() => setViewMode(v.id)}
+              className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium transition-colors shrink-0 ${
+                active
+                  ? 'bg-accent/15 text-accent'
+                  : 'text-stone-500 dark:text-stone-400 hover:text-stone-800 dark:hover:text-stone-100 hover:bg-stone-100 dark:hover:bg-stone-800/60'
+              }`}
+              title={`Switch to ${v.label} view`}
+              aria-pressed={active}
+            >
+              <Icon name={v.icon} size={12} />
+              <span>{v.label}</span>
+            </button>
+          )
+        })}
+      </div>
 
+      {/* Alternate views — each reads the same schema + rows and routes
+          edits back through commitCell / addRow / deleteRow so the data
+          contract is identical to the table view. The user can switch
+          between any view without losing data. */}
+      {viewMode !== 'table' && viewMode === 'list' && (
+        <ListView
+          schema={table.schema}
+          rows={rows}
+          viewConfig={viewConfig}
+          commitCell={commitCell}
+          addRow={() => void addRow(table.id)}
+          deleteRow={(id) => void deleteRow(id)}
+          setViewConfig={setViewConfig}
+        />
+      )}
+      {viewMode === 'cards' && (
+        <CardsView
+          schema={table.schema}
+          rows={rows}
+          viewConfig={viewConfig}
+          commitCell={commitCell}
+          addRow={() => void addRow(table.id)}
+          deleteRow={(id) => void deleteRow(id)}
+          setViewConfig={setViewConfig}
+        />
+      )}
+      {viewMode === 'kanban' && (
+        <KanbanView
+          schema={table.schema}
+          rows={rows}
+          viewConfig={viewConfig}
+          commitCell={commitCell}
+          addRow={() => void addRow(table.id)}
+          deleteRow={(id) => void deleteRow(id)}
+          setViewConfig={setViewConfig}
+        />
+      )}
+      {viewMode === 'calendar' && (
+        <CalendarView
+          schema={table.schema}
+          rows={rows}
+          viewConfig={viewConfig}
+          commitCell={commitCell}
+          addRow={() => void addRow(table.id)}
+          deleteRow={(id) => void deleteRow(id)}
+          setViewConfig={setViewConfig}
+        />
+      )}
+      {viewMode === 'gantt' && (
+        <GanttView
+          schema={table.schema}
+          rows={rows}
+          viewConfig={viewConfig}
+          commitCell={commitCell}
+          addRow={() => void addRow(table.id)}
+          deleteRow={(id) => void deleteRow(id)}
+          setViewConfig={setViewConfig}
+        />
+      )}
+      {viewMode === 'table' && (
       <div className="text-[12px]">
         <table className="w-full border-collapse">
           <thead>
@@ -403,6 +523,7 @@ export default function TableWidget({ widget, inline = false }: Props): JSX.Elem
           </tbody>
         </table>
       </div>
+      )}
 
       {aiOpen && (
         <div className="absolute bottom-2 left-2 right-2 z-50 rounded-lg border border-accent bg-white dark:bg-stone-900 shadow-xl p-3 max-h-[70%] flex flex-col gap-2">

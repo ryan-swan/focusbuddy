@@ -7,6 +7,8 @@ import { closeDb, getDb } from './db/database'
 import { registerIpcHandlers } from './ipc'
 import { decidePopup } from './popupRouter'
 import { getFile } from './db/files'
+import { installFocusTracker } from './streamdeckActions'
+import { installActivityTracker } from './activityTracker'
 import type { ContextMenuAction } from '@shared/types'
 
 loadEnv({ path: join(app.getAppPath(), '.env') })
@@ -231,6 +233,15 @@ app.whenReady().then(() => {
   }
   getDb()
   registerIpcHandlers()
+  // Stream Deck focus handoff — caches the previously-frontmost app so
+  // ⌘C / ⌘V / ⌘⇧4 / type-text land in the user's actual workspace
+  // rather than in FocusBuddy itself.
+  installFocusTracker()
+  // Activity tracker — polls frontmost app while FocusBuddy is open so
+  // the AI macro suggestor can later analyse repetitive workflows and
+  // propose macros. Off by default; the user opts in from the Stream
+  // Deck widget.
+  installActivityTracker()
 
   // Wire `fb-file://<id>` → file on disk. Uses Electron's modern `protocol.handle`
   // which supports Range requests transparently (critical for streaming
@@ -270,39 +281,54 @@ app.whenReady().then(() => {
   // electron-vite uses). In a packaged build this handler isn't installed
   // and fb-dev:// URLs fail gracefully.
   if (process.env.ELECTRON_RENDERER_URL) {
+    // app.getAppPath() in dev typically returns the project root because
+    // electron-vite runs from there — but log it once on registration so
+    // when a fb-dev:// request fails we have the resolved root for
+    // diagnosis. (The renderer's silent <video> error is otherwise opaque.)
+    // eslint-disable-next-line no-console
+    console.log('[fb-dev] registering protocol; appPath =', app.getAppPath())
     protocol.handle('fb-dev', async (request) => {
       try {
         const url = new URL(request.url)
-        // host = subdir under the project root (e.g. `mock-videos`).
-        // pathname is the file relative to that subdir (e.g. `/working-webcam.mp4`).
         const subdir = url.hostname
         const relPath = decodeURIComponent(url.pathname).replace(/^\/+/, '')
-        // Whitelist exactly what dev can serve to avoid an accidental
-        // filesystem read-anything bug if this handler ever leaks.
         const allowedSubdirs: Record<string, string> = {
           'mock-videos': 'Mock Videos'
         }
         const mappedSubdir = allowedSubdirs[subdir]
         if (!mappedSubdir) {
+          // eslint-disable-next-line no-console
+          console.warn('[fb-dev] forbidden subdir:', subdir)
           return new Response('Forbidden', { status: 403 })
         }
-        // app.getAppPath() in dev returns the project root because
-        // electron-vite runs from there.
         const root = app.getAppPath()
         const onDisk = `${root}/${mappedSubdir}/${relPath}`
+        // Sanity check before handing off — net.fetch's 404 page wraps the
+        // real cause in a long HTML body that's hard to spot in the log.
+        if (!existsSync(onDisk)) {
+          // eslint-disable-next-line no-console
+          console.warn('[fb-dev] file does not exist on disk:', onDisk)
+          return new Response('Not found', { status: 404 })
+        }
         const response = await net.fetch(pathToFileURL(onDisk).toString())
         const headers = new Headers(response.headers)
-        // Map common extensions to mime types so the renderer's <video>
-        // element picks the right codec path.
         if (relPath.endsWith('.mp4')) headers.set('Content-Type', 'video/mp4')
         else if (relPath.endsWith('.webm')) headers.set('Content-Type', 'video/webm')
         headers.set('Cache-Control', 'no-cache')
+        // Helpful one-line dev log so we see "the file IS being served"
+        // when the user reports the video isn't loading. If this line
+        // doesn't print but the <video> shows the fallback, the issue is
+        // CSP / element wiring, not the protocol.
+        // eslint-disable-next-line no-console
+        console.log('[fb-dev] served', request.url, '→', onDisk)
         return new Response(response.body, {
           status: response.status,
           statusText: response.statusText,
           headers
         })
       } catch (err) {
+        // eslint-disable-next-line no-console
+        console.error('[fb-dev] handler threw:', err)
         return new Response(`fb-dev error: ${String(err)}`, { status: 500 })
       }
     })

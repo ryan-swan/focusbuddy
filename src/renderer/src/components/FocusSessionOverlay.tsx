@@ -86,6 +86,27 @@ export default function FocusSessionOverlay(): JSX.Element | null {
 
   return (
     <>
+      {/* Objective banner — task title rendered prominently while a session
+          is live. Sits just under the timer pill, in a glass strip. Reads
+          as the "current objective" callout the brief asks for. Hidden
+          when the session has no task (rare: only happens for global
+          timers). */}
+      {task && (
+        <div className="fixed top-[88px] left-1/2 -translate-x-1/2 z-[148] pointer-events-none">
+          <div
+            className="pointer-events-auto fb-glass-chrome px-4 py-1.5 rounded-full border border-[color:var(--glass-chrome-border)] inline-flex items-center gap-2 max-w-[420px]"
+            title={`Current objective: ${taskTitle}`}
+          >
+            <Icon name="my_location" size={11} className="text-accent shrink-0" />
+            <span className="text-[10px] uppercase tracking-[0.14em] text-stone-500 dark:text-stone-400 font-semibold shrink-0">
+              Objective
+            </span>
+            <span className="text-[12px] text-stone-800 dark:text-stone-100 truncate">
+              {taskTitle}
+            </span>
+          </div>
+        </div>
+      )}
       {/* Floating timer pill — top of canvas */}
       <div className="fixed top-12 left-1/2 -translate-x-1/2 z-[150] pointer-events-none">
         <div
