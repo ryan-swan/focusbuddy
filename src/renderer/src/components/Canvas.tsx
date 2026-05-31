@@ -19,6 +19,7 @@ import ImageWidget from './widgets/ImageWidget'
 import VideoWidget from './widgets/VideoWidget'
 import TimerWidget from './widgets/TimerWidget'
 import SectionWidget from './widgets/SectionWidget'
+import StreamDeckWidget from './widgets/StreamDeckWidget'
 import WidgetPalette from './WidgetPalette'
 import WidgetDock from './WidgetDock'
 import WidgetFocusMode from './WidgetFocusMode'
@@ -31,6 +32,9 @@ import type { AiBuildSuggestion } from '@shared/types'
 import LoadMeter from './LoadMeter'
 import CanvasContextMenu, { type CtxMenuItem } from './CanvasContextMenu'
 import FloatingToolbar, { type ToolbarAction } from './FloatingToolbar'
+import CanvasMinimap from './CanvasMinimap'
+import ZoomControls from './ZoomControls'
+import CanvasAIAssistantRail from './CanvasAIAssistantRail'
 import Icon from './Icon'
 import { useChatStore } from '../stores/chat'
 import { useFocusSessionStore } from '../stores/focusSession'
@@ -113,6 +117,8 @@ function renderWidget(w: Widget): JSX.Element | null {
       return <VideoWidget widget={w} />
     case 'timer':
       return <TimerWidget widget={w} />
+    case 'streamdeck':
+      return <StreamDeckWidget widget={w} />
     case 'section':
       return <SectionWidget widget={w} renderChild={renderWidget} />
     case 'webview':
@@ -175,6 +181,22 @@ export default function Canvas(): JSX.Element {
   const promptedDoneRef = useRef<Set<string>>(new Set())
   const [paletteOpen, setPaletteOpen] = useState(true)
   const [animatingPan, setAnimatingPan] = useState(false)
+  // Track canvas viewport dimensions so the minimap can position its
+  // viewport rectangle accurately. ResizeObserver keeps this fresh under
+  // panel resizes without the manual gbcr calls scattered through the file.
+  const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 })
+  useEffect(() => {
+    const el = dropRef.current
+    if (!el) return
+    const ro = new ResizeObserver(() => {
+      const rect = el.getBoundingClientRect()
+      setViewportSize({ width: rect.width, height: rect.height })
+    })
+    ro.observe(el)
+    const rect = el.getBoundingClientRect()
+    setViewportSize({ width: rect.width, height: rect.height })
+    return () => ro.disconnect()
+  }, [])
   const [, setNowTick] = useState(0) // for the running-task clock
   const [snoozeUntil, setSnoozeUntil] = useState<number>(0)
   const [showResume, setShowResume] = useState(false)
@@ -725,7 +747,7 @@ export default function Canvas(): JSX.Element {
     const cx = ctxMenu.canvasX
     const cy = ctxMenu.canvasY
     const addWidget: CtxMenuItem = {
-      label: 'Add widget',
+      label: 'Add object',
       icon: 'add',
       children: CATEGORIES.map((cat) => ({
         label: cat,
@@ -1330,7 +1352,7 @@ export default function Canvas(): JSX.Element {
           {widgets.length === 0 && (
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
               <p className="text-sm text-stone-500">
-                Drag a tool from the palette above onto the desk.
+                Drag an object from the palette onto the desk.
               </p>
             </div>
           )}
@@ -1449,6 +1471,32 @@ export default function Canvas(): JSX.Element {
               <span>Widget active · click outside or press Esc to pan canvas</span>
             </div>
           )}
+          {/* Canvas minimap — bottom-right overview + draggable viewport
+              rect. Only renders when there's at least one top-level widget;
+              shows nothing on a blank canvas to avoid noise. */}
+          {viewportSize.width > 0 && viewportSize.height > 0 && (
+            <CanvasMinimap
+              viewportWidth={viewportSize.width}
+              viewportHeight={viewportSize.height}
+            />
+          )}
+          {/* Zoom + pan controls — bottom-left. Mirrors the 2.0 mockup. */}
+          <ZoomControls />
+          {/* Right-side AI Assistant rail — workspace health + next actions
+              + AI suggestions. Collapsible; user preference persisted. The
+              projectId is resolved by walking up the active task's parent
+              chain to the first folder, so the rail's health scope matches
+              the project the user is inside. */}
+          {activeTaskId && (() => {
+            let cur: typeof nodes[number] | undefined = nodes.find(
+              (n) => n.id === activeTaskId
+            )
+            while (cur && cur.kind === 'task') {
+              const parentId: string | null = cur.parentId
+              cur = parentId ? nodes.find((n) => n.id === parentId) : undefined
+            }
+            return <CanvasAIAssistantRail projectId={cur?.id ?? null} />
+          })()}
           {linkSourceId && (() => {
             const src = widgets.find((w) => w.id === linkSourceId)
             const label = src?.title || src?.kind || 'widget'

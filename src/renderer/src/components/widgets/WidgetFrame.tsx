@@ -376,6 +376,11 @@ export default function WidgetFrame({
       onDragStart={() => {
         void bringToFront(widget.id)
         setActive(widget.id)
+        // Toggle a root-level class so the desk surface can render the
+        // snap-to-grid hint while the user is actively positioning an
+        // object. Removed on dragstop. Cheap to add/remove; CSS does the
+        // heavy lifting.
+        document.documentElement.classList.add('fb-canvas-dragging')
       }}
       onDrag={(_, d) => {
         // Live-track the dragging widget's position so the inter-widget
@@ -398,6 +403,7 @@ export default function WidgetFrame({
         setHoveredSection(null)
         setDragOverride(null)
         commitDrop(d.x, d.y)
+        document.documentElement.classList.remove('fb-canvas-dragging')
         // Mark the mouseup as drag-end so the click event that follows
         // doesn't run our onClick activation logic.
         dragJustEnded.current = performance.now()
@@ -472,6 +478,7 @@ export default function WidgetFrame({
       <AgeHalo createdAt={widget.createdAt} variant="widget" />
       <div
         data-widget-id={widget.id}
+        data-widget-kind={widget.kind}
         // No onMouseDownCapture here — that was setting `active` so early
         // that the WebView overlay (showOverlay = !isActive) would unmount
         // BEFORE the click event fired, robbing the overlay's onClick

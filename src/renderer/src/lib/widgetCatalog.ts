@@ -105,6 +105,17 @@ export const WIDGET_CATALOG: WidgetCatalogEntry[] = [
     isWebBased: false
   },
   {
+    kind: 'streamdeck',
+    category: 'Tools',
+    label: 'SpeedDeck',
+    icon: 'apps',
+    hint: 'Elgato-style 10×3 macro pad — launch apps, run macros, control media, organise with folders. Toggle between this-task and Universal scopes.',
+    defaultWidth: 760,
+    defaultHeight: 260,
+    defaultContent: '',
+    isWebBased: false
+  },
+  {
     kind: 'task-link',
     category: 'Layout',
     label: 'Task link',

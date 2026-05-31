@@ -68,8 +68,93 @@ interface BroadcastMessage {
 
 const CHANNEL = 'fb-body-double-mock'
 
+// Transport abstraction for the local-mock matcher. BroadcastChannel
+// works fine between two browser tabs in the SAME renderer process; it
+// does NOT cross Electron window boundaries. The IPC-bus transport
+// (below) routes through main so two FocusBuddy windows on the same
+// machine can pair — which is the common dev case.
+export interface MatcherTransport {
+  broadcast: (msg: BroadcastMessage) => void
+  onMessage: (cb: (msg: BroadcastMessage) => void) => void
+  close: () => void
+}
+
+class BroadcastChannelTransport implements MatcherTransport {
+  private channel: BroadcastChannel
+  constructor() {
+    this.channel = new BroadcastChannel(CHANNEL)
+  }
+  broadcast(msg: BroadcastMessage): void {
+    this.channel.postMessage(msg)
+  }
+  onMessage(cb: (msg: BroadcastMessage) => void): void {
+    this.channel.onmessage = (e: MessageEvent) => cb(e.data as BroadcastMessage)
+  }
+  close(): void {
+    this.channel.close()
+  }
+}
+
+// IPC-bus transport — sends every outgoing message to main, which
+// re-broadcasts to every other renderer window. Preload exposes the
+// `bodyDoubleBus` channel; main handles `fb:body-double-bus`.
+class IpcBusTransport implements MatcherTransport {
+  private unsubscribe: (() => void) | null = null
+  private api: {
+    send: (payload: unknown) => void
+    onMessage: (cb: (payload: unknown) => void) => () => void
+  }
+  constructor() {
+    // window.api.bodyDoubleBus is added in preload; we'd be checking
+    // .bodyDoubleBus on a non-existent object on a pre-update window.
+    const api = (
+      window as unknown as {
+        api: {
+          bodyDoubleBus: {
+            send: (payload: unknown) => void
+            onMessage: (cb: (payload: unknown) => void) => () => void
+          }
+        }
+      }
+    ).api.bodyDoubleBus
+    this.api = api
+  }
+  broadcast(msg: BroadcastMessage): void {
+    this.api.send(msg)
+  }
+  onMessage(cb: (msg: BroadcastMessage) => void): void {
+    this.unsubscribe = this.api.onMessage((payload) =>
+      cb(payload as BroadcastMessage)
+    )
+  }
+  close(): void {
+    this.unsubscribe?.()
+    this.unsubscribe = null
+  }
+}
+
+// Factory — picks IPC when available (Electron), falls back to
+// BroadcastChannel for plain browser contexts (vitest, web preview).
+export function createLocalTransport(): MatcherTransport {
+  if (
+    typeof window !== 'undefined' &&
+    typeof (window as unknown as { api?: { bodyDoubleBus?: unknown } }).api
+      ?.bodyDoubleBus !== 'undefined'
+  ) {
+    return new IpcBusTransport()
+  }
+  return new BroadcastChannelTransport()
+}
+
 export class LocalMockMatcher implements Matcher {
-  private channel: BroadcastChannel | null = null
+  private transport: MatcherTransport | null = null
+  // Factory injected at construction so tests can supply a stub. Defaults
+  // to the IPC-or-BroadcastChannel auto-picker so the common path "just
+  // works" in both dev and unit tests.
+  private transportFactory: () => MatcherTransport
+  // Legacy `channel` field removed — every transport-touching site now
+  // routes through this.transport. Kept the class name LocalMockMatcher
+  // so the rest of the renderer (store, dialog) doesn't churn.
   private mySessionId: string
   private myHandle: string | null = null
   private partnerSessionId: string | null = null
@@ -79,7 +164,8 @@ export class LocalMockMatcher implements Matcher {
   private myEntry: PoolEntry | null = null
   private rescanTimer: ReturnType<typeof setTimeout> | null = null
 
-  constructor() {
+  constructor(transportFactory: () => MatcherTransport = createLocalTransport) {
+    this.transportFactory = transportFactory
     this.mySessionId =
       Math.random().toString(36).slice(2, 9) +
       Math.random().toString(36).slice(2, 9)
@@ -92,8 +178,8 @@ export class LocalMockMatcher implements Matcher {
     this.myRequest = req
     this.myHandle = req.handle
     this.events = events
-    this.channel = new BroadcastChannel(CHANNEL)
-    this.channel.onmessage = (e: MessageEvent) => this.onMessage(e.data as BroadcastMessage)
+    this.transport = this.transportFactory()
+    this.transport.onMessage((msg) => this.onMessage(msg))
     this.myEntry = {
       fromHandle: req.handle,
       mode: req.mode,
@@ -109,14 +195,14 @@ export class LocalMockMatcher implements Matcher {
   }
 
   async stopLooking(): Promise<void> {
-    if (this.channel) {
+    if (this.transport) {
       this.broadcast({ type: 'leave-pool', payload: { sessionId: this.mySessionId } })
     }
     this.clear()
   }
 
   sendChat(text: string): void {
-    if (!this.channel || !this.partnerSessionId || !this.myHandle) return
+    if (!this.transport || !this.partnerSessionId || !this.myHandle) return
     this.broadcast({
       type: 'chat',
       payload: {
@@ -131,7 +217,7 @@ export class LocalMockMatcher implements Matcher {
   }
 
   async endSession(): Promise<void> {
-    if (this.channel && this.partnerSessionId) {
+    if (this.transport && this.partnerSessionId) {
       this.broadcast({
         type: 'end',
         payload: {
@@ -267,7 +353,7 @@ export class LocalMockMatcher implements Matcher {
     if (this.rescanTimer) clearTimeout(this.rescanTimer)
     // Re-announce every 1.5s so peers that opened after us still see us.
     this.rescanTimer = setTimeout(() => {
-      if (!this.channel || this.partnerSessionId) return
+      if (!this.transport || this.partnerSessionId) return
       if (this.myEntry) {
         this.broadcast({ type: 'announce', payload: this.myEntry })
       }
@@ -276,14 +362,14 @@ export class LocalMockMatcher implements Matcher {
   }
 
   private broadcast(msg: BroadcastMessage): void {
-    this.channel?.postMessage(msg)
+    this.transport?.broadcast(msg)
   }
 
   private clear(): void {
     if (this.rescanTimer) clearTimeout(this.rescanTimer)
     this.rescanTimer = null
-    this.channel?.close()
-    this.channel = null
+    this.transport?.close()
+    this.transport = null
     this.pool.clear()
     this.partnerSessionId = null
     this.myEntry = null

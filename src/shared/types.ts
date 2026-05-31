@@ -32,6 +32,10 @@ export type WidgetKind =
   | 'field' // single field (text, number, select, checkbox, etc.) on canvas
   | 'page' // Tiptap-based Notion-style document
   | 'table' // Notion/Airtable-style database with typed columns
+  // Stream Deck — Elgato-style 10×3 button grid with folder navigation,
+  // macros, app launching, media keys, and volume control. Configuration
+  // (buttons, folders, action payloads) lives in widget.content as JSON.
+  | 'streamdeck'
 
 export type ContextMenuAction =
   | 'createStickyFromSelection'
@@ -597,6 +601,11 @@ export type DashboardCardKind =
   | 'recent-activity'
   | 'energy'
   | 'folders'
+  | 'workspace-progress'
+  | 'workspace-health'
+  | 'focus-session'
+  | 'ai-assistant'
+  | 'recent-notes'
 
 export interface DashboardLayout {
   dashboardKey: string // 'home' for the master dashboard, or a project node id

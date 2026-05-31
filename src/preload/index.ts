@@ -120,6 +120,76 @@ const api = {
     removeInbox: (id: string): Promise<boolean> =>
       ipcRenderer.invoke('shares:removeInbox', id)
   },
+  // Account session — load/save/clear lives in main so the session token
+  // is encrypted at rest via Electron safeStorage. The renderer treats
+  // the token as opaque and never persists it directly.
+  streamdeck: {
+    execute: (
+      action: unknown
+    ): Promise<{ ok: boolean; error?: string; needsAccessibility?: boolean }> =>
+      ipcRenderer.invoke('streamdeck:execute', action),
+    openAccessibilitySettings: (): Promise<{
+      ok: boolean
+      strategy: string
+    }> => ipcRenderer.invoke('streamdeck:openAccessibilitySettings'),
+    checkAccessibility: (): Promise<boolean> =>
+      ipcRenderer.invoke('streamdeck:checkAccessibility'),
+    // Triggers the macOS native accessibility prompt with a working
+    // "Open System Settings" button. Returns the current trust state.
+    promptAccessibility: (): Promise<boolean> =>
+      ipcRenderer.invoke('streamdeck:promptAccessibility'),
+    // Just opens System Settings (or System Preferences) by app name —
+    // bulletproof, no URL processing involved. User navigates manually.
+    openSettingsApp: (): Promise<boolean> =>
+      ipcRenderer.invoke('streamdeck:openSettingsApp'),
+    // Reveals the running app's bundle in Finder. In dev = Electron.app,
+    // in prod = FocusBuddy.app. The user drags this into Accessibility.
+    revealAppInFinder: (): Promise<{
+      ok: boolean
+      bundleName: string | null
+    }> => ipcRenderer.invoke('streamdeck:revealAppInFinder')
+  },
+  // Universal SpeedDeck config — shared across every SpeedDeck widget
+  // in "Universal" scope so the same buttons follow the user from task
+  // to task. Stored as opaque JSON in userData; the renderer
+  // parses/serialises via parseDeckConfig.
+  speeddeck: {
+    loadUniversal: (): Promise<string | null> =>
+      ipcRenderer.invoke('speeddeck:loadUniversal'),
+    saveUniversal: (json: string): Promise<void> =>
+      ipcRenderer.invoke('speeddeck:saveUniversal', json)
+  },
+  activity: {
+    getState: (): Promise<{
+      enabled: boolean
+      switchCount: number
+      pressCount: number
+    }> => ipcRenderer.invoke('activity:getState'),
+    setEnabled: (enabled: boolean): Promise<{ ok: boolean }> =>
+      ipcRenderer.invoke('activity:setEnabled', enabled),
+    read: (): Promise<{
+      enabled: boolean
+      switches: Array<{ app: string; ts: number }>
+      presses: Array<{ label: string; kind: string; ts: number }>
+    }> => ipcRenderer.invoke('activity:read'),
+    logPress: (input: { label: string; kind: string }): Promise<{ ok: boolean }> =>
+      ipcRenderer.invoke('activity:logPress', input),
+    wipe: (): Promise<{ ok: boolean }> => ipcRenderer.invoke('activity:wipe')
+  },
+  account: {
+    load: (): Promise<{
+      sessionToken: string | null
+      skippedAt: number | null
+      cachedEmail: string | null
+    }> => ipcRenderer.invoke('account:load'),
+    saveSession: (input: { token: string; email: string | null }): Promise<void> =>
+      ipcRenderer.invoke('account:saveSession', input),
+    clearSession: (): Promise<void> => ipcRenderer.invoke('account:clearSession'),
+    setSkipped: (skipped: boolean): Promise<void> =>
+      ipcRenderer.invoke('account:setSkipped', skipped),
+    setCachedEmail: (email: string | null): Promise<void> =>
+      ipcRenderer.invoke('account:setCachedEmail', email)
+  },
   chat: {
     send: (req: ChatRequest): Promise<ChatResponse> => ipcRenderer.invoke('chat:send', req),
     hasApiKey: (): Promise<boolean> => ipcRenderer.invoke('chat:hasApiKey'),
@@ -339,6 +409,19 @@ const api = {
       const handler = (_: unknown, payload: ContextMenuPayload): void => cb(payload)
       ipcRenderer.on('context-menu:action', handler)
       return () => ipcRenderer.removeListener('context-menu:action', handler)
+    }
+  },
+  // Cross-window IPC bus used by the body-double BridgeMatcher. Two
+  // FocusBuddy windows on the same machine share this channel — main
+  // process broadcasts everything one renderer sends to every other.
+  bodyDoubleBus: {
+    send: (payload: unknown): void => {
+      ipcRenderer.send('fb:body-double-bus', payload)
+    },
+    onMessage: (cb: (payload: unknown) => void): (() => void) => {
+      const handler = (_: unknown, payload: unknown): void => cb(payload)
+      ipcRenderer.on('fb:body-double-bus', handler)
+      return () => ipcRenderer.removeListener('fb:body-double-bus', handler)
     }
   },
   files: {

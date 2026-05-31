@@ -20,7 +20,7 @@ export default function WidgetPalette({ onAdd, disabled }: Props): JSX.Element {
     <div className="border-b border-stone-200 dark:border-stone-700 bg-stone-50/70 dark:bg-stone-900/70 backdrop-blur">
       <div className="flex items-center justify-between px-4 py-1.5">
         <span className="text-[10px] uppercase tracking-[0.12em] text-stone-500 dark:text-stone-400 font-medium">
-          Tools
+          Desk objects
         </span>
         <button
           onClick={() => setCollapsed((v) => !v)}

@@ -5,13 +5,19 @@ import type { DashboardCardKind } from '@shared/types'
 // Keyed by 'home' (master dashboard) or a project node id.
 
 export const DEFAULT_LAYOUT: DashboardCardKind[] = [
+  'workspace-progress',
+  'focus-session',
+  'ai-assistant',
+  'today-tasks',
+  'recent-notes',
+  'workspace-health',
   'quick-start',
   'stats',
-  'today-tasks',
   'folders',
   'recent-activity'
-  // 'garden' deprecated — left in the type union for backward compatibility with
-  // existing user layouts but removed from default + palette in Dashboard.tsx
+  // 'garden' / 'energy' deprecated — left in the type union for backward
+  // compatibility with existing user layouts but removed from default +
+  // palette in Dashboard.tsx
 ]
 
 interface LayoutStore {

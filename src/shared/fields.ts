@@ -191,6 +191,36 @@ export const FIELD_TYPE_ICONS: Record<FieldType, string> = {
 export interface TableSchema {
   // Ordered list of column definitions. Order in this array == display order.
   columns: FieldDefinition[]
+  // Display view. 'table' is the historic default and stays the implicit
+  // fallback when this field is absent. Each non-table view can carry its
+  // own configuration in `viewConfig` (which column drives kanban lanes,
+  // calendar dates, etc.) — leaving viewConfig undefined uses auto-pick.
+  viewMode?: TableViewMode
+  viewConfig?: TableViewConfig
+}
+
+export type TableViewMode =
+  | 'table'
+  | 'list'
+  | 'cards'
+  | 'kanban'
+  | 'calendar'
+  | 'gantt'
+
+export interface TableViewConfig {
+  // Column shown as the title / primary label in card / list / kanban /
+  // calendar / gantt views. Defaults to the first text-short column.
+  titleColumnId?: string
+  // For kanban: id of a single-select column used to group rows into lanes.
+  // Each lane = one option of that select. If the column has no options or
+  // the chosen column isn't a select, the view shows a configure hint.
+  kanbanColumnId?: string
+  // For calendar: id of a date column. Each row appears as an event on its
+  // date. Multi-day support left for a later iteration.
+  calendarColumnId?: string
+  // For gantt: ids of start + end date columns. Bars span from start→end.
+  ganttStartColumnId?: string
+  ganttEndColumnId?: string
 }
 
 export interface FbTable {
