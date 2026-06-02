@@ -21,6 +21,11 @@ import RelationConfigEditor from '../fields/RelationConfigEditor'
 import { coerceCellValue } from '../../lib/actionExecutor'
 import Icon from '../Icon'
 import { ListView, CardsView, KanbanView, CalendarView, GanttView } from './TableViews'
+import CanvasContextMenu, { type CtxMenuItem } from '../CanvasContextMenu'
+import {
+  CREATE_AND_CONNECT_MENU,
+  createConnectedTool
+} from '../../lib/createConnectedTool'
 
 // All available views with the icon + label that drive the switcher pill.
 const VIEW_OPTIONS: Array<{ id: TableViewMode; label: string; icon: string }> = [
@@ -104,6 +109,16 @@ export default function TableWidget({ widget, inline = false }: Props): JSX.Elem
   // more hooks than during the previous render" and blanks the app.
   const [aiOpen, setAiOpen] = useState(false)
   const [aiPrompt, setAiPrompt] = useState('')
+  // Per-cell right-click "Create + connect" menu. The column label +
+  // cell text are passed into the menu so the user-facing copy can
+  // change ("Create new sticky from this cell" etc.). The spawn helper
+  // (createConnectedTool) uses them as the new tool's seed content.
+  const [cellCtxMenu, setCellCtxMenu] = useState<{
+    x: number
+    y: number
+    columnLabel: string
+    cellText: string
+  } | null>(null)
   const [aiCount, setAiCount] = useState(5)
   // When true, the AI is asked to generate as many rows as the prompt
   // naturally implies (no fixed N). The renderer signals this to the
@@ -496,6 +511,24 @@ export default function TableWidget({ widget, inline = false }: Props): JSX.Elem
                     key={col.id}
                     className="border-r border-stone-200 dark:border-stone-700 align-top"
                     style={{ minWidth: 140 }}
+                    onContextMenu={(e) => {
+                      // Shift bypasses our menu and gives the OS clipboard menu.
+                      if (e.shiftKey) return
+                      e.preventDefault()
+                      const rawCell = row.cells[col.id]
+                      const cellStr =
+                        rawCell == null
+                          ? ''
+                          : typeof rawCell === 'string'
+                            ? rawCell
+                            : String(rawCell)
+                      setCellCtxMenu({
+                        x: e.clientX,
+                        y: e.clientY,
+                        columnLabel: col.label,
+                        cellText: cellStr
+                      })
+                    }}
                   >
                     <FieldEditor
                       def={col}
@@ -755,6 +788,50 @@ export default function TableWidget({ widget, inline = false }: Props): JSX.Elem
           </div>
         </div>
       )}
+      {cellCtxMenu && (() => {
+        const baseItems: CtxMenuItem[] = [
+          {
+            label: `Cell · ${cellCtxMenu.columnLabel}`,
+            icon: 'view_column',
+            disabled: true
+          },
+          { separator: true }
+        ]
+        const spawnItems: CtxMenuItem[] = CREATE_AND_CONNECT_MENU.map((entry) => {
+          // For text-receiving kinds, prefix the menu item so the
+          // user-facing copy reflects what will be seeded.
+          const isTextKind = ['sticky', 'note', 'markdown', 'page'].includes(entry.kind)
+          const label =
+            isTextKind && cellCtxMenu.cellText
+              ? `${entry.label} from this cell`
+              : entry.label
+          return {
+            label,
+            icon: entry.icon,
+            onClick: () => {
+              const content =
+                entry.seedContent ??
+                (isTextKind && cellCtxMenu.cellText
+                  ? cellCtxMenu.cellText.slice(0, 1000)
+                  : undefined)
+              void createConnectedTool({
+                sourceWidgetId: widget.id,
+                kind: entry.kind,
+                content
+              })
+              setCellCtxMenu(null)
+            }
+          }
+        })
+        return (
+          <CanvasContextMenu
+            x={cellCtxMenu.x}
+            y={cellCtxMenu.y}
+            items={[...baseItems, ...spawnItems]}
+            onClose={() => setCellCtxMenu(null)}
+          />
+        )
+      })()}
     </div>
   )
 

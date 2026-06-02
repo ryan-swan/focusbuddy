@@ -91,6 +91,50 @@ export default function WidgetFrame({
   // because Electron creates a fresh process and the URL fully reloads.
   const rndRef = useRef<Rnd | null>(null)
 
+  // Scale the widget by a multiplicative factor (1.5 = +50%, 1/1.5 = -50%
+  // symmetric inverse). Used by the header +/− buttons and the legacy
+  // enlarge-on-desk popover. Capped at [minWidth, MAX_W] × [minHeight, MAX_H]
+  // so the user can't shrink past Rnd's drag-handle threshold or grow off
+  // the screen. Skips section children — those are auto-arranged.
+  //
+  // Like onEnlargeOnDesk before it, this uses the imperative Rnd update path
+  // (applyRndSizeAndPosition) — NOT bumpLayoutVersion. A key-change re-mount
+  // tears down every <webview> child (each Electron webview is its own
+  // process; remount = full URL reload + lost logged-in state). Same logic
+  // applies to ProseMirror editors and any component with internal state.
+  function scaleWidgetBy(factor: number): void {
+    if (isChildOfSection) return
+    const MAX_W = 1400
+    const MAX_H = 900
+    const MIN_W = 180
+    const MIN_H = 120
+    const newW = Math.max(MIN_W, Math.min(MAX_W, Math.round(widget.width * factor)))
+    const newH = Math.max(MIN_H, Math.min(MAX_H, Math.round(widget.height * factor)))
+    if (newW === widget.width && newH === widget.height) return
+    if (isPinned) {
+      // Pinned widgets are screen-anchored — no overlap-detection needed
+      // because their position is computed by pinLayout. Just resize.
+      void update(widget.id, { width: newW, height: newH })
+      applyRndSizeAndPosition(newW, newH, defaultX, defaultY)
+      return
+    }
+    const latest = useWidgetStore.getState().widgets
+    const siblings = latest.filter(
+      (w) => w.id !== widget.id && !w.pinned && !w.parentSectionId
+    )
+    const placed = findNonOverlapPosition(
+      { x: widget.x, y: widget.y, width: newW, height: newH },
+      effectiveSiblingsForCheck(siblings, latest)
+    )
+    void update(widget.id, {
+      width: newW,
+      height: newH,
+      x: placed.x,
+      y: placed.y
+    })
+    applyRndSizeAndPosition(newW, newH, placed.x, placed.y)
+  }
+
   // Imperatively push a new size + position into Rnd's internal state.
   // Equivalent to what a key-change re-mount would do via the `default`
   // prop, but without unmounting any children. This is the bridge that
@@ -606,44 +650,25 @@ export default function WidgetFrame({
                 setOpen={setPinPickerOpen}
               />
             )}
+            {!isChildOfSection && (
+              <>
+                <ResizeStepButton
+                  direction="shrink"
+                  widgetId={widget.id}
+                  onClick={() => scaleWidgetBy(1 / 1.5)}
+                />
+                <ResizeStepButton
+                  direction="grow"
+                  widgetId={widget.id}
+                  onClick={() => scaleWidgetBy(1.5)}
+                />
+              </>
+            )}
             <ExpandControl
               open={expandPickerOpen}
               setOpen={setExpandPickerOpen}
               onFocusMode={() => setFocused(widget.id)}
-              onEnlargeOnDesk={() => {
-                // Grow the widget by 30% (capped at 1400 × 900) and run
-                // the result through the same reverse-magnetic snap a
-                // drop would — so an enlarge into a neighbour pushes off
-                // it instead of overlapping silently. Pinned + section-
-                // child widgets are out of scope here.
-                //
-                // Critically, we update Rnd's size + position via the
-                // imperative API (updateSize/updatePosition) rather than
-                // bumpLayout(). bumpLayout would force a key-change
-                // re-mount, which tears down any <webview> child — every
-                // Electron webview is its own process, and re-mount
-                // means a full URL reload (losing logged-in state).
-                if (isPinned || isChildOfSection) return
-                const MAX_W = 1400
-                const MAX_H = 900
-                const newW = Math.min(MAX_W, Math.round(widget.width * 1.3))
-                const newH = Math.min(MAX_H, Math.round(widget.height * 1.3))
-                const latest = useWidgetStore.getState().widgets
-                const siblings = latest.filter(
-                  (w) => w.id !== widget.id && !w.pinned && !w.parentSectionId
-                )
-                const placed = findNonOverlapPosition(
-                  { x: widget.x, y: widget.y, width: newW, height: newH },
-                  effectiveSiblingsForCheck(siblings, latest)
-                )
-                void update(widget.id, {
-                  width: newW,
-                  height: newH,
-                  x: placed.x,
-                  y: placed.y
-                })
-                applyRndSizeAndPosition(newW, newH, placed.x, placed.y)
-              }}
+              onEnlargeOnDesk={() => scaleWidgetBy(1.3)}
             />
             <button
               onMouseDown={(e) => e.stopPropagation()}
@@ -682,6 +707,41 @@ export default function WidgetFrame({
               icon: 'share',
               onClick: () => setShareOpen(true)
             })
+            // Eject from section — only when this widget is a child of a
+            // section. Gives a path out of compact / grid / stack layouts
+            // where the Rnd drag is disabled and the user can't simply
+            // pull the widget out by hand.
+            if (isChildOfSection && parent) {
+              items.push({
+                label: 'Move out of section',
+                icon: 'logout',
+                onClick: () => {
+                  const ws = useWidgetStore.getState().widgets
+                  // Drop the ejected widget directly below the parent
+                  // section, anchored to the section's left edge offset
+                  // by the widget's current in-section x position. This
+                  // keeps the visual association obvious without landing
+                  // on top of any sibling widgets — findNonOverlapPosition
+                  // bumps it further if there's still a clash.
+                  const canvasX = Math.round(parent.x + SECTION_PADDING + widget.x)
+                  const canvasY = Math.round(parent.y + parent.height + 24)
+                  const topLevelSiblings = ws.filter(
+                    (w) => w.id !== widget.id && !w.pinned && !w.parentSectionId
+                  )
+                  const placed = findNonOverlapPosition(
+                    { x: canvasX, y: canvasY, width: widget.width, height: widget.height },
+                    effectiveSiblingsForCheck(topLevelSiblings, ws)
+                  )
+                  void update(widget.id, {
+                    parentSectionId: null,
+                    x: placed.x,
+                    y: placed.y
+                  })
+                  bumpLayout()
+                }
+              })
+              items.push({ separator: true })
+            }
             items.push({ separator: true })
             items.push({
               label: 'Duplicate',
@@ -757,6 +817,46 @@ export default function WidgetFrame({
         />
       )}
     </Rnd>
+  )
+}
+
+// ── Resize step button — small +/− in the header for quick scaling ──────────
+//
+// One-click ratchet: every press grows or shrinks the widget by 50%, capped
+// at the same [180×120, 1400×900] envelope as enlarge-on-desk. Used in
+// pairs so the user gets symmetric grow/shrink ergonomics without opening
+// the expand popover. We deliberately use the inverse factor (×1.5 grow,
+// ÷1.5 shrink) so the two operations cancel — pressing + then − returns
+// the widget to its original size within a pixel.
+
+function ResizeStepButton({
+  direction,
+  widgetId,
+  onClick
+}: {
+  direction: 'grow' | 'shrink'
+  widgetId: string
+  onClick: () => void
+}): JSX.Element {
+  const isGrow = direction === 'grow'
+  return (
+    <button
+      onMouseDown={(e) => e.stopPropagation()}
+      onClick={(e) => {
+        e.stopPropagation()
+        onClick()
+      }}
+      className="h-5 w-5 rounded inline-flex items-center justify-center text-stone-500 hover:bg-stone-300/60 hover:text-stone-900 transition-colors"
+      aria-label={isGrow ? 'Grow widget' : 'Shrink widget'}
+      data-testid={isGrow ? `widget-grow-${widgetId}` : `widget-shrink-${widgetId}`}
+      title={
+        isGrow
+          ? 'Grow this widget by 50% (max 1400 × 900)'
+          : 'Shrink this widget by ~33% (min 180 × 120) — inverse of grow so + then − returns to the original size'
+      }
+    >
+      <Icon name={isGrow ? 'add' : 'remove'} size={13} />
+    </button>
   )
 }
 

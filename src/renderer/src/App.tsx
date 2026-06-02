@@ -32,6 +32,7 @@ import { typingClick } from './lib/audioBeep'
 import { setActiveWidgetForSound } from './lib/soundPrefs'
 import { useWidgetStore } from './stores/widgets'
 import { installLivingPageScheduler } from './lib/livingPageScheduler'
+import { installCapabilityWatcher } from './stores/capabilities'
 import { useViewStore } from './stores/view'
 import './lib/timeOfDay' // side-effect: pushes --tod-* CSS vars to :root + ticks every 60s
 import './lib/modelPrefs' // side-effect: pushes user's saved model mode to main process
@@ -91,6 +92,23 @@ export default function App(): JSX.Element {
   const accountInit = useAccountStore((s) => s.init)
   const account = useAccountStore((s) => s.account)
   const signOut = useAccountStore((s) => s.signOut)
+  const adoptHandoff = useAccountStore((s) => s.adoptHandoff)
+
+  // Web→desktop auth handoff. The brochure sign-in flow at haptyx.app/account/*
+  // produces a session token, then deep-links to haptyx://auth?token=...
+  // which main forwards over IPC. We adopt the token here.
+  useEffect(() => {
+    let detach: (() => void) | null = null
+    async function consumeAndSubscribe(): Promise<void> {
+      const pending = await window.api.auth.getPending()
+      if (pending) await adoptHandoff({ sessionToken: pending.sessionToken, email: pending.email })
+      detach = window.api.auth.onIncomingToken((handoff) => {
+        void adoptHandoff({ sessionToken: handoff.sessionToken, email: handoff.email })
+      })
+    }
+    void consumeAndSubscribe()
+    return () => { detach?.() }
+  }, [adoptHandoff])
 
   useEffect(() => {
     void refresh()
@@ -105,6 +123,10 @@ export default function App(): JSX.Element {
     // for new inbox items when the user is signed in. No-op when signed
     // out. Tears down automatically on sign-out.
     installInboxPoller()
+    // Capability watcher — fetches /account/capabilities on auth change
+    // and on window focus. Drives the useCapability hook + the in-app
+    // gates (body double, marketplace credits, AI features per tier).
+    installCapabilityWatcher()
   }, [refresh, refreshTemplates, refreshVaultMeta, accountInit])
 
   // On boot, if the persisted view is a task, hydrate the active task id so Canvas

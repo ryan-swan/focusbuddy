@@ -51,6 +51,15 @@ interface AccountStore {
   signOut: () => Promise<void>
   // Tell main to remember the user dismissed the launch modal.
   setSkipped: (skipped: boolean) => Promise<void>
+  // Adopt a session token handed off from the web flow via the
+  // haptyx:// URL scheme. Validates the token against the server,
+  // persists it locally if valid, returns the new account. The token
+  // is the same shape as `signup`/`login` produce, so this method is
+  // just "skip the password step because the web already proved it."
+  adoptHandoff: (input: {
+    sessionToken: string
+    email: string | null
+  }) => Promise<AuthResult>
 }
 
 export const useAccountStore = create<AccountStore>((set, get) => ({
@@ -142,5 +151,34 @@ export const useAccountStore = create<AccountStore>((set, get) => ({
   setSkipped: async (skipped) => {
     await window.api.account.setSkipped(skipped)
     set({ skippedAt: skipped ? Date.now() : null })
+  },
+
+  adoptHandoff: async ({ sessionToken, email }) => {
+    // Validate the token by asking the server who it belongs to.
+    // If the token is expired/forged the server returns null and we
+    // surface a normal failed-auth result so the caller can show the
+    // launch modal.
+    const account = await getMe(sessionToken)
+    if (!account) {
+      return {
+        ok: false,
+        error: 'Sign-in link expired. Sign in again from the website.',
+        code: 'INVALID_CREDENTIALS'
+      }
+    }
+    // Mismatched email-hint is non-fatal — the server's account row is
+    // authoritative. We log it once for debug.
+    if (email && email.toLowerCase() !== account.email.toLowerCase()) {
+      // eslint-disable-next-line no-console
+      console.warn('[accountStore.adoptHandoff] email hint mismatch', email, account.email)
+    }
+    await window.api.account.saveSession({ token: sessionToken, email: account.email })
+    set({
+      sessionToken,
+      account,
+      skippedAt: null,
+      cachedEmail: account.email
+    })
+    return { ok: true, sessionToken, account }
   }
 }))

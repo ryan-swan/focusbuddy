@@ -25,9 +25,9 @@ import Icon from './Icon'
 export interface LinkDragGhost {
   // Source widget for the in-flight ghost (the user has armed a link).
   fromWidgetId: string
-  // Cursor position in CANVAS-PANE-relative screen coords (left/top offset
-  // from the dropRef's bounding rect). Same coord space as the rendered
-  // SVG, so no conversion needed.
+  // Cursor position in RAW viewport coords (same space as
+  // MouseEvent.clientX/clientY). Same coord space as the SVG, which is
+  // now mounted `position: fixed` covering the viewport.
   cursorScreenX: number
   cursorScreenY: number
 }
@@ -43,20 +43,29 @@ interface Bounds {
   h: number
 }
 
-// Read widget bounds in canvas-pane-relative screen coordinates. Returns
-// null if the widget isn't currently in the DOM (archived, switched task,
-// etc.) — the corresponding link silently drops out of the render until
-// the widget reappears.
-function readWidgetBounds(widgetId: string, canvasEl: HTMLElement): Bounds | null {
+// Read widget bounds in RAW viewport-relative screen coordinates (the
+// same coord space `clientX/clientY` use). Returns null if the widget
+// isn't currently in the DOM (archived, switched task, etc.) — the
+// corresponding link silently drops out of the render until the widget
+// reappears.
+//
+// Earlier this returned canvas-surface-relative coords (subtracting the
+// canvas surface's GBCR), paired with an SVG sized to fill that surface.
+// That approach drifted by ~half the viewport in practice — likely
+// because the `absolute inset-0` SVG container was finding a different
+// positioned ancestor than the canvas surface in the prod bundle. The
+// fix is to keep everything in viewport pixels and mount the SVG at
+// `position: fixed` covering the viewport — then there are zero
+// intermediate coord-space conversions to get wrong.
+function readWidgetBounds(widgetId: string): Bounds | null {
   const el = document.querySelector(
     `[data-widget-id="${cssEscape(widgetId)}"]`
   ) as HTMLElement | null
   if (!el) return null
   const wr = el.getBoundingClientRect()
-  const cr = canvasEl.getBoundingClientRect()
   return {
-    cx: wr.left - cr.left + wr.width / 2,
-    cy: wr.top - cr.top + wr.height / 2,
+    cx: wr.left + wr.width / 2,
+    cy: wr.top + wr.height / 2,
     w: wr.width,
     h: wr.height
   }
@@ -154,6 +163,10 @@ export default function LinkOverlay({ ghost }: Props): JSX.Element | null {
   // snap only on drop because react-rnd's mid-drag transforms don't
   // trigger React re-renders elsewhere in the tree.
   const [, setTick] = useState(0)
+  // Canvas surface clip rect (in viewport coords). Recomputed on resize
+  // + sidebar toggles. We clip the fixed-position SVG to this rect so
+  // bezier curves can't render over the sidebar / header chrome.
+  const [clipRect, setClipRect] = useState<{ top: number; right: number; bottom: number; left: number } | null>(null)
 
   useEffect(() => {
     // While any mouse button is held, run a rAF loop bumping the tick. On
@@ -188,6 +201,50 @@ export default function LinkOverlay({ ghost }: Props): JSX.Element | null {
     }
   }, [])
 
+  // Track the canvas surface's bounding rect so we can clip the SVG
+  // to it. Without this, the fixed-position SVG covers the whole
+  // viewport and bezier curves render over the sidebar / chrome.
+  useEffect(() => {
+    function recompute(): void {
+      const el = document.querySelector('[data-canvas-surface="true"]') as HTMLElement | null
+      if (!el) {
+        setClipRect(null)
+        return
+      }
+      const r = el.getBoundingClientRect()
+      setClipRect({
+        top: r.top,
+        right: window.innerWidth - r.right,
+        bottom: window.innerHeight - r.bottom,
+        left: r.left
+      })
+    }
+    recompute()
+    // Observe the canvas surface for size changes + listen for window
+    // resize + sidebar collapse animations. The ResizeObserver fires
+    // when the parent layout changes (sidebar toggles, panel resizes).
+    const el = document.querySelector('[data-canvas-surface="true"]') as HTMLElement | null
+    let ro: ResizeObserver | null = null
+    if (el && typeof ResizeObserver !== 'undefined') {
+      ro = new ResizeObserver(() => recompute())
+      ro.observe(el)
+      // Also observe document.body so we catch parent-driven layout
+      // changes (sidebar collapse pushes the canvas surface left).
+      ro.observe(document.body)
+    }
+    window.addEventListener('resize', recompute)
+    // Sidebar animations finish over ~200ms — re-poll a couple of times
+    // to settle into the new rect after the transition completes.
+    const t1 = window.setTimeout(recompute, 200)
+    const t2 = window.setTimeout(recompute, 500)
+    return () => {
+      ro?.disconnect()
+      window.removeEventListener('resize', recompute)
+      window.clearTimeout(t1)
+      window.clearTimeout(t2)
+    }
+  }, [])
+
   // Dismiss the delete popover on outside-of-popover click.
   useEffect(() => {
     if (!selectedLinkId) return
@@ -202,20 +259,13 @@ export default function LinkOverlay({ ghost }: Props): JSX.Element | null {
     return () => document.removeEventListener('mousedown', onDown)
   }, [selectedLinkId])
 
-  // Locate the canvas surface element ONCE per render. Bail out if it's
-  // not in the DOM yet (the very first paint may beat the canvas mount).
-  const canvasEl = document.querySelector(
-    '[data-canvas-surface="true"]'
-  ) as HTMLElement | null
-  if (!canvasEl) return null
-
   // Build the segment list from live DOM positions. Any link whose
   // endpoint isn't currently in the DOM (e.g. archived widget) gets
   // silently skipped — its row stays in SQLite but doesn't render.
   const segments: Segment[] = []
   for (const link of links) {
-    const src = readWidgetBounds(link.sourceWidgetId, canvasEl)
-    const tgt = readWidgetBounds(link.targetWidgetId, canvasEl)
+    const src = readWidgetBounds(link.sourceWidgetId)
+    const tgt = readWidgetBounds(link.targetWidgetId)
     if (!src || !tgt) continue
     const from = rectEdgePoint(src, tgt.cx, tgt.cy)
     const to = rectEdgePoint(tgt, src.cx, src.cy)
@@ -225,7 +275,7 @@ export default function LinkOverlay({ ghost }: Props): JSX.Element | null {
   // Ghost line: source widget edge → cursor.
   let ghostPath: string | null = null
   if (ghost) {
-    const src = readWidgetBounds(ghost.fromWidgetId, canvasEl)
+    const src = readWidgetBounds(ghost.fromWidgetId)
     if (src) {
       const tip = rectEdgePoint(src, ghost.cursorScreenX, ghost.cursorScreenY)
       ghostPath = bezierPath(tip.x, tip.y, ghost.cursorScreenX, ghost.cursorScreenY)
@@ -244,14 +294,29 @@ export default function LinkOverlay({ ghost }: Props): JSX.Element | null {
     setPopoverPos(null)
   }
 
+  // CSS `clip-path: inset(top right bottom left)` masks the SVG so it
+  // only renders within the canvas surface area — preventing bezier
+  // curves from drawing over the sidebar / header / chrome that lives
+  // outside the canvas. Falls back to "no clip" until the rect is read
+  // (first paint), at which point we re-render with the clip applied.
+  const clipPath = clipRect
+    ? `inset(${clipRect.top}px ${clipRect.right}px ${clipRect.bottom}px ${clipRect.left}px)`
+    : undefined
+
   return (
     <div
+      // POSITION: FIXED to the viewport. Endpoints are computed in raw
+      // `getBoundingClientRect` coords (viewport pixels), so the SVG must
+      // mount in the same coord space. Clipped to the canvas surface via
+      // clip-path so bezier curves don't render over the sidebar / header.
+      //
       // Stacking: above the transformed canvas widgets (which have their
-      // own z-indices starting at 1), below the floating toolbar (z-20)
-      // and the pinned-widget layer (z-30). pointer-events: none so the
+      // own z-indices starting at 1), below the floating toolbar and
+      // pinned-widget layer (both higher z). pointer-events: none so the
       // overlay itself never blocks widget interactions — only the visible
       // bezier paths catch clicks via their own pointer-events: stroke.
-      className="absolute inset-0 z-[15] pointer-events-none"
+      className="fixed inset-0 z-[15] pointer-events-none"
+      style={{ clipPath, WebkitClipPath: clipPath }}
       data-link-overlay
     >
       <svg

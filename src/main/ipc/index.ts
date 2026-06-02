@@ -1,4 +1,20 @@
 import { ipcMain, BrowserWindow, type WebContents } from 'electron'
+import { consumePendingAuthHandoff } from '../authProtocol'
+import {
+  checkForUpdates,
+  getCurrentUpdateState,
+  installUpdateAndRestart
+} from '../autoUpdate'
+import {
+  clearSecret,
+  encryptionAvailable,
+  hint,
+  resolveAnthropicKey,
+  resolveOpenAIKey,
+  setSecret
+} from '../settingsStore'
+import { invalidateAnthropicClient } from '../ai/anthropic'
+import Anthropic from '@anthropic-ai/sdk'
 import {
   createNode,
   deleteNode,
@@ -70,6 +86,49 @@ import {
   ingestFromPath,
   readFileBytes
 } from '../db/files'
+import {
+  openExternalUrl,
+  openLocalFile,
+  pickAndIngestFile,
+  thumbnailForFile
+} from '../filePreviews'
+import {
+  extractActionsFromTranscript,
+  processTranscript,
+  transcribeAudio,
+  type ProcessMode,
+  type TranscriptionProvider
+} from '../ai/voiceNote'
+import { preloadLocalWhisper } from '../ai/localWhisper'
+import {
+  expandMindMapNode,
+  listAvailableAgents,
+  suggestAgentsForNode,
+  type MindMapNodeKind,
+  type LocalAgent
+} from '../ai/mindMap'
+import {
+  createAgent,
+  type AgentModelTier,
+  type AgentTool
+} from '../ai/agentBuilder'
+import { shell as electronShell } from 'electron'
+import {
+  getWorkspaceOverride,
+  setWorkspaceOverride
+} from '../workspacePref'
+import { invokeAgent } from '../ai/agentDispatcher'
+import {
+  listInvocationsForNode,
+  recordOutcome,
+  statsForSlug,
+  undoLastApply
+} from '../ai/agentHistory'
+import { app as electronApp } from 'electron'
+import {
+  getTranscriptionProvider,
+  setTranscriptionProvider
+} from '../voiceProviderPref'
 import {
   createRow,
   createTable,
@@ -322,7 +381,7 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('templates:delete', (_e, id: string) => deleteTemplate(id))
 
   ipcMain.handle('chat:send', (_e, req: ChatRequest) => sendChat(req))
-  ipcMain.handle('chat:hasApiKey', () => Boolean(process.env.ANTHROPIC_API_KEY))
+  ipcMain.handle('chat:hasApiKey', () => Boolean(resolveAnthropicKey()))
   ipcMain.handle('chat:proactiveWelcome', (_e, taskId: string) =>
     generateProactiveWelcome(taskId)
   )
@@ -496,6 +555,212 @@ export function registerIpcHandlers(): void {
       )
     }
   })
+  // pickAndIngest: opens the native file picker AND copies the chosen file
+  // into userData/files in one round-trip. Returns the new FbFile or null
+  // if the user cancelled.
+  ipcMain.handle(
+    'files:pickAndIngest',
+    (_e, opts?: { title?: string; defaultPath?: string }) =>
+      pickAndIngestFile(opts ?? {})
+  )
+  // QuickLook-backed thumbnail for any ingested file. Cached on disk by file
+  // id + size, regenerated only on cache miss.
+  ipcMain.handle(
+    'files:thumbnail',
+    (_e, id: string, opts?: { size?: number }) =>
+      thumbnailForFile(id, opts ?? {})
+  )
+  // Open a locally ingested file in the user's default app (Preview, Word,
+  // VS Code, etc. — whatever Finder would open). Returns { ok } discriminated
+  // result so the renderer can surface error toasts.
+  ipcMain.handle('files:open', (_e, id: string) => openLocalFile(id))
+  // Open a remote URL in the user's default browser. Allowed only for
+  // http: / https: — other protocols return { ok: false, error }.
+  ipcMain.handle('files:openExternal', (_e, url: string) => openExternalUrl(url))
+
+  // ── Voice / video note AI pipeline ────────────────────────────────────────
+  // Three independently-invokable stages so the renderer can:
+  //   1. Record → transcribe (calls Whisper)
+  //   2. Choose Full / Cleaned / Summary → render the chosen text
+  //   3. (optional) Run action extraction → preview proposals → apply
+  // Each returns a tagged-union result so the renderer can branch on
+  // result.ok without unwrapping exceptions.
+  ipcMain.handle(
+    'ai:transcribeAudio',
+    (
+      _e,
+      input: {
+        buffer?: ArrayBuffer
+        mimeType?: string
+        samples?: ArrayBuffer | Float32Array
+        sampleRate?: number
+      }
+    ) => {
+      // Float32Array travels via structured-clone over IPC and tends to
+      // arrive intact, but defensively normalise from ArrayBuffer as
+      // well (in case a serializer flattens the typed-array tag).
+      let samples: Float32Array | undefined
+      if (input.samples instanceof Float32Array) {
+        samples = input.samples
+      } else if (input.samples instanceof ArrayBuffer) {
+        samples = new Float32Array(input.samples)
+      }
+      return transcribeAudio({
+        bytes: input.buffer ? new Uint8Array(input.buffer) : undefined,
+        mimeType: input.mimeType,
+        samples,
+        sampleRate: input.sampleRate
+      })
+    }
+  )
+  ipcMain.handle(
+    'ai:processTranscript',
+    (_e, input: { transcript: string; mode: ProcessMode }) =>
+      processTranscript(input.transcript, input.mode)
+  )
+  ipcMain.handle(
+    'ai:extractActionsFromTranscript',
+    (_e, input: { transcript: string }) =>
+      extractActionsFromTranscript(input.transcript)
+  )
+
+  // Transcription provider preference — read + write the persisted
+  // choice between 'cloud' (OpenAI Whisper) and 'local' (Transformers.js).
+  // Flipping to 'local' immediately fires a preload so the user doesn't
+  // wait ~30s on their first recording.
+  // ── Mind-mapper AI pipeline ───────────────────────────────────────────────
+  // Three handlers backing the mind-map widget:
+  //   - mindmap:expand        — Claude generates 3-5 child branches
+  //   - mindmap:listAgents    — read .claude/agents/*.md
+  //   - mindmap:suggestAgents — Claude picks 1-3 best matches per node
+  ipcMain.handle(
+    'mindmap:expand',
+    (
+      _e,
+      input: {
+        rootPath: string[]
+        nodeLabel: string
+        nodeKind?: MindMapNodeKind
+        guidance?: string
+      }
+    ) => expandMindMapNode(input)
+  )
+
+  // workspaceResolver handles the path probing in one centralised
+  // place (settings override → cwd walk → known operator paths →
+  // userData fallback). Returns the inventory PLUS metadata so the
+  // renderer can show "Agents from: <path>" and offer Open-in-Finder.
+  ipcMain.handle('mindmap:listAgents', () => listAvailableAgents())
+
+  // Workspace path override + Open-in-Finder. Exposed under the
+  // `agents:` namespace because the resolver primarily serves the
+  // agent system, but the resolved path is useful for any other
+  // tool that wants to read from .claude/.
+  ipcMain.handle('agents:getWorkspaceOverride', () => getWorkspaceOverride())
+  ipcMain.handle(
+    'agents:setWorkspaceOverride',
+    (_e, path: string) => {
+      setWorkspaceOverride(path)
+      return { ok: true }
+    }
+  )
+  ipcMain.handle('agents:revealInFinder', (_e, path: string) => {
+    try {
+      electronShell.showItemInFolder(path)
+      return { ok: true }
+    } catch (err) {
+      return { ok: false, error: (err as Error).message }
+    }
+  })
+
+  ipcMain.handle(
+    'mindmap:suggestAgents',
+    (
+      _e,
+      input: {
+        rootPath: string[]
+        nodeLabel: string
+        nodeKind?: MindMapNodeKind
+        candidates: LocalAgent[]
+      }
+    ) => suggestAgentsForNode(input)
+  )
+
+  // Phase 2A — Agent creation. Generates the body via Claude Sonnet
+  // and writes a new .md file to <workspace>/.claude/agents/.
+  ipcMain.handle(
+    'agents:create',
+    (
+      _e,
+      input: {
+        slug: string
+        description: string
+        model: AgentModelTier
+        tools: AgentTool[]
+        purpose: string
+        contextPath?: string[]
+      }
+    ) => createAgent(input)
+  )
+
+  // Phase 2C foundation — single-turn agent invocation. Returns
+  // ActionProposal[] for the renderer to review-and-apply via the
+  // existing chat-side flow. NOT autonomous; user is always in the
+  // loop. See agentDispatcher.ts for the PHASE_3 markers.
+  ipcMain.handle(
+    'agents:invoke',
+    (
+      _e,
+      input: {
+        agentPath: string
+        rootPath: string[]
+        nodeLabel: string
+        nodeKind: string
+        userMessage: string
+        conversationHistory?: Array<{ role: 'user' | 'agent'; content: string }>
+        conversationKey?: string
+        nodeId?: string | null
+      }
+    ) => invokeAgent(input)
+  )
+
+  // Phase 2 polish — outcome recording + per-agent stats + undo.
+  ipcMain.handle(
+    'agents:recordOutcome',
+    (
+      _e,
+      input: {
+        invocationId: string
+        agentSlug: string
+        proposalId: string
+        proposalKind: string
+        action: 'applied' | 'dismissed' | 'undone'
+        createdEntityRef?: string | null
+      }
+    ) => {
+      recordOutcome(input)
+      return { ok: true }
+    }
+  )
+  ipcMain.handle(
+    'agents:listInvocationsForNode',
+    (_e, nodeId: string) => listInvocationsForNode(nodeId)
+  )
+  ipcMain.handle(
+    'agents:statsForSlug',
+    (_e, slug: string) => statsForSlug(slug)
+  )
+  ipcMain.handle('agents:undoLast', () => undoLastApply())
+
+  ipcMain.handle('voice:getProvider', () => getTranscriptionProvider())
+  ipcMain.handle('voice:setProvider', async (_e, p: TranscriptionProvider) => {
+    setTranscriptionProvider(p)
+    if (p === 'local') {
+      const result = await preloadLocalWhisper()
+      return { ok: result.ok, error: result.error }
+    }
+    return { ok: true }
+  })
 
   // ── Tables (Notion/Airtable-style databases) ──────────────────────────────
   ipcMain.handle('tables:list', () => listTables())
@@ -514,4 +779,138 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('tables:reorderRows', (_e, tableId: string, ids: string[]) =>
     reorderRows(tableId, ids)
   )
+
+  // ── haptyx:// deep-link auth handoff ─────────────────────────────────────
+  // The renderer calls `auth:get-pending` on mount to drain any token that
+  // arrived before the window was ready (cold-start case where the user
+  // clicked the brochure "Open in Haptyx" button while the app wasn't
+  // running). Subsequent tokens arrive via the `auth:incoming-token`
+  // event broadcast from authProtocol.ts.
+  ipcMain.handle('auth:get-pending', () => consumePendingAuthHandoff())
+
+  // ── Auto-update ──────────────────────────────────────────────────────────
+  // The renderer subscribes via the `update:state` event (broadcast from
+  // autoUpdate.ts on every state transition). On mount the renderer
+  // can read the current snapshot via `update:get-state` so it picks
+  // up whatever state was missed before subscription.
+  ipcMain.handle('update:get-state', () => getCurrentUpdateState())
+  ipcMain.handle('update:check', () => {
+    checkForUpdates()
+    return { ok: true }
+  })
+  ipcMain.handle('update:install-and-restart', () => {
+    installUpdateAndRestart()
+    return { ok: true }
+  })
+
+  // ── Settings: API-key vault ──────────────────────────────────────────────
+  // Replaces the old "edit projects/focusbuddy/.env and restart" flow with
+  // an in-app form. Plaintext never crosses the IPC boundary on read —
+  // the renderer only sees `{ hasKey, last4 }` so the UI can render a
+  // "set" / "•••• abcd" badge. Saving and testing accept plaintext one-way.
+
+  ipcMain.handle('settings:encryptionAvailable', () => encryptionAvailable())
+
+  ipcMain.handle('settings:hintAnthropic', () => hint('anthropic'))
+  ipcMain.handle('settings:hintOpenAI', () => hint('openai'))
+
+  ipcMain.handle('settings:saveAnthropicKey', (_e, plaintext: string) => {
+    try {
+      setSecret('anthropic', plaintext)
+      invalidateAnthropicClient()
+      return { ok: true, ...hint('anthropic') }
+    } catch (err) {
+      return { ok: false, error: (err as Error).message }
+    }
+  })
+
+  ipcMain.handle('settings:saveOpenAIKey', (_e, plaintext: string) => {
+    try {
+      setSecret('openai', plaintext)
+      // No client cache to invalidate — Whisper calls construct the
+      // fetch directly per request, so the next call picks up the new
+      // key automatically.
+      return { ok: true, ...hint('openai') }
+    } catch (err) {
+      return { ok: false, error: (err as Error).message }
+    }
+  })
+
+  ipcMain.handle('settings:clearAnthropicKey', () => {
+    try {
+      clearSecret('anthropic')
+      invalidateAnthropicClient()
+      return { ok: true }
+    } catch (err) {
+      return { ok: false, error: (err as Error).message }
+    }
+  })
+
+  ipcMain.handle('settings:clearOpenAIKey', () => {
+    try {
+      clearSecret('openai')
+      return { ok: true }
+    } catch (err) {
+      return { ok: false, error: (err as Error).message }
+    }
+  })
+
+  // Validate the stored key by sending a 1-token "ping" prompt. Costs
+  // roughly $0.0001 on Haiku — small enough that a "Test" button click is
+  // basically free, and it confirms the key, the model, and the network
+  // path all work end-to-end (vs. just checking a list endpoint).
+  ipcMain.handle('settings:testAnthropicKey', async () => {
+    const key = resolveAnthropicKey()
+    if (!key) return { ok: false, error: 'No key set.' }
+    try {
+      const client = new Anthropic({ apiKey: key })
+      const response = await client.messages.create({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 1,
+        messages: [{ role: 'user', content: 'hi' }]
+      })
+      if ((response.stop_reason as string) === 'refusal') {
+        return { ok: false, error: 'Claude declined this request. Try rephrasing or breaking it into smaller steps.' }
+      }
+      if ((response.stop_reason as string) === 'model_context_window_exceeded') {
+        return { ok: false, error: 'Conversation hit the model context window. Start a fresh session.' }
+      }
+      return { ok: true, model: response.model }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      // Strip the SDK's verbose response body so the renderer can show a
+      // single-line error rather than a wall of JSON.
+      const short = msg.length > 240 ? msg.slice(0, 240) + '…' : msg
+      return { ok: false, error: short }
+    }
+  })
+
+  // Validate the OpenAI key by hitting /v1/models (free — no token cost,
+  // confirms the key + network + scope all line up before the user runs
+  // into it via the Whisper transcription flow). Mirrors the Anthropic
+  // test pattern.
+  ipcMain.handle('settings:testOpenAIKey', async () => {
+    const key = resolveOpenAIKey()
+    if (!key) return { ok: false, error: 'No key set.' }
+    try {
+      const res = await fetch('https://api.openai.com/v1/models', {
+        headers: { authorization: `Bearer ${key}` }
+      })
+      if (!res.ok) {
+        const txt = await res.text().catch(() => '')
+        const short = txt.length > 240 ? txt.slice(0, 240) + '…' : txt
+        return { ok: false, error: `${res.status} ${res.statusText}${short ? ' · ' + short : ''}` }
+      }
+      const body = (await res.json()) as { data?: Array<{ id: string }> }
+      const hasWhisper = (body.data ?? []).some((m) => m.id.startsWith('whisper'))
+      return {
+        ok: true,
+        model: hasWhisper ? 'whisper available' : 'no whisper model in account'
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      const short = msg.length > 240 ? msg.slice(0, 240) + '…' : msg
+      return { ok: false, error: short }
+    }
+  })
 }

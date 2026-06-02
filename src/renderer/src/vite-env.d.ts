@@ -1,5 +1,10 @@
 /// <reference types="vite/client" />
 
+// Build-time inject from electron-vite's `define` (electron.vite.config.ts).
+// Source: focusbuddy/package.json "version" field. Bump there on every
+// release and every consumer of __APP_VERSION__ updates automatically.
+declare const __APP_VERSION__: string
+
 // Project-specific env vars surfaced via import.meta.env.* — extends
 // vite/client's ImportMetaEnv so the renderer code gets typed values.
 interface ImportMetaEnv {

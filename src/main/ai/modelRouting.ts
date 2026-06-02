@@ -3,7 +3,7 @@ import type { AIPurpose, ModelMode } from '@shared/types'
 // Model IDs — kept in main process so renderer never sees raw IDs.
 const HAIKU = 'claude-haiku-4-5-20251001'
 const SONNET = 'claude-sonnet-4-6'
-const OPUS = 'claude-opus-4-7'
+const OPUS = 'claude-opus-4-8'
 
 // Auto-mode routing table. Each purpose gets the cheapest model that meets the
 // quality bar for that task. Override these with caution — tighter routing

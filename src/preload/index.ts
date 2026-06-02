@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type {
+  ActionProposal,
   ActivityEvent,
   ActivityRecordDraft,
   AiBuildResponse,
@@ -441,7 +442,240 @@ const api = {
     read: (
       id: string
     ): Promise<{ mimeType: string; buffer: ArrayBuffer } | null> =>
-      ipcRenderer.invoke('files:read', id)
+      ipcRenderer.invoke('files:read', id),
+    // Open the native file picker + ingest the chosen file in one round-trip.
+    // Returns null when the user cancels.
+    pickAndIngest: (opts?: {
+      title?: string
+      defaultPath?: string
+    }): Promise<FbFile | null> => ipcRenderer.invoke('files:pickAndIngest', opts),
+    // Generate (or read from cache) a QuickLook-backed PNG thumbnail for any
+    // ingested file. Works for images, PDFs, Office docs, Keynote, etc. —
+    // anything Finder's preview can render.
+    thumbnail: (
+      id: string,
+      opts?: { size?: number }
+    ): Promise<{
+      base64: string
+      mimeType: 'image/png'
+      width: number
+      height: number
+    } | null> => ipcRenderer.invoke('files:thumbnail', id, opts),
+    // Open a local file in the user's default app (Preview/Word/VS Code/etc.)
+    open: (id: string): Promise<{ ok: true } | { ok: false; error: string }> =>
+      ipcRenderer.invoke('files:open', id),
+    // Open a remote URL in the user's default browser. http:/https: only.
+    openExternal: (
+      url: string
+    ): Promise<{ ok: true } | { ok: false; error: string }> =>
+      ipcRenderer.invoke('files:openExternal', url)
+  },
+  // Voice / video note AI pipeline. Three independent stages — record
+  // → transcribe, transcript → processed text, transcript → action
+  // proposals. Each returns a tagged-union result; renderer branches on
+  // `ok` to either show the success payload or a "set your key" /
+  // "network error" affordance.
+  voiceNote: {
+    // Transcription IPC. Cloud provider needs `buffer` + `mimeType`;
+    // local provider needs pre-decoded `samples` (Float32Array, 16kHz
+    // mono PCM) + `sampleRate`. The renderer should branch on
+    // getProvider() and only decode for the local path — decoding for
+    // cloud would be wasted work (Whisper API accepts webm/opus
+    // directly and the raw bytes are 5-10x smaller over IPC).
+    transcribe: (input: {
+      buffer?: ArrayBuffer
+      mimeType?: string
+      samples?: Float32Array
+      sampleRate?: number
+    }): Promise<
+      | {
+          ok: true
+          transcript: string
+          durationSec: number | null
+          language: string | null
+        }
+      | { ok: false; error: string; reason?: 'no_key' | 'network' | 'api' | 'unknown' | 'model_load' | 'decode' }
+    > => ipcRenderer.invoke('ai:transcribeAudio', input),
+    process: (input: {
+      transcript: string
+      mode: 'full' | 'cleaned' | 'summary'
+    }): Promise<
+      | { ok: true; mode: 'full' | 'cleaned' | 'summary'; text: string }
+      | { ok: false; error: string; reason?: 'no_key' | 'api' | 'unknown' }
+    > => ipcRenderer.invoke('ai:processTranscript', input),
+    extractActions: (input: { transcript: string }): Promise<
+      | { ok: true; proposals: ActionProposal[] }
+      | { ok: false; error: string; reason?: 'no_key' | 'api' | 'parse' }
+    > => ipcRenderer.invoke('ai:extractActionsFromTranscript', input),
+    // Provider preference — 'cloud' = OpenAI Whisper API,
+    // 'local' = on-device ONNX Whisper tiny (downloads ~80MB on first
+    // selection). Calling setProvider('local') preloads the model so
+    // the first recording isn't blocked on the download.
+    getProvider: (): Promise<'cloud' | 'local'> =>
+      ipcRenderer.invoke('voice:getProvider'),
+    setProvider: (
+      p: 'cloud' | 'local'
+    ): Promise<{ ok: boolean; error?: string }> =>
+      ipcRenderer.invoke('voice:setProvider', p)
+  },
+  // Phase 2A — agent creation wizard. Writes a brand-new agent .md
+  // file to .claude/agents/ with a Claude-generated body following
+  // the kit's conventions. Phase 2C — single-turn agent invocation
+  // returning ActionProposal[] for review-and-apply.
+  agents: {
+    create: (input: {
+      slug: string
+      description: string
+      model: 'haiku' | 'sonnet' | 'opus'
+      tools: Array<
+        'Read' | 'Write' | 'Edit' | 'Bash' | 'Glob' | 'Grep' | 'WebFetch' | 'WebSearch' | 'Agent'
+      >
+      purpose: string
+      contextPath?: string[]
+    }): Promise<
+      | { ok: true; slug: string; path: string }
+      | {
+          ok: false
+          error: string
+          reason?: 'no_key' | 'api' | 'fs' | 'exists' | 'no_workspace'
+        }
+    > => ipcRenderer.invoke('agents:create', input),
+    invoke: (input: {
+      agentPath: string
+      rootPath: string[]
+      nodeLabel: string
+      nodeKind: string
+      userMessage: string
+      // Phase 2 polish — multi-turn conversation. Pass prior history
+      // for follow-up turns; omit for the initial invocation. Hard
+      // cap of 5 round-trips enforced server-side; the response's
+      // conversationCapped flag signals when the renderer should
+      // disable further replies.
+      conversationHistory?: Array<{ role: 'user' | 'agent'; content: string }>
+      conversationKey?: string
+      nodeId?: string | null
+    }): Promise<
+      | {
+          ok: true
+          agentName: string
+          reply: string
+          proposals: ActionProposal[]
+          invocationId: string
+          conversationTurn: number
+          conversationCapped: boolean
+        }
+      | {
+          ok: false
+          error: string
+          reason?: 'no_key' | 'agent_not_found' | 'agent_unreadable' | 'api' | 'parse'
+        }
+    > => ipcRenderer.invoke('agents:invoke', input),
+    // Outcome bookkeeping — applied / dismissed / undone. Drives the
+    // per-agent stats and "undo last apply" affordances.
+    recordOutcome: (input: {
+      invocationId: string
+      agentSlug: string
+      proposalId: string
+      proposalKind: string
+      action: 'applied' | 'dismissed' | 'undone'
+      createdEntityRef?: string | null
+    }): Promise<{ ok: true }> =>
+      ipcRenderer.invoke('agents:recordOutcome', input),
+    listInvocationsForNode: (
+      nodeId: string
+    ): Promise<
+      Array<{
+        id: string
+        agentSlug: string
+        agentName: string
+        nodeId: string | null
+        nodeLabel: string
+        rootPath: string[]
+        reply: string
+        proposals: ActionProposal[]
+        conversationTurn: number
+        conversationKey: string
+        invokedAt: number
+      }>
+    > => ipcRenderer.invoke('agents:listInvocationsForNode', nodeId),
+    statsForSlug: (
+      slug: string
+    ): Promise<{
+      slug: string
+      invocations: number
+      totalProposals: number
+      applied: number
+      dismissed: number
+      undone: number
+      applyRate: number
+    }> => ipcRenderer.invoke('agents:statsForSlug', slug),
+    undoLast: (): Promise<{
+      ok: boolean
+      message: string
+      entityRef?: string | null
+    }> => ipcRenderer.invoke('agents:undoLast'),
+    // Workspace path override — when set, the resolver pushes this
+    // path to the front of its probe list. Used by Settings to let
+    // users point Haptyx at their workspace if auto-detect missed it.
+    getWorkspaceOverride: (): Promise<string | null> =>
+      ipcRenderer.invoke('agents:getWorkspaceOverride'),
+    setWorkspaceOverride: (
+      path: string
+    ): Promise<{ ok: true }> =>
+      ipcRenderer.invoke('agents:setWorkspaceOverride', path),
+    // Reveal a path in Finder. Wraps shell.showItemInFolder so the
+    // renderer can offer "show me where Haptyx is reading agents from"
+    // affordances without needing the Electron API directly.
+    revealInFinder: (
+      path: string
+    ): Promise<{ ok: true } | { ok: false; error: string }> =>
+      ipcRenderer.invoke('agents:revealInFinder', path)
+  },
+  // Mind-mapper AI pipeline. Three thin wrappers over Claude:
+  //   expand → child branches for a node
+  //   listAgents → static enumeration of .claude/agents/*.md
+  //   suggestAgents → Claude-ranked top picks for a node
+  mindmap: {
+    expand: (input: {
+      rootPath: string[]
+      nodeLabel: string
+      nodeKind?: 'idea' | 'task' | 'question' | 'tool' | 'agent'
+      guidance?: string
+    }): Promise<
+      | {
+          ok: true
+          children: Array<{
+            id: string
+            label: string
+            kind: 'idea' | 'task' | 'question' | 'tool' | 'agent'
+            rationale?: string
+          }>
+        }
+      | { ok: false; error: string; reason?: 'no_key' | 'api' | 'parse' }
+    > => ipcRenderer.invoke('mindmap:expand', input),
+    listAgents: (): Promise<{
+      source:
+        | 'override'
+        | 'workspace'
+        | 'userData-existing'
+        | 'userData-new'
+        | 'none'
+      agentsDir: string | null
+      workspaceRoot: string | null
+      agents: Array<{ slug: string; path: string; name: string; description: string }>
+    }> => ipcRenderer.invoke('mindmap:listAgents'),
+    suggestAgents: (input: {
+      rootPath: string[]
+      nodeLabel: string
+      nodeKind?: 'idea' | 'task' | 'question' | 'tool' | 'agent'
+      candidates: Array<{ slug: string; path: string; name: string; description: string }>
+    }): Promise<
+      | {
+          ok: true
+          suggestions: Array<{ slug: string; name: string; rationale: string }>
+        }
+      | { ok: false; error: string; reason?: 'no_key' | 'api' | 'parse' | 'no_agents' }
+    > => ipcRenderer.invoke('mindmap:suggestAgents', input)
   },
   tables: {
     list: (): Promise<FbTable[]> => ipcRenderer.invoke('tables:list'),
@@ -461,8 +695,94 @@ const api = {
       ipcRenderer.invoke('tables:deleteRow', id),
     reorderRows: (tableId: string, ids: string[]): Promise<void> =>
       ipcRenderer.invoke('tables:reorderRows', tableId, ids)
+  },
+  // Settings — API-key vault. Replaces the old "edit .env and restart"
+  // flow. Plaintext only travels renderer→main on save; reads return
+  // `{ hasKey, last4 }` so the UI can render a confirmation badge
+  // without ever holding the secret in renderer memory.
+  settings: {
+    encryptionAvailable: (): Promise<boolean> =>
+      ipcRenderer.invoke('settings:encryptionAvailable'),
+    hintAnthropic: (): Promise<{ hasKey: boolean; last4: string | null }> =>
+      ipcRenderer.invoke('settings:hintAnthropic'),
+    saveAnthropicKey: (
+      plaintext: string
+    ): Promise<{ ok: boolean; hasKey?: boolean; last4?: string | null; error?: string }> =>
+      ipcRenderer.invoke('settings:saveAnthropicKey', plaintext),
+    clearAnthropicKey: (): Promise<{ ok: boolean; error?: string }> =>
+      ipcRenderer.invoke('settings:clearAnthropicKey'),
+    testAnthropicKey: (): Promise<{ ok: boolean; model?: string; error?: string }> =>
+      ipcRenderer.invoke('settings:testAnthropicKey'),
+    // OpenAI key — used by the audio transcription pipeline (Whisper API).
+    // Mirror the Anthropic surface 1:1 so the ApiKeysSection UI can render
+    // both with one shared row component.
+    hintOpenAI: (): Promise<{ hasKey: boolean; last4: string | null }> =>
+      ipcRenderer.invoke('settings:hintOpenAI'),
+    saveOpenAIKey: (
+      plaintext: string
+    ): Promise<{ ok: boolean; hasKey?: boolean; last4?: string | null; error?: string }> =>
+      ipcRenderer.invoke('settings:saveOpenAIKey', plaintext),
+    clearOpenAIKey: (): Promise<{ ok: boolean; error?: string }> =>
+      ipcRenderer.invoke('settings:clearOpenAIKey'),
+    testOpenAIKey: (): Promise<{ ok: boolean; model?: string; error?: string }> =>
+      ipcRenderer.invoke('settings:testOpenAIKey')
+  },
+  // haptyx:// deep-link auth handoff. The brochure at haptyx.app/account/*
+  // signs the user in against the signal server, then redirects to
+  // haptyx://auth?token=...&email=...&handle=... — main process catches
+  // that URL and forwards it here. The renderer either gets the token
+  // immediately via `onIncomingToken`, or drains the pending one via
+  // `getPending` on mount (cold-start case).
+  auth: {
+    getPending: (): Promise<{
+      sessionToken: string
+      email: string | null
+      handle: string | null
+      origin: 'open-url' | 'argv' | 'second-instance'
+    } | null> => ipcRenderer.invoke('auth:get-pending'),
+    onIncomingToken: (
+      cb: (handoff: {
+        sessionToken: string
+        email: string | null
+        handle: string | null
+        origin: 'open-url' | 'argv' | 'second-instance'
+      }) => void
+    ): (() => void) => {
+      const handler = (_: unknown, handoff: {
+        sessionToken: string
+        email: string | null
+        handle: string | null
+        origin: 'open-url' | 'argv' | 'second-instance'
+      }): void => cb(handoff)
+      ipcRenderer.on('auth:incoming-token', handler)
+      return () => ipcRenderer.removeListener('auth:incoming-token', handler)
+    }
+  },
+  // Auto-update bridge. Renderer reads the snapshot via getState on
+  // mount, then subscribes via onState to receive every transition.
+  update: {
+    getState: (): Promise<UpdateState> => ipcRenderer.invoke('update:get-state'),
+    check: (): Promise<{ ok: true }> => ipcRenderer.invoke('update:check'),
+    installAndRestart: (): Promise<{ ok: true }> => ipcRenderer.invoke('update:install-and-restart'),
+    onState: (cb: (state: UpdateState) => void): (() => void) => {
+      const handler = (_: unknown, s: UpdateState): void => cb(s)
+      ipcRenderer.on('update:state', handler)
+      return () => ipcRenderer.removeListener('update:state', handler)
+    }
   }
 }
+
+// Mirror of UpdateState from main/autoUpdate.ts. Kept in sync by hand —
+// only six variants and the field shapes are tiny, so a shared types
+// module would be heavier than it's worth.
+export type UpdateState =
+  | { kind: 'idle' }
+  | { kind: 'checking' }
+  | { kind: 'available'; version: string; releaseNotes?: string }
+  | { kind: 'downloading'; percent: number }
+  | { kind: 'ready'; version: string; releaseNotes?: string }
+  | { kind: 'none'; currentVersion: string }
+  | { kind: 'error'; message: string }
 
 try {
   contextBridge.exposeInMainWorld('api', api)

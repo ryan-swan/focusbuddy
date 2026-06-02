@@ -6,6 +6,7 @@ import { useWidgetStore } from '../stores/widgets'
 import type { WidgetKind } from '@shared/types'
 import { WIDGET_CATALOG } from '../lib/widgetCatalog'
 import Icon from './Icon'
+import { useCapabilityEnabled } from '../stores/capabilities'
 
 interface Props {
   onOpenBodyDouble: () => void
@@ -57,6 +58,7 @@ export default function CommandCenter({
   const [query, setQuery] = useState('')
   const [highlightIdx, setHighlightIdx] = useState(0)
   const inputRef = useRef<HTMLInputElement | null>(null)
+  const bodyDoubleEnabled = useCapabilityEnabled('body_double')
 
   const nodes = useNodeStore((s) => s.nodes)
   const setActive = useNodeStore((s) => s.setActive)
@@ -121,7 +123,10 @@ export default function CommandCenter({
         id: 'a-pair',
         icon: 'diversity_3',
         label: 'Pair',
-        title: 'Find a body double',
+        title: bodyDoubleEnabled
+          ? 'Find a body double'
+          : 'Body double matching is a Pro feature — upgrade or ask admin to enable.',
+        disabled: !bodyDoubleEnabled,
         onClick: onOpenBodyDouble
       },
       {
@@ -133,7 +138,7 @@ export default function CommandCenter({
         onClick: onOpenSmartStack
       }
     ]
-  }, [view, activeTaskId, createWidget, canSmartStack, onOpenBodyDouble, onOpenSmartStack])
+  }, [view, activeTaskId, createWidget, canSmartStack, onOpenBodyDouble, onOpenSmartStack, bodyDoubleEnabled])
 
   function openPalette(): void {
     setPaletteOpen(true)

@@ -32,3 +32,4 @@ sources/
 # Kept on disk locally but excluded from version control because the videos
 # are large (the working webcam placeholder alone is ~190 MB).
 Mock Videos/
+release/

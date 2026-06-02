@@ -348,19 +348,22 @@ export default function StreamDeckAI({
     // CRITICAL: the chat IPC strips role:'system' messages and applies
     // FocusBuddy's generic chat system prompt instead — which makes the
     // model respond conversationally ("I can help you with..."). We
-    // work around this by:
-    //   1. Embedding our system prompt as a normal USER message labelled
-    //      as instructions. The chat-level system prompt still fires but
-    //      our instruction message dominates because it's the explicit,
-    //      most-recent context.
-    //   2. PREFILLING the assistant turn with "[" — Anthropic's API
-    //      treats trailing assistant messages as a prefix the model
-    //      continues from. Forcing it to start with "[" means the model
-    //      MUST emit a JSON array; there's no path to natural prose.
-    const composed = `${systemPrompt}\n\n---\n\nUSER REQUEST:\n${userContent}\n\nNow respond with ONLY a JSON array. Your response continues from the [ I have already typed.`
+    // work around this by embedding our system prompt as a normal USER
+    // message labelled as instructions. The chat-level system prompt
+    // still fires but our instruction message dominates because it's
+    // the explicit, most-recent context.
+    //
+    // NOTE: we previously prefilled the assistant turn with "[" to
+    // force JSON-array output. Claude Opus 4.6+ / Sonnet 4.6+ reject
+    // requests with trailing assistant messages (400 error), so the
+    // prefill is gone. Instead we lean on:
+    //   1. Strict "OUTPUT FORMAT" instructions appended to the composed
+    //      user message (below) — restating the JSON-only contract.
+    //   2. The depth-aware extractJson() parser, which already strips
+    //      stray prose / markdown fences if the model adds any.
+    const composed = `${systemPrompt}\n\n---\n\nUSER REQUEST:\n${userContent}\n\n---\n\nOUTPUT FORMAT — STRICT:\nReturn ONLY a single valid JSON array. The first character of your response MUST be "[" and the last character MUST be "]". No prose. No markdown fences (no \`\`\`). No commentary before or after. No preamble like "Here is" or "Sure". Just the JSON array.`
     const messages: ChatMessage[] = [
-      { role: 'user', content: composed, ts: Date.now() },
-      { role: 'assistant', content: '[', ts: Date.now() }
+      { role: 'user', content: composed, ts: Date.now() }
     ]
     const res = await window.api.chat.send({ taskId: null, messages })
     if (!res.ok || !res.message) {
@@ -370,12 +373,14 @@ export default function StreamDeckAI({
           : res.error || 'Could not reach the model.'
       }
     }
-    // The model's response picks up AFTER our prefilled "[" — prepend
-    // it so we have a complete JSON array string to parse.
+    // Hand the raw response to the depth-aware extractor. (Previously we
+    // prefilled the assistant turn with "[" and prepended it back here,
+    // but assistant prefill was removed when migrating to Opus 4.6+ /
+    // Sonnet 4.6+ — see ai-proposal-owner. The strict OUTPUT FORMAT
+    // clause + extractJson tolerate any residual prose / fences.)
     const raw = res.message.content
-    const reconstructed = raw.trim().startsWith('[') ? raw : '[' + raw
     try {
-      const parsed = extractJson(reconstructed)
+      const parsed = extractJson(raw)
       const ps = normalizeProposals(parsed)
       if (ps.length === 0) {
         return {

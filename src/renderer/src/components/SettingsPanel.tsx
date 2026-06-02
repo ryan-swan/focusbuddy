@@ -22,6 +22,7 @@ import {
 } from '../lib/modelPrefs'
 import { haptic } from '../lib/haptics'
 import Icon from './Icon'
+import ApiKeysSection from './settings/ApiKeysSection'
 
 interface Props {
   mode: ThemeMode
@@ -81,7 +82,7 @@ export default function SettingsPanel({
   return (
     <div
       ref={ref}
-      className="fixed z-[200] w-72 rounded-lg bg-stone-50 dark:bg-stone-900 border border-stone-200 dark:border-stone-700 shadow-2xl backdrop-blur"
+      className="fixed z-[200] w-80 max-h-[80vh] overflow-y-auto rounded-lg bg-stone-50 dark:bg-stone-900 border border-stone-200 dark:border-stone-700 shadow-2xl backdrop-blur"
       style={{ top: anchorY, right: window.innerWidth - anchorX }}
     >
       <div className="px-3 py-2 border-b border-stone-200 dark:border-stone-700 flex items-center justify-between">
@@ -395,6 +396,8 @@ export default function SettingsPanel({
           ))}
         </div>
       </div>
+
+      <ApiKeysSection />
 
       <div className="px-3 py-2 border-t border-stone-200 dark:border-stone-700 bg-stone-100/50 dark:bg-stone-800/50 text-[10px] text-stone-500 dark:text-stone-500">
         Preferences saved locally. Click sounds in browser widgets aren't captured yet — only in stickies, notes, chat, and dialogs.

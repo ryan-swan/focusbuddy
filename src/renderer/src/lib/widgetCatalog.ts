@@ -13,6 +13,12 @@ export interface WidgetCatalogEntry {
   defaultContent: string
   urlPlaceholder?: string
   isWebBased: boolean
+  // When true, hidden from the picker but still routed correctly when an
+  // existing widget of this kind is rendered. Used to fold redundant kinds
+  // (image / video / pdf / gdoc / gsheet / gslide / email) into the
+  // universal File widget, which now handles upload + URL paste + auto-
+  // detection by MIME or hostname — without breaking existing canvases.
+  hideFromPicker?: boolean
 }
 
 export const WIDGET_CATALOG: WidgetCatalogEntry[] = [
@@ -63,11 +69,11 @@ export const WIDGET_CATALOG: WidgetCatalogEntry[] = [
   {
     kind: 'file',
     category: 'Files',
-    label: 'File',
+    label: 'File or link',
     icon: 'upload_file',
-    hint: 'Drop any file onto the canvas to preview it — PDF, image, video, audio, anything',
-    defaultWidth: 360,
-    defaultHeight: 280,
+    hint: 'Upload any file (PDF, image, video, audio, doc) or paste a cloud link (Google Doc, Drive, Notion). Auto-detects type and renders the right preview.',
+    defaultWidth: 320,
+    defaultHeight: 240,
     defaultContent: '',
     isWebBased: false
   },
@@ -138,6 +144,14 @@ export const WIDGET_CATALOG: WidgetCatalogEntry[] = [
     urlPlaceholder: 'https://…',
     isWebBased: true
   },
+  // ── Folded into File ───────────────────────────────────────────────────
+  // pdf / gdoc / gsheet / gslide / email / image / video were separate
+  // picker entries — each redundant with the File widget, which now
+  // handles both upload (auto-detects PDF/image/video/audio by MIME) and
+  // URL paste (auto-detects cloud docs by hostname). The kinds remain
+  // valid so existing widgets keep rendering, but they're hidden from
+  // the picker. Users wanting a "live Google Doc iframe" can still drop
+  // a Browser widget and paste the URL.
   {
     kind: 'pdf',
     category: 'Files',
@@ -148,7 +162,8 @@ export const WIDGET_CATALOG: WidgetCatalogEntry[] = [
     defaultHeight: 640,
     defaultContent: '',
     urlPlaceholder: 'https://…/file.pdf',
-    isWebBased: true
+    isWebBased: true,
+    hideFromPicker: true
   },
   {
     kind: 'gdoc',
@@ -160,7 +175,8 @@ export const WIDGET_CATALOG: WidgetCatalogEntry[] = [
     defaultHeight: 500,
     defaultContent: '',
     urlPlaceholder: 'https://docs.google.com/document/…',
-    isWebBased: true
+    isWebBased: true,
+    hideFromPicker: true
   },
   {
     kind: 'gsheet',
@@ -172,7 +188,8 @@ export const WIDGET_CATALOG: WidgetCatalogEntry[] = [
     defaultHeight: 480,
     defaultContent: '',
     urlPlaceholder: 'https://docs.google.com/spreadsheets/…',
-    isWebBased: true
+    isWebBased: true,
+    hideFromPicker: true
   },
   {
     kind: 'gslide',
@@ -184,7 +201,8 @@ export const WIDGET_CATALOG: WidgetCatalogEntry[] = [
     defaultHeight: 420,
     defaultContent: '',
     urlPlaceholder: 'https://docs.google.com/presentation/…',
-    isWebBased: true
+    isWebBased: true,
+    hideFromPicker: true
   },
   {
     kind: 'email',
@@ -196,31 +214,34 @@ export const WIDGET_CATALOG: WidgetCatalogEntry[] = [
     defaultHeight: 500,
     defaultContent: 'https://mail.google.com/',
     urlPlaceholder: 'https://mail.google.com/ or any inbox URL',
-    isWebBased: true
+    isWebBased: true,
+    hideFromPicker: true
   },
   {
     kind: 'image',
     category: 'Files',
     label: 'Image',
     icon: 'image',
-    hint: 'Image from URL (or right-click on a webpage image to save here)',
+    hint: 'Image from URL',
     defaultWidth: 360,
     defaultHeight: 280,
     defaultContent: '',
     urlPlaceholder: 'https://…/image.png',
-    isWebBased: false
+    isWebBased: false,
+    hideFromPicker: true
   },
   {
     kind: 'video',
     category: 'Files',
     label: 'Video',
     icon: 'movie',
-    hint: 'Video from URL (mp4 / webm) — right-click webpage videos to save here',
+    hint: 'Video from URL (mp4 / webm)',
     defaultWidth: 480,
     defaultHeight: 320,
     defaultContent: '',
     urlPlaceholder: 'https://…/video.mp4',
-    isWebBased: false
+    isWebBased: false,
+    hideFromPicker: true
   },
   {
     kind: 'calculator',
@@ -265,6 +286,39 @@ export const WIDGET_CATALOG: WidgetCatalogEntry[] = [
     defaultHeight: 360,
     defaultContent: '',
     isWebBased: false
+  },
+  {
+    kind: 'minimap',
+    category: 'Layout',
+    label: 'Minimap',
+    icon: 'map',
+    hint: 'Bird\'s-eye view of the canvas — drag the viewport rect to pan, click anywhere to jump there',
+    defaultWidth: 220,
+    defaultHeight: 160,
+    defaultContent: '',
+    isWebBased: false
+  },
+  {
+    kind: 'voice-recorder',
+    category: 'Tools',
+    label: 'Voice note',
+    icon: 'mic',
+    hint: 'Record a voice note — AI transcribes (full / cleaned / summary), suggests tasks and widgets, then sends results anywhere on the canvas',
+    defaultWidth: 320,
+    defaultHeight: 240,
+    defaultContent: '',
+    isWebBased: false
+  },
+  {
+    kind: 'mindmap',
+    category: 'Tools',
+    label: 'Mind map',
+    icon: 'account_tree',
+    hint: 'Explore an idea — AI suggests branches, tasks, and the Agent OS agents that can execute on each node',
+    defaultWidth: 720,
+    defaultHeight: 480,
+    defaultContent: '',
+    isWebBased: false
   }
 ]
 
@@ -274,6 +328,11 @@ export function catalogFor(kind: WidgetKind): WidgetCatalogEntry | null {
 
 export const CATEGORIES: WidgetCategory[] = ['Notes', 'Web', 'Files', 'Tools', 'Comms', 'Layout']
 
+/**
+ * Entries grouped for the picker — excludes anything marked
+ * `hideFromPicker`. Use `WIDGET_CATALOG` directly for the full list
+ * (e.g. when looking up an existing widget's metadata).
+ */
 export function entriesByCategory(): Record<WidgetCategory, WidgetCatalogEntry[]> {
   const out: Record<WidgetCategory, WidgetCatalogEntry[]> = {
     Notes: [],
@@ -283,7 +342,10 @@ export function entriesByCategory(): Record<WidgetCategory, WidgetCatalogEntry[]
     Comms: [],
     Layout: []
   }
-  for (const entry of WIDGET_CATALOG) out[entry.category].push(entry)
+  for (const entry of WIDGET_CATALOG) {
+    if (entry.hideFromPicker) continue
+    out[entry.category].push(entry)
+  }
   return out
 }
 

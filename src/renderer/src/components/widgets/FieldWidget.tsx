@@ -12,6 +12,7 @@ import FieldEditor from '../fields/FieldEditor'
 import RelationConfigEditor from '../fields/RelationConfigEditor'
 import { useWidgetStore } from '../../stores/widgets'
 import Icon from '../Icon'
+import ConnectedToolMenu from '../ConnectedToolMenu'
 
 interface Props {
   widget: Widget
@@ -51,6 +52,7 @@ export default function FieldWidget({ widget, inline = false }: Props): JSX.Elem
   const [state, setState] = useState<FieldState | null>(() =>
     parseFieldState(widget.content)
   )
+  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null)
 
   useEffect(() => {
     setState(parseFieldState(widget.content))
@@ -133,7 +135,17 @@ export default function FieldWidget({ widget, inline = false }: Props): JSX.Elem
   }
 
   const body = (
-    <div className="h-full w-full bg-white dark:bg-stone-900 p-3 flex flex-col gap-2.5 overflow-y-auto">
+    <div
+      className="h-full w-full bg-white dark:bg-stone-900 p-3 flex flex-col gap-2.5 overflow-y-auto"
+      onContextMenu={(e) => {
+        // Right-click anywhere on the field body opens the "Create +
+        // connect" menu. Shift bypass restores the native menu on
+        // inputs/selects for cut/copy/paste.
+        if (e.shiftKey) return
+        e.preventDefault()
+        setCtxMenu({ x: e.clientX, y: e.clientY })
+      }}
+    >
       <div className="flex items-center gap-1.5 pb-1.5 border-b border-stone-100 dark:border-stone-800">
         <Icon
           name={FIELD_TYPE_ICONS[state.def.type]}
@@ -195,6 +207,14 @@ export default function FieldWidget({ widget, inline = false }: Props): JSX.Elem
             onChange={(c) => void updateConfig(c)}
           />
         </div>
+      )}
+      {ctxMenu && (
+        <ConnectedToolMenu
+          sourceWidgetId={widget.id}
+          x={ctxMenu.x}
+          y={ctxMenu.y}
+          onClose={() => setCtxMenu(null)}
+        />
       )}
     </div>
   )

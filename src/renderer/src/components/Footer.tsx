@@ -3,6 +3,8 @@ import { CHANGELOG, hasUnseenChanges } from '../lib/changelog'
 import Icon from './Icon'
 import WhatsNewPanel from './WhatsNewPanel'
 import TermsModal from './TermsModal'
+import UpdaterBanner from './UpdaterBanner'
+import TrialBadge from './TrialBadge'
 
 export default function Footer(): JSX.Element {
   const [showWhatsNew, setShowWhatsNew] = useState(false)
@@ -15,17 +17,31 @@ export default function Footer(): JSX.Element {
 
   const year = new Date().getFullYear()
   const newestEntry = CHANGELOG[0]
-  const buildVer = newestEntry
+  const buildDate = newestEntry
     ? new Date(newestEntry.date).toISOString().slice(0, 10)
     : ''
+  // __APP_VERSION__ is injected at build time from package.json by
+  // electron-vite's `define`. Bump package.json on every release; this
+  // footer (and any other display) updates automatically.
+  const appVersion = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : 'dev'
 
   return (
     <>
       <footer className="h-7 px-3 flex items-center justify-between text-[11px] text-stone-500 dark:text-stone-400 border-t border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-900 select-none">
         <div className="flex items-center gap-2 truncate">
-          <span>© {year} FocusBuddy</span>
+          <span>© {year} Haptyx</span>
           <span className="text-stone-300 dark:text-stone-700">·</span>
-          <span className="text-stone-400 dark:text-stone-500 font-mono">build {buildVer}</span>
+          <button
+            type="button"
+            onClick={() => { void window.api.update.check() }}
+            className="text-stone-400 dark:text-stone-500 font-mono hover:text-stone-700 dark:hover:text-stone-200 transition-colors"
+            title={`Haptyx ${appVersion} · build ${buildDate} · click to check for updates`}
+          >
+            v{appVersion}
+            {buildDate && ` · ${buildDate}`}
+          </button>
+          <UpdaterBanner />
+          <TrialBadge />
         </div>
         <div className="flex items-center gap-1">
           <button
@@ -33,6 +49,14 @@ export default function Footer(): JSX.Element {
             className="px-2 py-1 rounded hover:bg-stone-100 dark:hover:bg-stone-800 hover:text-stone-900 dark:hover:text-stone-100 transition-colors"
           >
             Terms of Use
+          </button>
+          <span className="text-stone-300 dark:text-stone-700">·</span>
+          <button
+            onClick={() => window.open('https://haptyx.app/help', '_blank', 'noopener,noreferrer')}
+            className="px-2 py-1 rounded hover:bg-stone-100 dark:hover:bg-stone-800 hover:text-stone-900 dark:hover:text-stone-100 transition-colors flex items-center gap-1"
+          >
+            <Icon name="help_outline" size={12} />
+            Help & support
           </button>
           <span className="text-stone-300 dark:text-stone-700">·</span>
           <button

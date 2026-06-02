@@ -1,0 +1,437 @@
+// API-key vault section of the Settings panel.
+//
+// Plaintext never lives in the renderer for longer than the moment after
+// the user pastes it — we send the value to main via the per-provider
+// save IPC, which encrypts via Electron's safeStorage and persists to
+// disk. We then drop the input state and rerender from the
+// `{ hasKey, last4 }` hint returned by main.
+//
+// Two providers as of June 2026: Anthropic (canvas AI + chat) and
+// OpenAI (Whisper for voice-note transcription). Each gets a row
+// rendered by the shared <ApiKeyRow> component. Adding a third = pass
+// new props to a new <ApiKeyRow>; no further changes here.
+
+import { useEffect, useState } from 'react'
+
+type Status =
+  | { kind: 'idle' }
+  | { kind: 'saving' }
+  | { kind: 'testing' }
+  | { kind: 'success'; message: string }
+  | { kind: 'error'; message: string }
+
+interface Props {
+  onKeySaved?: () => void
+}
+
+interface ProviderSurface {
+  hint: () => Promise<{ hasKey: boolean; last4: string | null }>
+  save: (
+    plaintext: string
+  ) => Promise<{ ok: boolean; hasKey?: boolean; last4?: string | null; error?: string }>
+  clear: () => Promise<{ ok: boolean; error?: string }>
+  test: () => Promise<{ ok: boolean; model?: string; error?: string }>
+}
+
+interface ProviderConfig {
+  // Display name shown above the row.
+  label: string
+  // Placeholder hint inside the password field — helps users spot a
+  // wrong-vendor paste before they hit Save.
+  placeholder: string
+  // External link to wherever the user gets the key.
+  helpUrl: string
+  helpLabel: string
+  // Used inside the confirm() copy on Clear so the warning explains
+  // exactly what stops working.
+  removeWarning: string
+  // The IPC surface specific to this provider.
+  api: ProviderSurface
+}
+
+export default function ApiKeysSection({ onKeySaved }: Props): JSX.Element {
+  const [encryption, setEncryption] = useState<boolean | null>(null)
+
+  useEffect(() => {
+    void window.api.settings.encryptionAvailable().then(setEncryption)
+  }, [])
+
+  return (
+    <div className="px-3 py-3 border-t border-stone-200 dark:border-stone-700 space-y-3">
+      <div className="text-[11px] uppercase tracking-[0.12em] text-stone-500 dark:text-stone-400 font-medium">
+        AI · API keys
+      </div>
+
+      <ApiKeyRow
+        config={{
+          label: 'Anthropic API key',
+          placeholder: 'sk-ant-api03-…',
+          helpUrl: 'https://console.anthropic.com/settings/keys',
+          helpLabel: 'Get a key from console.anthropic.com →',
+          removeWarning:
+            'Remove the Anthropic API key from Haptyx? AI features will stop working until you add it back.',
+          api: {
+            hint: () => window.api.settings.hintAnthropic(),
+            save: (p) => window.api.settings.saveAnthropicKey(p),
+            clear: () => window.api.settings.clearAnthropicKey(),
+            test: () => window.api.settings.testAnthropicKey()
+          }
+        }}
+        encryption={encryption}
+        onKeySaved={onKeySaved}
+      />
+
+      <ApiKeyRow
+        config={{
+          label: 'OpenAI API key',
+          placeholder: 'sk-proj-…',
+          helpUrl: 'https://platform.openai.com/api-keys',
+          helpLabel: 'Get a key from platform.openai.com →',
+          removeWarning:
+            'Remove the OpenAI API key from Haptyx? Voice-note transcription will stop working until you add it back.',
+          api: {
+            hint: () => window.api.settings.hintOpenAI(),
+            save: (p) => window.api.settings.saveOpenAIKey(p),
+            clear: () => window.api.settings.clearOpenAIKey(),
+            test: () => window.api.settings.testOpenAIKey()
+          }
+        }}
+        encryption={encryption}
+        onKeySaved={onKeySaved}
+      />
+
+      <div className="text-[10px] text-stone-500 dark:text-stone-400 leading-relaxed">
+        Each key is encrypted with the macOS Keychain and stored locally only.
+        Haptyx never proxies AI calls — your prompts go direct from this Mac
+        to Anthropic / OpenAI.
+        {encryption === false && (
+          <div className="text-red-600 dark:text-red-400 mt-1">
+            ⚠ System encryption isn't available — saving is disabled.
+          </div>
+        )}
+      </div>
+
+      <VoiceProviderToggle />
+    </div>
+  )
+}
+
+function VoiceProviderToggle(): JSX.Element {
+  // `null` = haven't heard from main yet. `'unavailable'` = the IPC
+  // handler is missing (typically because the main process is running
+  // older code than the renderer — restart Haptyx to pick up the new
+  // handlers). Without this state we silently leave the buttons
+  // disabled forever and the user has no idea why.
+  const [provider, setProvider] = useState<'cloud' | 'local' | 'unavailable' | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [status, setStatus] = useState<string | null>(null)
+
+  useEffect(() => {
+    void window.api.voiceNote
+      .getProvider()
+      .then((p) => setProvider(p))
+      .catch((err: Error) => {
+        // eslint-disable-next-line no-console
+        console.error('voiceNote.getProvider failed:', err)
+        setProvider('unavailable')
+        setStatus(
+          'Transcription provider preference is unavailable. ' +
+            'This usually means Haptyx needs a full restart to pick up ' +
+            'new IPC handlers (renderer was updated but main process wasn\'t). ' +
+            'Quit Haptyx (⌘Q) and reopen.'
+        )
+      })
+  }, [])
+
+  async function pick(next: 'cloud' | 'local'): Promise<void> {
+    if (provider === next || busy) return
+    setBusy(true)
+    setStatus(null)
+    if (next === 'local') {
+      setStatus('Loading local Whisper model (one-time download, ~80MB)…')
+    }
+    try {
+      const result = await window.api.voiceNote.setProvider(next)
+      if (!result.ok) {
+        setStatus(`Couldn't switch: ${result.error ?? 'unknown error'}`)
+        return
+      }
+      setProvider(next)
+      setStatus(
+        next === 'local'
+          ? 'Switched to Local Whisper. Future recordings transcribe on this Mac.'
+          : 'Switched to Cloud Whisper (OpenAI).'
+      )
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      setStatus(`Couldn\'t switch: ${msg}. Try restarting Haptyx.`)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="pt-3 border-t border-stone-200 dark:border-stone-700">
+      <div className="text-[11px] uppercase tracking-[0.12em] text-stone-500 dark:text-stone-400 font-medium mb-2">
+        Voice · transcription provider
+      </div>
+      <div className="grid grid-cols-2 gap-1.5">
+        <button
+          onClick={() => void pick('cloud')}
+          disabled={busy || provider === null || provider === 'unavailable'}
+          className={`text-[11px] px-2.5 py-1.5 rounded-md border ${
+            provider === 'cloud'
+              ? 'border-accent bg-accent/10 text-stone-900 dark:text-stone-100'
+              : 'border-stone-200 dark:border-stone-700 text-stone-600 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800'
+          } disabled:opacity-50`}
+          data-testid="voice-provider-cloud"
+        >
+          <div className="font-medium">Cloud</div>
+          <div className="text-[10px] text-stone-500 dark:text-stone-400 mt-0.5">
+            OpenAI Whisper · fastest · paid per minute
+          </div>
+        </button>
+        <button
+          onClick={() => void pick('local')}
+          disabled={busy || provider === null || provider === 'unavailable'}
+          className={`text-[11px] px-2.5 py-1.5 rounded-md border ${
+            provider === 'local'
+              ? 'border-accent bg-accent/10 text-stone-900 dark:text-stone-100'
+              : 'border-stone-200 dark:border-stone-700 text-stone-600 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800'
+          } disabled:opacity-50`}
+          data-testid="voice-provider-local"
+        >
+          <div className="font-medium">Local</div>
+          <div className="text-[10px] text-stone-500 dark:text-stone-400 mt-0.5">
+            Whisper tiny · offline · free · ~80MB
+          </div>
+        </button>
+      </div>
+      {status && (
+        <div className="text-[10px] text-stone-500 dark:text-stone-400 mt-2 leading-snug">
+          {status}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function ApiKeyRow({
+  config,
+  encryption,
+  onKeySaved
+}: {
+  config: ProviderConfig
+  encryption: boolean | null
+  onKeySaved?: () => void
+}): JSX.Element {
+  const [hint, setHint] = useState<{ hasKey: boolean; last4: string | null }>({
+    hasKey: false,
+    last4: null
+  })
+  // Track whether the hint IPC even responded. If main is running older
+  // code (no handler for this provider's hint endpoint), the promise
+  // rejects and `unavailable` becomes true — we surface a clear "restart
+  // Haptyx" affordance instead of letting the row look operational while
+  // every subsequent save / test / clear silently fails.
+  const [unavailable, setUnavailable] = useState(false)
+  const [editing, setEditing] = useState(false)
+  const [pasted, setPasted] = useState('')
+  const [show, setShow] = useState(false)
+  const [status, setStatus] = useState<Status>({ kind: 'idle' })
+
+  useEffect(() => {
+    config.api
+      .hint()
+      .then((h) => {
+        setHint(h)
+        setUnavailable(false)
+      })
+      .catch((err: Error) => {
+        // eslint-disable-next-line no-console
+        console.error(`${config.label} hint IPC unavailable:`, err)
+        setUnavailable(true)
+      })
+  }, [config])
+
+  const isBusy = status.kind === 'saving' || status.kind === 'testing'
+
+  async function onSave(): Promise<void> {
+    if (!pasted.trim()) return
+    setStatus({ kind: 'saving' })
+    try {
+      const result = await config.api.save(pasted)
+      if (!result.ok) {
+        setStatus({ kind: 'error', message: result.error ?? 'Save failed.' })
+        return
+      }
+      setHint({ hasKey: result.hasKey ?? true, last4: result.last4 ?? null })
+      setPasted('')
+      setEditing(false)
+      setStatus({
+        kind: 'success',
+        message: 'Key saved. Encrypted with the system keychain.'
+      })
+      onKeySaved?.()
+    } catch (err) {
+      // Reaches here when the IPC handler doesn't exist on the main
+      // side — e.g. renderer was hot-reloaded but main wasn't restarted.
+      const msg = err instanceof Error ? err.message : String(err)
+      setStatus({
+        kind: 'error',
+        message: `Save failed: ${msg}. If this just appeared, quit Haptyx (⌘Q) and reopen — the renderer has new code that the main process hasn't loaded yet.`
+      })
+    }
+  }
+
+  async function onTest(): Promise<void> {
+    setStatus({ kind: 'testing' })
+    const result = await config.api.test()
+    if (result.ok) {
+      setStatus({
+        kind: 'success',
+        message: `Key works · ${result.model ?? 'connected'}.`
+      })
+    } else {
+      setStatus({ kind: 'error', message: result.error ?? 'Test failed.' })
+    }
+  }
+
+  async function onClear(): Promise<void> {
+    const confirmed = confirm(config.removeWarning)
+    if (!confirmed) return
+    const result = await config.api.clear()
+    if (!result.ok) {
+      setStatus({ kind: 'error', message: result.error ?? 'Clear failed.' })
+      return
+    }
+    setHint({ hasKey: false, last4: null })
+    setEditing(false)
+    setPasted('')
+    setStatus({ kind: 'success', message: 'Key removed.' })
+  }
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-1.5">
+        <span className="text-xs text-stone-700 dark:text-stone-300">
+          {config.label}
+        </span>
+        {hint.hasKey && !editing && !unavailable && (
+          <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-300">
+            Set
+          </span>
+        )}
+        {unavailable && (
+          <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-300">
+            Restart needed
+          </span>
+        )}
+      </div>
+      {unavailable && (
+        <div className="text-[11px] text-amber-700 dark:text-amber-300 mb-2 leading-snug bg-amber-500/10 border border-amber-500/20 rounded px-2 py-1.5">
+          Main process is missing this provider's IPC handler. Quit Haptyx (⌘Q) and reopen so it picks up the new code. Saving / testing this key won't work until you do.
+        </div>
+      )}
+
+      {hint.hasKey && !editing && (
+        <div className="flex items-center justify-between bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-md px-2.5 py-1.5 mb-2">
+          <code className="text-xs font-mono text-stone-700 dark:text-stone-300">
+            ••••••••{hint.last4 ?? '????'}
+          </code>
+          <div className="flex gap-1">
+            <button
+              onClick={() => {
+                setEditing(true)
+                setStatus({ kind: 'idle' })
+              }}
+              className="text-[11px] text-stone-600 dark:text-stone-300 hover:text-stone-900 dark:hover:text-stone-50 px-1.5"
+            >
+              Replace
+            </button>
+            <button
+              onClick={onTest}
+              disabled={isBusy}
+              className="text-[11px] text-stone-600 dark:text-stone-300 hover:text-stone-900 dark:hover:text-stone-50 px-1.5 disabled:opacity-50"
+            >
+              {status.kind === 'testing' ? 'Testing…' : 'Test'}
+            </button>
+            <button
+              onClick={onClear}
+              className="text-[11px] text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 px-1.5"
+            >
+              Remove
+            </button>
+          </div>
+        </div>
+      )}
+
+      {(!hint.hasKey || editing) && (
+        <div className="space-y-2">
+          <div className="relative">
+            <input
+              type={show ? 'text' : 'password'}
+              value={pasted}
+              onChange={(e) => {
+                setPasted(e.target.value)
+                setStatus({ kind: 'idle' })
+              }}
+              placeholder={config.placeholder}
+              autoComplete="off"
+              spellCheck={false}
+              className="w-full text-xs font-mono bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-md px-2.5 py-1.5 pr-12 focus:outline-none focus:border-accent"
+            />
+            <button
+              type="button"
+              onClick={() => setShow(!show)}
+              className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] uppercase tracking-wider text-stone-500 dark:text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 px-1.5 py-0.5"
+            >
+              {show ? 'Hide' : 'Show'}
+            </button>
+          </div>
+          <div className="flex gap-1.5">
+            <button
+              onClick={onSave}
+              disabled={!pasted.trim() || isBusy || encryption === false}
+              className="flex-1 text-[11px] bg-accent text-white rounded-md py-1.5 hover:opacity-90 disabled:opacity-50"
+            >
+              {status.kind === 'saving' ? 'Saving…' : 'Save key'}
+            </button>
+            {editing && (
+              <button
+                onClick={() => {
+                  setEditing(false)
+                  setPasted('')
+                  setStatus({ kind: 'idle' })
+                }}
+                className="text-[11px] text-stone-600 dark:text-stone-300 hover:text-stone-900 dark:hover:text-stone-50 px-2"
+              >
+                Cancel
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {status.kind === 'success' && (
+        <div className="text-[11px] text-emerald-700 dark:text-emerald-300 mt-2">
+          {status.message}
+        </div>
+      )}
+      {status.kind === 'error' && (
+        <div className="text-[11px] text-red-600 dark:text-red-400 mt-2 break-words">
+          {status.message}
+        </div>
+      )}
+
+      <a
+        href={config.helpUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-[11px] text-accent hover:underline inline-flex items-center gap-1 mt-1"
+      >
+        {config.helpLabel}
+      </a>
+    </div>
+  )
+}

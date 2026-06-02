@@ -48,10 +48,11 @@ export default function TermsModal({ onClose }: Props): JSX.Element {
           <section>
             <h4 className="text-stone-900 dark:text-stone-100 font-semibold mb-1.5">2. AI features use your own API key</h4>
             <p>
-              When you add an <code className="bg-stone-100 dark:bg-stone-800 px-1 py-0.5 rounded text-xs">ANTHROPIC_API_KEY</code> to
-              your local <code className="bg-stone-100 dark:bg-stone-800 px-1 py-0.5 rounded text-xs">.env</code> file, the
-              assistant, AI Setup, and resume features call Anthropic's API directly from this app.
-              You are responsible for any usage charges on that key.
+              Open <strong>Settings → AI · API keys</strong> to paste your Anthropic API key.
+              It's encrypted with your system keychain and never leaves this Mac except as
+              part of an outbound request to Anthropic — the assistant, AI Setup, and resume
+              features call Anthropic's API directly from the app. You are responsible for any
+              usage charges on that key.
             </p>
           </section>
 
