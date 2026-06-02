@@ -16,6 +16,9 @@ import WebViewWidget from './widgets/WebViewWidget'
 import ImageWidget from './widgets/ImageWidget'
 import VideoWidget from './widgets/VideoWidget'
 import TimerWidget from './widgets/TimerWidget'
+import MinimapWidget from './widgets/MinimapWidget'
+import VoiceRecorderWidget from './widgets/VoiceRecorderWidget'
+import MindMapWidget from './widgets/MindMapWidget'
 import Icon from './Icon'
 import type { Widget } from '@shared/types'
 
@@ -49,6 +52,12 @@ function renderInline(w: Widget): JSX.Element | null {
       return <VideoWidget widget={w} inline />
     case 'timer':
       return <TimerWidget widget={w} inline />
+    case 'minimap':
+      return <MinimapWidget widget={w} inline />
+    case 'voice-recorder':
+      return <VoiceRecorderWidget widget={w} inline />
+    case 'mindmap':
+      return <MindMapWidget widget={w} inline />
     case 'section':
       return null
     case 'webview':

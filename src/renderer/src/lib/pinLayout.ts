@@ -14,6 +14,25 @@ export interface ZoneRect {
   height: number
 }
 
+/**
+ * Chrome insets — distance in pixels each corner / edge needs to reserve
+ * for non-widget UI (AI rail on the right, zoom controls + floating
+ * toolbar on the left, etc.) so zone-pinned widgets never sit underneath
+ * the persistent chrome.
+ *
+ * Each value is the cumulative inset for that side. A "right: 296" inset
+ * (≈ AI rail 280 + gap 16) pushes anything pinned to TR or BR leftward
+ * by 296px relative to the container's right edge.
+ */
+export interface ChromeInsets {
+  top: number
+  right: number
+  bottom: number
+  left: number
+}
+
+export const ZERO_INSETS: ChromeInsets = { top: 0, right: 0, bottom: 0, left: 0 }
+
 const PADDING = 16
 const GAP = 8
 
@@ -23,10 +42,17 @@ const GAP = 8
  *
  * Stacking order within a zone is deterministic by widget creation time —
  * earliest pinned widget sits closest to the corner.
+ *
+ * `insets` reserves space for persistent chrome so widgets don't
+ * disappear behind the AI rail, the zoom controls, the floating
+ * toolbar, etc. When the rail collapses, the calling component should
+ * re-render with a smaller right inset and pinned widgets glide back
+ * toward the corner.
  */
 export function computeZonePinPositions(
   widgets: Widget[],
-  container: { width: number; height: number }
+  container: { width: number; height: number },
+  insets: ChromeInsets = ZERO_INSETS
 ): Map<string, ZoneRect> {
   const out = new Map<string, ZoneRect>()
   const byZone: Record<PinZone, Widget[]> = {
@@ -39,14 +65,18 @@ export function computeZonePinPositions(
     if (!w.pinned || w.pinnedZone === null || w.parentSectionId !== null) continue
     byZone[w.pinnedZone].push(w)
   }
-  // Stable order — earliest-pinned widget docks closest to the corner.
   for (const zone of Object.keys(byZone) as PinZone[]) {
     byZone[zone].sort((a, b) => a.createdAt - b.createdAt)
   }
 
+  // Per-edge available coordinate after subtracting chrome.
+  const leftEdge = PADDING + insets.left
+  const rightEdge = container.width - PADDING - insets.right
+  const topEdge = PADDING + insets.top
+  const bottomEdge = container.height - PADDING - insets.bottom
+
   for (const zone of Object.keys(byZone) as PinZone[]) {
     const list = byZone[zone]
-    // Compute cumulative offset along the stacking axis (horizontal).
     let offset = 0
     for (const w of list) {
       const width = w.width
@@ -55,21 +85,21 @@ export function computeZonePinPositions(
       let y: number
       switch (zone) {
         case 'tl':
-          x = PADDING + offset
-          y = PADDING
+          x = leftEdge + offset
+          y = topEdge
           break
         case 'tr':
-          x = container.width - PADDING - width - offset
-          y = PADDING
+          x = rightEdge - width - offset
+          y = topEdge
           break
         case 'bl':
-          x = PADDING + offset
-          y = container.height - PADDING - height
+          x = leftEdge + offset
+          y = bottomEdge - height
           break
         case 'br':
         default:
-          x = container.width - PADDING - width - offset
-          y = container.height - PADDING - height
+          x = rightEdge - width - offset
+          y = bottomEdge - height
           break
       }
       out.set(w.id, { x, y, width, height })

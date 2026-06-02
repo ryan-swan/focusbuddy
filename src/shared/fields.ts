@@ -294,6 +294,33 @@ export interface FbFileMetaOnly {
 // this in shared/ so renderer + main agree on the same buckets.
 export type FileKind = 'image' | 'pdf' | 'video' | 'audio' | 'generic'
 
+/**
+ * The FileWidget's `widget.content` field can be either:
+ *   - an `fb_files.id` (a UUID v4) — a locally ingested file, or
+ *   - an external http(s) URL — a cloud link (Google Doc, Notion, Drive, etc.)
+ *
+ * No prefix, no migration: a UUID isn't a URL and a URL isn't a UUID, so we
+ * discriminate by content shape. Empty content = uninitialised widget.
+ */
+export function isExternalUrlContent(content: string | null | undefined): boolean {
+  if (!content) return false
+  return /^https?:\/\//i.test(content.trim())
+}
+
+/**
+ * Friendly hostname for a URL — used as the display label on cloud-link
+ * widgets ("docs.google.com", "notion.so") in place of a filename. Returns
+ * the raw string if URL parsing fails so the widget still has something to
+ * show.
+ */
+export function hostnameForUrl(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '')
+  } catch {
+    return url
+  }
+}
+
 export function fileKindFromMime(mime: string, ext: string): FileKind {
   const e = ext.replace(/^\./, '').toLowerCase()
   if (mime.startsWith('image/') || ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp'].includes(e)) {

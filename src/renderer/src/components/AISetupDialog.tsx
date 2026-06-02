@@ -120,7 +120,7 @@ export default function AISetupDialog({ task, onClose, onAccept }: Props): JSX.E
               />
               <p className="text-sm text-stone-800 dark:text-stone-200">
                 {state.needsApiKey
-                  ? 'Add ANTHROPIC_API_KEY to projects/focusbuddy/.env and restart to use AI setup.'
+                  ? 'Open Settings → AI · API keys and paste your Anthropic API key. No restart needed.'
                   : state.message}
               </p>
             </div>

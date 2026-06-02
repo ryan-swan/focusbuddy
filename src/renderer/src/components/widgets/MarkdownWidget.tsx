@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { EditorContent, useEditor } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Link from '@tiptap/extension-link'
@@ -11,6 +11,7 @@ import type { Widget } from '@shared/types'
 import { useWidgetStore } from '../../stores/widgets'
 import WidgetFrame from './WidgetFrame'
 import Icon from '../Icon'
+import ConnectedToolMenu from '../ConnectedToolMenu'
 
 interface Props {
   widget: Widget
@@ -118,6 +119,7 @@ export default function MarkdownWidget({ widget, inline = false }: Props): JSX.E
   const update = useWidgetStore((s) => s.update)
   const lastSavedRef = useRef(widget.content)
   const saveTimerRef = useRef<number | null>(null)
+  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; selectionText?: string } | null>(null)
 
   const editor = useEditor(
     {
@@ -243,9 +245,24 @@ export default function MarkdownWidget({ widget, inline = false }: Props): JSX.E
       <div
         className="flex-1 overflow-auto md-rendered tiptap-editor px-4 py-3 text-stone-900 dark:text-stone-100"
         onMouseDown={(e) => e.stopPropagation()}
+        onContextMenu={(e) => {
+          if (e.shiftKey) return
+          e.preventDefault()
+          const sel = window.getSelection()?.toString() ?? ''
+          setCtxMenu({ x: e.clientX, y: e.clientY, selectionText: sel })
+        }}
       >
         <EditorContent editor={editor} />
       </div>
+      {ctxMenu && (
+        <ConnectedToolMenu
+          sourceWidgetId={widget.id}
+          x={ctxMenu.x}
+          y={ctxMenu.y}
+          selectionContext={{ selectionText: ctxMenu.selectionText }}
+          onClose={() => setCtxMenu(null)}
+        />
+      )}
     </div>
   )
 

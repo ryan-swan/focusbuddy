@@ -88,9 +88,14 @@ export function createWidget(draft: WidgetDraft): Widget {
   const db = getDb()
   const id = randomUUID()
   const now = Date.now()
+  // Optional pin at creation — used by the minimap auto-create flow so the
+  // widget is docked the moment it spawns instead of "flash on canvas, then
+  // jump to corner" on the next render.
+  const pinned = draft.pinned ? 1 : 0
+  const pinnedZone = draft.pinnedZone ?? null
   db.prepare(
-    `INSERT INTO widgets (id, task_id, kind, title, content, x, y, width, height, z_index, color, pinned, pinned_screen_x, pinned_screen_y, parent_section_id, source_app_id, mode, created_at, updated_at)
-     VALUES (@id, @taskId, @kind, @title, @content, @x, @y, @width, @height, @zIndex, @color, 0, NULL, NULL, NULL, @sourceAppId, @mode, @now, @now)`
+    `INSERT INTO widgets (id, task_id, kind, title, content, x, y, width, height, z_index, color, pinned, pinned_screen_x, pinned_screen_y, pinned_zone, parent_section_id, source_app_id, mode, created_at, updated_at)
+     VALUES (@id, @taskId, @kind, @title, @content, @x, @y, @width, @height, @zIndex, @color, @pinned, NULL, NULL, @pinnedZone, NULL, @sourceAppId, @mode, @now, @now)`
   ).run({
     id,
     taskId: draft.taskId,
@@ -103,6 +108,8 @@ export function createWidget(draft: WidgetDraft): Widget {
     height: draft.height ?? (draft.kind === 'webview' ? 360 : 200),
     zIndex: nextZ(draft.taskId),
     color: draft.color ?? null,
+    pinned,
+    pinnedZone,
     sourceAppId: draft.sourceAppId ?? null,
     mode: draft.mode ?? null,
     now

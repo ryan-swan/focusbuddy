@@ -32,8 +32,12 @@ import type { AiBuildSuggestion } from '@shared/types'
 import LoadMeter from './LoadMeter'
 import CanvasContextMenu, { type CtxMenuItem } from './CanvasContextMenu'
 import FloatingToolbar, { type ToolbarAction } from './FloatingToolbar'
-import CanvasMinimap from './CanvasMinimap'
+import MinimapWidget from './widgets/MinimapWidget'
+import VoiceRecorderWidget from './widgets/VoiceRecorderWidget'
+import MindMapWidget from './widgets/MindMapWidget'
 import ZoomControls from './ZoomControls'
+import CanvasEdgeIndicators from './CanvasEdgeIndicators'
+import { useEdgePan } from '../lib/useEdgePan'
 import CanvasAIAssistantRail from './CanvasAIAssistantRail'
 import Icon from './Icon'
 import { useChatStore } from '../stores/chat'
@@ -54,7 +58,16 @@ import {
   SECTION_PADDING
 } from '../lib/sectionGeometry'
 import { lookupWebview } from '../lib/webviewRegistry'
-import { PinLayoutContext, computeZonePinPositions } from '../lib/pinLayout'
+import {
+  PinLayoutContext,
+  computeZonePinPositions,
+  type ChromeInsets
+} from '../lib/pinLayout'
+import {
+  AI_RAIL_BUTTON_SIZE,
+  AI_RAIL_WIDTH,
+  useAIRailCollapsed
+} from '../lib/chromeState'
 import LinkOverlay from './LinkOverlay'
 import { useLinksStore } from '../stores/links'
 import { LinkDragContext } from '../lib/linkDragContext'
@@ -119,6 +132,12 @@ function renderWidget(w: Widget): JSX.Element | null {
       return <TimerWidget widget={w} />
     case 'streamdeck':
       return <StreamDeckWidget widget={w} />
+    case 'minimap':
+      return <MinimapWidget widget={w} />
+    case 'voice-recorder':
+      return <VoiceRecorderWidget widget={w} />
+    case 'mindmap':
+      return <MindMapWidget widget={w} />
     case 'section':
       return <SectionWidget widget={w} renderChild={renderWidget} />
     case 'webview':
@@ -179,7 +198,8 @@ export default function Canvas(): JSX.Element {
   // "Done → Reopen → Done" doesn't re-open the prompt in a loop. Reset
   // when the task changes.
   const promptedDoneRef = useRef<Set<string>>(new Set())
-  const [paletteOpen, setPaletteOpen] = useState(true)
+  // (palette state is local to WidgetPalette now — it manages its own
+  // popover open/closed; we removed the canvas-level toggle.)
   const [animatingPan, setAnimatingPan] = useState(false)
   // Track canvas viewport dimensions so the minimap can position its
   // viewport rectangle accurately. ResizeObserver keeps this fresh under
@@ -197,6 +217,27 @@ export default function Canvas(): JSX.Element {
     setViewportSize({ width: rect.width, height: rect.height })
     return () => ro.disconnect()
   }, [])
+  // Edge-pan / "infinite map" camera. The hook installs a rAF loop
+  // that pans the canvas when the cursor enters a 80px margin near
+  // any edge — closer to the edge = faster pan (quadratic ramp).
+  // Disabled while a widget is active (the user is editing inside it),
+  // while a zoom-to-fit animation is running, or when keyboard focus is
+  // in a form input. Returns the live per-edge intensity (0-1) for the
+  // visual indicators below.
+  const edgeIntensity = useEdgePan({
+    containerRef: dropRef,
+    // Only animatingPan disables edge-pan. We DELIBERATELY no longer
+    // disable on `activeId !== null`. Reasoning: a user moving the
+    // cursor to the canvas edge is unambiguously asking to navigate
+    // the canvas — even with a widget currently active. The old gate
+    // meant clicking any widget killed edge-pan until the user
+    // remembered to press Escape or click on bare canvas to deselect.
+    // Hiding canvas navigation behind a manual deselect step was the
+    // root cause of "edge-pan stopped working" complaints — paired
+    // with the form-focus gate (now scoped to canvas-internal forms),
+    // any kind of widget interaction would silently kill it.
+    disabled: animatingPan
+  })
   const [, setNowTick] = useState(0) // for the running-task clock
   const [snoozeUntil, setSnoozeUntil] = useState<number>(0)
   const [showResume, setShowResume] = useState(false)
@@ -242,6 +283,82 @@ export default function Canvas(): JSX.Element {
     else clearLinks()
   }, [activeTaskId, loadLinksForTask, clearLinks])
 
+  // Minimap auto-create. Every task gets a minimap widget pinned to its
+  // BR zone the first time it's opened — gives users an always-available
+  // canvas overview without forcing them to dig through the widget picker.
+  //
+  // Once spawned, the minimap is a regular widget: the user can resize,
+  // pin to a different zone, drag back to the canvas, or delete it.
+  // Deletion writes a localStorage flag (fb-minimap-dismissed:{taskId})
+  // so we don't re-create the widget the next time the task opens. The
+  // user can always re-add it from the widget picker — kind 'minimap'
+  // appears in the Layout category.
+  //
+  // We poll the store via `loadingFor === null` to know when loadForTask
+  // has completed (the store doesn't expose a Promise we can await from
+  // here). The createdMinimapForRef set guards against double-creates if
+  // React strict-mode runs the effect twice in dev.
+  const widgetsLoadingFor = useWidgetStore((s) => s.loadingFor)
+  const widgetIds = useWidgetStore((s) =>
+    s.widgets.map((w) => `${w.id}:${w.kind}`).join('|')
+  )
+  const createdMinimapForRef = useRef<Set<string>>(new Set())
+  useEffect(() => {
+    if (!activeTaskId) return
+    if (widgetsLoadingFor !== null) return // still loading
+    if (createdMinimapForRef.current.has(activeTaskId)) return
+    const dismissed = localStorage.getItem(`fb-minimap-dismissed:${activeTaskId}`) === '1'
+    if (dismissed) {
+      createdMinimapForRef.current.add(activeTaskId)
+      return
+    }
+    const existing = useWidgetStore
+      .getState()
+      .widgets.find((w) => w.kind === 'minimap' && w.taskId === activeTaskId)
+    if (existing) {
+      createdMinimapForRef.current.add(activeTaskId)
+      return
+    }
+    createdMinimapForRef.current.add(activeTaskId)
+    void createWidget({
+      taskId: activeTaskId,
+      kind: 'minimap',
+      title: '',
+      content: '',
+      x: 0,
+      y: 0,
+      width: 220,
+      height: 160,
+      pinned: true,
+      pinnedZone: 'br'
+    })
+    // Suppress noise about widgetIds — included in deps to re-evaluate
+    // after widgets load completes, but we use the getState() snapshot.
+    void widgetIds
+  }, [activeTaskId, widgetsLoadingFor, widgetIds, createWidget])
+
+  // Track minimap deletions → write the dismissed flag so we don't auto-
+  // resurrect. Pure observer; doesn't touch the store from inside the
+  // subscribe callback (which could loop).
+  useEffect(() => {
+    if (!activeTaskId) return
+    let prevHadMinimap = useWidgetStore
+      .getState()
+      .widgets.some((w) => w.kind === 'minimap' && w.taskId === activeTaskId)
+    const unsubscribe = useWidgetStore.subscribe((state) => {
+      const hasMinimap = state.widgets.some(
+        (w) => w.kind === 'minimap' && w.taskId === activeTaskId
+      )
+      if (prevHadMinimap && !hasMinimap) {
+        localStorage.setItem(`fb-minimap-dismissed:${activeTaskId}`, '1')
+      } else if (!prevHadMinimap && hasMinimap) {
+        localStorage.removeItem(`fb-minimap-dismissed:${activeTaskId}`)
+      }
+      prevHadMinimap = hasMinimap
+    })
+    return unsubscribe
+  }, [activeTaskId])
+
   // Imperative controller exposed via context to WidgetFrame / SectionWidget.
   // The .start() call is what arms the link gesture — it's invoked from a
   // widget header button's onClick handler. We keep this on a ref so the
@@ -264,11 +381,13 @@ export default function Canvas(): JSX.Element {
     // pin it locally.
     const sourceId: string = linkSourceId
     function onMove(e: MouseEvent): void {
-      if (!dropRef.current) return
-      const rect = dropRef.current.getBoundingClientRect()
-      // Canvas-pane-relative screen coords — same space the LinkOverlay
-      // SVG renders in, so no further conversion needed.
-      setGhostCursor({ x: e.clientX - rect.left, y: e.clientY - rect.top })
+      // Raw viewport coords — the LinkOverlay SVG is now position: fixed
+      // covering the viewport, so client coords ARE its coord space.
+      // Previously this subtracted dropRef's left/top; that broke as soon
+      // as the SVG's positioned ancestor diverged from dropRef, which
+      // turned out to be the cause of the long-standing "ghost lines
+      // float off in the middle of nowhere" bug.
+      setGhostCursor({ x: e.clientX, y: e.clientY })
     }
     function endArm(): void {
       setLinkSourceId(null)
@@ -298,10 +417,14 @@ export default function Canvas(): JSX.Element {
         endArm()
         return
       }
-      if (from.parentSectionId !== null || to.parentSectionId !== null) {
-        endArm()
-        return
-      }
+      // Linking widgets inside sections — and to sections themselves — is
+      // now permitted. The visual link is drawn between the actual
+      // rendered widget rects (LinkOverlay reads getBoundingClientRect on
+      // [data-widget-id]) so an in-section widget produces a line that
+      // anchors to its visible position inside the section frame, and a
+      // section produces a line that anchors to the section's outer
+      // frame. The persisted row in widget_links stores source + target
+      // widget ids regardless of section membership.
       void createLink(sourceId, toId, activeTaskId)
       endArm()
     }
@@ -1326,16 +1449,12 @@ export default function Canvas(): JSX.Element {
             <Icon name="bookmark_add" size={14} />
             <span>{savingTemplate ? 'Saving…' : 'Save template'}</span>
           </button>
-          <button
-            onClick={() => setPaletteOpen((v) => !v)}
-            className="icon-btn"
-            title={paletteOpen ? 'Hide palette' : 'Show palette'}
-          >
-            <Icon name={paletteOpen ? 'unfold_less' : 'unfold_more'} size={16} />
-          </button>
+          {/* Compact desk-objects palette — single "+ Add" button that
+              opens a portalled popover with categorised chips. Replaces
+              the previous full-width horizontal strip that wasted ~100px
+              of vertical real estate even when collapsed. */}
+          <WidgetPalette onAdd={handleClickAdd} disabled={!activeTaskId} />
         </div>
-
-        {paletteOpen && <WidgetPalette onAdd={handleClickAdd} disabled={!activeTaskId} />}
 
         <div
           ref={dropRef}
@@ -1471,15 +1590,22 @@ export default function Canvas(): JSX.Element {
               <span>Widget active · click outside or press Esc to pan canvas</span>
             </div>
           )}
-          {/* Canvas minimap — bottom-right overview + draggable viewport
-              rect. Only renders when there's at least one top-level widget;
-              shows nothing on a blank canvas to avoid noise. */}
-          {viewportSize.width > 0 && viewportSize.height > 0 && (
-            <CanvasMinimap
-              viewportWidth={viewportSize.width}
-              viewportHeight={viewportSize.height}
-            />
-          )}
+          {/* Edge-pan boundary indicators — subtle violet glow hugging
+              each edge. Idle: faint breathing hairline so the user
+              discovers the affordance. Active: brighter halo that
+              matches the live mouse intensity from useEdgePan. Hidden
+              while a widget is being edited (so editing UI isn't
+              competing with ambient motion) — but EXPLICITLY shown
+              again while the user is mid-drag, which is exactly when
+              edge-pan matters most. */}
+          <CanvasEdgeIndicators
+            intensity={edgeIntensity}
+            visible={!animatingPan}
+          />
+          {/* Minimap is now a standard widget kind — per-task, pinned to BR
+              by default, auto-created on first task open (see the minimap
+              auto-create effect earlier in this component). The legacy
+              standalone CanvasMinimap render lived here. */}
           {/* Zoom + pan controls — bottom-left. Mirrors the 2.0 mockup. */}
           <ZoomControls />
           {/* Right-side AI Assistant rail — workspace health + next actions
@@ -1641,6 +1767,22 @@ function PinnedLayer({
 }): JSX.Element {
   const layerRef = useRef<HTMLDivElement | null>(null)
   const [bounds, setBounds] = useState({ width: 0, height: 0 })
+  // Subscribe to the AI rail's collapsed state so any change re-runs the
+  // pin-position memo. When the rail opens, BR/TR widgets glide left by
+  // AI_RAIL_WIDTH + gap; when it collapses to the small icon, they glide
+  // back. ChromeInsets is the single point where rail width + (later)
+  // dock height + zoom-controls inset get composed.
+  const railCollapsed = useAIRailCollapsed()
+  const insets: ChromeInsets = useMemo(
+    () => ({
+      top: 0,
+      right: railCollapsed ? AI_RAIL_BUTTON_SIZE + 8 : AI_RAIL_WIDTH + 12,
+      bottom: 0,
+      left: 0
+    }),
+    [railCollapsed]
+  )
+
   useEffect(() => {
     const el = layerRef.current
     if (!el) return
@@ -1649,18 +1791,14 @@ function PinnedLayer({
       if (r) setBounds({ width: r.width, height: r.height })
     })
     ro.observe(el)
-    // Prime with initial size — ResizeObserver fires async on first observe.
     const rect = el.getBoundingClientRect()
     setBounds({ width: rect.width, height: rect.height })
     return () => ro.disconnect()
   }, [])
 
-  // Compute zone-pin positions every render. Cheap — just iterates pinned
-  // widgets. Map identity matters for memo so use useMemo across deps that
-  // genuinely affect output.
   const zonePositions = useMemo(
-    () => computeZonePinPositions(widgets, bounds),
-    [widgets, bounds]
+    () => computeZonePinPositions(widgets, bounds, insets),
+    [widgets, bounds, insets]
   )
 
   return (

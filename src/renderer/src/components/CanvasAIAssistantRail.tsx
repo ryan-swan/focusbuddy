@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import type { ChatMessage, FbNode } from '@shared/types'
 import { useNodeStore } from '../stores/nodes'
 import Icon from './Icon'
+import { setAIRailCollapsed, useAIRailCollapsed } from '../lib/chromeState'
 
 interface Props {
   // Project context for the workspace health ring + suggestion targets.
@@ -21,7 +22,8 @@ interface Props {
 // eat 320px of canvas. State persists in localStorage so the user's
 // preference survives reloads.
 
-const LS_KEY = 'fb.ai-rail.collapsed'
+// (collapsed state moved to lib/chromeState — kept here as documentation
+// of the storage key for grep-friendliness: AI_RAIL_LS_KEY = 'fb.ai-rail.collapsed')
 
 interface HealthSummary {
   pct: number
@@ -38,11 +40,6 @@ interface Suggestion {
   id: string
   label: string
   prompt: string
-}
-
-function loadCollapsed(): boolean {
-  if (typeof localStorage === 'undefined') return false
-  return localStorage.getItem(LS_KEY) === '1'
 }
 
 function buildHealthSummary(
@@ -139,7 +136,12 @@ const STATIC_SUGGESTIONS: Suggestion[] = [
 ]
 
 export default function CanvasAIAssistantRail({ projectId }: Props): JSX.Element {
-  const [collapsed, setCollapsed] = useState(loadCollapsed)
+  // Collapsed state lives in lib/chromeState so the pinned-layer maths
+  // (which need to reserve right-edge inset when rail is open) and any
+  // other chrome-aware component subscribe to the same source of truth.
+  // Toggling here re-renders Canvas, which recomputes pin positions.
+  const collapsed = useAIRailCollapsed()
+  const setCollapsed = setAIRailCollapsed
   const [busy, setBusy] = useState<string | null>(null) // id of running suggestion
   const [error, setError] = useState<string | null>(null)
   const [response, setResponse] = useState<{ id: string; text: string } | null>(null)
@@ -149,12 +151,6 @@ export default function CanvasAIAssistantRail({ projectId }: Props): JSX.Element
   const ringRadius = 32
   const ringStroke = 6
   const ringC = 2 * Math.PI * ringRadius
-
-  useEffect(() => {
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem(LS_KEY, collapsed ? '1' : '0')
-    }
-  }, [collapsed])
 
   const health = useMemo(
     () => buildHealthSummary(nodes, projectId),

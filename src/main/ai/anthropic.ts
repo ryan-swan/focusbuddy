@@ -6,6 +6,7 @@ import { getRecentHistory } from '../db/browsing'
 import { getRecentActivity } from '../db/activity'
 import { markdownToTiptap } from './markdownToTiptap'
 import { resolveModel } from './modelRouting'
+import { resolveAnthropicKey } from '../settingsStore'
 import type {
   ActionProposal,
   ActivityEvent,
@@ -77,12 +78,24 @@ function sectionsToTiptap(
 // schema-violating inputs are dropped silently so a bad proposal never breaks
 // the chat reply.
 
-let client: Anthropic | null = null
+// Cached SDK client keyed by the API key it was built with. When the user
+// rotates the key from Settings we transparently swap to a fresh client on
+// the next call — no app restart, no stale auth header.
+let client: { key: string; instance: Anthropic } | null = null
+
 function getClient(): Anthropic | null {
-  const key = process.env.ANTHROPIC_API_KEY
+  const key = resolveAnthropicKey()
   if (!key) return null
-  if (!client) client = new Anthropic({ apiKey: key })
-  return client
+  if (!client || client.key !== key) {
+    client = { key, instance: new Anthropic({ apiKey: key }) }
+  }
+  return client.instance
+}
+
+/** Called by the IPC layer after a settings change so the next AI call
+ *  picks up the new key without restarting the app. */
+export function invalidateAnthropicClient(): void {
+  client = null
 }
 
 // Model IDs are now resolved per-call via `resolveModel(purpose)` in ./modelRouting.
@@ -481,7 +494,7 @@ export async function sendChat(req: ChatRequest): Promise<ChatResponse> {
       ok: false,
       needsApiKey: true,
       error:
-        'No ANTHROPIC_API_KEY found. Add it to projects/focusbuddy/.env (see .env.example) and restart the app.'
+        'No Anthropic API key set. Open Settings → AI → API keys and paste your key.'
     }
   }
   try {
@@ -500,6 +513,12 @@ export async function sendChat(req: ChatRequest): Promise<ChatResponse> {
       system,
       messages: msgs
     })
+    if ((resp.stop_reason as string) === 'refusal') {
+      return { ok: false, error: 'Claude declined this request. Try rephrasing or breaking it into smaller steps.' }
+    }
+    if ((resp.stop_reason as string) === 'model_context_window_exceeded') {
+      return { ok: false, error: 'Conversation hit the model context window. Start a fresh session.' }
+    }
     const text = resp.content
       .filter((b) => b.type === 'text')
       .map((b) => ('text' in b ? b.text : ''))
@@ -531,7 +550,7 @@ export async function sendChat(req: ChatRequest): Promise<ChatResponse> {
 
 export async function generateProactiveWelcome(taskId: string): Promise<ChatResponse> {
   const c = getClient()
-  if (!c) return { ok: false, needsApiKey: true, error: 'No ANTHROPIC_API_KEY' }
+  if (!c) return { ok: false, needsApiKey: true, error: 'No Anthropic API key set. Open Settings → AI · API keys to paste one.' }
   const node = getNode(taskId)
   if (!node || node.kind !== 'task') {
     return { ok: false, error: 'Task not found' }
@@ -552,6 +571,12 @@ export async function generateProactiveWelcome(taskId: string): Promise<ChatResp
       system,
       messages: [{ role: 'user', content: user }]
     })
+    if ((resp.stop_reason as string) === 'refusal') {
+      return { ok: false, error: 'Claude declined this request. Try rephrasing or breaking it into smaller steps.' }
+    }
+    if ((resp.stop_reason as string) === 'model_context_window_exceeded') {
+      return { ok: false, error: 'Conversation hit the model context window. Start a fresh session.' }
+    }
     const text = resp.content
       .filter((b) => b.type === 'text')
       .map((b) => ('text' in b ? b.text : ''))
@@ -592,7 +617,7 @@ function extractJson(text: string): string | null {
 
 export async function suggestSetupWidgets(taskId: string): Promise<SetupSuggestResponse> {
   const c = getClient()
-  if (!c) return { ok: false, needsApiKey: true, error: 'No ANTHROPIC_API_KEY' }
+  if (!c) return { ok: false, needsApiKey: true, error: 'No Anthropic API key set. Open Settings → AI · API keys to paste one.' }
   const node = getNode(taskId)
   if (!node || node.kind !== 'task') {
     return { ok: false, error: 'Task not found' }
@@ -665,6 +690,12 @@ Return the JSON now. 4–7 suggestions. Specific URLs where possible.`
       system,
       messages: [{ role: 'user', content: userMsg }]
     })
+    if ((resp.stop_reason as string) === 'refusal') {
+      return { ok: false, error: 'Claude declined this request. Try rephrasing or breaking it into smaller steps.' }
+    }
+    if ((resp.stop_reason as string) === 'model_context_window_exceeded') {
+      return { ok: false, error: 'Conversation hit the model context window. Start a fresh session.' }
+    }
     const text = resp.content
       .filter((b) => b.type === 'text')
       .map((b) => ('text' in b ? b.text : ''))
@@ -706,7 +737,7 @@ export async function generateResume(
   taskId: string
 ): Promise<{ ok: boolean; markdown?: string; error?: string; needsApiKey?: boolean }> {
   const c = getClient()
-  if (!c) return { ok: false, needsApiKey: true, error: 'No ANTHROPIC_API_KEY' }
+  if (!c) return { ok: false, needsApiKey: true, error: 'No Anthropic API key set. Open Settings → AI · API keys to paste one.' }
   const node = getNode(taskId)
   if (!node || node.kind !== 'task') {
     return { ok: false, error: 'Task not found' }
@@ -728,6 +759,12 @@ export async function generateResume(
       system,
       messages: [{ role: 'user', content: user }]
     })
+    if ((resp.stop_reason as string) === 'refusal') {
+      return { ok: false, error: 'Claude declined this request. Try rephrasing or breaking it into smaller steps.' }
+    }
+    if ((resp.stop_reason as string) === 'model_context_window_exceeded') {
+      return { ok: false, error: 'Conversation hit the model context window. Start a fresh session.' }
+    }
     const text = resp.content
       .filter((b) => b.type === 'text')
       .map((b) => ('text' in b ? b.text : ''))
@@ -750,7 +787,7 @@ export async function summarizeRecentTrail(
   sinceMs: number
 ): Promise<TrailSummaryResponse> {
   const c = getClient()
-  if (!c) return { ok: false, needsApiKey: true, error: 'No ANTHROPIC_API_KEY' }
+  if (!c) return { ok: false, needsApiKey: true, error: 'No Anthropic API key set. Open Settings → AI · API keys to paste one.' }
 
   const events = getRecentActivity({ taskId, sinceMs, limit: 120 })
   if (events.length === 0) {
@@ -785,6 +822,12 @@ export async function summarizeRecentTrail(
       system,
       messages: [{ role: 'user', content: user }]
     })
+    if ((resp.stop_reason as string) === 'refusal') {
+      return { ok: false, error: 'Claude declined this request. Try rephrasing or breaking it into smaller steps.' }
+    }
+    if ((resp.stop_reason as string) === 'model_context_window_exceeded') {
+      return { ok: false, error: 'Conversation hit the model context window. Start a fresh session.' }
+    }
     const text = resp.content
       .filter((b) => b.type === 'text')
       .map((b) => ('text' in b ? b.text : ''))
@@ -812,7 +855,7 @@ export async function generatePresenceNarration(
   recentMessages: string[]
 ): Promise<BodyDoubleResponse> {
   const c = getClient()
-  if (!c) return { ok: false, needsApiKey: true, error: 'No ANTHROPIC_API_KEY' }
+  if (!c) return { ok: false, needsApiKey: true, error: 'No Anthropic API key set. Open Settings → AI · API keys to paste one.' }
 
   const now = Date.now()
   const events = getRecentActivity({ taskId, sinceMs: now - 20 * 60 * 1000, limit: 30 })
@@ -866,6 +909,12 @@ export async function generatePresenceNarration(
       system,
       messages: [{ role: 'user', content: user }]
     })
+    if ((resp.stop_reason as string) === 'refusal') {
+      return { ok: false, error: 'Claude declined this request. Try rephrasing or breaking it into smaller steps.' }
+    }
+    if ((resp.stop_reason as string) === 'model_context_window_exceeded') {
+      return { ok: false, error: 'Conversation hit the model context window. Start a fresh session.' }
+    }
     const text = resp.content
       .filter((b) => b.type === 'text')
       .map((b) => ('text' in b ? b.text : ''))
@@ -889,7 +938,7 @@ export async function generatePresenceNarration(
  */
 export async function proposeSmartStacks(taskId: string): Promise<SmartStackResponse> {
   const c = getClient()
-  if (!c) return { ok: false, needsApiKey: true, error: 'No ANTHROPIC_API_KEY' }
+  if (!c) return { ok: false, needsApiKey: true, error: 'No Anthropic API key set. Open Settings → AI · API keys to paste one.' }
   const node = getNode(taskId)
   if (!node) return { ok: false, error: 'Task not found' }
 
@@ -947,6 +996,12 @@ export async function proposeSmartStacks(taskId: string): Promise<SmartStackResp
       system,
       messages: [{ role: 'user', content: user }]
     })
+    if ((resp.stop_reason as string) === 'refusal') {
+      return { ok: false, error: 'Claude declined this request. Try rephrasing or breaking it into smaller steps.' }
+    }
+    if ((resp.stop_reason as string) === 'model_context_window_exceeded') {
+      return { ok: false, error: 'Conversation hit the model context window. Start a fresh session.' }
+    }
     const text = resp.content
       .filter((b) => b.type === 'text')
       .map((b) => ('text' in b ? b.text : ''))
@@ -1006,7 +1061,7 @@ export async function buildFromPrompt(input: {
   taskId: string | null
 }): Promise<AiBuildResponse> {
   const c = getClient()
-  if (!c) return { ok: false, needsApiKey: true, error: 'No ANTHROPIC_API_KEY' }
+  if (!c) return { ok: false, needsApiKey: true, error: 'No Anthropic API key set. Open Settings → AI · API keys to paste one.' }
   const userPrompt = input.prompt.trim()
   if (!userPrompt) {
     return { ok: false, error: 'Empty prompt — describe what you want to build.' }
@@ -1105,6 +1160,12 @@ Return the JSON now.`
       system,
       messages: [{ role: 'user', content: userMsg }]
     })
+    if ((resp.stop_reason as string) === 'refusal') {
+      return { ok: false, error: 'Claude declined this request. Try rephrasing or breaking it into smaller steps.' }
+    }
+    if ((resp.stop_reason as string) === 'model_context_window_exceeded') {
+      return { ok: false, error: 'Conversation hit the model context window. Start a fresh session.' }
+    }
     const text = resp.content
       .filter((b) => b.type === 'text')
       .map((b) => ('text' in b ? b.text : ''))
@@ -1175,7 +1236,7 @@ export async function regenerateLivingPage(
   widgetId: string
 ): Promise<LivingPageRegenerateResponse> {
   const c = getClient()
-  if (!c) return { ok: false, needsApiKey: true, error: 'No ANTHROPIC_API_KEY' }
+  if (!c) return { ok: false, needsApiKey: true, error: 'No Anthropic API key set. Open Settings → AI · API keys to paste one.' }
 
   const w = getWidget(widgetId)
   if (!w) return { ok: false, error: 'Widget not found' }
@@ -1228,6 +1289,12 @@ export async function regenerateLivingPage(
       system,
       messages: [{ role: 'user', content: user }]
     })
+    if ((resp.stop_reason as string) === 'refusal') {
+      return { ok: false, error: 'Claude declined this request. Try rephrasing or breaking it into smaller steps.' }
+    }
+    if ((resp.stop_reason as string) === 'model_context_window_exceeded') {
+      return { ok: false, error: 'Conversation hit the model context window. Start a fresh session.' }
+    }
     const text = resp.content
       .filter((b) => b.type === 'text')
       .map((b) => ('text' in b ? b.text : ''))
@@ -1270,7 +1337,7 @@ export async function suggestPageContent(
   prompt: string
 ): Promise<PageContentSuggestion> {
   const c = getClient()
-  if (!c) return { ok: false, needsApiKey: true, error: 'No ANTHROPIC_API_KEY' }
+  if (!c) return { ok: false, needsApiKey: true, error: 'No Anthropic API key set. Open Settings → AI · API keys to paste one.' }
   const trimmed = prompt.trim()
   if (!trimmed) return { ok: false, error: 'Prompt is empty.' }
 
@@ -1293,6 +1360,12 @@ export async function suggestPageContent(
       system,
       messages: [{ role: 'user', content: trimmed }]
     })
+    if ((resp.stop_reason as string) === 'refusal') {
+      return { ok: false, error: 'Claude declined this request. Try rephrasing or breaking it into smaller steps.' }
+    }
+    if ((resp.stop_reason as string) === 'model_context_window_exceeded') {
+      return { ok: false, error: 'Conversation hit the model context window. Start a fresh session.' }
+    }
     const text = resp.content
       .filter((b) => b.type === 'text')
       .map((b) => ('text' in b ? b.text : ''))
@@ -1341,7 +1414,7 @@ export async function suggestTableRows(
   count: number
 ): Promise<TableRowsSuggestion> {
   const c = getClient()
-  if (!c) return { ok: false, needsApiKey: true, error: 'No ANTHROPIC_API_KEY' }
+  if (!c) return { ok: false, needsApiKey: true, error: 'No Anthropic API key set. Open Settings → AI · API keys to paste one.' }
   const trimmed = prompt.trim()
   if (!trimmed) return { ok: false, error: 'Prompt is empty.' }
   const table = getTable(tableId)
@@ -1418,6 +1491,12 @@ export async function suggestTableRows(
       system,
       messages: [{ role: 'user', content: user }]
     })
+    if ((resp.stop_reason as string) === 'refusal') {
+      return { ok: false, error: 'Claude declined this request. Try rephrasing or breaking it into smaller steps.' }
+    }
+    if ((resp.stop_reason as string) === 'model_context_window_exceeded') {
+      return { ok: false, error: 'Conversation hit the model context window. Start a fresh session.' }
+    }
     const text = resp.content
       .filter((b) => b.type === 'text')
       .map((b) => ('text' in b ? b.text : ''))

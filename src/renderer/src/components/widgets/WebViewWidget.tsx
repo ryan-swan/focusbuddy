@@ -8,6 +8,7 @@ import { catalogFor } from '../../lib/widgetCatalog'
 import { registerWebview, unregisterWebviewByWidgetId } from '../../lib/webviewRegistry'
 import { autofillWebview } from '../../lib/vaultAutofill'
 import Icon from '../Icon'
+import ConnectedToolMenu from '../ConnectedToolMenu'
 
 function hostnameOf(url: string): string {
   try {
@@ -60,6 +61,11 @@ export default function WebViewWidget({ widget, inline = false }: Props): JSX.El
   // (call loadURL) on Enter or blur, so transient typing doesn't navigate.
   const [urlDraft, setUrlDraft] = useState('')
   const [urlEditing, setUrlEditing] = useState(false)
+  // Right-click on the widget frame (NOT the inner webview — webviews
+  // own their own context menu). Captures clicks on the chrome / URL
+  // bar area; we ALWAYS suppress the chrome's native menu so the
+  // create-and-connect entry is reachable.
+  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; cellText?: string } | null>(null)
   // Live preview shown in the header — tracks the CURRENT page while navigating.
   const [livePreview, setLivePreview] = useState<{ url: string; title: string } | null>(null)
   // Last URL we persisted into widget.content — avoids redundant DB writes on rapid navs
@@ -459,7 +465,25 @@ export default function WebViewWidget({ widget, inline = false }: Props): JSX.El
   }
 
   const body = (
-    <div className="h-full w-full bg-white relative flex flex-col">
+    <div
+      className="h-full w-full bg-white relative flex flex-col"
+      onContextMenu={(e) => {
+        // The <webview> element owns its inner context menu via
+        // shell-level webContents; we only act on right-clicks landing
+        // on the chrome / URL bar / loading overlay (everything OUTSIDE
+        // the webview). Detect by checking whether the target is
+        // inside the webview element.
+        const t = e.target as HTMLElement
+        if (t.closest && t.closest('webview')) return
+        if (e.shiftKey) return
+        e.preventDefault()
+        // For webview widgets, the most useful seed is the URL — passes
+        // through as content for sticky/note/markdown so the user has
+        // the URL handy in the new tool too.
+        const seed = widget.content || ''
+        setCtxMenu({ x: e.clientX, y: e.clientY, cellText: seed })
+      }}
+    >
       {editing ? (
         <form
           onSubmit={(e) => {
@@ -616,6 +640,15 @@ export default function WebViewWidget({ widget, inline = false }: Props): JSX.El
           )}
           </div>
         </>
+      )}
+      {ctxMenu && (
+        <ConnectedToolMenu
+          sourceWidgetId={widget.id}
+          x={ctxMenu.x}
+          y={ctxMenu.y}
+          selectionContext={{ selectionText: ctxMenu.cellText }}
+          onClose={() => setCtxMenu(null)}
+        />
       )}
     </div>
   )

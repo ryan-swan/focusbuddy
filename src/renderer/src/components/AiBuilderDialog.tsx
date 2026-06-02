@@ -204,8 +204,7 @@ export default function AiBuilderDialog({ taskId, onClose, onAccept }: Props): J
               </p>
               {state.needsApiKey && (
                 <p className="text-[11px] text-stone-500 dark:text-stone-400 max-w-md">
-                  Add <code className="font-mono">ANTHROPIC_API_KEY</code> to your
-                  .env file and restart FocusBuddy.
+                  Open <strong>Settings → AI · API keys</strong> and paste your Anthropic API key. No restart needed.
                 </p>
               )}
             </div>

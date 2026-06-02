@@ -10,6 +10,7 @@ import type { Widget } from '@shared/types'
 import WidgetFrame from './WidgetFrame'
 import { useWidgetStore } from '../../stores/widgets'
 import Icon from '../Icon'
+import ConnectedToolMenu from '../ConnectedToolMenu'
 
 function formatAge(ts: number | null): string {
   if (!ts) return 'never'
@@ -36,6 +37,7 @@ interface Props {
 // on each transaction (debounced lightly) so the page survives reloads.
 export default function PageWidget({ widget, inline = false }: Props): JSX.Element {
   const update = useWidgetStore((s) => s.update)
+  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; selectionText?: string } | null>(null)
   const [slashOpen, setSlashOpen] = useState(false)
   const [slashPos, setSlashPos] = useState<{ top: number; left: number } | null>(null)
   const [aiOpen, setAiOpen] = useState(false)
@@ -337,9 +339,26 @@ export default function PageWidget({ widget, inline = false }: Props): JSX.Eleme
           — they're hand-defined in globals.css. We don't have Tailwind's
           @tailwindcss/typography plugin installed, so `prose` classes would
           render as bare text (which is why this used to be blank). */}
-      <div className={`md-rendered tiptap-editor px-5 py-4 text-stone-900 dark:text-stone-100 min-h-[140px] flex-1 text-[14px] leading-relaxed ${isLiving ? 'select-text' : ''}`}>
+      <div
+        className={`md-rendered tiptap-editor px-5 py-4 text-stone-900 dark:text-stone-100 min-h-[140px] flex-1 text-[14px] leading-relaxed ${isLiving ? 'select-text' : ''}`}
+        onContextMenu={(e) => {
+          if (e.shiftKey) return
+          e.preventDefault()
+          const sel = window.getSelection()?.toString() ?? ''
+          setCtxMenu({ x: e.clientX, y: e.clientY, selectionText: sel })
+        }}
+      >
         <EditorContent editor={editor} />
       </div>
+      {ctxMenu && (
+        <ConnectedToolMenu
+          sourceWidgetId={widget.id}
+          x={ctxMenu.x}
+          y={ctxMenu.y}
+          selectionContext={{ selectionText: ctxMenu.selectionText }}
+          onClose={() => setCtxMenu(null)}
+        />
+      )}
 
       {slashOpen && slashPos && (
         <div

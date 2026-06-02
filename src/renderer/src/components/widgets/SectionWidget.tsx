@@ -544,6 +544,8 @@ function CompactChildView({ child, cell, layout, color, onOpen, onEject }: Compa
   if (layout === 'list') {
     return (
       <div
+        data-widget-id={child.id}
+        data-widget-kind={child.kind}
         style={{
           position: 'absolute',
           left: cell.x,
@@ -582,6 +584,8 @@ function CompactChildView({ child, cell, layout, color, onOpen, onEject }: Compa
   // icons mode — use the computed cell so section frame and child positions always agree
   return (
     <div
+      data-widget-id={child.id}
+      data-widget-kind={child.kind}
       style={{
         position: 'absolute',
         left: cell.x,

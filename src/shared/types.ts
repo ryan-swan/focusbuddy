@@ -36,6 +36,31 @@ export type WidgetKind =
   // macros, app launching, media keys, and volume control. Configuration
   // (buttons, folders, action payloads) lives in widget.content as JSON.
   | 'streamdeck'
+  // Canvas minimap — bottom-right overview rectangle with widget silhouettes
+  // and a draggable viewport rect. Auto-created on every new task pinned to
+  // BR, but it's a regular widget the user can resize, unpin, drag to the
+  // canvas, delete, or re-add via the widget picker like anything else.
+  | 'minimap'
+  // Voice / video recorder — captures audio (and later webcam video) via
+  // MediaRecorder, persists the blob through the files store, and runs
+  // it through Whisper (OpenAI) for transcription, then Anthropic for
+  // optional cleanup or summary. The widget owns the Record/Stop UI and
+  // the post-record three-way mode picker (Full / Cleaned / Summary). A
+  // separate post-processing modal surfaces extracted ActionProposals
+  // (new tasks, new widgets, etc.) for one-click apply.
+  | 'voice-recorder'
+  // AI mind mapper — root-of-thought node tree. Each node has a label
+  // and an optional kind classifier (idea / task / question / tool /
+  // agent). Clicking a node fires Claude with the full root-path
+  // context and generates 3-5 child branches. A side panel shows
+  // suggested Agent OS agents that could execute on the node's topic,
+  // sourced from .claude/agents/*.md and ranked by Claude.
+  //
+  // PHASE_2: embedded mini-widgets per node (tables, fields, searches)
+  // PHASE_2: agent-creation wizard for "no matching agent" flow
+  // PHASE_3: autonomous agent execution on the canvas via a runtime
+  //   that watches state changes + proposes actions with kill switches
+  | 'mindmap'
 
 export type ContextMenuAction =
   | 'createStickyFromSelection'
@@ -172,6 +197,12 @@ export interface WidgetDraft {
   color?: string | null
   sourceAppId?: string | null
   mode?: 'launcher' | 'mirror' | null
+  // Pin a widget to a screen zone at creation time. Used by the minimap
+  // auto-create flow (and any future "always-on" widget that should
+  // dock to a corner from the moment it spawns). Defaults are unpinned
+  // free-positioned via x/y.
+  pinned?: boolean
+  pinnedZone?: PinZone | null
 }
 
 export interface WidgetPatch {

@@ -254,8 +254,7 @@ export default function SmartStackModal({ onClose }: Props): JSX.Element {
               <p className="text-sm text-stone-800 dark:text-stone-200">{state.message}</p>
               {state.needsApiKey && (
                 <p className="text-[12px] text-stone-500 dark:text-stone-400">
-                  Add <code className="bg-stone-100 dark:bg-stone-800 px-1 py-0.5 rounded">ANTHROPIC_API_KEY</code> to
-                  your .env and restart.
+                  Open <strong>Settings → AI · API keys</strong> to paste your Anthropic key.
                 </p>
               )}
             </div>

@@ -9,6 +9,8 @@ import { decidePopup } from './popupRouter'
 import { getFile } from './db/files'
 import { installFocusTracker } from './streamdeckActions'
 import { installActivityTracker } from './activityTracker'
+import { registerHaptyxAuthProtocol } from './authProtocol'
+import { installAutoUpdater } from './autoUpdate'
 import type { ContextMenuAction } from '@shared/types'
 
 loadEnv({ path: join(app.getAppPath(), '.env') })
@@ -61,6 +63,11 @@ protocol.registerSchemesAsPrivileged([
 
 const isDev = !app.isPackaged
 
+// Register haptyx:// before whenReady so the OS knows we own the
+// protocol scheme. Also handles second-instance / open-url events for
+// the web→desktop auth handoff. See authProtocol.ts.
+registerHaptyxAuthProtocol()
+
 function createCommandCenter(): BrowserWindow {
   // The window stays opaque. Live-mirror widgets render desktopCapturer
   // screenshots in the canvas (cheap, no recording indicator at rest); the
@@ -73,7 +80,7 @@ function createCommandCenter(): BrowserWindow {
     height: 900,
     minWidth: 1100,
     minHeight: 680,
-    title: 'FocusBuddy',
+    title: 'Haptyx',
     backgroundColor: '#fbf7ee',
     show: false,
     autoHideMenuBar: true,
@@ -242,6 +249,9 @@ app.whenReady().then(() => {
   // propose macros. Off by default; the user opts in from the Stream
   // Deck widget.
   installActivityTracker()
+  // Auto-updater — polls GitHub Releases on boot + every 4h, broadcasts
+  // state via the `update:state` IPC event. No-op in dev builds.
+  installAutoUpdater()
 
   // Wire `fb-file://<id>` → file on disk. Uses Electron's modern `protocol.handle`
   // which supports Range requests transparently (critical for streaming

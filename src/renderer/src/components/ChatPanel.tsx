@@ -50,7 +50,7 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
     if (hasApiKey === false) {
       pushAssistantMessage(
         activeTaskId,
-        'Add an ANTHROPIC_API_KEY to .env to use the "What was I doing?" feature.'
+        'Open Settings → AI · API keys and paste your Anthropic API key to use "What was I doing?".'
       )
       return
     }
@@ -235,10 +235,9 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
         <div className="m-3 p-3 rounded-md bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/50 text-xs text-stone-800 dark:text-stone-200 leading-relaxed flex gap-2">
           <Icon name="key" size={16} className="text-amber-700 dark:text-amber-400 mt-0.5" />
           <div>
-            <strong className="text-stone-900 dark:text-stone-100">No API key yet.</strong> Add{' '}
-            <code className="bg-white dark:bg-stone-800 px-1 py-0.5 rounded">ANTHROPIC_API_KEY</code> to{' '}
-            <code className="bg-white dark:bg-stone-800 px-1 py-0.5 rounded">projects/focusbuddy/.env</code> and
-            restart.
+            <strong className="text-stone-900 dark:text-stone-100">No API key yet.</strong> Open{' '}
+            <strong>Settings → AI · API keys</strong> and paste your Anthropic API key.
+            It's encrypted with your system keychain and only this Mac can read it.
           </div>
         </div>
       )}
@@ -373,16 +372,66 @@ function ProposalCards({
 
   // resolvedIds threads newly-created entity ids (today: tables) through a
   // batch so a follow-up proposal (today: add-table-row) can reference what
-  // an earlier one created via "$<proposalId>" symbolic refs. The map is
-  // scoped to the lifetime of a single applyAll() loop so a later batch
-  // doesn't accidentally pick up stale resolutions.
+  // an earlier one created via "$<proposalId>" symbolic refs. Held in a ref
+  // so a per-card click survives outside of a single applyAll() loop —
+  // without this, clicking Apply on an add-table-row card after manually
+  // applying its parent create-table card would still fail because the
+  // resolution map was local to applyAll's stack frame.
+  const batchResolvedIds = useRef<Map<string, string>>(new Map())
+
+  // Detect "I depend on a proposal that hasn't been applied yet" cases.
+  // When the user clicks Apply on a single dependent card (e.g. an
+  // add-table-row pointing at $tbl-1), we look up the parent in the
+  // current proposals array and run it first, threading the resolved id
+  // into the batch map so the child's apply succeeds. Today only
+  // add-table-row → create-table exists; the helper is structured so
+  // new dependent kinds slot in by adding a case to the switch.
+  async function ensureDependencies(
+    p: ActionProposal,
+    resolvedIds: Map<string, string>
+  ): Promise<{ ok: true } | { ok: false; message: string }> {
+    if (p.kind === 'add-table-row' && p.tableId.startsWith('$')) {
+      const refKey = p.tableId.slice(1)
+      if (resolvedIds.has(refKey)) return { ok: true }
+      const parent = proposals.find(
+        (x) => x.id === refKey && x.kind === 'create-table'
+      )
+      if (!parent) {
+        return {
+          ok: false,
+          message:
+            'Row references a table that was never proposed alongside it — try regenerating the request.'
+        }
+      }
+      const parentResult = await applyProposal(parent, { activeTaskId, resolvedIds })
+      if (!parentResult.ok) {
+        return {
+          ok: false,
+          message: `Couldn't auto-create parent table: ${parentResult.message}`
+        }
+      }
+      // Parent landed — drop it from the visible list too so the user
+      // doesn't see a duplicate "create table" card sitting around.
+      onConsume(parent.id)
+    }
+    return { ok: true }
+  }
+
   async function applyOne(
     p: ActionProposal,
     resolvedIds?: Map<string, string>
   ): Promise<void> {
     if (busy) return
+    const ids = resolvedIds ?? batchResolvedIds.current
     setBusy(p.id)
-    const result = await applyProposal(p, { activeTaskId, resolvedIds })
+    const dep = await ensureDependencies(p, ids)
+    if (!dep.ok) {
+      setBusy(null)
+      setToast({ id: p.id, ok: false, message: dep.message })
+      setTimeout(() => setToast((t) => (t?.id === p.id ? null : t)), 2800)
+      return
+    }
+    const result = await applyProposal(p, { activeTaskId, resolvedIds: ids })
     setBusy(null)
     setToast({ id: p.id, ok: result.ok, message: result.message })
     // Only remove from the list if it succeeded. Failures stay so the user
@@ -394,7 +443,7 @@ function ProposalCards({
 
   async function applyAll(): Promise<void> {
     if (busy) return
-    const resolvedIds = new Map<string, string>()
+    const resolvedIds = batchResolvedIds.current
     for (const p of proposals) {
       // Sequential so error messages from one don't get clobbered by the
       // next, AND so symbolic-id refs resolve in order (create-table must

@@ -293,6 +293,57 @@ export function getDb(): Database.Database {
   ensureColumn(db, 'connected_apps', 'app_path', 'TEXT')
   ensureColumn(db, 'connected_apps', 'bundle_id', 'TEXT')
   ensureColumn(db, 'connected_apps', 'icon_png_base64', 'TEXT')
+  // Agent invocation history + outcomes. Drives Phase 2 polish:
+  // per-agent applied/refused stats, invocation log, "undo last
+  // apply". One row per invocation; one row per outcome event
+  // (proposal applied / dismissed / undone). Outcomes reference
+  // invocations by id; deleting an invocation cascades.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS agent_invocations (
+      id TEXT PRIMARY KEY,
+      agent_slug TEXT NOT NULL,
+      agent_name TEXT NOT NULL,
+      node_id TEXT,
+      node_label TEXT NOT NULL DEFAULT '',
+      root_path TEXT NOT NULL DEFAULT '[]',
+      reply TEXT NOT NULL DEFAULT '',
+      proposals TEXT NOT NULL DEFAULT '[]',
+      conversation_turn INTEGER NOT NULL DEFAULT 1,
+      conversation_key TEXT NOT NULL DEFAULT '',
+      invoked_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_agent_invocations_slug
+      ON agent_invocations (agent_slug);
+    CREATE INDEX IF NOT EXISTS idx_agent_invocations_node
+      ON agent_invocations (node_id);
+    CREATE INDEX IF NOT EXISTS idx_agent_invocations_conv
+      ON agent_invocations (conversation_key);
+    CREATE INDEX IF NOT EXISTS idx_agent_invocations_invoked_at
+      ON agent_invocations (invoked_at DESC);
+
+    CREATE TABLE IF NOT EXISTS agent_outcomes (
+      id TEXT PRIMARY KEY,
+      invocation_id TEXT NOT NULL
+        REFERENCES agent_invocations(id) ON DELETE CASCADE,
+      agent_slug TEXT NOT NULL,
+      proposal_id TEXT NOT NULL,
+      proposal_kind TEXT NOT NULL,
+      action TEXT NOT NULL CHECK (action IN ('applied', 'dismissed', 'undone')),
+      -- Pointer to the entity created by an applied proposal so undo
+      -- knows what to delete. Format: "<kind>:<id>" e.g. "task:abc",
+      -- "widget:xyz". Null for dismissed/undone outcomes.
+      created_entity_ref TEXT,
+      at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_agent_outcomes_inv
+      ON agent_outcomes (invocation_id);
+    CREATE INDEX IF NOT EXISTS idx_agent_outcomes_slug
+      ON agent_outcomes (agent_slug);
+    CREATE INDEX IF NOT EXISTS idx_agent_outcomes_action
+      ON agent_outcomes (action);
+    CREATE INDEX IF NOT EXISTS idx_agent_outcomes_at
+      ON agent_outcomes (at DESC);
+  `)
   return db
 }
 
