@@ -518,6 +518,48 @@ const api = {
     ): Promise<{ ok: boolean; error?: string }> =>
       ipcRenderer.invoke('voice:setProvider', p)
   },
+  // Voice command — floating mic interpreter. Takes a transcript plus a
+  // pruned canvas snapshot and returns ActionProposal[] for the user to
+  // review. Same Apply/Dismiss UX as the existing AI assistants.
+  voiceCommand: {
+    run: (input: {
+      transcript: string
+      activeTaskId: string | null
+      selectedWidgetId: string | null
+      widgets: Array<{
+        id: string
+        kind: string
+        title: string
+        contentPreview: string
+        selected?: boolean
+        recentlyTouched?: boolean
+        visible?: boolean
+      }>
+    }): Promise<
+      | { ok: true; reply: string; proposals: ActionProposal[] }
+      | {
+          ok: false
+          error: string
+          reason?: 'no_key' | 'empty_transcript' | 'no_proposals' | 'api' | 'parse'
+        }
+    > => ipcRenderer.invoke('voiceCommand:run', input),
+    getPrefs: (): Promise<{
+      commandMode: 'press-hold' | 'click-toggle'
+      autoStopSilenceMs: number
+      voiceback: boolean
+    }> => ipcRenderer.invoke('voiceCommand:getPrefs'),
+    setPrefs: (
+      patch: Partial<{
+        commandMode: 'press-hold' | 'click-toggle'
+        autoStopSilenceMs: number
+        voiceback: boolean
+      }>
+    ): Promise<{
+      commandMode: 'press-hold' | 'click-toggle'
+      autoStopSilenceMs: number
+      voiceback: boolean
+    }> => ipcRenderer.invoke('voiceCommand:setPrefs', patch)
+  },
   // Phase 2A — agent creation wizard. Writes a brand-new agent .md
   // file to .claude/agents/ with a Claude-generated body following
   // the kit's conventions. Phase 2C — single-turn agent invocation

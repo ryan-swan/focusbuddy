@@ -101,6 +101,12 @@ import {
 } from '../ai/voiceNote'
 import { preloadLocalWhisper } from '../ai/localWhisper'
 import {
+  runVoiceCommand,
+  type CanvasSnapshotWidget,
+  type VoiceCommandInput
+} from '../ai/voiceCommand'
+import { getVoiceCommandPrefs, setVoiceCommandPrefs } from '../voiceCommandPref'
+import {
   expandMindMapNode,
   listAvailableAgents,
   suggestAgentsForNode,
@@ -761,6 +767,27 @@ export function registerIpcHandlers(): void {
     }
     return { ok: true }
   })
+
+  // Voice command — floating mic interpreter. Sonnet receives the
+  // transcript + a pruned canvas snapshot and returns ActionProposals.
+  ipcMain.handle(
+    'voiceCommand:run',
+    (
+      _e,
+      input: {
+        transcript: string
+        activeTaskId: string | null
+        selectedWidgetId: string | null
+        widgets: CanvasSnapshotWidget[]
+      }
+    ) => runVoiceCommand(input as VoiceCommandInput)
+  )
+  ipcMain.handle('voiceCommand:getPrefs', () => getVoiceCommandPrefs())
+  ipcMain.handle(
+    'voiceCommand:setPrefs',
+    (_e, patch: Parameters<typeof setVoiceCommandPrefs>[0]) =>
+      setVoiceCommandPrefs(patch)
+  )
 
   // ── Tables (Notion/Airtable-style databases) ──────────────────────────────
   ipcMain.handle('tables:list', () => listTables())

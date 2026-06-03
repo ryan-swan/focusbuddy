@@ -1,0 +1,665 @@
+import { useCallback, useEffect, useRef, useState } from 'react'
+import Icon from './Icon'
+import { applyProposal, describeProposal } from '../lib/actionExecutor'
+import { buildCanvasSnapshot } from '../lib/canvasSnapshot'
+import { useViewStore } from '../stores/view'
+import type { ActionProposal } from '@shared/types'
+
+// VoiceCommandFAB — the always-available floating mic for voice control
+// of the canvas. Spec:
+//   - Bottom-middle, fixed, chrome-aware (sits above the CommandCenter
+//     pill, both centered)
+//   - Two trigger modes (user preference in Settings → Voice):
+//       press-hold   : record while held, submit on release
+//       click-toggle : click to start, auto-stop after N ms of silence
+//   - Live captions overlay while listening
+//   - On stop: transcript stages for correction → user clicks Send
+//   - AI returns ActionProposal[] → cards stack near the FAB with the
+//     usual Apply / Dismiss UX
+//   - Optional spoken voice-back when proposals return
+//
+// We deliberately reuse the existing Whisper pipeline (window.api.voiceNote)
+// rather than introducing a parallel one. The mic is wired via MediaRecorder
+// with audio-only constraints (no video for the FAB — it's not a recorder).
+
+type Phase =
+  | 'idle'
+  | 'listening'
+  | 'staged' // transcript ready for review/edit, not sent yet
+  | 'sending' // hit Anthropic
+  | 'result' // proposals dock visible
+
+interface Proposal extends ActionProposal {
+  // status tracked locally so we can mark a card consumed without
+  // mutating the AI's payload.
+  _status?: 'pending' | 'applied' | 'dismissed' | 'failed'
+  _message?: string
+}
+
+interface VoicePrefs {
+  commandMode: 'press-hold' | 'click-toggle'
+  autoStopSilenceMs: number
+  voiceback: boolean
+}
+
+const DEFAULT_PREFS: VoicePrefs = {
+  commandMode: 'press-hold',
+  autoStopSilenceMs: 5000,
+  voiceback: true
+}
+
+function activeTaskId(): string | null {
+  const v = useViewStore.getState().view
+  return v.kind === 'task' ? v.taskId : null
+}
+
+interface SpeechRecognitionLike {
+  continuous: boolean
+  interimResults: boolean
+  lang: string
+  start(): void
+  stop(): void
+  onresult: (e: { resultIndex: number; results: { isFinal: boolean; 0: { transcript: string } }[] & { length: number } }) => void
+  onerror: () => void
+}
+
+type SpeechRecognitionCtor = new () => SpeechRecognitionLike
+
+export default function VoiceCommandFAB(): JSX.Element {
+  const [prefs, setPrefs] = useState<VoicePrefs>(DEFAULT_PREFS)
+  const [phase, setPhase] = useState<Phase>('idle')
+  const [liveCaption, setLiveCaption] = useState<string>('')
+  const [transcript, setTranscript] = useState<string>('')
+  const [editedTranscript, setEditedTranscript] = useState<string>('')
+  const [reply, setReply] = useState<string>('')
+  const [error, setError] = useState<string | null>(null)
+  const [proposals, setProposals] = useState<Proposal[]>([])
+  const [hovering, setHovering] = useState<boolean>(false)
+
+  const recorderRef = useRef<MediaRecorder | null>(null)
+  const chunksRef = useRef<Blob[]>([])
+  const streamRef = useRef<MediaStream | null>(null)
+  const recognitionRef = useRef<SpeechRecognitionLike | null>(null)
+  const silenceTimerRef = useRef<number | null>(null)
+  const interimAtRef = useRef<number>(0) // last time we saw interim or final speech
+  const pressHoldArmedRef = useRef<boolean>(false)
+
+  // Load persisted prefs.
+  useEffect(() => {
+    void (async () => {
+      try {
+        const p = await window.api.voiceCommand.getPrefs()
+        setPrefs(p)
+      } catch {
+        // Fall back to defaults — IPC may not be ready yet on first paint.
+      }
+    })()
+  }, [])
+
+  const stopCaptureStream = useCallback((): void => {
+    if (recorderRef.current && recorderRef.current.state !== 'inactive') {
+      try {
+        recorderRef.current.stop()
+      } catch {
+        // already stopped
+      }
+    }
+    streamRef.current?.getTracks().forEach((t) => t.stop())
+    streamRef.current = null
+    recorderRef.current = null
+  }, [])
+
+  const stopLiveCaptions = useCallback((): void => {
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.stop()
+      } catch {
+        // ignore
+      }
+      recognitionRef.current = null
+    }
+  }, [])
+
+  const clearSilenceTimer = useCallback((): void => {
+    if (silenceTimerRef.current !== null) {
+      window.clearTimeout(silenceTimerRef.current)
+      silenceTimerRef.current = null
+    }
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      stopCaptureStream()
+      stopLiveCaptions()
+      clearSilenceTimer()
+    }
+  }, [stopCaptureStream, stopLiveCaptions, clearSilenceTimer])
+
+  // ── Live captions via Web Speech API (Chromium-only, works in Electron)
+  const startLiveCaptions = useCallback((): void => {
+    const SR: SpeechRecognitionCtor | undefined =
+      (window as unknown as { webkitSpeechRecognition?: SpeechRecognitionCtor })
+        .webkitSpeechRecognition ||
+      (window as unknown as { SpeechRecognition?: SpeechRecognitionCtor }).SpeechRecognition
+    if (!SR) return
+    try {
+      const rec = new SR()
+      rec.continuous = true
+      rec.interimResults = true
+      rec.lang = navigator.language || 'en-US'
+      let finalText = ''
+      rec.onresult = (event): void => {
+        let interim = ''
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const r = event.results[i]
+          if (r.isFinal) finalText += r[0].transcript + ' '
+          else interim += r[0].transcript
+        }
+        interimAtRef.current = Date.now()
+        setLiveCaption((finalText + ' ' + interim).trim())
+      }
+      rec.onerror = (): void => {
+        // Captions are non-essential — Whisper provides the authoritative
+        // transcript on stop. Swallow.
+      }
+      rec.start()
+      recognitionRef.current = rec
+    } catch {
+      // unsupported on this build
+    }
+  }, [])
+
+  // ── Begin / end capture
+  const beginCapture = useCallback(async (): Promise<void> => {
+    setError(null)
+    setLiveCaption('')
+    setTranscript('')
+    setEditedTranscript('')
+    setReply('')
+    setProposals([])
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false })
+      streamRef.current = stream
+      chunksRef.current = []
+      const mr = new MediaRecorder(stream)
+      mr.ondataavailable = (e): void => {
+        if (e.data.size > 0) chunksRef.current.push(e.data)
+      }
+      mr.start(250)
+      recorderRef.current = mr
+      interimAtRef.current = Date.now()
+      setPhase('listening')
+      startLiveCaptions()
+      // Click-toggle mode: arm the silence watchdog.
+      if (prefs.commandMode === 'click-toggle') {
+        const tick = (): void => {
+          if (recorderRef.current?.state !== 'recording') return
+          const sinceSpeech = Date.now() - interimAtRef.current
+          if (sinceSpeech >= prefs.autoStopSilenceMs) {
+            void stopCapture(true) // auto-stop
+            return
+          }
+          silenceTimerRef.current = window.setTimeout(tick, 400)
+        }
+        silenceTimerRef.current = window.setTimeout(tick, 400)
+      }
+    } catch (err) {
+      setError((err as Error).message || 'Microphone unavailable.')
+      setPhase('idle')
+    }
+  }, [prefs.commandMode, prefs.autoStopSilenceMs, startLiveCaptions])
+
+  const stopCapture = useCallback(
+    async (auto: boolean): Promise<void> => {
+      clearSilenceTimer()
+      stopLiveCaptions()
+      const rec = recorderRef.current
+      if (!rec) return
+      // Wait for the final dataavailable to land before we package.
+      await new Promise<void>((resolve) => {
+        const t = window.setTimeout(resolve, 600) // hard cap
+        rec.onstop = (): void => {
+          window.clearTimeout(t)
+          resolve()
+        }
+        try {
+          if (rec.state !== 'inactive') rec.stop()
+        } catch {
+          // already stopped
+          resolve()
+        }
+      })
+      streamRef.current?.getTracks().forEach((t) => t.stop())
+      streamRef.current = null
+      recorderRef.current = null
+
+      const captionText = liveCaption.trim()
+      if (chunksRef.current.length === 0 && !captionText) {
+        setError('No audio captured.')
+        setPhase('idle')
+        return
+      }
+      const blob = new Blob(chunksRef.current, { type: 'audio/webm' })
+      setPhase('staged')
+      // Kick off Whisper transcription — when it returns, prefer the
+      // Whisper output over the live caption (more accurate).
+      const buf = await blob.arrayBuffer()
+      try {
+        const provider = await window.api.voiceNote.getProvider()
+        let res
+        if (provider === 'local') {
+          // Decode in renderer for local Whisper path.
+          const samples = await decodeToMono16k(buf)
+          res = await window.api.voiceNote.transcribe({ samples, sampleRate: 16000 })
+        } else {
+          res = await window.api.voiceNote.transcribe({ buffer: buf, mimeType: 'audio/webm' })
+        }
+        if (res.ok) {
+          const final = res.transcript.trim() || captionText
+          setTranscript(final)
+          setEditedTranscript(final)
+        } else {
+          // Whisper failed — fall back to the live caption text. Better
+          // a slightly-wrong transcript the user can edit than nothing.
+          setTranscript(captionText)
+          setEditedTranscript(captionText)
+          if (!captionText) {
+            setError(res.error)
+            setPhase('idle')
+            return
+          }
+        }
+      } catch (err) {
+        setTranscript(captionText)
+        setEditedTranscript(captionText)
+        if (!captionText) {
+          setError((err as Error).message || 'Transcription failed.')
+          setPhase('idle')
+          return
+        }
+      }
+      // In click-toggle auto-stop, immediately send. In press-hold OR
+      // manual click-stop, stay in 'staged' so the user can edit.
+      if (auto && prefs.commandMode === 'click-toggle') {
+        // Use the edited transcript value via a setter-driven dispatch.
+        setTimeout(() => {
+          void sendToAi()
+        }, 100)
+      }
+    },
+    [
+      clearSilenceTimer,
+      liveCaption,
+      prefs.commandMode,
+      stopLiveCaptions
+      // sendToAi forward declared — referenced via closure on next render
+    ]
+  )
+
+  const sendToAi = useCallback(async (): Promise<void> => {
+    const text = (editedTranscript || transcript).trim()
+    if (!text) return
+    setPhase('sending')
+    setError(null)
+    try {
+      const snapshot = buildCanvasSnapshot(activeTaskId())
+      const res = await window.api.voiceCommand.run({
+        transcript: text,
+        activeTaskId: snapshot.activeTaskId,
+        selectedWidgetId: snapshot.selectedWidgetId,
+        widgets: snapshot.widgets.map((w) => ({
+          id: w.id,
+          kind: w.kind,
+          title: w.title,
+          contentPreview: w.contentPreview,
+          selected: w.selected,
+          recentlyTouched: w.recentlyTouched,
+          visible: w.visible
+        }))
+      })
+      if (res.ok) {
+        setReply(res.reply)
+        setProposals(res.proposals.map((p) => ({ ...p, _status: 'pending' })))
+        setPhase('result')
+        if (prefs.voiceback) {
+          speak(res.reply || `${res.proposals.length} suggestion${res.proposals.length === 1 ? '' : 's'}`)
+        }
+      } else {
+        setError(res.error)
+        setPhase('staged')
+      }
+    } catch (err) {
+      setError((err as Error).message || 'Interpreter failed.')
+      setPhase('staged')
+    }
+  }, [editedTranscript, transcript, prefs.voiceback])
+
+  // ── Apply / Dismiss
+  const onApply = useCallback(
+    async (id: string): Promise<void> => {
+      const p = proposals.find((x) => x.id === id)
+      if (!p) return
+      const result = await applyProposal(p, { activeTaskId: activeTaskId() })
+      setProposals((prev) =>
+        prev.map((q) =>
+          q.id === id
+            ? { ...q, _status: result.ok ? 'applied' : 'failed', _message: result.message }
+            : q
+        )
+      )
+    },
+    [proposals]
+  )
+
+  const onDismiss = useCallback((id: string): void => {
+    setProposals((prev) =>
+      prev.map((q) => (q.id === id ? { ...q, _status: 'dismissed' } : q))
+    )
+  }, [])
+
+  const onDismissAll = useCallback((): void => {
+    setProposals([])
+    setReply('')
+    setTranscript('')
+    setEditedTranscript('')
+    setPhase('idle')
+  }, [])
+
+  // ── FAB interaction handlers
+  const fabPressDown = useCallback(
+    async (e: React.PointerEvent): Promise<void> => {
+      if (prefs.commandMode === 'press-hold') {
+        e.preventDefault()
+        pressHoldArmedRef.current = true
+        await beginCapture()
+      }
+    },
+    [prefs.commandMode, beginCapture]
+  )
+
+  const fabPressUp = useCallback(
+    async (e: React.PointerEvent): Promise<void> => {
+      if (prefs.commandMode === 'press-hold' && pressHoldArmedRef.current) {
+        e.preventDefault()
+        pressHoldArmedRef.current = false
+        if (phase === 'listening') {
+          await stopCapture(false)
+          // In press-hold, default to immediate send — they spoke, they
+          // released, that's their submit. The staged screen still shows
+          // briefly so they can cancel if the transcript looks wrong.
+          setTimeout(() => {
+            void sendToAi()
+          }, 150)
+        }
+      }
+    },
+    [prefs.commandMode, phase, stopCapture, sendToAi]
+  )
+
+  const fabClick = useCallback(async (): Promise<void> => {
+    if (prefs.commandMode === 'click-toggle') {
+      if (phase === 'idle') {
+        await beginCapture()
+      } else if (phase === 'listening') {
+        await stopCapture(false)
+      }
+    }
+  }, [prefs.commandMode, phase, beginCapture, stopCapture])
+
+  // ── Render
+  const isActive = phase === 'listening'
+  const showOverlay = phase !== 'idle'
+
+  return (
+    <>
+      {/* The mic button — fixed bottom-middle, above the CommandCenter pill */}
+      <div
+        className="fixed bottom-16 left-1/2 -translate-x-1/2 z-[125] flex flex-col items-center pointer-events-none"
+        data-testid="voice-command-root"
+      >
+        {/* Live captions / transcript / result overlay above the button */}
+        {showOverlay && (
+          <div className="mb-2 pointer-events-auto max-w-[600px] w-[min(600px,90vw)]">
+            {phase === 'listening' && (
+              <div className="fb-glass-chrome rounded-lg border border-accent/40 px-3 py-2 text-[12px] text-stone-100 shadow-xl min-h-[44px] flex items-center">
+                <div className="text-accent text-[10px] uppercase tracking-[0.18em] mr-2 shrink-0">
+                  Listening
+                </div>
+                <div className="flex-1 leading-snug">
+                  {liveCaption || <span className="text-stone-500 italic">Say it…</span>}
+                </div>
+              </div>
+            )}
+            {phase === 'staged' && (
+              <div className="fb-glass-chrome rounded-lg border border-[color:var(--glass-chrome-border)] p-3 shadow-xl">
+                <div className="text-accent text-[10px] uppercase tracking-[0.18em] mb-1.5">
+                  Transcript · edit before sending
+                </div>
+                <textarea
+                  value={editedTranscript}
+                  onChange={(e) => setEditedTranscript(e.target.value)}
+                  rows={2}
+                  className="w-full bg-stone-50/40 dark:bg-stone-800/40 border border-stone-200/60 dark:border-stone-700/60 rounded px-2 py-1.5 text-[12px] text-stone-900 dark:text-stone-100 focus:outline-none focus:border-accent resize-none"
+                  data-testid="voice-command-transcript"
+                />
+                <div className="flex justify-end gap-1.5 mt-2">
+                  <button
+                    onClick={onDismissAll}
+                    className="text-[11px] px-2 py-1 rounded hover:bg-stone-100/10 text-stone-300"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => void sendToAi()}
+                    disabled={!editedTranscript.trim()}
+                    className="text-[11px] px-2.5 py-1 rounded bg-accent text-white disabled:opacity-50 hover:brightness-110"
+                    data-testid="voice-command-send"
+                  >
+                    Send
+                  </button>
+                </div>
+                {error && (
+                  <div className="text-[10px] text-amber-400 mt-1.5">{error}</div>
+                )}
+              </div>
+            )}
+            {phase === 'sending' && (
+              <div className="fb-glass-chrome rounded-lg border border-accent/40 px-3 py-2 text-[12px] text-stone-100 shadow-xl inline-flex items-center gap-2">
+                <Icon name="hourglass_empty" size={12} className="text-accent" />
+                Interpreting…
+              </div>
+            )}
+            {phase === 'result' && (
+              <div
+                className="fb-glass-chrome rounded-lg border border-[color:var(--glass-chrome-border)] p-3 shadow-xl"
+                data-testid="voice-command-result"
+              >
+                {reply && (
+                  <div className="text-[12px] text-stone-200 mb-2 leading-snug">{reply}</div>
+                )}
+                {proposals.length === 0 ? (
+                  <div className="text-[11px] text-stone-400 italic">
+                    No actions proposed.
+                  </div>
+                ) : (
+                  <div className="space-y-1.5">
+                    {proposals.map((p) => (
+                      <ProposalCard
+                        key={p.id}
+                        proposal={p}
+                        onApply={() => void onApply(p.id)}
+                        onDismiss={() => onDismiss(p.id)}
+                      />
+                    ))}
+                  </div>
+                )}
+                <div className="flex justify-end mt-2">
+                  <button
+                    onClick={onDismissAll}
+                    className="text-[10px] text-stone-400 hover:text-stone-200"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* The button itself */}
+        <button
+          onPointerDown={fabPressDown}
+          onPointerUp={fabPressUp}
+          onPointerLeave={fabPressUp}
+          onClick={fabClick}
+          onMouseEnter={() => setHovering(true)}
+          onMouseLeave={() => setHovering(false)}
+          className={`pointer-events-auto h-12 w-12 rounded-full flex items-center justify-center shadow-2xl transition-all duration-150 ${
+            isActive
+              ? 'bg-accent text-white scale-110 fb-halo'
+              : 'fb-glass-chrome text-accent border border-[color:var(--glass-chrome-border)] hover:brightness-110'
+          }`}
+          title={
+            prefs.commandMode === 'press-hold'
+              ? 'Hold to speak'
+              : phase === 'listening'
+                ? 'Click to stop'
+                : 'Click to speak'
+          }
+          aria-label="Voice command"
+          data-testid="voice-command-fab"
+          data-phase={phase}
+        >
+          <Icon name={isActive ? 'graphic_eq' : 'mic'} size={20} />
+        </button>
+        {!showOverlay && hovering && (
+          <div className="absolute -top-7 left-1/2 -translate-x-1/2 text-[10px] text-stone-300 bg-stone-900/85 rounded px-1.5 py-0.5 whitespace-nowrap">
+            {prefs.commandMode === 'press-hold' ? 'Hold to speak' : 'Click to speak'}
+          </div>
+        )}
+      </div>
+    </>
+  )
+}
+
+// ── Subcomponents ────────────────────────────────────────────────────────────
+
+interface ProposalCardProps {
+  proposal: Proposal
+  onApply: () => void
+  onDismiss: () => void
+}
+
+function ProposalCard({ proposal, onApply, onDismiss }: ProposalCardProps): JSX.Element {
+  const desc = describeProposal(proposal)
+  const isDestructive = proposal.kind === 'delete-widget'
+  const status = proposal._status ?? 'pending'
+
+  if (status === 'applied') {
+    return (
+      <div className="flex items-center gap-1.5 px-2 py-1.5 rounded bg-emerald-500/10 border border-emerald-500/30 text-[11px] text-emerald-200">
+        <Icon name="check" size={12} />
+        <span className="flex-1 truncate">{proposal._message || `${desc.verb} ${desc.subject}`}</span>
+      </div>
+    )
+  }
+  if (status === 'dismissed') {
+    return (
+      <div className="flex items-center gap-1.5 px-2 py-1.5 rounded bg-stone-700/20 border border-stone-600/20 text-[11px] text-stone-500 italic">
+        <Icon name="close" size={12} />
+        <span className="flex-1 truncate">Dismissed · {desc.subject}</span>
+      </div>
+    )
+  }
+  if (status === 'failed') {
+    return (
+      <div className="flex items-center gap-1.5 px-2 py-1.5 rounded bg-amber-500/10 border border-amber-500/30 text-[11px] text-amber-200">
+        <Icon name="warning" size={12} />
+        <span className="flex-1 truncate">{proposal._message || 'Failed'}</span>
+        <button
+          onClick={onDismiss}
+          className="text-[10px] text-stone-400 hover:text-stone-200"
+        >
+          Close
+        </button>
+      </div>
+    )
+  }
+  return (
+    <div
+      className={`flex items-center gap-1.5 px-2 py-1.5 rounded border text-[11px] ${
+        isDestructive
+          ? 'bg-rose-500/5 border-rose-500/30'
+          : 'bg-stone-800/40 border-stone-700/60'
+      }`}
+    >
+      <Icon
+        name={desc.icon}
+        size={12}
+        className={isDestructive ? 'text-rose-400' : 'text-accent'}
+      />
+      <div className="flex-1 min-w-0">
+        <div className="text-stone-100 font-medium truncate">{desc.verb}</div>
+        <div className="text-stone-400 text-[10px] truncate">{desc.subject}</div>
+      </div>
+      <button
+        onClick={onDismiss}
+        className="text-[10px] text-stone-400 hover:text-stone-200 px-1"
+        data-testid={`voice-proposal-dismiss-${proposal.id}`}
+      >
+        Dismiss
+      </button>
+      <button
+        onClick={onApply}
+        className={`text-[10px] px-2 py-0.5 rounded text-white hover:brightness-110 ${
+          isDestructive ? 'bg-rose-600' : 'bg-accent'
+        }`}
+        data-testid={`voice-proposal-apply-${proposal.id}`}
+      >
+        {isDestructive ? 'Confirm delete' : 'Apply'}
+      </button>
+    </div>
+  )
+}
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+// Decode an arbitrary audio blob (webm/opus etc) into mono 16kHz Float32 PCM
+// samples — the format the local Whisper model expects. Matches the
+// VoiceRecorderWidget's helper but inlined here so the FAB is standalone.
+async function decodeToMono16k(arrayBuffer: ArrayBuffer): Promise<Float32Array> {
+  const AC: typeof AudioContext =
+    (window as unknown as { AudioContext?: typeof AudioContext }).AudioContext ||
+    (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext!
+  const ctx = new AC({ sampleRate: 16000 })
+  const decoded = await ctx.decodeAudioData(arrayBuffer.slice(0))
+  let mono: Float32Array
+  if (decoded.numberOfChannels === 1) {
+    mono = decoded.getChannelData(0)
+  } else {
+    const len = decoded.length
+    mono = new Float32Array(len)
+    const ch0 = decoded.getChannelData(0)
+    const ch1 = decoded.getChannelData(1)
+    for (let i = 0; i < len; i++) mono[i] = (ch0[i] + ch1[i]) * 0.5
+  }
+  await ctx.close()
+  return mono
+}
+
+// Spoken voice-back via Web Speech API. Best-effort: any platform that
+// doesn't have synthesis (rare in Chromium / Electron) just no-ops.
+function speak(text: string): void {
+  try {
+    const synth = (window as unknown as { speechSynthesis?: SpeechSynthesis }).speechSynthesis
+    if (!synth) return
+    synth.cancel() // kill any in-flight utterance
+    const u = new SpeechSynthesisUtterance(text)
+    u.rate = 1.05
+    u.pitch = 1.0
+    u.volume = 0.85
+    synth.speak(u)
+  } catch {
+    // ignore
+  }
+}

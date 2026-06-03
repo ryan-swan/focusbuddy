@@ -20,6 +20,7 @@ import CursorSpotlight from './components/CursorSpotlight'
 import PeerBodyDoubleDialog from './components/PeerBodyDoubleDialog'
 import CommandCenter from './components/CommandCenter'
 import AICommandBar from './components/AICommandBar'
+import VoiceCommandFAB from './components/VoiceCommandFAB'
 import LaunchSignInModal from './components/LaunchSignInModal'
 import { usePeerBodyDoubleStore } from './stores/peerBodyDouble'
 import { useNodeStore } from './stores/nodes'
@@ -372,6 +373,7 @@ export default function App(): JSX.Element {
       />
       <LaunchSignInModal />
       <AICommandBar open={aiBarOpen} onClose={() => setAiBarOpen(false)} />
+      <VoiceCommandFAB />
       {smartStackOpen && <SmartStackModal onClose={() => setSmartStackOpen(false)} />}
       {bodyDoubleOpen && (
         <PeerBodyDoubleDialog onClose={() => setBodyDoubleOpen(false)} />
