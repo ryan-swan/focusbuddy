@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { launchApp, type LaunchedApp } from './_helpers'
+import { launchApp, type LaunchedApp, waitForReady } from './_helpers'
 
 // Verify that the webview:link-clicked IPC pipeline is wired end-to-end through
 // the real Electron app: main → preload contextBridge → renderer subscriber.
@@ -18,10 +18,7 @@ test.afterEach(async () => {
 test('webview:link-clicked IPC carries payload from main to renderer', async () => {
   launched = await launchApp()
   const { window, app } = launched
-
-  await expect(
-    window.getByRole('heading', { name: 'FocusBuddy', level: 2 })
-  ).toBeVisible({ timeout: 10_000 })
+  await waitForReady(window)
 
   // Step 1 — install the listener in the renderer and stash the captured
   // payload on the global object. We do NOT await this; we just register the

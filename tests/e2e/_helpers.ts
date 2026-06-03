@@ -1,4 +1,4 @@
-import { _electron as electron, type ElectronApplication, type Page } from '@playwright/test'
+import { _electron as electron, expect, type ElectronApplication, type Page } from '@playwright/test'
 import { mkdtempSync, rmSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
@@ -57,4 +57,44 @@ export async function launchApp(): Promise<LaunchedApp> {
     }
   }
   return { app, window, userDataDir, dispose }
+}
+
+/**
+ * Wait for the React shell to mount and dismiss any post-boot modals
+ * (launch sign-in dialog, welcome prompts) that would otherwise
+ * intercept pointer events.
+ *
+ * Single source of truth for "the app is ready to drive" so future
+ * rebrands / wordmark changes only require an edit in one place. The
+ * sidebar wordmark heading is the canary (its accessible name is
+ * "FOCUSBUDDY" after the futuristic-theme rebrand — matched via regex
+ * so a future rename doesn't break every spec again).
+ */
+export async function waitForReady(window: Page): Promise<void> {
+  // Wait for window.api so renderer-side IPC calls inside the test are
+  // safe to make immediately after this resolves.
+  await window.waitForFunction(
+    () => typeof (window as unknown as { api?: unknown }).api === 'object',
+    null,
+    { timeout: 10_000 }
+  )
+
+  // Sidebar wordmark — anchored on an EXACT case-insensitive regex so
+  // future case rebrands (FocusBuddy → FOCUSBUDDY → Haptyx) survive a
+  // one-line edit here. Must NOT match the launch sign-in dialog's
+  // "Sign in to FocusBuddy" heading, hence the anchored ^...$ form.
+  await expect(
+    window.getByRole('heading', { name: /^(focusbuddy|haptyx)$/i, level: 2 })
+  ).toBeVisible({ timeout: 10_000 })
+
+  // Sign-in modal — dismiss with "Continue without account" so subsequent
+  // interactions don't get pointer-intercepted by the modal overlay.
+  // Best-effort: if the modal isn't there (account already signed in, or
+  // already dismissed within the 7-day TTL) the call is a no-op.
+  const skip = window.getByRole('button', {
+    name: /continue without account|skip|not now/i
+  })
+  if (await skip.isVisible().catch(() => false)) {
+    await skip.click().catch(() => {})
+  }
 }

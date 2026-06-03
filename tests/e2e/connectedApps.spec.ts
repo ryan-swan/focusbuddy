@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { launchApp, type LaunchedApp } from './_helpers'
+import { launchApp, type LaunchedApp, waitForReady } from './_helpers'
 
 // Integration tests for Connected Apps: schema migrations, seeding, sort
 // promotion + favourites split, drag MIME shape. Drives the real Electron app
@@ -17,10 +17,7 @@ test.afterEach(async () => {
 test('seeded Connected Apps render in the sidebar', async () => {
   launched = await launchApp()
   const { window } = launched
-
-  await expect(
-    window.getByRole('heading', { name: 'FocusBuddy', level: 2 })
-  ).toBeVisible({ timeout: 10_000 })
+  await waitForReady(window)
 
   // Seed via window.api so we exercise the real IPC + the new schema columns.
   await window.evaluate(async () => {
@@ -39,9 +36,7 @@ test('seeded Connected Apps render in the sidebar', async () => {
     await api.connectedApps.list()
   })
   await window.reload()
-  await expect(
-    window.getByRole('heading', { name: 'FocusBuddy', level: 2 })
-  ).toBeVisible({ timeout: 10_000 })
+  await waitForReady(window)
 
   // Both apps appear in the sidebar (favourites strip — the empty/cold list
   // promotes everything since fewer than 6 apps).
@@ -52,10 +47,7 @@ test('seeded Connected Apps render in the sidebar', async () => {
 test('schema migration: new connected_apps columns return correct defaults', async () => {
   launched = await launchApp()
   const { window } = launched
-
-  await expect(
-    window.getByRole('heading', { name: 'FocusBuddy', level: 2 })
-  ).toBeVisible({ timeout: 10_000 })
+  await waitForReady(window)
 
   const created = await window.evaluate(async () => {
     const api = (window as unknown as { api: typeof window.api }).api
@@ -79,10 +71,7 @@ test('schema migration: new connected_apps columns return correct defaults', asy
 test('touch() bumps use_count and last_used_at', async () => {
   launched = await launchApp()
   const { window } = launched
-
-  await expect(
-    window.getByRole('heading', { name: 'FocusBuddy', level: 2 })
-  ).toBeVisible({ timeout: 10_000 })
+  await waitForReady(window)
 
   const result = await window.evaluate(async () => {
     const api = (window as unknown as { api: typeof window.api }).api
@@ -106,10 +95,7 @@ test('touch() bumps use_count and last_used_at', async () => {
 test('findByHostname matches on hostname (no duplicates on Pin)', async () => {
   launched = await launchApp()
   const { window } = launched
-
-  await expect(
-    window.getByRole('heading', { name: 'FocusBuddy', level: 2 })
-  ).toBeVisible({ timeout: 10_000 })
+  await waitForReady(window)
 
   const result = await window.evaluate(async () => {
     const api = (window as unknown as { api: typeof window.api }).api
@@ -142,10 +128,7 @@ test('Pin app affordance dedupes against existing Connected Apps by hostname', a
   // app — not create a second one. The flow is hostname-match + link the widget.
   launched = await launchApp()
   const { window } = launched
-
-  await expect(
-    window.getByRole('heading', { name: 'FocusBuddy', level: 2 })
-  ).toBeVisible({ timeout: 10_000 })
+  await waitForReady(window)
 
   const result = await window.evaluate(async () => {
     const api = (window as unknown as { api: typeof window.api }).api

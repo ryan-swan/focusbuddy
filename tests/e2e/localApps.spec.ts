@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test'
 import { exec } from 'child_process'
-import { launchApp, type LaunchedApp } from './_helpers'
+import { launchApp, type LaunchedApp, waitForReady } from './_helpers'
 
 // Local-app integration: create with kind='local', drag-to-canvas spawns the
 // launcher widget (not webview), and the launch IPC actually runs `open -a`.
@@ -19,9 +19,7 @@ test.afterEach(async () => {
 test('describeLocalApp pulls title + bundle id + icon from a real .app bundle', async () => {
   launched = await launchApp()
   const { window } = launched
-  await expect(
-    window.getByRole('heading', { name: 'FocusBuddy', level: 2 })
-  ).toBeVisible({ timeout: 10_000 })
+  await waitForReady(window)
 
   const desc = await window.evaluate(async (path: string) => {
     return await window.api.localApp.describe(path)
@@ -41,9 +39,7 @@ test('describeLocalApp pulls title + bundle id + icon from a real .app bundle', 
 test('describeLocalApp rejects non-.app paths', async () => {
   launched = await launchApp()
   const { window } = launched
-  await expect(
-    window.getByRole('heading', { name: 'FocusBuddy', level: 2 })
-  ).toBeVisible({ timeout: 10_000 })
+  await waitForReady(window)
 
   const desc = await window.evaluate(async () => {
     // /etc/hosts exists but isn't an .app bundle. The picker filter only
@@ -57,9 +53,7 @@ test('describeLocalApp rejects non-.app paths', async () => {
 test('create + persist a local Connected App round-trips through the DB', async () => {
   launched = await launchApp()
   const { window } = launched
-  await expect(
-    window.getByRole('heading', { name: 'FocusBuddy', level: 2 })
-  ).toBeVisible({ timeout: 10_000 })
+  await waitForReady(window)
 
   const created = await window.evaluate(async (path: string) => {
     const desc = await window.api.localApp.describe(path)
@@ -83,9 +77,7 @@ test('create + persist a local Connected App round-trips through the DB', async 
 
   // Reload window and verify the local-app columns survive hydration.
   await window.reload()
-  await expect(
-    window.getByRole('heading', { name: 'FocusBuddy', level: 2 })
-  ).toBeVisible({ timeout: 10_000 })
+  await waitForReady(window)
 
   const reread = await window.evaluate(async (id: string) => {
     const list = await window.api.connectedApps.list()
@@ -102,9 +94,7 @@ test('create + persist a local Connected App round-trips through the DB', async 
 test('launching a local app via IPC returns ok (TextEdit opens)', async () => {
   launched = await launchApp()
   const { window } = launched
-  await expect(
-    window.getByRole('heading', { name: 'FocusBuddy', level: 2 })
-  ).toBeVisible({ timeout: 10_000 })
+  await waitForReady(window)
 
   const result = await window.evaluate(async (path: string) => {
     return await window.api.localApp.launch({
@@ -138,9 +128,7 @@ test('launching a local app via IPC returns ok (TextEdit opens)', async () => {
 test('launch returns error when both appPath and bundleId are null', async () => {
   launched = await launchApp()
   const { window } = launched
-  await expect(
-    window.getByRole('heading', { name: 'FocusBuddy', level: 2 })
-  ).toBeVisible({ timeout: 10_000 })
+  await waitForReady(window)
 
   const result = await window.evaluate(async () => {
     return await window.api.localApp.launch({ appPath: null, bundleId: null })
@@ -155,9 +143,7 @@ test('launch returns error when both appPath and bundleId are null', async () =>
 test('dragging a local Connected App onto canvas spawns a local-app-launcher widget', async () => {
   launched = await launchApp()
   const { window } = launched
-  await expect(
-    window.getByRole('heading', { name: 'FocusBuddy', level: 2 })
-  ).toBeVisible({ timeout: 10_000 })
+  await waitForReady(window)
 
   // Seed: task + local connected app.
   const seeded = await window.evaluate(async (path: string) => {
@@ -182,9 +168,7 @@ test('dragging a local Connected App onto canvas spawns a local-app-launcher wid
   }, TEST_APP_PATH)
 
   await window.reload()
-  await expect(
-    window.getByRole('heading', { name: 'FocusBuddy', level: 2 })
-  ).toBeVisible({ timeout: 10_000 })
+  await waitForReady(window)
 
   await expect(
     window.getByRole('button', { name: 'Notes session' }).first()
