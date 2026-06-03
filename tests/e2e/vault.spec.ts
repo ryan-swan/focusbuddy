@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { launchApp, type LaunchedApp } from './_helpers'
+import { launchApp, type LaunchedApp, waitForReady } from './_helpers'
 
 // Vault round-trip + Connected App binding tests. We can't drive the actual
 // autofill against a real login page (would need a fixture HTTP server + real
@@ -18,10 +18,7 @@ test.afterEach(async () => {
 test('vault create + unlock + entry encrypt/decrypt round-trip', async () => {
   launched = await launchApp()
   const { window } = launched
-
-  await expect(
-    window.getByRole('heading', { name: 'FocusBuddy', level: 2 })
-  ).toBeVisible({ timeout: 10_000 })
+  await waitForReady(window)
 
   const result = await window.evaluate(async () => {
     const api = (window as unknown as { api: typeof window.api }).api
@@ -89,10 +86,7 @@ test('vault create + unlock + entry encrypt/decrypt round-trip', async () => {
 test('Connected App vault binding survives reload (persists in DB)', async () => {
   launched = await launchApp()
   const { window } = launched
-
-  await expect(
-    window.getByRole('heading', { name: 'FocusBuddy', level: 2 })
-  ).toBeVisible({ timeout: 10_000 })
+  await waitForReady(window)
 
   const { appId, entryId } = await window.evaluate(async () => {
     const api = (window as unknown as { api: typeof window.api }).api
@@ -124,9 +118,7 @@ test('Connected App vault binding survives reload (persists in DB)', async () =>
 
   // Reload window — store hydrates from DB.
   await window.reload()
-  await expect(
-    window.getByRole('heading', { name: 'FocusBuddy', level: 2 })
-  ).toBeVisible({ timeout: 10_000 })
+  await waitForReady(window)
 
   const reread = await window.evaluate(async (boundAppId: string) => {
     const api = (window as unknown as { api: typeof window.api }).api
@@ -142,10 +134,7 @@ test('Connected App vault binding survives reload (persists in DB)', async () =>
 test('autofillEnabled toggle persists', async () => {
   launched = await launchApp()
   const { window } = launched
-
-  await expect(
-    window.getByRole('heading', { name: 'FocusBuddy', level: 2 })
-  ).toBeVisible({ timeout: 10_000 })
+  await waitForReady(window)
 
   const result = await window.evaluate(async () => {
     const api = (window as unknown as { api: typeof window.api }).api

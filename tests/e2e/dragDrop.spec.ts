@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { launchApp, type LaunchedApp } from './_helpers'
+import { launchApp, type LaunchedApp, waitForReady } from './_helpers'
 
 // Drag-and-drop test: drag a Connected App from the sidebar onto the canvas
 // and verify the resulting webview widget is bound to the source app
@@ -23,10 +23,7 @@ test.afterEach(async () => {
 test('dragging a Connected App onto the canvas creates a webview widget bound to that app', async () => {
   launched = await launchApp()
   const { window } = launched
-
-  await expect(
-    window.getByRole('heading', { name: 'FocusBuddy', level: 2 })
-  ).toBeVisible({ timeout: 10_000 })
+  await waitForReady(window)
 
   // Seed: one task to activate the canvas, one connected app to drag.
   const seeded = await window.evaluate(async () => {
@@ -45,9 +42,7 @@ test('dragging a Connected App onto the canvas creates a webview widget bound to
 
   // Reload so stores hydrate, then navigate to the task so the canvas mounts.
   await window.reload()
-  await expect(
-    window.getByRole('heading', { name: 'FocusBuddy', level: 2 })
-  ).toBeVisible({ timeout: 10_000 })
+  await waitForReady(window)
 
   await expect(
     window.getByRole('button', { name: 'Sign emails' }).first()
