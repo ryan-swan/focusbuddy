@@ -72,6 +72,12 @@ export async function applyProposal(
       return applyLinkWidgets(proposal, ctx)
     case 'focus-widget':
       return applyFocusWidget(proposal)
+    case 'toggle-todo-item':
+      return applyToggleTodoItem(proposal)
+    case 'drill-in-widget':
+      return applyDrillInWidget(proposal)
+    case 'arrange-widgets':
+      return applyArrangeWidgets(proposal, ctx)
     case 'create-table':
       return applyCreateTable(proposal, ctx)
     case 'add-table-row':
@@ -285,6 +291,113 @@ async function applyFocusWidget(
   return { ok: true, message: `Focused ${p.label}` }
 }
 
+async function applyDrillInWidget(
+  p: Extract<ActionProposal, { kind: 'drill-in-widget' }>
+): Promise<ApplyResult> {
+  const widgets = useWidgetStore.getState().widgets
+  const target = widgets.find((w) => w.id === p.widgetId)
+  if (!target) {
+    return { ok: false, message: `No widget found with id ${p.widgetId.slice(0, 8)}…` }
+  }
+  // setFocused opens the WidgetFocusMode modal (single-widget zoomed view).
+  // bringToFront so the widget renders above any siblings in case the
+  // modal mounts inline.
+  await useWidgetStore.getState().bringToFront(p.widgetId)
+  useWidgetStore.getState().setFocused(p.widgetId)
+  return { ok: true, message: `Opened ${p.label} in focus mode` }
+}
+
+async function applyToggleTodoItem(
+  p: Extract<ActionProposal, { kind: 'toggle-todo-item' }>
+): Promise<ApplyResult> {
+  const widgets = useWidgetStore.getState().widgets
+  const target = widgets.find((w) => w.id === p.widgetId)
+  if (!target) {
+    return { ok: false, message: `No widget found with id ${p.widgetId.slice(0, 8)}…` }
+  }
+  const lines = (target.content || '').split('\n')
+  const needle = p.itemMatch.trim().toLowerCase()
+  // Match either Markdown task list (`- [ ] item`) or plain bullet
+  // ("- item") that we should convert to a task box. Lines starting with
+  // any leading whitespace are tolerated.
+  const taskBoxRe = /^(\s*)([-*])\s+(\[[ xX]\])\s+(.*)$/
+  const bulletRe = /^(\s*)([-*])\s+(.*)$/
+  let mutated = false
+  const next = lines.map((line) => {
+    if (!line.toLowerCase().includes(needle)) return line
+    const tm = line.match(taskBoxRe)
+    if (tm) {
+      mutated = true
+      const box = p.checked ? '[x]' : '[ ]'
+      return `${tm[1]}${tm[2]} ${box} ${tm[4]}`
+    }
+    const bm = line.match(bulletRe)
+    if (bm && !mutated) {
+      mutated = true
+      const box = p.checked ? '[x]' : '[ ]'
+      return `${bm[1]}${bm[2]} ${box} ${bm[3]}`
+    }
+    return line
+  })
+  if (!mutated) {
+    return {
+      ok: false,
+      message: `Couldn't find an item containing "${p.itemMatch}" in ${p.widgetLabel}.`
+    }
+  }
+  await useWidgetStore.getState().update(p.widgetId, { content: next.join('\n') })
+  return {
+    ok: true,
+    message: p.checked
+      ? `Checked off "${p.itemMatch}" in ${p.widgetLabel}`
+      : `Re-opened "${p.itemMatch}" in ${p.widgetLabel}`
+  }
+}
+
+async function applyArrangeWidgets(
+  p: Extract<ActionProposal, { kind: 'arrange-widgets' }>,
+  ctx: { activeTaskId: string | null }
+): Promise<ApplyResult> {
+  if (!ctx.activeTaskId) {
+    return { ok: false, message: 'Open a task first — nothing to arrange.' }
+  }
+  const store = useWidgetStore.getState()
+  // Resolve the set we're arranging: explicit list, or every visible
+  // free-position widget on the active task.
+  const explicitIds = p.widgetIds && p.widgetIds.length > 0 ? new Set(p.widgetIds) : null
+  const targets = store.widgets.filter((w) => {
+    if (w.archived) return false
+    if (w.pinned) return false
+    if (w.parentSectionId) return false // section children laid out by their section
+    if (explicitIds) return explicitIds.has(w.id)
+    return true
+  })
+  if (targets.length === 0) {
+    return { ok: false, message: 'No widgets to arrange on the current canvas.' }
+  }
+  // Simple grid: square-ish layout, 320px columns × 240px rows + 24px gutter.
+  // Anchored near the top-left of the visible viewport (origin (0,0)) so
+  // even an off-screen mess gets pulled into view.
+  const GAP = 24
+  const COL_W = 320
+  const ROW_H = 240
+  const cols = Math.max(1, Math.ceil(Math.sqrt(targets.length)))
+  // Sort by current (y, x) so widgets keep approximate spatial order
+  // after the rearrange (less jarring than a random shuffle).
+  const ordered = [...targets].sort((a, b) =>
+    a.y === b.y ? a.x - b.x : a.y - b.y
+  )
+  for (let i = 0; i < ordered.length; i++) {
+    const w = ordered[i]
+    const col = i % cols
+    const row = Math.floor(i / cols)
+    const x = col * (COL_W + GAP) + GAP
+    const y = row * (ROW_H + GAP) + GAP
+    await store.update(w.id, { x, y, width: COL_W, height: ROW_H })
+  }
+  return { ok: true, message: `Arranged ${ordered.length} widget${ordered.length === 1 ? '' : 's'}` }
+}
+
 // Translate the AI's column shorthand (label/type/options strings) into the
 // strict FieldDefinition shape the table widget expects, including stable
 // ids + hex colors for select options.
@@ -377,6 +490,14 @@ async function applyAddTableRow(
       }
     }
     tableId = resolved
+  }
+  // Voice-command path: the AI references tables by their widget id (the
+  // only id it can see in the snapshot). Fall back to looking the id up
+  // as a widget — if it's a table widget, its content field holds the
+  // real backing-table id.
+  const maybeWidget = useWidgetStore.getState().widgets.find((w) => w.id === tableId)
+  if (maybeWidget && maybeWidget.kind === 'table' && maybeWidget.content) {
+    tableId = maybeWidget.content
   }
   // Resolve the table + its schema so we can map AI-provided column labels
   // (or ids) to actual column ids + coerce values to the right primitive.
@@ -598,6 +719,20 @@ export function describeProposal(
       return { icon: 'link', verb: 'Link', subject: `${p.sourceLabel} → ${p.targetLabel}` }
     case 'focus-widget':
       return { icon: 'center_focus_strong', verb: 'Focus', subject: p.label }
+    case 'toggle-todo-item':
+      return {
+        icon: p.checked ? 'check_box' : 'check_box_outline_blank',
+        verb: p.checked ? 'Check off' : 'Re-open',
+        subject: `"${p.itemMatch}" in ${p.widgetLabel}`
+      }
+    case 'drill-in-widget':
+      return { icon: 'zoom_in', verb: 'Open in focus mode', subject: p.label }
+    case 'arrange-widgets':
+      return {
+        icon: 'dashboard_customize',
+        verb: 'Arrange',
+        subject: p.widgetIds && p.widgetIds.length > 0 ? `${p.widgetIds.length} widgets` : p.label
+      }
     default:
       return { icon: 'auto_awesome', verb: 'Action', subject: '' }
   }

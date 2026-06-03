@@ -288,37 +288,74 @@ export default function VoiceCommandFAB(): JSX.Element {
     if (!text) return
     setPhase('sending')
     setError(null)
-    try {
-      const snapshot = buildCanvasSnapshot(activeTaskId())
-      const res = await window.api.voiceCommand.run({
-        transcript: text,
-        activeTaskId: snapshot.activeTaskId,
-        selectedWidgetId: snapshot.selectedWidgetId,
-        widgets: snapshot.widgets.map((w) => ({
-          id: w.id,
-          kind: w.kind,
-          title: w.title,
-          contentPreview: w.contentPreview,
-          selected: w.selected,
-          recentlyTouched: w.recentlyTouched,
-          visible: w.visible
-        }))
-      })
-      if (res.ok) {
-        setReply(res.reply)
-        setProposals(res.proposals.map((p) => ({ ...p, _status: 'pending' })))
-        setPhase('result')
-        if (prefs.voiceback) {
-          speak(res.reply || `${res.proposals.length} suggestion${res.proposals.length === 1 ? '' : 's'}`)
+    setProposals([])
+    setReply('')
+
+    // Switch to the streaming variant so cards pop in as Claude emits
+    // them. The first reply / proposal lands in ~600ms instead of
+    // waiting ~1.5s for the full response — feels alive.
+    const snapshot = buildCanvasSnapshot(activeTaskId())
+    const requestId = `vc-${Date.now().toString(36)}-${Math.random()
+      .toString(36)
+      .slice(2, 8)}`
+
+    return new Promise<void>((resolve) => {
+      const unsubscribe = window.api.voiceCommand.runStream(
+        {
+          requestId,
+          transcript: text,
+          activeTaskId: snapshot.activeTaskId,
+          selectedWidgetId: snapshot.selectedWidgetId,
+          widgets: snapshot.widgets.map((w) => ({
+            id: w.id,
+            kind: w.kind,
+            title: w.title,
+            contentPreview: w.contentPreview,
+            selected: w.selected,
+            recentlyTouched: w.recentlyTouched,
+            visible: w.visible
+          }))
+        },
+        {
+          onReply: (replyText) => {
+            setReply(replyText)
+            // Move to result phase on first signal — so the dock appears
+            // immediately instead of waiting for the first proposal.
+            setPhase('result')
+          },
+          onProposal: (proposal) => {
+            // Each new proposal appears as its own card.
+            setProposals((prev) => {
+              if (prev.some((p) => p.id === proposal.id)) return prev
+              return [...prev, { ...proposal, _status: 'pending' }]
+            })
+            setPhase('result')
+          },
+          onError: (err) => {
+            setError(err.error)
+            // If we already had some proposals streamed, keep them up
+            // and surface the error inline; otherwise fall back to
+            // staged so the user can edit + resend.
+            setPhase((prev) => (prev === 'result' ? 'result' : 'staged'))
+            unsubscribe()
+            resolve()
+          },
+          onComplete: (summary) => {
+            // Speak the reply (or a fallback) for voice-back users.
+            if (prefs.voiceback) {
+              speak(
+                summary.replyText ||
+                  `${summary.totalProposals} suggestion${
+                    summary.totalProposals === 1 ? '' : 's'
+                  }`
+              )
+            }
+            unsubscribe()
+            resolve()
+          }
         }
-      } else {
-        setError(res.error)
-        setPhase('staged')
-      }
-    } catch (err) {
-      setError((err as Error).message || 'Interpreter failed.')
-      setPhase('staged')
-    }
+      )
+    })
   }, [editedTranscript, transcript, prefs.voiceback])
 
   // ── Apply / Dismiss

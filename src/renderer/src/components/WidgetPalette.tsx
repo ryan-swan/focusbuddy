@@ -10,6 +10,7 @@ import Icon from './Icon'
 
 interface Props {
   onAdd: (entry: WidgetCatalogEntry) => void
+  onImport?: () => void
   disabled: boolean
 }
 
@@ -23,7 +24,7 @@ interface Props {
 // keyboard-friendly (Tab through chips, Enter to add). The picker itself
 // is what shrank — what's IN it (the chips) is the same set, minus the
 // redundant kinds we just folded into File.
-export default function WidgetPalette({ onAdd, disabled }: Props): JSX.Element {
+export default function WidgetPalette({ onAdd, onImport, disabled }: Props): JSX.Element {
   const [open, setOpen] = useState(false)
   const buttonRef = useRef<HTMLButtonElement | null>(null)
   const popoverRef = useRef<HTMLDivElement | null>(null)
@@ -133,6 +134,29 @@ export default function WidgetPalette({ onAdd, disabled }: Props): JSX.Element {
                 </div>
               )
             })}
+            {onImport && (
+              <div className="border-t border-stone-200 dark:border-stone-700 pt-2">
+                <div className="text-[9px] uppercase tracking-[0.14em] text-stone-500 dark:text-stone-400 font-semibold mb-1.5">
+                  Import
+                </div>
+                <button
+                  onClick={() => {
+                    onImport()
+                    setOpen(false)
+                  }}
+                  className="w-full flex items-center gap-2 px-2 py-2 rounded-md border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 hover:border-accent hover:bg-accent/5 dark:hover:bg-accent/10 text-stone-700 dark:text-stone-300 text-[11px]"
+                  data-testid="palette-import-file"
+                >
+                  <Icon name="upload_file" size={14} className="text-stone-600 dark:text-stone-400" />
+                  <div className="flex-1 text-left">
+                    <div className="font-medium">Import file…</div>
+                    <div className="text-[9px] text-stone-500 dark:text-stone-400">
+                      .txt / .md → note · .csv / .json → table
+                    </div>
+                  </div>
+                </button>
+              </div>
+            )}
             <div className="text-[10px] text-stone-500 dark:text-stone-400 leading-snug border-t border-stone-200 dark:border-stone-700 pt-2 -mb-1">
               Tip: drag any tile onto the canvas to place it where you want, or click to add at the centre.
             </div>

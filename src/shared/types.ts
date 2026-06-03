@@ -351,6 +351,35 @@ export type ActionProposal =
     }
   | {
       id: string
+      kind: 'toggle-todo-item'
+      // Mark an item in a Markdown / Page widget's task list as done/undone.
+      // The renderer finds the line containing `itemMatch` (substring,
+      // case-insensitive) and flips its `- [ ]` ↔ `- [x]` marker.
+      widgetId: string
+      widgetLabel: string
+      itemMatch: string
+      checked: boolean
+      reason?: string
+    }
+  | {
+      id: string
+      kind: 'drill-in-widget'
+      // Opens the widget in FocusMode (single-widget zoomed modal).
+      widgetId: string
+      label: string
+      reason?: string
+    }
+  | {
+      id: string
+      kind: 'arrange-widgets'
+      // Auto-layouts widgets into a tidy grid. When widgetIds is
+      // omitted, applies to every non-pinned widget on the active task.
+      widgetIds?: string[] | null
+      label: string
+      reason?: string
+    }
+  | {
+      id: string
       kind: 'create-table'
       title: string
       columns: Array<{
