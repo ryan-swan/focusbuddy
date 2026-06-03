@@ -99,10 +99,18 @@ test('dragging a Connected App onto the canvas creates a webview widget bound to
   // We intentionally don't assert exact URL equality — the webview may have
   // navigated by the time we read it (e.g. Gmail redirecting to /mail/u/0/),
   // and our URL-persistence layer saves the post-redirect URL into widget.content.
-  // The invariant that matters: same origin as the connected app.
+  // The invariant that matters: the live URL belongs to the same registrable
+  // domain as the seed (mail.google.com → accounts.google.com via OAuth is
+  // still google.com). Asserting the registrable suffix instead of exact host
+  // makes the test resilient to the SSO/login redirect flow that Gmail does
+  // on a fresh machine.
   const widgetHost = new URL(bound!.content).hostname.replace(/^www\./, '')
   const appHost = new URL(seeded.appUrl).hostname.replace(/^www\./, '')
-  expect(widgetHost).toBe(appHost)
+  function registrableDomain(host: string): string {
+    const parts = host.split('.')
+    return parts.length >= 2 ? parts.slice(-2).join('.') : host
+  }
+  expect(registrableDomain(widgetHost)).toBe(registrableDomain(appHost))
   // Title may have been overwritten to the page hostname by persistNavUrl
   // when the webview started loading and didn't yet have a real <title>.
   // That's intended — widget.title tracks current page state. We just sanity
