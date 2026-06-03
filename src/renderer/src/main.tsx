@@ -35,6 +35,20 @@ window.addEventListener(
   },
   true
 )
+// Same protection at the beforeinput layer — some libraries (TipTap /
+// prosemirror, contenteditable wrappers) handle insertion via
+// beforeinput rather than keydown. If one of them ever decides to
+// preventDefault on inserting a single space, this guard cuts the
+// other handlers off first.
+window.addEventListener(
+  'beforeinput',
+  (e) => {
+    if ((e as InputEvent).data !== ' ') return
+    if (!isEditable(e.target)) return
+    e.stopImmediatePropagation()
+  },
+  true
+)
 
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
   <React.StrictMode>
