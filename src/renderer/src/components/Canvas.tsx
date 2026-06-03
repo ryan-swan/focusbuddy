@@ -950,6 +950,122 @@ export default function Canvas(): JSX.Element {
     void placeWidget(entry, center.x - entry.defaultWidth / 2 + jitter(), center.y - entry.defaultHeight / 2 + jitter())
   }
 
+  async function handleImportFile(): Promise<void> {
+    if (!activeTaskId) return
+    const path = await window.api.fileImport.pick()
+    if (!path) return // user cancelled
+    const isMarkdown = /\.(md|markdown)$/i.test(path)
+    const isTxt = /\.txt$/i.test(path)
+    // Default mapping: .txt → note, .md → markdown. Tabular formats
+    // self-elect on the backend.
+    const preferredTextKind = isMarkdown ? 'markdown' : isTxt ? 'note' : 'page'
+    const draft = await window.api.fileImport.run({ path, preferredTextKind })
+    if ('ok' in draft && draft.ok === false) {
+      // eslint-disable-next-line no-alert
+      window.alert(draft.error)
+      return
+    }
+    const rect = dropRef.current?.getBoundingClientRect()
+    const center = rect
+      ? screenToCanvas(rect.width / 2, rect.height / 2)
+      : { x: 80, y: 80 }
+    const jitter = (): number => (Math.random() - 0.5) * 60
+    if (draft.kind === 'text') {
+      // Use the catalog entry's default size when available so import
+      // widgets feel like a natural drop, not a unique footprint.
+      const targetCatalogKind: 'page' | 'markdown' | 'note' = draft.targetKind
+      const entry = catalogFor(targetCatalogKind)
+      const w = entry?.defaultWidth ?? 360
+      const h = entry?.defaultHeight ?? 280
+      await useWidgetStore.getState().create({
+        taskId: activeTaskId,
+        kind: targetCatalogKind,
+        title: draft.title,
+        content: draft.content,
+        x: center.x - w / 2 + jitter(),
+        y: center.y - h / 2 + jitter(),
+        width: w,
+        height: h,
+        color: null
+      })
+    } else if (draft.kind === 'page-from-json') {
+      const entry = catalogFor('page')
+      const w = entry?.defaultWidth ?? 420
+      const h = entry?.defaultHeight ?? 320
+      await useWidgetStore.getState().create({
+        taskId: activeTaskId,
+        kind: 'page',
+        title: draft.title,
+        content: draft.content,
+        x: center.x - w / 2 + jitter(),
+        y: center.y - h / 2 + jitter(),
+        width: w,
+        height: h,
+        color: null
+      })
+    } else if (draft.kind === 'table') {
+      // CSV / array-of-objects JSON → create the backing table first,
+      // append every parsed row, then spawn the widget pointing at it.
+      const { useTablesStore } = await import('../stores/tables')
+      const table = await useTablesStore.getState().createTable({
+        taskId: activeTaskId,
+        title: draft.title,
+        schema: draft.schema
+      })
+      // Append rows. addRow expects cell values keyed by column id;
+      // our import emits them keyed by label, so we re-key via the
+      // schema.
+      const byLabel = new Map(
+        draft.schema.columns.map((c) => [c.label.toLowerCase(), c])
+      )
+      for (const row of draft.rows) {
+        const cells: Record<string, unknown> = {}
+        for (const [label, raw] of Object.entries(row)) {
+          const col = byLabel.get(label.toLowerCase())
+          if (!col) continue
+          cells[col.id] = coerceImportedCell(col.type, raw)
+        }
+        if (Object.keys(cells).length > 0) {
+          await useTablesStore.getState().addRow(table.id, cells)
+        }
+      }
+      const entry = catalogFor('table')
+      const w = entry?.defaultWidth ?? 480
+      const h = entry?.defaultHeight ?? 320
+      await useWidgetStore.getState().create({
+        taskId: activeTaskId,
+        kind: 'table',
+        title: draft.title,
+        content: table.id,
+        x: center.x - w / 2 + jitter(),
+        y: center.y - h / 2 + jitter(),
+        width: w,
+        height: h,
+        color: null
+      })
+    }
+  }
+
+  // Light cell coercion mirroring actionExecutor.coerceCellValue but
+  // inlined here so import doesn't have to thread its proposal through
+  // the apply pipeline.
+  function coerceImportedCell(
+    type: import('@shared/fields').FieldDefinition['type'],
+    raw: string
+  ): unknown {
+    if (raw === '') return type === 'checkbox' ? false : ''
+    switch (type) {
+      case 'number': {
+        const n = Number(raw)
+        return Number.isFinite(n) ? n : raw
+      }
+      case 'checkbox':
+        return /^(true|yes|1)$/i.test(raw)
+      default:
+        return raw
+    }
+  }
+
   function handleDragOver(e: React.DragEvent<HTMLDivElement>): void {
     const types = Array.from(e.dataTransfer.types)
     if (
@@ -1453,7 +1569,11 @@ export default function Canvas(): JSX.Element {
               opens a portalled popover with categorised chips. Replaces
               the previous full-width horizontal strip that wasted ~100px
               of vertical real estate even when collapsed. */}
-          <WidgetPalette onAdd={handleClickAdd} disabled={!activeTaskId} />
+          <WidgetPalette
+            onAdd={handleClickAdd}
+            onImport={() => void handleImportFile()}
+            disabled={!activeTaskId}
+          />
         </div>
 
         <div

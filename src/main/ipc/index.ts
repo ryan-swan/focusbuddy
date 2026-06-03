@@ -102,10 +102,16 @@ import {
 import { preloadLocalWhisper } from '../ai/localWhisper'
 import {
   runVoiceCommand,
+  runVoiceCommandStreaming,
   type CanvasSnapshotWidget,
   type VoiceCommandInput
 } from '../ai/voiceCommand'
 import { getVoiceCommandPrefs, setVoiceCommandPrefs } from '../voiceCommandPref'
+import {
+  importFile,
+  pickFileForImport,
+  type ImportTargetKind
+} from '../fileImport'
 import {
   expandMindMapNode,
   listAvailableAgents,
@@ -787,6 +793,50 @@ export function registerIpcHandlers(): void {
     'voiceCommand:setPrefs',
     (_e, patch: Parameters<typeof setVoiceCommandPrefs>[0]) =>
       setVoiceCommandPrefs(patch)
+  )
+  // File import — system file picker, plus a content-aware converter
+  // that turns .txt/.md/.csv/.json into widget drafts.
+  ipcMain.handle('fileImport:pick', () => pickFileForImport())
+  ipcMain.handle(
+    'fileImport:run',
+    (_e, args: { path: string; preferredTextKind?: ImportTargetKind }) =>
+      importFile(args.path, args.preferredTextKind ?? 'page')
+  )
+
+  // Streaming variant — proposals + reply text arrive on a per-request
+  // channel `voiceCommand:stream:<reqId>` so the renderer can correlate
+  // multiple in-flight invocations. Caller mints the reqId; we just
+  // shovel events at it. The handler returns synchronously once the
+  // stream completes (success OR error) so the renderer's await
+  // resolves cleanly.
+  ipcMain.handle(
+    'voiceCommand:runStream',
+    async (
+      e,
+      input: VoiceCommandInput & { requestId: string }
+    ): Promise<{ ok: boolean }> => {
+      const channel = `voiceCommand:stream:${input.requestId}`
+      const sender = e.sender
+      const send = (type: string, payload?: unknown): void => {
+        if (sender.isDestroyed()) return
+        sender.send(channel, { type, payload })
+      }
+      await runVoiceCommandStreaming(
+        {
+          transcript: input.transcript,
+          activeTaskId: input.activeTaskId,
+          selectedWidgetId: input.selectedWidgetId,
+          widgets: input.widgets
+        },
+        {
+          onReply: (text) => send('reply', text),
+          onProposal: (p) => send('proposal', p),
+          onError: (err) => send('error', err),
+          onComplete: (sum) => send('complete', sum)
+        }
+      )
+      return { ok: true }
+    }
   )
 
   // ── Tables (Notion/Airtable-style databases) ──────────────────────────────

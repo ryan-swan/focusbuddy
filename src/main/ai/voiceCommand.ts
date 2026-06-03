@@ -213,11 +213,25 @@ Available proposal kinds (return as a JSON array under "proposals"):
 5. "focus-widget" — bring a specific widget to the front + activate it ("focus the timer").
    { "kind": "focus-widget", "widgetId": "<id>", "label": "...", "reason": "..." }
 
-6. "create-task" — make a new sub-task.
-   { "kind": "create-task", "title": "...", "notes": "...", "reason": "..." }
+6. "drill-in-widget" — open a widget in focus mode (fullscreen single-widget zoomed modal). Use when the user wants a distraction-free view of one widget ("expand the page", "open my notes full screen").
+   { "kind": "drill-in-widget", "widgetId": "<id>", "label": "...", "reason": "..." }
 
-7. "create-todo-list" — quick markdown checklist widget.
-   { "kind": "create-todo-list", "title": "...", "items": ["...", "..."], "reason": "..." }
+7. "toggle-todo-item" — check / uncheck a specific item inside a markdown checklist or page widget. Match by substring.
+   { "kind": "toggle-todo-item", "widgetId": "<id>", "widgetLabel": "...", "itemMatch": "<substring of the line>", "checked": true|false, "reason": "..." }
+   Example: "check off the dentist appointment" → itemMatch: "dentist", checked: true.
+
+8. "arrange-widgets" — tidy the canvas into a grid. Use when the user says "arrange", "tidy", "organise the canvas", etc. Omit widgetIds to arrange ALL free-position widgets on the active task; include widgetIds to arrange a subset.
+   { "kind": "arrange-widgets", "widgetIds": null | ["<id>", ...], "label": "...", "reason": "..." }
+
+9. "add-table-row" — append a row to an existing table widget. Match by widgetId from the snapshot below; the table id is the widget's id (the canvas table widget owns one backing table).
+   { "kind": "add-table-row", "tableId": "<the table widget's id>", "cells": { "<columnLabel>": "<value>", ... }, "reason": "..." }
+   Use this when the user says "add a row to the budget table for groceries $80" — match column labels case-insensitively; the executor handles coercion.
+
+10. "create-task" — make a new sub-task.
+    { "kind": "create-task", "title": "...", "notes": "...", "reason": "..." }
+
+11. "create-todo-list" — quick markdown checklist widget.
+    { "kind": "create-todo-list", "title": "...", "items": ["...", "..."], "reason": "..." }
 
 Resolving "this" / "that" / "it":
 - If "selectedWidget" is set, that's "this".
@@ -398,6 +412,78 @@ function sanitiseProposal(
         reason
       }
     }
+    case 'toggle-todo-item': {
+      const wid = typeof o.widgetId === 'string' ? o.widgetId : ''
+      if (!known.has(wid)) return null
+      const match = typeof o.itemMatch === 'string' ? o.itemMatch.trim() : ''
+      if (!match) return null
+      return {
+        id,
+        kind: 'toggle-todo-item',
+        widgetId: wid,
+        widgetLabel:
+          typeof o.widgetLabel === 'string'
+            ? o.widgetLabel
+            : known.get(wid)?.title || 'widget',
+        itemMatch: match,
+        checked: typeof o.checked === 'boolean' ? o.checked : true,
+        reason
+      }
+    }
+    case 'drill-in-widget': {
+      const wid = typeof o.widgetId === 'string' ? o.widgetId : ''
+      if (!known.has(wid)) return null
+      return {
+        id,
+        kind: 'drill-in-widget',
+        widgetId: wid,
+        label: typeof o.label === 'string' ? o.label : known.get(wid)?.title || 'widget',
+        reason
+      }
+    }
+    case 'arrange-widgets': {
+      // widgetIds is optional — empty/null means "arrange every visible
+      // non-pinned widget". When provided, every id MUST be in the
+      // snapshot or the whole proposal is dropped.
+      let widgetIds: string[] | null = null
+      if (Array.isArray(o.widgetIds) && o.widgetIds.length > 0) {
+        widgetIds = []
+        for (const wid of o.widgetIds) {
+          if (typeof wid !== 'string') return null
+          if (!known.has(wid)) return null
+          widgetIds.push(wid)
+        }
+      }
+      return {
+        id,
+        kind: 'arrange-widgets',
+        widgetIds,
+        label: typeof o.label === 'string' ? o.label : 'all widgets',
+        reason
+      }
+    }
+    case 'add-table-row': {
+      const tid = typeof o.tableId === 'string' ? o.tableId : ''
+      // tableId is the table-widget's id; voiceCommand can only target
+      // widgets the user can see, so it MUST be in the snapshot AND of
+      // kind 'table'. (The executor itself does the column-coercion.)
+      const target = known.get(tid)
+      if (!target || target.kind !== 'table') return null
+      if (!o.cells || typeof o.cells !== 'object') return null
+      const cells: Record<string, string> = {}
+      for (const [k, v] of Object.entries(o.cells as Record<string, unknown>)) {
+        if (typeof k !== 'string') continue
+        cells[k] = typeof v === 'string' ? v : v == null ? '' : String(v)
+      }
+      if (Object.keys(cells).length === 0) return null
+      return {
+        id,
+        kind: 'add-table-row',
+        tableId: tid,
+        cells,
+        reason
+      }
+    }
     default:
       return null
   }
@@ -408,4 +494,251 @@ function sanitiseProposal(
 // touching the export surface.
 export function _voiceCommandTestUuid(): string {
   return randomUUID()
+}
+
+// ── Streaming variant ───────────────────────────────────────────────────────
+//
+// runVoiceCommandStreaming is the "feels alive" path the operator's spec
+// asked for: proposals appear in the dock as Claude emits them, not after
+// a full round-trip. Same input shape, same sanitiser, but each accepted
+// proposal is delivered through onProposal() the moment it lands, and the
+// reply text streams via onReply() so the user can read it as it forms.
+//
+// JSON streaming strategy: the model outputs free-form JSON like
+//   { "reply": "…", "proposals": [ {...}, {...}, … ] }
+// We accumulate text deltas, scan for the "reply" field as soon as it
+// closes, then track top-level objects inside the "proposals" array using
+// a brace counter (string-literal aware). Each balanced object is parsed
+// + sanitised independently. If the model emits a malformed entry we
+// drop that one, keep streaming the rest.
+//
+// We deliberately do NOT use Anthropic's tool-use streaming here, which
+// would also work but require rewriting the prompt to emit tool calls
+// instead of a JSON envelope. The "JSON envelope + brace scanner" path
+// keeps the single-source-of-truth prompt and lets us share the
+// sanitiser with the non-streaming runVoiceCommand.
+
+export interface VoiceCommandStreamCallbacks {
+  onReply: (replyText: string) => void
+  onProposal: (proposal: ActionProposal) => void
+  onError: (error: VoiceCommandError) => void
+  onComplete: (summary: { totalProposals: number; replyText: string }) => void
+}
+
+export async function runVoiceCommandStreaming(
+  input: VoiceCommandInput,
+  cb: VoiceCommandStreamCallbacks
+): Promise<void> {
+  const transcript = input.transcript.trim()
+  if (!transcript) {
+    cb.onError({ ok: false, error: 'Empty transcript — nothing to interpret.', reason: 'empty_transcript' })
+    return
+  }
+  const key = resolveAnthropicKey()
+  if (!key) {
+    cb.onError({
+      ok: false,
+      error: 'No Anthropic key set. Open Settings → AI · API keys to paste one.',
+      reason: 'no_key'
+    })
+    return
+  }
+  const widgetCatalogBlock = buildWidgetIndex(input.widgets, input.selectedWidgetId)
+  const contextBlock = buildContextBlock(input)
+  const system = buildSystemPrompt()
+  const userMsg =
+    `User said (voice transcript):\n"${transcript}"\n\n` +
+    `Current canvas:\n${contextBlock}\n\n` +
+    `Widgets on canvas (id ── kind ── title ── content-preview):\n${widgetCatalogBlock}\n\n` +
+    `Return the JSON now.`
+
+  const client = new Anthropic({ apiKey: key })
+  const known = new Map(input.widgets.map((w) => [w.id, w]))
+  const scanner = new StreamingProposalScanner()
+  let replyEmitted = false
+  let replyText = ''
+  let proposalIndex = 0
+  let acceptedCount = 0
+
+  try {
+    const stream = client.messages.stream({
+      model: resolveModel('setup'),
+      max_tokens: 2048,
+      system,
+      messages: [{ role: 'user', content: userMsg }]
+    })
+
+    stream.on('text', (delta: string) => {
+      scanner.push(delta)
+
+      // Emit reply text greedily once we've seen the closing quote on the
+      // reply field. Sometimes the model emits the proposals first
+      // (rarely, but valid) — onReply may stay un-fired until completion
+      // in that case, and we flush from the final parse in `finally`.
+      if (!replyEmitted) {
+        const r = scanner.extractReply()
+        if (r !== null) {
+          replyEmitted = true
+          replyText = r
+          cb.onReply(r)
+        }
+      }
+
+      // Drain all complete proposal objects we can see right now.
+      while (true) {
+        const next = scanner.nextProposal()
+        if (next === null) break
+        const sanitised = sanitiseProposal(next, known, input.activeTaskId, proposalIndex++)
+        if (sanitised) {
+          acceptedCount += 1
+          cb.onProposal(sanitised)
+        }
+      }
+    })
+
+    await stream.finalMessage()
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    cb.onError({ ok: false, error: msg.length > 240 ? msg.slice(0, 240) + '…' : msg, reason: 'api' })
+    return
+  }
+
+  // Fallback: if reply never streamed (e.g. proposals-first order), pull
+  // it from the final accumulated text via the same parser the
+  // non-streaming path uses.
+  if (!replyEmitted) {
+    const parsed = parseResponse(scanner.fullText())
+    if (parsed.ok && parsed.reply) {
+      replyText = parsed.reply
+      cb.onReply(parsed.reply)
+    }
+  }
+
+  cb.onComplete({ totalProposals: acceptedCount, replyText })
+}
+
+// Incremental JSON-array scanner. Stores the running text buffer and
+// tracks the brace + bracket depth so we can carve out completed
+// objects inside the "proposals" array as soon as they land. String-
+// literal aware (escapes + quotes don't confuse the counter).
+//
+// The scanner doesn't validate — it returns raw parsed objects, which
+// the caller pipes through sanitiseProposal() before emitting.
+class StreamingProposalScanner {
+  private buf = ''
+  private replyEnd: number | null = null // index where the reply field's closing " sits
+  private proposalsArrayStart: number | null = null
+  // Position the next-extract scan starts at (cursor advances as we
+  // emit each completed object).
+  private scanFrom = 0
+
+  push(chunk: string): void {
+    this.buf += chunk
+  }
+
+  fullText(): string {
+    return this.buf
+  }
+
+  extractReply(): string | null {
+    if (this.replyEnd !== null) {
+      // Already emitted — caller shouldn't call us again, but guard.
+      return null
+    }
+    // Look for `"reply"\s*:\s*"` then walk forward respecting escapes
+    // until the closing quote.
+    const m = this.buf.match(/"reply"\s*:\s*"/)
+    if (!m || m.index === undefined) return null
+    const start = m.index + m[0].length
+    let i = start
+    while (i < this.buf.length) {
+      const c = this.buf[i]
+      if (c === '\\') {
+        i += 2
+        continue
+      }
+      if (c === '"') {
+        this.replyEnd = i
+        // Decode the JSON string fragment by reparsing it within a tiny envelope.
+        try {
+          const json = `"${this.buf.slice(start, i)}"`
+          return JSON.parse(json) as string
+        } catch {
+          return this.buf.slice(start, i)
+        }
+      }
+      i += 1
+    }
+    return null
+  }
+
+  nextProposal(): unknown | null {
+    // Locate the proposals array if we haven't already.
+    if (this.proposalsArrayStart === null) {
+      const m = this.buf.match(/"proposals"\s*:\s*\[/)
+      if (!m || m.index === undefined) return null
+      this.proposalsArrayStart = m.index + m[0].length
+      this.scanFrom = this.proposalsArrayStart
+    }
+    // Scan from scanFrom looking for a complete top-level object.
+    // Skip whitespace / commas between objects.
+    let i = this.scanFrom
+    while (i < this.buf.length && /[\s,]/.test(this.buf[i])) i += 1
+    if (i >= this.buf.length) {
+      this.scanFrom = i
+      return null
+    }
+    if (this.buf[i] === ']') {
+      // End of proposals array — nothing more to find.
+      this.scanFrom = i
+      return null
+    }
+    if (this.buf[i] !== '{') {
+      // Junk before the next object — skip a char and try again next push.
+      this.scanFrom = i + 1
+      return null
+    }
+    // We're at the start of an object. Walk forward maintaining brace +
+    // bracket depth + string-literal state until depth returns to 0.
+    let depth = 0
+    let inString = false
+    let escape = false
+    let j = i
+    while (j < this.buf.length) {
+      const c = this.buf[j]
+      if (escape) {
+        escape = false
+        j += 1
+        continue
+      }
+      if (inString) {
+        if (c === '\\') escape = true
+        else if (c === '"') inString = false
+        j += 1
+        continue
+      }
+      if (c === '"') {
+        inString = true
+      } else if (c === '{' || c === '[') {
+        depth += 1
+      } else if (c === '}' || c === ']') {
+        depth -= 1
+        if (depth === 0) {
+          // Completed object spans i..j inclusive.
+          const slice = this.buf.slice(i, j + 1)
+          this.scanFrom = j + 1
+          try {
+            return JSON.parse(slice)
+          } catch {
+            return null
+          }
+        }
+      }
+      j += 1
+    }
+    // Object not yet complete — don't advance scanFrom past i so the
+    // next push() finds it again.
+    this.scanFrom = i
+    return null
+  }
 }

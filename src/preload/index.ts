@@ -558,7 +558,61 @@ const api = {
       commandMode: 'press-hold' | 'click-toggle'
       autoStopSilenceMs: number
       voiceback: boolean
-    }> => ipcRenderer.invoke('voiceCommand:setPrefs', patch)
+    }> => ipcRenderer.invoke('voiceCommand:setPrefs', patch),
+    // Streaming variant — caller mints a requestId and listens on the
+    // per-request channel. Returns a cleanup function to unsubscribe.
+    runStream: (
+      input: {
+        requestId: string
+        transcript: string
+        activeTaskId: string | null
+        selectedWidgetId: string | null
+        widgets: Array<{
+          id: string
+          kind: string
+          title: string
+          contentPreview: string
+          selected?: boolean
+          recentlyTouched?: boolean
+          visible?: boolean
+        }>
+      },
+      callbacks: {
+        onReply?: (text: string) => void
+        onProposal?: (proposal: ActionProposal) => void
+        onError?: (error: { ok: false; error: string; reason?: string }) => void
+        onComplete?: (summary: { totalProposals: number; replyText: string }) => void
+      }
+    ): (() => void) => {
+      const channel = `voiceCommand:stream:${input.requestId}`
+      type Event =
+        | { type: 'reply'; payload: string }
+        | { type: 'proposal'; payload: ActionProposal }
+        | { type: 'error'; payload: { ok: false; error: string; reason?: string } }
+        | { type: 'complete'; payload: { totalProposals: number; replyText: string } }
+      const handler = (_: unknown, ev: Event): void => {
+        switch (ev.type) {
+          case 'reply':
+            callbacks.onReply?.(ev.payload)
+            break
+          case 'proposal':
+            callbacks.onProposal?.(ev.payload)
+            break
+          case 'error':
+            callbacks.onError?.(ev.payload)
+            break
+          case 'complete':
+            callbacks.onComplete?.(ev.payload)
+            break
+        }
+      }
+      ipcRenderer.on(channel, handler)
+      // Kick off the stream. We deliberately fire-and-forget — the
+      // events handle the result; the invoke promise just keeps the
+      // request alive on the main side until it resolves.
+      void ipcRenderer.invoke('voiceCommand:runStream', input)
+      return (): void => ipcRenderer.removeListener(channel, handler)
+    }
   },
   // Phase 2A — agent creation wizard. Writes a brand-new agent .md
   // file to .claude/agents/ with a Claude-generated body following
@@ -799,6 +853,44 @@ const api = {
       ipcRenderer.on('auth:incoming-token', handler)
       return () => ipcRenderer.removeListener('auth:incoming-token', handler)
     }
+  },
+  // File import — opens a native picker scoped to importable extensions,
+  // then converts the contents into a widget draft (text / table /
+  // page-from-json). The renderer creates the actual widget through the
+  // widget store so import shares the same persistence + drop semantics
+  // as a manually-created widget.
+  fileImport: {
+    pick: (): Promise<string | null> => ipcRenderer.invoke('fileImport:pick'),
+    run: (args: {
+      path: string
+      preferredTextKind?: 'page' | 'markdown' | 'note'
+    }): Promise<
+      | {
+          kind: 'text'
+          targetKind: 'page' | 'markdown' | 'note'
+          title: string
+          content: string
+          sourcePath: string
+        }
+      | {
+          kind: 'table'
+          title: string
+          schema: import('@shared/fields').TableSchema
+          rows: Array<Record<string, string>>
+          sourcePath: string
+        }
+      | {
+          kind: 'page-from-json'
+          title: string
+          content: string
+          sourcePath: string
+        }
+      | {
+          ok: false
+          error: string
+          reason: 'cancelled' | 'unsupported' | 'parse' | 'read' | 'docx_not_supported'
+        }
+    > => ipcRenderer.invoke('fileImport:run', args)
   },
   // Auto-update bridge. Renderer reads the snapshot via getState on
   // mount, then subscribes via onState to receive every transition.
