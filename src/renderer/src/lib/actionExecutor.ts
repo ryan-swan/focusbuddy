@@ -7,13 +7,14 @@
 // Each handler returns { ok, message } so the chat UI can show a confirmation
 // chip ("✓ Created Project tracker" / "✗ Couldn't open URL") inline.
 
-import type { ActionProposal, WidgetKind } from '@shared/types'
+import type { ActionProposal, WidgetKind, WidgetPatch } from '@shared/types'
 import type { FieldDefinition, TableSchema } from '@shared/fields'
 import { defaultConfig, defaultValue } from '@shared/fields'
 import { useNodeStore } from '../stores/nodes'
 import { useWidgetStore } from '../stores/widgets'
 import { useFocusSessionStore } from '../stores/focusSession'
 import { useTablesStore } from '../stores/tables'
+import { useLinksStore } from '../stores/links'
 import { catalogFor } from './widgetCatalog'
 
 // Palette for auto-assigning select option colors when the AI doesn't specify.
@@ -67,6 +68,10 @@ export async function applyProposal(
       return applyDeleteWidget(proposal)
     case 'update-widget':
       return applyUpdateWidget(proposal)
+    case 'link-widgets':
+      return applyLinkWidgets(proposal, ctx)
+    case 'focus-widget':
+      return applyFocusWidget(proposal)
     case 'create-table':
       return applyCreateTable(proposal, ctx)
     case 'add-table-row':
@@ -219,14 +224,65 @@ async function applyUpdateWidget(
   if (!target) {
     return { ok: false, message: `No widget found with id ${p.widgetId.slice(0, 8)}…` }
   }
-  const patch: { title?: string; content?: string } = {}
+  const patch: WidgetPatch = {}
   if (p.title !== undefined) patch.title = p.title
-  if (p.content !== undefined) patch.content = p.content
+  if (p.content !== undefined) {
+    const op = p.operation ?? 'replace'
+    if (op === 'append') {
+      const sep = target.content && !target.content.endsWith('\n') ? '\n' : ''
+      patch.content = `${target.content || ''}${sep}${p.content}`
+    } else if (op === 'prepend') {
+      const sep = p.content.endsWith('\n') ? '' : '\n'
+      patch.content = `${p.content}${sep}${target.content || ''}`
+    } else {
+      patch.content = p.content
+    }
+  }
+  if (p.x !== undefined) patch.x = p.x
+  if (p.y !== undefined) patch.y = p.y
+  if (p.width !== undefined) patch.width = Math.max(120, p.width)
+  if (p.height !== undefined) patch.height = Math.max(80, p.height)
   if (Object.keys(patch).length === 0) {
-    return { ok: false, message: 'Nothing to update — no title or content provided.' }
+    return { ok: false, message: 'Nothing to update.' }
   }
   await useWidgetStore.getState().update(p.widgetId, patch)
   return { ok: true, message: `Updated ${p.label}` }
+}
+
+async function applyLinkWidgets(
+  p: Extract<ActionProposal, { kind: 'link-widgets' }>,
+  ctx: { activeTaskId: string | null }
+): Promise<ApplyResult> {
+  if (!ctx.activeTaskId) {
+    return { ok: false, message: 'Open a task first — links live on a canvas.' }
+  }
+  const widgets = useWidgetStore.getState().widgets
+  const src = widgets.find((w) => w.id === p.sourceWidgetId)
+  const tgt = widgets.find((w) => w.id === p.targetWidgetId)
+  if (!src || !tgt) {
+    return { ok: false, message: 'One of the linked widgets no longer exists.' }
+  }
+  const link = await useLinksStore
+    .getState()
+    .create(p.sourceWidgetId, p.targetWidgetId, ctx.activeTaskId)
+  if (!link) {
+    return { ok: false, message: 'Link already exists or was rejected by the server.' }
+  }
+  return { ok: true, message: `Linked ${p.sourceLabel} → ${p.targetLabel}` }
+}
+
+async function applyFocusWidget(
+  p: Extract<ActionProposal, { kind: 'focus-widget' }>
+): Promise<ApplyResult> {
+  const widgets = useWidgetStore.getState().widgets
+  const target = widgets.find((w) => w.id === p.widgetId)
+  if (!target) {
+    return { ok: false, message: `No widget found with id ${p.widgetId.slice(0, 8)}…` }
+  }
+  await useWidgetStore.getState().bringToFront(p.widgetId)
+  useWidgetStore.getState().setActive(p.widgetId)
+  useWidgetStore.getState().focusOn(p.widgetId)
+  return { ok: true, message: `Focused ${p.label}` }
 }
 
 // Translate the AI's column shorthand (label/type/options strings) into the
@@ -538,6 +594,10 @@ export function describeProposal(
         verb: 'Add field',
         subject: `${p.label} · ${p.fieldType}`
       }
+    case 'link-widgets':
+      return { icon: 'link', verb: 'Link', subject: `${p.sourceLabel} → ${p.targetLabel}` }
+    case 'focus-widget':
+      return { icon: 'center_focus_strong', verb: 'Focus', subject: p.label }
     default:
       return { icon: 'auto_awesome', verb: 'Action', subject: '' }
   }

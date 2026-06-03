@@ -316,6 +316,37 @@ export type ActionProposal =
       label: string
       title?: string
       content?: string
+      // Position / size mutations — all optional. Any field omitted is left
+      // unchanged. Voice commands like "move this to the top right" or "make
+      // it bigger" land here.
+      x?: number
+      y?: number
+      width?: number
+      height?: number
+      // For content updates: replace (default) wipes the existing body,
+      // append/prepend tack the new text onto either end with a leading
+      // space/newline. Lets voice commands like "add 'call dentist' to my
+      // todo list" append without obliterating the existing items.
+      operation?: 'replace' | 'append' | 'prepend'
+      reason?: string
+    }
+  | {
+      id: string
+      kind: 'link-widgets'
+      // Source / target are widget ids. The voice interpreter resolves
+      // user-friendly references ("the budget table") into ids before
+      // returning this proposal — Apply just calls widgetLinks.create.
+      sourceWidgetId: string
+      targetWidgetId: string
+      sourceLabel: string
+      targetLabel: string
+      reason?: string
+    }
+  | {
+      id: string
+      kind: 'focus-widget'
+      widgetId: string
+      label: string
       reason?: string
     }
   | {

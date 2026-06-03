@@ -47,6 +47,11 @@ export default function SettingsPanel({
   const [sound, setSound] = useState<SoundPrefs>(() => getSoundPrefs())
   const [modelMode, setModelMode] = useModelMode()
   const [hapticsNative, setHapticsNative] = useState<boolean | null>(null)
+  const [voicePrefs, setVoicePrefs] = useState<{
+    commandMode: 'press-hold' | 'click-toggle'
+    autoStopSilenceMs: number
+    voiceback: boolean
+  } | null>(null)
 
   useEffect(() => {
     window.api.haptics
@@ -54,6 +59,24 @@ export default function SettingsPanel({
       .then((ok) => setHapticsNative(ok))
       .catch(() => setHapticsNative(false))
   }, [])
+
+  useEffect(() => {
+    window.api.voiceCommand
+      .getPrefs()
+      .then((p) => setVoicePrefs(p))
+      .catch(() => {})
+  }, [])
+
+  async function patchVoicePrefs(
+    patch: Partial<{
+      commandMode: 'press-hold' | 'click-toggle'
+      autoStopSilenceMs: number
+      voiceback: boolean
+    }>
+  ): Promise<void> {
+    const next = await window.api.voiceCommand.setPrefs(patch)
+    setVoicePrefs(next)
+  }
 
   useEffect(() => {
     return subscribeSoundPrefs((p) => setSound(p))
@@ -398,6 +421,92 @@ export default function SettingsPanel({
       </div>
 
       <ApiKeysSection />
+
+      {voicePrefs && (
+        <div className="px-3 py-3 border-t border-stone-200 dark:border-stone-700 space-y-3">
+          <div className="text-[11px] uppercase tracking-[0.12em] text-stone-500 dark:text-stone-400 font-medium">
+            Voice command (mic button)
+          </div>
+          <div>
+            <div className="text-[11px] text-stone-600 dark:text-stone-400 mb-1.5">
+              Trigger mode
+            </div>
+            <div className="grid grid-cols-2 gap-1">
+              {(
+                [
+                  {
+                    value: 'press-hold' as const,
+                    label: 'Press & hold',
+                    sub: 'Walkie-talkie — release to send'
+                  },
+                  {
+                    value: 'click-toggle' as const,
+                    label: 'Click to toggle',
+                    sub: 'Auto-stops on silence'
+                  }
+                ]
+              ).map((o) => (
+                <button
+                  key={o.value}
+                  onClick={() => void patchVoicePrefs({ commandMode: o.value })}
+                  className={`text-left px-2.5 py-2 rounded-md border text-[11px] transition-colors ${
+                    voicePrefs.commandMode === o.value
+                      ? 'border-accent bg-accent/10 text-stone-900 dark:text-stone-100'
+                      : 'border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 text-stone-700 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-700'
+                  }`}
+                  data-testid={`voice-mode-${o.value}`}
+                >
+                  <div className="font-medium">{o.label}</div>
+                  <div className="text-[9px] text-stone-500 dark:text-stone-400 mt-0.5">
+                    {o.sub}
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+          {voicePrefs.commandMode === 'click-toggle' && (
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-[11px] text-stone-600 dark:text-stone-400">
+                  Auto-stop after silence
+                </span>
+                <span className="text-[10px] font-mono text-stone-500 dark:text-stone-400">
+                  {(voicePrefs.autoStopSilenceMs / 1000).toFixed(1)}s
+                </span>
+              </div>
+              <input
+                type="range"
+                min={1000}
+                max={15000}
+                step={500}
+                value={voicePrefs.autoStopSilenceMs}
+                onChange={(e) =>
+                  void patchVoicePrefs({ autoStopSilenceMs: Number(e.target.value) })
+                }
+                className="w-full accent-accent"
+                data-testid="voice-silence-slider"
+              />
+            </div>
+          )}
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={voicePrefs.voiceback}
+              onChange={(e) => void patchVoicePrefs({ voiceback: e.target.checked })}
+              className="accent-accent"
+              data-testid="voice-voiceback-checkbox"
+            />
+            <span className="text-[11px] text-stone-700 dark:text-stone-200">
+              Speak the AI's reply aloud
+            </span>
+          </label>
+          <p className="text-[10px] text-stone-500 dark:text-stone-400 leading-snug">
+            Press the floating mic at the bottom of the canvas to give the AI a
+            verbal command. It returns suggestions you can Apply or Dismiss —
+            just like AI-generated tasks.
+          </p>
+        </div>
+      )}
 
       <div className="px-3 py-2 border-t border-stone-200 dark:border-stone-700 bg-stone-100/50 dark:bg-stone-800/50 text-[10px] text-stone-500 dark:text-stone-500">
         Preferences saved locally. Click sounds in browser widgets aren't captured yet — only in stickies, notes, chat, and dialogs.
