@@ -3,7 +3,8 @@ import Icon from './Icon'
 import { applyProposal, describeProposal } from '../lib/actionExecutor'
 import { buildCanvasSnapshot } from '../lib/canvasSnapshot'
 import { useViewStore } from '../stores/view'
-import type { ActionProposal } from '@shared/types'
+import { useWidgetStore } from '../stores/widgets'
+import type { ActionProposal, Widget } from '@shared/types'
 
 // VoiceCommandFAB — the always-available floating mic for voice control
 // of the canvas. Spec:
@@ -190,13 +191,16 @@ export default function VoiceCommandFAB(): JSX.Element {
       interimAtRef.current = Date.now()
       setPhase('listening')
       startLiveCaptions()
-      // Click-toggle mode: arm the silence watchdog.
+      // Click-toggle mode: arm the silence watchdog. When silence
+      // exceeds the threshold, stop capture — the transcript still
+      // stages for correction; we don't auto-send. The user always
+      // decides what to send.
       if (prefs.commandMode === 'click-toggle') {
         const tick = (): void => {
           if (recorderRef.current?.state !== 'recording') return
           const sinceSpeech = Date.now() - interimAtRef.current
           if (sinceSpeech >= prefs.autoStopSilenceMs) {
-            void stopCapture(true) // auto-stop
+            void stopCapture()
             return
           }
           silenceTimerRef.current = window.setTimeout(tick, 400)
@@ -209,92 +213,75 @@ export default function VoiceCommandFAB(): JSX.Element {
     }
   }, [prefs.commandMode, prefs.autoStopSilenceMs, startLiveCaptions])
 
-  const stopCapture = useCallback(
-    async (auto: boolean): Promise<void> => {
-      clearSilenceTimer()
-      stopLiveCaptions()
-      const rec = recorderRef.current
-      if (!rec) return
-      // Wait for the final dataavailable to land before we package.
-      await new Promise<void>((resolve) => {
-        const t = window.setTimeout(resolve, 600) // hard cap
-        rec.onstop = (): void => {
-          window.clearTimeout(t)
-          resolve()
-        }
-        try {
-          if (rec.state !== 'inactive') rec.stop()
-        } catch {
-          // already stopped
-          resolve()
-        }
-      })
-      streamRef.current?.getTracks().forEach((t) => t.stop())
-      streamRef.current = null
-      recorderRef.current = null
-
-      const captionText = liveCaption.trim()
-      if (chunksRef.current.length === 0 && !captionText) {
-        setError('No audio captured.')
-        setPhase('idle')
-        return
+  const stopCapture = useCallback(async (): Promise<void> => {
+    clearSilenceTimer()
+    stopLiveCaptions()
+    const rec = recorderRef.current
+    if (!rec) return
+    // Wait for the final dataavailable to land before we package.
+    await new Promise<void>((resolve) => {
+      const t = window.setTimeout(resolve, 600) // hard cap
+      rec.onstop = (): void => {
+        window.clearTimeout(t)
+        resolve()
       }
-      const blob = new Blob(chunksRef.current, { type: 'audio/webm' })
-      setPhase('staged')
-      // Kick off Whisper transcription — when it returns, prefer the
-      // Whisper output over the live caption (more accurate).
-      const buf = await blob.arrayBuffer()
       try {
-        const provider = await window.api.voiceNote.getProvider()
-        let res
-        if (provider === 'local') {
-          // Decode in renderer for local Whisper path.
-          const samples = await decodeToMono16k(buf)
-          res = await window.api.voiceNote.transcribe({ samples, sampleRate: 16000 })
-        } else {
-          res = await window.api.voiceNote.transcribe({ buffer: buf, mimeType: 'audio/webm' })
-        }
-        if (res.ok) {
-          const final = res.transcript.trim() || captionText
-          setTranscript(final)
-          setEditedTranscript(final)
-        } else {
-          // Whisper failed — fall back to the live caption text. Better
-          // a slightly-wrong transcript the user can edit than nothing.
-          setTranscript(captionText)
-          setEditedTranscript(captionText)
-          if (!captionText) {
-            setError(res.error)
-            setPhase('idle')
-            return
-          }
-        }
-      } catch (err) {
+        if (rec.state !== 'inactive') rec.stop()
+      } catch {
+        // already stopped
+        resolve()
+      }
+    })
+    streamRef.current?.getTracks().forEach((t) => t.stop())
+    streamRef.current = null
+    recorderRef.current = null
+
+    const captionText = liveCaption.trim()
+    if (chunksRef.current.length === 0 && !captionText) {
+      setError('No audio captured.')
+      setPhase('idle')
+      return
+    }
+    const blob = new Blob(chunksRef.current, { type: 'audio/webm' })
+    // Spec: "when finished are staged for correction" — both modes land
+    // here. The user reviews / edits the transcript and clicks Send when
+    // ready. We never auto-send: the user always controls when the
+    // canvas snapshot is shipped to the AI.
+    setPhase('staged')
+    const buf = await blob.arrayBuffer()
+    try {
+      const provider = await window.api.voiceNote.getProvider()
+      let res
+      if (provider === 'local') {
+        const samples = await decodeToMono16k(buf)
+        res = await window.api.voiceNote.transcribe({ samples, sampleRate: 16000 })
+      } else {
+        res = await window.api.voiceNote.transcribe({ buffer: buf, mimeType: 'audio/webm' })
+      }
+      if (res.ok) {
+        const final = res.transcript.trim() || captionText
+        setTranscript(final)
+        setEditedTranscript(final)
+      } else {
+        // Whisper failed — fall back to the live caption text. Better
+        // a slightly-wrong transcript the user can edit than nothing.
         setTranscript(captionText)
         setEditedTranscript(captionText)
         if (!captionText) {
-          setError((err as Error).message || 'Transcription failed.')
+          setError(res.error)
           setPhase('idle')
           return
         }
       }
-      // In click-toggle auto-stop, immediately send. In press-hold OR
-      // manual click-stop, stay in 'staged' so the user can edit.
-      if (auto && prefs.commandMode === 'click-toggle') {
-        // Use the edited transcript value via a setter-driven dispatch.
-        setTimeout(() => {
-          void sendToAi()
-        }, 100)
+    } catch (err) {
+      setTranscript(captionText)
+      setEditedTranscript(captionText)
+      if (!captionText) {
+        setError((err as Error).message || 'Transcription failed.')
+        setPhase('idle')
       }
-    },
-    [
-      clearSilenceTimer,
-      liveCaption,
-      prefs.commandMode,
-      stopLiveCaptions
-      // sendToAi forward declared — referenced via closure on next render
-    ]
-  )
+    }
+  }, [clearSilenceTimer, liveCaption, stopLiveCaptions])
 
   const sendToAi = useCallback(async (): Promise<void> => {
     const text = (editedTranscript || transcript).trim()
@@ -383,17 +370,11 @@ export default function VoiceCommandFAB(): JSX.Element {
         e.preventDefault()
         pressHoldArmedRef.current = false
         if (phase === 'listening') {
-          await stopCapture(false)
-          // In press-hold, default to immediate send — they spoke, they
-          // released, that's their submit. The staged screen still shows
-          // briefly so they can cancel if the transcript looks wrong.
-          setTimeout(() => {
-            void sendToAi()
-          }, 150)
+          await stopCapture()
         }
       }
     },
-    [prefs.commandMode, phase, stopCapture, sendToAi]
+    [prefs.commandMode, phase, stopCapture]
   )
 
   const fabClick = useCallback(async (): Promise<void> => {
@@ -401,7 +382,7 @@ export default function VoiceCommandFAB(): JSX.Element {
       if (phase === 'idle') {
         await beginCapture()
       } else if (phase === 'listening') {
-        await stopCapture(false)
+        await stopCapture()
       }
     }
   }, [prefs.commandMode, phase, beginCapture, stopCapture])
@@ -433,30 +414,48 @@ export default function VoiceCommandFAB(): JSX.Element {
             {phase === 'staged' && (
               <div className="fb-glass-chrome rounded-lg border border-[color:var(--glass-chrome-border)] p-3 shadow-xl">
                 <div className="text-accent text-[10px] uppercase tracking-[0.18em] mb-1.5">
-                  Transcript · edit before sending
+                  Transcript · edit and send
                 </div>
                 <textarea
+                  ref={(el) => {
+                    // Auto-focus when staged so the user can immediately
+                    // correct without reaching for the mouse.
+                    if (el && document.activeElement !== el) el.focus()
+                  }}
                   value={editedTranscript}
                   onChange={(e) => setEditedTranscript(e.target.value)}
-                  rows={2}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                      e.preventDefault()
+                      void sendToAi()
+                    } else if (e.key === 'Escape') {
+                      e.preventDefault()
+                      onDismissAll()
+                    }
+                  }}
+                  rows={3}
+                  placeholder={transcript ? '' : 'Transcribing…'}
                   className="w-full bg-stone-50/40 dark:bg-stone-800/40 border border-stone-200/60 dark:border-stone-700/60 rounded px-2 py-1.5 text-[12px] text-stone-900 dark:text-stone-100 focus:outline-none focus:border-accent resize-none"
                   data-testid="voice-command-transcript"
                 />
-                <div className="flex justify-end gap-1.5 mt-2">
-                  <button
-                    onClick={onDismissAll}
-                    className="text-[11px] px-2 py-1 rounded hover:bg-stone-100/10 text-stone-300"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={() => void sendToAi()}
-                    disabled={!editedTranscript.trim()}
-                    className="text-[11px] px-2.5 py-1 rounded bg-accent text-white disabled:opacity-50 hover:brightness-110"
-                    data-testid="voice-command-send"
-                  >
-                    Send
-                  </button>
+                <div className="flex items-center justify-between mt-2">
+                  <span className="text-[9px] text-stone-500">⌘⏎ to send · Esc to cancel</span>
+                  <div className="flex gap-1.5">
+                    <button
+                      onClick={onDismissAll}
+                      className="text-[11px] px-2 py-1 rounded hover:bg-stone-100/10 text-stone-300"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => void sendToAi()}
+                      disabled={!editedTranscript.trim()}
+                      className="text-[11px] px-2.5 py-1 rounded bg-accent text-white disabled:opacity-50 hover:brightness-110"
+                      data-testid="voice-command-send"
+                    >
+                      Send
+                    </button>
+                  </div>
                 </div>
                 {error && (
                   <div className="text-[10px] text-amber-400 mt-1.5">{error}</div>
@@ -553,7 +552,17 @@ interface ProposalCardProps {
 function ProposalCard({ proposal, onApply, onDismiss }: ProposalCardProps): JSX.Element {
   const desc = describeProposal(proposal)
   const isDestructive = proposal.kind === 'delete-widget'
+  const isUpdate = proposal.kind === 'update-widget'
   const status = proposal._status ?? 'pending'
+
+  // Look up the target widget so update cards can render a before/after
+  // diff inline. Subscribed reactively — if the widget mutates while a
+  // proposal is pending, the card stays accurate.
+  const target = useWidgetStore((s) =>
+    proposal.kind === 'update-widget' || proposal.kind === 'delete-widget' || proposal.kind === 'focus-widget'
+      ? s.widgets.find((w) => w.id === proposal.widgetId)
+      : undefined
+  )
 
   if (status === 'applied') {
     return (
@@ -587,39 +596,126 @@ function ProposalCard({ proposal, onApply, onDismiss }: ProposalCardProps): JSX.
   }
   return (
     <div
-      className={`flex items-center gap-1.5 px-2 py-1.5 rounded border text-[11px] ${
+      className={`px-2 py-1.5 rounded border text-[11px] ${
         isDestructive
           ? 'bg-rose-500/5 border-rose-500/30'
           : 'bg-stone-800/40 border-stone-700/60'
       }`}
     >
-      <Icon
-        name={desc.icon}
-        size={12}
-        className={isDestructive ? 'text-rose-400' : 'text-accent'}
-      />
-      <div className="flex-1 min-w-0">
-        <div className="text-stone-100 font-medium truncate">{desc.verb}</div>
-        <div className="text-stone-400 text-[10px] truncate">{desc.subject}</div>
+      <div className="flex items-center gap-1.5">
+        <Icon
+          name={desc.icon}
+          size={12}
+          className={isDestructive ? 'text-rose-400' : 'text-accent'}
+        />
+        <div className="flex-1 min-w-0">
+          <div className="text-stone-100 font-medium truncate">{desc.verb}</div>
+          <div className="text-stone-400 text-[10px] truncate">{desc.subject}</div>
+        </div>
+        <button
+          onClick={onDismiss}
+          className="text-[10px] text-stone-400 hover:text-stone-200 px-1"
+          data-testid={`voice-proposal-dismiss-${proposal.id}`}
+        >
+          Dismiss
+        </button>
+        <button
+          onClick={onApply}
+          className={`text-[10px] px-2 py-0.5 rounded text-white hover:brightness-110 ${
+            isDestructive ? 'bg-rose-600' : 'bg-accent'
+          }`}
+          data-testid={`voice-proposal-apply-${proposal.id}`}
+        >
+          {isDestructive ? 'Confirm delete' : 'Apply'}
+        </button>
       </div>
-      <button
-        onClick={onDismiss}
-        className="text-[10px] text-stone-400 hover:text-stone-200 px-1"
-        data-testid={`voice-proposal-dismiss-${proposal.id}`}
-      >
-        Dismiss
-      </button>
-      <button
-        onClick={onApply}
-        className={`text-[10px] px-2 py-0.5 rounded text-white hover:brightness-110 ${
-          isDestructive ? 'bg-rose-600' : 'bg-accent'
-        }`}
-        data-testid={`voice-proposal-apply-${proposal.id}`}
-      >
-        {isDestructive ? 'Confirm delete' : 'Apply'}
-      </button>
+      {isUpdate && target && proposal.kind === 'update-widget' && (
+        <UpdateDiff
+          before={target}
+          proposal={proposal as Extract<ActionProposal, { kind: 'update-widget' }>}
+        />
+      )}
     </div>
   )
+}
+
+// Inline before/after diff for update-widget proposals. Only renders
+// rows for fields the proposal actually mutates — keeps the card
+// compact when only one attribute changes. Long text values are
+// clipped to a single ellipsised line; the full content is in the
+// canvas after Apply.
+interface UpdateDiffProps {
+  before: Widget
+  proposal: Extract<ActionProposal, { kind: 'update-widget' }>
+}
+
+function UpdateDiff({ before, proposal }: UpdateDiffProps): JSX.Element {
+  const rows: Array<{ field: string; from: string; to: string }> = []
+  if (proposal.title !== undefined) {
+    rows.push({ field: 'Title', from: before.title || '∅', to: proposal.title || '∅' })
+  }
+  if (proposal.content !== undefined) {
+    const op = proposal.operation ?? 'replace'
+    if (op === 'append') {
+      rows.push({
+        field: 'Append',
+        from: clip(before.content || '', 36),
+        to: `… + ${clip(proposal.content, 36)}`
+      })
+    } else if (op === 'prepend') {
+      rows.push({
+        field: 'Prepend',
+        from: clip(before.content || '', 36),
+        to: `${clip(proposal.content, 36)} + …`
+      })
+    } else {
+      rows.push({
+        field: 'Content',
+        from: clip(before.content || '', 36),
+        to: clip(proposal.content, 36)
+      })
+    }
+  }
+  if (proposal.x !== undefined || proposal.y !== undefined) {
+    rows.push({
+      field: 'Position',
+      from: `(${Math.round(before.x)}, ${Math.round(before.y)})`,
+      to: `(${Math.round(proposal.x ?? before.x)}, ${Math.round(proposal.y ?? before.y)})`
+    })
+  }
+  if (proposal.width !== undefined || proposal.height !== undefined) {
+    rows.push({
+      field: 'Size',
+      from: `${Math.round(before.width)} × ${Math.round(before.height)}`,
+      to: `${Math.round(proposal.width ?? before.width)} × ${Math.round(proposal.height ?? before.height)}`
+    })
+  }
+  if (rows.length === 0) return <></>
+  return (
+    <div
+      className="mt-1.5 pt-1.5 border-t border-stone-700/60 space-y-0.5"
+      data-testid="voice-proposal-diff"
+    >
+      {rows.map((r) => (
+        <div key={r.field} className="flex items-center gap-1 text-[10px] min-w-0">
+          <span className="text-stone-500 w-14 shrink-0">{r.field}</span>
+          <span className="text-stone-400 truncate flex-1" title={r.from}>
+            {r.from}
+          </span>
+          <Icon name="arrow_right_alt" size={10} className="text-stone-500 shrink-0" />
+          <span className="text-accent truncate flex-1" title={r.to}>
+            {r.to}
+          </span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function clip(s: string, n: number): string {
+  const flat = s.replace(/\s+/g, ' ').trim()
+  if (flat.length <= n) return flat || '∅'
+  return flat.slice(0, n) + '…'
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
