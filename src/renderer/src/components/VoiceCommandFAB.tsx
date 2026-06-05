@@ -183,12 +183,21 @@ export default function VoiceCommandFAB(): JSX.Element {
     setEditedTranscript('')
     setReply('')
     setProposals([])
+    // eslint-disable-next-line no-console
+    console.log('[voice] beginCapture — mode:', prefs.commandMode)
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false })
+      // eslint-disable-next-line no-console
+      console.log(
+        '[voice] getUserMedia OK — audio tracks:',
+        stream.getAudioTracks().map((t) => t.label || t.kind)
+      )
       // Press-hold race: if the user released during the async getUserMedia,
       // don't start recording — release the just-acquired mic and bail, so a
       // quick tap can't leave the recorder running with no way to stop it.
       if (prefs.commandMode === 'press-hold' && !pressHoldArmedRef.current) {
+        // eslint-disable-next-line no-console
+        console.log('[voice] ABORTED — released during getUserMedia (too-quick tap); nothing recorded')
         stream.getTracks().forEach((t) => t.stop())
         setPhase('idle')
         return
@@ -203,6 +212,8 @@ export default function VoiceCommandFAB(): JSX.Element {
       recorderRef.current = mr
       interimAtRef.current = Date.now()
       setPhase('listening')
+      // eslint-disable-next-line no-console
+      console.log('[voice] recording started (phase=listening) — hold and speak')
       startLiveCaptions()
       // Click-toggle mode: arm the silence watchdog. When silence
       // exceeds the threshold, stop capture — the transcript still
@@ -222,6 +233,8 @@ export default function VoiceCommandFAB(): JSX.Element {
       }
     } catch (err) {
       const e = err as Error
+      // eslint-disable-next-line no-console
+      console.error('[voice] getUserMedia FAILED:', e?.name, '·', e?.message)
       setError(
         e?.name === 'NotAllowedError'
           ? 'Microphone access is blocked. Allow it in System Settings → Privacy & Security → Microphone, then try again. (In dev the app appears as “Electron”.)'
@@ -237,6 +250,8 @@ export default function VoiceCommandFAB(): JSX.Element {
     clearSilenceTimer()
     stopLiveCaptions()
     const rec = recorderRef.current
+    // eslint-disable-next-line no-console
+    console.log('[voice] stopCapture — recorder present:', !!rec, rec ? `(state=${rec.state})` : '')
     if (!rec) return
     // Wait for the final dataavailable to land before we package.
     await new Promise<void>((resolve) => {
@@ -257,12 +272,18 @@ export default function VoiceCommandFAB(): JSX.Element {
     recorderRef.current = null
 
     const captionText = liveCaption.trim()
+    // eslint-disable-next-line no-console
+    console.log('[voice] captured chunks:', chunksRef.current.length, '· caption:', JSON.stringify(captionText))
     if (chunksRef.current.length === 0 && !captionText) {
+      // eslint-disable-next-line no-console
+      console.error('[voice] NO AUDIO CAPTURED — 0 chunks. The mic stream delivered no data.')
       setError('No audio captured. Check your microphone, then hold the mic a moment longer while you speak.')
       setPhase('error')
       return
     }
     const blob = new Blob(chunksRef.current, { type: 'audio/webm' })
+    // eslint-disable-next-line no-console
+    console.log('[voice] audio blob bytes:', blob.size)
     // Spec: "when finished are staged for correction" — both modes land
     // here. The user reviews / edits the transcript and clicks Send when
     // ready. We never auto-send: the user always controls when the
@@ -271,6 +292,8 @@ export default function VoiceCommandFAB(): JSX.Element {
     const buf = await blob.arrayBuffer()
     try {
       const provider = await window.api.voiceNote.getProvider()
+      // eslint-disable-next-line no-console
+      console.log('[voice] transcribing via provider:', provider, '· bytes:', buf.byteLength)
       let res
       if (provider === 'local') {
         const samples = await decodeToMono16k(buf)
@@ -278,6 +301,8 @@ export default function VoiceCommandFAB(): JSX.Element {
       } else {
         res = await window.api.voiceNote.transcribe({ buffer: buf, mimeType: 'audio/webm' })
       }
+      // eslint-disable-next-line no-console
+      console.log('[voice] transcribe result:', JSON.stringify(res))
       if (res.ok) {
         const final = res.transcript.trim() || captionText
         setTranscript(final)
@@ -294,6 +319,8 @@ export default function VoiceCommandFAB(): JSX.Element {
         }
       }
     } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('[voice] transcribe threw:', (err as Error)?.name, '·', (err as Error)?.message)
       setTranscript(captionText)
       setEditedTranscript(captionText)
       if (!captionText) {
