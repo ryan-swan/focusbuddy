@@ -1810,9 +1810,9 @@ export default function Canvas(): JSX.Element {
   return (
     <>
       <div className="h-full flex flex-col">
-        <div className="px-4 py-2.5 border-b border-[color:var(--glass-chrome-border)] fb-glass-chrome flex items-center gap-2">
-          <Icon name="task_alt" size={18} className="text-stone-700 dark:text-stone-300" />
-          <h2 className="text-sm font-semibold text-stone-900 dark:text-stone-100 truncate flex-1">
+        <div className="px-4 py-2.5 border-b border-[color:var(--glass-chrome-border)] fb-glass-chrome flex flex-wrap items-center gap-x-2 gap-y-1.5">
+          <Icon name="task_alt" size={18} className="text-stone-700 dark:text-stone-300 shrink-0" />
+          <h2 className="text-sm font-semibold text-stone-900 dark:text-stone-100 truncate flex-1 min-w-[80px]">
             {activeTask.title}
           </h2>
           <div className="hidden md:flex items-center gap-3 text-[11px] text-stone-500 dark:text-stone-400">
