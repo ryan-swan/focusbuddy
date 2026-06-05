@@ -89,6 +89,13 @@ export default function VoiceCommandFAB(): JSX.Element {
   const silenceTimerRef = useRef<number | null>(null)
   const interimAtRef = useRef<number>(0) // last time we saw interim or final speech
   const pressHoldArmedRef = useRef<boolean>(false)
+  // Re-entrancy guard. Set synchronously the moment a capture begins and
+  // cleared only when that capture's whole stop+transcribe cycle ends. Without
+  // it, a second click/tap before phase flips to 'listening' (getUserMedia is
+  // async) spins up a SECOND MediaRecorder; both push into chunksRef and the
+  // interleaved webm from two streams is a corrupt file Whisper rejects with
+  // "Invalid file format … seconds: 0".
+  const capturingRef = useRef<boolean>(false)
 
   // Load persisted prefs.
   useEffect(() => {
@@ -177,6 +184,14 @@ export default function VoiceCommandFAB(): JSX.Element {
 
   // ── Begin / end capture
   const beginCapture = useCallback(async (): Promise<void> => {
+    // Non-reentrant: a second start while one is already in flight would create
+    // a second MediaRecorder whose chunks corrupt the first's webm.
+    if (capturingRef.current) {
+      // eslint-disable-next-line no-console
+      console.log('[voice] ignored duplicate beginCapture — already capturing')
+      return
+    }
+    capturingRef.current = true
     setError(null)
     setLiveCaption('')
     setTranscript('')
@@ -199,6 +214,7 @@ export default function VoiceCommandFAB(): JSX.Element {
         // eslint-disable-next-line no-console
         console.log('[voice] ABORTED — released during getUserMedia (too-quick tap); nothing recorded')
         stream.getTracks().forEach((t) => t.stop())
+        capturingRef.current = false
         setPhase('idle')
         return
       }
@@ -235,6 +251,7 @@ export default function VoiceCommandFAB(): JSX.Element {
       const e = err as Error
       // eslint-disable-next-line no-console
       console.error('[voice] getUserMedia FAILED:', e?.name, '·', e?.message)
+      capturingRef.current = false
       setError(
         e?.name === 'NotAllowedError'
           ? 'Microphone access is blocked. Allow it in System Settings → Privacy & Security → Microphone, then try again. (In dev the app appears as “Electron”.)'
@@ -252,7 +269,10 @@ export default function VoiceCommandFAB(): JSX.Element {
     const rec = recorderRef.current
     // eslint-disable-next-line no-console
     console.log('[voice] stopCapture — recorder present:', !!rec, rec ? `(state=${rec.state})` : '')
-    if (!rec) return
+    if (!rec) {
+      capturingRef.current = false
+      return
+    }
     // Wait for the final dataavailable to land before we package.
     await new Promise<void>((resolve) => {
       const t = window.setTimeout(resolve, 600) // hard cap
@@ -277,6 +297,7 @@ export default function VoiceCommandFAB(): JSX.Element {
     if (chunksRef.current.length === 0 && !captionText) {
       // eslint-disable-next-line no-console
       console.error('[voice] NO AUDIO CAPTURED — 0 chunks. The mic stream delivered no data.')
+      capturingRef.current = false
       setError('No audio captured. Check your microphone, then hold the mic a moment longer while you speak.')
       setPhase('error')
       return
@@ -327,6 +348,10 @@ export default function VoiceCommandFAB(): JSX.Element {
         setError((err as Error).message || 'Transcription failed.')
         setPhase('error')
       }
+    } finally {
+      // Capture cycle complete — release the re-entrancy guard so the next
+      // recording can start.
+      capturingRef.current = false
     }
   }, [clearSilenceTimer, liveCaption, stopLiveCaptions])
 
