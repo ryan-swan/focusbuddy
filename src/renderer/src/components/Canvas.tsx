@@ -37,6 +37,9 @@ import VoiceRecorderWidget from './widgets/VoiceRecorderWidget'
 import MindMapWidget from './widgets/MindMapWidget'
 import DiagramWidget from './widgets/DiagramWidget'
 import ScratchpadWidget from './widgets/ScratchpadWidget'
+import ShapeWidget from './widgets/ShapeWidget'
+import CardWidget from './widgets/CardWidget'
+import CustomBlockWidget from './widgets/CustomBlockWidget'
 import ZoomControls from './ZoomControls'
 import CanvasEdgeIndicators from './CanvasEdgeIndicators'
 import { useEdgePan } from '../lib/useEdgePan'
@@ -148,6 +151,12 @@ function renderWidget(w: Widget): JSX.Element | null {
       return <DiagramWidget widget={w} />
     case 'scratchpad':
       return <ScratchpadWidget widget={w} />
+    case 'shape':
+      return <ShapeWidget widget={w} />
+    case 'card':
+      return <CardWidget widget={w} />
+    case 'custom-block':
+      return <CustomBlockWidget widget={w} />
     case 'section':
       return <SectionWidget widget={w} renderChild={renderWidget} />
     case 'webview':

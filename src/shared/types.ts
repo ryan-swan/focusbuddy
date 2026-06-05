@@ -71,6 +71,16 @@ export type WidgetKind =
   // perfect-freehand) for quick drawings, annotations, and visual thinking.
   // Strokes + background are serialised to widget.content as JSON.
   | 'scratchpad'
+  // Shape — a vector shape (rect/ellipse/diamond/triangle/hexagon/star/line/
+  // arrow) with fill, stroke and an optional centred label. Stretches to fill
+  // the widget. Config serialised to widget.content as JSON.
+  | 'shape'
+  // Card — a titled callout card: accent bar + bold title + multi-line body.
+  | 'card'
+  // Custom block — a WYSIWYG form/record designer: freely-placed typed fields
+  // the user lays out themselves; doubles as a data-entry form. Layout + values
+  // serialised to widget.content as JSON; can be saved as a reusable template.
+  | 'custom-block'
 
 export type ContextMenuAction =
   | 'createStickyFromSelection'

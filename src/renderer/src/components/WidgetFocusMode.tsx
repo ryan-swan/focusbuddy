@@ -19,6 +19,9 @@ import TimerWidget from './widgets/TimerWidget'
 import MinimapWidget from './widgets/MinimapWidget'
 import VoiceRecorderWidget from './widgets/VoiceRecorderWidget'
 import MindMapWidget from './widgets/MindMapWidget'
+import ShapeWidget from './widgets/ShapeWidget'
+import CardWidget from './widgets/CardWidget'
+import CustomBlockWidget from './widgets/CustomBlockWidget'
 import Icon from './Icon'
 import type { Widget } from '@shared/types'
 
@@ -58,6 +61,12 @@ function renderInline(w: Widget): JSX.Element | null {
       return <VoiceRecorderWidget widget={w} inline />
     case 'mindmap':
       return <MindMapWidget widget={w} inline />
+    case 'shape':
+      return <ShapeWidget widget={w} inline />
+    case 'card':
+      return <CardWidget widget={w} inline />
+    case 'custom-block':
+      return <CustomBlockWidget widget={w} inline />
     case 'section':
       return null
     case 'webview':

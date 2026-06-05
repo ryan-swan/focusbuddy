@@ -341,6 +341,39 @@ export const WIDGET_CATALOG: WidgetCatalogEntry[] = [
     defaultHeight: 420,
     defaultContent: '',
     isWebBased: false
+  },
+  {
+    kind: 'shape',
+    category: 'Layout',
+    label: 'Shape',
+    icon: 'category',
+    hint: 'A vector shape — rectangle, ellipse, diamond, triangle, hexagon, star, line or arrow — with fill, stroke and an optional label',
+    defaultWidth: 200,
+    defaultHeight: 160,
+    defaultContent: '',
+    isWebBased: false
+  },
+  {
+    kind: 'card',
+    category: 'Notes',
+    label: 'Card',
+    icon: 'view_agenda',
+    hint: 'A titled callout card with an accent bar, bold title and body',
+    defaultWidth: 280,
+    defaultHeight: 200,
+    defaultContent: '',
+    isWebBased: false
+  },
+  {
+    kind: 'custom-block',
+    category: 'Tools',
+    label: 'Custom block',
+    icon: 'dashboard_customize',
+    hint: 'Design your own form/record — drop typed fields and place them where you want; save as a reusable template',
+    defaultWidth: 440,
+    defaultHeight: 380,
+    defaultContent: '',
+    isWebBased: false
   }
 ]
 
