@@ -61,6 +61,11 @@ export default function MakeTaskDialog({
   // if they just want the task and the widget should stay on the current
   // canvas (e.g. a sticky that's a reference, not the task itself).
   const [copyWidget, setCopyWidget] = useState<boolean>(!!sourceWidget)
+  // When copying the widget across, default to a LIVE-synced copy (autolinked) —
+  // the user can choose an independent point-in-time copy instead. This is the
+  // explicit "copy vs sync" choice; synced is the default so edits mirror unless
+  // the user opts out.
+  const [syncCopy, setSyncCopy] = useState<boolean>(true)
   const [switchToNewTask, setSwitchToNewTask] = useState<boolean>(!!sourceWidget)
   // Default the selector to the supplied parent if it's a real folder,
   // otherwise the first existing folder, otherwise the "new folder" path.
@@ -127,13 +132,17 @@ export default function MakeTaskDialog({
       // doesn't collide with the original's stored x/y if the user happens
       // to land on the new task quickly.
       if (sourceWidget && copyWidget) {
-        // Link the copy to the source so edits stay in sync across the two
+        // SYNCED copy → share a syncGroupId so edits mirror across the two
         // tasks (tick a checkbox / rename here → it mirrors there). Reuse the
         // source's group or create one and tag the source too.
-        let groupId = sourceWidget.syncGroupId
-        if (!groupId) {
-          groupId = crypto.randomUUID()
-          await updateWidget(sourceWidget.id, { syncGroupId: groupId })
+        // INDEPENDENT copy → no syncGroupId: a point-in-time snapshot that
+        // never affects (or is affected by) the source.
+        let groupId: string | undefined
+        if (syncCopy) {
+          groupId = sourceWidget.syncGroupId ?? crypto.randomUUID()
+          if (!sourceWidget.syncGroupId) {
+            await updateWidget(sourceWidget.id, { syncGroupId: groupId })
+          }
         }
         await createWidget({
           taskId: newTask.id,
@@ -287,10 +296,48 @@ export default function MakeTaskDialog({
                     Copy this widget into the new task
                   </div>
                   <div className="text-[10px] text-stone-500 dark:text-stone-400 leading-tight">
-                    A 🔗 linked copy lands on the new task — its content, title and colour stay in sync with this one (unlink anytime from the widget menu).
+                    Bring this widget onto the new task. Choose whether it stays in sync or becomes its own copy.
                   </div>
                 </div>
               </label>
+              {copyWidget && (
+                <div className="ml-6 space-y-1.5 pl-0.5 border-l-2 border-stone-200 dark:border-stone-700">
+                  <label className="flex items-start gap-2 cursor-pointer pl-2">
+                    <input
+                      type="radio"
+                      name="fb-copy-mode"
+                      checked={syncCopy}
+                      onChange={() => setSyncCopy(true)}
+                      className="mt-0.5 accent-accent"
+                    />
+                    <div className="flex-1">
+                      <div className="text-[12px] text-stone-800 dark:text-stone-100">
+                        🔗 Keep in sync <span className="text-stone-400">(live)</span>
+                      </div>
+                      <div className="text-[10px] text-stone-500 dark:text-stone-400 leading-tight">
+                        Content, title and colour mirror both ways. Unlink anytime from the widget menu.
+                      </div>
+                    </div>
+                  </label>
+                  <label className="flex items-start gap-2 cursor-pointer pl-2">
+                    <input
+                      type="radio"
+                      name="fb-copy-mode"
+                      checked={!syncCopy}
+                      onChange={() => setSyncCopy(false)}
+                      className="mt-0.5 accent-accent"
+                    />
+                    <div className="flex-1">
+                      <div className="text-[12px] text-stone-800 dark:text-stone-100">
+                        Independent copy <span className="text-stone-400">(point-in-time)</span>
+                      </div>
+                      <div className="text-[10px] text-stone-500 dark:text-stone-400 leading-tight">
+                        A snapshot of the current state. The two never affect each other.
+                      </div>
+                    </div>
+                  </label>
+                </div>
+              )}
               <label className="flex items-start gap-2 cursor-pointer">
                 <input
                   type="checkbox"
