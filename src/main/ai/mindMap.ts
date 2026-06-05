@@ -78,7 +78,7 @@ export async function expandMindMapNode(input: {
   const client = new Anthropic({ apiKey: key })
 
   const SYSTEM =
-    'You expand a node in a personal mind map. Given the path of labels from the root and the current node, propose 3-5 distinct child branches that genuinely advance the thinking — not paraphrases, not synonyms.\n' +
+    'You expand a node in a personal mind map. Given the path of labels from the root and the current node, explore the idea FULLY and propose the distinct child branches that genuinely advance the thinking — not paraphrases, not synonyms.\n' +
     '\n' +
     'Return ONLY a JSON array. Each object must be:\n' +
     '\n' +
@@ -91,8 +91,10 @@ export async function expandMindMapNode(input: {
     '- "tool" = a tool, app, or file the user should reach for\n' +
     '- "agent" = a domain of work an AI agent could own end-to-end\n' +
     '\n' +
-    '- Aim for 3-5 children. More than that overwhelms the canvas.\n' +
-    '- Mix kinds where natural. A node with five "task" children is rarely the best decomposition.\n' +
+    '- Let the IDEA decide the count, not a quota. Some nodes split cleanly into 2; a rich topic may genuinely warrant 8, 10, or more. Return as many as the thinking truly contains and NO MORE.\n' +
+    '- Never pad to hit a number, and never drop a genuinely valuable branch just to stay small. Quality over quantity: every child must earn its place — if you would not act on it, leave it out. A handful of sharp branches beats a dozen vague ones.\n' +
+    '- No fluff, no filler, no near-duplicates. If two candidates overlap, keep only the stronger one.\n' +
+    '- Mix kinds where natural. A node with many "task" children is rarely the best decomposition.\n' +
     '- Labels must be specific enough that the user can act on them. Avoid "consider X" / "think about Y" wording.\n' +
     '- Do NOT include the parent\'s words back as children — go forward.'
 
@@ -102,12 +104,14 @@ export async function expandMindMapNode(input: {
     `\n` +
     `Current node kind: ${input.nodeKind ?? 'idea'}\n` +
     (input.guidance ? `Guidance: ${input.guidance}\n` : '') +
-    'Propose 3-5 children:'
+    'Propose the children that genuinely advance this — as many or as few as the idea warrants:'
 
   try {
     const resp = await client.messages.create({
       model: 'claude-sonnet-4-6',
-      max_tokens: 1024,
+      // Generous so a rich node can return many high-quality branches without
+      // being truncated mid-array (the count is decided by the idea, not a quota).
+      max_tokens: 2048,
       system: SYSTEM,
       messages: [{ role: 'user', content: userMsg }]
     })
@@ -402,7 +406,9 @@ function parseChildrenArray(raw: string): ChildrenParseOk | ChildrenParseErr {
   }
   const out: SuggestedChild[] = []
   const allowed: MindMapNodeKind[] = ['idea', 'task', 'question', 'tool', 'agent']
-  for (const item of arr.slice(0, 5)) {
+  // Let the idea decide the count — only a generous safety bound against a
+  // pathological runaway response (the prompt already gates hard on quality).
+  for (const item of arr.slice(0, 40)) {
     if (typeof item !== 'object' || item === null) continue
     const obj = item as Record<string, unknown>
     if (typeof obj.label !== 'string' || !obj.label.trim()) continue
