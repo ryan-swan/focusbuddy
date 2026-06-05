@@ -6,7 +6,9 @@ import { useWidgetStore } from '../stores/widgets'
 import type { WidgetKind } from '@shared/types'
 import { WIDGET_CATALOG } from '../lib/widgetCatalog'
 import Icon from './Icon'
-import { useCapabilityEnabled } from '../stores/capabilities'
+import { useCapabilityEnabled, useCapabilityStore } from '../stores/capabilities'
+import { canCreateWidget } from '../lib/gating'
+import { promptUpgrade } from '../stores/upgradePrompt'
 
 interface Props {
   onOpenBodyDouble: () => void
@@ -59,6 +61,7 @@ export default function CommandCenter({
   const [highlightIdx, setHighlightIdx] = useState(0)
   const inputRef = useRef<HTMLInputElement | null>(null)
   const bodyDoubleEnabled = useCapabilityEnabled('body_double')
+  const caps = useCapabilityStore((s) => s.capabilities)
 
   const nodes = useNodeStore((s) => s.nodes)
   const setActive = useNodeStore((s) => s.setActive)
@@ -87,6 +90,12 @@ export default function CommandCenter({
       // Build a quick widget at a sensible position on the active task.
       function spawn(kind: WidgetKind): () => void {
         return () => {
+          // Same matrix gate as the widget palette — a Pro-only widget kind
+          // (e.g. table on Free) opens the upgrade prompt instead of creating.
+          if (!canCreateWidget(caps, kind)) {
+            promptUpgrade(`The ${kind} widget is a Pro feature.`)
+            return
+          }
           const entry = WIDGET_CATALOG.find((e) => e.kind === kind)
           void createWidget({
             taskId: activeTaskId!,
@@ -138,7 +147,7 @@ export default function CommandCenter({
         onClick: onOpenSmartStack
       }
     ]
-  }, [view, activeTaskId, createWidget, canSmartStack, onOpenBodyDouble, onOpenSmartStack, bodyDoubleEnabled])
+  }, [view, activeTaskId, createWidget, canSmartStack, onOpenBodyDouble, onOpenSmartStack, bodyDoubleEnabled, caps])
 
   function openPalette(): void {
     setPaletteOpen(true)

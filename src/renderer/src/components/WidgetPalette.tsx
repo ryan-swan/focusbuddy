@@ -6,6 +6,9 @@ import {
   entriesByCategory,
   type WidgetCatalogEntry
 } from '../lib/widgetCatalog'
+import { canCreateWidget } from '../lib/gating'
+import { useCapabilityStore } from '../stores/capabilities'
+import { promptUpgrade } from '../stores/upgradePrompt'
 import Icon from './Icon'
 
 interface Props {
@@ -64,6 +67,10 @@ export default function WidgetPalette({ onAdd, onImport, disabled }: Props): JSX
   }, [open])
 
   const grouped = entriesByCategory()
+  // Live, admin-overridable capability map. A widget kind whose capability
+  // resolves falsy for this user renders locked + opens the upgrade prompt
+  // instead of creating. This is what makes the matrix gate the app.
+  const caps = useCapabilityStore((s) => s.capabilities)
 
   return (
     <>
@@ -110,26 +117,49 @@ export default function WidgetPalette({ onAdd, onImport, disabled }: Props): JSX
                     {cat}
                   </div>
                   <div className="grid grid-cols-3 gap-1.5">
-                    {items.map((entry) => (
-                      <button
-                        key={entry.kind}
-                        title={entry.hint}
-                        draggable
-                        onClick={() => {
-                          onAdd(entry)
-                          setOpen(false)
-                        }}
-                        onDragStart={(e) => {
-                          e.dataTransfer.setData(DRAG_MIME, entry.kind)
-                          e.dataTransfer.effectAllowed = 'copy'
-                        }}
-                        className="flex flex-col items-center gap-1 px-2 py-2 rounded-md border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 hover:border-accent hover:bg-accent/5 dark:hover:bg-accent/10 text-stone-700 dark:text-stone-300 text-[10px] leading-tight cursor-grab active:cursor-grabbing transition-colors"
-                        data-testid={`palette-add-${entry.kind}`}
-                      >
-                        <Icon name={entry.icon} size={18} className="text-stone-600 dark:text-stone-400" />
-                        <span className="font-medium text-center">{entry.label}</span>
-                      </button>
-                    ))}
+                    {items.map((entry) => {
+                      const locked = !canCreateWidget(caps, entry.kind)
+                      if (locked) {
+                        return (
+                          <button
+                            key={entry.kind}
+                            title={`${entry.label} is a Pro feature — click to upgrade`}
+                            onClick={() => {
+                              promptUpgrade(`The ${entry.label} widget is a Pro feature.`)
+                              setOpen(false)
+                            }}
+                            className="relative flex flex-col items-center gap-1 px-2 py-2 rounded-md border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800/50 text-stone-400 dark:text-stone-500 text-[10px] leading-tight cursor-pointer transition-colors hover:border-accent/40"
+                            data-testid={`palette-locked-${entry.kind}`}
+                          >
+                            <span className="absolute top-1 right-1 text-accent">
+                              <Icon name="lock" size={10} />
+                            </span>
+                            <Icon name={entry.icon} size={18} className="opacity-50" />
+                            <span className="font-medium text-center opacity-70">{entry.label}</span>
+                          </button>
+                        )
+                      }
+                      return (
+                        <button
+                          key={entry.kind}
+                          title={entry.hint}
+                          draggable
+                          onClick={() => {
+                            onAdd(entry)
+                            setOpen(false)
+                          }}
+                          onDragStart={(e) => {
+                            e.dataTransfer.setData(DRAG_MIME, entry.kind)
+                            e.dataTransfer.effectAllowed = 'copy'
+                          }}
+                          className="flex flex-col items-center gap-1 px-2 py-2 rounded-md border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 hover:border-accent hover:bg-accent/5 dark:hover:bg-accent/10 text-stone-700 dark:text-stone-300 text-[10px] leading-tight cursor-grab active:cursor-grabbing transition-colors"
+                          data-testid={`palette-add-${entry.kind}`}
+                        >
+                          <Icon name={entry.icon} size={18} className="text-stone-600 dark:text-stone-400" />
+                          <span className="font-medium text-center">{entry.label}</span>
+                        </button>
+                      )
+                    })}
                   </div>
                 </div>
               )

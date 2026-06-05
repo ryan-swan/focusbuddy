@@ -22,6 +22,7 @@ import CommandCenter from './components/CommandCenter'
 import AICommandBar from './components/AICommandBar'
 import VoiceCommandFAB from './components/VoiceCommandFAB'
 import LaunchSignInModal from './components/LaunchSignInModal'
+import UpgradePromptModal from './components/UpgradePromptModal'
 import { usePeerBodyDoubleStore } from './stores/peerBodyDouble'
 import { useNodeStore } from './stores/nodes'
 import { useTemplateStore } from './stores/templates'
@@ -372,6 +373,7 @@ export default function App(): JSX.Element {
         canSmartStack={canSmartStack}
       />
       <LaunchSignInModal />
+      <UpgradePromptModal />
       <AICommandBar open={aiBarOpen} onClose={() => setAiBarOpen(false)} />
       <VoiceCommandFAB />
       {smartStackOpen && <SmartStackModal onClose={() => setSmartStackOpen(false)} />}
