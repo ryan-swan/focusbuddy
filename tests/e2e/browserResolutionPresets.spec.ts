@@ -124,7 +124,7 @@ test('aspect_ratio button is present in the browser widget toolbar', async () =>
   expect(exists).toBe(true)
 })
 
-test('opening the preset menu shows 4 resolution options', async () => {
+test('opening the preset menu shows 5 resolution options incl. Tablet landscape', async () => {
   launched = await launchApp()
   const { widgetId } = await seedBrowserWidget(launched)
   const { window } = launched
@@ -135,22 +135,101 @@ test('opening the preset menu shows 4 resolution options', async () => {
   await domClick(launched, `[data-widget-id="${widgetId}"] button[aria-label="Resize to a stored resolution"]`)
   await window.waitForTimeout(200)
 
-  // The dropdown should appear — verify all 4 preset labels are present
+  // The dropdown should appear — verify all 5 presets are present. We match on
+  // the dimension sub-labels so "Tablet" and "Tablet (landscape)" don't collide.
   const presets = await window.evaluate(() => {
-    const btns = Array.from(document.querySelectorAll('button'))
-    const labels = btns.map((b) => b.textContent?.toLowerCase() ?? '')
+    const text = Array.from(document.querySelectorAll('.z-50 button'))
+      .map((b) => b.textContent ?? '')
+      .join(' | ')
     return {
-      hasMobile: labels.some((l) => l.includes('mobile')),
-      hasTablet: labels.some((l) => l.includes('tablet')),
-      hasLaptop: labels.some((l) => l.includes('laptop')),
-      hasDesktop: labels.some((l) => l.includes('desktop'))
+      hasMobile: text.includes('390 × 844'),
+      hasTabletPortrait: text.includes('768 × 1024'),
+      hasTabletLandscape: text.includes('1024 × 768'),
+      hasLaptop: text.includes('1366 × 768'),
+      hasDesktop: text.includes('1920 × 1080')
     }
   })
 
   expect(presets.hasMobile).toBe(true)
-  expect(presets.hasTablet).toBe(true)
+  expect(presets.hasTabletPortrait).toBe(true)
+  expect(presets.hasTabletLandscape).toBe(true)
   expect(presets.hasLaptop).toBe(true)
   expect(presets.hasDesktop).toBe(true)
+})
+
+test('clicking Tablet (landscape) preset resizes the widget to 1024×768', async () => {
+  launched = await launchApp()
+  const { widgetId, taskId } = await seedBrowserWidget(launched)
+  const { window } = launched
+
+  await window.waitForSelector(`[data-widget-id="${widgetId}"]`, { timeout: 5_000 })
+
+  await domClick(launched, `[data-widget-id="${widgetId}"] button[aria-label="Resize to a stored resolution"]`)
+  await window.waitForTimeout(200)
+
+  const clicked = await window.evaluate(() => {
+    const btns = Array.from(document.querySelectorAll<HTMLButtonElement>('.z-50 button'))
+    const btn = btns.find((b) => (b.textContent ?? '').includes('1024 × 768'))
+    if (!btn) return false
+    btn.click()
+    return true
+  })
+  expect(clicked).toBe(true)
+  await window.waitForTimeout(400)
+
+  const dims = await window.evaluate(
+    async ({ id, tid }: { id: string; tid: string }) => {
+      const api = (window as unknown as { api: typeof window.api }).api
+      const widgets = await api.widgets.listByTask(tid)
+      const w = widgets.find((x) => x.id === id)
+      return w ? { width: w.width, height: w.height } : null
+    },
+    { id: widgetId, tid: taskId }
+  )
+
+  expect(dims).not.toBeNull()
+  expect(dims!.width).toBe(1024)
+  expect(dims!.height).toBe(768)
+})
+
+test('preset resize takes effect LIVE on the element (no hard refresh needed)', async () => {
+  launched = await launchApp()
+  const { widgetId } = await seedBrowserWidget(launched)
+  const { window } = launched
+
+  const frameSel = `[data-widget-id="${widgetId}"]`
+  await window.waitForSelector(frameSel, { timeout: 5_000 })
+
+  // Measure the widget frame's live width BEFORE applying a preset.
+  const before = await window.evaluate((sel: string) => {
+    const el = document.querySelector(sel) as HTMLElement | null
+    return el ? el.getBoundingClientRect().width : null
+  }, frameSel)
+  expect(before).not.toBeNull()
+
+  // Apply the Mobile preset (390 wide) — a clearly different width.
+  await domClick(launched, `${frameSel} button[aria-label="Resize to a stored resolution"]`)
+  await window.waitForTimeout(150)
+  await window.evaluate(() => {
+    const btn = Array.from(document.querySelectorAll<HTMLButtonElement>('.z-50 button')).find(
+      (b) => (b.textContent ?? '').includes('390 × 844')
+    )
+    btn?.click()
+  })
+  // No reload — just give React + the imperative Rnd resize a beat.
+  await window.waitForTimeout(400)
+
+  const after = await window.evaluate((sel: string) => {
+    const el = document.querySelector(sel) as HTMLElement | null
+    return el ? el.getBoundingClientRect().width : null
+  }, frameSel)
+  expect(after).not.toBeNull()
+  // The element itself must have resized in place — without the useLayoutEffect
+  // size-sync it stayed at the mount width until a remount/refresh. Tolerant of
+  // the frame's border so we're testing "did it resize live", not exact px.
+  expect(after!).toBeGreaterThan(370)
+  expect(after!).toBeLessThan(412)
+  expect(after!).toBeLessThan(before! - 40)
 })
 
 test('clicking Mobile preset resizes the widget to 390×844', async () => {
