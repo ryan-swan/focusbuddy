@@ -668,9 +668,19 @@ export default function WidgetFrame({
         // Shift-only, so a normal mousedown is untouched (the WebView overlay
         // relies on NOT setting `active` early here, which we preserve).
         onMouseDownCapture={(e) => {
+          // Shift / ⌘-dive must be handled on mousedown (CAPTURE phase): the
+          // header is react-rnd's drag handle, so a normal mousedown is consumed
+          // by the drag machinery and onClick never fires on the header. Catching
+          // it here (before react-rnd) + stopPropagation toggles/dives AND
+          // suppresses the drag. Body clicks fall through to onClick as before.
           if (e.shiftKey && !isChildOfSection && !isPinned) {
             e.stopPropagation()
             shiftToggle()
+            return
+          }
+          if ((e.metaKey || e.ctrlKey) && zoom < 0.8 && !isChildOfSection) {
+            e.stopPropagation()
+            zoomToWidget(widget.id)
           }
         }}
         onClick={(e) => {

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import Icon from './Icon'
 
@@ -46,11 +46,26 @@ export default function CanvasContextMenu({ x, y, items, onClose }: Props): JSX.
   // headers, the ancestor is the canvas's pan+zoomed container, so without
   // portalling the menu lands at a transformed location instead of where
   // the user clicked.
+  const menuRef = useRef<HTMLDivElement | null>(null)
+  const [pos, setPos] = useState({ left: x, top: y })
+  // Clamp the menu inside the viewport — right-clicking near the right/bottom
+  // edge previously pushed the menu (and any tall submenu) off-screen.
+  useLayoutEffect(() => {
+    const el = menuRef.current
+    if (!el) return
+    const r = el.getBoundingClientRect()
+    setPos({
+      left: Math.max(8, Math.min(x, window.innerWidth - r.width - 8)),
+      top: Math.max(8, Math.min(y, window.innerHeight - r.height - 8))
+    })
+  }, [x, y, items])
+
   return createPortal(
     <div
+      ref={menuRef}
       data-canvas-ctx-menu
-      className="fixed z-[260] bg-white dark:bg-stone-800 rounded-md shadow-2xl border border-stone-200 dark:border-stone-700 py-1 min-w-[210px] text-sm"
-      style={{ left: x, top: y }}
+      className="fixed z-[260] bg-white dark:bg-stone-800 rounded-md shadow-2xl border border-stone-200 dark:border-stone-700 py-1 min-w-[210px] max-h-[85vh] overflow-y-auto text-sm"
+      style={{ left: pos.left, top: pos.top }}
       onContextMenu={(e) => e.preventDefault()}
     >
       {items.map((item, i) => (
@@ -63,6 +78,19 @@ export default function CanvasContextMenu({ x, y, items, onClose }: Props): JSX.
 
 function MenuItem({ item, onSelect }: { item: CtxMenuItem; onSelect: () => void }): JSX.Element {
   const [open, setOpen] = useState(false)
+  const subRef = useRef<HTMLDivElement | null>(null)
+  const [flipLeft, setFlipLeft] = useState(false)
+
+  // When the submenu opens, flip it to the LEFT of its parent if opening to the
+  // right would run off the viewport (right-click near the right edge). The
+  // submenu is also height-capped + scrollable so a long catalog list (the
+  // "Add object" menu) never spills below the screen — that was hiding the
+  // lower tiles like Diagram / Scratchpad.
+  useLayoutEffect(() => {
+    if (!open || !subRef.current) return
+    const r = subRef.current.getBoundingClientRect()
+    setFlipLeft(r.right > window.innerWidth - 8)
+  }, [open])
 
   if (item.separator) {
     return <div className="my-1 h-px bg-stone-200 dark:bg-stone-700" />
@@ -105,8 +133,11 @@ function MenuItem({ item, onSelect }: { item: CtxMenuItem; onSelect: () => void 
       </button>
       {hasChildren && open && (
         <div
+          ref={subRef}
           data-canvas-ctx-menu
-          className="absolute left-full top-0 -mt-1 ml-0.5 bg-white dark:bg-stone-800 rounded-md shadow-2xl border border-stone-200 dark:border-stone-700 py-1 min-w-[190px]"
+          className={`absolute top-0 -mt-1 bg-white dark:bg-stone-800 rounded-md shadow-2xl border border-stone-200 dark:border-stone-700 py-1 min-w-[190px] max-h-[70vh] overflow-y-auto ${
+            flipLeft ? 'right-full mr-0.5' : 'left-full ml-0.5'
+          }`}
         >
           {item.children?.map((c, i) => (
             <MenuItem key={i} item={c} onSelect={onSelect} />
