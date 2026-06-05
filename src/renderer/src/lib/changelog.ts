@@ -12,6 +12,21 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    date: '2026-06-06T12:00:00Z',
+    title: 'v2.5 — Shapes, Cards, Custom Blocks & multi-select',
+    tag: 'feature',
+    highlights: [
+      'New widget — Custom Block: a WYSIWYG form/record designer. In Design mode, drop typed fields (text, paragraph, number, date, email, URL, dropdown, checkbox, heading, divider) and drag/resize each one where you want. In Use mode the same block is a live data-entry form. Save any layout as a personal Template reusable across every folder/task/canvas.',
+      'New widget — Shapes: rectangle, rounded, ellipse, diamond, triangle, hexagon, star, line and arrow with fill, stroke, line weight and an optional centred label. Stretches as you resize.',
+      'New widget — Cards: a titled callout with an accent bar, bold title and body + colour picker.',
+      'Multi-select: Shift-click an object header or Shift-drag a marquee box to select many at once. Drag any selected object and the whole group moves together. Group the selection into a section, or duplicate / delete the lot. ⌘/Ctrl+A selects all, Esc clears.',
+      'Browser windows get size presets — Mobile / Tablet / Tablet (landscape) / Laptop / Desktop — and resize instantly (no refresh).',
+      '⌘/Ctrl-click any object while zoomed out dives straight to it at 100%, centred — now works for objects inside sections too. Drag an object out of a section to pop it back onto the desk.',
+      'Duplicating now asks: keep the copy in sync (edits mirror) or make an independent copy.',
+      'Fixes: the + Add toolbar and its menus no longer run off the edge on smaller / non-fullscreen windows; the right-click "Add object" menu scrolls and flips so every widget (incl. Diagram & Scratchpad) is reachable.'
+    ]
+  },
+  {
     date: '2026-05-27T18:00:00Z',
     title: 'Build with AI — natural-language workspace builder',
     tag: 'feature',
