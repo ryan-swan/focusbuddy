@@ -40,12 +40,21 @@ export default function MakeTaskDialog({
   const create = useNodeStore((s) => s.create)
   const setActiveTask = useNodeStore((s) => s.setActive)
   const createWidget = useWidgetStore((s) => s.create)
+  const activeTaskId = useNodeStore((s) => s.activeTaskId)
   const folders = useMemo(
     () => nodes.filter((n) => n.kind === 'folder'),
     [nodes]
   )
+  // The folder the user is currently working in = the active task's parent.
+  // This is what we default the picker to (the operator's explicit ask).
+  const currentFolderId = useMemo(() => {
+    const task = nodes.find((n) => n.id === activeTaskId)
+    const pid = task?.parentId ?? null
+    return pid && folders.some((f) => f.id === pid) ? pid : null
+  }, [nodes, activeTaskId, folders])
 
   const [taskTitle, setTaskTitle] = useState(seedTitle.trim() || 'Untitled task')
+  const [folderQuery, setFolderQuery] = useState('')
   // Default to ON when a source widget was passed — almost always what the
   // user wants from a right-click "make this a task" flow. They can untick
   // if they just want the task and the widget should stay on the current
@@ -55,9 +64,14 @@ export default function MakeTaskDialog({
   // Default the selector to the supplied parent if it's a real folder,
   // otherwise the first existing folder, otherwise the "new folder" path.
   const [folderSel, setFolderSel] = useState<string>(() => {
+    // Default order: explicit prop → the current folder (active task's parent)
+    // → first folder → create-new.
     if (defaultParentId && folders.some((f) => f.id === defaultParentId)) {
       return defaultParentId
     }
+    const task = nodes.find((n) => n.id === activeTaskId)
+    const pid = task?.parentId ?? null
+    if (pid && folders.some((f) => f.id === pid)) return pid
     if (folders.length > 0) return folders[0].id
     return NEW_FOLDER_VALUE
   })
@@ -178,35 +192,77 @@ export default function MakeTaskDialog({
             <label className="block text-[10px] uppercase tracking-wider text-stone-500 dark:text-stone-400 mb-1">
               Folder
             </label>
-            <select
-              value={folderSel}
-              onChange={(e) => setFolderSel(e.target.value)}
-              className="w-full text-sm px-2.5 py-1.5 rounded border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-800 text-stone-900 dark:text-stone-100 focus:outline-none focus:border-accent"
-            >
-              {folders.map((f: FbNode) => (
-                <option key={f.id} value={f.id}>
-                  {f.title || '(untitled folder)'}
-                </option>
-              ))}
-              <option value={NEW_FOLDER_VALUE}>+ Create new folder…</option>
-            </select>
+            {folderSel === NEW_FOLDER_VALUE ? (
+              <div className="space-y-1.5">
+                <input
+                  autoFocus
+                  value={newFolderName}
+                  onChange={(e) => setNewFolderName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') void handleSubmit()
+                  }}
+                  placeholder="New folder name — e.g. Q3 outreach"
+                  className="w-full text-sm px-2.5 py-1.5 rounded border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-800 text-stone-900 dark:text-stone-100 focus:outline-none focus:border-accent"
+                />
+                <button
+                  type="button"
+                  onClick={() => setFolderSel(currentFolderId || folders[0]?.id || NEW_FOLDER_VALUE)}
+                  className="text-[11px] text-stone-500 hover:text-stone-700 dark:hover:text-stone-300"
+                >
+                  ← Pick an existing folder
+                </button>
+              </div>
+            ) : (
+              <div>
+                <input
+                  value={folderQuery}
+                  onChange={(e) => setFolderQuery(e.target.value)}
+                  placeholder="Search folders…"
+                  className="w-full text-sm px-2.5 py-1.5 rounded border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-800 text-stone-900 dark:text-stone-100 focus:outline-none focus:border-accent"
+                />
+                <div className="mt-1 max-h-40 overflow-auto rounded border border-stone-200 dark:border-stone-700">
+                  {folders
+                    .filter((f: FbNode) =>
+                      (f.title || '').toLowerCase().includes(folderQuery.trim().toLowerCase())
+                    )
+                    .map((f: FbNode) => (
+                      <button
+                        type="button"
+                        key={f.id}
+                        onClick={() => setFolderSel(f.id)}
+                        className={`w-full text-left px-2.5 py-1.5 text-sm flex items-center justify-between gap-2 ${
+                          folderSel === f.id
+                            ? 'bg-accent/15 text-accent'
+                            : 'text-stone-800 dark:text-stone-100 hover:bg-stone-100 dark:hover:bg-stone-800'
+                        }`}
+                      >
+                        <span className="truncate">{f.title || '(untitled folder)'}</span>
+                        {f.id === currentFolderId && (
+                          <span className="text-[9px] uppercase tracking-wider text-stone-400 shrink-0">
+                            current
+                          </span>
+                        )}
+                      </button>
+                    ))}
+                  {folders.filter((f: FbNode) =>
+                    (f.title || '').toLowerCase().includes(folderQuery.trim().toLowerCase())
+                  ).length === 0 && (
+                    <div className="px-2.5 py-1.5 text-[11px] text-stone-400">No folders match.</div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFolderSel(NEW_FOLDER_VALUE)
+                      if (folderQuery.trim()) setNewFolderName(folderQuery.trim())
+                    }}
+                    className="w-full text-left px-2.5 py-1.5 text-sm text-accent border-t border-stone-200 dark:border-stone-700 hover:bg-accent/5"
+                  >
+                    + Create new folder{folderQuery.trim() ? ` "${folderQuery.trim()}"` : '…'}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
-          {folderSel === NEW_FOLDER_VALUE && (
-            <div>
-              <label className="block text-[10px] uppercase tracking-wider text-stone-500 dark:text-stone-400 mb-1">
-                New folder name
-              </label>
-              <input
-                value={newFolderName}
-                onChange={(e) => setNewFolderName(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') void handleSubmit()
-                }}
-                placeholder="e.g. Q3 outreach"
-                className="w-full text-sm px-2.5 py-1.5 rounded border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-800 text-stone-900 dark:text-stone-100 focus:outline-none focus:border-accent"
-              />
-            </div>
-          )}
           {sourceWidget && (
             <div className="pt-1 border-t border-stone-200 dark:border-stone-700 space-y-1.5">
               <label className="flex items-start gap-2 cursor-pointer">
