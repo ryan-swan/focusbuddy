@@ -40,6 +40,7 @@ import ScratchpadWidget from './widgets/ScratchpadWidget'
 import ZoomControls from './ZoomControls'
 import CanvasEdgeIndicators from './CanvasEdgeIndicators'
 import { useEdgePan } from '../lib/useEdgePan'
+import { useNavPrefs, frictionFromGlide } from '../lib/navPrefs'
 import CanvasAIAssistantRail from './CanvasAIAssistantRail'
 import Icon from './Icon'
 import { useChatStore } from '../stores/chat'
@@ -184,6 +185,7 @@ export default function Canvas(): JSX.Element {
   const panY = useWidgetStore((s) => s.panY)
   const setZoom = useWidgetStore((s) => s.setZoom)
   const panBy = useWidgetStore((s) => s.panBy)
+  const nav = useNavPrefs()
   const zoomTowardPoint = useWidgetStore((s) => s.zoomTowardPoint)
   const resetView = useWidgetStore((s) => s.resetView)
   const loadForTask = useWidgetStore((s) => s.loadForTask)
@@ -229,7 +231,8 @@ export default function Canvas(): JSX.Element {
     // root cause of "edge-pan stopped working" complaints — paired
     // with the form-focus gate (now scoped to canvas-internal forms),
     // any kind of widget interaction would silently kill it.
-    disabled: animatingPan
+    disabled: animatingPan || !nav.edgePanEnabled,
+    maxSpeedPerSecond: 1100 * nav.edgePanSpeed
   })
   const [, setNowTick] = useState(0) // for the running-task clock
   const [snoozeUntil, setSnoozeUntil] = useState<number>(0)
@@ -724,13 +727,13 @@ export default function Canvas(): JSX.Element {
     if (e.ctrlKey || e.metaKey) {
       e.preventDefault()
       const rect = e.currentTarget.getBoundingClientRect()
-      const factor = Math.exp(-e.deltaY * 0.005)
+      const factor = Math.exp(-e.deltaY * 0.005 * nav.zoomSensitivity)
       const cursorX = e.clientX - rect.left
       const cursorY = e.clientY - rect.top
       zoomTowardPoint(zoom * factor, cursorX, cursorY)
     } else {
       e.preventDefault()
-      panBy(-e.deltaX, -e.deltaY)
+      panBy(-e.deltaX * nav.wheelSensitivity, -e.deltaY * nav.wheelSensitivity)
     }
   }
 
@@ -776,6 +779,7 @@ export default function Canvas(): JSX.Element {
     if (e.button !== 0) return // primary button only
     const target = e.target as HTMLElement
     if (target.dataset.bareCanvas === undefined) return // only on bare canvas
+    if (!nav.dragPanEnabled) return // click-drag panning turned off in settings
     cancelPanInertia() // a fresh grab stops any in-flight glide
     panVelocityRef.current = { vx: 0, vy: 0 }
     panLastMoveRef.current = { x: e.clientX, y: e.clientY, t: performance.now() }
@@ -792,14 +796,16 @@ export default function Canvas(): JSX.Element {
     } catch {
       // pointer capture unsupported — drag still works while over the surface
     }
-    sonarPing()
     setGrabbing(true)
-    // Surface-relative coords so the ring positions correctly regardless of any
-    // transformed ancestor (position:absolute inside dropRef).
-    const rect = e.currentTarget.getBoundingClientRect()
-    setPanPing({ x: e.clientX - rect.left, y: e.clientY - rect.top })
-    if (panPingTimer.current !== null) window.clearTimeout(panPingTimer.current)
-    panPingTimer.current = window.setTimeout(() => setPanPing(null), 650)
+    if (nav.sonarOnGrab) {
+      sonarPing()
+      // Surface-relative coords so the ring positions correctly regardless of
+      // any transformed ancestor (position:absolute inside dropRef).
+      const rect = e.currentTarget.getBoundingClientRect()
+      setPanPing({ x: e.clientX - rect.left, y: e.clientY - rect.top })
+      if (panPingTimer.current !== null) window.clearTimeout(panPingTimer.current)
+      panPingTimer.current = window.setTimeout(() => setPanPing(null), 650)
+    }
   }
 
   function handleCanvasPointerMove(e: React.PointerEvent<HTMLDivElement>): void {
@@ -808,7 +814,7 @@ export default function Canvas(): JSX.Element {
     const dx = e.clientX - d.startX
     const dy = e.clientY - d.startY
     if (!d.moved && Math.hypot(dx, dy) > 3) d.moved = true
-    setPan(d.startPanX + dx, d.startPanY + dy)
+    setPan(d.startPanX + dx * nav.dragSensitivity, d.startPanY + dy * nav.dragSensitivity)
     // Track smoothed velocity (normalised to ~16ms frames) for release inertia.
     const last = panLastMoveRef.current
     const now = performance.now()
@@ -844,16 +850,16 @@ export default function Canvas(): JSX.Element {
       return
     }
     // Release inertia: slingshot in the drag direction, then decelerate to a
-    // stop. LAUNCH_GAIN multiplies the release speed so a flick coasts well past
-    // the cursor; the higher friction keeps it gliding longer. The faster the
-    // flick, the further it flies (speed is clamped so a frantic flick stays
-    // controllable).
-    const LAUNCH_GAIN = 3.2
+    // stop. slingshot × sensitivity multiply the release speed so a flick
+    // coasts past the cursor; glide (friction) sets how long it keeps moving.
+    // All user-configurable in Settings → Navigation.
+    if (!nav.momentumEnabled) return
+    const launch = nav.slingshot * nav.dragSensitivity
     const MAX_LAUNCH = 160 // px/frame
-    let vx = Math.max(-MAX_LAUNCH, Math.min(MAX_LAUNCH, panVelocityRef.current.vx * LAUNCH_GAIN))
-    let vy = Math.max(-MAX_LAUNCH, Math.min(MAX_LAUNCH, panVelocityRef.current.vy * LAUNCH_GAIN))
+    let vx = Math.max(-MAX_LAUNCH, Math.min(MAX_LAUNCH, panVelocityRef.current.vx * launch))
+    let vy = Math.max(-MAX_LAUNCH, Math.min(MAX_LAUNCH, panVelocityRef.current.vy * launch))
     if (Math.hypot(vx, vy) > 1.2) {
-      const friction = 0.95
+      const friction = frictionFromGlide(nav.glide)
       const step = (): void => {
         panBy(vx, vy)
         vx *= friction
