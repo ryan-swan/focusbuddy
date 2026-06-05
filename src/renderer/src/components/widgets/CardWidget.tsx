@@ -47,6 +47,16 @@ export default function CardWidget({ widget, inline = false }: Props): JSX.Eleme
     return () => window.clearTimeout(h)
   }, [data, widget.id, update])
 
+  // Adopt content pushed in from a synced sibling (live sync). Without this the
+  // linked copy only reflects edits after a remount / hard refresh. We compare
+  // against lastSaved so our OWN debounced save round-trip doesn't re-trigger.
+  useEffect(() => {
+    if (widget.content !== lastSaved.current) {
+      lastSaved.current = widget.content
+      setData(parse(widget.content))
+    }
+  }, [widget.content])
+
   const set = (patch: Partial<CardData>): void => setData((d) => ({ ...d, ...patch }))
 
   const content = (

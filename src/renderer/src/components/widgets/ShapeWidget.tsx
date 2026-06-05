@@ -119,6 +119,14 @@ export default function ShapeWidget({ widget, inline = false }: Props): JSX.Elem
     return () => window.clearTimeout(h)
   }, [data, widget.id, update])
 
+  // Adopt content from a synced sibling (live sync) without a remount/refresh.
+  useEffect(() => {
+    if (widget.content !== lastSaved.current) {
+      lastSaved.current = widget.content
+      setData(parse(widget.content))
+    }
+  }, [widget.content])
+
   const set = (patch: Partial<ShapeData>): void => setData((d) => ({ ...d, ...patch }))
   const noFill = data.shape === 'line' || data.shape === 'arrow'
 
