@@ -36,6 +36,21 @@ interface WidgetStore {
   setFocused: (id: string | null) => void
   setActive: (id: string | null) => void
   setHoveredSection: (id: string | null) => void
+  // ── Multi-select ──────────────────────────────────────────────────────────
+  // selectedIds holds every canvas widget the user has marqueed or shift-picked.
+  // Group-drag lets one dragged widget carry the whole selection: beginGroupDrag
+  // snapshots each selected widget's start position, setGroupDelta is pushed on
+  // every drag tick (members follow imperatively — no per-frame IPC), and
+  // endGroupDrag commits all final positions in one batch.
+  selectedIds: string[]
+  setSelection: (ids: string[]) => void
+  toggleSelection: (id: string) => void
+  clearSelection: () => void
+  groupDrag: { leaderId: string; dx: number; dy: number } | null
+  groupStart: Record<string, { x: number; y: number }> | null
+  beginGroupDrag: (leaderId: string) => void
+  setGroupDelta: (dx: number, dy: number) => void
+  endGroupDrag: () => Promise<void>
   focusOn: (id: string) => void
   zoomToWidget: (id: string) => void
   requestCenter: () => void
@@ -78,6 +93,9 @@ export const useWidgetStore = create<WidgetStore>((set, get) => ({
       widgets: [],
       focusedWidgetId: null,
       activeWidgetId: null,
+      selectedIds: [],
+      groupDrag: null,
+      groupStart: null,
       zoom: 1,
       panX: 0,
       panY: 0
@@ -93,6 +111,9 @@ export const useWidgetStore = create<WidgetStore>((set, get) => ({
       loadingFor: null,
       focusedWidgetId: null,
       activeWidgetId: null,
+      selectedIds: [],
+      groupDrag: null,
+      groupStart: null,
       zoom: 1,
       panX: 0,
       panY: 0
@@ -100,6 +121,39 @@ export const useWidgetStore = create<WidgetStore>((set, get) => ({
   setFocused: (id) => set({ focusedWidgetId: id }),
   setActive: (id) => set({ activeWidgetId: id }),
   setHoveredSection: (id) => set({ hoveredSectionId: id }),
+  selectedIds: [],
+  groupDrag: null,
+  groupStart: null,
+  setSelection: (ids) => set({ selectedIds: ids }),
+  toggleSelection: (id) =>
+    set((s) => ({
+      selectedIds: s.selectedIds.includes(id)
+        ? s.selectedIds.filter((x) => x !== id)
+        : [...s.selectedIds, id]
+    })),
+  clearSelection: () => set((s) => (s.selectedIds.length ? { selectedIds: [] } : {})),
+  beginGroupDrag: (leaderId) => {
+    const sel = new Set(get().selectedIds)
+    const start: Record<string, { x: number; y: number }> = {}
+    for (const w of get().widgets) {
+      if (sel.has(w.id)) start[w.id] = { x: w.x, y: w.y }
+    }
+    set({ groupDrag: { leaderId, dx: 0, dy: 0 }, groupStart: start })
+  },
+  setGroupDelta: (dx, dy) =>
+    set((s) => (s.groupDrag ? { groupDrag: { ...s.groupDrag, dx, dy } } : {})),
+  endGroupDrag: async () => {
+    const { groupDrag, groupStart } = get()
+    set({ groupDrag: null, groupStart: null })
+    if (!groupDrag || !groupStart) return
+    const { dx, dy } = groupDrag
+    if (dx === 0 && dy === 0) return
+    await Promise.all(
+      Object.entries(groupStart).map(([id, sp]) =>
+        get().update(id, { x: Math.round(sp.x + dx), y: Math.round(sp.y + dy) })
+      )
+    )
+  },
   // focusOn = make this widget active AND pan the canvas to center it. Used
   // by BringMeBack + explicit "open in focus mode" actions where the widget
   // might be off-screen and we want to surface it. NOT used by widget clicks

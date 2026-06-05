@@ -59,7 +59,9 @@ import {
   computeSectionFrame,
   computeLayoutCells,
   effectiveLayout,
-  SECTION_PADDING
+  SECTION_PADDING,
+  SECTION_MIN_W,
+  SECTION_MIN_H
 } from '../lib/sectionGeometry'
 import { lookupWebview } from '../lib/webviewRegistry'
 import {
@@ -194,6 +196,11 @@ export default function Canvas(): JSX.Element {
   const createWidget = useWidgetStore((s) => s.create)
   const updateWidget = useWidgetStore((s) => s.update)
   const bumpLayoutVersion = useWidgetStore((s) => s.bumpLayoutVersion)
+  const selectedIds = useWidgetStore((s) => s.selectedIds)
+  const setSelection = useWidgetStore((s) => s.setSelection)
+  const clearSelection = useWidgetStore((s) => s.clearSelection)
+  const removeWidget = useWidgetStore((s) => s.remove)
+  const groupDragActive = useWidgetStore((s) => s.groupDrag !== null)
   const dropRef = useRef<HTMLDivElement | null>(null)
   const setPan = useWidgetStore((s) => s.setPan)
   const [savingTemplate] = useState(false)
@@ -776,6 +783,148 @@ export default function Canvas(): JSX.Element {
   } | null>(null)
   const [grabbing, setGrabbing] = useState(false)
   const [panPing, setPanPing] = useState<{ x: number; y: number } | null>(null)
+  // ── Rubber-band (marquee) selection ────────────────────────────────────────
+  // rubberRef holds the canvas-space anchor while a Shift+drag is in flight;
+  // rubberRect is the live canvas-space rectangle (rendered as a screen-space
+  // overlay so the dashed border stays crisp at any zoom).
+  const rubberRef = useRef<{ startX: number; startY: number; pointerId: number } | null>(null)
+  const [rubberRect, setRubberRect] = useState<{ x: number; y: number; w: number; h: number } | null>(
+    null
+  )
+  // Last hit-set (sorted, joined) so we only push a new selection when the set
+  // of overlapped widgets actually changes — avoids a re-render every mousemove.
+  const lastHitsRef = useRef<string>('')
+  // Widgets eligible for marquee/selection: top-level, non-pinned, not the
+  // minimap, and not a section (sections can be moved but aren't multi-selected
+  // in v1). Their x/y/width/height are absolute canvas coords.
+  const selectableWidgets = useCallback(
+    () =>
+      useWidgetStore
+        .getState()
+        .widgets.filter(
+          (w) =>
+            w.parentSectionId === null &&
+            !w.pinned &&
+            w.kind !== 'section' &&
+            w.kind !== 'minimap'
+        ),
+    []
+  )
+
+  // Screen-space bounding box of the current selection (for the floating
+  // selection toolbar). Recomputed when the selection or any widget moves.
+  const selectionBBox = useMemo(() => {
+    if (selectedIds.length === 0) return null
+    const sel = widgets.filter((w) => selectedIds.includes(w.id))
+    if (sel.length === 0) return null
+    const minX = Math.min(...sel.map((w) => w.x))
+    const minY = Math.min(...sel.map((w) => w.y))
+    const maxX = Math.max(...sel.map((w) => w.x + w.width))
+    const maxY = Math.max(...sel.map((w) => w.y + w.height))
+    return { minX, minY, maxX, maxY, count: sel.length }
+  }, [selectedIds, widgets])
+
+  // Wrap the selected widgets in a new section that encloses them. The section
+  // is sized to their bounding box (+ padding); each child's absolute canvas
+  // x/y becomes section-local. Free layout preserves their relative positions.
+  const groupIntoSection = useCallback(async (): Promise<void> => {
+    const all = useWidgetStore.getState().widgets
+    const sel = all.filter(
+      (w) =>
+        selectedIds.includes(w.id) &&
+        w.parentSectionId === null &&
+        !w.pinned &&
+        w.kind !== 'section' &&
+        w.kind !== 'minimap'
+    )
+    if (sel.length < 1) return
+    const minX = Math.min(...sel.map((w) => w.x))
+    const minY = Math.min(...sel.map((w) => w.y))
+    const maxX = Math.max(...sel.map((w) => w.x + w.width))
+    const maxY = Math.max(...sel.map((w) => w.y + w.height))
+    const sectionX = minX - SECTION_PADDING
+    const sectionY = minY - SECTION_PADDING
+    const sectionW = Math.max(maxX - minX + 2 * SECTION_PADDING, SECTION_MIN_W)
+    const sectionH = Math.max(maxY - minY + 2 * SECTION_PADDING, SECTION_MIN_H)
+    const section = await createWidget({
+      taskId: sel[0].taskId,
+      kind: 'section',
+      title: 'Group',
+      content: '',
+      x: sectionX,
+      y: sectionY,
+      width: sectionW,
+      height: sectionH
+    })
+    chimeIn()
+    await Promise.all(
+      sel.map((w) =>
+        updateWidget(w.id, {
+          parentSectionId: section.id,
+          x: Math.round(w.x - sectionX - SECTION_PADDING),
+          y: Math.round(w.y - sectionY - SECTION_PADDING)
+        })
+      )
+    )
+    bumpLayoutVersion()
+    clearSelection()
+  }, [selectedIds, createWidget, updateWidget, bumpLayoutVersion, clearSelection])
+
+  // Duplicate every selected widget as an independent copy, offset slightly,
+  // then select the new copies so the user can immediately reposition them.
+  const duplicateSelection = useCallback(async (): Promise<void> => {
+    const all = useWidgetStore.getState().widgets
+    const sel = all.filter((w) => selectedIds.includes(w.id))
+    if (sel.length === 0) return
+    const created = await Promise.all(
+      sel.map((w) =>
+        createWidget({
+          taskId: w.taskId,
+          kind: w.kind,
+          title: w.title,
+          content: w.content,
+          x: w.x + 28,
+          y: w.y + 28,
+          width: w.width,
+          height: w.height,
+          color: w.color,
+          sourceAppId: w.sourceAppId,
+          mode: w.mode
+        })
+      )
+    )
+    setSelection(created.map((w) => w.id))
+  }, [selectedIds, createWidget, setSelection])
+
+  const deleteSelection = useCallback(async (): Promise<void> => {
+    const ids = useWidgetStore.getState().selectedIds.slice()
+    clearSelection()
+    await Promise.all(ids.map((id) => removeWidget(id)))
+  }, [clearSelection, removeWidget])
+
+  // Keyboard: Esc clears the selection; Cmd/Ctrl+A selects every selectable
+  // widget on the desk (ignored while typing in a field).
+  useEffect(() => {
+    function onKey(e: KeyboardEvent): void {
+      const el = document.activeElement as HTMLElement | null
+      const typing =
+        !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)
+      if (e.key === 'Escape' && useWidgetStore.getState().selectedIds.length > 0) {
+        clearSelection()
+        return
+      }
+      if ((e.metaKey || e.ctrlKey) && (e.key === 'a' || e.key === 'A') && !typing) {
+        const ids = selectableWidgets().map((w) => w.id)
+        if (ids.length > 0) {
+          e.preventDefault()
+          setSelection(ids)
+        }
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [clearSelection, selectableWidgets, setSelection])
+
   const panPingTimer = useRef<number | null>(null)
   // Release-inertia state: smoothed velocity (px/frame), last sample, and the
   // running glide animation frame.
@@ -795,9 +944,26 @@ export default function Canvas(): JSX.Element {
     if (e.button !== 0) return // primary button only
     const target = e.target as HTMLElement
     if (target.dataset.bareCanvas === undefined) return // only on bare canvas
-    if (!nav.dragPanEnabled) return // click-drag panning turned off in settings
     cancelPanInertia() // a fresh grab stops any in-flight glide
     panVelocityRef.current = { vx: 0, vy: 0 }
+    // Shift+drag on the bare canvas = rubber-band (marquee) select. This works
+    // even when drag-pan is disabled in settings, and intentionally pre-empts
+    // panning so the user can sweep a selection box. Plain drag falls through
+    // to panning below.
+    if (e.shiftKey) {
+      const rect = e.currentTarget.getBoundingClientRect()
+      const pt = screenToCanvas(e.clientX - rect.left, e.clientY - rect.top)
+      rubberRef.current = { startX: pt.x, startY: pt.y, pointerId: e.pointerId }
+      lastHitsRef.current = ''
+      setRubberRect({ x: pt.x, y: pt.y, w: 0, h: 0 })
+      try {
+        e.currentTarget.setPointerCapture(e.pointerId)
+      } catch {
+        // pointer capture unsupported — marquee still works while over the surface
+      }
+      return
+    }
+    if (!nav.dragPanEnabled) return // click-drag panning turned off in settings
     panLastMoveRef.current = { x: e.clientX, y: e.clientY, t: performance.now() }
     panDragRef.current = {
       startX: e.clientX,
@@ -825,6 +991,28 @@ export default function Canvas(): JSX.Element {
   }
 
   function handleCanvasPointerMove(e: React.PointerEvent<HTMLDivElement>): void {
+    const rub = rubberRef.current
+    if (rub) {
+      const rect = e.currentTarget.getBoundingClientRect()
+      const pt = screenToCanvas(e.clientX - rect.left, e.clientY - rect.top)
+      const x = Math.min(rub.startX, pt.x)
+      const y = Math.min(rub.startY, pt.y)
+      const w = Math.abs(pt.x - rub.startX)
+      const h = Math.abs(pt.y - rub.startY)
+      setRubberRect({ x, y, w, h })
+      // Live hit-test in canvas space — highlight everything the box overlaps.
+      const hits = selectableWidgets()
+        .filter(
+          (wd) => x < wd.x + wd.width && x + w > wd.x && y < wd.y + wd.height && y + h > wd.y
+        )
+        .map((wd) => wd.id)
+      const key = hits.slice().sort().join(',')
+      if (key !== lastHitsRef.current) {
+        lastHitsRef.current = key
+        setSelection(hits)
+      }
+      return
+    }
     const d = panDragRef.current
     if (!d) return
     const dx = e.clientX - d.startX
@@ -849,6 +1037,19 @@ export default function Canvas(): JSX.Element {
   }
 
   function handleCanvasPointerUp(e: React.PointerEvent<HTMLDivElement>): void {
+    const rub = rubberRef.current
+    if (rub) {
+      try {
+        e.currentTarget.releasePointerCapture(rub.pointerId)
+      } catch {
+        // ignore
+      }
+      rubberRef.current = null
+      setRubberRect(null)
+      // Selection was set live during the move. A shift-click that never moved
+      // leaves the (empty) selection as-is.
+      return
+    }
     const d = panDragRef.current
     if (!d) return
     panDragRef.current = null
@@ -862,7 +1063,10 @@ export default function Canvas(): JSX.Element {
     // onClick, which may not fire reliably after a pointer-capture sequence).
     if (!d.moved) {
       const target = e.target as HTMLElement
-      if (target.dataset.bareCanvas !== undefined && activeId !== null) setActive(null)
+      if (target.dataset.bareCanvas !== undefined) {
+        if (activeId !== null) setActive(null)
+        clearSelection() // click empty space → drop the selection
+      }
       return
     }
     // Release inertia: slingshot in the drag direction, then decelerate to a
@@ -1753,6 +1957,72 @@ export default function Canvas(): JSX.Element {
             >
               <span className="block h-10 w-10 rounded-full border-2 border-accent/70 animate-ping" />
               <span className="absolute inset-0 m-auto h-2 w-2 rounded-full bg-accent shadow" />
+            </div>
+          )}
+          {/* Marquee selection box — screen-space projection of the canvas-space
+              rubber-band rect, so the marching ants stay 1px crisp at any zoom. */}
+          {rubberRect && (
+            <div
+              className="fb-marquee absolute pointer-events-none z-[150]"
+              style={{
+                left: rubberRect.x * zoom + panX,
+                top: rubberRect.y * zoom + panY,
+                width: rubberRect.w * zoom,
+                height: rubberRect.h * zoom
+              }}
+            />
+          )}
+          {/* Floating selection toolbar — appears above the selection's bounding
+              box. Hidden mid-marquee and during a group drag (positions in flux). */}
+          {selectionBBox && !rubberRect && !groupDragActive && (
+            <div
+              className="absolute z-[210]"
+              style={{
+                left: ((selectionBBox.minX + selectionBBox.maxX) / 2) * zoom + panX,
+                top: selectionBBox.minY * zoom + panY - 12,
+                transform: 'translate(-50%, -100%)'
+              }}
+              onPointerDown={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center gap-0.5 rounded-full bg-stone-900/92 backdrop-blur px-1.5 py-1 shadow-xl ring-1 ring-white/10 text-stone-100">
+                <span className="px-2 text-[11px] font-medium tabular-nums whitespace-nowrap">
+                  {selectionBBox.count} selected
+                </span>
+                <div className="h-4 w-px bg-white/20" />
+                <button
+                  onClick={() => void groupIntoSection()}
+                  title="Group into a section"
+                  className="h-7 px-2 inline-flex items-center gap-1 rounded-full hover:bg-white/15 text-[11px]"
+                >
+                  <Icon name="dashboard" size={13} />
+                  <span>Group</span>
+                </button>
+                <button
+                  onClick={() => void duplicateSelection()}
+                  title="Duplicate all selected"
+                  aria-label="Duplicate selected"
+                  className="h-7 w-7 inline-flex items-center justify-center rounded-full hover:bg-white/15"
+                >
+                  <Icon name="content_copy" size={13} />
+                </button>
+                <button
+                  onClick={() => void deleteSelection()}
+                  title="Delete all selected"
+                  aria-label="Delete selected"
+                  className="h-7 w-7 inline-flex items-center justify-center rounded-full hover:bg-rose-500/30 text-rose-200"
+                >
+                  <Icon name="delete" size={13} />
+                </button>
+                <div className="h-4 w-px bg-white/20" />
+                <button
+                  onClick={() => clearSelection()}
+                  title="Clear selection (Esc)"
+                  aria-label="Clear selection"
+                  className="h-7 w-7 inline-flex items-center justify-center rounded-full hover:bg-white/15"
+                >
+                  <Icon name="close" size={13} />
+                </button>
+              </div>
             </div>
           )}
           {widgets.length === 0 && (
