@@ -53,17 +53,23 @@ export default function WidgetPalette({ onAdd, onImport, disabled }: Props): JSX
   }, [open])
 
   // Anchor the popover under the button. Portal it into document.body so it
-  // escapes the toolbar's overflow/transform stacking context.
+  // escapes the toolbar's overflow/transform stacking context. CLAMP both axes
+  // to the viewport so the 340-wide popover never runs off the right edge (the
+  // Add button sits on the right of the toolbar) and never spills below the
+  // bottom — previously the right/bottom of the menu was unreachable on smaller
+  // windows, hiding the lower catalog tiles (Diagram / Scratchpad).
   useLayoutEffect(() => {
     if (!open || !buttonRef.current) {
       setPopoverPos(null)
       return
     }
+    const POPOVER_W = 340
     const r = buttonRef.current.getBoundingClientRect()
-    setPopoverPos({
-      top: r.bottom + 6,
-      left: Math.max(8, r.left)
-    })
+    const left = Math.min(Math.max(8, r.left), window.innerWidth - POPOVER_W - 8)
+    // Prefer below the button; if there isn't room, the max-h + overflow-y-auto
+    // keeps it scrollable, but pull it up so its top stays on-screen.
+    const top = Math.min(r.bottom + 6, window.innerHeight - 80)
+    setPopoverPos({ top, left })
   }, [open])
 
   const grouped = entriesByCategory()
