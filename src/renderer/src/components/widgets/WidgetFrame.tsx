@@ -80,6 +80,23 @@ export default function WidgetFrame({
   // True while THIS widget is the leader of an in-flight group drag — gates the
   // onDrag/onDragStop branches without re-subscribing to selection on every tick.
   const groupLeadRef = useRef(false)
+  // One-shot guard so a non-lead drag drops the selection at most once, on the
+  // FIRST real movement (never on a click — react-rnd fires onDragStart on a
+  // plain mousedown too, so selection-clearing must wait for actual motion).
+  const groupClearedRef = useRef(false)
+  // Shift-select fires from TWO places depending on where you click: the body
+  // routes through onMouseDownCapture, but the header IS react-rnd's drag handle
+  // and only reaches onDragStart. shiftToggle() dedupes so a header click (which
+  // can hit both) toggles exactly once. shiftGestureRef tells onDrag to skip its
+  // "dragging an unselected widget clears the selection" branch for a shift gesture.
+  const lastShiftToggleRef = useRef(0)
+  const shiftGestureRef = useRef(false)
+  function shiftToggle(): void {
+    const now = performance.now()
+    if (now - lastShiftToggleRef.current < 250) return
+    lastShiftToggleRef.current = now
+    toggleSelection(widget.id)
+  }
   const [pinPickerOpen, setPinPickerOpen] = useState(false)
   const [expandPickerOpen, setExpandPickerOpen] = useState(false)
   // Right-click on the widget header opens a small context menu with a
@@ -481,14 +498,28 @@ export default function WidgetFrame({
               topLeft: true
             }
       }
-      onDragStart={() => {
+      onDragStart={(e) => {
+        // Shift+click on the header is a SELECTION toggle, not a drag — but
+        // react-rnd still fires onDragStart on the mousedown. Bail out before
+        // touching active/selection state so the onClick handler's shift-toggle
+        // can build a multi-selection without this wiping it each click.
+        if ((e as MouseEvent).shiftKey) {
+          groupLeadRef.current = false
+          shiftGestureRef.current = true
+          // Header shift-click reaches us here (onMouseDownCapture doesn't fire
+          // for the drag handle). shiftToggle() dedupes against the body path.
+          if (!isChildOfSection && !isPinned && !isSection) shiftToggle()
+          return
+        }
+        shiftGestureRef.current = false
         void bringToFront(widget.id)
         setActive(widget.id)
+        groupClearedRef.current = false
         // Multi-select interplay: if this widget is part of a 2+ selection,
         // become the GROUP-DRAG leader — every selected widget rides along.
-        // If it's NOT selected, dragging it drops the existing selection (you
-        // grabbed something outside it). Sections/section-children/pins never
-        // lead a group drag (they can't be multi-selected).
+        // (Dropping the selection when you grab an UNSELECTED widget is deferred
+        // to the first real movement in onDrag — never on a click.)
+        // Sections/section-children/pins never lead a group drag.
         const st = useWidgetStore.getState()
         const canLead = !isChildOfSection && !isPinned && !isSection
         if (canLead && st.selectedIds.includes(widget.id) && st.selectedIds.length > 1) {
@@ -496,7 +527,6 @@ export default function WidgetFrame({
           beginGroupDrag(widget.id)
         } else {
           groupLeadRef.current = false
-          if (!st.selectedIds.includes(widget.id)) clearSelection()
         }
         // Toggle a root-level class so the desk surface can render the
         // snap-to-grid hint while the user is actively positioning an
@@ -510,6 +540,18 @@ export default function WidgetFrame({
         if (groupLeadRef.current) {
           const start = useWidgetStore.getState().groupStart?.[widget.id]
           if (start) setGroupDelta(d.x - start.x, d.y - start.y)
+        } else if (
+          !groupClearedRef.current &&
+          !shiftGestureRef.current &&
+          !isChildOfSection &&
+          !isPinned
+        ) {
+          // First real movement of a non-lead, non-shift drag: if we grabbed a
+          // widget that ISN'T in the current selection, drop the selection now
+          // (on motion, never on a click — so shift-clicking builds a selection).
+          groupClearedRef.current = true
+          const st = useWidgetStore.getState()
+          if (st.selectedIds.length && !st.selectedIds.includes(widget.id)) clearSelection()
         }
         // Live-track the dragging widget's position so the inter-widget
         // links overlay can keep its endpoints attached to the widget in
@@ -542,6 +584,7 @@ export default function WidgetFrame({
           commitDrop(d.x, d.y)
         }
         document.documentElement.classList.remove('fb-canvas-dragging')
+        shiftGestureRef.current = false
         // Mark the mouseup as drag-end so the click event that follows
         // doesn't run our onClick activation logic.
         dragJustEnded.current = performance.now()
@@ -617,22 +660,25 @@ export default function WidgetFrame({
       <div
         data-widget-id={widget.id}
         data-widget-kind={widget.kind}
-        // No onMouseDownCapture here — that was setting `active` so early
-        // that the WebView overlay (showOverlay = !isActive) would unmount
-        // BEFORE the click event fired, robbing the overlay's onClick
-        // (which calls focusOn) of its chance to run. Result: clicking a
-        // browser would activate it but never centre the camera. Rnd's
-        // onDragStart still calls setActive at the start of a drag, so the
-        // active-glow-during-drag path is unaffected.
+        // Shift-select is handled on mousedown (CAPTURE phase) — not onClick —
+        // because the header IS react-rnd's drag handle: react-draggable's
+        // bubble-phase mousedown consumes the gesture and onClick never fires on
+        // the header. Catching it in capture (before the drag machinery) and
+        // stopPropagation lets us toggle the selection AND suppress the drag.
+        // Shift-only, so a normal mousedown is untouched (the WebView overlay
+        // relies on NOT setting `active` early here, which we preserve).
+        onMouseDownCapture={(e) => {
+          if (e.shiftKey && !isChildOfSection && !isPinned) {
+            e.stopPropagation()
+            shiftToggle()
+          }
+        }}
         onClick={(e) => {
           e.stopPropagation()
-          // Shift-click toggles this widget in the multi-selection (canvas
-          // widgets only — section children don't participate). Takes priority
-          // over centre/zoom so the user can build a selection without the
-          // camera jumping around.
+          // Shift handled on mousedown above — just swallow the click so it
+          // doesn't fall through to centre/zoom.
           if (e.shiftKey && !isChildOfSection && !isPinned) {
             e.preventDefault()
-            toggleSelection(widget.id)
             return
           }
           // Cmd/⌘-click while zoomed out (< 80%) → dive into this widget: jump
