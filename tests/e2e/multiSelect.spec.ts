@@ -55,11 +55,20 @@ async function seedStickiesAndOpen(
 }
 
 async function shiftClick(l: LaunchedApp, id: string): Promise<void> {
-  await l.window.evaluate((wid: string) => {
-    const el = document.querySelector(`[data-widget-id="${wid}"]`)
-    el?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, shiftKey: true }))
+  // Real Shift+mousedown→mouseup on the HEADER (react-rnd's drag handle), at the
+  // title (left) area — the header CENTRE is an icon button, so we target the
+  // left. This is the exact gesture a user makes and, unlike a synthetic click,
+  // exercises react-rnd's onDragStart path (where header shift-select is wired).
+  const pt = await l.window.evaluate((wid: string) => {
+    const h = document.querySelector(`[data-widget-id="${wid}"] .widget-handle`)
+    const target = h ?? document.querySelector(`[data-widget-id="${wid}"]`)
+    const b = (target as HTMLElement).getBoundingClientRect()
+    return { x: b.left + 26, y: b.top + (h ? b.height / 2 : 44) }
   }, id)
-  await l.window.waitForTimeout(120)
+  await l.window.keyboard.down('Shift')
+  await l.window.mouse.click(pt.x, pt.y)
+  await l.window.keyboard.up('Shift')
+  await l.window.waitForTimeout(150)
 }
 
 async function stickiesOf(
