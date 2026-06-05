@@ -305,11 +305,19 @@ export default function Canvas(): JSX.Element {
       createdMinimapForRef.current.add(activeTaskId)
       return
     }
-    const existing = useWidgetStore
+    const mine = useWidgetStore
       .getState()
-      .widgets.find((w) => w.kind === 'minimap' && w.taskId === activeTaskId)
-    if (existing) {
+      .widgets.filter((w) => w.kind === 'minimap' && w.taskId === activeTaskId)
+    if (mine.length >= 1) {
       createdMinimapForRef.current.add(activeTaskId)
+      // Self-heal: a load-race in an earlier session could have created several
+      // minimaps (the user saw four). Keep exactly one, delete the rest. This
+      // also stops new dupes accumulating on every refresh.
+      if (mine.length > 1) {
+        for (const extra of mine.slice(1)) {
+          void useWidgetStore.getState().remove(extra.id)
+        }
+      }
       return
     }
     createdMinimapForRef.current.add(activeTaskId)
@@ -750,11 +758,27 @@ export default function Canvas(): JSX.Element {
   const [grabbing, setGrabbing] = useState(false)
   const [panPing, setPanPing] = useState<{ x: number; y: number } | null>(null)
   const panPingTimer = useRef<number | null>(null)
+  // Release-inertia state: smoothed velocity (px/frame), last sample, and the
+  // running glide animation frame.
+  const panVelocityRef = useRef<{ vx: number; vy: number }>({ vx: 0, vy: 0 })
+  const panLastMoveRef = useRef<{ x: number; y: number; t: number } | null>(null)
+  const panInertiaRaf = useRef<number | null>(null)
+
+  function cancelPanInertia(): void {
+    if (panInertiaRaf.current !== null) {
+      cancelAnimationFrame(panInertiaRaf.current)
+      panInertiaRaf.current = null
+    }
+  }
+  useEffect(() => cancelPanInertia, [])
 
   function handleCanvasPointerDown(e: React.PointerEvent<HTMLDivElement>): void {
     if (e.button !== 0) return // primary button only
     const target = e.target as HTMLElement
     if (target.dataset.bareCanvas === undefined) return // only on bare canvas
+    cancelPanInertia() // a fresh grab stops any in-flight glide
+    panVelocityRef.current = { vx: 0, vy: 0 }
+    panLastMoveRef.current = { x: e.clientX, y: e.clientY, t: performance.now() }
     panDragRef.current = {
       startX: e.clientX,
       startY: e.clientY,
@@ -785,6 +809,19 @@ export default function Canvas(): JSX.Element {
     const dy = e.clientY - d.startY
     if (!d.moved && Math.hypot(dx, dy) > 3) d.moved = true
     setPan(d.startPanX + dx, d.startPanY + dy)
+    // Track smoothed velocity (normalised to ~16ms frames) for release inertia.
+    const last = panLastMoveRef.current
+    const now = performance.now()
+    if (last) {
+      const mdt = Math.max(1, now - last.t)
+      const fvx = ((e.clientX - last.x) / mdt) * 16
+      const fvy = ((e.clientY - last.y) / mdt) * 16
+      panVelocityRef.current = {
+        vx: panVelocityRef.current.vx * 0.6 + fvx * 0.4,
+        vy: panVelocityRef.current.vy * 0.6 + fvy * 0.4
+      }
+    }
+    panLastMoveRef.current = { x: e.clientX, y: e.clientY, t: now }
   }
 
   function handleCanvasPointerUp(e: React.PointerEvent<HTMLDivElement>): void {
@@ -802,6 +839,25 @@ export default function Canvas(): JSX.Element {
     if (!d.moved) {
       const target = e.target as HTMLElement
       if (target.dataset.bareCanvas !== undefined && activeId !== null) setActive(null)
+      return
+    }
+    // Release inertia: keep gliding in the drag direction, decelerating to a
+    // stop (friction) — so a flick coasts instead of stopping dead. The faster
+    // the flick, the further it travels.
+    let { vx, vy } = panVelocityRef.current
+    if (Math.hypot(vx, vy) > 1.5) {
+      const friction = 0.92
+      const step = (): void => {
+        panBy(vx, vy)
+        vx *= friction
+        vy *= friction
+        if (Math.hypot(vx, vy) > 0.4) {
+          panInertiaRaf.current = requestAnimationFrame(step)
+        } else {
+          panInertiaRaf.current = null
+        }
+      }
+      panInertiaRaf.current = requestAnimationFrame(step)
     }
   }
 
