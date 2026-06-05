@@ -133,6 +133,15 @@ function createCommandCenter(): BrowserWindow {
     win.webContents.once('did-finish-load', () => {
       win.webContents.openDevTools({ mode: 'detach' })
     })
+    // Mirror the renderer's [voice] trace to the main-process stdout (dev only)
+    // so `npm run dev > log` captures the whole voice flow without anyone
+    // needing to open DevTools. Temporary diagnostic.
+    win.webContents.on('console-message', (_e, _level, message) => {
+      if (typeof message === 'string' && message.includes('[voice]')) {
+        // eslint-disable-next-line no-console
+        console.log('[renderer]', message)
+      }
+    })
   } else {
     win.loadFile(join(__dirname, '../renderer/index.html'))
   }
