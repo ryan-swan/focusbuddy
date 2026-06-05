@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import type { ActionProposal, Widget, WidgetKind } from '@shared/types'
 import WidgetFrame from './WidgetFrame'
 import Icon from '../Icon'
@@ -1070,7 +1070,6 @@ export default function MindMapWidget({ widget, inline = false }: Props): JSX.El
                   style={{ pointerEvents: 'none' }}
                 >
                   <div
-                    xmlns="http://www.w3.org/1999/xhtml"
                     className="w-full h-full flex items-center justify-center px-2 text-center text-[11px] font-medium leading-tight"
                     style={{
                       color: isSelected ? 'rgb(var(--accent))' : 'currentColor',

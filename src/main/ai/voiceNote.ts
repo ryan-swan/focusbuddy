@@ -34,7 +34,7 @@ import { randomUUID } from 'crypto'
 import Anthropic from '@anthropic-ai/sdk'
 import type { ActionProposal } from '@shared/types'
 import { resolveAnthropicKey, resolveOpenAIKey } from '../settingsStore'
-import { transcribeLocal, isLocalWhisperReady } from './localWhisper'
+import { transcribeLocal } from './localWhisper'
 import { getTranscriptionProvider } from '../voiceProviderPref'
 
 // Fourth processing mode joined the family when speaker diarisation
@@ -64,8 +64,11 @@ export interface TranscribeError {
   ok: false
   error: string
   // Helps the renderer surface "Set your OpenAI key in Settings" vs a
-  // generic network/server error.
-  reason?: 'no_key' | 'network' | 'api' | 'unknown'
+  // generic network/server error. Superset of localWhisper's reasons
+  // ('decode' = renderer didn't pre-decode samples for the local provider;
+  // 'model_load' = the local ONNX model failed to initialise) so a result
+  // forwarded straight from transcribeLocal stays type-compatible.
+  reason?: 'no_key' | 'network' | 'api' | 'unknown' | 'decode' | 'model_load'
 }
 
 /**
@@ -130,7 +133,10 @@ async function transcribeCloud(
   // build the form manually (no form-data dep) since Node 20+ has a
   // native FormData + Blob.
   const ext = guessExtension(mimeType)
-  const blob = new Blob([audioBytes], { type: mimeType })
+  // Copy into a fresh ArrayBuffer-backed view: a bare Uint8Array is typed
+  // Uint8Array<ArrayBufferLike>, which (since ArrayBufferLike may be a
+  // SharedArrayBuffer) isn't a valid BlobPart under lib.dom's stricter typing.
+  const blob = new Blob([new Uint8Array(audioBytes)], { type: mimeType })
   const form = new FormData()
   form.append('file', blob, `voice-note.${ext}`)
   form.append('model', 'whisper-1')

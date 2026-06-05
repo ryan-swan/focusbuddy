@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import type { ChatMessage, FbNode } from '@shared/types'
 import { useNodeStore } from '../stores/nodes'
 import Icon from './Icon'

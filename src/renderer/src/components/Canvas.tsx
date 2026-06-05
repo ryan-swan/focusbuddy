@@ -201,22 +201,9 @@ export default function Canvas(): JSX.Element {
   // (palette state is local to WidgetPalette now — it manages its own
   // popover open/closed; we removed the canvas-level toggle.)
   const [animatingPan, setAnimatingPan] = useState(false)
-  // Track canvas viewport dimensions so the minimap can position its
-  // viewport rectangle accurately. ResizeObserver keeps this fresh under
-  // panel resizes without the manual gbcr calls scattered through the file.
-  const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 })
-  useEffect(() => {
-    const el = dropRef.current
-    if (!el) return
-    const ro = new ResizeObserver(() => {
-      const rect = el.getBoundingClientRect()
-      setViewportSize({ width: rect.width, height: rect.height })
-    })
-    ro.observe(el)
-    const rect = el.getBoundingClientRect()
-    setViewportSize({ width: rect.width, height: rect.height })
-    return () => ro.disconnect()
-  }, [])
+  // (The minimap measures the canvas viewport itself via its own
+  // ResizeObserver — see MinimapWidget — so Canvas no longer tracks a
+  // separate, unread viewportSize here.)
   // Edge-pan / "infinite map" camera. The hook installs a rAF loop
   // that pans the canvas when the cursor enters a 80px margin near
   // any edge — closer to the edge = faster pan (quadratic ramp).
@@ -960,7 +947,12 @@ export default function Canvas(): JSX.Element {
     // self-elect on the backend.
     const preferredTextKind = isMarkdown ? 'markdown' : isTxt ? 'note' : 'page'
     const draft = await window.api.fileImport.run({ path, preferredTextKind })
-    if ('ok' in draft && draft.ok === false) {
+    // ImportError has no `kind`; every success draft does. Narrowing on the
+    // positive `kind` key reliably removes the error member from the union for
+    // the branches below — the prior `'ok' in draft && draft.ok === false`
+    // guard didn't narrow the fall-through, leaving draft.kind/title/etc.
+    // unresolved across the whole handler.
+    if (!('kind' in draft)) {
       // eslint-disable-next-line no-alert
       window.alert(draft.error)
       return

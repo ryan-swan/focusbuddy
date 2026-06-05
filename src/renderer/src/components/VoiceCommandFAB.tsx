@@ -30,7 +30,11 @@ type Phase =
   | 'sending' // hit Anthropic
   | 'result' // proposals dock visible
 
-interface Proposal extends ActionProposal {
+// Intersection (not `interface extends`): ActionProposal is a discriminated
+// union, and an interface extending a union silently drops the per-member
+// discriminants (kind/id/widgetId). `ActionProposal & {…}` distributes over the
+// union so each member keeps its fields AND gains the local UI status.
+type Proposal = ActionProposal & {
   // status tracked locally so we can mark a card consumed without
   // mutating the AI's payload.
   _status?: 'pending' | 'applied' | 'dismissed' | 'failed'
