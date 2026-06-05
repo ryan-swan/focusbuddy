@@ -960,6 +960,17 @@ export default function WidgetFrame({
               icon: 'content_copy',
               onClick: () => duplicateWidget(false)
             })
+            if (!isChildOfSection && !isSection) {
+              items.push({
+                // Bridges "duplicate" → a copy in ANOTHER folder as a new task.
+                // Opens the Make-a-task dialog, where you pick any folder (or
+                // create one) and choose synced vs independent. Same-task
+                // duplicates stay on the two items above.
+                label: 'Duplicate into another folder / task…',
+                icon: 'drive_file_move',
+                onClick: () => setMakeTaskOpen(true)
+              })
+            }
             if (widget.syncGroupId) {
               items.push({
                 label: 'Unlink from synced copies',

@@ -96,6 +96,16 @@ export default function CustomBlockWidget({ widget, inline = false }: Props): JS
     return () => window.clearTimeout(h)
   }, [data, widget.id, update])
 
+  // Adopt fields/values pushed in from a synced sibling (live sync), so a linked
+  // copy updates without a remount/refresh. Compared against lastSaved so our
+  // own debounced save doesn't re-trigger; design mode + selection are untouched.
+  useEffect(() => {
+    if (widget.content !== lastSaved.current) {
+      lastSaved.current = widget.content
+      setData(parse(widget.content))
+    }
+  }, [widget.content])
+
   const setFields = (fn: (f: BlockField[]) => BlockField[]): void =>
     setData((d) => ({ ...d, fields: fn(d.fields) }))
   const patchField = (id: string, patch: Partial<BlockField>): void =>
