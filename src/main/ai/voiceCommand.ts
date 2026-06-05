@@ -199,6 +199,7 @@ Available proposal kinds (return as a JSON array under "proposals"):
 1. "create-widget" — drop a new widget on the canvas.
    { "kind": "create-widget", "widgetKind": "sticky|note|markdown|page|table|field|file|webview|timer|calculator|color|mindmap", "title": "...", "content": "...", "reason": "..." }
    The content field holds the body the user wants populated. Tables/pages get sensible empty starts, sticky/note/markdown get plain text.
+   IMPORTANT: widgetKind "table" here makes a DEFAULT empty table (a Name + Done column). If the user names the columns/fields they want to track, use "create-table" (kind 12) instead so those columns are actually created.
 
 2. "update-widget" — modify an existing widget. Reference by id from the snapshot below.
    { "kind": "update-widget", "widgetId": "<id-from-snapshot>", "label": "<short user-facing description>", "title": "...", "content": "...", "operation": "replace|append|prepend", "x": 0, "y": 0, "width": 0, "height": 0, "reason": "..." }
@@ -232,6 +233,11 @@ Available proposal kinds (return as a JSON array under "proposals"):
 
 11. "create-todo-list" — quick markdown checklist widget.
     { "kind": "create-todo-list", "title": "...", "items": ["...", "..."], "reason": "..." }
+
+12. "create-table" — create a NEW table widget WITH SPECIFIC COLUMNS. Use this (NOT create-widget) whenever the user describes the fields/columns they want to track.
+    { "kind": "create-table", "title": "...", "columns": [ { "label": "Name", "type": "text-short" }, { "label": "Phone number", "type": "text-short" }, { "label": "Date", "type": "date" }, { "label": "Status", "type": "single-select", "options": ["To call", "Called", "No answer"] } ], "reason": "..." }
+    Column "type" is one of: text-short, text-long, number, checkbox, single-select, multi-select, date, attachment, button. Include "options" for the select types. Pick the most natural type per field (phone/email/name → text-short, a notes field → text-long, an amount → number, a yes/no → checkbox, a stage/status → single-select).
+    Example: "make a table to track calls with name, phone number, date and status" → exactly the columns shown above.
 
 Resolving "this" / "that" / "it":
 - If "selectedWidget" is set, that's "this".
@@ -318,6 +324,45 @@ function sanitiseProposal(
         content: typeof o.content === 'string' ? o.content : undefined,
         reason
       }
+    }
+    case 'create-table': {
+      // A table WITH explicit columns (vs create-widget widgetKind:table, which
+      // is a default name/done table). The executor's applyCreateTable builds
+      // the schema from these columns.
+      if (!activeTaskId) return null
+      const title = typeof o.title === 'string' ? o.title.trim() : ''
+      const VALID_COL_TYPES = [
+        'text-short',
+        'text-long',
+        'number',
+        'checkbox',
+        'single-select',
+        'multi-select',
+        'date',
+        'attachment',
+        'button'
+      ]
+      type Col = Extract<ActionProposal, { kind: 'create-table' }>['columns'][number]
+      const columns = (Array.isArray(o.columns) ? o.columns : [])
+        .map((c): Col | null => {
+          if (!c || typeof c !== 'object') return null
+          const co = c as Record<string, unknown>
+          const label = typeof co.label === 'string' ? co.label.trim() : ''
+          if (!label) return null
+          const type =
+            typeof co.type === 'string' && VALID_COL_TYPES.includes(co.type)
+              ? (co.type as Col['type'])
+              : 'text-short'
+          const col: Col = { label, type }
+          if (Array.isArray(co.options)) {
+            const opts = co.options.filter((x): x is string => typeof x === 'string')
+            if (opts.length > 0) col.options = opts
+          }
+          return col
+        })
+        .filter((c): c is Col => c !== null)
+      if (!title || columns.length === 0) return null
+      return { id, kind: 'create-table', title, columns, reason }
     }
     case 'update-widget': {
       const wid = typeof o.widgetId === 'string' ? o.widgetId : ''
