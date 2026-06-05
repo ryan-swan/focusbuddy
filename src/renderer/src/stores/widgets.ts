@@ -37,6 +37,7 @@ interface WidgetStore {
   setActive: (id: string | null) => void
   setHoveredSection: (id: string | null) => void
   focusOn: (id: string) => void
+  zoomToWidget: (id: string) => void
   requestCenter: () => void
   bumpLayoutVersion: () => void
   togglePin: (id: string) => Promise<void>
@@ -106,6 +107,11 @@ export const useWidgetStore = create<WidgetStore>((set, get) => ({
   // world under you.
   focusOn: (id) =>
     set({ activeWidgetId: id, centerToken: get().centerToken + 1 }),
+  // zoomToWidget = jump to 100% zoom AND center this widget. Used by Cmd+click
+  // on a widget while zoomed out — dive straight into it. The centerToken bump
+  // drives the Canvas centering effect, which reads the (now 100%) zoom.
+  zoomToWidget: (id) =>
+    set({ zoom: 1, activeWidgetId: id, centerToken: get().centerToken + 1 }),
   requestCenter: () => set({ centerToken: get().centerToken + 1 }),
   bumpLayoutVersion: () => set({ layoutVersion: get().layoutVersion + 1 }),
   setZoom: (z) => set({ zoom: clampZoom(z) }),

@@ -134,6 +134,34 @@ export default function SectionWidget({
     setEditing(false)
   }
 
+  // A compact (icons/list) child was dragged. If it was released OUTSIDE the
+  // section card, eject it onto the desk at the drop point; if released inside,
+  // it snaps back into the layout (no-op). This is the drag-out gesture the
+  // user asked for — an alternative to the right-click "Move out of section".
+  function handleChildDragRelease(
+    child: Widget,
+    cell: LayoutCell,
+    clientX: number,
+    clientY: number,
+    startX: number,
+    startY: number
+  ): void {
+    const sectionEl = document.querySelector(`[data-widget-id="${widget.id}"]`)
+    const r = sectionEl?.getBoundingClientRect()
+    const inside =
+      !!r && clientX >= r.left && clientX <= r.right && clientY >= r.top && clientY <= r.bottom
+    if (inside) return
+    const z = useWidgetStore.getState().zoom || 1
+    // The child started at this canvas position; translate the cursor's screen
+    // delta into canvas px to find where on the desk to drop it.
+    const childCanvasX = widget.x + SECTION_PADDING + cell.x
+    const childCanvasY = widget.y + SECTION_PADDING + cell.y
+    const dropX = Math.round(childCanvasX + (clientX - startX) / z)
+    const dropY = Math.round(childCanvasY + (clientY - startY) / z)
+    chimeOut()
+    void update(child.id, { parentSectionId: null, x: dropX, y: dropY }).then(() => bumpLayout())
+  }
+
   const cells = computeLayoutCells(layout, children, contentW)
 
   return (
@@ -393,14 +421,19 @@ export default function SectionWidget({
                   onOpen={() => setFocused(c.id)}
                   onEject={() => {
                     chimeOut()
-                    const canvasX = Math.round(widget.x + SECTION_PADDING + c.x)
-                    const canvasY = Math.round(widget.y + SECTION_PADDING + c.y)
+                    // Eject button: drop just below the section so it doesn't
+                    // land under the section card.
+                    const canvasX = Math.round(widget.x + SECTION_PADDING + cells[i].x)
+                    const canvasY = Math.round(widget.y + SECTION_PADDING + cells[i].y)
                     void update(c.id, {
                       parentSectionId: null,
                       x: canvasX,
                       y: canvasY
                     }).then(() => bumpLayout())
                   }}
+                  onDragRelease={(cx, cy, sx, sy) =>
+                    handleChildDragRelease(c, cells[i], cx, cy, sx, sy)
+                  }
                 />
               ))
             ) : (
@@ -522,6 +555,51 @@ export default function SectionWidget({
   )
 }
 
+// Pointer-drag gesture that lets a section child be dragged out onto the open
+// canvas. We use document-level listeners (NOT setPointerCapture) so a plain
+// tap still reaches the element's own onClick — only a real drag past the
+// threshold is treated as a drag-out. `onRelease` fires with the final +
+// starting cursor positions so the caller can decide inside-vs-outside and
+// translate to canvas coords. `suppressClickRef` lets the caller swallow the
+// click that the browser fires right after a drag.
+function useEjectDrag(
+  onRelease: (clientX: number, clientY: number, startX: number, startY: number) => void
+): {
+  onPointerDown: (e: React.PointerEvent) => void
+  offset: { x: number; y: number } | null
+  suppressClickRef: React.MutableRefObject<boolean>
+} {
+  const movedRef = useRef(false)
+  const suppressClickRef = useRef(false)
+  const [offset, setOffset] = useState<{ x: number; y: number } | null>(null)
+
+  const onPointerDown = (e: React.PointerEvent): void => {
+    if (e.button !== 0) return
+    const start = { x: e.clientX, y: e.clientY }
+    movedRef.current = false
+    const move = (ev: PointerEvent): void => {
+      const dx = ev.clientX - start.x
+      const dy = ev.clientY - start.y
+      if (!movedRef.current && Math.hypot(dx, dy) < 6) return
+      movedRef.current = true
+      setOffset({ x: dx, y: dy })
+    }
+    const up = (ev: PointerEvent): void => {
+      document.removeEventListener('pointermove', move)
+      document.removeEventListener('pointerup', up)
+      if (movedRef.current) {
+        suppressClickRef.current = true
+        onRelease(ev.clientX, ev.clientY, start.x, start.y)
+      }
+      setOffset(null)
+    }
+    document.addEventListener('pointermove', move)
+    document.addEventListener('pointerup', up)
+  }
+
+  return { onPointerDown, offset, suppressClickRef }
+}
+
 interface CompactProps {
   child: Widget
   cell: LayoutCell
@@ -529,10 +607,51 @@ interface CompactProps {
   color: string
   onOpen: () => void
   onEject: () => void
+  onDragRelease: (clientX: number, clientY: number, startX: number, startY: number) => void
 }
 
-function CompactChildView({ child, cell, layout, color, onOpen, onEject }: CompactProps): JSX.Element {
+function CompactChildView({
+  child,
+  cell,
+  layout,
+  color,
+  onOpen,
+  onEject,
+  onDragRelease
+}: CompactProps): JSX.Element {
   const entry = catalogFor(child.kind)
+  const { onPointerDown, offset, suppressClickRef } = useEjectDrag(onDragRelease)
+  const dragging = offset !== null
+
+  // Click handler shared by the list row and the icon tile. ⌘/Ctrl-click while
+  // zoomed out dives into the child (100% + centred) exactly like every other
+  // canvas item — compact section children render as plain divs (not
+  // WidgetFrame), so they'd otherwise be the one place the gesture is missing.
+  const handleOpen = (e: React.MouseEvent): void => {
+    e.stopPropagation()
+    // Swallow the click the browser fires right after a drag-out gesture.
+    if (suppressClickRef.current) {
+      suppressClickRef.current = false
+      return
+    }
+    const store = useWidgetStore.getState()
+    if ((e.metaKey || e.ctrlKey) && store.zoom < 0.8) {
+      store.zoomToWidget(child.id)
+      return
+    }
+    onOpen()
+  }
+
+  // Visual feedback while dragging a child out of the section.
+  const dragStyle: React.CSSProperties = dragging
+    ? {
+        transform: `translate(${offset.x}px, ${offset.y}px)`,
+        zIndex: 50,
+        opacity: 0.9,
+        cursor: 'grabbing',
+        boxShadow: '0 8px 24px rgba(0,0,0,0.18)'
+      }
+    : {}
   const title =
     child.title ||
     (child.content
@@ -552,13 +671,13 @@ function CompactChildView({ child, cell, layout, color, onOpen, onEject }: Compa
           top: cell.y,
           width: cell.width,
           height: cell.height,
-          pointerEvents: 'auto'
+          pointerEvents: 'auto',
+          ...dragStyle
         }}
         className="group flex items-center gap-2 px-3 rounded-md bg-white border border-stone-200 hover:border-stone-400 hover:shadow-sm cursor-pointer transition-colors"
-        onClick={(e) => {
-          e.stopPropagation()
-          onOpen()
-        }}
+        onPointerDown={onPointerDown}
+        onClick={handleOpen}
+        title="Drag out of the section to move it back to the desk"
       >
         <span
           className="h-7 w-7 rounded inline-flex items-center justify-center shrink-0"
@@ -592,15 +711,15 @@ function CompactChildView({ child, cell, layout, color, onOpen, onEject }: Compa
         top: cell.y,
         width: cell.width,
         height: cell.height,
-        pointerEvents: 'auto'
+        pointerEvents: 'auto',
+        ...dragStyle
       }}
       className="group"
+      onPointerDown={onPointerDown}
+      title="Drag out of the section to move it back to the desk"
     >
       <button
-        onClick={(e) => {
-          e.stopPropagation()
-          onOpen()
-        }}
+        onClick={handleOpen}
         className="w-full h-full flex flex-col items-center justify-center gap-1 rounded-md bg-white border border-stone-200 hover:border-stone-400 hover:shadow-md transition-colors p-2"
         title={title}
       >
