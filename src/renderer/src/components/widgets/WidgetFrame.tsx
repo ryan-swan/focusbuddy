@@ -653,7 +653,7 @@ export default function WidgetFrame({
             )}
             {widget.syncGroupId && (
               <span
-                title="Linked duplicate — content, title and colour stay in sync with its copies (across tasks)"
+                title="Synced copy — content, title and colour mirror across all linked copies (even in other tasks). Right-click → ‘Unlink from synced copies’ to make this one independent."
                 className="inline-flex items-center text-accent shrink-0"
               >
                 <Icon name="link" size={11} />
@@ -795,36 +795,45 @@ export default function WidgetFrame({
               items.push({ separator: true })
             }
             items.push({ separator: true })
-            items.push({
-              label: 'Duplicate',
-              icon: 'content_copy',
-              onClick: () => {
-                // Clone the widget AND link it to the source: both share a
-                // syncGroupId, so content / title / colour edits mirror across
-                // every copy — including copies in other tasks. Offset so the
-                // copy is visible next to the original.
-                void (async () => {
-                  let groupId = widget.syncGroupId
-                  if (!groupId) {
-                    groupId = crypto.randomUUID()
+            // Duplicate — the user chooses synced (default, autolinked) or an
+            // independent point-in-time copy. SYNCED: both share a syncGroupId,
+            // so content / title / colour edits mirror across every copy,
+            // including copies later moved to other tasks. INDEPENDENT: no
+            // syncGroupId — a snapshot that never affects the original.
+            const duplicateWidget = (synced: boolean): void => {
+              void (async () => {
+                let groupId: string | undefined
+                if (synced) {
+                  groupId = widget.syncGroupId ?? crypto.randomUUID()
+                  if (!widget.syncGroupId) {
                     await update(widget.id, { syncGroupId: groupId })
                   }
-                  await createWidget({
-                    taskId: widget.taskId,
-                    kind: widget.kind,
-                    title: widget.title,
-                    content: widget.content,
-                    x: widget.x + 30,
-                    y: widget.y + 30,
-                    width: widget.width,
-                    height: widget.height,
-                    color: widget.color,
-                    sourceAppId: widget.sourceAppId,
-                    mode: widget.mode,
-                    syncGroupId: groupId
-                  })
-                })()
-              }
+                }
+                await createWidget({
+                  taskId: widget.taskId,
+                  kind: widget.kind,
+                  title: widget.title,
+                  content: widget.content,
+                  x: widget.x + 30,
+                  y: widget.y + 30,
+                  width: widget.width,
+                  height: widget.height,
+                  color: widget.color,
+                  sourceAppId: widget.sourceAppId,
+                  mode: widget.mode,
+                  syncGroupId: groupId
+                })
+              })()
+            }
+            items.push({
+              label: 'Duplicate (keep synced)',
+              icon: 'link',
+              onClick: () => duplicateWidget(true)
+            })
+            items.push({
+              label: 'Duplicate (independent copy)',
+              icon: 'content_copy',
+              onClick: () => duplicateWidget(false)
             })
             if (widget.syncGroupId) {
               items.push({
