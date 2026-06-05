@@ -136,7 +136,6 @@ import {
   statsForSlug,
   undoLastApply
 } from '../ai/agentHistory'
-import { app as electronApp } from 'electron'
 import {
   getTranscriptionProvider,
   setTranscriptionProvider

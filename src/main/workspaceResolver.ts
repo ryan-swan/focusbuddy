@@ -21,7 +21,7 @@
 //                              CREATES one under userData and returns
 //                              that path. Never returns null.
 
-import { existsSync, mkdirSync, statSync } from 'fs'
+import { mkdirSync, statSync } from 'fs'
 import { homedir } from 'os'
 import { dirname, join } from 'path'
 import { app } from 'electron'

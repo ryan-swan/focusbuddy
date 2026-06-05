@@ -498,9 +498,9 @@ const api = {
     > => ipcRenderer.invoke('ai:transcribeAudio', input),
     process: (input: {
       transcript: string
-      mode: 'full' | 'cleaned' | 'summary'
+      mode: 'full' | 'cleaned' | 'summary' | 'diarised'
     }): Promise<
-      | { ok: true; mode: 'full' | 'cleaned' | 'summary'; text: string }
+      | { ok: true; mode: 'full' | 'cleaned' | 'summary' | 'diarised'; text: string }
       | { ok: false; error: string; reason?: 'no_key' | 'api' | 'unknown' }
     > => ipcRenderer.invoke('ai:processTranscript', input),
     extractActions: (input: { transcript: string }): Promise<
@@ -611,7 +611,12 @@ const api = {
       // events handle the result; the invoke promise just keeps the
       // request alive on the main side until it resolves.
       void ipcRenderer.invoke('voiceCommand:runStream', input)
-      return (): void => ipcRenderer.removeListener(channel, handler)
+      // Braces so the cleanup arrow returns void — ipcRenderer.removeListener
+      // returns the IpcRenderer instance, which a `(): void =>` concise body
+      // would otherwise try (and fail) to return.
+      return (): void => {
+        ipcRenderer.removeListener(channel, handler)
+      }
     }
   },
   // Phase 2A — agent creation wizard. Writes a brand-new agent .md

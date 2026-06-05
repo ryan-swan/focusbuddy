@@ -22,7 +22,7 @@ This document is the honest answer. It is paired with two companions:
 
 **Discipline:** no claim of "broken" appears here without a code citation. Where verification downgraded or corrected the survey, the correction is shown — flattery and alarmism are both failures of a "no second chances" review.
 
-A note surfaced during verification, not in the original brief: **the working tree does not pass `npm run typecheck` today** — pre-existing errors in `voiceNote.ts`, `ipc/index.ts`, `preload/index.ts`, `VoiceCommandFAB.tsx`, `MindMapWidget.tsx`, `VoiceRecorderWidget.tsx` (unrelated WIP). `electron-vite build` transpiles without typechecking, so the app still builds and boots — but "it typechecks" is not currently true on `main`. Restoring a green typecheck gate is a prerequisite for the test-first discipline this project already aspires to.
+A note surfaced during verification, not in the original brief: **the working tree did not pass `npm run typecheck`** — 18 pre-existing errors across 8 files (`voiceNote.ts`, `ipc/index.ts`, `workspaceResolver.ts`, `preload/index.ts`, `VoiceCommandFAB.tsx`, `MindMapWidget.tsx`, `Canvas.tsx`, `CanvasAIAssistantRail.tsx`) — unrelated WIP. `electron-vite build` transpiles without typechecking, so the app still built and booted, but "it typechecks" was not true on `main`. **Resolved 2026-06-05:** all 18 fixed (unused imports, a too-narrow error-reason union, a `Uint8Array`/`BlobPart` strictness issue, an `interface extends` over a discriminated union, a missing `'diarised'` IPC mode, and an un-narrowed file-import union). `npm run typecheck` is now green (node + web), verified by 66 unit + 32 targeted e2e.
 
 ---
 
