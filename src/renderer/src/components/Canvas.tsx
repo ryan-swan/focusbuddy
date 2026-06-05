@@ -35,6 +35,8 @@ import FloatingToolbar, { type ToolbarAction } from './FloatingToolbar'
 import MinimapWidget from './widgets/MinimapWidget'
 import VoiceRecorderWidget from './widgets/VoiceRecorderWidget'
 import MindMapWidget from './widgets/MindMapWidget'
+import DiagramWidget from './widgets/DiagramWidget'
+import ScratchpadWidget from './widgets/ScratchpadWidget'
 import ZoomControls from './ZoomControls'
 import CanvasEdgeIndicators from './CanvasEdgeIndicators'
 import { useEdgePan } from '../lib/useEdgePan'
@@ -138,6 +140,10 @@ function renderWidget(w: Widget): JSX.Element | null {
       return <VoiceRecorderWidget widget={w} />
     case 'mindmap':
       return <MindMapWidget widget={w} />
+    case 'diagram':
+      return <DiagramWidget widget={w} />
+    case 'scratchpad':
+      return <ScratchpadWidget widget={w} />
     case 'section':
       return <SectionWidget widget={w} renderChild={renderWidget} />
     case 'webview':

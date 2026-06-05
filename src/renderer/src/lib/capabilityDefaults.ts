@@ -84,6 +84,8 @@ export const CAPABILITY_DEFAULTS: Record<string, Record<TierId, CapabilityValue>
   // (kept in sync with haptyx-shared + signal-server via `check:drift`)
   widget_mindmap:          { free: true,  pro: true,        team: true        },
   widget_voice_recorder:   { free: true,  pro: true,        team: true        },
+  widget_diagram:          { free: false, pro: true,        team: true        },
+  widget_scratchpad:       { free: true,  pro: true,        team: true        },
   widget_focus_mode:       { free: true,  pro: true,        team: true        },
   widget_linking:          { free: true,  pro: true,        team: true        },
   widget_auto_arrange:     { free: false, pro: true,        team: true        },

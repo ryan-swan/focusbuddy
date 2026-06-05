@@ -61,6 +61,16 @@ export type WidgetKind =
   // PHASE_3: autonomous agent execution on the canvas via a runtime
   //   that watches state changes + proposes actions with kill switches
   | 'mindmap'
+  // Diagram — a React Flow node/edge canvas for structured diagrams: flowcharts,
+  // entity hierarchies, server/software design, mind-map-style trees, and basic
+  // Venn (overlapping translucent circle nodes). Nodes can be boxes, circles,
+  // text, or an uploaded image/icon; edges are connectors. The whole graph
+  // (nodes + edges + viewport) is serialised to widget.content as JSON.
+  | 'diagram'
+  // Scratchpad — a freeform sketch surface (pressure-sensitive ink via
+  // perfect-freehand) for quick drawings, annotations, and visual thinking.
+  // Strokes + background are serialised to widget.content as JSON.
+  | 'scratchpad'
 
 export type ContextMenuAction =
   | 'createStickyFromSelection'
