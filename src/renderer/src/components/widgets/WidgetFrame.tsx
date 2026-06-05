@@ -391,6 +391,25 @@ export default function WidgetFrame({
     : isInControlledLayout
       ? layoutCtx?.size
       : undefined
+  // Keep the live (uncontrolled) Rnd in sync when a free widget's SIZE is
+  // changed from OUTSIDE a drag/resize gesture — e.g. the browser resolution
+  // presets, or a synced duplicate. A free widget's Rnd only reads `default`
+  // at mount, so without this the store updates but the element keeps its old
+  // size until a remount — and a <webview> can't be remounted (it would reload
+  // the page + lose login). updateSize pushes the new dimensions imperatively,
+  // so the change is visible immediately with no refresh. Size only: position
+  // is already handled by the drag/drop machinery. onResize writes the store
+  // only on resizeStop, so this never fights a live user resize (same value =
+  // no-op). Controlled widgets track size via props, so they're skipped.
+  useLayoutEffect(() => {
+    if (useControlled) return
+    const rnd = rndRef.current as unknown as {
+      updateSize?: (s: { width: number; height: number }) => void
+    } | null
+    rnd?.updateSize?.({ width: widget.width, height: widget.height })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [widget.width, widget.height, useControlled])
+
   // Zone-pins can't be dragged (they auto-dock). Controlled SECTION children
   // (grid/stacks), however, ARE draggable — that's how the user drags an item
   // out of a section onto the desk. Their position is still controlled by the

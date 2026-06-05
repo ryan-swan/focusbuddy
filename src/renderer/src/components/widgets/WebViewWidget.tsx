@@ -36,6 +36,9 @@ function normalizeUrl(input: string): string | null {
 const BROWSER_RESOLUTIONS: { label: string; sub: string; width: number; height: number }[] = [
   { label: 'Mobile', sub: '390 × 844', width: 390, height: 844 },
   { label: 'Tablet', sub: '768 × 1024', width: 768, height: 1024 },
+  // Tablet landscape — the small-screen-friendly wide option. 1024×768 fits
+  // comfortably where Laptop/Desktop would run off the edges of a small display.
+  { label: 'Tablet (landscape)', sub: '1024 × 768', width: 1024, height: 768 },
   { label: 'Laptop', sub: '1366 × 768', width: 1366, height: 768 },
   { label: 'Desktop', sub: '1920 × 1080', width: 1920, height: 1080 }
 ]
