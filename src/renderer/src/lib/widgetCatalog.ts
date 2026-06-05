@@ -319,6 +319,28 @@ export const WIDGET_CATALOG: WidgetCatalogEntry[] = [
     defaultHeight: 480,
     defaultContent: '',
     isWebBased: false
+  },
+  {
+    kind: 'diagram',
+    category: 'Tools',
+    label: 'Diagram',
+    icon: 'schema',
+    hint: 'Flowcharts, hierarchies, server/software design, Venn — boxes, circles, text & image nodes joined with connectors',
+    defaultWidth: 760,
+    defaultHeight: 520,
+    defaultContent: '',
+    isWebBased: false
+  },
+  {
+    kind: 'scratchpad',
+    category: 'Tools',
+    label: 'Scratchpad',
+    icon: 'draw',
+    hint: 'Freeform sketch surface — draw, annotate and think visually with pressure-sensitive ink',
+    defaultWidth: 560,
+    defaultHeight: 420,
+    defaultContent: '',
+    isWebBased: false
   }
 ]
 

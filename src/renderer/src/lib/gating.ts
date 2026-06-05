@@ -26,7 +26,9 @@ export const WIDGET_KIND_CAPABILITY: Record<string, string> = {
   markdown: 'widget_notes',
   file: 'widget_files',
   webview: 'widget_browser',
-  'task-link': 'widget_task_list'
+  'task-link': 'widget_task_list',
+  diagram: 'widget_diagram',
+  scratchpad: 'widget_scratchpad'
 }
 
 export function capabilityForWidgetKind(kind: string): string | null {
