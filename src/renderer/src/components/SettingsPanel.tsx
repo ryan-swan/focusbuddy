@@ -23,6 +23,7 @@ import {
 import { haptic } from '../lib/haptics'
 import Icon from './Icon'
 import ApiKeysSection from './settings/ApiKeysSection'
+import NavigationSection from './settings/NavigationSection'
 
 interface Props {
   mode: ThemeMode
@@ -421,6 +422,8 @@ export default function SettingsPanel({
       </div>
 
       <ApiKeysSection />
+
+      <NavigationSection />
 
       {voicePrefs && (
         <div className="px-3 py-3 border-t border-stone-200 dark:border-stone-700 space-y-3">
