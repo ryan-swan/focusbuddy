@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ConnectedApp, FbNode, NodeKind, WidgetSuggestion } from '@shared/types'
 import { useNodeStore } from '../stores/nodes'
+import { useCanCreateMore } from '../stores/capabilities'
+import { promptUpgrade } from '../stores/upgradePrompt'
 import { useWidgetStore } from '../stores/widgets'
 import { useConnectedAppsStore } from '../stores/connectedApps'
 import { useTemplateStore } from '../stores/templates'
@@ -313,6 +315,25 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
     return () => window.removeEventListener('fb:command-new-task', onCmd)
   }, [])
 
+  // Desk limit — a top-level folder IS a desk. Gate the visible "New
+  // project" triggers so a free user at the limit gets the upgrade prompt
+  // instead of an empty create dialog. (The nodes store also hard-blocks
+  // creation on every path as a backstop.)
+  const topLevelDeskCount = nodes.filter(
+    (n) => n.parentId === null && n.kind === 'folder'
+  ).length
+  const canCreateDesk = useCanCreateMore('multiple_desks', topLevelDeskCount)
+  function requestCreateDesk(): void {
+    if (!canCreateDesk) {
+      promptUpgrade(
+        "You've reached your desk limit on the Free plan. Upgrade for unlimited desks.",
+        'pro'
+      )
+      return
+    }
+    setDialog({ mode: 'create', parentId: null, kind: 'folder' })
+  }
+
   async function applyTemplateToActiveTask(templateId: string): Promise<void> {
     // Templates are applied by spawning their saved widgets on the
     // currently-active task's canvas. If there's no active task, the user
@@ -542,7 +563,7 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
         </h2>
         <div className="flex items-center gap-1">
           <button
-            onClick={() => setDialog({ mode: 'create', parentId: null, kind: 'folder' })}
+            onClick={requestCreateDesk}
             title="New top-level project"
             className="btn-primary !px-2 !py-1"
           >
@@ -712,7 +733,7 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
             <button
               onClick={(e) => {
                 e.stopPropagation()
-                setDialog({ mode: 'create', parentId: null, kind: 'folder' })
+                requestCreateDesk()
               }}
               className="icon-btn !h-5 !w-5"
               title="New top-level project"
@@ -727,7 +748,7 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
               <div className="px-4 py-3 text-xs text-stone-500 dark:text-stone-400 leading-relaxed">
                 No projects yet.{' '}
                 <button
-                  onClick={() => setDialog({ mode: 'create', parentId: null, kind: 'folder' })}
+                  onClick={requestCreateDesk}
                   className="underline hover:text-stone-900 dark:hover:text-stone-100"
                 >
                   Create one

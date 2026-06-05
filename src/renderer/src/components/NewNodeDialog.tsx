@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { AxisValue, BrowsingHistoryEntry, FbNode, NodeKind, Template } from '@shared/types'
 import { useNodeStore } from '../stores/nodes'
+import { useCapabilityEnabled } from '../stores/capabilities'
+import { promptUpgrade } from '../stores/upgradePrompt'
 import { useWidgetStore } from '../stores/widgets'
 import { useTemplateStore } from '../stores/templates'
 import { computeVelocity, predictForEstimate } from '../lib/velocityStats'
@@ -46,6 +48,7 @@ export default function NewNodeDialog({
   const parentId = node ? node.parentId : parentIdProp ?? null
 
   const create = useNodeStore((s) => s.create)
+  const aiSetupEnabled = useCapabilityEnabled('ai_task_setup')
   const updateNode = useNodeStore((s) => s.update)
   const setActive = useNodeStore((s) => s.setActive)
   const allNodes = useNodeStore((s) => s.nodes)
@@ -417,8 +420,26 @@ export default function NewNodeDialog({
                 </div>
               )}
 
-              {/* AI Setup integration — create mode: toggle that opens AI Setup right after create. Edit mode: button to open it now. */}
-              {onRequestAISetup && (
+              {/* AI Setup integration — gated by the ai_task_setup capability.
+                  On Free it renders locked + opens the upgrade prompt. */}
+              {onRequestAISetup && !aiSetupEnabled && (
+                <button
+                  type="button"
+                  onClick={() => promptUpgrade('AI task setup is a Pro feature.')}
+                  className="w-full rounded-md border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800/50 px-3 py-2.5 text-left"
+                  data-testid="ai-setup-locked"
+                >
+                  <div className="text-xs font-medium text-stone-500 dark:text-stone-400 flex items-center gap-1.5">
+                    <Icon name="lock" size={13} className="text-accent" />
+                    Have AI suggest the setup
+                    <span className="ml-auto text-[9px] uppercase tracking-wider text-accent">Pro</span>
+                  </div>
+                  <div className="text-[11px] text-stone-400 dark:text-stone-500 mt-0.5">
+                    Upgrade to let the assistant propose widgets, browsers and notes for this task.
+                  </div>
+                </button>
+              )}
+              {onRequestAISetup && aiSetupEnabled && (
                 <div className="rounded-md border border-violet-200 dark:border-violet-800/40 bg-violet-50 dark:bg-violet-950/20 px-3 py-2.5">
                   {!isEdit ? (
                     <label className="flex items-start gap-2 cursor-pointer">

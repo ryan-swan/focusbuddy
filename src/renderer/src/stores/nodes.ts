@@ -3,6 +3,20 @@ import type { FbNode, NodeDraft, NodePatch } from '@shared/types'
 import { recordTrail } from '../lib/trail'
 import { taskComplete } from '../lib/audioBeep'
 import { hapticSuccess } from '../lib/haptics'
+import { canCreateMore, limitFor } from '../lib/gating'
+import { useCapabilityStore } from './capabilities'
+import { promptUpgrade } from './upgradePrompt'
+
+// A "desk" (marketing) / "project" (sidebar) is a top-level folder. The
+// multiple_desks capability caps how many a tier may have. Thrown by
+// create() when a free user would exceed it — callers that don't catch it
+// simply have the creation prevented (the throw happens before the IPC
+// create call, so nothing is persisted).
+export const DESK_LIMIT_ERROR = 'DESK_LIMIT_REACHED'
+
+function isTopLevelDesk(draft: NodeDraft): boolean {
+  return draft.parentId === null && draft.kind === 'folder'
+}
 
 interface NodeStore {
   nodes: FbNode[]
@@ -31,6 +45,23 @@ export const useNodeStore = create<NodeStore>((set, get) => ({
     set({ nodes, loading: false })
   },
   create: async (draft) => {
+    // Hard backstop for the desk limit — catches EVERY create path (sidebar,
+    // dashboard, AI command bar). The sidebar additionally gates the trigger
+    // for nicer UX, but this is what actually prevents a 4th free desk.
+    if (isTopLevelDesk(draft)) {
+      const caps = useCapabilityStore.getState().capabilities
+      const deskCount = get().nodes.filter(
+        (n) => n.parentId === null && n.kind === 'folder'
+      ).length
+      if (!canCreateMore(caps, 'multiple_desks', deskCount)) {
+        const limit = limitFor(caps, 'multiple_desks')
+        promptUpgrade(
+          `You've reached your ${limit}-desk limit on the Free plan. Upgrade for unlimited desks.`,
+          'pro'
+        )
+        throw new Error(DESK_LIMIT_ERROR)
+      }
+    }
     const node = await window.api.nodes.create(draft)
     set({ nodes: [...get().nodes, node] })
     if (draft.parentId) set({ expanded: { ...get().expanded, [draft.parentId]: true } })

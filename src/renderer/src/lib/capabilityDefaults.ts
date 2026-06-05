@@ -78,7 +78,27 @@ export const CAPABILITY_DEFAULTS: Record<string, Record<TierId, CapabilityValue>
   usage_analytics:         { free: false, pro: false,       team: true        },
   capability_matrix_edit:  { free: false, pro: false,       team: true        },
   audit_log:               { free: false, pro: false,       team: true        },
-  priority_support:        { free: false, pro: false,       team: true        }
+  priority_support:        { free: false, pro: false,       team: true        },
+
+  // ── 2.4.x — voice, imports, mind-map, focus-mode & linking widgets ──────
+  // (kept in sync with haptyx-shared + signal-server via `check:drift`)
+  widget_mindmap:          { free: true,  pro: true,        team: true        },
+  widget_voice_recorder:   { free: true,  pro: true,        team: true        },
+  widget_focus_mode:       { free: true,  pro: true,        team: true        },
+  widget_linking:          { free: true,  pro: true,        team: true        },
+  widget_auto_arrange:     { free: false, pro: true,        team: true        },
+  voice_command:           { free: true,  pro: true,        team: true        },
+  voice_command_streaming: { free: false, pro: true,        team: true        },
+  voice_command_silence:   { free: false, pro: true,        team: true        },
+  voiceback:               { free: false, pro: true,        team: true        },
+  whisper_cloud:           { free: true,  pro: true,        team: true        },
+  whisper_local:           { free: false, pro: true,        team: true        },
+  live_captions:           { free: true,  pro: true,        team: true        },
+  mindmap_agents:          { free: false, pro: true,        team: true        },
+  file_import_text:        { free: true,  pro: true,        team: true        },
+  file_import_csv:         { free: false, pro: true,        team: true        },
+  file_import_json:        { free: false, pro: true,        team: true        },
+  file_import_docx:        { free: false, pro: true,        team: true        }
 }
 
 /** Resolve a capability value for a tier from the local defaults snapshot. */

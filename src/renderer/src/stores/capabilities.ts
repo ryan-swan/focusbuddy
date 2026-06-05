@@ -20,6 +20,7 @@ import {
   type CapabilityValue,
   type TierId
 } from '../lib/capabilityDefaults'
+import { canCreateMore, canCreateWidget, limitFor } from '../lib/gating'
 import { signalConfig } from '../lib/signalConfig'
 import { useAccountStore } from './account'
 
@@ -189,4 +190,24 @@ export function useCapabilityEnabled(key: string): boolean {
   if (typeof v === 'number') return v > 0
   if (typeof v === 'string') return v.length > 0 && v.toLowerCase() !== 'off'
   return false
+}
+
+// ── Gating hooks (thin wrappers over the pure decision layer) ────────────
+// These let UI gate against the live, admin-overridable capability map
+// using the exact same logic the unit tests cover. UI must use these
+// rather than re-deriving limits/booleans inline.
+
+/** The numeric limit for a capability (null = unlimited). */
+export function useCapabilityLimit(key: string): number | null {
+  return useCapabilityStore((s) => limitFor(s.capabilities, key))
+}
+
+/** Whether the user may create one more of a limited resource. */
+export function useCanCreateMore(key: string, currentCount: number): boolean {
+  return useCapabilityStore((s) => canCreateMore(s.capabilities, key, currentCount))
+}
+
+/** Whether the user may create a widget of this catalog kind. */
+export function useCanCreateWidget(kind: string): boolean {
+  return useCapabilityStore((s) => canCreateWidget(s.capabilities, kind))
 }

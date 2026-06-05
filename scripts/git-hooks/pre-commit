@@ -1,0 +1,45 @@
+#!/bin/sh
+# Capability-drift guard (pre-commit).
+#
+# Keeps the three capability snapshots identical BEFORE a commit lands, so
+# the desktop app, the signal server, and the brochure can never silently
+# disagree about what each tier gets. Runs the same `check:drift` the deploy
+# gate uses — but now on every commit, not just at deploy time.
+#
+# The matrix lives in three files (see projects/NEW_FEATURE_PLAYBOOK.md):
+#   1. haptyx-shared/src/capabilities.ts                     (canonical)
+#   2. focusbuddy-signal/src/capabilities.ts                 (server)
+#   3. focusbuddy/src/renderer/src/lib/capabilityDefaults.ts (app — this repo)
+#
+# The check tool lives in the sibling focusbuddy-signal project. If that
+# sibling isn't checked out / installed next to this repo (e.g. a partial
+# clone, or CI that only pulled the app), the hook SKIPS rather than blocks —
+# it never fails the commit for an environment it can't evaluate.
+#
+# Install: scripts/install-git-hooks.sh  (copies this into .git/hooks)
+
+set -e
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+SIGNAL_DIR="$REPO_ROOT/../focusbuddy-signal"
+
+if [ ! -f "$SIGNAL_DIR/scripts/check-capability-drift.ts" ] || [ ! -d "$SIGNAL_DIR/node_modules" ]; then
+  echo "[pre-commit] focusbuddy-signal not present/installed beside this repo — skipping capability-drift check."
+  exit 0
+fi
+
+printf '[pre-commit] checking capability matrix is in sync across all 3 snapshots… '
+
+if ( cd "$SIGNAL_DIR" && npm run --silent check:drift >/tmp/fb-precommit-drift.log 2>&1 ); then
+  echo "ok"
+  exit 0
+fi
+
+echo "DRIFT"
+echo "────────────────────────────────────────────────────────────────────"
+cat /tmp/fb-precommit-drift.log
+echo "────────────────────────────────────────────────────────────────────"
+echo "[pre-commit] ✗ Capability snapshots are out of sync — commit blocked."
+echo "             Sync the diverging file (the diff above names key.tier),"
+echo "             then commit again. See projects/NEW_FEATURE_PLAYBOOK.md §2-3."
+exit 1
