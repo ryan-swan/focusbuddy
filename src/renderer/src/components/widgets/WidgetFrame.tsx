@@ -67,6 +67,19 @@ export default function WidgetFrame({
   const setHoveredSection = useWidgetStore((s) => s.setHoveredSection)
   const setDragOverride = useWidgetStore((s) => s.setDragOverride)
   const focusOn = useWidgetStore((s) => s.focusOn)
+  // ── Multi-select ────────────────────────────────────────────────────────
+  const selected = useWidgetStore((s) => s.selectedIds.includes(widget.id))
+  const toggleSelection = useWidgetStore((s) => s.toggleSelection)
+  const clearSelection = useWidgetStore((s) => s.clearSelection)
+  const beginGroupDrag = useWidgetStore((s) => s.beginGroupDrag)
+  const setGroupDelta = useWidgetStore((s) => s.setGroupDelta)
+  const endGroupDrag = useWidgetStore((s) => s.endGroupDrag)
+  // groupDrag is read live in the member-follow effect below; subscribe so the
+  // effect re-runs on every delta tick.
+  const groupDrag = useWidgetStore((s) => s.groupDrag)
+  // True while THIS widget is the leader of an in-flight group drag — gates the
+  // onDrag/onDragStop branches without re-subscribing to selection on every tick.
+  const groupLeadRef = useRef(false)
   const [pinPickerOpen, setPinPickerOpen] = useState(false)
   const [expandPickerOpen, setExpandPickerOpen] = useState(false)
   // Right-click on the widget header opens a small context menu with a
@@ -391,24 +404,39 @@ export default function WidgetFrame({
     : isInControlledLayout
       ? layoutCtx?.size
       : undefined
-  // Keep the live (uncontrolled) Rnd in sync when a free widget's SIZE is
-  // changed from OUTSIDE a drag/resize gesture — e.g. the browser resolution
-  // presets, or a synced duplicate. A free widget's Rnd only reads `default`
-  // at mount, so without this the store updates but the element keeps its old
-  // size until a remount — and a <webview> can't be remounted (it would reload
-  // the page + lose login). updateSize pushes the new dimensions imperatively,
-  // so the change is visible immediately with no refresh. Size only: position
-  // is already handled by the drag/drop machinery. onResize writes the store
-  // only on resizeStop, so this never fights a live user resize (same value =
-  // no-op). Controlled widgets track size via props, so they're skipped.
+  // Keep the live (uncontrolled) Rnd in sync when a free widget's size OR
+  // position is changed from OUTSIDE its own drag/resize gesture — e.g. the
+  // browser resolution presets (size) or a group-move commit (position). A free
+  // widget's Rnd only reads `default` at mount, so without this the store
+  // updates but the element keeps its mounted size/position until a remount —
+  // and a <webview> can't be remounted (it would reload the page + lose login).
+  // applyRndSizeAndPosition pushes the new geometry imperatively. The store's
+  // x/y/w/h only change on drag/resize STOP (or a group commit), never mid-
+  // gesture for THIS widget, so re-applying the committed value is a harmless
+  // no-op and never fights a live drag. Controlled widgets track geometry via
+  // props, so they're skipped.
   useLayoutEffect(() => {
     if (useControlled) return
-    const rnd = rndRef.current as unknown as {
-      updateSize?: (s: { width: number; height: number }) => void
-    } | null
-    rnd?.updateSize?.({ width: widget.width, height: widget.height })
+    applyRndSizeAndPosition(widget.width, widget.height, widget.x, widget.y)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [widget.width, widget.height, useControlled])
+  }, [widget.width, widget.height, widget.x, widget.y, useControlled])
+
+  // Group-move follower: while another selected widget is being dragged, move
+  // THIS widget's Rnd imperatively by the live delta (no per-frame store/IPC
+  // write — positions are committed once on drop by endGroupDrag). Only members
+  // that aren't the drag leader follow; the leader is moved by Rnd itself.
+  useLayoutEffect(() => {
+    if (useControlled || !groupDrag || groupDrag.leaderId === widget.id) return
+    const start = useWidgetStore.getState().groupStart?.[widget.id]
+    if (!start) return
+    applyRndSizeAndPosition(
+      widget.width,
+      widget.height,
+      Math.round(start.x + groupDrag.dx),
+      Math.round(start.y + groupDrag.dy)
+    )
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [groupDrag])
 
   // Zone-pins can't be dragged (they auto-dock). Controlled SECTION children
   // (grid/stacks), however, ARE draggable — that's how the user drags an item
@@ -456,6 +484,20 @@ export default function WidgetFrame({
       onDragStart={() => {
         void bringToFront(widget.id)
         setActive(widget.id)
+        // Multi-select interplay: if this widget is part of a 2+ selection,
+        // become the GROUP-DRAG leader — every selected widget rides along.
+        // If it's NOT selected, dragging it drops the existing selection (you
+        // grabbed something outside it). Sections/section-children/pins never
+        // lead a group drag (they can't be multi-selected).
+        const st = useWidgetStore.getState()
+        const canLead = !isChildOfSection && !isPinned && !isSection
+        if (canLead && st.selectedIds.includes(widget.id) && st.selectedIds.length > 1) {
+          groupLeadRef.current = true
+          beginGroupDrag(widget.id)
+        } else {
+          groupLeadRef.current = false
+          if (!st.selectedIds.includes(widget.id)) clearSelection()
+        }
         // Toggle a root-level class so the desk surface can render the
         // snap-to-grid hint while the user is actively positioning an
         // object. Removed on dragstop. Cheap to add/remove; CSS does the
@@ -463,6 +505,12 @@ export default function WidgetFrame({
         document.documentElement.classList.add('fb-canvas-dragging')
       }}
       onDrag={(_, d) => {
+        // Group-drag leader: push the live delta so co-selected members follow
+        // imperatively (their effect moves their own Rnd — no per-frame IPC).
+        if (groupLeadRef.current) {
+          const start = useWidgetStore.getState().groupStart?.[widget.id]
+          if (start) setGroupDelta(d.x - start.x, d.y - start.y)
+        }
         // Live-track the dragging widget's position so the inter-widget
         // links overlay can keep its endpoints attached to the widget in
         // real time (rather than only updating on drop, which would let
@@ -475,14 +523,24 @@ export default function WidgetFrame({
         const now = performance.now()
         if (now - lastHoverCheck.current < HOVER_THROTTLE_MS) return
         lastHoverCheck.current = now
-        if (isChildOfSection || isPinned || isSection) return
+        // Don't hover-target a section while group-dragging — the group commits
+        // as free widgets, not into a section.
+        if (isChildOfSection || isPinned || isSection || groupLeadRef.current) return
         const target = findHoveredSection(d.x, d.y)
         setHoveredSection(target)
       }}
       onDragStop={(_, d) => {
         setHoveredSection(null)
         setDragOverride(null)
-        commitDrop(d.x, d.y)
+        if (groupLeadRef.current) {
+          // Commit every selected widget's final position in one batch; skip the
+          // normal single-widget commitDrop (which would snap/overlap-resolve and
+          // fight the group's relative layout).
+          groupLeadRef.current = false
+          void endGroupDrag()
+        } else {
+          commitDrop(d.x, d.y)
+        }
         document.documentElement.classList.remove('fb-canvas-dragging')
         // Mark the mouseup as drag-end so the click event that follows
         // doesn't run our onClick activation logic.
@@ -568,6 +626,15 @@ export default function WidgetFrame({
         // active-glow-during-drag path is unaffected.
         onClick={(e) => {
           e.stopPropagation()
+          // Shift-click toggles this widget in the multi-selection (canvas
+          // widgets only — section children don't participate). Takes priority
+          // over centre/zoom so the user can build a selection without the
+          // camera jumping around.
+          if (e.shiftKey && !isChildOfSection && !isPinned) {
+            e.preventDefault()
+            toggleSelection(widget.id)
+            return
+          }
           // Cmd/⌘-click while zoomed out (< 80%) → dive into this widget: jump
           // to 100% with it centred. A fast way to go from an overview to one
           // thing without reaching for the zoom controls.
@@ -592,13 +659,15 @@ export default function WidgetFrame({
           }
         }}
         className={`h-full w-full flex flex-col rounded-[12px] overflow-hidden border bg-white dark:bg-stone-900 fb-spring-snap ${
-          isActive
-            ? 'border-[rgb(var(--accent)/0.5)] widget-glow'
-            : isPinned
-              ? 'border-amber-400/60'
-              : isChildOfSection
-                ? 'border-[color:var(--edge-soft)]'
-                : 'border-[color:var(--edge-soft)]'
+          selected
+            ? 'border-[rgb(var(--accent))] ring-2 ring-[rgb(var(--accent)/0.7)] ring-offset-2 ring-offset-transparent'
+            : isActive
+              ? 'border-[rgb(var(--accent)/0.5)] widget-glow'
+              : isPinned
+                ? 'border-amber-400/60'
+                : isChildOfSection
+                  ? 'border-[color:var(--edge-soft)]'
+                  : 'border-[color:var(--edge-soft)]'
         }`}
         style={{
           // Light-aware cast shadow + inset highlight on top edge. Tightens
