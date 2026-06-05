@@ -36,6 +36,10 @@ interface ProviderSurface {
 interface ProviderConfig {
   // Display name shown above the row.
   label: string
+  // One-line description of what this key powers, shown directly under the
+  // label so it's obvious which key voice transcription needs (the #1 thing
+  // users hunt for — "where do I put the key for voice?").
+  purpose: string
   // Placeholder hint inside the password field — helps users spot a
   // wrong-vendor paste before they hit Save.
   placeholder: string
@@ -65,6 +69,7 @@ export default function ApiKeysSection({ onKeySaved }: Props): JSX.Element {
       <ApiKeyRow
         config={{
           label: 'Anthropic API key',
+          purpose: 'Canvas AI, chat, and voice commands',
           placeholder: 'sk-ant-api03-…',
           helpUrl: 'https://console.anthropic.com/settings/keys',
           helpLabel: 'Get a key from console.anthropic.com →',
@@ -84,6 +89,7 @@ export default function ApiKeysSection({ onKeySaved }: Props): JSX.Element {
       <ApiKeyRow
         config={{
           label: 'OpenAI API key',
+          purpose: 'Voice transcription — voice notes & push-to-talk (Whisper). Or use Local below, no key needed.',
           placeholder: 'sk-proj-…',
           helpUrl: 'https://platform.openai.com/api-keys',
           helpLabel: 'Get a key from platform.openai.com →',
@@ -313,10 +319,15 @@ function ApiKeyRow({
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-1.5">
-        <span className="text-xs text-stone-700 dark:text-stone-300">
-          {config.label}
-        </span>
+      <div className="flex items-start justify-between mb-1.5 gap-2">
+        <div className="flex flex-col min-w-0">
+          <span className="text-xs text-stone-700 dark:text-stone-300">
+            {config.label}
+          </span>
+          <span className="text-[10px] text-stone-500 dark:text-stone-400 leading-snug">
+            {config.purpose}
+          </span>
+        </div>
         {hint.hasKey && !editing && !unavailable && (
           <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-300">
             Set
