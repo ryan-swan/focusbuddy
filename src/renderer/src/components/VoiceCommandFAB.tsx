@@ -50,7 +50,7 @@ interface VoicePrefs {
 
 const DEFAULT_PREFS: VoicePrefs = {
   commandMode: 'press-hold',
-  autoStopSilenceMs: 5000,
+  autoStopSilenceMs: 2000,
   voiceback: true
 }
 
@@ -96,6 +96,11 @@ export default function VoiceCommandFAB(): JSX.Element {
   // interleaved webm from two streams is a corrupt file Whisper rejects with
   // "Invalid file format … seconds: 0".
   const capturingRef = useRef<boolean>(false)
+  // Web-Audio analyser for REAL silence detection. webkitSpeechRecognition
+  // (the old interim-result source) doesn't work in Electron, so we measure
+  // actual mic level to know when the user has genuinely stopped talking.
+  const audioCtxRef = useRef<AudioContext | null>(null)
+  const analyserRef = useRef<AnalyserNode | null>(null)
 
   // Load persisted prefs.
   useEffect(() => {
@@ -236,16 +241,47 @@ export default function VoiceCommandFAB(): JSX.Element {
       // stages for correction; we don't auto-send. The user always
       // decides what to send.
       if (prefs.commandMode === 'click-toggle') {
+        // Real silence detection from actual mic level. Stops only after a
+        // forgiving window of GENUINE silence, so a minor mid-sentence pause
+        // never cuts you off (the old path relied on webkitSpeechRecognition
+        // interim results, which never fire in Electron — so it was really a
+        // fixed timer from start).
+        try {
+          const ctx = new AudioContext()
+          const srcNode = ctx.createMediaStreamSource(stream)
+          const analyser = ctx.createAnalyser()
+          analyser.fftSize = 512
+          srcNode.connect(analyser)
+          audioCtxRef.current = ctx
+          analyserRef.current = analyser
+        } catch {
+          // Web Audio unavailable — fall back to the fixed-timer behaviour.
+        }
+        const SPEECH_RMS = 6 // idle hiss ~1-3, speech ~12-40
+        // Clamp to a sane, responsive window regardless of any stale stored
+        // pref (the old default was 5000ms = a 5s fixed cutoff).
+        const silenceWindowMs = Math.max(1500, Math.min(prefs.autoStopSilenceMs || 2000, 3000))
         const tick = (): void => {
           if (recorderRef.current?.state !== 'recording') return
-          const sinceSpeech = Date.now() - interimAtRef.current
-          if (sinceSpeech >= prefs.autoStopSilenceMs) {
+          const a = analyserRef.current
+          if (a) {
+            const lv = new Uint8Array(a.fftSize)
+            a.getByteTimeDomainData(lv)
+            let sum = 0
+            for (let i = 0; i < lv.length; i++) {
+              const d = lv[i] - 128
+              sum += d * d
+            }
+            // Above the noise floor → user is speaking; reset the silence clock.
+            if (Math.sqrt(sum / lv.length) > SPEECH_RMS) interimAtRef.current = Date.now()
+          }
+          if (Date.now() - interimAtRef.current >= silenceWindowMs) {
             void stopCapture()
             return
           }
-          silenceTimerRef.current = window.setTimeout(tick, 400)
+          silenceTimerRef.current = window.setTimeout(tick, 180)
         }
-        silenceTimerRef.current = window.setTimeout(tick, 400)
+        silenceTimerRef.current = window.setTimeout(tick, 180)
       }
     } catch (err) {
       const e = err as Error
@@ -290,6 +326,11 @@ export default function VoiceCommandFAB(): JSX.Element {
     streamRef.current?.getTracks().forEach((t) => t.stop())
     streamRef.current = null
     recorderRef.current = null
+    if (audioCtxRef.current) {
+      void audioCtxRef.current.close().catch(() => {})
+      audioCtxRef.current = null
+      analyserRef.current = null
+    }
 
     const captionText = liveCaption.trim()
     // eslint-disable-next-line no-console
