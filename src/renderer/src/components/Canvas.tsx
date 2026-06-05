@@ -57,6 +57,7 @@ import {
 } from '../lib/widgetCatalog'
 import {
   computeSectionFrame,
+  computeLayoutCells,
   effectiveLayout,
   SECTION_PADDING
 } from '../lib/sectionGeometry'
@@ -614,13 +615,28 @@ export default function Canvas(): JSX.Element {
           cx = parent.x + SECTION_PADDING + w.x
           cy = parent.y + SECTION_PADDING + w.y
         } else {
-          // In non-free layouts, child positions are computed; fall back to centering on the section itself
+          // Non-free layouts (grid/stacks/icons/list): the child's stored x/y
+          // are meaningless — its real position is computed by the layout.
+          // Re-run the exact layout math to find this child's cell, so the
+          // camera centres on the item itself, not the whole section.
           const siblings = widgets.filter((c) => c.parentSectionId === parent.id)
           const frame = computeSectionFrame(siblings, parentLayout)
-          cx = parent.x
-          cy = parent.y
-          cw = frame.width
-          ch = frame.height
+          const contentW = frame.width - 2 * SECTION_PADDING
+          const cells = computeLayoutCells(parentLayout, siblings, contentW)
+          const idx = siblings.findIndex((c) => c.id === w.id)
+          const cell = idx >= 0 ? cells[idx] : undefined
+          if (cell) {
+            cx = parent.x + SECTION_PADDING + cell.x
+            cy = parent.y + SECTION_PADDING + cell.y
+            cw = cell.width
+            ch = cell.height
+          } else {
+            // Defensive fallback: centre the section if the child vanished.
+            cx = parent.x
+            cy = parent.y
+            cw = frame.width
+            ch = frame.height
+          }
         }
       }
     } else if (w.kind === 'section') {

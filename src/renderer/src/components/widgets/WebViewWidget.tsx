@@ -30,6 +30,16 @@ function normalizeUrl(input: string): string | null {
   }
 }
 
+// Stored viewport presets the user can snap a browser window to. Sizes are
+// the common device classes (CSS px) so a page renders the way it would on
+// that form factor — the user asked for "4 commonly used options".
+const BROWSER_RESOLUTIONS: { label: string; sub: string; width: number; height: number }[] = [
+  { label: 'Mobile', sub: '390 × 844', width: 390, height: 844 },
+  { label: 'Tablet', sub: '768 × 1024', width: 768, height: 1024 },
+  { label: 'Laptop', sub: '1366 × 768', width: 1366, height: 768 },
+  { label: 'Desktop', sub: '1920 × 1080', width: 1920, height: 1080 }
+]
+
 interface Props {
   widget: Widget
   inline?: boolean
@@ -65,6 +75,8 @@ export default function WebViewWidget({ widget, inline = false }: Props): JSX.El
   // (call loadURL) on Enter or blur, so transient typing doesn't navigate.
   const [urlDraft, setUrlDraft] = useState('')
   const [urlEditing, setUrlEditing] = useState(false)
+  // Resolution-preset dropdown (snap the browser window to a stored viewport).
+  const [resMenuOpen, setResMenuOpen] = useState(false)
   // Right-click on the widget frame (NOT the inner webview — webviews
   // own their own context menu). Captures clicks on the chrome / URL
   // bar area; we ALWAYS suppress the chrome's native menu so the
@@ -583,6 +595,63 @@ export default function WebViewWidget({ widget, inline = false }: Props): JSX.El
                 title={currentUrl}
               />
             </div>
+            <div className="relative shrink-0">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setResMenuOpen((v) => !v)
+                }}
+                onMouseDown={(e) => e.stopPropagation()}
+                className={`h-6 w-6 inline-flex items-center justify-center rounded text-stone-600 hover:bg-stone-200 ${resMenuOpen ? 'bg-stone-200' : ''}`}
+                title="Resize to a stored resolution"
+                aria-label="Resize to a stored resolution"
+              >
+                <Icon name="aspect_ratio" size={14} />
+              </button>
+              {resMenuOpen && (
+                <>
+                  {/* click-away backdrop */}
+                  <div
+                    className="fixed inset-0 z-40"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setResMenuOpen(false)
+                    }}
+                    onMouseDown={(e) => e.stopPropagation()}
+                  />
+                  <div
+                    className="absolute right-0 top-7 z-50 w-44 rounded-lg border border-stone-200 bg-white shadow-lg py-1"
+                    onMouseDown={(e) => e.stopPropagation()}
+                  >
+                    <div className="px-3 py-1 text-[10px] font-medium uppercase tracking-wide text-stone-400">
+                      Window size
+                    </div>
+                    {BROWSER_RESOLUTIONS.map((r) => {
+                      const active =
+                        Math.round(widget.width) === r.width &&
+                        Math.round(widget.height) === r.height
+                      return (
+                        <button
+                          key={r.label}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            update(widget.id, { width: r.width, height: r.height })
+                            setResMenuOpen(false)
+                          }}
+                          className={`w-full flex items-center justify-between px-3 py-1.5 text-left text-[12px] hover:bg-stone-100 ${active ? 'text-stone-900 font-medium' : 'text-stone-700'}`}
+                        >
+                          <span className="flex items-center gap-2">
+                            {active && <Icon name="check" size={12} />}
+                            <span className={active ? '' : 'pl-[18px]'}>{r.label}</span>
+                          </span>
+                          <span className="text-[10px] text-stone-400 tabular-nums">{r.sub}</span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </>
+              )}
+            </div>
           </div>
           <div className="flex-1 relative min-h-0">
           <webview
@@ -595,6 +664,16 @@ export default function WebViewWidget({ widget, inline = false }: Props): JSX.El
             <div
               onClick={(e) => {
                 e.stopPropagation()
+                // ⌘/Ctrl-click while zoomed out dives into this browser: jump
+                // to 100% with it centred. The overlay swallows the event
+                // (stopPropagation) so it never reaches WidgetFrame — we have
+                // to honour the gesture here too, or browsers would be the
+                // one widget kind that can't be dived into.
+                const store = useWidgetStore.getState()
+                if ((e.metaKey || e.ctrlKey) && store.zoom < 0.8) {
+                  store.zoomToWidget(widget.id)
+                  return
+                }
                 setActive(widget.id)
               }}
               className="absolute inset-0 cursor-pointer group bg-transparent"

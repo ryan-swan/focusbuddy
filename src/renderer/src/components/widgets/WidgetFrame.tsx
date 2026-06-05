@@ -77,6 +77,7 @@ export default function WidgetFrame({
   const [shareOpen, setShareOpen] = useState(false)
   const isActive = useWidgetStore((s) => s.activeWidgetId === widget.id)
   const zoom = useWidgetStore((s) => s.zoom)
+  const zoomToWidget = useWidgetStore((s) => s.zoomToWidget)
   const allWidgets = useWidgetStore((s) => s.widgets)
   const bumpLayout = useWidgetStore((s) => s.bumpLayoutVersion)
   const lastHoverCheck = useRef(0)
@@ -274,6 +275,18 @@ export default function WidgetFrame({
           y: placed.y
         })
         bumpLayout()
+      } else if (isInControlledLayout && layoutCtx) {
+        // Auto-arranged layout (grid/stacks): a drop that stayed inside the
+        // section does NOT reposition — the layout owns placement. The user
+        // was dragging to eject but released inside, so snap Rnd back to the
+        // computed cell (the controlled `position` prop won't reset on its
+        // own when its value is unchanged).
+        applyRndSizeAndPosition(
+          layoutCtx.size.width,
+          layoutCtx.size.height,
+          layoutCtx.position.x,
+          layoutCtx.position.y
+        )
       } else {
         // Moving within the same section. In free layout, snap away from
         // siblings (excluding self). In stack mode, allow overlap — that's
@@ -378,7 +391,11 @@ export default function WidgetFrame({
     : isInControlledLayout
       ? layoutCtx?.size
       : undefined
-  const dragDisabled = useControlled
+  // Zone-pins can't be dragged (they auto-dock). Controlled SECTION children
+  // (grid/stacks), however, ARE draggable — that's how the user drags an item
+  // out of a section onto the desk. Their position is still controlled by the
+  // layout, so a non-eject drop snaps them back to their cell (see commitDrop).
+  const dragDisabled = Boolean(isZonePinned)
 
   return (
     <Rnd
@@ -404,7 +421,7 @@ export default function WidgetFrame({
       dragHandleClassName={draggableHandleClass}
       disableDragging={dragDisabled}
       enableResizing={
-        dragDisabled
+        useControlled
           ? false
           : {
               top: true,
@@ -532,6 +549,14 @@ export default function WidgetFrame({
         // active-glow-during-drag path is unaffected.
         onClick={(e) => {
           e.stopPropagation()
+          // Cmd/⌘-click while zoomed out (< 80%) → dive into this widget: jump
+          // to 100% with it centred. A fast way to go from an overview to one
+          // thing without reaching for the zoom controls.
+          if ((e.metaKey || e.ctrlKey) && zoom < 0.8) {
+            e.preventDefault()
+            zoomToWidget(widget.id)
+            return
+          }
           // Suppress the click that fires immediately after a drag-end —
           // react-rnd doesn't natively distinguish them. A drop is NOT a
           // request to centre the camera; the user just placed the widget
