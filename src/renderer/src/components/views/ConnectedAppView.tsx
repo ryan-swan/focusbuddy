@@ -46,6 +46,13 @@ export default function ConnectedAppView({ appId }: Props): JSX.Element {
     if (!wv) return
     const entry = vaultEntries.find((e) => e.id === app.vaultEntryId) ?? null
     if (!entry) return
+    // Origin gate: only auto-fill on the host this Connected App is bound to.
+    let boundHost = ''
+    try {
+      boundHost = new URL(app.url).hostname
+    } catch {
+      boundHost = ''
+    }
 
     function onFinish(): void {
       try {
@@ -53,7 +60,7 @@ export default function ConnectedAppView({ appId }: Props): JSX.Element {
           (wv as unknown as { getURL?: () => string } | null)?.getURL?.() ?? ''
         if (!url || url === autofilledForUrl.current) return
         autofilledForUrl.current = url
-        void autofillWebview(wv as HTMLElement | null, entry)
+        void autofillWebview(wv as HTMLElement | null, entry, boundHost)
       } catch {
         // ignore
       }

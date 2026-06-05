@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildAutofillScript } from '../../src/renderer/src/lib/vaultAutofill'
+import { buildAutofillScript, hostMatches } from '../../src/renderer/src/lib/vaultAutofill'
 
 describe('buildAutofillScript', () => {
   it('JSON-encodes credentials so quotes and backslashes cannot break out', () => {
@@ -58,5 +58,49 @@ describe('buildAutofillScript', () => {
     expect(script).toContain('try {')
     expect(script).toContain('} catch (e) {')
     expect(script).toContain('return false')
+  })
+
+  it('embeds an in-page origin guard when an expectedHost is supplied (defence in depth)', () => {
+    const script = buildAutofillScript('a', 'b', 'github.com')
+    // The expected host is embedded and the script checks location.hostname
+    // against it before touching any field.
+    expect(script).toContain('"github.com"')
+    expect(script).toContain('location.hostname')
+    expect(script).toContain("__h.endsWith('.' + __e)")
+  })
+
+  it('omits the origin guard when no expectedHost is supplied (back-compat)', () => {
+    const script = buildAutofillScript('a', 'b')
+    // The guard branch only runs when __expected is truthy; with no host it is
+    // an empty string so the guard is a no-op.
+    expect(script).toContain('const __expected = ""')
+  })
+})
+
+describe('hostMatches (origin gate)', () => {
+  it('matches the exact host', () => {
+    expect(hostMatches('github.com', 'github.com')).toBe(true)
+  })
+
+  it('matches a subdomain of the bound host (login redirects)', () => {
+    expect(hostMatches('accounts.google.com', 'google.com')).toBe(true)
+    expect(hostMatches('login.microsoftonline.com', 'microsoftonline.com')).toBe(true)
+  })
+
+  it('ignores a leading www. on either side', () => {
+    expect(hostMatches('www.figma.com', 'figma.com')).toBe(true)
+    expect(hostMatches('figma.com', 'www.figma.com')).toBe(true)
+  })
+
+  it('REFUSES a different registrable domain (the credential-exfil case)', () => {
+    expect(hostMatches('evil.com', 'github.com')).toBe(false)
+    // look-alike suffix without the dot boundary must NOT match
+    expect(hostMatches('evilgithub.com', 'github.com')).toBe(false)
+    expect(hostMatches('github.com.evil.com', 'github.com')).toBe(false)
+  })
+
+  it('fails closed on empty / unparseable hosts', () => {
+    expect(hostMatches('', 'github.com')).toBe(false)
+    expect(hostMatches('github.com', '')).toBe(false)
   })
 })
