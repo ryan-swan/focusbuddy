@@ -816,9 +816,11 @@ export default function Canvas(): JSX.Element {
       const mdt = Math.max(1, now - last.t)
       const fvx = ((e.clientX - last.x) / mdt) * 16
       const fvy = ((e.clientY - last.y) / mdt) * 16
+      // Weight the most-recent sample heavily so a fast flick's peak speed
+      // carries into the release (less smoothing = punchier slingshot).
       panVelocityRef.current = {
-        vx: panVelocityRef.current.vx * 0.6 + fvx * 0.4,
-        vy: panVelocityRef.current.vy * 0.6 + fvy * 0.4
+        vx: panVelocityRef.current.vx * 0.35 + fvx * 0.65,
+        vy: panVelocityRef.current.vy * 0.35 + fvy * 0.65
       }
     }
     panLastMoveRef.current = { x: e.clientX, y: e.clientY, t: now }
@@ -841,12 +843,17 @@ export default function Canvas(): JSX.Element {
       if (target.dataset.bareCanvas !== undefined && activeId !== null) setActive(null)
       return
     }
-    // Release inertia: keep gliding in the drag direction, decelerating to a
-    // stop (friction) — so a flick coasts instead of stopping dead. The faster
-    // the flick, the further it travels.
-    let { vx, vy } = panVelocityRef.current
-    if (Math.hypot(vx, vy) > 1.5) {
-      const friction = 0.92
+    // Release inertia: slingshot in the drag direction, then decelerate to a
+    // stop. LAUNCH_GAIN multiplies the release speed so a flick coasts well past
+    // the cursor; the higher friction keeps it gliding longer. The faster the
+    // flick, the further it flies (speed is clamped so a frantic flick stays
+    // controllable).
+    const LAUNCH_GAIN = 3.2
+    const MAX_LAUNCH = 160 // px/frame
+    let vx = Math.max(-MAX_LAUNCH, Math.min(MAX_LAUNCH, panVelocityRef.current.vx * LAUNCH_GAIN))
+    let vy = Math.max(-MAX_LAUNCH, Math.min(MAX_LAUNCH, panVelocityRef.current.vy * LAUNCH_GAIN))
+    if (Math.hypot(vx, vy) > 1.2) {
+      const friction = 0.95
       const step = (): void => {
         panBy(vx, vy)
         vx *= friction
