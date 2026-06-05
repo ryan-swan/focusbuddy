@@ -151,6 +151,25 @@ export const useWidgetStore = create<WidgetStore>((set, get) => ({
     if (!updated) return
     // Reconcile with the server's authoritative copy (timestamps + any computed fields)
     set({ widgets: get().widgets.map((w) => (w.id === id ? updated : w)) })
+    // Linked-duplicate live sync: mirror the synced fields (content / title /
+    // colour) to any OTHER in-store copies that share this widget's syncGroupId,
+    // so same-task copies update instantly. Cross-task copies are mirrored by the
+    // main process (db/widgets.ts) and show when their task is opened.
+    const sgid = updated.syncGroupId
+    if (
+      sgid &&
+      (patch.content !== undefined || patch.title !== undefined || patch.color !== undefined)
+    ) {
+      const mirror: Partial<Widget> = {}
+      if (patch.content !== undefined) mirror.content = patch.content
+      if (patch.title !== undefined) mirror.title = patch.title
+      if (patch.color !== undefined) mirror.color = patch.color
+      set({
+        widgets: get().widgets.map((w) =>
+          w.syncGroupId === sgid && w.id !== id ? { ...w, ...mirror } : w
+        )
+      })
+    }
   },
   remove: async (id) => {
     await window.api.widgets.delete(id)

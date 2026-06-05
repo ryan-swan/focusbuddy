@@ -28,6 +28,7 @@ interface WidgetRow {
   created_at: number
   updated_at: number
   archived: number | null
+  sync_group_id: string | null
 }
 
 function rowToWidget(row: WidgetRow): Widget {
@@ -56,7 +57,8 @@ function rowToWidget(row: WidgetRow): Widget {
     livingPaused: row.living_paused === 1,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
-    archived: row.archived === 1
+    archived: row.archived === 1,
+    syncGroupId: row.sync_group_id ?? null
   }
 }
 
@@ -94,8 +96,8 @@ export function createWidget(draft: WidgetDraft): Widget {
   const pinned = draft.pinned ? 1 : 0
   const pinnedZone = draft.pinnedZone ?? null
   db.prepare(
-    `INSERT INTO widgets (id, task_id, kind, title, content, x, y, width, height, z_index, color, pinned, pinned_screen_x, pinned_screen_y, pinned_zone, parent_section_id, source_app_id, mode, created_at, updated_at)
-     VALUES (@id, @taskId, @kind, @title, @content, @x, @y, @width, @height, @zIndex, @color, @pinned, NULL, NULL, @pinnedZone, NULL, @sourceAppId, @mode, @now, @now)`
+    `INSERT INTO widgets (id, task_id, kind, title, content, x, y, width, height, z_index, color, pinned, pinned_screen_x, pinned_screen_y, pinned_zone, parent_section_id, source_app_id, mode, sync_group_id, created_at, updated_at)
+     VALUES (@id, @taskId, @kind, @title, @content, @x, @y, @width, @height, @zIndex, @color, @pinned, NULL, NULL, @pinnedZone, NULL, @sourceAppId, @mode, @syncGroupId, @now, @now)`
   ).run({
     id,
     taskId: draft.taskId,
@@ -112,6 +114,7 @@ export function createWidget(draft: WidgetDraft): Widget {
     pinnedZone,
     sourceAppId: draft.sourceAppId ?? null,
     mode: draft.mode ?? null,
+    syncGroupId: draft.syncGroupId ?? null,
     now
   })
   const row = db.prepare('SELECT * FROM widgets WHERE id = ?').get(id) as WidgetRow
@@ -139,7 +142,8 @@ export function updateWidget(id: string, patch: WidgetPatch): Widget | null {
     ['mode', 'mode'],
     ['pinnedZone', 'pinned_zone'],
     ['livingQuery', 'living_query'],
-    ['livingGeneratedAt', 'living_generated_at']
+    ['livingGeneratedAt', 'living_generated_at'],
+    ['syncGroupId', 'sync_group_id']
   ]
   for (const [key, col] of cols) {
     if (patch[key] !== undefined) {
@@ -166,7 +170,40 @@ export function updateWidget(id: string, patch: WidgetPatch): Widget | null {
   fields.push('updated_at = @now')
   db.prepare(`UPDATE widgets SET ${fields.join(', ')} WHERE id = @id`).run(params)
   const row = db.prepare('SELECT * FROM widgets WHERE id = ?').get(id) as WidgetRow | undefined
-  return row ? rowToWidget(row) : null
+  const updated = row ? rowToWidget(row) : null
+  // ── Linked-duplicate propagation ────────────────────────────────────────
+  // If this widget belongs to a sync group, mirror the SYNCED fields that
+  // changed in this patch (content / title / colour) to every other copy in
+  // the group — across tasks. A direct DB fan-out: it never re-enters
+  // updateWidget, so there is no propagation loop. Position / size / task are
+  // deliberately NOT synced (each copy lives independently).
+  if (updated?.syncGroupId) {
+    const syncSet: string[] = []
+    const sp: Record<string, unknown> = {
+      sgid: updated.syncGroupId,
+      self: id,
+      now: Date.now()
+    }
+    if (patch.content !== undefined) {
+      syncSet.push('content = @content')
+      sp.content = patch.content
+    }
+    if (patch.title !== undefined) {
+      syncSet.push('title = @title')
+      sp.title = patch.title
+    }
+    if (patch.color !== undefined) {
+      syncSet.push('color = @color')
+      sp.color = patch.color
+    }
+    if (syncSet.length > 0) {
+      syncSet.push('updated_at = @now')
+      db.prepare(
+        `UPDATE widgets SET ${syncSet.join(', ')} WHERE sync_group_id = @sgid AND id != @self`
+      ).run(sp)
+    }
+  }
+  return updated
 }
 
 export function deleteWidget(id: string): boolean {

@@ -193,6 +193,11 @@ export interface Widget {
   createdAt: number
   updatedAt: number
   archived: boolean
+  // When set, this widget is a LINKED duplicate: all widgets sharing the same
+  // syncGroupId mirror their content + title + colour to each other (across
+  // tasks). Position / size / which task each copy lives in stay independent.
+  // null = standalone (not linked).
+  syncGroupId: string | null
 }
 
 export interface WidgetDraft {
@@ -213,6 +218,9 @@ export interface WidgetDraft {
   // free-positioned via x/y.
   pinned?: boolean
   pinnedZone?: PinZone | null
+  // Link this new widget into a sync group (used by Duplicate so the copy stays
+  // in sync with its source).
+  syncGroupId?: string | null
 }
 
 export interface WidgetPatch {
@@ -236,6 +244,8 @@ export interface WidgetPatch {
   livingGeneratedAt?: number | null
   livingPaused?: boolean
   archived?: boolean
+  // Set to a group id to LINK this widget into a sync group, or null to UNLINK.
+  syncGroupId?: string | null
 }
 
 export type ChatRole = 'user' | 'assistant' | 'system'
