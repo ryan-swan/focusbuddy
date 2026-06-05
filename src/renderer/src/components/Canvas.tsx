@@ -44,7 +44,7 @@ import CanvasAIAssistantRail from './CanvasAIAssistantRail'
 import Icon from './Icon'
 import { useChatStore } from '../stores/chat'
 import { useFocusSessionStore } from '../stores/focusSession'
-import { chimeIn, futuristicPowerOn } from '../lib/audioBeep'
+import { chimeIn, futuristicPowerOn, sonarPing } from '../lib/audioBeep'
 import type { WidgetSuggestion } from '@shared/types'
 import {
   CATEGORIES,
@@ -731,6 +731,77 @@ export default function Canvas(): JSX.Element {
     const target = e.target as HTMLElement
     if (target.dataset.bareCanvas !== undefined && activeId !== null) {
       setActive(null)
+    }
+  }
+
+  // ── Click-drag canvas panning ──────────────────────────────────────────────
+  // Press on bare canvas → a sonar ping + a pulsing ring confirm the grab; hold
+  // and move and the camera pans 1:1 with the cursor (panX/panY are screen-space
+  // translations, so the delta maps directly). A press without a drag still acts
+  // as a click (deactivate the active widget).
+  const panDragRef = useRef<{
+    startX: number
+    startY: number
+    startPanX: number
+    startPanY: number
+    moved: boolean
+    pointerId: number
+  } | null>(null)
+  const [grabbing, setGrabbing] = useState(false)
+  const [panPing, setPanPing] = useState<{ x: number; y: number } | null>(null)
+  const panPingTimer = useRef<number | null>(null)
+
+  function handleCanvasPointerDown(e: React.PointerEvent<HTMLDivElement>): void {
+    if (e.button !== 0) return // primary button only
+    const target = e.target as HTMLElement
+    if (target.dataset.bareCanvas === undefined) return // only on bare canvas
+    panDragRef.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      startPanX: panX,
+      startPanY: panY,
+      moved: false,
+      pointerId: e.pointerId
+    }
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId)
+    } catch {
+      // pointer capture unsupported — drag still works while over the surface
+    }
+    sonarPing()
+    setGrabbing(true)
+    // Surface-relative coords so the ring positions correctly regardless of any
+    // transformed ancestor (position:absolute inside dropRef).
+    const rect = e.currentTarget.getBoundingClientRect()
+    setPanPing({ x: e.clientX - rect.left, y: e.clientY - rect.top })
+    if (panPingTimer.current !== null) window.clearTimeout(panPingTimer.current)
+    panPingTimer.current = window.setTimeout(() => setPanPing(null), 650)
+  }
+
+  function handleCanvasPointerMove(e: React.PointerEvent<HTMLDivElement>): void {
+    const d = panDragRef.current
+    if (!d) return
+    const dx = e.clientX - d.startX
+    const dy = e.clientY - d.startY
+    if (!d.moved && Math.hypot(dx, dy) > 3) d.moved = true
+    setPan(d.startPanX + dx, d.startPanY + dy)
+  }
+
+  function handleCanvasPointerUp(e: React.PointerEvent<HTMLDivElement>): void {
+    const d = panDragRef.current
+    if (!d) return
+    panDragRef.current = null
+    setGrabbing(false)
+    try {
+      e.currentTarget.releasePointerCapture(d.pointerId)
+    } catch {
+      // ignore
+    }
+    // A press with no drag behaves like a bare-canvas click (idempotent with
+    // onClick, which may not fire reliably after a pointer-capture sequence).
+    if (!d.moved) {
+      const target = e.target as HTMLElement
+      if (target.dataset.bareCanvas !== undefined && activeId !== null) setActive(null)
     }
   }
 
@@ -1583,9 +1654,22 @@ export default function Canvas(): JSX.Element {
           onWheel={handleWheel}
           onClick={handleCanvasClick}
           onContextMenu={handleCanvasContextMenu}
+          onPointerDown={handleCanvasPointerDown}
+          onPointerMove={handleCanvasPointerMove}
+          onPointerUp={handleCanvasPointerUp}
+          onPointerCancel={handleCanvasPointerUp}
           className="flex-1 relative overflow-hidden desk-paper"
-          style={{ overscrollBehavior: 'none' }}
+          style={{ overscrollBehavior: 'none', cursor: grabbing ? 'grabbing' : undefined }}
         >
+          {panPing && (
+            <div
+              className="absolute pointer-events-none z-[200]"
+              style={{ left: panPing.x, top: panPing.y, transform: 'translate(-50%, -50%)' }}
+            >
+              <span className="block h-10 w-10 rounded-full border-2 border-accent/70 animate-ping" />
+              <span className="absolute inset-0 m-auto h-2 w-2 rounded-full bg-accent shadow" />
+            </div>
+          )}
           {widgets.length === 0 && (
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
               <p className="text-sm text-stone-500">

@@ -37,6 +37,31 @@ export function beep(freq = 660, durationMs = 120, volume = 0.12): void {
   }
 }
 
+// Sonar "ping" — a short downward sine chirp with a soft tail. Played when the
+// user presses on bare canvas to begin a click-drag pan.
+export function sonarPing(): void {
+  if (!shouldPlay()) return
+  try {
+    const c = getCtx()
+    const osc = c.createOscillator()
+    const gain = c.createGain()
+    osc.connect(gain)
+    gain.connect(c.destination)
+    osc.type = 'sine'
+    const now = c.currentTime
+    const vol = effectiveVolume(0.1)
+    osc.frequency.setValueAtTime(900, now)
+    osc.frequency.exponentialRampToValueAtTime(560, now + 0.18)
+    gain.gain.setValueAtTime(0.0001, now)
+    gain.gain.exponentialRampToValueAtTime(Math.max(0.0001, vol), now + 0.008)
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.34)
+    osc.start(now)
+    osc.stop(now + 0.36)
+  } catch {
+    // AudioContext suspended until first user gesture
+  }
+}
+
 export function alarm(): void {
   beep(660, 140, 0.16)
   window.setTimeout(() => beep(880, 140, 0.18), 180)
