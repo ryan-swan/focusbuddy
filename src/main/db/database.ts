@@ -278,6 +278,8 @@ export function getDb(): Database.Database {
   ensureColumn(db, 'widgets', 'living_query', 'TEXT')
   ensureColumn(db, 'widgets', 'living_generated_at', 'INTEGER')
   ensureColumn(db, 'widgets', 'living_paused', 'INTEGER NOT NULL DEFAULT 0')
+  // Linked duplicates: widgets sharing a sync_group_id mirror content/title/colour.
+  ensureColumn(db, 'widgets', 'sync_group_id', 'TEXT')
   // Usage telemetry + favourites for Connected Apps. `use_count` and `last_used_at`
   // feed the recency × frequency sort that promotes apps into the Favourites strip;
   // `pinned` lets the user override. `vault_entry_id` binds an app to a vault entry

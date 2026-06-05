@@ -607,6 +607,14 @@ export default function WidgetFrame({
                 <Icon name="layers_clear" size={11} />
               </button>
             )}
+            {widget.syncGroupId && (
+              <span
+                title="Linked duplicate — content, title and colour stay in sync with its copies (across tasks)"
+                className="inline-flex items-center text-accent shrink-0"
+              >
+                <Icon name="link" size={11} />
+              </span>
+            )}
             {headerLabel}
           </span>
           <div className="flex items-center gap-0.5">
@@ -747,27 +755,40 @@ export default function WidgetFrame({
               label: 'Duplicate',
               icon: 'content_copy',
               onClick: () => {
-                // Clone the widget's metadata and offset it slightly so the
-                // copy is visible next to the original. Content is copied
-                // verbatim — page widgets get their own independent Tiptap
-                // doc, table widgets stay pointed at the same backing
-                // fb_tables row (two views of one dataset, which is the
-                // common intent for a quick duplicate).
-                void createWidget({
-                  taskId: widget.taskId,
-                  kind: widget.kind,
-                  title: widget.title,
-                  content: widget.content,
-                  x: widget.x + 30,
-                  y: widget.y + 30,
-                  width: widget.width,
-                  height: widget.height,
-                  color: widget.color,
-                  sourceAppId: widget.sourceAppId,
-                  mode: widget.mode
-                })
+                // Clone the widget AND link it to the source: both share a
+                // syncGroupId, so content / title / colour edits mirror across
+                // every copy — including copies in other tasks. Offset so the
+                // copy is visible next to the original.
+                void (async () => {
+                  let groupId = widget.syncGroupId
+                  if (!groupId) {
+                    groupId = crypto.randomUUID()
+                    await update(widget.id, { syncGroupId: groupId })
+                  }
+                  await createWidget({
+                    taskId: widget.taskId,
+                    kind: widget.kind,
+                    title: widget.title,
+                    content: widget.content,
+                    x: widget.x + 30,
+                    y: widget.y + 30,
+                    width: widget.width,
+                    height: widget.height,
+                    color: widget.color,
+                    sourceAppId: widget.sourceAppId,
+                    mode: widget.mode,
+                    syncGroupId: groupId
+                  })
+                })()
               }
             })
+            if (widget.syncGroupId) {
+              items.push({
+                label: 'Unlink from synced copies',
+                icon: 'link_off',
+                onClick: () => void update(widget.id, { syncGroupId: null })
+              })
+            }
             items.push({
               label: 'Bring to front',
               icon: 'flip_to_front',

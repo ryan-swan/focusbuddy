@@ -40,6 +40,7 @@ export default function MakeTaskDialog({
   const create = useNodeStore((s) => s.create)
   const setActiveTask = useNodeStore((s) => s.setActive)
   const createWidget = useWidgetStore((s) => s.create)
+  const updateWidget = useWidgetStore((s) => s.update)
   const activeTaskId = useNodeStore((s) => s.activeTaskId)
   const folders = useMemo(
     () => nodes.filter((n) => n.kind === 'folder'),
@@ -126,6 +127,14 @@ export default function MakeTaskDialog({
       // doesn't collide with the original's stored x/y if the user happens
       // to land on the new task quickly.
       if (sourceWidget && copyWidget) {
+        // Link the copy to the source so edits stay in sync across the two
+        // tasks (tick a checkbox / rename here → it mirrors there). Reuse the
+        // source's group or create one and tag the source too.
+        let groupId = sourceWidget.syncGroupId
+        if (!groupId) {
+          groupId = crypto.randomUUID()
+          await updateWidget(sourceWidget.id, { syncGroupId: groupId })
+        }
         await createWidget({
           taskId: newTask.id,
           kind: sourceWidget.kind,
@@ -137,7 +146,8 @@ export default function MakeTaskDialog({
           height: sourceWidget.height,
           color: sourceWidget.color,
           sourceAppId: sourceWidget.sourceAppId,
-          mode: sourceWidget.mode
+          mode: sourceWidget.mode,
+          syncGroupId: groupId
         })
       }
       // Switch the active task so the user lands on the new task they
@@ -277,7 +287,7 @@ export default function MakeTaskDialog({
                     Copy this widget into the new task
                   </div>
                   <div className="text-[10px] text-stone-500 dark:text-stone-400 leading-tight">
-                    A duplicate {sourceWidget.kind === 'section' ? 'section container' : sourceWidget.kind} lands on the new task's canvas.
+                    A 🔗 linked copy lands on the new task — its content, title and colour stay in sync with this one (unlink anytime from the widget menu).
                   </div>
                 </div>
               </label>
