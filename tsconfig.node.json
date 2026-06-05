@@ -9,9 +9,13 @@
   "compilerOptions": {
     "composite": true,
     "types": ["electron-vite/node"],
-    "baseUrl": ".",
+    // No baseUrl (deprecated): the path below resolves relative to this
+    // tsconfig (project root) — identical to the old `baseUrl: "."`.
+    // moduleResolution "bundler" replaces the base config's deprecated node10
+    // (electron-vite bundles main/preload), dropping the ignoreDeprecations need.
+    "moduleResolution": "bundler",
     "paths": {
-      "@shared/*": ["src/shared/*"]
+      "@shared/*": ["./src/shared/*"]
     }
   }
 }
