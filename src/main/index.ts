@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Menu, MenuItem, protocol, shell, net } from 'electron'
+import { app, BrowserWindow, Menu, MenuItem, protocol, session, shell, net } from 'electron'
 import { join } from 'path'
 import { existsSync } from 'fs'
 import { pathToFileURL } from 'url'
@@ -6,6 +6,7 @@ import { config as loadEnv } from 'dotenv'
 import { closeDb, getDb } from './db/database'
 import { registerIpcHandlers } from './ipc'
 import { decidePopup } from './popupRouter'
+import { cleanWebviewUserAgent } from './userAgent'
 import { getFile } from './db/files'
 import { installFocusTracker } from './streamdeckActions'
 import { installActivityTracker } from './activityTracker'
@@ -62,6 +63,32 @@ protocol.registerSchemesAsPrivileged([
 ])
 
 const isDev = !app.isPackaged
+
+// ── Permission hardening ──────────────────────────────────────────────────
+// By default Electron AUTO-GRANTS every permission a page requests. Because we
+// embed arbitrary third-party websites in <webview> browser widgets, that means
+// any loaded page could silently obtain geolocation, WebHID / WebSerial /
+// WebUSB device access, MIDI-sysex, etc. We install a denylist for the
+// genuinely dangerous device/location permissions while leaving the ones the
+// app actually uses (media for voice/video notes, notifications, clipboard,
+// fullscreen) granted. Applied to the default session (main renderer) AND to
+// every <webview> session in web-contents-created below.
+const DENIED_PERMISSIONS = new Set<string>([
+  'geolocation',
+  'hid',
+  'serial',
+  'usb',
+  'midiSysex',
+  'idle-detection',
+  'speaker-selection'
+])
+
+function applyPermissionPolicy(ses: Electron.Session): void {
+  ses.setPermissionRequestHandler((_wc, permission, callback) => {
+    callback(!DENIED_PERMISSIONS.has(permission))
+  })
+  ses.setPermissionCheckHandler((_wc, permission) => !DENIED_PERMISSIONS.has(permission))
+}
 
 // Register haptyx:// before whenReady so the OS knows we own the
 // protocol scheme. Also handles second-instance / open-url events for
@@ -134,6 +161,21 @@ function dispatchContextAction(
 app.on('web-contents-created', (_, contents) => {
   // Only attach to <webview> tag contents — not the main window's React renderer
   if (contents.getType() !== 'webview') return
+
+  // ── User-Agent + permissions ────────────────────────────────────────────
+  // Present each browser widget as plain desktop Chrome (strip the Electron +
+  // app-name tokens) so OAuth providers stop rejecting the embedded UA with
+  // `disallowed_useragent`. Set on the webview's SESSION so popup windows that
+  // share the session (see popupRouter) inherit the clean UA too. Also install
+  // the permission denylist on this session so embedded sites can't grab
+  // geolocation / WebHID / WebSerial / WebUSB. See userAgent.ts.
+  try {
+    const ses = contents.session
+    ses.setUserAgent(cleanWebviewUserAgent(ses.getUserAgent()))
+    applyPermissionPolicy(ses)
+  } catch {
+    // session unavailable on a torn-down contents — best effort
+  }
 
   // ── Popup / OAuth handling ──────────────────────────────────────────────
   // OAuth providers (Google, GitHub, Microsoft, etc.) post their callback back
@@ -239,6 +281,9 @@ app.whenReady().then(() => {
     app.setAppUserModelId('agency.saasmouth.focusbuddy')
   }
   getDb()
+  // Harden the main renderer's session too (voice/video-note media stays
+  // granted; dangerous device/location permissions are denied).
+  applyPermissionPolicy(session.defaultSession)
   registerIpcHandlers()
   // Stream Deck focus handoff — caches the previously-frontmost app so
   // ⌘C / ⌘V / ⌘⇧4 / type-text land in the user's actual workspace

@@ -13,6 +13,11 @@ export default function NoteWidget({ widget, inline = false }: Props): JSX.Eleme
   const update = useWidgetStore((s) => s.update)
   const [text, setText] = useState(widget.content)
   const lastSavedRef = useRef(widget.content)
+  // Mirror the latest text each render so the unmount-flush closure reads the
+  // CURRENT value; hold the debounce timer in a ref so the flush can cancel it.
+  const textRef = useRef(widget.content)
+  textRef.current = text
+  const saveTimerRef = useRef<number | null>(null)
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; selectionText?: string } | null>(null)
 
   useEffect(() => {
@@ -22,12 +27,30 @@ export default function NoteWidget({ widget, inline = false }: Props): JSX.Eleme
 
   useEffect(() => {
     if (text === lastSavedRef.current) return
-    const handle = window.setTimeout(() => {
+    saveTimerRef.current = window.setTimeout(() => {
       lastSavedRef.current = text
+      saveTimerRef.current = null
       void update(widget.id, { content: text })
     }, 600)
-    return () => window.clearTimeout(handle)
+    return () => {
+      if (saveTimerRef.current !== null) window.clearTimeout(saveTimerRef.current)
+    }
   }, [text, widget.id, update])
+
+  // Flush any pending save on unmount. The canvas remounts every widget when
+  // layoutVersion bumps (pin/unpin/group/auto-arrange/AI-accept); without this,
+  // the un-debounced tail of what you just typed is silently lost. Mirrors the
+  // unmount-flush already present in MarkdownWidget.
+  useEffect(() => {
+    return () => {
+      if (saveTimerRef.current !== null) {
+        window.clearTimeout(saveTimerRef.current)
+        if (textRef.current !== lastSavedRef.current) {
+          void update(widget.id, { content: textRef.current })
+        }
+      }
+    }
+  }, [update, widget.id])
 
   const content = (
     <div className={`h-full w-full bg-[#fefcf6] ${inline ? 'p-8' : 'p-4'}`}>

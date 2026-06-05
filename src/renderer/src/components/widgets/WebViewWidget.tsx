@@ -38,7 +38,11 @@ interface Props {
 export default function WebViewWidget({ widget, inline = false }: Props): JSX.Element {
   const update = useWidgetStore((s) => s.update)
   const create = useWidgetStore((s) => s.create)
-  const focusOn = useWidgetStore((s) => s.focusOn)
+  // setActive (not focusOn): activating a browser widget you can already see
+  // must NOT pan the camera — focusOn bumps centerToken and yanks the world.
+  // The overlay's whole job is to hand the NEXT click to the page, so it just
+  // marks the widget active in place.
+  const setActive = useWidgetStore((s) => s.setActive)
   const isActive = useWidgetStore((s) => s.activeWidgetId === widget.id)
   const webviewRef = useRef<HTMLElement | null>(null)
   const entry = catalogFor(widget.kind)
@@ -370,6 +374,8 @@ export default function WebViewWidget({ widget, inline = false }: Props): JSX.El
     if (!wv) return
     const entry = vaultEntries.find((e) => e.id === sourceApp.vaultEntryId) ?? null
     if (!entry) return
+    // Origin gate: only auto-fill on the host this Connected App is bound to.
+    const boundHost = hostnameOf(sourceApp.url)
 
     function onFinish(): void {
       try {
@@ -377,7 +383,7 @@ export default function WebViewWidget({ widget, inline = false }: Props): JSX.El
           (wv as unknown as { getURL?: () => string } | null)?.getURL?.() ?? ''
         if (!url || url === autofilledForUrl.current) return
         autofilledForUrl.current = url
-        void autofillWebview(wv as HTMLElement | null, entry)
+        void autofillWebview(wv as HTMLElement | null, entry, boundHost)
       } catch {
         // ignore
       }
@@ -589,7 +595,7 @@ export default function WebViewWidget({ widget, inline = false }: Props): JSX.El
             <div
               onClick={(e) => {
                 e.stopPropagation()
-                focusOn(widget.id)
+                setActive(widget.id)
               }}
               className="absolute inset-0 cursor-pointer group bg-transparent"
               title="Click to interact — scroll pans the canvas while not active"

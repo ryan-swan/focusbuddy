@@ -2,9 +2,15 @@ import { dialog, nativeImage } from 'electron'
 import { exec, execFile } from 'child_process'
 import { promisify } from 'util'
 import { basename, extname, join } from 'path'
-import { readFileSync, existsSync } from 'fs'
+import { readFileSync, existsSync, rmSync } from 'fs'
 
 const execAsync = promisify(exec)
+// execFile variant that CAPTURES stdout, with NO shell — arguments are passed
+// as a discrete argv array so a path/value can never be interpreted as shell
+// syntax (closes the `defaults`/`sips` command-injection vector). The osascript
+// calls below keep execAsync only where their arguments are already escaped and
+// shell-free by construction.
+const execFileP = promisify(execFile)
 
 // ── Picker ──────────────────────────────────────────────────────────────────
 // Surfaces the macOS file picker filtered to .app bundles. Returns a structured
@@ -71,13 +77,11 @@ async function readBundleId(appPath: string): Promise<string | null> {
   const plist = join(appPath, 'Contents', 'Info')
   try {
     // 2s timeout guard. `defaults read` is usually <100ms but we never want
-    // a stuck process to hang the entire describe pipeline.
-    const { stdout } = await Promise.race([
-      execAsync(`defaults read "${plist}" CFBundleIdentifier`),
-      new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('timeout')), 2000)
-      )
-    ])
+    // a stuck process to hang the entire describe pipeline. execFile (no shell)
+    // means `plist` cannot inject commands even with metacharacters in the path.
+    const { stdout } = await execFileP('defaults', ['read', plist, 'CFBundleIdentifier'], {
+      timeout: 2000
+    })
     const id = stdout.trim()
     return id || null
   } catch {
@@ -142,10 +146,14 @@ async function captureAppIcon(appPath: string): Promise<string | null> {
       // synchronous-ish (sub-100ms) and avoids needing native .icns parsing.
       const tmp = join('/tmp', `fb-icon-${Date.now()}.png`)
       try {
-        await execAsync(`sips -s format png "${candidate}" --out "${tmp}" -Z 128`)
+        await execFileP(
+          'sips',
+          ['-s', 'format', 'png', candidate, '--out', tmp, '-Z', '128'],
+          { timeout: 4000 }
+        )
         const buf = readFileSync(tmp)
         try {
-          await execAsync(`rm "${tmp}"`)
+          rmSync(tmp, { force: true })
         } catch {
           // best effort cleanup
         }
@@ -163,12 +171,9 @@ async function captureAppIcon(appPath: string): Promise<string | null> {
 async function readIconFileName(appPath: string): Promise<string | null> {
   const plistBase = join(appPath, 'Contents', 'Info')
   try {
-    const { stdout } = await Promise.race([
-      execAsync(`defaults read "${plistBase}" CFBundleIconFile`),
-      new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('timeout')), 2000)
-      )
-    ])
+    const { stdout } = await execFileP('defaults', ['read', plistBase, 'CFBundleIconFile'], {
+      timeout: 2000
+    })
     const name = stdout.trim()
     return name || null
   } catch {
