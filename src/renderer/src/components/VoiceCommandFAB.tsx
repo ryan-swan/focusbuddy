@@ -29,6 +29,7 @@ type Phase =
   | 'staged' // transcript ready for review/edit, not sent yet
   | 'sending' // hit Anthropic
   | 'result' // proposals dock visible
+  | 'error' // capture/transcribe failed — show the reason (don't silently hide it)
 
 // Intersection (not `interface extends`): ActionProposal is a discriminated
 // union, and an interface extending a union silently drops the per-member
@@ -184,6 +185,14 @@ export default function VoiceCommandFAB(): JSX.Element {
     setProposals([])
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false })
+      // Press-hold race: if the user released during the async getUserMedia,
+      // don't start recording — release the just-acquired mic and bail, so a
+      // quick tap can't leave the recorder running with no way to stop it.
+      if (prefs.commandMode === 'press-hold' && !pressHoldArmedRef.current) {
+        stream.getTracks().forEach((t) => t.stop())
+        setPhase('idle')
+        return
+      }
       streamRef.current = stream
       chunksRef.current = []
       const mr = new MediaRecorder(stream)
@@ -212,8 +221,15 @@ export default function VoiceCommandFAB(): JSX.Element {
         silenceTimerRef.current = window.setTimeout(tick, 400)
       }
     } catch (err) {
-      setError((err as Error).message || 'Microphone unavailable.')
-      setPhase('idle')
+      const e = err as Error
+      setError(
+        e?.name === 'NotAllowedError'
+          ? 'Microphone access is blocked. Allow it in System Settings → Privacy & Security → Microphone, then try again. (In dev the app appears as “Electron”.)'
+          : e?.name === 'NotFoundError'
+            ? 'No microphone found. Connect one and try again.'
+            : e?.message || 'Microphone unavailable.'
+      )
+      setPhase('error')
     }
   }, [prefs.commandMode, prefs.autoStopSilenceMs, startLiveCaptions])
 
@@ -242,8 +258,8 @@ export default function VoiceCommandFAB(): JSX.Element {
 
     const captionText = liveCaption.trim()
     if (chunksRef.current.length === 0 && !captionText) {
-      setError('No audio captured.')
-      setPhase('idle')
+      setError('No audio captured. Check your microphone, then hold the mic a moment longer while you speak.')
+      setPhase('error')
       return
     }
     const blob = new Blob(chunksRef.current, { type: 'audio/webm' })
@@ -273,7 +289,7 @@ export default function VoiceCommandFAB(): JSX.Element {
         setEditedTranscript(captionText)
         if (!captionText) {
           setError(res.error)
-          setPhase('idle')
+          setPhase('error')
           return
         }
       }
@@ -282,7 +298,7 @@ export default function VoiceCommandFAB(): JSX.Element {
       setEditedTranscript(captionText)
       if (!captionText) {
         setError((err as Error).message || 'Transcription failed.')
-        setPhase('idle')
+        setPhase('error')
       }
     }
   }, [clearSilenceTimer, liveCaption, stopLiveCaptions])
@@ -390,6 +406,7 @@ export default function VoiceCommandFAB(): JSX.Element {
     setReply('')
     setTranscript('')
     setEditedTranscript('')
+    setError(null)
     setPhase('idle')
   }, [])
 
@@ -410,12 +427,15 @@ export default function VoiceCommandFAB(): JSX.Element {
       if (prefs.commandMode === 'press-hold' && pressHoldArmedRef.current) {
         e.preventDefault()
         pressHoldArmedRef.current = false
-        if (phase === 'listening') {
+        // Stop based on the live recorder ref, not the (possibly stale) phase:
+        // if recording started, stop + transcribe; if getUserMedia is still
+        // pending, clearing the armed flag above makes beginCapture abort.
+        if (recorderRef.current) {
           await stopCapture()
         }
       }
     },
-    [prefs.commandMode, phase, stopCapture]
+    [prefs.commandMode, stopCapture]
   )
 
   const fabClick = useCallback(async (): Promise<void> => {
@@ -501,6 +521,26 @@ export default function VoiceCommandFAB(): JSX.Element {
                 {error && (
                   <div className="text-[10px] text-amber-400 mt-1.5">{error}</div>
                 )}
+              </div>
+            )}
+            {phase === 'error' && (
+              <div className="fb-glass-chrome rounded-lg border border-amber-500/40 p-3 shadow-xl">
+                <div className="text-amber-400 text-[10px] uppercase tracking-[0.18em] mb-1 flex items-center gap-1">
+                  <Icon name="warning" size={12} />
+                  Voice command couldn’t run
+                </div>
+                <div className="text-[12px] text-stone-200 leading-snug">
+                  {error || 'Something went wrong. Try again.'}
+                </div>
+                <div className="flex justify-end mt-2">
+                  <button
+                    onClick={onDismissAll}
+                    className="text-[11px] px-2.5 py-1 rounded bg-stone-100/10 hover:bg-stone-100/20 text-stone-200"
+                    data-testid="voice-command-error-dismiss"
+                  >
+                    Dismiss
+                  </button>
+                </div>
               </div>
             )}
             {phase === 'sending' && (
