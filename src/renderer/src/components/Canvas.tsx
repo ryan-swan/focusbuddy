@@ -67,6 +67,7 @@ import {
   SECTION_MIN_H
 } from '../lib/sectionGeometry'
 import { lookupWebview } from '../lib/webviewRegistry'
+import { getOrigin, subscribeOrigins, type NodeCanvasOrigin } from '../lib/nodeCanvasOrigin'
 import {
   PinLayoutContext,
   computeZonePinPositions,
@@ -185,6 +186,17 @@ export default function Canvas(): JSX.Element {
   const activeTaskId = useNodeStore((s) => s.activeTaskId)
   const nodes = useNodeStore((s) => s.nodes)
   const updateNode = useNodeStore((s) => s.update)
+  const setActiveTask = useNodeStore((s) => s.setActive)
+  // Breadcrumb origin: if this task's canvas was opened by exploring a mind-map
+  // node, show a path back to the map. Re-read on task switch + origin changes.
+  const [nodeOrigin, setNodeOrigin] = useState<NodeCanvasOrigin | null>(() =>
+    getOrigin(activeTaskId)
+  )
+  useEffect(() => {
+    const read = (): void => setNodeOrigin(getOrigin(activeTaskId))
+    read()
+    return subscribeOrigins(read)
+  }, [activeTaskId])
   const widgets = useWidgetStore((s) => s.widgets)
   const focusedId = useWidgetStore((s) => s.focusedWidgetId)
   const activeId = useWidgetStore((s) => s.activeWidgetId)
@@ -1810,6 +1822,29 @@ export default function Canvas(): JSX.Element {
   return (
     <>
       <div className="h-full flex flex-col">
+        {nodeOrigin && (
+          <div className="shrink-0 flex items-center gap-1 px-4 py-1 border-b border-[color:var(--glass-chrome-border)] bg-accent/5 text-[11px] text-stone-600 dark:text-stone-400 overflow-x-auto whitespace-nowrap">
+            <button
+              onClick={() => setActiveTask(nodeOrigin.sourceTaskId)}
+              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded hover:bg-stone-200/60 dark:hover:bg-stone-700/60 text-stone-700 dark:text-stone-300 font-medium shrink-0"
+              title="Back to the mind map"
+            >
+              <Icon name="arrow_back" size={12} />
+              <Icon name="account_tree" size={12} className="text-accent" />
+              <span className="max-w-[180px] truncate">{nodeOrigin.sourceTaskTitle}</span>
+            </button>
+            {nodeOrigin.nodePath.map((label, i) => (
+              <span key={i} className="inline-flex items-center gap-1 shrink-0 text-stone-400">
+                <Icon name="chevron_right" size={12} />
+                <span className="max-w-[140px] truncate">{label}</span>
+              </span>
+            ))}
+            <Icon name="chevron_right" size={12} className="text-stone-400 shrink-0" />
+            <span className="text-stone-800 dark:text-stone-200 font-medium max-w-[200px] truncate">
+              {nodeOrigin.nodeLabel}
+            </span>
+          </div>
+        )}
         <div className="px-4 py-2.5 border-b border-[color:var(--glass-chrome-border)] fb-glass-chrome flex flex-wrap items-center gap-x-2 gap-y-1.5">
           <Icon name="task_alt" size={18} className="text-stone-700 dark:text-stone-300 shrink-0" />
           <h2 className="text-sm font-semibold text-stone-900 dark:text-stone-100 truncate flex-1 min-w-[80px]">

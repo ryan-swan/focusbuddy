@@ -6,6 +6,7 @@ import { useWidgetStore } from '../../stores/widgets'
 import { useNodeStore } from '../../stores/nodes'
 import { applyProposal } from '../../lib/actionExecutor'
 import { catalogFor, entriesByCategory } from '../../lib/widgetCatalog'
+import { setOrigin } from '../../lib/nodeCanvasOrigin'
 
 // AI mind-mapper widget — Phase 1 + Phase 2 (this file).
 //
@@ -76,6 +77,11 @@ interface MindMapNode {
   // This implements the "triage child nodes before committing" UX
   // pattern from the task-starting AI flow.
   pendingChildren?: MindMapNode[]
+  // Phase 3 — when a node is "explored", it gets its OWN task + canvas. This
+  // is the forward link to that FbNode task; exploring again just re-opens it
+  // (lazy: the task is created on first explore). The reverse breadcrumb hint
+  // lives in lib/nodeCanvasOrigin.
+  taskId?: string
 }
 
 interface AgentSuggestion {
@@ -646,6 +652,52 @@ export default function MindMapWidget({ widget, inline = false }: Props): JSX.El
     }
   }
 
+  // ── Phase 3: explore a node as its OWN task canvas ───────────────────────
+  // Lazily create (or re-open) a real task + canvas for this node, record the
+  // breadcrumb origin so the canvas can climb back to the map, then switch the
+  // desk to it. The node remembers its taskId — exploring again re-opens it.
+  async function exploreNode(node: MindMapNode): Promise<void> {
+    const nodes = useNodeStore.getState().nodes
+    const goTo = (taskId: string): void => {
+      const sourceTitle = nodes.find((n) => n.id === activeTaskId)?.title ?? 'Mind map'
+      setOrigin(taskId, {
+        sourceTaskId: activeTaskId ?? '',
+        sourceTaskTitle: sourceTitle,
+        mindmapWidgetId: widget.id,
+        nodeId: node.id,
+        nodeLabel: node.label,
+        // Ancestor labels (root → parent), excluding the node itself.
+        nodePath: pathFromRoot(state.root, node.id)
+          .slice(0, -1)
+          .map((n) => n.label)
+      })
+      useNodeStore.getState().setActive(taskId)
+    }
+    // Re-open the existing canvas if its task still exists.
+    if (node.taskId && nodes.some((n) => n.id === node.taskId)) {
+      goTo(node.taskId)
+      return
+    }
+    if (!activeTaskId) {
+      setErrorMsg('Open a task first — node canvases need a parent task.')
+      return
+    }
+    try {
+      const task = await createNode({
+        parentId: activeTaskId,
+        kind: 'task',
+        title: node.label || 'Untitled',
+        description: node.rationale ?? ''
+      })
+      updateNode(node.id, (n) => ({ ...n, taskId: task.id, kind: 'task' }))
+      goTo(task.id)
+    } catch (err) {
+      setErrorMsg(
+        `Could not open node canvas: ${err instanceof Error ? err.message : String(err)}`
+      )
+    }
+  }
+
   // ── Phase 2B: attach a real canvas widget to this node ───────────────────
   async function attachWidget(node: MindMapNode, kind: WidgetKind): Promise<void> {
     if (!activeTaskId) {
@@ -1088,6 +1140,28 @@ export default function MindMapWidget({ widget, inline = false }: Props): JSX.El
                     fill="rgb(var(--accent))"
                   />
                 )}
+                {/* "Has its own canvas" badge (bottom-right) — click to open it. */}
+                {n.hasCanvas && !n.pending && (
+                  <g
+                    transform={`translate(${n.width / 2 - 11}, ${n.height / 2 - 11})`}
+                    className="cursor-pointer"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      const full = findNode(state.root, n.id)
+                      if (full) void exploreNode(full)
+                    }}
+                    data-testid={`mindmap-open-canvas-${n.id}`}
+                  >
+                    <title>Open this node’s canvas</title>
+                    <rect x={-6} y={-6} width={12} height={12} rx={3} fill="rgb(var(--accent))" />
+                    <path
+                      d="M -3 -2 H 3 M -3 1 H 1"
+                      stroke="white"
+                      strokeWidth={1.2}
+                      strokeLinecap="round"
+                    />
+                  </g>
+                )}
                 {n.pending && n.pendingParentId && (
                   <g>
                     {/* Accept (✓) — bottom-left of node */}
@@ -1169,6 +1243,8 @@ export default function MindMapWidget({ widget, inline = false }: Props): JSX.El
             setErrorMsg(null)
             setAgentWizardOpen(true)
           }}
+          onExplore={() => void exploreNode(selected)}
+          hasCanvas={!!selected.taskId}
           onConvertToTask={() => void convertToTask(selected)}
           onDelete={() => deleteNode(selected.id)}
           onOpenToolPicker={() => setToolPickerOpen(true)}
@@ -1231,6 +1307,8 @@ function SidePanel({
   onRunAgent,
   onReplyToAgent,
   onCreateAgent,
+  onExplore,
+  hasCanvas,
   onConvertToTask,
   onDelete,
   onOpenToolPicker,
@@ -1273,6 +1351,8 @@ function SidePanel({
   onRunAgent: (s: AgentSuggestion) => void
   onReplyToAgent: (s: AgentSuggestion, text: string) => void
   onCreateAgent: () => void
+  onExplore: () => void
+  hasCanvas: boolean
   onConvertToTask: () => void
   onDelete: () => void
   onOpenToolPicker: () => void
@@ -1362,9 +1442,23 @@ function SidePanel({
             </button>
           </div>
           <button
+            onClick={onExplore}
+            className="w-full text-[11px] px-2 py-1.5 rounded-md bg-[rgb(var(--accent))] text-white hover:opacity-90 inline-flex items-center justify-center gap-1.5"
+            data-testid="mindmap-explore"
+            title={
+              hasCanvas
+                ? 'Open this node’s own task canvas'
+                : 'Turn this node into its own task with a canvas you can explore'
+            }
+          >
+            <Icon name={hasCanvas ? 'open_in_full' : 'dashboard'} size={12} />
+            {hasCanvas ? 'Open canvas' : 'Explore as canvas'}
+          </button>
+          <button
             onClick={onConvertToTask}
             className="w-full text-[11px] px-2 py-1.5 rounded-md bg-stone-200 dark:bg-stone-700 text-stone-800 dark:text-stone-100 hover:opacity-90 inline-flex items-center justify-center gap-1.5"
             data-testid="mindmap-convert-task"
+            title="Add this node to the sidebar as a task, without leaving the map"
           >
             <Icon name="task_alt" size={12} />
             Convert to task
@@ -2091,6 +2185,8 @@ interface LaidOutNode {
   width: number
   height: number
   hasAttachments: boolean
+  // True when the node has been explored into its own task canvas.
+  hasCanvas: boolean
   // Pending nodes render with a dashed outline + reduced opacity so
   // the triage stage is visually obvious. Click → accept (in the
   // side panel); click reject (×) to drop.
@@ -2204,6 +2300,7 @@ function layoutTree(root: MindMapNode): Layout {
         width: dims.width,
         height: dims.height,
         hasAttachments: (node.attachedWidgetIds?.length ?? 0) > 0,
+        hasCanvas: !!node.taskId,
         pending,
         pendingParentId
       })
@@ -2225,6 +2322,7 @@ function layoutTree(root: MindMapNode): Layout {
       width: dims.width,
       height: dims.height,
       hasAttachments: (node.attachedWidgetIds?.length ?? 0) > 0,
+      hasCanvas: !!node.taskId,
       pending,
       pendingParentId
     })
@@ -2414,6 +2512,8 @@ function normaliseNode(n: MindMapNode): MindMapNode {
         ? n.kind
         : 'idea',
     rationale: typeof n.rationale === 'string' ? n.rationale : undefined,
+    // Preserve the explored-canvas link across reloads.
+    taskId: typeof n.taskId === 'string' && n.taskId ? n.taskId : undefined,
     children: Array.isArray(n.children) ? n.children.map(normaliseNode) : [],
     attachedWidgetIds: Array.isArray(n.attachedWidgetIds)
       ? n.attachedWidgetIds.filter((x): x is string => typeof x === 'string')

@@ -1,4 +1,4 @@
-# FocusBuddy — Market-Readiness Roadmap
+# Archeon — Market-Readiness Roadmap
 
 **From:** 38/100 (not shippable as a paid product) · **To:** an elite, market-ready "next big thing"
 **Companion to:** [SYSTEM-REVIEW-2026-06](./SYSTEM-REVIEW-2026-06.md) · [BROWSER-ADR-001](./BROWSER-ADR-001-in-canvas-browser.md)
@@ -15,7 +15,7 @@ You cannot make a product elite before it is safe to trust, and you cannot sell 
   Wave 1  ▢ SAFE       Close the RCE/injection holes · sign+notarize · durable data · vault re-key
   Wave 2  ▢ SELLABLE   Server-enforced gating · metered hosted-AI wedge · in-app billing
   Wave 3  ▢ ELITE      Browser phases 2-4 · fix+harden AI · canvas nav+undo · perf · onboarding
-  Wave 4  ▢ MOAT       ADHD insight loop · native browser + vetted extensions
+  Wave 4  ▢ MOAT       canvas + flow insight loop · native browser + vetted extensions
 ```
 
 > **Cut-line for "can charge money safely":** end of Wave 2. Everything before it is non-negotiable for a paid launch; Wave 3-4 is what makes it *win*.
@@ -120,12 +120,12 @@ Six fixes, implemented and verified GREEN (`haptyx-tester`: 66/66 unit + 18/18 e
 
 ## Wave 4 — Make it the NEXT BIG THING  *(the moat; ~6-8 weeks)*
 
-### 12. Deepen the ADHD moat  · `L (3-4w)`
-- Resurrect the **captured-but-unused** engagement/energy data into a **post-session insight loop** ("here's when your brain actually showed up") and a **"what should I do right now given my state"** suggestion. The data and math already exist in the DB — the loop is just never closed.
-- **Adaptive personalization**: learn each user's focus-run / drift cadence instead of hard-coded 90/5/3-min constants.
-- Reliability primitives for peer body-double (scheduled slots, no-show handling, post-session reflection) to match Focusmate/Flow Club.
-- Coachmarks for the moat features; tests for the engagement/drift/guardian logic.
-- *This is the durable differentiation that makes FocusBuddy more than another canvas tool — but it only pays off once the product is safe (W1), sellable (W2), and discoverable (W3).*
+### 12. Deepen the canvas and flow moat  · `L (3-4w)`
+- Resurrect the **captured-but-unused** engagement and energy data into a **post-session insight loop** ("here is when you were actually in flow") and a **"what should I work on right now given my state"** suggestion. The data and math already exist in the DB; the loop is just never closed.
+- **Adaptive personalization**: learn each user's focus-run and drift cadence instead of hard-coded 90/5/3-min constants.
+- Reliability primitives for **working alongside others** on a shared surface (scheduled slots, no-show handling, post-session reflection) so shared focus is dependable.
+- Coachmarks for the moat features; tests for the engagement, drift, and flow-protection logic.
+- *This is the durable differentiation that makes Archeon more than another canvas tool, but it only pays off once the product is safe (W1), sellable (W2), and discoverable (W3).*
 
 ### 13. Native browser + extensions (Browser Phase 3-4)  · already scheduled in Wave 3/ADR.
 
