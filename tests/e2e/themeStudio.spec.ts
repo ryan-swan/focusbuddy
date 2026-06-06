@@ -62,3 +62,58 @@ test('theme studio switches the UI font and sets a custom accent live', async ()
   expect(persisted.accent).toBe('custom')
   expect(persisted.custom).toBe('#0ea5e9')
 })
+
+test('theme studio deep customisation drives background, glass and icon vars', async () => {
+  launched = await launchApp()
+  const { window } = launched
+  await waitForReady(window)
+
+  await window.getByRole('button', { name: 'Appearance settings' }).click()
+  await window.locator('[data-testid="open-theme-studio"]').click()
+  await expect(window.locator('[data-testid="theme-builder"]')).toBeVisible()
+
+  // Gradient background → root gets data-desk-bg + a linear-gradient image var.
+  await window.locator('[data-testid="themestudio-bg-gradient"]').click()
+  await window.waitForTimeout(150)
+  const bg = await window.evaluate(() => {
+    const root = document.documentElement
+    return {
+      attr: root.getAttribute('data-desk-bg'),
+      image: root.style.getPropertyValue('--fb-desk-bg')
+    }
+  })
+  expect(bg.attr).toBe('1')
+  expect(bg.image).toContain('linear-gradient')
+
+  // Glass blur slider drives the shared scale variable.
+  await window.locator('[data-testid="themestudio-glass-blur"]').fill('150')
+  await window.waitForTimeout(120)
+  const blurScale = await window.evaluate(() =>
+    document.documentElement.style.getPropertyValue('--fb-glass-blur-scale').trim()
+  )
+  expect(parseFloat(blurScale)).toBeCloseTo(1.5, 1)
+
+  // Icon weight + outlined style drive the global icon vars.
+  await window.locator('[data-testid="themestudio-icon-weight-700"]').click()
+  await window.locator('[data-testid="themestudio-icon-fill-outlined"]').click()
+  await window.waitForTimeout(120)
+  const icon = await window.evaluate(() => {
+    const root = document.documentElement
+    return {
+      wght: root.style.getPropertyValue('--fb-icon-wght').trim(),
+      fill: root.style.getPropertyValue('--fb-icon-fill').trim()
+    }
+  })
+  expect(icon.wght).toBe('700')
+  expect(icon.fill).toBe('0')
+
+  // Reset clears the custom background entirely.
+  await window.locator('[data-testid="themestudio-reset"]').click()
+  await window.waitForTimeout(150)
+  const afterReset = await window.evaluate(() => ({
+    attr: document.documentElement.getAttribute('data-desk-bg'),
+    fill: document.documentElement.style.getPropertyValue('--fb-icon-fill').trim()
+  }))
+  expect(afterReset.attr).toBeNull()
+  expect(afterReset.fill).toBe('1')
+})

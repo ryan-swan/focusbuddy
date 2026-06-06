@@ -4,6 +4,7 @@ import {
   THEME_OPTIONS,
   type AccentColor,
   type FontChoice,
+  type ThemeCustomization,
   type ThemeMode
 } from '../lib/theme'
 import ThemeBuilder from './ThemeBuilder'
@@ -34,10 +35,13 @@ interface Props {
   accent: AccentColor
   font: FontChoice
   customAccentHex: string
+  customization: ThemeCustomization
   onModeChange: (m: ThemeMode) => void
   onAccentChange: (a: AccentColor) => void
   onFontChange: (f: FontChoice) => void
   onCustomAccentChange: (hex: string) => void
+  onCustomizationChange: (patch: Partial<ThemeCustomization>) => void
+  onResetCustomization: () => void
   onClose: () => void
   anchorX: number
   anchorY: number
@@ -48,10 +52,13 @@ export default function SettingsPanel({
   accent,
   font,
   customAccentHex,
+  customization,
   onModeChange,
   onAccentChange,
   onFontChange,
   onCustomAccentChange,
+  onCustomizationChange,
+  onResetCustomization,
   onClose,
   anchorX,
   anchorY
@@ -588,10 +595,13 @@ export default function SettingsPanel({
           accent={accent}
           font={font}
           customAccentHex={customAccentHex}
+          customization={customization}
           onModeChange={onModeChange}
           onAccentChange={onAccentChange}
           onFontChange={onFontChange}
           onCustomAccentChange={onCustomAccentChange}
+          onCustomizationChange={onCustomizationChange}
+          onResetCustomization={onResetCustomization}
           onClose={() => setStudioOpen(false)}
         />
       )}
