@@ -40,7 +40,8 @@ import type {
   SharedItem,
   ShareScope,
   WidgetLink,
-  WidgetPatch
+  WidgetPatch,
+  WireType
 } from '@shared/types'
 import type {
   FbFile,
@@ -85,11 +86,29 @@ const api = {
     create: (
       sourceWidgetId: string,
       targetWidgetId: string,
-      taskId: string
+      taskId: string,
+      type?: WireType
     ): Promise<WidgetLink | null> =>
-      ipcRenderer.invoke('widgetLinks:create', sourceWidgetId, targetWidgetId, taskId),
+      ipcRenderer.invoke('widgetLinks:create', sourceWidgetId, targetWidgetId, taskId, type),
+    update: (
+      id: string,
+      patch: { type?: WireType; verb?: string; enabled?: boolean }
+    ): Promise<WidgetLink | null> => ipcRenderer.invoke('widgetLinks:update', id, patch),
     delete: (id: string): Promise<boolean> =>
       ipcRenderer.invoke('widgetLinks:delete', id)
+  },
+  wires: {
+    runTransform: (
+      sourceId: string,
+      targetId: string,
+      verb: string
+    ): Promise<{
+      ok: boolean
+      result?: string
+      skipped?: boolean
+      needsApiKey?: boolean
+      error?: string
+    }> => ipcRenderer.invoke('wires:runTransform', sourceId, targetId, verb)
   },
   shares: {
     listAll: (): Promise<ShareLink[]> => ipcRenderer.invoke('shares:listAll'),

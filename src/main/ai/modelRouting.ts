@@ -19,7 +19,11 @@ const AUTO_ROUTING: Record<AIPurpose, string> = {
   // Living pages: cheap synthesis that re-runs on every meaningful canvas
   // change. Haiku is right unless the user explicitly opts into a stronger
   // model via global model-mode override.
-  living_page: HAIKU
+  living_page: HAIKU,
+  // Transform wires fire reactively whenever a wired source changes, so they
+  // must be cheap by default. Haiku handles "summarize / extract / rewrite"
+  // verbs well; the global model-mode override still applies.
+  wire_transform: HAIKU
 }
 
 let currentMode: ModelMode = 'auto'

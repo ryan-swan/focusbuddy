@@ -27,10 +27,17 @@ import {
   bringToFront,
   createWidget,
   deleteWidget,
+  getWidget,
   listWidgetsByTask,
   updateWidget
 } from '../db/widgets'
-import { createLink, deleteLink, listLinksByTask } from '../db/widgetLinks'
+import {
+  createLink,
+  deleteLink,
+  listLinksByTask,
+  updateLink,
+  type WireUpdate
+} from '../db/widgetLinks'
 import {
   clearSession,
   loadAccountState,
@@ -191,6 +198,7 @@ import {
   generateResume,
   proposeSmartStacks,
   regenerateLivingPage,
+  runTransformWire,
   sendChat,
   suggestPageContent,
   suggestSetupWidgets,
@@ -213,7 +221,8 @@ import type {
   VaultEntryDraft,
   VaultEntryPatch,
   WidgetDraft,
-  WidgetPatch
+  WidgetPatch,
+  WireType
 } from '@shared/types'
 
 export function registerIpcHandlers(): void {
@@ -373,10 +382,29 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle(
     'widgetLinks:create',
-    (_e, sourceWidgetId: string, targetWidgetId: string, taskId: string) =>
-      createLink(sourceWidgetId, targetWidgetId, taskId)
+    (_e, sourceWidgetId: string, targetWidgetId: string, taskId: string, type?: WireType) =>
+      createLink(sourceWidgetId, targetWidgetId, taskId, type ?? 'context')
+  )
+  ipcMain.handle('widgetLinks:update', (_e, id: string, patch: WireUpdate) =>
+    updateLink(id, patch)
   )
   ipcMain.handle('widgetLinks:delete', (_e, id: string) => deleteLink(id))
+
+  // Live wires: run a transform wire. Reads the source + target content in
+  // main (avoids shipping large documents over IPC twice) and returns the
+  // plain-text result for the renderer to write into the target.
+  ipcMain.handle('wires:runTransform', async (_e, sourceId: string, targetId: string, verb: string) => {
+    const source = getWidget(sourceId)
+    const target = getWidget(targetId)
+    if (!source || !target) {
+      return { ok: false, error: 'A wired widget no longer exists.' }
+    }
+    return runTransformWire({
+      sourceContent: source.content ?? '',
+      verb,
+      targetCurrentContent: target.content ?? ''
+    })
+  })
 
   ipcMain.handle('templates:list', () => listTemplates())
   ipcMain.handle(

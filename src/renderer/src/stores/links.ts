@@ -13,6 +13,11 @@ interface LinksStore {
   // Create a directed link from source → target. Returns the created link
   // (or the existing one if a same-direction duplicate is rejected).
   create: (sourceId: string, targetId: string, taskId: string) => Promise<WidgetLink | null>
+  // Update a wire's live-wire fields (type / verb / enabled). Optimistic.
+  update: (
+    id: string,
+    patch: { type?: WidgetLink['type']; verb?: string; enabled?: boolean }
+  ) => Promise<void>
   remove: (id: string) => Promise<void>
   // Drop every link that references a widget id — called when a widget is
   // deleted. The DB cascade handles the persistence side; this just keeps
@@ -44,6 +49,16 @@ export const useLinksStore = create<LinksStore>((set, get) => ({
     if (get().links.some((l) => l.id === created.id)) return created
     set({ links: [...get().links, created] })
     return created
+  },
+  update: async (id, patch) => {
+    // Optimistic — apply locally so the wire's badge / style updates at once.
+    set({
+      links: get().links.map((l) => (l.id === id ? { ...l, ...patch } : l))
+    })
+    const updated = await window.api.widgetLinks.update(id, patch)
+    if (updated) {
+      set({ links: get().links.map((l) => (l.id === id ? updated : l)) })
+    }
   },
   remove: async (id) => {
     // Optimistic — remove locally first so the line disappears immediately.
