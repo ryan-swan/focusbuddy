@@ -71,3 +71,32 @@ export function subscribeOrigins(fn: () => void): () => void {
   listeners.add(fn)
   return () => listeners.delete(fn)
 }
+
+// ── Starting-kit dismissal (Phase 2) ────────────────────────────────────────
+// Remember which node-canvases the user has dismissed the "starting kit" on, so
+// it doesn't re-offer every time they open an still-empty node.
+const DISMISS_KEY = 'fb.mindmap.kitDismissed'
+
+export function isKitDismissed(taskId: string | null): boolean {
+  if (!taskId) return false
+  try {
+    const raw = localStorage.getItem(DISMISS_KEY)
+    const arr = raw ? (JSON.parse(raw) as string[]) : []
+    return Array.isArray(arr) && arr.includes(taskId)
+  } catch {
+    return false
+  }
+}
+
+export function dismissKit(taskId: string): void {
+  try {
+    const raw = localStorage.getItem(DISMISS_KEY)
+    const arr = raw ? (JSON.parse(raw) as string[]) : []
+    if (Array.isArray(arr) && !arr.includes(taskId)) {
+      arr.push(taskId)
+      localStorage.setItem(DISMISS_KEY, JSON.stringify(arr))
+    }
+  } catch {
+    // non-fatal
+  }
+}
