@@ -69,6 +69,37 @@ function localMap(tier: TierId): Record<string, CapabilityValue> {
   return out
 }
 
+// ── Dev-only tier override ───────────────────────────────────────────────
+// Testing the Pro/Team surface normally requires being logged in against the
+// dev signal so the server resolves your tier. That coupling is a constant
+// papercut while iterating locally (a stale session token silently drops you
+// to free and every Pro widget locks). This escape hatch lets a DEV build
+// force a tier from the Settings → Developer toggle, resolved entirely from
+// the local capability snapshot with no network. It is gated on
+// `import.meta.env.DEV`, so it cannot affect a packaged production build.
+const DEV_TIER_KEY = 'fb.dev.forceTier'
+
+export function readDevForcedTier(): TierId | null {
+  if (!import.meta.env.DEV) return null
+  try {
+    const v = localStorage.getItem(DEV_TIER_KEY)
+    return v === 'free' || v === 'pro' || v === 'team' ? v : null
+  } catch {
+    return null
+  }
+}
+
+/** Set (or clear, with null) the dev tier override and re-resolve capabilities. */
+export function setDevForcedTier(tier: TierId | null): void {
+  try {
+    if (tier) localStorage.setItem(DEV_TIER_KEY, tier)
+    else localStorage.removeItem(DEV_TIER_KEY)
+  } catch {
+    /* localStorage unavailable — nothing to persist */
+  }
+  void useCapabilityStore.getState().refresh()
+}
+
 export const useCapabilityStore = create<CapabilityStore>((set, get) => ({
   tier: 'free',
   effectiveTier: 'free',
@@ -78,6 +109,20 @@ export const useCapabilityStore = create<CapabilityStore>((set, get) => ({
   loadedAt: null,
   error: null,
   refresh: async () => {
+    // Dev override wins over everything (login state, network). DEV-only.
+    const forced = readDevForcedTier()
+    if (forced) {
+      set({
+        tier: forced,
+        effectiveTier: forced,
+        storedTier: forced,
+        trial: DEFAULT_TRIAL,
+        capabilities: localMap(forced),
+        loadedAt: Date.now(),
+        error: null
+      })
+      return
+    }
     const token = useAccountStore.getState().sessionToken
     if (!token) {
       set({
