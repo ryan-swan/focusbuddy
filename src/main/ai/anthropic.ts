@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { getNode } from '../db/nodes'
 import { getWidget, listWidgetsByTask } from '../db/widgets'
+import { listLinksByTask } from '../db/widgetLinks'
 import { getTable } from '../db/tables'
 import { getRecentHistory } from '../db/browsing'
 import { getRecentActivity } from '../db/activity'
@@ -205,10 +206,28 @@ function summarizeWidgets(widgets: Widget[]): string {
   return lines.join('\n')
 }
 
+// Compact "related & linked items" context: the widget-link graph for the task,
+// so the assistant can act on linked widgets ("update the note linked to this
+// browser"). Uses the same ids that appear in summarizeWidgets. Capped.
+function summarizeLinks(taskId: string, widgets: Widget[]): string {
+  const links = listLinksByTask(taskId)
+  if (links.length === 0) return ''
+  const MAX_LINKS = 20
+  const idToKind = new Map(widgets.map((w) => [w.id, w.kind]))
+  const lines = links.slice(0, MAX_LINKS).map((lk) => {
+    const srcKind = idToKind.get(lk.sourceWidgetId) ?? '?'
+    const tgtKind = idToKind.get(lk.targetWidgetId) ?? '?'
+    return `  ${lk.sourceWidgetId}(${srcKind}) → ${lk.targetWidgetId}(${tgtKind})`
+  })
+  if (links.length > MAX_LINKS) lines.push(`  (+${links.length - MAX_LINKS} more links)`)
+  return 'Links between widgets (related items):\n' + lines.join('\n')
+}
+
 function taskBlock(taskId: string): string {
   const node = getNode(taskId)
   if (!node || node.kind !== 'task') return ''
   const widgets = listWidgetsByTask(taskId)
+  const linksSummary = summarizeLinks(taskId, widgets)
   const lines = [
     `Task: ${node.title}`,
     node.description ? `Notes: ${node.description}` : '',
@@ -219,7 +238,8 @@ function taskBlock(taskId: string): string {
       : '',
     '',
     'Widgets on the desk:',
-    summarizeWidgets(widgets)
+    summarizeWidgets(widgets),
+    linksSummary || ''
   ].filter(Boolean)
   return lines.join('\n')
 }
