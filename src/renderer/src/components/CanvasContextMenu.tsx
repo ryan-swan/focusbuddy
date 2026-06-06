@@ -78,31 +78,69 @@ export default function CanvasContextMenu({ x, y, items, onClose }: Props): JSX.
 
 function MenuItem({ item, onSelect }: { item: CtxMenuItem; onSelect: () => void }): JSX.Element {
   const [open, setOpen] = useState(false)
+  const rowRef = useRef<HTMLDivElement | null>(null)
   const subRef = useRef<HTMLDivElement | null>(null)
-  const [flipLeft, setFlipLeft] = useState(false)
+  const closeTimer = useRef<number | null>(null)
+  const [subPos, setSubPos] = useState<{ left: number; top: number } | null>(null)
 
-  // When the submenu opens, flip it to the LEFT of its parent if opening to the
-  // right would run off the viewport (right-click near the right edge). The
-  // submenu is also height-capped + scrollable so a long catalog list (the
-  // "Add object" menu) never spills below the screen — that was hiding the
-  // lower tiles like Diagram / Scratchpad.
+  // The submenu now lives in a <body> portal (see below), so hovering off the
+  // parent row onto the submenu crosses a DOM gap that would normally fire
+  // mouseleave and close it. A short close delay that either side can cancel
+  // bridges that gap.
+  const cancelClose = (): void => {
+    if (closeTimer.current !== null) {
+      window.clearTimeout(closeTimer.current)
+      closeTimer.current = null
+    }
+  }
+  const scheduleClose = (): void => {
+    cancelClose()
+    closeTimer.current = window.setTimeout(() => setOpen(false), 140)
+  }
+  useEffect(() => cancelClose, [])
+
+  const hasChildren = !!item.children?.length
+
+  // Position the portalled submenu beside its row, flipping left when opening
+  // right would run off-screen and clamping vertically so a long list stays on
+  // screen (it scrolls internally past 70vh).
+  //
+  // Why portal at all: the root menu is `overflow-y-auto` so long catalogs
+  // scroll. But a container with overflow-y set forces overflow-x to clip as
+  // well, which hid any submenu extending sideways out of the parent (the
+  // regression). Portalling each submenu to <body> escapes that clip entirely.
   useLayoutEffect(() => {
-    if (!open || !subRef.current) return
-    const r = subRef.current.getBoundingClientRect()
-    setFlipLeft(r.right > window.innerWidth - 8)
+    if (!open || !rowRef.current) {
+      setSubPos(null)
+      return
+    }
+    const anchor = rowRef.current.getBoundingClientRect()
+    const w = subRef.current?.offsetWidth ?? 200
+    const h = subRef.current?.offsetHeight ?? 0
+    let left = anchor.right - 2
+    if (left + w > window.innerWidth - 8) left = Math.max(8, anchor.left - w + 2)
+    let top = anchor.top - 5
+    if (h && top + h > window.innerHeight - 8) top = Math.max(8, window.innerHeight - h - 8)
+    setSubPos({ left, top })
   }, [open])
 
   if (item.separator) {
     return <div className="my-1 h-px bg-stone-200 dark:bg-stone-700" />
   }
 
-  const hasChildren = !!item.children?.length
-
   return (
     <div
+      ref={rowRef}
       className="relative"
-      onMouseEnter={() => hasChildren && setOpen(true)}
-      onMouseLeave={() => setOpen(false)}
+      onMouseEnter={() => {
+        if (hasChildren) {
+          cancelClose()
+          setOpen(true)
+        }
+      }}
+      onMouseLeave={() => {
+        if (hasChildren) scheduleClose()
+      }}
     >
       <button
         onClick={
@@ -131,19 +169,30 @@ function MenuItem({ item, onSelect }: { item: CtxMenuItem; onSelect: () => void 
           <Icon name="chevron_right" size={14} className="text-stone-500 dark:text-stone-400" />
         )}
       </button>
-      {hasChildren && open && (
-        <div
-          ref={subRef}
-          data-canvas-ctx-menu
-          className={`absolute top-0 -mt-1 bg-white dark:bg-stone-800 rounded-md shadow-2xl border border-stone-200 dark:border-stone-700 py-1 min-w-[190px] max-h-[70vh] overflow-y-auto ${
-            flipLeft ? 'right-full mr-0.5' : 'left-full ml-0.5'
-          }`}
-        >
-          {item.children?.map((c, i) => (
-            <MenuItem key={i} item={c} onSelect={onSelect} />
-          ))}
-        </div>
-      )}
+      {hasChildren &&
+        open &&
+        createPortal(
+          <div
+            ref={subRef}
+            data-canvas-ctx-menu
+            onMouseEnter={cancelClose}
+            onMouseLeave={scheduleClose}
+            onContextMenu={(e) => e.preventDefault()}
+            className="fixed z-[270] bg-white dark:bg-stone-800 rounded-md shadow-2xl border border-stone-200 dark:border-stone-700 py-1 min-w-[190px] max-h-[70vh] overflow-y-auto text-sm"
+            style={{
+              left: subPos?.left ?? -9999,
+              top: subPos?.top ?? -9999,
+              // Hidden for the first (unmeasured) frame; useLayoutEffect sets the
+              // real position before the browser paints, so there's no flash.
+              visibility: subPos ? 'visible' : 'hidden'
+            }}
+          >
+            {item.children?.map((c, i) => (
+              <MenuItem key={i} item={c} onSelect={onSelect} />
+            ))}
+          </div>,
+          document.body
+        )}
     </div>
   )
 }
