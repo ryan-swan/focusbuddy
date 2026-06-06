@@ -29,7 +29,7 @@ import { useTemplateStore } from './stores/templates'
 import { useVaultStore } from './stores/vault'
 import { useAccountStore } from './stores/account'
 import { installInboxPoller } from './lib/inboxPoller'
-import { applyFont, applyTheme, loadTheme, useTheme } from './lib/theme'
+import { applyCustomization, applyFont, applyTheme, loadCustomization, loadTheme, useTheme } from './lib/theme'
 import { typingClick } from './lib/audioBeep'
 import { setActiveWidgetForSound } from './lib/soundPrefs'
 import { useWidgetStore } from './stores/widgets'
@@ -46,6 +46,7 @@ import './lib/hyperfocusGuardian' // side-effect: tracks continuous focus runs t
 const _bootTheme = loadTheme()
 applyTheme(_bootTheme.mode, _bootTheme.accent, _bootTheme.customAccentHex)
 applyFont(_bootTheme.font)
+applyCustomization(loadCustomization())
 
 export default function App(): JSX.Element {
   const refresh = useNodeStore((s) => s.refresh)
@@ -388,10 +389,13 @@ export default function App(): JSX.Element {
           accent={theme.accent}
           font={theme.font}
           customAccentHex={theme.customAccentHex}
+          customization={theme.customization}
           onModeChange={theme.setMode}
           onAccentChange={theme.setAccent}
           onFontChange={theme.setFont}
           onCustomAccentChange={theme.setCustomAccent}
+          onCustomizationChange={theme.setCustomization}
+          onResetCustomization={theme.resetCustomization}
           onClose={() => setSettingsOpen(null)}
           anchorX={settingsOpen.x}
           anchorY={settingsOpen.y}

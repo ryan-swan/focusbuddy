@@ -91,6 +91,18 @@ body {
       auto,
       18px 18px;
   }
+  /* Theme studio custom canvas background. When the user picks one, the root
+     gets data-desk-bg and --fb-desk-bg / --fb-desk-bg-color carry a solid
+     colour or a gradient. Specificity (0,2,1) beats the .dark / .futuristic
+     paper rules (0,2,0) so it wins in every base theme. The ambient
+     time-of-day ::before still plays softly on top. */
+  html[data-desk-bg] .desk-paper {
+    background-color: var(--fb-desk-bg-color, transparent);
+    background-image: var(--fb-desk-bg, none);
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+  }
   /* `.no-tod` modifier — suppresses ambient overlays (time-of-day ::before AND the
      Futuristic flowing accent-beam ::after) on surfaces where they bleed through
      semi-transparent cards. Only the Canvas keeps these ambient effects. */

@@ -5,7 +5,9 @@ import {
   THEME_OPTIONS,
   isValidHex,
   type AccentColor,
+  type DeskBgMode,
   type FontChoice,
+  type ThemeCustomization,
   type ThemeMode
 } from '../lib/theme'
 import { captureRitualOrigin, playThemeRitual } from '../lib/themeRitual'
@@ -16,12 +18,22 @@ interface Props {
   accent: AccentColor
   font: FontChoice
   customAccentHex: string
+  customization: ThemeCustomization
   onModeChange: (m: ThemeMode) => void
   onAccentChange: (a: AccentColor) => void
   onFontChange: (f: FontChoice) => void
   onCustomAccentChange: (hex: string) => void
+  onCustomizationChange: (patch: Partial<ThemeCustomization>) => void
+  onResetCustomization: () => void
   onClose: () => void
 }
+
+const ICON_WEIGHTS: Array<{ value: number; label: string }> = [
+  { value: 300, label: 'Light' },
+  { value: 400, label: 'Regular' },
+  { value: 500, label: 'Medium' },
+  { value: 700, label: 'Bold' }
+]
 
 // Theme studio — the "make it yours" surface. Everything here is free for every
 // tier; it's about personalisation and legibility, not a paywalled cosmetic.
@@ -33,12 +45,16 @@ export default function ThemeBuilder({
   accent,
   font,
   customAccentHex,
+  customization,
   onModeChange,
   onAccentChange,
   onFontChange,
   onCustomAccentChange,
+  onCustomizationChange,
+  onResetCustomization,
   onClose
 }: Props): JSX.Element {
+  const c = customization
   const ref = useRef<HTMLDivElement | null>(null)
   // Local text mirror of the hex so typing an in-progress value (e.g. "#7c3")
   // doesn't immediately clobber the live colour until it's a valid 6-digit hex.
@@ -85,9 +101,19 @@ export default function ThemeBuilder({
               </div>
             </div>
           </div>
-          <button onClick={onClose} className="icon-btn" aria-label="Close theme studio">
-            <Icon name="close" size={16} />
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={onResetCustomization}
+              className="text-[10px] px-2 py-1 rounded border border-stone-200 dark:border-stone-700 text-stone-500 dark:text-stone-400 hover:bg-stone-100 dark:hover:bg-stone-700"
+              data-testid="themestudio-reset"
+              title="Reset background, glass and icon customisations to default"
+            >
+              Reset
+            </button>
+            <button onClick={onClose} className="icon-btn" aria-label="Close theme studio">
+              <Icon name="close" size={16} />
+            </button>
+          </div>
         </div>
 
         <div className="p-4 space-y-5">
@@ -261,8 +287,273 @@ export default function ThemeBuilder({
               })}
             </div>
           </section>
+
+          {/* Canvas background */}
+          <section>
+            <div className="text-[11px] uppercase tracking-[0.12em] text-stone-500 dark:text-stone-400 font-semibold mb-2">
+              Canvas background
+            </div>
+            <div className="grid grid-cols-3 gap-1.5 mb-2.5">
+              {(
+                [
+                  { value: 'default' as DeskBgMode, label: 'Default', icon: 'texture' },
+                  { value: 'solid' as DeskBgMode, label: 'Solid', icon: 'format_color_fill' },
+                  { value: 'gradient' as DeskBgMode, label: 'Gradient', icon: 'gradient' }
+                ]
+              ).map((o) => (
+                <button
+                  key={o.value}
+                  onClick={() => onCustomizationChange({ deskBgMode: o.value })}
+                  className={`flex flex-col items-center gap-1 py-2 rounded-md border text-[10px] transition-colors ${
+                    c.deskBgMode === o.value
+                      ? 'border-accent bg-accent/10 text-stone-900 dark:text-stone-100'
+                      : 'border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 text-stone-700 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-700'
+                  }`}
+                  data-testid={`themestudio-bg-${o.value}`}
+                >
+                  <Icon
+                    name={o.icon}
+                    size={16}
+                    className={
+                      c.deskBgMode === o.value ? 'text-accent' : 'text-stone-500 dark:text-stone-400'
+                    }
+                  />
+                  <span>{o.label}</span>
+                </button>
+              ))}
+            </div>
+
+            {c.deskBgMode === 'solid' && (
+              <SwatchRow
+                label="Background colour"
+                value={c.deskColor}
+                onChange={(hex) => onCustomizationChange({ deskColor: hex })}
+                testid="themestudio-bg-solid-color"
+              />
+            )}
+
+            {c.deskBgMode === 'gradient' && (
+              <div className="space-y-2.5">
+                <div
+                  className="h-12 rounded-lg border border-stone-200 dark:border-stone-700"
+                  style={{
+                    background: `linear-gradient(${c.gradAngle}deg, ${c.gradFrom}, ${c.gradTo})`
+                  }}
+                  data-testid="themestudio-bg-gradient-preview"
+                />
+                <div className="grid grid-cols-2 gap-2">
+                  <SwatchRow
+                    label="From"
+                    value={c.gradFrom}
+                    onChange={(hex) => onCustomizationChange({ gradFrom: hex })}
+                    testid="themestudio-grad-from"
+                    compact
+                  />
+                  <SwatchRow
+                    label="To"
+                    value={c.gradTo}
+                    onChange={(hex) => onCustomizationChange({ gradTo: hex })}
+                    testid="themestudio-grad-to"
+                    compact
+                  />
+                </div>
+                <SliderRow
+                  label="Angle"
+                  value={c.gradAngle}
+                  min={0}
+                  max={360}
+                  step={5}
+                  suffix="°"
+                  onChange={(v) => onCustomizationChange({ gradAngle: v })}
+                  testid="themestudio-grad-angle"
+                />
+              </div>
+            )}
+          </section>
+
+          {/* Glass & depth */}
+          <section>
+            <div className="text-[11px] uppercase tracking-[0.12em] text-stone-500 dark:text-stone-400 font-semibold mb-2">
+              Glass &amp; depth
+            </div>
+            <p className="text-[10px] text-stone-500 dark:text-stone-400 mb-2 leading-snug">
+              Tunes the frosted-glass blur and translucency on the sidebar, toolbar, popovers
+              and dialogs all at once.
+            </p>
+            <SliderRow
+              label="Blur"
+              value={Math.round(c.glassBlur * 100)}
+              min={0}
+              max={200}
+              step={5}
+              suffix="%"
+              onChange={(v) => onCustomizationChange({ glassBlur: v / 100 })}
+              testid="themestudio-glass-blur"
+            />
+            <SliderRow
+              label="Translucency"
+              value={Math.round(c.glassOpacity * 100)}
+              min={40}
+              max={130}
+              step={5}
+              suffix="%"
+              onChange={(v) => onCustomizationChange({ glassOpacity: v / 100 })}
+              testid="themestudio-glass-opacity"
+            />
+          </section>
+
+          {/* Icons */}
+          <section>
+            <div className="text-[11px] uppercase tracking-[0.12em] text-stone-500 dark:text-stone-400 font-semibold mb-2">
+              Icons
+            </div>
+            <div className="flex items-center gap-2 mb-2.5">
+              <span className="text-[11px] text-stone-600 dark:text-stone-400 w-14 shrink-0">
+                Weight
+              </span>
+              <div className="grid grid-cols-4 gap-1 flex-1">
+                {ICON_WEIGHTS.map((w) => (
+                  <button
+                    key={w.value}
+                    onClick={() => onCustomizationChange({ iconWeight: w.value })}
+                    className={`py-1 rounded text-[10px] border transition-colors ${
+                      c.iconWeight === w.value
+                        ? 'border-accent bg-accent/10 text-stone-900 dark:text-stone-100'
+                        : 'border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 text-stone-600 dark:text-stone-400 hover:bg-stone-100 dark:hover:bg-stone-700'
+                    }`}
+                    data-testid={`themestudio-icon-weight-${w.value}`}
+                  >
+                    {w.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] text-stone-600 dark:text-stone-400 w-14 shrink-0">
+                Style
+              </span>
+              <div className="grid grid-cols-2 gap-1 flex-1">
+                {(
+                  [
+                    { val: true, label: 'Filled' },
+                    { val: false, label: 'Outlined' }
+                  ]
+                ).map((o) => (
+                  <button
+                    key={String(o.val)}
+                    onClick={() => onCustomizationChange({ iconFilled: o.val })}
+                    className={`py-1 rounded text-[10px] border transition-colors ${
+                      c.iconFilled === o.val
+                        ? 'border-accent bg-accent/10 text-stone-900 dark:text-stone-100'
+                        : 'border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 text-stone-600 dark:text-stone-400 hover:bg-stone-100 dark:hover:bg-stone-700'
+                    }`}
+                    data-testid={`themestudio-icon-fill-${o.val ? 'filled' : 'outlined'}`}
+                  >
+                    {o.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {/* Live sample — these icons pass no explicit weight/fill, so they
+                reflect the global choice immediately. */}
+            <div className="flex items-center gap-4 mt-3 px-1 text-stone-600 dark:text-stone-300">
+              {['home', 'folder', 'settings', 'favorite', 'bolt', 'check_circle'].map((n) => (
+                <Icon key={n} name={n} size={22} />
+              ))}
+            </div>
+          </section>
         </div>
       </div>
+    </div>
+  )
+}
+
+// A colour swatch + hex field row used by the background pickers.
+function SwatchRow({
+  label,
+  value,
+  onChange,
+  testid,
+  compact
+}: {
+  label: string
+  value: string
+  onChange: (hex: string) => void
+  testid: string
+  compact?: boolean
+}): JSX.Element {
+  return (
+    <div className="flex items-center gap-2.5 rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 p-2">
+      <label
+        className="relative h-8 w-8 rounded-md overflow-hidden border border-stone-300 dark:border-stone-600 cursor-pointer shrink-0"
+        title={label}
+      >
+        <span className="absolute inset-0" style={{ backgroundColor: value }} />
+        <input
+          type="color"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className="absolute inset-0 opacity-0 cursor-pointer"
+          data-testid={`${testid}-picker`}
+          aria-label={label}
+        />
+      </label>
+      <div className="min-w-0 flex-1">
+        <div className="text-[11px] text-stone-600 dark:text-stone-400">{label}</div>
+        {!compact && (
+          <input
+            type="text"
+            value={value}
+            spellCheck={false}
+            onChange={(e) => onChange(e.target.value)}
+            className="mt-0.5 w-24 px-1.5 py-0.5 rounded bg-stone-100 dark:bg-stone-900 border border-stone-200 dark:border-stone-700 text-[11px] font-mono text-stone-700 dark:text-stone-300 focus:outline-none focus:border-accent"
+            data-testid={`${testid}-hex`}
+          />
+        )}
+      </div>
+    </div>
+  )
+}
+
+// A labelled range slider with a live numeric read-out.
+function SliderRow({
+  label,
+  value,
+  min,
+  max,
+  step,
+  suffix,
+  onChange,
+  testid
+}: {
+  label: string
+  value: number
+  min: number
+  max: number
+  step: number
+  suffix?: string
+  onChange: (v: number) => void
+  testid: string
+}): JSX.Element {
+  return (
+    <div className="py-1">
+      <div className="flex items-center justify-between mb-1">
+        <span className="text-[11px] text-stone-600 dark:text-stone-400">{label}</span>
+        <span className="text-[10px] font-mono text-stone-500 dark:text-stone-400">
+          {value}
+          {suffix ?? ''}
+        </span>
+      </div>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        className="w-full h-1 accent-accent cursor-pointer"
+        data-testid={testid}
+      />
     </div>
   )
 }

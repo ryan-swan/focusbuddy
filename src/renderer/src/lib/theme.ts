@@ -135,6 +135,92 @@ export function isValidHex(hex: string): boolean {
   return hexToRgb(hex) !== null
 }
 
+// ── Deep customisation (background, glass, icons) ─────────────────────────
+// Everything here is free for every tier. It writes CSS variables + a couple
+// of root attributes that the token sheet and Icon component consume; at the
+// default values it's a no-op, so an uncustomised UI is byte-for-byte the
+// stock look.
+export type DeskBgMode = 'default' | 'solid' | 'gradient'
+
+export interface ThemeCustomization {
+  deskBgMode: DeskBgMode
+  deskColor: string
+  gradFrom: string
+  gradTo: string
+  gradAngle: number
+  // Multipliers over the stock glass tokens. 1 = stock.
+  glassBlur: number
+  glassOpacity: number
+  iconWeight: number
+  iconFilled: boolean
+}
+
+export const DEFAULT_CUSTOMIZATION: ThemeCustomization = {
+  deskBgMode: 'default',
+  deskColor: '#fbf7ee',
+  gradFrom: '#7c3aed',
+  gradTo: '#0ea5e9',
+  gradAngle: 135,
+  glassBlur: 1,
+  glassOpacity: 1,
+  iconWeight: 500,
+  iconFilled: true
+}
+
+const KEY_CUSTOMIZE = 'fb.theme.customize'
+
+export function applyCustomization(c: ThemeCustomization): void {
+  if (typeof document === 'undefined') return
+  const root = document.documentElement
+
+  // Canvas background.
+  if (c.deskBgMode === 'default') {
+    root.removeAttribute('data-desk-bg')
+    root.style.removeProperty('--fb-desk-bg')
+    root.style.removeProperty('--fb-desk-bg-color')
+  } else if (c.deskBgMode === 'solid') {
+    root.setAttribute('data-desk-bg', '1')
+    root.style.setProperty('--fb-desk-bg', 'none')
+    root.style.setProperty('--fb-desk-bg-color', c.deskColor)
+  } else {
+    root.setAttribute('data-desk-bg', '1')
+    root.style.setProperty(
+      '--fb-desk-bg',
+      `linear-gradient(${c.gradAngle}deg, ${c.gradFrom}, ${c.gradTo})`
+    )
+    root.style.setProperty('--fb-desk-bg-color', 'transparent')
+  }
+
+  // Glass — translucency + blur scale across all three tiers at once.
+  root.style.setProperty('--fb-glass-blur-scale', String(c.glassBlur))
+  root.style.setProperty('--fb-glass-opacity-scale', String(c.glassOpacity))
+
+  // Icons — global default weight + fill (per-instance explicit values win).
+  root.style.setProperty('--fb-icon-wght', String(c.iconWeight))
+  root.style.setProperty('--fb-icon-fill', c.iconFilled ? '1' : '0')
+}
+
+export function loadCustomization(): ThemeCustomization {
+  if (typeof localStorage === 'undefined') return { ...DEFAULT_CUSTOMIZATION }
+  try {
+    const raw = localStorage.getItem(KEY_CUSTOMIZE)
+    if (!raw) return { ...DEFAULT_CUSTOMIZATION }
+    const parsed = JSON.parse(raw) as Partial<ThemeCustomization>
+    return { ...DEFAULT_CUSTOMIZATION, ...parsed }
+  } catch {
+    return { ...DEFAULT_CUSTOMIZATION }
+  }
+}
+
+export function saveCustomization(c: ThemeCustomization): void {
+  if (typeof localStorage === 'undefined') return
+  try {
+    localStorage.setItem(KEY_CUSTOMIZE, JSON.stringify(c))
+  } catch {
+    /* storage unavailable */
+  }
+}
+
 export const THEME_OPTIONS: Array<{ value: ThemeMode; label: string; icon: string }> = [
   { value: 'light', label: 'Light', icon: 'light_mode' },
   { value: 'dark', label: 'Dark', icon: 'dark_mode' },
@@ -234,12 +320,16 @@ export interface ThemeApi {
   accent: AccentColor
   font: FontChoice
   customAccentHex: string
+  customization: ThemeCustomization
   setMode: (m: ThemeMode) => void
   setAccent: (a: AccentColor) => void
   setFont: (f: FontChoice) => void
   // Set the custom accent hex AND switch the active accent to 'custom' so the
   // picker is live the moment the user touches the colour.
   setCustomAccent: (hex: string) => void
+  // Merge a partial into the deep-customisation state; applies + persists live.
+  setCustomization: (patch: Partial<ThemeCustomization>) => void
+  resetCustomization: () => void
 }
 
 export function useTheme(): ThemeApi {
@@ -248,6 +338,9 @@ export function useTheme(): ThemeApi {
   const [accent, setAccentState] = useState<AccentColor>(() => boot.accent)
   const [font, setFontState] = useState<FontChoice>(() => boot.font)
   const [customAccentHex, setCustomAccentHexState] = useState<string>(() => boot.customAccentHex)
+  const [customization, setCustomizationState] = useState<ThemeCustomization>(() =>
+    loadCustomization()
+  )
 
   useEffect(() => {
     applyTheme(mode, accent, customAccentHex)
@@ -257,6 +350,11 @@ export function useTheme(): ThemeApi {
   useEffect(() => {
     applyFont(font)
   }, [font])
+
+  useEffect(() => {
+    applyCustomization(customization)
+    saveCustomization(customization)
+  }, [customization])
 
   useEffect(() => {
     if (mode !== 'auto') return
@@ -278,14 +376,24 @@ export function useTheme(): ThemeApi {
     setAccentState('custom')
   }
 
+  const setCustomization = (patch: Partial<ThemeCustomization>): void => {
+    setCustomizationState((prev) => ({ ...prev, ...patch }))
+  }
+  const resetCustomization = (): void => {
+    setCustomizationState({ ...DEFAULT_CUSTOMIZATION })
+  }
+
   return {
     mode,
     accent,
     font,
     customAccentHex,
+    customization,
     setMode,
     setAccent: setAccentState,
     setFont: setFontState,
-    setCustomAccent
+    setCustomAccent,
+    setCustomization,
+    resetCustomization
   }
 }

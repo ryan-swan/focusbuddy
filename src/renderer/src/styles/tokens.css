@@ -85,17 +85,23 @@
   --dur-cinematic: 720ms;
 
   /* ── Glass surface composition ──────────────────────────────────────────── */
-  /* Three tiers: chrome (sidebar/dock), panel (popovers), pillow (modal cards) */
-  --glass-chrome-fill: oklch(98% 0.003 264 / 0.72);
-  --glass-chrome-blur: saturate(160%) blur(24px);
+  /* Three tiers: chrome (sidebar/dock), panel (popovers), pillow (modal cards).
+     The two scale knobs below let the Theme studio tune translucency + blur
+     across every glass surface at once. At scale 1 the values are identical to
+     the hand-tuned originals, so an uncustomised UI looks exactly as before. */
+  --fb-glass-opacity-scale: 1;
+  --fb-glass-blur-scale: 1;
+
+  --glass-chrome-fill: oklch(98% 0.003 264 / calc(0.72 * var(--fb-glass-opacity-scale)));
+  --glass-chrome-blur: saturate(160%) blur(calc(24px * var(--fb-glass-blur-scale)));
   --glass-chrome-border: oklch(100% 0 0 / 0.4);
 
-  --glass-panel-fill: oklch(99% 0.002 264 / 0.78);
-  --glass-panel-blur: saturate(180%) blur(28px);
+  --glass-panel-fill: oklch(99% 0.002 264 / calc(0.78 * var(--fb-glass-opacity-scale)));
+  --glass-panel-blur: saturate(180%) blur(calc(28px * var(--fb-glass-blur-scale)));
   --glass-panel-border: oklch(100% 0 0 / 0.5);
 
-  --glass-pillow-fill: oklch(100% 0 0 / 0.84);
-  --glass-pillow-blur: saturate(170%) blur(40px);
+  --glass-pillow-fill: oklch(100% 0 0 / calc(0.84 * var(--fb-glass-opacity-scale)));
+  --glass-pillow-blur: saturate(170%) blur(calc(40px * var(--fb-glass-blur-scale)));
   --glass-pillow-border: oklch(100% 0 0 / 0.55);
 
   /* ── Radii — a more deliberate scale ────────────────────────────────────── */
@@ -140,13 +146,13 @@
     0 32px 80px -16px rgb(var(--accent) / 0.10);
   --shadow-inset-highlight: inset 0 1px 0 oklch(100% 0 0 / 0.06);
 
-  --glass-chrome-fill: oklch(20% 0.014 264 / 0.66);
+  --glass-chrome-fill: oklch(20% 0.014 264 / calc(0.66 * var(--fb-glass-opacity-scale)));
   --glass-chrome-border: oklch(100% 0 0 / 0.06);
 
-  --glass-panel-fill: oklch(22% 0.014 264 / 0.72);
+  --glass-panel-fill: oklch(22% 0.014 264 / calc(0.72 * var(--fb-glass-opacity-scale)));
   --glass-panel-border: oklch(100% 0 0 / 0.08);
 
-  --glass-pillow-fill: oklch(24% 0.014 264 / 0.78);
+  --glass-pillow-fill: oklch(24% 0.014 264 / calc(0.78 * var(--fb-glass-opacity-scale)));
   --glass-pillow-border: oklch(100% 0 0 / 0.10);
 }
 
@@ -208,13 +214,13 @@
   --shadow-inset-highlight: inset 0 1px 0 rgb(var(--accent) / 0.12);
 
   /* Glass tiers — warmer fill than .dark, more pronounced gold edge */
-  --glass-chrome-fill: oklch(20% 0.028 250 / 0.72);
+  --glass-chrome-fill: oklch(20% 0.028 250 / calc(0.72 * var(--fb-glass-opacity-scale)));
   --glass-chrome-border: rgb(var(--accent) / 0.10);
 
-  --glass-panel-fill: oklch(22% 0.026 250 / 0.78);
+  --glass-panel-fill: oklch(22% 0.026 250 / calc(0.78 * var(--fb-glass-opacity-scale)));
   --glass-panel-border: rgb(var(--accent) / 0.14);
 
-  --glass-pillow-fill: oklch(24% 0.025 250 / 0.84);
+  --glass-pillow-fill: oklch(24% 0.025 250 / calc(0.84 * var(--fb-glass-opacity-scale)));
   --glass-pillow-border: rgb(var(--accent) / 0.18);
 }
 
