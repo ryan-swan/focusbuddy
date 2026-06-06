@@ -3,8 +3,12 @@ import {
   ACCENT_OPTIONS,
   THEME_OPTIONS,
   type AccentColor,
+  type FontChoice,
   type ThemeMode
 } from '../lib/theme'
+import ThemeBuilder from './ThemeBuilder'
+import { readDevForcedTier, setDevForcedTier } from '../stores/capabilities'
+import type { TierId } from '../lib/capabilityDefaults'
 import { captureRitualOrigin, playThemeRitual } from '../lib/themeRitual'
 import {
   getSoundPrefs,
@@ -28,8 +32,12 @@ import NavigationSection from './settings/NavigationSection'
 interface Props {
   mode: ThemeMode
   accent: AccentColor
+  font: FontChoice
+  customAccentHex: string
   onModeChange: (m: ThemeMode) => void
   onAccentChange: (a: AccentColor) => void
+  onFontChange: (f: FontChoice) => void
+  onCustomAccentChange: (hex: string) => void
   onClose: () => void
   anchorX: number
   anchorY: number
@@ -38,13 +46,19 @@ interface Props {
 export default function SettingsPanel({
   mode,
   accent,
+  font,
+  customAccentHex,
   onModeChange,
   onAccentChange,
+  onFontChange,
+  onCustomAccentChange,
   onClose,
   anchorX,
   anchorY
 }: Props): JSX.Element {
   const ref = useRef<HTMLDivElement | null>(null)
+  const [studioOpen, setStudioOpen] = useState(false)
+  const [devTier, setDevTierState] = useState<TierId | null>(() => readDevForcedTier())
   const [sound, setSound] = useState<SoundPrefs>(() => getSoundPrefs())
   const [modelMode, setModelMode] = useModelMode()
   const [hapticsNative, setHapticsNative] = useState<boolean | null>(null)
@@ -177,6 +191,59 @@ export default function SettingsPanel({
             ))}
           </div>
         </div>
+      </div>
+
+      <div className="px-3 pb-3 -mt-1">
+        <button
+          onClick={() => setStudioOpen(true)}
+          className="w-full flex items-center gap-2 px-2.5 py-2 rounded-md border border-accent/40 bg-accent/[0.06] hover:bg-accent/10 text-stone-800 dark:text-stone-200 transition-colors"
+          data-testid="open-theme-studio"
+        >
+          <Icon name="palette" size={15} className="text-accent" />
+          <div className="flex-1 text-left">
+            <div className="text-xs font-medium">Theme studio…</div>
+            <div className="text-[10px] text-stone-500 dark:text-stone-400">
+              Custom accent colour and accessibility fonts. Free for everyone.
+            </div>
+          </div>
+          <Icon name="chevron_right" size={14} className="text-stone-400" />
+        </button>
+
+        {import.meta.env.DEV && (
+          <div className="mt-2 rounded-md border border-amber-300/60 dark:border-amber-600/40 bg-amber-50/70 dark:bg-amber-950/30 px-2.5 py-2">
+            <div className="flex items-center gap-1.5 mb-1">
+              <Icon name="construction" size={13} className="text-amber-600 dark:text-amber-400" />
+              <span className="text-[10px] uppercase tracking-[0.12em] font-semibold text-amber-700 dark:text-amber-400">
+                Developer
+              </span>
+            </div>
+            <div className="text-[10px] text-stone-600 dark:text-stone-400 mb-1.5 leading-snug">
+              Force a plan tier locally, no login needed. Dev builds only.
+            </div>
+            <div className="grid grid-cols-4 gap-1">
+              {([null, 'free', 'pro', 'team'] as const).map((t) => {
+                const active = devTier === t
+                return (
+                  <button
+                    key={t ?? 'off'}
+                    onClick={() => {
+                      setDevForcedTier(t)
+                      setDevTierState(t)
+                    }}
+                    className={`px-1.5 py-1 rounded text-[10px] capitalize border transition-colors ${
+                      active
+                        ? 'border-accent bg-accent/10 text-stone-900 dark:text-stone-100 font-medium'
+                        : 'border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 text-stone-600 dark:text-stone-400 hover:bg-stone-100 dark:hover:bg-stone-700'
+                    }`}
+                    data-testid={`dev-tier-${t ?? 'off'}`}
+                  >
+                    {t ?? 'Off'}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="px-3 py-3 border-t border-stone-200 dark:border-stone-700 space-y-2">
@@ -514,6 +581,20 @@ export default function SettingsPanel({
       <div className="px-3 py-2 border-t border-stone-200 dark:border-stone-700 bg-stone-100/50 dark:bg-stone-800/50 text-[10px] text-stone-500 dark:text-stone-500">
         Preferences saved locally. Click sounds in browser widgets aren't captured yet — only in stickies, notes, chat, and dialogs.
       </div>
+
+      {studioOpen && (
+        <ThemeBuilder
+          mode={mode}
+          accent={accent}
+          font={font}
+          customAccentHex={customAccentHex}
+          onModeChange={onModeChange}
+          onAccentChange={onAccentChange}
+          onFontChange={onFontChange}
+          onCustomAccentChange={onCustomAccentChange}
+          onClose={() => setStudioOpen(false)}
+        />
+      )}
     </div>
   )
 }

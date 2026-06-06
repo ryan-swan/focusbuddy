@@ -29,7 +29,7 @@ import { useTemplateStore } from './stores/templates'
 import { useVaultStore } from './stores/vault'
 import { useAccountStore } from './stores/account'
 import { installInboxPoller } from './lib/inboxPoller'
-import { applyTheme, loadTheme, useTheme } from './lib/theme'
+import { applyFont, applyTheme, loadTheme, useTheme } from './lib/theme'
 import { typingClick } from './lib/audioBeep'
 import { setActiveWidgetForSound } from './lib/soundPrefs'
 import { useWidgetStore } from './stores/widgets'
@@ -44,7 +44,8 @@ import './lib/hyperfocusGuardian' // side-effect: tracks continuous focus runs t
 
 // Apply theme on script load — before React mounts — to avoid a light flash in dark mode
 const _bootTheme = loadTheme()
-applyTheme(_bootTheme.mode, _bootTheme.accent)
+applyTheme(_bootTheme.mode, _bootTheme.accent, _bootTheme.customAccentHex)
+applyFont(_bootTheme.font)
 
 export default function App(): JSX.Element {
   const refresh = useNodeStore((s) => s.refresh)
@@ -385,8 +386,12 @@ export default function App(): JSX.Element {
         <SettingsPanel
           mode={theme.mode}
           accent={theme.accent}
+          font={theme.font}
+          customAccentHex={theme.customAccentHex}
           onModeChange={theme.setMode}
           onAccentChange={theme.setAccent}
+          onFontChange={theme.setFont}
+          onCustomAccentChange={theme.setCustomAccent}
           onClose={() => setSettingsOpen(null)}
           anchorX={settingsOpen.x}
           anchorY={settingsOpen.y}
