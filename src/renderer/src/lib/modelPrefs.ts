@@ -50,7 +50,8 @@ export const AUTO_ROUTING_DISPLAY: Record<AIPurpose, { model: string; cost: stri
   trail_summary: { model: 'Haiku', cost: '$' },
   body_double: { model: 'Haiku', cost: '$' },
   smart_stack: { model: 'Sonnet', cost: '$$' },
-  living_page: { model: 'Haiku', cost: '$' }
+  living_page: { model: 'Haiku', cost: '$' },
+  wire_transform: { model: 'Haiku', cost: '$' }
 }
 
 function readFromStorage(): ModelMode {

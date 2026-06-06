@@ -263,6 +263,11 @@ export function getDb(): Database.Database {
   // Connected-app linkage: when a Connected App is dragged to the canvas, the
   // resulting webview widget shares that app's session partition + auto-fill binding.
   ensureColumn(db, 'widgets', 'source_app_id', 'TEXT')
+  // Live-wire fields on widget links. Existing links become passive 'context'
+  // wires; type/verb/enabled let a wire become reactive (transform / mirror).
+  ensureColumn(db, 'widget_links', 'type', "TEXT NOT NULL DEFAULT 'context'")
+  ensureColumn(db, 'widget_links', 'verb', "TEXT NOT NULL DEFAULT ''")
+  ensureColumn(db, 'widget_links', 'enabled', 'INTEGER NOT NULL DEFAULT 1')
   // Render mode for local-app-launcher widgets: 'launcher' (icon + click-to-open)
   // vs 'mirror' (punch-through live view of the real native app window). Null for
   // any other widget kind.

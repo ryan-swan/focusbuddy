@@ -217,10 +217,18 @@ function summarizeLinks(taskId: string, widgets: Widget[]): string {
   const lines = links.slice(0, MAX_LINKS).map((lk) => {
     const srcKind = idToKind.get(lk.sourceWidgetId) ?? '?'
     const tgtKind = idToKind.get(lk.targetWidgetId) ?? '?'
-    return `  ${lk.sourceWidgetId}(${srcKind}) → ${lk.targetWidgetId}(${tgtKind})`
+    // Surface the wire type so the assistant understands the relationship, not
+    // just that two widgets are connected. A 'context' wire means "treat the
+    // source as relevant background for the target"; a 'transform' wire names
+    // the live operation; a 'mirror' wire means the two stay content-identical.
+    let rel = 'related to'
+    if (lk.type === 'transform') rel = lk.verb ? `feeds (${lk.verb}) into` : 'transforms into'
+    else if (lk.type === 'mirror') rel = 'mirrors into'
+    else rel = 'is context for'
+    return `  ${lk.sourceWidgetId}(${srcKind}) ${rel} ${lk.targetWidgetId}(${tgtKind})`
   })
   if (links.length > MAX_LINKS) lines.push(`  (+${links.length - MAX_LINKS} more links)`)
-  return 'Links between widgets (related items):\n' + lines.join('\n')
+  return 'Live wires between widgets (typed relationships):\n' + lines.join('\n')
 }
 
 function taskBlock(taskId: string): string {
@@ -1539,6 +1547,88 @@ export async function suggestTableRows(
         ? parsed.columnsToAdd
         : undefined
     }
+  } catch (e) {
+    return { ok: false, error: (e as Error).message }
+  }
+}
+
+// ── Live wires: transform ────────────────────────────────────────────────────
+//
+// A "transform wire" runs a free-text verb over the SOURCE widget's content and
+// returns plain text to write into the TARGET. This deliberately bypasses the
+// ActionProposal JSON envelope — the result is just content, not a proposal —
+// so it is the cheapest, most direct AI path in the app. Routed to Haiku by
+// default (see modelRouting 'wire_transform'). The reactive scheduling, debounce
+// and loop-guard live in the renderer wire engine; this function is a pure,
+// bounded one-shot.
+export interface WireTransformResult {
+  ok: boolean
+  result?: string
+  // True when the model returned nothing usable — the caller should NOT write
+  // an empty string over the target, it should treat this as a no-op.
+  skipped?: boolean
+  needsApiKey?: boolean
+  error?: string
+}
+
+export async function runTransformWire(input: {
+  sourceContent: string
+  verb: string
+  targetCurrentContent: string
+}): Promise<WireTransformResult> {
+  const c = getClient()
+  if (!c) {
+    return {
+      ok: false,
+      needsApiKey: true,
+      error: 'No Anthropic API key set. Open Settings → AI · API keys to paste one.'
+    }
+  }
+
+  const verb = input.verb.trim()
+  if (!verb) return { ok: false, error: 'This transform wire has no instruction yet.' }
+
+  const source = (input.sourceContent || '').slice(0, 8000)
+  if (!source.trim()) return { ok: true, skipped: true }
+
+  const system =
+    'You are a transform step in a no-code pipeline on a visual canvas. ' +
+    'You receive the content of a SOURCE widget and an instruction, and you return the transformed text ' +
+    'that will be written verbatim into a TARGET widget. ' +
+    'Return ONLY the transformed text. No preamble, no labels, no quotes, no explanation, no markdown code fences. ' +
+    'The first character of your reply is the first character of the content. ' +
+    'If the instruction does not apply to this source, return the single token SKIP.'
+
+  const targetNote = input.targetCurrentContent.trim()
+    ? `\n\nFor reference, the target currently contains:\n"""\n${input.targetCurrentContent.slice(0, 1500)}\n"""`
+    : ''
+
+  const user =
+    `Instruction: ${verb}\n\n` +
+    `Source content:\n"""\n${source}\n"""` +
+    targetNote +
+    `\n\nReturn the transformed text for the target now.`
+
+  try {
+    const resp = await c.messages.create({
+      model: resolveModel('wire_transform'),
+      max_tokens: 1024,
+      system,
+      messages: [{ role: 'user', content: user }]
+    })
+    if ((resp.stop_reason as string) === 'refusal') {
+      return { ok: false, error: 'Claude declined this transform.' }
+    }
+    if ((resp.stop_reason as string) === 'model_context_window_exceeded') {
+      return { ok: false, error: 'Source content is too large for this transform.' }
+    }
+    const text = resp.content
+      .filter((b) => b.type === 'text')
+      .map((b) => ('text' in b ? b.text : ''))
+      .join('')
+      .trim()
+    if (!text || text.toUpperCase() === 'SKIP') return { ok: true, skipped: true }
+    return { ok: true, result: text }
   } catch (e) {
     return { ok: false, error: (e as Error).message }
   }

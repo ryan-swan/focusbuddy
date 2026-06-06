@@ -1,8 +1,18 @@
-import { useCallback, useEffect, useState } from 'react'
-import type { WidgetLink } from '@shared/types'
+import { useEffect, useState } from 'react'
+import type { WidgetLink, WireType } from '@shared/types'
 import { useLinksStore } from '../stores/links'
 import { useWidgetStore } from '../stores/widgets'
+import { runWireNow, useWireRunStore } from '../lib/wireEngine'
 import Icon from './Icon'
+
+// Per-wire-type presentation. context is a quiet dashed line; transform is a
+// solid directed line that animates while it runs; mirror is a solid line with
+// a double-chevron feel. The badge icon sits at the wire midpoint.
+const WIRE_META: Record<WireType, { icon: string; label: string; dash: string | undefined }> = {
+  context: { icon: 'link', label: 'Context', dash: '5 5' },
+  transform: { icon: 'auto_awesome', label: 'Transform', dash: undefined },
+  mirror: { icon: 'sync', label: 'Mirror', dash: undefined }
+}
 
 // Spatial backlinks rendered as bezier curves between widget centres.
 //
@@ -141,11 +151,16 @@ interface Segment {
   y1: number
   x2: number
   y2: number
+  mx: number
+  my: number
 }
 
 export default function LinkOverlay({ ghost }: Props): JSX.Element | null {
   const links = useLinksStore((s) => s.links)
   const remove = useLinksStore((s) => s.remove)
+  const updateWire = useLinksStore((s) => s.update)
+  const running = useWireRunStore((s) => s.running)
+  const wireErrors = useWireRunStore((s) => s.errors)
   // Subscribe to canvas state so re-renders happen on pan, zoom, layout
   // changes, and widget store updates. The DOM-read approach is robust to
   // stale dragOverride but still needs to re-render when widgets are
@@ -269,7 +284,8 @@ export default function LinkOverlay({ ghost }: Props): JSX.Element | null {
     if (!src || !tgt) continue
     const from = rectEdgePoint(src, tgt.cx, tgt.cy)
     const to = rectEdgePoint(tgt, src.cx, src.cy)
-    segments.push({ link, x1: from.x, y1: from.y, x2: to.x, y2: to.y })
+    const mid = bezierMidpoint(from.x, from.y, to.x, to.y)
+    segments.push({ link, x1: from.x, y1: from.y, x2: to.x, y2: to.y, mx: mid.x, my: mid.y })
   }
 
   // Ghost line: source widget edge → cursor.
@@ -281,6 +297,8 @@ export default function LinkOverlay({ ghost }: Props): JSX.Element | null {
       ghostPath = bezierPath(tip.x, tip.y, ghost.cursorScreenX, ghost.cursorScreenY)
     }
   }
+
+  const selectedLink = selectedLinkId ? links.find((l) => l.id === selectedLinkId) ?? null : null
 
   function handleClickLine(link: WidgetLink, mid: { x: number; y: number }): void {
     setSelectedLinkId(link.id)
@@ -324,11 +342,30 @@ export default function LinkOverlay({ ghost }: Props): JSX.Element | null {
         height="100%"
         style={{ position: 'absolute', inset: 0, overflow: 'visible' }}
       >
+        <defs>
+          <marker
+            id="fb-wire-arrow"
+            viewBox="0 0 10 10"
+            refX="8"
+            refY="5"
+            markerWidth="6"
+            markerHeight="6"
+            orient="auto-start-reverse"
+          >
+            <path d="M 0 1 L 9 5 L 0 9 z" fill="rgb(var(--accent))" />
+          </marker>
+        </defs>
         {segments.map((seg) => {
           const isSelected = seg.link.id === selectedLinkId
           const d = bezierPath(seg.x1, seg.y1, seg.x2, seg.y2)
+          const type = seg.link.type
+          const meta = WIRE_META[type]
+          const isReactive = type === 'transform' || type === 'mirror'
+          const isRunning = !!running[seg.link.id]
+          // A disabled reactive wire reads as a faint dotted line.
+          const disabled = isReactive && !seg.link.enabled
           return (
-            <g key={seg.link.id} data-link-line>
+            <g key={seg.link.id} data-link-line data-wire-type={type}>
               {/* Wide invisible hitbox underneath the visible curve. */}
               <path
                 d={d}
@@ -338,35 +375,61 @@ export default function LinkOverlay({ ghost }: Props): JSX.Element | null {
                 style={{ pointerEvents: 'stroke', cursor: 'pointer' }}
                 onClick={(e) => {
                   e.stopPropagation()
-                  handleClickLine(seg.link, bezierMidpoint(seg.x1, seg.y1, seg.x2, seg.y2))
+                  handleClickLine(seg.link, { x: seg.mx, y: seg.my })
                 }}
               />
               <path
                 d={d}
                 fill="none"
                 stroke="rgb(var(--accent))"
-                strokeOpacity={isSelected ? 0.95 : 0.6}
-                strokeWidth={isSelected ? 2.5 : 1.75}
+                strokeOpacity={disabled ? 0.3 : isSelected ? 0.95 : isReactive ? 0.75 : 0.5}
+                strokeWidth={isSelected ? 2.5 : isReactive ? 2 : 1.5}
                 strokeLinecap="round"
+                strokeDasharray={disabled ? '2 5' : meta.dash}
+                markerEnd={isReactive ? 'url(#fb-wire-arrow)' : undefined}
                 style={{
                   pointerEvents: 'none',
                   transition: 'stroke-opacity 120ms ease'
                 }}
-              />
+              >
+                {/* Flowing dashes while a transform is mid-run. */}
+                {isRunning && (
+                  <animate
+                    attributeName="stroke-dashoffset"
+                    from="24"
+                    to="0"
+                    dur="0.6s"
+                    repeatCount="indefinite"
+                  />
+                )}
+              </path>
+              {/* When running, overlay a dashed travelling segment for the pulse. */}
+              {isRunning && (
+                <path
+                  d={d}
+                  fill="none"
+                  stroke="rgb(var(--accent))"
+                  strokeOpacity={0.9}
+                  strokeWidth={2.5}
+                  strokeLinecap="round"
+                  strokeDasharray="6 18"
+                  style={{ pointerEvents: 'none' }}
+                >
+                  <animate
+                    attributeName="stroke-dashoffset"
+                    from="24"
+                    to="0"
+                    dur="0.5s"
+                    repeatCount="indefinite"
+                  />
+                </path>
+              )}
               <circle
                 cx={seg.x1}
                 cy={seg.y1}
                 r={isSelected ? 4 : 3}
                 fill="rgb(var(--accent))"
-                fillOpacity={isSelected ? 1 : 0.8}
-                style={{ pointerEvents: 'none' }}
-              />
-              <circle
-                cx={seg.x2}
-                cy={seg.y2}
-                r={isSelected ? 4 : 3}
-                fill="rgb(var(--accent))"
-                fillOpacity={isSelected ? 1 : 0.8}
+                fillOpacity={disabled ? 0.4 : isSelected ? 1 : 0.8}
                 style={{ pointerEvents: 'none' }}
               />
             </g>
@@ -385,20 +448,62 @@ export default function LinkOverlay({ ghost }: Props): JSX.Element | null {
           />
         )}
       </svg>
-      {popoverPos && selectedLinkId && (
+      {/* Wire-type badges at each midpoint — click to open the wire editor. */}
+      {segments.map((seg) => {
+        const meta = WIRE_META[seg.link.type]
+        const isRunning = !!running[seg.link.id]
+        const hasError = !!wireErrors[seg.link.id]
+        const reactiveOff =
+          (seg.link.type === 'transform' || seg.link.type === 'mirror') && !seg.link.enabled
+        return (
+          <button
+            key={`badge-${seg.link.id}`}
+            data-link-popover
+            data-testid={`wire-badge-${seg.link.id}`}
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation()
+              handleClickLine(seg.link, { x: seg.mx, y: seg.my })
+            }}
+            title={`${meta.label} wire`}
+            style={{
+              position: 'absolute',
+              left: seg.mx,
+              top: seg.my,
+              transform: 'translate(-50%, -50%)',
+              pointerEvents: 'auto'
+            }}
+            className={`inline-flex items-center justify-center h-5 w-5 rounded-full border shadow-sm transition-colors ${
+              hasError
+                ? 'bg-red-500 border-red-400 text-white'
+                : reactiveOff
+                  ? 'bg-white/90 dark:bg-stone-800/90 border-stone-300 dark:border-stone-600 text-stone-400'
+                  : 'bg-white/90 dark:bg-stone-800/90 border-accent/50 text-accent'
+            } ${isRunning ? 'fb-breathing' : ''}`}
+          >
+            <Icon name={hasError ? 'error' : meta.icon} size={11} />
+          </button>
+        )
+      })}
+      {popoverPos && selectedLink && (
         <div
           data-link-popover
           style={{
             position: 'absolute',
             left: popoverPos.x,
-            top: popoverPos.y,
-            transform: 'translate(-50%, -50%)',
+            top: popoverPos.y + 18,
+            transform: 'translate(-50%, 0)',
             pointerEvents: 'auto'
           }}
         >
-          <DeletePill
-            onConfirm={handleDelete}
-            onCancel={() => {
+          <WireEditor
+            link={selectedLink}
+            error={wireErrors[selectedLink.id]}
+            running={!!running[selectedLink.id]}
+            onChange={(patch) => void updateWire(selectedLink.id, patch)}
+            onRunNow={() => runWireNow(selectedLink.id)}
+            onUnlink={handleDelete}
+            onClose={() => {
               setSelectedLinkId(null)
               setPopoverPos(null)
             }}
@@ -409,44 +514,139 @@ export default function LinkOverlay({ ghost }: Props): JSX.Element | null {
   )
 }
 
-function DeletePill({
-  onConfirm,
-  onCancel
+// The wire editor popover. Turns a dead line into a live wire: pick the type,
+// give a transform its instruction, toggle the kill switch, run it on demand,
+// or unlink. Compact so it doesn't dominate the canvas.
+function WireEditor({
+  link,
+  error,
+  running,
+  onChange,
+  onRunNow,
+  onUnlink,
+  onClose
 }: {
-  onConfirm: () => void
-  onCancel: () => void
+  link: WidgetLink
+  error?: string
+  running: boolean
+  onChange: (patch: { type?: WireType; verb?: string; enabled?: boolean }) => void
+  onRunNow: () => void
+  onUnlink: () => void
+  onClose: () => void
 }): JSX.Element {
-  const [confirming, setConfirming] = useState(false)
-  const handleClick = useCallback(() => {
-    if (confirming) onConfirm()
-    else setConfirming(true)
-  }, [confirming, onConfirm])
+  const [verb, setVerb] = useState(link.verb)
+  useEffect(() => setVerb(link.verb), [link.verb])
+
+  const TYPES: Array<{ value: WireType; label: string; icon: string; hint: string }> = [
+    { value: 'context', label: 'Context', icon: 'link', hint: 'Passive — feeds the target’s AI as related background.' },
+    { value: 'transform', label: 'Transform', icon: 'auto_awesome', hint: 'When the source changes, run an instruction and write the result into the target.' },
+    { value: 'mirror', label: 'Mirror', icon: 'sync', hint: 'Copy the source’s content into the target on every change.' }
+  ]
+  const active = TYPES.find((t) => t.value === link.type) ?? TYPES[0]
 
   return (
     <div
+      data-link-popover
+      data-testid="wire-editor"
       onMouseDown={(e) => e.stopPropagation()}
-      className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded-full bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-700 shadow-md text-[10px]"
+      className="w-64 rounded-lg bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-700 shadow-xl text-[11px] overflow-hidden"
     >
-      <button
-        onClick={handleClick}
-        className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full transition-colors ${
-          confirming
-            ? 'bg-red-600 text-white hover:bg-red-700'
-            : 'text-stone-600 dark:text-stone-300 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40'
-        }`}
-      >
-        <Icon name="link_off" size={11} />
-        <span>{confirming ? 'Confirm' : 'Unlink'}</span>
-      </button>
-      {confirming && (
-        <button
-          onClick={onCancel}
-          className="text-stone-500 hover:text-stone-700 px-1"
-          aria-label="Cancel"
-        >
-          <Icon name="close" size={11} />
+      <div className="flex items-center justify-between px-2.5 py-1.5 border-b border-stone-200 dark:border-stone-700">
+        <span className="font-semibold text-stone-700 dark:text-stone-200">Live wire</span>
+        <button onClick={onClose} className="text-stone-400 hover:text-stone-700 dark:hover:text-stone-200" aria-label="Close">
+          <Icon name="close" size={12} />
         </button>
-      )}
+      </div>
+
+      <div className="p-2.5 space-y-2">
+        <div className="grid grid-cols-3 gap-1">
+          {TYPES.map((t) => (
+            <button
+              key={t.value}
+              onClick={() => onChange({ type: t.value })}
+              className={`flex flex-col items-center gap-0.5 py-1.5 rounded border transition-colors ${
+                link.type === t.value
+                  ? 'border-accent bg-accent/10 text-stone-900 dark:text-stone-100'
+                  : 'border-stone-200 dark:border-stone-700 text-stone-600 dark:text-stone-400 hover:bg-stone-100 dark:hover:bg-stone-800'
+              }`}
+              data-testid={`wire-type-${t.value}`}
+            >
+              <Icon name={t.icon} size={14} className={link.type === t.value ? 'text-accent' : ''} />
+              <span className="text-[10px]">{t.label}</span>
+            </button>
+          ))}
+        </div>
+        <p className="text-[10px] text-stone-500 dark:text-stone-400 leading-snug">{active.hint}</p>
+
+        {link.type === 'transform' && (
+          <div>
+            <input
+              type="text"
+              value={verb}
+              placeholder="e.g. extract action items"
+              spellCheck={false}
+              onChange={(e) => setVerb(e.target.value)}
+              onBlur={() => verb !== link.verb && onChange({ verb })}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  onChange({ verb })
+                  onRunNow()
+                }
+              }}
+              className="w-full px-2 py-1 rounded bg-stone-100 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 text-[11px] text-stone-700 dark:text-stone-200 focus:outline-none focus:border-accent"
+              data-testid="wire-verb-input"
+            />
+            <div className="flex items-center gap-1.5 mt-1.5">
+              <button
+                onClick={() => {
+                  onChange({ verb })
+                  onRunNow()
+                }}
+                disabled={running || !verb.trim()}
+                className="inline-flex items-center gap-1 px-2 py-1 rounded bg-accent text-white text-[10px] disabled:opacity-50"
+                data-testid="wire-run-now"
+              >
+                <Icon name={running ? 'hourglass_empty' : 'play_arrow'} size={12} />
+                {running ? 'Running…' : 'Run now'}
+              </button>
+              <label className="inline-flex items-center gap-1 text-[10px] text-stone-600 dark:text-stone-400 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={link.enabled}
+                  onChange={(e) => onChange({ enabled: e.target.checked })}
+                  className="accent-accent"
+                  data-testid="wire-enabled"
+                />
+                Auto-run
+              </label>
+            </div>
+          </div>
+        )}
+
+        {link.type === 'mirror' && (
+          <label className="inline-flex items-center gap-1.5 text-[10px] text-stone-600 dark:text-stone-400 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={link.enabled}
+              onChange={(e) => onChange({ enabled: e.target.checked })}
+              className="accent-accent"
+              data-testid="wire-enabled"
+            />
+            Keep target mirrored
+          </label>
+        )}
+
+        {error && <p className="text-[10px] text-red-600 dark:text-red-400 leading-snug">{error}</p>}
+
+        <button
+          onClick={onUnlink}
+          className="w-full inline-flex items-center justify-center gap-1 px-2 py-1 rounded border border-stone-200 dark:border-stone-700 text-stone-500 hover:text-red-600 hover:border-red-300 transition-colors"
+          data-testid="wire-unlink"
+        >
+          <Icon name="link_off" size={12} />
+          Unlink
+        </button>
+      </div>
     </div>
   )
 }

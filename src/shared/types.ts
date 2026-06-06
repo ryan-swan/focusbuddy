@@ -466,16 +466,34 @@ export type AIPurpose =
   | 'body_double'
   | 'smart_stack'
   | 'living_page'
+  | 'wire_transform'
 
-// Inter-widget spatial link. Directed (source → target) — users can draw a
-// reverse link as a separate row to express asymmetric relationships.
-// Rendered as a line on the canvas between the two widget centres.
+// "Live wire" semantics for an inter-widget link. A dead line becomes a pipe:
+//   context   — passive. The target's AI is told this source is a related
+//               family member (the default; never acts on its own).
+//   transform — reactive. When the SOURCE content changes, an AI call runs the
+//               wire's `verb` over the source and writes the result into the
+//               TARGET.
+//   mirror    — reactive. The SOURCE's content is copied into the TARGET on
+//               change (sync expressed as a connection, no AI).
+export type WireType = 'context' | 'transform' | 'mirror'
+
+// Inter-widget spatial link, now a typed "live wire". Directed (source →
+// target) — users can draw a reverse link as a separate row to express
+// asymmetric relationships. Rendered as a line on the canvas between the two
+// widget centres, with a small badge showing its wire type.
 export interface WidgetLink {
   id: string
   sourceWidgetId: string
   targetWidgetId: string
   taskId: string
   createdAt: number
+  // Live-wire fields. Existing rows default to a passive 'context' wire.
+  type: WireType
+  // Free-text instruction for a 'transform' wire, e.g. "extract action items".
+  verb: string
+  // Kill switch — a disabled reactive wire stays drawn but never fires.
+  enabled: boolean
 }
 
 // Result of a living-page regeneration. ok=true → returns freshly-generated
