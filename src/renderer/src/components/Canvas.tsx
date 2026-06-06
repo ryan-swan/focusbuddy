@@ -67,7 +67,15 @@ import {
   SECTION_MIN_H
 } from '../lib/sectionGeometry'
 import { lookupWebview } from '../lib/webviewRegistry'
-import { getOrigin, subscribeOrigins, type NodeCanvasOrigin } from '../lib/nodeCanvasOrigin'
+import {
+  getOrigin,
+  subscribeOrigins,
+  isKitDismissed,
+  dismissKit,
+  type NodeCanvasOrigin
+} from '../lib/nodeCanvasOrigin'
+import MindmapStartingKit from './MindmapStartingKit'
+import type { StandardApp } from '../lib/standardApps'
 import {
   PinLayoutContext,
   computeZonePinPositions,
@@ -197,7 +205,17 @@ export default function Canvas(): JSX.Element {
     read()
     return subscribeOrigins(read)
   }, [activeTaskId])
+  // Bumped when the user dismisses the starting kit, to re-evaluate visibility.
+  const [kitDismissTick, setKitDismissTick] = useState(0)
   const widgets = useWidgetStore((s) => s.widgets)
+  // Auto-offer the starting kit on a freshly-explored, still-EMPTY node canvas.
+  // "Empty" ignores the auto-created minimap + any pinned chrome.
+  const showStartingKit =
+    kitDismissTick >= 0 &&
+    !!nodeOrigin &&
+    !!activeTaskId &&
+    widgets.filter((w) => w.kind !== 'minimap' && !w.pinned).length === 0 &&
+    !isKitDismissed(activeTaskId)
   const focusedId = useWidgetStore((s) => s.focusedWidgetId)
   const activeId = useWidgetStore((s) => s.activeWidgetId)
   const setActive = useWidgetStore((s) => s.setActive)
@@ -1564,6 +1582,24 @@ export default function Canvas(): JSX.Element {
     setSaveTemplateOpen({ context: 'toolbar' })
   }
 
+  // Spawn a browser (webview) widget for a standard app — used by the starting
+  // kit's "open a browser" quick-adds. Staggered so multiple don't stack.
+  async function addBrowserApp(app: StandardApp): Promise<void> {
+    if (!activeTaskId) return
+    const entry = catalogFor('webview')
+    const n = useWidgetStore.getState().widgets.filter((w) => !w.pinned).length
+    await createWidget({
+      taskId: activeTaskId,
+      kind: 'webview',
+      title: app.title,
+      content: app.url,
+      x: 60 + (n % 5) * 36,
+      y: 60 + (n % 5) * 36,
+      width: entry?.defaultWidth ?? 520,
+      height: entry?.defaultHeight ?? 360
+    })
+  }
+
   // AI Builder accept path. Distinct from handleAISetupAccept because each
   // suggestion can carry a richer payload (table schema, Tiptap doc, field
   // def) that needs translating into the corresponding storage layer before
@@ -2002,6 +2038,19 @@ export default function Canvas(): JSX.Element {
               <span className="block h-10 w-10 rounded-full border-2 border-accent/70 animate-ping" />
               <span className="absolute inset-0 m-auto h-2 w-2 rounded-full bg-accent shadow" />
             </div>
+          )}
+          {showStartingKit && nodeOrigin && activeTaskId && (
+            <MindmapStartingKit
+              taskId={activeTaskId}
+              nodeLabel={nodeOrigin.nodeLabel}
+              nodePath={nodeOrigin.nodePath}
+              onAddWidgets={handleAiBuilderAccept}
+              onAddBrowser={addBrowserApp}
+              onDismiss={() => {
+                if (activeTaskId) dismissKit(activeTaskId)
+                setKitDismissTick((t) => t + 1)
+              }}
+            />
           )}
           {/* Marquee selection box — screen-space projection of the canvas-space
               rubber-band rect, so the marching ants stay 1px crisp at any zoom. */}
