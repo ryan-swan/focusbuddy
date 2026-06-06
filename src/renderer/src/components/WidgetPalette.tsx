@@ -14,6 +14,7 @@ import Icon from './Icon'
 interface Props {
   onAdd: (entry: WidgetCatalogEntry) => void
   onImport?: () => void
+  onBringSynced?: () => void
   disabled: boolean
 }
 
@@ -27,7 +28,12 @@ interface Props {
 // keyboard-friendly (Tab through chips, Enter to add). The picker itself
 // is what shrank — what's IN it (the chips) is the same set, minus the
 // redundant kinds we just folded into File.
-export default function WidgetPalette({ onAdd, onImport, disabled }: Props): JSX.Element {
+export default function WidgetPalette({
+  onAdd,
+  onImport,
+  onBringSynced,
+  disabled
+}: Props): JSX.Element {
   const [open, setOpen] = useState(false)
   const buttonRef = useRef<HTMLButtonElement | null>(null)
   const popoverRef = useRef<HTMLDivElement | null>(null)
@@ -170,6 +176,29 @@ export default function WidgetPalette({ onAdd, onImport, disabled }: Props): JSX
                 </div>
               )
             })}
+            {onBringSynced && (
+              <div className="border-t border-stone-200 dark:border-stone-700 pt-2">
+                <div className="text-[9px] uppercase tracking-[0.14em] text-stone-500 dark:text-stone-400 font-semibold mb-1.5">
+                  From elsewhere
+                </div>
+                <button
+                  onClick={() => {
+                    onBringSynced()
+                    setOpen(false)
+                  }}
+                  className="w-full flex items-center gap-2 px-2 py-2 rounded-md border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 hover:border-accent hover:bg-accent/5 dark:hover:bg-accent/10 text-stone-700 dark:text-stone-300 text-[11px]"
+                  data-testid="palette-bring-synced"
+                >
+                  <Icon name="link" size={14} className="text-accent" />
+                  <div className="flex-1 text-left">
+                    <div className="font-medium">Bring a synced widget…</div>
+                    <div className="text-[9px] text-stone-500 dark:text-stone-400">
+                      Live-linked copy from another task — edits mirror both ways
+                    </div>
+                  </div>
+                </button>
+              </div>
+            )}
             {onImport && (
               <div className="border-t border-stone-200 dark:border-stone-700 pt-2">
                 <div className="text-[9px] uppercase tracking-[0.14em] text-stone-500 dark:text-stone-400 font-semibold mb-1.5">

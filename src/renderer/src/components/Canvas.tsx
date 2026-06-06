@@ -75,6 +75,7 @@ import {
   type NodeCanvasOrigin
 } from '../lib/nodeCanvasOrigin'
 import MindmapStartingKit from './MindmapStartingKit'
+import SyncWidgetPicker from './SyncWidgetPicker'
 import type { StandardApp } from '../lib/standardApps'
 import {
   PinLayoutContext,
@@ -207,6 +208,7 @@ export default function Canvas(): JSX.Element {
   }, [activeTaskId])
   // Bumped when the user dismisses the starting kit, to re-evaluate visibility.
   const [kitDismissTick, setKitDismissTick] = useState(0)
+  const [syncPickerOpen, setSyncPickerOpen] = useState(false)
   const widgets = useWidgetStore((s) => s.widgets)
   // Auto-offer the starting kit on a freshly-explored, still-EMPTY node canvas.
   // "Empty" ignores the auto-created minimap + any pinned chrome.
@@ -2010,6 +2012,7 @@ export default function Canvas(): JSX.Element {
           <WidgetPalette
             onAdd={handleClickAdd}
             onImport={() => void handleImportFile()}
+            onBringSynced={activeTaskId ? () => setSyncPickerOpen(true) : undefined}
             disabled={!activeTaskId}
           />
         </div>
@@ -2333,6 +2336,9 @@ export default function Canvas(): JSX.Element {
           onClose={() => setShowAiBuilder(false)}
           onAccept={handleAiBuilderAccept}
         />
+      )}
+      {syncPickerOpen && activeTaskId && (
+        <SyncWidgetPicker targetTaskId={activeTaskId} onClose={() => setSyncPickerOpen(false)} />
       )}
       {ctxMenu && (
         <CanvasContextMenu
