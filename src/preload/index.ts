@@ -664,13 +664,24 @@ const api = {
       agentId: string,
       taskId: string,
       instruction: string,
-      liveInputs?: Record<string, string>
+      liveInputs?: Record<string, string>,
+      persona?: string
     ): Promise<{
       ok: boolean
       output?: string
       needsApiKey?: boolean
       error?: string
-    }> => ipcRenderer.invoke('agents:run', agentId, taskId, instruction, liveInputs),
+    }> => ipcRenderer.invoke('agents:run', agentId, taskId, instruction, liveInputs, persona),
+    designProfile: (
+      description: string
+    ): Promise<{
+      ok: boolean
+      name?: string
+      blurb?: string
+      systemPrompt?: string
+      needsApiKey?: boolean
+      error?: string
+    }> => ipcRenderer.invoke('agents:designProfile', description),
     create: (input: {
       slug: string
       description: string

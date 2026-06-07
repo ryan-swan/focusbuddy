@@ -14,6 +14,10 @@ export interface AgentConfig {
   trigger: AgentTrigger
   intervalSec: number
   enabled: boolean
+  // Which profile ("job description") shapes this agent's approach. Undefined =
+  // the generalist. The profile only affects HOW it reasons, never how its
+  // output is written to other widgets (that hygiene is enforced in code).
+  profileId?: string
   lastRunAt: number | null
   lastOutput: string
   lastError: string | null

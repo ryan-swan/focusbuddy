@@ -12,6 +12,13 @@ import {
   type AgentTrigger
 } from '../../lib/deskAgent'
 import { runAgent, useAgentRunStore } from '../../lib/deskAgentEngine'
+import {
+  allProfiles,
+  resolveProfile,
+  useAgentProfilesStore,
+  type AgentProfile
+} from '../../lib/agentProfiles'
+import AgentProfileDialog from '../AgentProfileDialog'
 
 // Desk agent — a standing AI worker on the canvas. Its inputs are the widgets
 // wired INTO it; it runs its instruction over them and logs the result here.
@@ -26,14 +33,15 @@ interface Props {
   inline?: boolean
 }
 
-type Editable = Pick<AgentConfig, 'instruction' | 'trigger' | 'intervalSec' | 'enabled'>
+type Editable = Pick<AgentConfig, 'instruction' | 'trigger' | 'intervalSec' | 'enabled' | 'profileId'>
 
 function editableOf(c: AgentConfig): Editable {
   return {
     instruction: c.instruction,
     trigger: c.trigger,
     intervalSec: c.intervalSec,
-    enabled: c.enabled
+    enabled: c.enabled,
+    profileId: c.profileId
   }
 }
 
@@ -112,12 +120,89 @@ export default function AgentWidget({ widget }: Props): JSX.Element {
 
   const set = (patch: Partial<Editable>): void => setEdit((e) => ({ ...e, ...patch }))
 
+  // ── Profile ("job description") ──────────────────────────────────────────
+  const customProfiles = useAgentProfilesStore((s) => s.custom)
+  const upsertProfile = useAgentProfilesStore((s) => s.upsert)
+  const removeProfile = useAgentProfilesStore((s) => s.remove)
+  const profile = resolveProfile(edit.profileId, customProfiles)
+  const [profileMenu, setProfileMenu] = useState(false)
+  const [profileDialog, setProfileDialog] = useState(false)
+
   const body = (
     <div
       className="h-full w-full flex flex-col bg-white dark:bg-stone-900 text-stone-800 dark:text-stone-200"
       onMouseDown={(e) => e.stopPropagation()}
       data-testid="agent-widget"
     >
+      {/* Profile selector — the agent's role / expertise. */}
+      <div className="relative px-2.5 pt-2 pb-1.5 border-b border-stone-200 dark:border-stone-800">
+        <button
+          onClick={() => setProfileMenu((v) => !v)}
+          className="w-full flex items-center gap-1.5 px-2 py-1 rounded-md border border-stone-200 dark:border-stone-700 hover:border-accent/50 bg-stone-50 dark:bg-stone-800 text-left"
+          data-testid="agent-profile-button"
+          title={profile.systemPrompt}
+        >
+          <Icon name={profile.icon} size={14} className="text-accent shrink-0" />
+          <span className="flex-1 min-w-0">
+            <span className="block text-[11px] font-medium truncate">{profile.name}</span>
+            <span className="block text-[9px] text-stone-500 dark:text-stone-400 truncate">
+              {profile.blurb}
+            </span>
+          </span>
+          <Icon name="expand_more" size={14} className="text-stone-400 shrink-0" />
+        </button>
+        {profileMenu && (
+          <>
+            <div className="fixed inset-0 z-10" onClick={() => setProfileMenu(false)} />
+            <div className="absolute left-2.5 right-2.5 top-full mt-1 z-20 max-h-56 overflow-y-auto rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 shadow-xl py-1">
+              {allProfiles(customProfiles).map((p) => (
+                <div
+                  key={p.id}
+                  className={`group flex items-center gap-2 px-2 py-1.5 cursor-pointer hover:bg-stone-100 dark:hover:bg-stone-800 ${
+                    p.id === profile.id ? 'bg-accent/10' : ''
+                  }`}
+                  onClick={() => {
+                    set({ profileId: p.id })
+                    setProfileMenu(false)
+                  }}
+                  data-testid={`agent-profile-option-${p.id}`}
+                >
+                  <Icon name={p.icon} size={14} className="text-accent shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[11px] font-medium truncate">{p.name}</div>
+                    <div className="text-[9px] text-stone-500 dark:text-stone-400 truncate">{p.blurb}</div>
+                  </div>
+                  {!p.builtIn && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        if (edit.profileId === p.id) set({ profileId: undefined })
+                        removeProfile(p.id)
+                      }}
+                      className="opacity-0 group-hover:opacity-100 text-stone-400 hover:text-red-600"
+                      title="Delete profile"
+                    >
+                      <Icon name="delete" size={12} />
+                    </button>
+                  )}
+                </div>
+              ))}
+              <button
+                onClick={() => {
+                  setProfileMenu(false)
+                  setProfileDialog(true)
+                }}
+                className="w-full flex items-center gap-2 px-2 py-1.5 border-t border-stone-200 dark:border-stone-700 text-[11px] text-accent hover:bg-accent/5"
+                data-testid="agent-profile-create"
+              >
+                <Icon name="add" size={14} />
+                Create new profile…
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+
       {/* Instruction */}
       <div className="p-2.5 border-b border-stone-200 dark:border-stone-800">
         <textarea
@@ -239,8 +324,20 @@ export default function AgentWidget({ widget }: Props): JSX.Element {
   )
 
   return (
-    <WidgetFrame widget={widget} headerLabel="agent" headerAccent="bg-accent/20">
-      {body}
-    </WidgetFrame>
+    <>
+      <WidgetFrame widget={widget} headerLabel="agent" headerAccent="bg-accent/20">
+        {body}
+      </WidgetFrame>
+      {profileDialog && (
+        <AgentProfileDialog
+          onClose={() => setProfileDialog(false)}
+          onSave={(p: AgentProfile) => {
+            upsertProfile(p)
+            set({ profileId: p.id })
+            setProfileDialog(false)
+          }}
+        />
+      )}
+    </>
   )
 }
