@@ -79,9 +79,12 @@ function link(sourceId, targetId, taskId, type, verb) {
 function table(taskId, title, columns, rows, pos) {
   const tableId = randomUUID()
   const t = now()
+  // Columns are FieldDefinitions — ensure each carries a config object so the
+  // cell editors (checkbox, select, etc.) always have one to read.
+  const cols = columns.map((c) => ({ config: {}, ...c }))
   db.prepare(
     `INSERT INTO fb_tables (id, task_id, title, schema_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)`
-  ).run(tableId, taskId, title, JSON.stringify({ columns }), t, t)
+  ).run(tableId, taskId, title, JSON.stringify({ columns: cols }), t, t)
   rows.forEach((cells, i) => {
     db.prepare(
       `INSERT INTO fb_rows (id, table_id, cells_json, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)`

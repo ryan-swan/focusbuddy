@@ -29,7 +29,14 @@ export interface FieldEditorProps {
   autoFocus?: boolean
 }
 
-export default function FieldEditor(props: FieldEditorProps): JSX.Element {
+export default function FieldEditor(rawProps: FieldEditorProps): JSX.Element {
+  // Defensive: every sub-input reads def.config (e.g. CheckboxInput reads
+  // config.label). A field/column with no config — legacy rows, an imported or
+  // seeded table — must degrade to defaults, not white-screen the canvas. Make
+  // config at least an empty object before dispatching.
+  const props: FieldEditorProps = rawProps.def.config
+    ? rawProps
+    : { ...rawProps, def: { ...rawProps.def, config: {} } as unknown as FieldDefinition }
   const { def, value } = props
   switch (def.type) {
     case 'text-short':
@@ -218,9 +225,10 @@ function SingleSelect({
   onCommit
 }: SubProps<string | null>): JSX.Element {
   const [open, setOpen] = useState(false)
-  const config = def.config as { options: SelectOption[] }
+  const config = def.config as { options?: SelectOption[] }
+  const options = config.options ?? []
   const ref = useRef<HTMLDivElement | null>(null)
-  const selected = config.options.find((o) => o.id === value) ?? null
+  const selected = options.find((o) => o.id === value) ?? null
   useEffect(() => {
     if (!open) return
     function onDown(e: MouseEvent): void {
@@ -257,7 +265,7 @@ function SingleSelect({
           >
             (none)
           </button>
-          {config.options.map((opt) => (
+          {options.map((opt) => (
             <button
               key={opt.id}
               onClick={() => {
@@ -286,9 +294,10 @@ function MultiSelect({
   onCommit
 }: SubProps<string[]>): JSX.Element {
   const [open, setOpen] = useState(false)
-  const config = def.config as { options: SelectOption[] }
+  const config = def.config as { options?: SelectOption[] }
+  const options = config.options ?? []
   const ref = useRef<HTMLDivElement | null>(null)
-  const selected = config.options.filter((o) => value.includes(o.id))
+  const selected = options.filter((o) => value.includes(o.id))
   useEffect(() => {
     if (!open) return
     function onDown(e: MouseEvent): void {
@@ -323,7 +332,7 @@ function MultiSelect({
       </button>
       {open && (
         <div className="absolute z-50 mt-1 left-0 min-w-[160px] rounded border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 shadow-lg py-1 max-h-60 overflow-y-auto">
-          {config.options.map((opt) => {
+          {options.map((opt) => {
             const checked = value.includes(opt.id)
             return (
               <button
@@ -343,7 +352,7 @@ function MultiSelect({
               </button>
             )
           })}
-          {config.options.length === 0 && (
+          {options.length === 0 && (
             <div className="px-2 py-1 text-[11px] text-stone-400">
               No options defined
             </div>
