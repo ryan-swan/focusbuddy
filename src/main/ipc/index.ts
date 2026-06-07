@@ -214,6 +214,7 @@ import {
   summarizeRecentTrail
 } from '../ai/anthropic'
 import { getModelMode, setModelMode } from '../ai/modelRouting'
+import { describeWidgetForAgent } from '../ai/agentInputs'
 import type {
   ActivityRecordDraft,
   ChatRequest,
@@ -232,19 +233,6 @@ import type {
   WidgetPatch,
   WireType
 } from '@shared/types'
-
-// The content a widget contributes when it is the SOURCE of a wire or a desk
-// agent's input. A desk agent contributes its latest OUTPUT (parsed from its
-// config JSON), not the raw config, so its results flow cleanly downstream.
-function wireSourceContent(w: { kind: string; content: string | null }): string {
-  if (w.kind !== 'agent') return w.content ?? ''
-  try {
-    const cfg = JSON.parse(w.content ?? '{}') as { lastOutput?: string }
-    return cfg.lastOutput ?? ''
-  } catch {
-    return ''
-  }
-}
 
 export function registerIpcHandlers(): void {
   // ── Body-double cross-window relay ──────────────────────────────────────
@@ -429,9 +417,11 @@ export function registerIpcHandlers(): void {
     if (!source || !target) {
       return { ok: false, error: 'A wired widget no longer exists.' }
     }
+    // Resolve the source to real content (an agent feeds its output; a browser
+    // is fetched so a transform can research the page), same as agent inputs.
+    const described = await describeWidgetForAgent(source)
     return runTransformWire({
-      // An agent source feeds its OUTPUT, not its JSON config.
-      sourceContent: wireSourceContent(source),
+      sourceContent: described.content,
       verb,
       targetCurrentContent: target.content ?? ''
     })
@@ -443,13 +433,13 @@ export function registerIpcHandlers(): void {
   // its latest OUTPUT as the input (so agents can pipeline into each other).
   ipcMain.handle('agents:run', async (_e, agentId: string, taskId: string, instruction: string) => {
     const links = listLinksByTask(taskId)
-    const inputIds = links
+    const inputWidgets = links
       .filter((l) => l.targetWidgetId === agentId)
-      .map((l) => l.sourceWidgetId)
-    const inputs = inputIds
-      .map((id) => getWidget(id))
-      .filter((w): w is NonNullable<typeof w> => !!w && !w.archived)
-      .map((w) => ({ kind: w.kind, title: w.title ?? '', content: wireSourceContent(w) }))
+      .map((l) => getWidget(l.sourceWidgetId))
+      .filter((w): w is NonNullable<ReturnType<typeof getWidget>> => !!w && !w.archived)
+    // Resolve each input to real, readable content — a browser is FETCHED so the
+    // agent can actually research the page, a table becomes its rows, etc.
+    const inputs = await Promise.all(inputWidgets.map((w) => describeWidgetForAgent(w)))
     return runDeskAgent({ instruction, inputs })
   })
 

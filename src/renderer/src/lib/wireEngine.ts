@@ -83,8 +83,17 @@ export function notifyWireSource(sourceId: string): void {
   // A change the engine itself caused must not start another cascade.
   if (inCooldown(sourceId)) return
   const links = useLinksStore.getState().links
+  // A desk agent's outgoing wires are ALL reactive — attaching a widget to an
+  // agent means "deliver your output here", whatever the wire type. For every
+  // other source, only transform / mirror wires react (a plain context wire is
+  // passive).
+  const sourceIsAgent =
+    useWidgetStore.getState().widgets.find((w) => w.id === sourceId)?.kind === 'agent'
   const outgoing = links.filter(
-    (l) => l.sourceWidgetId === sourceId && l.enabled && (l.type === 'transform' || l.type === 'mirror')
+    (l) =>
+      l.sourceWidgetId === sourceId &&
+      l.enabled &&
+      (sourceIsAgent || l.type === 'transform' || l.type === 'mirror')
   )
   for (const wire of outgoing) {
     const existing = debounceTimers.get(wire.id)
@@ -113,8 +122,11 @@ async function runWire(wireId: string, gen: number): Promise<void> {
 
   const runStore = useWireRunStore.getState()
 
-  if (wire.type === 'mirror') {
-    // Pure copy of the source's effective content (an agent feeds its output).
+  // Deliver-as-is when it's a mirror wire, OR any non-transform wire leaving an
+  // agent (so attaching a widget to an agent feeds it the agent's output).
+  const deliverDirect =
+    wire.type === 'mirror' || (source.kind === 'agent' && wire.type !== 'transform')
+  if (deliverDirect) {
     const src = effectiveContent(source)
     if (src === target.content) return
     writeCooldown.set(target.id, Date.now())
