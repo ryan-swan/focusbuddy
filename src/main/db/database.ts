@@ -176,6 +176,21 @@ CREATE INDEX IF NOT EXISTS idx_widget_links_task ON widget_links(task_id);
 CREATE INDEX IF NOT EXISTS idx_widget_links_source ON widget_links(source_widget_id);
 CREATE INDEX IF NOT EXISTS idx_widget_links_target ON widget_links(target_widget_id);
 
+-- ── Desk time-travel snapshots ──────────────────────────────────────────────
+-- A compact history of a task's canvas. Each row is the full widget set for the
+-- task at a moment in time (payload = JSON Widget[]). Written debounced as the
+-- desk changes; capped + pruned per task. Lets the user scrub the desk's
+-- evolution, restore a past state, or branch a new task from one.
+CREATE TABLE IF NOT EXISTS canvas_snapshots (
+  id TEXT PRIMARY KEY,
+  task_id TEXT NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
+  at INTEGER NOT NULL,
+  label TEXT NOT NULL DEFAULT '',
+  widget_count INTEGER NOT NULL DEFAULT 0,
+  payload TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_canvas_snapshots_task ON canvas_snapshots(task_id, at DESC);
+
 -- ── Outgoing share links ────────────────────────────────────────────────────
 -- Each row is a link the local user minted to share one of their folders /
 -- tasks / widgets. Tokens are opaque and URL-safe. revoked=1 soft-deletes

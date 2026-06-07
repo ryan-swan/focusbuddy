@@ -39,6 +39,13 @@ import {
   type WireUpdate
 } from '../db/widgetLinks'
 import {
+  branchSnapshot,
+  createSnapshot,
+  getSnapshot,
+  listSnapshots,
+  restoreSnapshot
+} from '../db/canvasSnapshots'
+import {
   clearSession,
   loadAccountState,
   saveSession,
@@ -390,6 +397,15 @@ export function registerIpcHandlers(): void {
     updateLink(id, patch)
   )
   ipcMain.handle('widgetLinks:delete', (_e, id: string) => deleteLink(id))
+
+  // Desk time-travel snapshots.
+  ipcMain.handle('snapshots:create', (_e, taskId: string, label?: string) =>
+    createSnapshot(taskId, listWidgetsByTask(taskId), label ?? '')
+  )
+  ipcMain.handle('snapshots:list', (_e, taskId: string) => listSnapshots(taskId))
+  ipcMain.handle('snapshots:get', (_e, id: string) => getSnapshot(id))
+  ipcMain.handle('snapshots:restore', (_e, id: string) => restoreSnapshot(id))
+  ipcMain.handle('snapshots:branch', (_e, id: string, title: string) => branchSnapshot(id, title))
 
   // Live wires: run a transform wire. Reads the source + target content in
   // main (avoids shipping large documents over IPC twice) and returns the

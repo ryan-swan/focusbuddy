@@ -479,6 +479,16 @@ export type AIPurpose =
   | 'wire_transform'
   | 'desk_agent'
 
+// Desk time-travel: metadata for one canvas snapshot (the full widget payload
+// lives in the DB and is fetched on demand).
+export interface SnapshotMeta {
+  id: string
+  taskId: string
+  at: number
+  label: string
+  widgetCount: number
+}
+
 // "Live wire" semantics for an inter-widget link. A dead line becomes a pipe:
 //   context   — passive. The target's AI is told this source is a related
 //               family member (the default; never acts on its own).
