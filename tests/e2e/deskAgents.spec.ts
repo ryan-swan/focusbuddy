@@ -234,3 +234,67 @@ test('an agent feeds its output into a note via a mirror wire', async () => {
     )
     .toBe('AGENT-OUTPUT-FEED')
 })
+
+test('a plain (default) wire out of an agent also feeds the target', async () => {
+  launched = await launchApp()
+  const { window } = launched
+  await waitForReady(window)
+
+  const ids = await window.evaluate(async () => {
+    const api = (window as unknown as { api: typeof window.api }).api
+    const task = await api.nodes.create({ parentId: null, kind: 'task', title: 'Agent default feed' })
+    const note = await api.widgets.create({
+      taskId: task.id,
+      kind: 'note',
+      title: 'out',
+      content: '',
+      x: 480,
+      y: 200,
+      width: 240,
+      height: 180
+    })
+    const agent = await api.widgets.create({
+      taskId: task.id,
+      kind: 'agent',
+      title: 'Agent',
+      content: JSON.stringify({
+        instruction: 'summarize',
+        trigger: 'manual',
+        enabled: true,
+        lastOutput: 'DEFAULT-WIRE-OUTPUT'
+      }),
+      x: 120,
+      y: 200,
+      width: 340,
+      height: 320
+    })
+    // NOTE: no wire type passed — defaults to 'context'. Because the source is
+    // an agent, it should still deliver the agent's output to the note.
+    await api.widgetLinks.create(agent.id, note.id, task.id)
+    return { taskId: task.id, agentId: agent.id, noteId: note.id }
+  })
+
+  await window.reload()
+  await waitForReady(window)
+  await window.getByRole('button', { name: /Agent default feed/ }).first().click()
+  await window.waitForSelector('[data-canvas-surface="true"]', { timeout: 5_000 })
+  await window.waitForTimeout(400)
+  await hideAssistant(window)
+
+  await window.locator('[data-testid="agent-instruction"]').fill('summarize briefly')
+
+  await expect
+    .poll(
+      async () =>
+        window.evaluate(
+          async ({ taskId, noteId }: { taskId: string; noteId: string }) => {
+            const api = (window as unknown as { api: typeof window.api }).api
+            const ws = await api.widgets.listByTask(taskId)
+            return ws.find((w) => w.id === noteId)?.content
+          },
+          { taskId: ids.taskId, noteId: ids.noteId }
+        ),
+      { timeout: 8_000, intervals: [400, 700, 1000] }
+    )
+    .toBe('DEFAULT-WIRE-OUTPUT')
+})
