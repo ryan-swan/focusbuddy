@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { LIBRARY_PROFILES } from './agentProfileLibrary'
 
 // Agent profiles — a "job description" that makes a desk agent uniquely good at
 // a kind of work. A profile only shapes HOW the agent approaches a task (its
@@ -119,8 +120,11 @@ export const useAgentProfilesStore = create<ProfilesStore>((set, get) => ({
   }
 }))
 
+// The full library of starter-kit agents, imported as profiles.
+export { LIBRARY_PROFILES }
+
 export function allProfiles(custom: AgentProfile[]): AgentProfile[] {
-  return [...BUILT_IN_PROFILES, ...custom]
+  return [...BUILT_IN_PROFILES, ...LIBRARY_PROFILES, ...custom]
 }
 
 // Resolve a profile id (or undefined) to a profile, defaulting to the generalist.
