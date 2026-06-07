@@ -2,10 +2,15 @@ import type { Widget } from '@shared/types'
 
 // Format-aware delivery. When a wire or a desk agent pushes text into a linked
 // widget, the text must land in the SHAPE that widget kind stores — otherwise a
-// card shows raw JSON-less text, a page shows nothing, a field breaks. This maps
-// a piece of text into the right content for the target so linked items update
-// cleanly. (Tables are handled separately via the table AI build — their content
-// is a table id, not text.)
+// card shows nothing useful, a page is blank, and (worse) a structured widget
+// like another agent, a timer or a mindmap gets its JSON config overwritten by
+// raw text and breaks.
+//
+// coerceToWidgetContent returns:
+//   - a string  → write this as the target's new content
+//   - null      → SKIP delivery (don't overwrite — text isn't meaningful here)
+//
+// Tables are handled separately by the table AI build (their content is an id).
 
 function safeParse<T>(s: string | undefined | null): T | null {
   if (!s) return null
@@ -16,6 +21,17 @@ function safeParse<T>(s: string | undefined | null): T | null {
   }
 }
 
+function firstLine(text: string): string {
+  return (text.split(/\r?\n/).find((l) => l.trim()) ?? '').trim()
+}
+
+function looksLikeUrl(text: string): string | null {
+  const t = text.trim().split(/\s+/)[0] ?? ''
+  if (/^https?:\/\/\S+$/i.test(t)) return t
+  if (/^[\w-]+(\.[\w-]+)+(\/\S*)?$/.test(t)) return `https://${t}`
+  return null
+}
+
 interface TiptapNode {
   type: string
   attrs?: Record<string, unknown>
@@ -23,9 +39,7 @@ interface TiptapNode {
   text?: string
 }
 
-// Minimal, robust text/markdown → Tiptap document. Headings (#, ##, ###),
-// bullet lists (-, *) and paragraphs; everything else is a paragraph. Always
-// returns a valid doc so the page editor never chokes.
+// Minimal, robust text/markdown → Tiptap document. Always returns a valid doc.
 function textToTiptap(text: string): string {
   const out: TiptapNode[] = []
   let list: TiptapNode[] | null = null
@@ -62,17 +76,42 @@ function textToTiptap(text: string): string {
   return JSON.stringify({ type: 'doc', content: out })
 }
 
-// Returns the content string to write into `target` for the given text. Returns
-// null to mean "leave it as-is, deliver the text unchanged" for plain-text kinds.
-export function coerceToWidgetContent(target: Widget, text: string): string {
+// Text outline → mindmap: first line is the root, the rest become children.
+function textToMindmap(text: string): string | null {
+  const lines = text
+    .split(/\r?\n/)
+    .map((l) => l.replace(/^[\s>#*-]+/, '').trim())
+    .filter(Boolean)
+  if (lines.length === 0) return null
+  const root = {
+    id: 'root',
+    label: lines[0].slice(0, 120),
+    kind: 'idea',
+    children: lines.slice(1, 25).map((l, i) => ({
+      id: `n-${i}`,
+      label: l.slice(0, 120),
+      kind: 'idea',
+      children: []
+    }))
+  }
+  return JSON.stringify({ root })
+}
+
+export function coerceToWidgetContent(target: Widget, text: string): string | null {
   switch (target.kind) {
+    // ── Plain-text widgets: text IS the content ──────────────────────────────
+    case 'sticky':
+    case 'note':
+    case 'markdown':
+      return text
+
+    // ── Structured widgets with a sensible text mapping ──────────────────────
     case 'card': {
       const prev = safeParse<{ accent?: string }>(target.content)
       const lines = text.split(/\r?\n/)
-      const firstNonEmpty = lines.find((l) => l.trim()) ?? ''
-      const title = firstNonEmpty.replace(/^#+\s*/, '').replace(/^[-*]\s*/, '').slice(0, 100)
-      const bodyStart = lines.indexOf(firstNonEmpty) + 1
-      const body = lines.slice(bodyStart).join('\n').trim()
+      const head = lines.find((l) => l.trim()) ?? ''
+      const title = head.replace(/^#+\s*/, '').replace(/^[-*]\s*/, '').slice(0, 100)
+      const body = lines.slice(lines.indexOf(head) + 1).join('\n').trim()
       return JSON.stringify({
         title: title || 'Note',
         body: body || (title ? '' : text),
@@ -81,14 +120,37 @@ export function coerceToWidgetContent(target: Widget, text: string): string {
     }
     case 'page':
       return textToTiptap(text)
-    case 'field': {
-      // Keep the field's definition; set its value to the text.
-      const prev = safeParse<{ def?: unknown; value?: unknown }>(target.content)
-      if (prev?.def) return JSON.stringify({ def: prev.def, value: text })
-      return text
+    case 'mindmap':
+      return textToMindmap(text)
+    case 'shape': {
+      // Set the shape's label; keep its look. (No look yet → skip, a label-less
+      // shape change isn't meaningful.)
+      const prev = safeParse<Record<string, unknown>>(target.content)
+      if (!prev) return null
+      return JSON.stringify({ ...prev, label: firstLine(text).slice(0, 60) })
     }
-    // sticky / note / markdown and anything else: plain text is the right shape.
+    case 'field': {
+      // Keep the field's definition, set its value. No def yet → skip.
+      const prev = safeParse<{ def?: unknown; value?: unknown }>(target.content)
+      if (!prev?.def) return null
+      return JSON.stringify({ def: prev.def, value: text })
+    }
+
+    // ── URL-based widgets: only if the text is actually a URL ─────────────────
+    case 'webview':
+    case 'file':
+    case 'image': {
+      const url = looksLikeUrl(text)
+      return url ?? null
+    }
+
+    // ── Everything else stores typed config we must NOT clobber with text ─────
+    // (agent, portal, timer, color, calculator, streamdeck, diagram, scratchpad,
+    //  custom-block, voice-recorder, task-link, local-app-launcher, section,
+    //  minimap, table, gdoc/gsheet/gslide/email/pdf/video). An agent target, for
+    //  example, reads its source as an INPUT — it must never have its config
+    //  overwritten by a delivery.
     default:
-      return text
+      return null
   }
 }

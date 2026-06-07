@@ -113,6 +113,71 @@ test('an agent feeds a page as a real document', async () => {
   expect(flat).toContain('item one')
 })
 
+test('an agent feeds a mindmap as a node tree', async () => {
+  launched = await launchApp()
+  const { window } = launched
+  await waitForReady(window)
+  const ids = await window.evaluate(async (content: string) => {
+    const api = (window as unknown as { api: typeof window.api }).api
+    const task = await api.nodes.create({ parentId: null, kind: 'task', title: 'Fmt map' })
+    const map = await api.widgets.create({
+      taskId: task.id, kind: 'mindmap', title: 'Map', content: '',
+      x: 480, y: 200, width: 420, height: 320
+    })
+    const agent = await api.widgets.create({
+      taskId: task.id, kind: 'agent', title: 'Agent', content,
+      x: 120, y: 200, width: 340, height: 320
+    })
+    await api.widgetLinks.create(agent.id, map.id, task.id)
+    return { taskId: task.id, mapId: map.id }
+  }, AGENT('Launch plan\nMarketing\nEngineering\nQA'))
+
+  await openAndTrigger(window, /Fmt map/)
+  await expect
+    .poll(async () => widgetContent(window, ids.taskId, ids.mapId), { timeout: 8_000, intervals: [400, 700] })
+    .toContain('"root"')
+  const mm = JSON.parse((await widgetContent(window, ids.taskId, ids.mapId)) || '{}')
+  expect(mm.root?.label).toBe('Launch plan')
+  expect(JSON.stringify(mm.root?.children ?? [])).toContain('Marketing')
+  expect((mm.root?.children ?? []).length).toBeGreaterThanOrEqual(3)
+})
+
+test('a delivery never overwrites a structured target (another agent)', async () => {
+  launched = await launchApp()
+  const { window } = launched
+  await waitForReady(window)
+  const ids = await window.evaluate(async (content: string) => {
+    const api = (window as unknown as { api: typeof window.api }).api
+    const task = await api.nodes.create({ parentId: null, kind: 'task', title: 'Fmt skip' })
+    const a = await api.widgets.create({
+      taskId: task.id, kind: 'agent', title: 'A', content,
+      x: 120, y: 200, width: 340, height: 320
+    })
+    const b = await api.widgets.create({
+      taskId: task.id, kind: 'agent', title: 'B',
+      content: JSON.stringify({ instruction: 'keep notes', trigger: 'manual', enabled: true }),
+      x: 520, y: 200, width: 340, height: 320
+    })
+    await api.widgetLinks.create(a.id, b.id, task.id)
+    return { taskId: task.id, aId: a.id, bId: b.id }
+  }, AGENT('arbitrary text the upstream agent produced'))
+
+  await window.reload()
+  await waitForReady(window)
+  await window.getByRole('button', { name: /Fmt skip/ }).first().click()
+  await window.waitForSelector('[data-canvas-surface="true"]', { timeout: 5_000 })
+  await window.waitForTimeout(400)
+  await hideAssistant(window)
+  // Trigger agent A by editing its instruction.
+  await window.locator(`[data-widget-id="${ids.aId}"] [data-testid="agent-instruction"]`).fill('do it')
+  await window.waitForTimeout(1800)
+
+  // Agent B's config was NOT overwritten by A's text — it's still a valid agent.
+  const bContent = await widgetContent(window, ids.taskId, ids.bId)
+  const b = JSON.parse(bContent || '{}')
+  expect(b.instruction).toBe('keep notes')
+})
+
 test('an agent feeding a table never overwrites the table id with text', async () => {
   launched = await launchApp()
   const { window } = launched
