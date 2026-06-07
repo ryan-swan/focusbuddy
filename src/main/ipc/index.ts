@@ -443,7 +443,8 @@ export function registerIpcHandlers(): void {
       taskId: string,
       instruction: string,
       liveInputs?: Record<string, string>,
-      persona?: string
+      persona?: string,
+      browserWcId?: number
     ) => {
       const links = listLinksByTask(taskId)
       const inputWidgets = links
@@ -456,7 +457,7 @@ export function registerIpcHandlers(): void {
       const inputs = await Promise.all(
         inputWidgets.map((w) => describeWidgetForAgent(w, liveInputs?.[w.id]))
       )
-      return runDeskAgent({ instruction, inputs, persona })
+      return runDeskAgent({ instruction, inputs, persona, browserWcId })
     }
   )
 

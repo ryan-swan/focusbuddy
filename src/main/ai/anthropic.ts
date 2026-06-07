@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk'
+import { BROWSER_TOOLS, runBrowserTool } from './agentBrowser'
 import { getNode } from '../db/nodes'
 import { getWidget, listWidgetsByTask } from '../db/widgets'
 import { listLinksByTask } from '../db/widgetLinks'
@@ -1654,6 +1655,8 @@ export async function runDeskAgent(input: {
   // approach. It is layered into the system prompt but CANNOT change the rules
   // below or how the output is later applied to widgets.
   persona?: string
+  // webContents id of a wired browser the agent may DRIVE to research.
+  browserWcId?: number
 }): Promise<DeskAgentResult> {
   const c = getClient()
   if (!c) {
@@ -1692,11 +1695,58 @@ export async function runDeskAgent(input: {
     // app — not you — decides how your output updates other widgets, and it
     // never deletes or overwrites existing data. Just produce the content.
     'You never manage how your output is written into other widgets; the app applies it safely ' +
-    '(it updates tables and notes without erasing existing data). Just produce the content itself.'
+    '(it updates tables and notes without erasing existing data). Just produce the content itself.' +
+    (input.browserWcId
+      ? ' You can DRIVE the wired browser to research: use read_current_page to read what is on screen, ' +
+        'open_url to visit a page, and web_search to find sources. Browse as needed, then write your output. ' +
+        'Do not ask the user to paste page content — read it yourself with the tools.'
+      : '')
 
   const user = `Standing instruction:\n${instruction}\n\nWired inputs:\n${inputBlock}\n\nProduce your output now.`
 
   try {
+    // Browser research loop — when a browser is wired in, the agent can call
+    // tools to read/navigate/search it, then synthesize. Bounded iterations.
+    if (input.browserWcId) {
+      const messages: Anthropic.MessageParam[] = [{ role: 'user', content: user }]
+      for (let step = 0; step < 6; step++) {
+        const resp = await c.messages.create({
+          model: resolveModel('desk_agent'),
+          max_tokens: 1500,
+          system,
+          tools: BROWSER_TOOLS,
+          messages
+        })
+        if ((resp.stop_reason as string) === 'refusal') {
+          return { ok: false, error: 'Claude declined this agent run.' }
+        }
+        messages.push({ role: 'assistant', content: resp.content })
+        if (resp.stop_reason === 'tool_use') {
+          const results: Anthropic.ToolResultBlockParam[] = []
+          for (const block of resp.content) {
+            if (block.type === 'tool_use') {
+              const out = await runBrowserTool(
+                input.browserWcId,
+                block.name,
+                (block.input ?? {}) as Record<string, unknown>
+              )
+              results.push({ type: 'tool_result', tool_use_id: block.id, content: out })
+            }
+          }
+          messages.push({ role: 'user', content: results })
+          continue
+        }
+        const text = resp.content
+          .filter((b) => b.type === 'text')
+          .map((b) => ('text' in b ? b.text : ''))
+          .join('')
+          .trim()
+        if (text) return { ok: true, output: text }
+        break
+      }
+      return { ok: false, error: 'The agent kept browsing without producing an answer.' }
+    }
+
     const resp = await c.messages.create({
       model: resolveModel('desk_agent'),
       max_tokens: 1024,

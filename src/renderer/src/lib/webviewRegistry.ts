@@ -30,6 +30,15 @@ function elByWidgetId(widgetId: string): HTMLElement | null {
   return null
 }
 
+// The webContents id of a mounted browser widget, so the main process can DRIVE
+// it (read / navigate / search) when an agent is wired to it.
+export function getWebContentsId(widgetId: string): number | null {
+  for (const [cid, entry] of byContentsId) {
+    if (entry.widgetId === widgetId) return cid
+  }
+  return null
+}
+
 // Extract the LIVE, rendered, authenticated text of a mounted browser widget by
 // running document.body.innerText inside its <webview>. This is what lets a desk
 // agent (or a transform wire) actually read a page the user is logged into —

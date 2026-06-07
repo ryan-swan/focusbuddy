@@ -665,13 +665,15 @@ const api = {
       taskId: string,
       instruction: string,
       liveInputs?: Record<string, string>,
-      persona?: string
+      persona?: string,
+      browserWcId?: number
     ): Promise<{
       ok: boolean
       output?: string
       needsApiKey?: boolean
       error?: string
-    }> => ipcRenderer.invoke('agents:run', agentId, taskId, instruction, liveInputs, persona),
+    }> =>
+      ipcRenderer.invoke('agents:run', agentId, taskId, instruction, liveInputs, persona, browserWcId),
     designProfile: (
       description: string
     ): Promise<{
