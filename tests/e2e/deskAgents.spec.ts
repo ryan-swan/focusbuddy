@@ -166,3 +166,71 @@ test('the onChange trigger fires a run when a wired input changes', async () => 
     })
     .not.toBeNull()
 })
+
+test('an agent feeds its output into a note via a mirror wire', async () => {
+  launched = await launchApp()
+  const { window } = launched
+  await waitForReady(window)
+
+  const ids = await window.evaluate(async () => {
+    const api = (window as unknown as { api: typeof window.api }).api
+    const task = await api.nodes.create({ parentId: null, kind: 'task', title: 'Agent feed' })
+    const note = await api.widgets.create({
+      taskId: task.id,
+      kind: 'note',
+      title: 'out',
+      content: '',
+      x: 480,
+      y: 200,
+      width: 240,
+      height: 180
+    })
+    const agent = await api.widgets.create({
+      taskId: task.id,
+      kind: 'agent',
+      title: 'Agent',
+      content: JSON.stringify({
+        instruction: 'summarize',
+        trigger: 'manual',
+        enabled: true,
+        lastOutput: 'AGENT-OUTPUT-FEED'
+      }),
+      x: 120,
+      y: 200,
+      width: 340,
+      height: 320
+    })
+    // Mirror wire FROM the agent INTO the note — delivers the agent's output.
+    await api.widgetLinks.create(agent.id, note.id, task.id, 'mirror')
+    return { taskId: task.id, agentId: agent.id, noteId: note.id }
+  })
+
+  await window.reload()
+  await waitForReady(window)
+  await window.getByRole('button', { name: /Agent feed/ }).first().click()
+  await window.waitForSelector('[data-canvas-surface="true"]', { timeout: 5_000 })
+  await window.waitForTimeout(400)
+  await hideAssistant(window)
+
+  // The agent shows it feeds a downstream widget.
+  await expect(window.locator('[data-testid="agent-output-count"]')).toContainText(/feeds 1/i)
+
+  // Touch the agent (edit its instruction) so its content change fires the
+  // mirror wire; the note receives the agent's latest OUTPUT (not its JSON).
+  await window.locator('[data-testid="agent-instruction"]').fill('summarize the inputs briefly')
+
+  await expect
+    .poll(
+      async () =>
+        window.evaluate(
+          async ({ taskId, noteId }: { taskId: string; noteId: string }) => {
+            const api = (window as unknown as { api: typeof window.api }).api
+            const ws = await api.widgets.listByTask(taskId)
+            return ws.find((w) => w.id === noteId)?.content
+          },
+          { taskId: ids.taskId, noteId: ids.noteId }
+        ),
+      { timeout: 8_000, intervals: [400, 700, 1000] }
+    )
+    .toBe('AGENT-OUTPUT-FEED')
+})

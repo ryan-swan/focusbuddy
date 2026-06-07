@@ -1,6 +1,15 @@
 import { create } from 'zustand'
+import type { Widget } from '@shared/types'
 import { useLinksStore } from '../stores/links'
 import { useWidgetStore } from '../stores/widgets'
+import { parseAgent } from './deskAgent'
+
+// The content that flows OUT of a widget along a wire. For a desk agent that is
+// its latest output (not its raw JSON config), so an agent can feed a note via a
+// mirror wire or be the source of a transform. Everything else flows its content.
+function effectiveContent(w: Widget): string {
+  return w.kind === 'agent' ? parseAgent(w.content).lastOutput ?? '' : w.content ?? ''
+}
 
 // ── Live wires: the reactive engine ──────────────────────────────────────────
 //
@@ -105,10 +114,11 @@ async function runWire(wireId: string, gen: number): Promise<void> {
   const runStore = useWireRunStore.getState()
 
   if (wire.type === 'mirror') {
-    // Pure copy. Guard the target so it doesn't bounce back.
-    if (source.content === target.content) return
+    // Pure copy of the source's effective content (an agent feeds its output).
+    const src = effectiveContent(source)
+    if (src === target.content) return
     writeCooldown.set(target.id, Date.now())
-    await widgets.update(target.id, { content: source.content ?? '' })
+    await widgets.update(target.id, { content: src })
     runStore.markRan(wire.id, Date.now())
     return
   }

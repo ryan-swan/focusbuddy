@@ -233,6 +233,19 @@ import type {
   WireType
 } from '@shared/types'
 
+// The content a widget contributes when it is the SOURCE of a wire or a desk
+// agent's input. A desk agent contributes its latest OUTPUT (parsed from its
+// config JSON), not the raw config, so its results flow cleanly downstream.
+function wireSourceContent(w: { kind: string; content: string | null }): string {
+  if (w.kind !== 'agent') return w.content ?? ''
+  try {
+    const cfg = JSON.parse(w.content ?? '{}') as { lastOutput?: string }
+    return cfg.lastOutput ?? ''
+  } catch {
+    return ''
+  }
+}
+
 export function registerIpcHandlers(): void {
   // ── Body-double cross-window relay ──────────────────────────────────────
   // BroadcastChannel is per-renderer-process — fine for two browser tabs,
@@ -417,7 +430,8 @@ export function registerIpcHandlers(): void {
       return { ok: false, error: 'A wired widget no longer exists.' }
     }
     return runTransformWire({
-      sourceContent: source.content ?? '',
+      // An agent source feeds its OUTPUT, not its JSON config.
+      sourceContent: wireSourceContent(source),
       verb,
       targetCurrentContent: target.content ?? ''
     })
@@ -425,7 +439,8 @@ export function registerIpcHandlers(): void {
 
   // Desk agents: gather the agent's wired inputs (widgets wired INTO it) in
   // main and run the standing instruction over them. Returns plain-text output
-  // for the renderer to log on the agent widget.
+  // for the renderer to log on the agent widget. An agent wired in contributes
+  // its latest OUTPUT as the input (so agents can pipeline into each other).
   ipcMain.handle('agents:run', async (_e, agentId: string, taskId: string, instruction: string) => {
     const links = listLinksByTask(taskId)
     const inputIds = links
@@ -434,7 +449,7 @@ export function registerIpcHandlers(): void {
     const inputs = inputIds
       .map((id) => getWidget(id))
       .filter((w): w is NonNullable<typeof w> => !!w && !w.archived)
-      .map((w) => ({ kind: w.kind, title: w.title ?? '', content: w.content ?? '' }))
+      .map((w) => ({ kind: w.kind, title: w.title ?? '', content: wireSourceContent(w) }))
     return runDeskAgent({ instruction, inputs })
   })
 
