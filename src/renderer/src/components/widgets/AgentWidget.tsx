@@ -5,12 +5,14 @@ import Icon from '../Icon'
 import { useWidgetStore } from '../../stores/widgets'
 import { useLinksStore } from '../../stores/links'
 import {
+  DEFAULT_AGENT,
   MIN_INTERVAL_SEC,
   parseAgent,
   serializeAgent,
   type AgentConfig,
   type AgentTrigger
 } from '../../lib/deskAgent'
+import { recommendProfileLocal, type ProfileSuggestion } from '../../lib/agentRecommend'
 import { runAgent, useAgentRunStore } from '../../lib/deskAgentEngine'
 import {
   allProfiles,
@@ -128,11 +130,104 @@ export default function AgentWidget({ widget }: Props): JSX.Element {
   const [profileMenu, setProfileMenu] = useState(false)
   const [profileDialog, setProfileDialog] = useState(false)
   const [profileQuery, setProfileQuery] = useState('')
+  const allList = useMemo(() => allProfiles(customProfiles), [customProfiles])
   const profileList = useMemo(() => {
     const q = profileQuery.trim().toLowerCase()
-    const all = allProfiles(customProfiles)
-    return q ? all.filter((p) => `${p.name} ${p.blurb}`.toLowerCase().includes(q)) : all
-  }, [customProfiles, profileQuery])
+    return q ? allList.filter((p) => `${p.name} ${p.blurb}`.toLowerCase().includes(q)) : allList
+  }, [allList, profileQuery])
+
+  // ── Intelligent agent suggestion (non-intrusive) ─────────────────────────
+  const [suggestion, setSuggestion] = useState<ProfileSuggestion | null>(null)
+  const dismissed = useRef<Set<string>>(new Set())
+  const [specialist, setSpecialist] = useState<AgentProfile | null>(null)
+  const [specialistBusy, setSpecialistBusy] = useState(false)
+
+  // Recompute the instant, local suggestion shortly after the instruction
+  // settles. Never blocks typing; only surfaces a clearly-better role.
+  useEffect(() => {
+    const h = window.setTimeout(() => {
+      const instr = edit.instruction.trim()
+      if (!instr || dismissed.current.has(instr)) {
+        setSuggestion(null)
+        return
+      }
+      const s = recommendProfileLocal(instr, edit.profileId, allList)
+      setSuggestion(s && s.id !== edit.profileId ? s : null)
+    }, 700)
+    return () => window.clearTimeout(h)
+  }, [edit.instruction, edit.profileId, allList])
+
+  const dismissSuggestion = (): void => {
+    const instr = edit.instruction.trim()
+    if (instr) dismissed.current.add(instr)
+    setSuggestion(null)
+  }
+
+  // Create a NEW agent with the chosen profile, wired into the SAME flows
+  // (this agent's incoming + outgoing wires are replicated), placed beside it.
+  async function addLinkedAgent(profileId: string, draft?: AgentProfile): Promise<void> {
+    if (draft) upsertProfile(draft)
+    const ls = useLinksStore.getState()
+    const incoming = ls.links.filter((l) => l.targetWidgetId === widget.id)
+    const outgoing = ls.links.filter((l) => l.sourceWidgetId === widget.id)
+    const created = await useWidgetStore.getState().create({
+      taskId: widget.taskId,
+      kind: 'agent',
+      title: widget.title || 'Agent',
+      content: serializeAgent({
+        ...DEFAULT_AGENT,
+        instruction: edit.instruction,
+        trigger: edit.trigger,
+        intervalSec: edit.intervalSec,
+        enabled: edit.enabled,
+        profileId
+      }),
+      x: widget.x + (widget.width || 340) + 40,
+      y: widget.y,
+      width: widget.width,
+      height: widget.height,
+      color: null
+    })
+    for (const l of incoming) {
+      const link = await window.api.widgetLinks.create(l.sourceWidgetId, created.id, widget.taskId, l.type)
+      if (link && l.verb) await window.api.widgetLinks.update(link.id, { verb: l.verb })
+    }
+    for (const l of outgoing) {
+      const link = await window.api.widgetLinks.create(created.id, l.targetWidgetId, widget.taskId, l.type)
+      if (link && l.verb) await window.api.widgetLinks.update(link.id, { verb: l.verb })
+    }
+    await ls.loadForTask(widget.taskId)
+    setSuggestion(null)
+    setSpecialist(null)
+  }
+
+  function replaceWithProfile(p: AgentProfile): void {
+    upsertProfile(p)
+    set({ profileId: p.id })
+    setSpecialist(null)
+    setSuggestion(null)
+  }
+
+  // AI path — design a brand-new specialist persona for this exact instruction.
+  async function makeSpecialist(): Promise<void> {
+    if (specialistBusy || !edit.instruction.trim()) return
+    setSpecialistBusy(true)
+    try {
+      const res = await window.api.agents.designProfile(edit.instruction.trim())
+      if (res.ok && res.name && res.systemPrompt) {
+        setSpecialist({
+          id: `cp-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
+          name: res.name,
+          blurb: res.blurb || 'Custom specialist',
+          icon: 'psychology',
+          systemPrompt: res.systemPrompt
+        })
+        setSuggestion(null)
+      }
+    } finally {
+      setSpecialistBusy(false)
+    }
+  }
 
   const body = (
     <div
@@ -245,6 +340,92 @@ export default function AgentWidget({ widget }: Props): JSX.Element {
             </span>
           )}
         </div>
+
+        {/* Intelligent suggestion — a better-fitting existing role. */}
+        {suggestion && !specialist && (
+          <div
+            className="mt-2 flex items-center gap-1.5 rounded-md border border-accent/40 bg-accent/[0.06] px-2 py-1.5 text-[10px]"
+            data-testid="agent-suggestion"
+            data-suggested-id={suggestion.id}
+          >
+            <Icon name="tips_and_updates" size={13} className="text-accent shrink-0" />
+            <span className="flex-1 min-w-0 truncate">
+              Better fit: <span className="font-medium">{suggestion.name}</span>
+            </span>
+            <button
+              onClick={() => {
+                set({ profileId: suggestion.id })
+                setSuggestion(null)
+              }}
+              className="px-1.5 py-0.5 rounded bg-accent text-white"
+              data-testid="agent-suggestion-switch"
+            >
+              Switch
+            </button>
+            <button
+              onClick={() => void addLinkedAgent(suggestion.id)}
+              className="px-1.5 py-0.5 rounded border border-accent/50 text-accent"
+              title="Create a new agent with this role, wired into the same flows"
+              data-testid="agent-suggestion-add"
+            >
+              + linked
+            </button>
+            <button
+              onClick={dismissSuggestion}
+              className="text-stone-400 hover:text-stone-600 shrink-0"
+              aria-label="Dismiss suggestion"
+            >
+              <Icon name="close" size={12} />
+            </button>
+          </div>
+        )}
+
+        {/* A freshly-designed specialist persona — replace this agent or spin up
+            a linked one. */}
+        {specialist && (
+          <div
+            className="mt-2 rounded-md border border-accent/40 bg-accent/[0.06] px-2 py-1.5 text-[10px]"
+            data-testid="agent-specialist"
+          >
+            <div className="flex items-center gap-1.5">
+              <Icon name="psychology" size={13} className="text-accent shrink-0" />
+              <span className="flex-1 font-medium truncate">{specialist.name}</span>
+              <button onClick={() => setSpecialist(null)} className="text-stone-400 hover:text-stone-600" aria-label="Dismiss">
+                <Icon name="close" size={12} />
+              </button>
+            </div>
+            <div className="text-stone-500 dark:text-stone-400 mt-0.5">{specialist.blurb}</div>
+            <div className="flex items-center gap-1.5 mt-1.5">
+              <button
+                onClick={() => replaceWithProfile(specialist)}
+                className="px-1.5 py-0.5 rounded bg-accent text-white"
+                data-testid="agent-specialist-replace"
+              >
+                Replace this agent
+              </button>
+              <button
+                onClick={() => void addLinkedAgent(specialist.id, specialist)}
+                className="px-1.5 py-0.5 rounded border border-accent/50 text-accent"
+                data-testid="agent-specialist-add"
+              >
+                Create linked agent
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* AI entry point — design a specialist for this exact instruction. */}
+        {!specialist && edit.instruction.trim().length > 10 && (
+          <button
+            onClick={() => void makeSpecialist()}
+            disabled={specialistBusy}
+            className="mt-1.5 inline-flex items-center gap-1 text-[9px] text-stone-500 hover:text-accent disabled:opacity-60"
+            data-testid="agent-make-specialist"
+          >
+            <Icon name={specialistBusy ? 'hourglass_empty' : 'auto_awesome'} size={11} />
+            {specialistBusy ? 'Designing…' : 'Design a specialist for this'}
+          </button>
+        )}
       </div>
 
       {/* Controls */}
