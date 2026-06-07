@@ -1,16 +1,19 @@
-import type { FieldDefinition, FieldType } from '@shared/fields'
+import type { FbRow, FieldDefinition, FieldType } from '@shared/fields'
 import { defaultConfig } from '@shared/fields'
 import { useTablesStore } from '../stores/tables'
 import { coerceCellValue } from './actionExecutor'
 
-// Build/populate a table from free text using the SAME AI path the in-table
-// assistant uses (suggestTableRows → add proposed columns → coerce + insert
-// rows). This is what lets a wire or a desk agent feed a table so it ends up
-// "configured as if the user used the table's AI" — proper typed columns and
-// rows — instead of raw text landing in the table's id field.
+// Build/maintain a table from free text using the SAME AI path the in-table
+// assistant uses (suggestTableRows → add proposed columns → coerce rows). This
+// lets a wire or a desk agent feed a table so it ends up "configured as if the
+// user used the table's AI" — proper typed columns and rows — instead of raw
+// text landing in the table's id field.
 //
-// Rows are REPLACED on each build (the source owns the table's contents), so an
-// agent re-running refreshes the table rather than piling up duplicates.
+// CRITICAL: this is a non-destructive UPSERT, never a wipe-and-replace. The AI
+// sees the table's CURRENT rows + the instruction, and we match returned rows to
+// existing ones by their key column: a match UPDATES that row in place, a new
+// item ADDS a row, and rows the AI doesn't mention are LEFT ALONE. So asking an
+// agent to "complete task X" updates that row instead of deleting the table.
 
 const PALETTE = [
   '#ef4444', '#f97316', '#eab308', '#22c55e', '#06b6d4', '#3b82f6', '#a855f7', '#ec4899'
@@ -40,19 +43,46 @@ export interface TableBuildResult {
 export async function buildTableFromText(
   tableId: string,
   material: string,
-  extraInstruction?: string
+  instruction?: string
 ): Promise<TableBuildResult> {
   if (!tableId) return { ok: false, error: 'No linked table.' }
   const tables = useTablesStore.getState()
   const table = await tables.ensureTableLoaded(tableId)
   if (!table) return { ok: false, error: 'Linked table not found.' }
+  const existingRows = await tables.ensureRowsLoaded(tableId)
 
-  const lead = extraInstruction && extraInstruction.trim()
-    ? `${extraInstruction.trim()}\n\n`
-    : 'Populate this table from the following content. Make one row per item.\n\n'
-  const resp = await window.api.ai.suggestTableRows(tableId, lead + material.slice(0, 8000), 0)
+  // The key column we match rows on (first text column, else the first column).
+  const cols0 = table.schema.columns
+  const keyCol =
+    cols0.find((c) => c.type === 'text-short' || c.type === 'text-long') ?? cols0[0] ?? null
+
+  // Show the AI the current rows so it UPDATES the right ones instead of
+  // regenerating the table from scratch.
+  const rowsCtx = existingRows.length
+    ? existingRows
+        .map((r) => cols0.map((c) => `${c.label}: ${String(r.cells[c.id] ?? '')}`).join(' | '))
+        .join('\n')
+    : '(no rows yet)'
+
+  const prompt =
+    `The table currently contains these rows:\n${rowsCtx}\n\n` +
+    (instruction && instruction.trim()
+      ? `Request: ${instruction.trim()}\n\n`
+      : 'Request: update this table from the material below.\n\n') +
+    `Material to work from:\n${material.slice(0, 8000)}\n\n` +
+    (keyCol
+      ? `Return ONLY rows to add or update. To UPDATE an existing row, return it with the exact same "${keyCol.label}" value and just the fields that change. Add a row only for a genuinely new item. Do NOT restate unchanged rows and never remove rows.`
+      : 'Return rows to add or update; never remove rows.')
+
+  const resp = await window.api.ai.suggestTableRows(tableId, prompt, 0)
   if (!resp.ok) return { ok: false, error: resp.error ?? 'Table AI failed.' }
-  if (!resp.rows || resp.rows.length === 0) return { ok: false, error: 'No rows generated.' }
+  if (!resp.rows || resp.rows.length === 0) {
+    // Nothing to change is fine for a populated table; only an error if the
+    // table was empty and we still got nothing.
+    return existingRows.length > 0
+      ? { ok: true, rows: 0 }
+      : { ok: false, error: 'No rows generated.' }
+  }
 
   // Add any proposed columns the table doesn't already have.
   const fresh = (resp.columnsToAdd ?? []).filter((c) => {
@@ -65,17 +95,23 @@ export async function buildTableFromText(
     })
   }
 
-  // Replace existing rows.
-  const existing = await tables.ensureRowsLoaded(tableId)
-  for (const r of existing) await tables.deleteRow(r.id)
-
   const cols = useTablesStore.getState().tables[tableId]?.schema.columns ?? table.schema.columns
   const byKey = new Map<string, FieldDefinition>()
   for (const col of cols) {
     byKey.set(col.id, col)
     byKey.set(col.label.toLowerCase().trim(), col)
   }
-  let count = 0
+  // Index existing rows by their key-column value for matching.
+  const keyColId = keyCol?.id ?? null
+  const existingByKey = new Map<string, FbRow>()
+  if (keyColId) {
+    for (const r of await tables.ensureRowsLoaded(tableId)) {
+      const k = String(r.cells[keyColId] ?? '').toLowerCase().trim()
+      if (k) existingByKey.set(k, r)
+    }
+  }
+
+  let changed = 0
   for (const aiRow of resp.rows) {
     const cells: Record<string, unknown> = {}
     for (const [key, raw] of Object.entries(aiRow)) {
@@ -83,10 +119,15 @@ export async function buildTableFromText(
       if (!col) continue
       cells[col.id] = coerceCellValue(col.type, raw, col.config)
     }
-    if (Object.keys(cells).length > 0) {
-      await tables.addRow(tableId, cells)
-      count++
+    if (Object.keys(cells).length === 0) continue
+    const keyVal = keyColId ? String(cells[keyColId] ?? '').toLowerCase().trim() : ''
+    const match = keyVal ? existingByKey.get(keyVal) : null
+    if (match) {
+      await tables.updateCells(match.id, cells) // UPDATE in place
+    } else {
+      await tables.addRow(tableId, cells) // genuinely new
     }
+    changed++
   }
-  return { ok: true, rows: count }
+  return { ok: true, rows: changed }
 }

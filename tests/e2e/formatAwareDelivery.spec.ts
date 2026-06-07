@@ -124,6 +124,8 @@ test('an agent feeding a table never overwrites the table id with text', async (
       taskId: task.id, title: 'Tasks',
       schema: { columns: [{ id: 'c_name', label: 'Name', type: 'text-short', config: {} }] }
     } as never)
+    // A pre-existing row the user added — it must NEVER be deleted by a feed.
+    await api.tables.createRow({ tableId: tbl.id, cells: { c_name: 'Existing task' } } as never)
     const table = await api.widgets.create({
       taskId: task.id, kind: 'table', title: 'Tasks', content: tbl.id,
       x: 480, y: 200, width: 420, height: 280
@@ -137,14 +139,16 @@ test('an agent feeding a table never overwrites the table id with text', async (
   }, AGENT('Buy milk\nEmail Dana\nShip the build'))
 
   await openAndTrigger(window, /Fmt table/)
-  await window.waitForTimeout(2500) // let the (no-key) build attempt run + settle
+  await window.waitForTimeout(2500) // let the build attempt run + settle
 
   // The widget's content is STILL the backing table id — not the agent's text.
   const content = await widgetContent(window, ids.taskId, ids.tableWidgetId)
   expect(content).toBe(ids.tableId)
-  const stillReal = await window.evaluate(async (tid: string) => {
+  // And the user's existing row was NOT deleted (non-destructive upsert).
+  const survived = await window.evaluate(async (tid: string) => {
     const api = (window as unknown as { api: typeof window.api }).api
-    return !!(await api.tables.get(tid))
+    const rows = await api.tables.listRows(tid)
+    return rows.some((r) => r.cells['c_name'] === 'Existing task')
   }, ids.tableId)
-  expect(stillReal).toBe(true)
+  expect(survived).toBe(true)
 })
