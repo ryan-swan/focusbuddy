@@ -98,11 +98,17 @@ async function applyCreateWidget(
     return { ok: false, message: 'Open a task first — widgets need a canvas.' }
   }
   const entry = catalogFor(p.widgetKind)
+  // A table widget's content is its backing-table id, NOT free text. If the AI
+  // emits create-widget(table) with arbitrary content, that becomes a dangling
+  // table id and the widget hangs on "Loading table…". Force empty so the table
+  // widget self-provisions a real backing table. (Proper table creation goes
+  // through the create-table proposal, which builds the schema + rows.)
+  const content = p.widgetKind === 'table' ? '' : p.content ?? entry?.defaultContent ?? ''
   await useWidgetStore.getState().create({
     taskId: ctx.activeTaskId,
     kind: p.widgetKind as WidgetKind,
     title: p.title ?? '',
-    content: p.content ?? entry?.defaultContent ?? '',
+    content,
     width: entry?.defaultWidth,
     height: entry?.defaultHeight,
     color: p.widgetKind === 'sticky' ? '#fef08a' : null
