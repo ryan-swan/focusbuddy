@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { useLinksStore } from '../stores/links'
 import { useWidgetStore } from '../stores/widgets'
 import { parseAgent, serializeAgent, withRun } from './deskAgent'
-import { extractWebviewText } from './webviewRegistry'
+import { extractWebviewText, getWebContentsId } from './webviewRegistry'
 import { resolveProfile, useAgentProfilesStore } from './agentProfiles'
 
 // Collect the LIVE rendered text of any browser widgets wired into this agent,
@@ -85,7 +85,26 @@ export async function runAgent(agentId: string): Promise<void> {
     const liveInputs = await gatherLiveInputs(agentId)
     // The profile persona shapes the approach; hygiene stays enforced in code.
     const persona = resolveProfile(cfg.profileId, useAgentProfilesStore.getState().custom).systemPrompt
-    const res = await window.api.agents.run(agentId, agent.taskId, cfg.instruction, liveInputs, persona)
+    // If a browser is wired into this agent, hand its webContents id to main so
+    // the agent can DRIVE it (read / navigate / search) to research.
+    let browserWcId: number | undefined
+    for (const l of useLinksStore.getState().links.filter((x) => x.targetWidgetId === agentId)) {
+      if (useWidgetStore.getState().widgets.find((w) => w.id === l.sourceWidgetId)?.kind === 'webview') {
+        const cid = getWebContentsId(l.sourceWidgetId)
+        if (cid) {
+          browserWcId = cid
+          break
+        }
+      }
+    }
+    const res = await window.api.agents.run(
+      agentId,
+      agent.taskId,
+      cfg.instruction,
+      liveInputs,
+      persona,
+      browserWcId
+    )
     const at = Date.now()
     if (!res.ok) {
       await writeLog(agentId, parseAgent(latestContent(agentId) ?? agent.content), {
