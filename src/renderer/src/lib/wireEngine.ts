@@ -3,6 +3,7 @@ import type { Widget } from '@shared/types'
 import { useLinksStore } from '../stores/links'
 import { useWidgetStore } from '../stores/widgets'
 import { parseAgent } from './deskAgent'
+import { extractWebviewText } from './webviewRegistry'
 
 // The content that flows OUT of a widget along a wire. For a desk agent that is
 // its latest output (not its raw JSON config), so an agent can feed a note via a
@@ -143,7 +144,10 @@ async function runWire(wireId: string, gen: number): Promise<void> {
   runStore.setError(wire.id, null)
   runStore.setRunning(wire.id, true)
   try {
-    const res = await window.api.wires.runTransform(source.id, target.id, wire.verb)
+    // If the source is a browser, hand main its LIVE rendered text so a
+    // transform can read a logged-in page rather than a blind URL fetch.
+    const liveText = source.kind === 'webview' ? (await extractWebviewText(source.id)) ?? undefined : undefined
+    const res = await window.api.wires.runTransform(source.id, target.id, wire.verb, liveText)
     // Superseded by a newer edit while we were waiting — drop this result.
     if ((wireGeneration.get(wire.id) ?? gen) !== gen) return
     if (!res.ok) {

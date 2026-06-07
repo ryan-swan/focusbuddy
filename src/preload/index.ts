@@ -114,14 +114,15 @@ const api = {
     runTransform: (
       sourceId: string,
       targetId: string,
-      verb: string
+      verb: string,
+      liveText?: string
     ): Promise<{
       ok: boolean
       result?: string
       skipped?: boolean
       needsApiKey?: boolean
       error?: string
-    }> => ipcRenderer.invoke('wires:runTransform', sourceId, targetId, verb)
+    }> => ipcRenderer.invoke('wires:runTransform', sourceId, targetId, verb, liveText)
   },
   shares: {
     listAll: (): Promise<ShareLink[]> => ipcRenderer.invoke('shares:listAll'),
@@ -662,13 +663,14 @@ const api = {
     run: (
       agentId: string,
       taskId: string,
-      instruction: string
+      instruction: string,
+      liveInputs?: Record<string, string>
     ): Promise<{
       ok: boolean
       output?: string
       needsApiKey?: boolean
       error?: string
-    }> => ipcRenderer.invoke('agents:run', agentId, taskId, instruction),
+    }> => ipcRenderer.invoke('agents:run', agentId, taskId, instruction, liveInputs),
     create: (input: {
       slug: string
       description: string

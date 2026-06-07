@@ -82,12 +82,17 @@ export interface AgentInput {
   content: string
 }
 
-export async function describeWidgetForAgent(w: Widget): Promise<AgentInput> {
+export async function describeWidgetForAgent(w: Widget, liveText?: string): Promise<AgentInput> {
   const base = { kind: w.kind, title: w.title ?? '' }
   const raw = w.content ?? ''
   switch (w.kind) {
-    case 'webview':
-      return { ...base, content: `Browser tab at ${raw || '(no URL)'}\n\n${await fetchPageText(raw)}` }
+    case 'webview': {
+      // Prefer the live, authenticated, rendered page text captured from the
+      // mounted webview; only fall back to a server-side fetch when it wasn't
+      // available (page not mounted).
+      const page = liveText && liveText.trim() ? liveText : await fetchPageText(raw)
+      return { ...base, content: `Browser tab at ${raw || '(no URL)'}\n\n${page}` }
+    }
     case 'table':
       return { ...base, content: raw ? tableText(raw) : '(empty table)' }
     case 'page':

@@ -411,37 +411,52 @@ export function registerIpcHandlers(): void {
   // Live wires: run a transform wire. Reads the source + target content in
   // main (avoids shipping large documents over IPC twice) and returns the
   // plain-text result for the renderer to write into the target.
-  ipcMain.handle('wires:runTransform', async (_e, sourceId: string, targetId: string, verb: string) => {
-    const source = getWidget(sourceId)
-    const target = getWidget(targetId)
-    if (!source || !target) {
-      return { ok: false, error: 'A wired widget no longer exists.' }
+  ipcMain.handle(
+    'wires:runTransform',
+    async (_e, sourceId: string, targetId: string, verb: string, liveText?: string) => {
+      const source = getWidget(sourceId)
+      const target = getWidget(targetId)
+      if (!source || !target) {
+        return { ok: false, error: 'A wired widget no longer exists.' }
+      }
+      // Resolve the source to real content (an agent feeds its output; a browser
+      // contributes its LIVE page text if supplied, else a server-side fetch).
+      const described = await describeWidgetForAgent(source, liveText)
+      return runTransformWire({
+        sourceContent: described.content,
+        verb,
+        targetCurrentContent: target.content ?? ''
+      })
     }
-    // Resolve the source to real content (an agent feeds its output; a browser
-    // is fetched so a transform can research the page), same as agent inputs.
-    const described = await describeWidgetForAgent(source)
-    return runTransformWire({
-      sourceContent: described.content,
-      verb,
-      targetCurrentContent: target.content ?? ''
-    })
-  })
+  )
 
   // Desk agents: gather the agent's wired inputs (widgets wired INTO it) in
   // main and run the standing instruction over them. Returns plain-text output
   // for the renderer to log on the agent widget. An agent wired in contributes
   // its latest OUTPUT as the input (so agents can pipeline into each other).
-  ipcMain.handle('agents:run', async (_e, agentId: string, taskId: string, instruction: string) => {
-    const links = listLinksByTask(taskId)
-    const inputWidgets = links
-      .filter((l) => l.targetWidgetId === agentId)
-      .map((l) => getWidget(l.sourceWidgetId))
-      .filter((w): w is NonNullable<ReturnType<typeof getWidget>> => !!w && !w.archived)
-    // Resolve each input to real, readable content — a browser is FETCHED so the
-    // agent can actually research the page, a table becomes its rows, etc.
-    const inputs = await Promise.all(inputWidgets.map((w) => describeWidgetForAgent(w)))
-    return runDeskAgent({ instruction, inputs })
-  })
+  ipcMain.handle(
+    'agents:run',
+    async (
+      _e,
+      agentId: string,
+      taskId: string,
+      instruction: string,
+      liveInputs?: Record<string, string>
+    ) => {
+      const links = listLinksByTask(taskId)
+      const inputWidgets = links
+        .filter((l) => l.targetWidgetId === agentId)
+        .map((l) => getWidget(l.sourceWidgetId))
+        .filter((w): w is NonNullable<ReturnType<typeof getWidget>> => !!w && !w.archived)
+      // Resolve each input to real, readable content. A browser uses its LIVE
+      // rendered text when the renderer supplied it (so logged-in pages work),
+      // else a server-side fetch; a table becomes its rows, etc.
+      const inputs = await Promise.all(
+        inputWidgets.map((w) => describeWidgetForAgent(w, liveInputs?.[w.id]))
+      )
+      return runDeskAgent({ instruction, inputs })
+    }
+  )
 
   ipcMain.handle('templates:list', () => listTemplates())
   ipcMain.handle(

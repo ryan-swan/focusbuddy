@@ -2,6 +2,25 @@ import { create } from 'zustand'
 import { useLinksStore } from '../stores/links'
 import { useWidgetStore } from '../stores/widgets'
 import { parseAgent, serializeAgent, withRun } from './deskAgent'
+import { extractWebviewText } from './webviewRegistry'
+
+// Collect the LIVE rendered text of any browser widgets wired into this agent,
+// so logged-in / JS-rendered pages reach the model instead of an unauthenticated
+// URL fetch. Keyed by widget id; main falls back to fetching for any not here.
+async function gatherLiveInputs(agentId: string): Promise<Record<string, string>> {
+  const links = useLinksStore.getState().links
+  const widgets = useWidgetStore.getState().widgets
+  const out: Record<string, string> = {}
+  const inputIds = links
+    .filter((l) => l.targetWidgetId === agentId)
+    .map((l) => l.sourceWidgetId)
+  for (const id of inputIds) {
+    if (widgets.find((w) => w.id === id)?.kind !== 'webview') continue
+    const text = await extractWebviewText(id)
+    if (text) out[id] = text
+  }
+  return out
+}
 
 // ── Desk agents: the run engine ──────────────────────────────────────────────
 //
@@ -62,7 +81,8 @@ export async function runAgent(agentId: string): Promise<void> {
   inflight.add(agentId)
   useAgentRunStore.getState().setRunning(agentId, true)
   try {
-    const res = await window.api.agents.run(agentId, agent.taskId, cfg.instruction)
+    const liveInputs = await gatherLiveInputs(agentId)
+    const res = await window.api.agents.run(agentId, agent.taskId, cfg.instruction, liveInputs)
     const at = Date.now()
     if (!res.ok) {
       await writeLog(agentId, parseAgent(latestContent(agentId) ?? agent.content), {
