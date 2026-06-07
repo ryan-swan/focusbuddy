@@ -66,6 +66,21 @@ test('selecting a built-in profile persists on the agent', async () => {
   await expect(window.locator('[data-testid="agent-profile-button"]')).toContainText('Research Analyst')
 })
 
+test('a starter-kit library profile can be searched and selected', async () => {
+  launched = await launchApp()
+  const { window } = launched
+  await waitForReady(window)
+  const ids = await seedAndOpen(window)
+
+  await window.locator('[data-testid="agent-profile-button"]').click()
+  await window.locator('[data-testid="agent-profile-search"]').fill('research scout')
+  await window.locator('[data-testid="agent-profile-option-lib-research-scout"]').click()
+  await window.waitForTimeout(600)
+
+  expect(await agentProfileId(window, ids.taskId)).toBe('lib-research-scout')
+  await expect(window.locator('[data-testid="agent-profile-button"]')).toContainText('Research Scout')
+})
+
 test('a custom profile can be created and selected', async () => {
   launched = await launchApp()
   const { window } = launched

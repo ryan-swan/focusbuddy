@@ -127,6 +127,12 @@ export default function AgentWidget({ widget }: Props): JSX.Element {
   const profile = resolveProfile(edit.profileId, customProfiles)
   const [profileMenu, setProfileMenu] = useState(false)
   const [profileDialog, setProfileDialog] = useState(false)
+  const [profileQuery, setProfileQuery] = useState('')
+  const profileList = useMemo(() => {
+    const q = profileQuery.trim().toLowerCase()
+    const all = allProfiles(customProfiles)
+    return q ? all.filter((p) => `${p.name} ${p.blurb}`.toLowerCase().includes(q)) : all
+  }, [customProfiles, profileQuery])
 
   const body = (
     <div
@@ -154,8 +160,18 @@ export default function AgentWidget({ widget }: Props): JSX.Element {
         {profileMenu && (
           <>
             <div className="fixed inset-0 z-10" onClick={() => setProfileMenu(false)} />
-            <div className="absolute left-2.5 right-2.5 top-full mt-1 z-20 max-h-56 overflow-y-auto rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 shadow-xl py-1">
-              {allProfiles(customProfiles).map((p) => (
+            <div className="absolute left-2.5 right-2.5 top-full mt-1 z-20 max-h-64 overflow-y-auto rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 shadow-xl py-1">
+              <div className="sticky top-0 bg-white dark:bg-stone-900 px-2 pb-1.5 pt-0.5 border-b border-stone-100 dark:border-stone-800">
+                <input
+                  autoFocus
+                  value={profileQuery}
+                  onChange={(e) => setProfileQuery(e.target.value)}
+                  placeholder="Search roles…"
+                  className="w-full px-2 py-1 rounded bg-stone-100 dark:bg-stone-800 text-[11px] focus:outline-none focus:ring-1 focus:ring-accent"
+                  data-testid="agent-profile-search"
+                />
+              </div>
+              {profileList.map((p) => (
                 <div
                   key={p.id}
                   className={`group flex items-center gap-2 px-2 py-1.5 cursor-pointer hover:bg-stone-100 dark:hover:bg-stone-800 ${
