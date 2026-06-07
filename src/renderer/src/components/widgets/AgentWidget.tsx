@@ -103,6 +103,13 @@ export default function AgentWidget({ widget }: Props): JSX.Element {
     return widgets.filter((w) => ids.has(w.id) && !w.archived)
   }, [links, widgets, widget.id])
 
+  // Widgets this agent FEEDS — its outgoing wires. A mirror wire out delivers
+  // the agent's latest output into the target automatically after each run.
+  const outputCount = useMemo(
+    () => links.filter((l) => l.sourceWidgetId === widget.id).length,
+    [links, widget.id]
+  )
+
   const set = (patch: Partial<Editable>): void => setEdit((e) => ({ ...e, ...patch }))
 
   const body = (
@@ -130,6 +137,12 @@ export default function AgentWidget({ widget }: Props): JSX.Element {
                   .slice(0, 3)
                   .join(', ')}${inputs.length > 3 ? '…' : ''}`}
           </span>
+          {outputCount > 0 && (
+            <span className="inline-flex items-center gap-0.5 text-accent" data-testid="agent-output-count">
+              <Icon name="arrow_forward" size={11} />
+              feeds {outputCount}
+            </span>
+          )}
         </div>
       </div>
 
