@@ -1650,6 +1650,10 @@ export interface DeskAgentResult {
 export async function runDeskAgent(input: {
   instruction: string
   inputs: Array<{ kind: string; title: string; content: string }>
+  // Optional profile persona ("job description") that shapes the agent's
+  // approach. It is layered into the system prompt but CANNOT change the rules
+  // below or how the output is later applied to widgets.
+  persona?: string
 }): Promise<DeskAgentResult> {
   const c = getClient()
   if (!c) {
@@ -1673,13 +1677,22 @@ export async function runDeskAgent(input: {
           })
           .join('\n\n')
 
+  const persona = input.persona?.trim()
   const system =
     'You are a desk agent: a small, standing AI worker that lives on a visual canvas. ' +
+    (persona
+      ? `\n\nYour role and expertise (shapes HOW you work):\n${persona}\n\n`
+      : '') +
     'You are given a standing instruction and the current content of the widgets wired into you. ' +
     'Do exactly what the instruction asks, using only the inputs provided. ' +
     'Return ONLY the resulting text that should appear as your latest output — no preamble, no labels, ' +
     'no meta-commentary about being an AI. Be concise and useful. ' +
-    'If the inputs do not give you enough to act on, say briefly what is missing.'
+    'If the inputs do not give you enough to act on, say briefly what is missing. ' +
+    // The hygiene guarantee. Even if a role description implies otherwise, the
+    // app — not you — decides how your output updates other widgets, and it
+    // never deletes or overwrites existing data. Just produce the content.
+    'You never manage how your output is written into other widgets; the app applies it safely ' +
+    '(it updates tables and notes without erasing existing data). Just produce the content itself.'
 
   const user = `Standing instruction:\n${instruction}\n\nWired inputs:\n${inputBlock}\n\nProduce your output now.`
 
@@ -1703,6 +1716,72 @@ export async function runDeskAgent(input: {
       .trim()
     if (!text) return { ok: false, error: 'The agent returned nothing.' }
     return { ok: true, output: text }
+  } catch (e) {
+    return { ok: false, error: (e as Error).message }
+  }
+}
+
+// Design a custom agent profile from a free-form description of what the user
+// needs. Returns a short name, a one-line blurb, and a system-prompt persona.
+export interface AgentProfileDraft {
+  ok: boolean
+  name?: string
+  blurb?: string
+  systemPrompt?: string
+  needsApiKey?: boolean
+  error?: string
+}
+
+export async function designAgentProfile(description: string): Promise<AgentProfileDraft> {
+  const c = getClient()
+  if (!c) {
+    return {
+      ok: false,
+      needsApiKey: true,
+      error: 'No Anthropic API key set. Open Settings → AI · API keys to paste one.'
+    }
+  }
+  const desc = description.trim()
+  if (!desc) return { ok: false, error: 'Describe what the agent should be good at.' }
+
+  const system =
+    'You design "agent profiles" — concise job descriptions for a small AI worker. ' +
+    'Given what the user needs, return a JSON object with exactly these keys: ' +
+    '"name" (2-4 words, a role title), "blurb" (one short sentence, under 12 words), and ' +
+    '"systemPrompt" (2-4 sentences in second person describing the role, its expertise, and HOW it ' +
+    'should approach work — judgement, priorities, tone). ' +
+    'The systemPrompt must NOT mention deleting, overwriting, or managing other widgets, files or data — ' +
+    'it only describes how the agent thinks. Return ONLY the JSON object, no prose, no code fences.'
+
+  try {
+    const resp = await c.messages.create({
+      model: resolveModel('setup'),
+      max_tokens: 600,
+      system,
+      messages: [{ role: 'user', content: desc }]
+    })
+    if ((resp.stop_reason as string) === 'refusal') {
+      return { ok: false, error: 'Claude declined this request.' }
+    }
+    const raw = resp.content
+      .filter((b) => b.type === 'text')
+      .map((b) => ('text' in b ? b.text : ''))
+      .join('')
+      .trim()
+    const parsed = JSON.parse(raw.replace(/^```(?:json)?\s*|\s*```$/g, '')) as {
+      name?: string
+      blurb?: string
+      systemPrompt?: string
+    }
+    if (!parsed.name || !parsed.systemPrompt) {
+      return { ok: false, error: 'Could not generate a profile. Try a clearer description.' }
+    }
+    return {
+      ok: true,
+      name: String(parsed.name).slice(0, 40),
+      blurb: String(parsed.blurb ?? '').slice(0, 120),
+      systemPrompt: String(parsed.systemPrompt).slice(0, 1200)
+    }
   } catch (e) {
     return { ok: false, error: (e as Error).message }
   }

@@ -204,6 +204,7 @@ import {
   buildFromPrompt,
   generateResume,
   proposeSmartStacks,
+  designAgentProfile,
   regenerateLivingPage,
   runDeskAgent,
   runTransformWire,
@@ -441,7 +442,8 @@ export function registerIpcHandlers(): void {
       agentId: string,
       taskId: string,
       instruction: string,
-      liveInputs?: Record<string, string>
+      liveInputs?: Record<string, string>,
+      persona?: string
     ) => {
       const links = listLinksByTask(taskId)
       const inputWidgets = links
@@ -454,8 +456,12 @@ export function registerIpcHandlers(): void {
       const inputs = await Promise.all(
         inputWidgets.map((w) => describeWidgetForAgent(w, liveInputs?.[w.id]))
       )
-      return runDeskAgent({ instruction, inputs })
+      return runDeskAgent({ instruction, inputs, persona })
     }
+  )
+
+  ipcMain.handle('agents:designProfile', (_e, description: string) =>
+    designAgentProfile(description)
   )
 
   ipcMain.handle('templates:list', () => listTemplates())

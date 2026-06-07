@@ -3,6 +3,7 @@ import { useLinksStore } from '../stores/links'
 import { useWidgetStore } from '../stores/widgets'
 import { parseAgent, serializeAgent, withRun } from './deskAgent'
 import { extractWebviewText } from './webviewRegistry'
+import { resolveProfile, useAgentProfilesStore } from './agentProfiles'
 
 // Collect the LIVE rendered text of any browser widgets wired into this agent,
 // so logged-in / JS-rendered pages reach the model instead of an unauthenticated
@@ -82,7 +83,9 @@ export async function runAgent(agentId: string): Promise<void> {
   useAgentRunStore.getState().setRunning(agentId, true)
   try {
     const liveInputs = await gatherLiveInputs(agentId)
-    const res = await window.api.agents.run(agentId, agent.taskId, cfg.instruction, liveInputs)
+    // The profile persona shapes the approach; hygiene stays enforced in code.
+    const persona = resolveProfile(cfg.profileId, useAgentProfilesStore.getState().custom).systemPrompt
+    const res = await window.api.agents.run(agentId, agent.taskId, cfg.instruction, liveInputs, persona)
     const at = Date.now()
     if (!res.ok) {
       await writeLog(agentId, parseAgent(latestContent(agentId) ?? agent.content), {
