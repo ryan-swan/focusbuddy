@@ -4,6 +4,8 @@ import { useLinksStore } from '../stores/links'
 import { useWidgetStore } from '../stores/widgets'
 import { parseAgent } from './deskAgent'
 import { extractWebviewText } from './webviewRegistry'
+import { buildTableFromText } from './tableAiBuild'
+import { coerceToWidgetContent } from './widgetContentFormat'
 
 // The content that flows OUT of a widget along a wire. For a desk agent that is
 // its latest output (not its raw JSON config), so an agent can feed a note via a
@@ -89,6 +91,9 @@ const debounceTimers = new Map<string, ReturnType<typeof setTimeout>>()
 const wireGeneration = new Map<string, number>()
 // widgetId -> timestamp it last received an engine write (loop guard).
 const writeCooldown = new Map<string, number>()
+// wireId -> the last material used to build a table target, so identical source
+// content doesn't trigger a redundant (paid) rebuild.
+const lastTableMaterial = new Map<string, string>()
 
 function inCooldown(widgetId: string): boolean {
   const t = writeCooldown.get(widgetId)
@@ -150,10 +155,37 @@ async function runWire(wireId: string, gen: number): Promise<void> {
     wire.type === 'mirror' || (source.kind === 'agent' && wire.type !== 'transform')
   if (deliverDirect) {
     const src = effectiveContent(source)
-    if (src === target.content) return
+
+    // Table target: build it via the table AI (typed columns + rows), exactly
+    // as if the user used the in-table assistant — never write text into a
+    // table's id. Guarded so the same material isn't rebuilt repeatedly.
+    if (target.kind === 'table') {
+      if (!src.trim() || lastTableMaterial.get(wire.id) === src) return
+      runStore.setError(wire.id, null)
+      runStore.setRunning(wire.id, true)
+      try {
+        const res = await buildTableFromText(target.content, src, wire.verb)
+        if (!res.ok) runStore.setError(wire.id, res.error ?? 'Could not build the table.')
+        else {
+          lastTableMaterial.set(wire.id, src)
+          runStore.markRan(wire.id, Date.now())
+        }
+      } catch (e) {
+        runStore.setError(wire.id, e instanceof Error ? e.message : String(e))
+      } finally {
+        runStore.setRunning(wire.id, false)
+      }
+      return
+    }
+
+    // Other targets: shape the text into the form that kind stores (a card's
+    // title/body, a page's document, a field's value, plain text otherwise) so
+    // the linked widget updates cleanly.
+    const next = coerceToWidgetContent(target, src)
+    if (next === target.content) return
     runStore.pulseWire(wire.id) // electric spark for the (instant) delivery
     writeCooldown.set(target.id, Date.now())
-    await widgets.update(target.id, { content: src })
+    await widgets.update(target.id, { content: next })
     runStore.markRan(wire.id, Date.now())
     return
   }
@@ -181,8 +213,15 @@ async function runWire(wireId: string, gen: number): Promise<void> {
       runStore.markRan(wire.id, Date.now())
       return
     }
+    // The transform output is shaped for the target kind too: a transform into a
+    // table builds the table; into a card/page it lands as title/body or a doc.
+    if (target.kind === 'table') {
+      await buildTableFromText(target.content, res.result)
+      runStore.markRan(wire.id, Date.now())
+      return
+    }
     writeCooldown.set(target.id, Date.now())
-    await widgets.update(target.id, { content: res.result })
+    await widgets.update(target.id, { content: coerceToWidgetContent(target, res.result) })
     runStore.markRan(wire.id, Date.now())
   } catch (e) {
     runStore.setError(wire.id, e instanceof Error ? e.message : String(e))
