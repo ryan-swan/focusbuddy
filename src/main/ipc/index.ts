@@ -198,6 +198,7 @@ import {
   generateResume,
   proposeSmartStacks,
   regenerateLivingPage,
+  runDeskAgent,
   runTransformWire,
   sendChat,
   suggestPageContent,
@@ -404,6 +405,21 @@ export function registerIpcHandlers(): void {
       verb,
       targetCurrentContent: target.content ?? ''
     })
+  })
+
+  // Desk agents: gather the agent's wired inputs (widgets wired INTO it) in
+  // main and run the standing instruction over them. Returns plain-text output
+  // for the renderer to log on the agent widget.
+  ipcMain.handle('agents:run', async (_e, agentId: string, taskId: string, instruction: string) => {
+    const links = listLinksByTask(taskId)
+    const inputIds = links
+      .filter((l) => l.targetWidgetId === agentId)
+      .map((l) => l.sourceWidgetId)
+    const inputs = inputIds
+      .map((id) => getWidget(id))
+      .filter((w): w is NonNullable<typeof w> => !!w && !w.archived)
+      .map((w) => ({ kind: w.kind, title: w.title ?? '', content: w.content ?? '' }))
+    return runDeskAgent({ instruction, inputs })
   })
 
   ipcMain.handle('templates:list', () => listTemplates())

@@ -26,6 +26,14 @@ export async function launchApp(): Promise<LaunchedApp> {
   // package.json `dev: env -u ELECTRON_RUN_AS_NODE electron-vite dev`).
   const cleanEnv: NodeJS.ProcessEnv = { ...process.env }
   delete cleanEnv.ELECTRON_RUN_AS_NODE
+  // Keep e2e hermetic: never make real (paid, slow, non-deterministic) AI calls.
+  // The mind-map / voice / wire / agent specs all assert structural plumbing and
+  // the graceful no-key path, not real model output. Leaving a developer's key
+  // in the env made agent/transform runs hit Sonnet for 10-30s and race the
+  // Electron teardown ("Target page has been closed"). Stripping the keys forces
+  // the fast, deterministic no-key path.
+  delete cleanEnv.ANTHROPIC_API_KEY
+  delete cleanEnv.OPENAI_API_KEY
 
   const app = await electron.launch({
     args: ['.'],

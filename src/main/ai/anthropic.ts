@@ -1633,3 +1633,77 @@ export async function runTransformWire(input: {
     return { ok: false, error: (e as Error).message }
   }
 }
+
+// ── Desk agents ──────────────────────────────────────────────────────────────
+//
+// A desk agent reasons over the content of the widgets wired INTO it against a
+// standing instruction, and returns a single block of text that becomes its
+// latest output. Like the transform wire it returns plain text (no proposal
+// envelope), but it is routed to Sonnet because it weighs multiple inputs.
+export interface DeskAgentResult {
+  ok: boolean
+  output?: string
+  needsApiKey?: boolean
+  error?: string
+}
+
+export async function runDeskAgent(input: {
+  instruction: string
+  inputs: Array<{ kind: string; title: string; content: string }>
+}): Promise<DeskAgentResult> {
+  const c = getClient()
+  if (!c) {
+    return {
+      ok: false,
+      needsApiKey: true,
+      error: 'No Anthropic API key set. Open Settings → AI · API keys to paste one.'
+    }
+  }
+  const instruction = input.instruction.trim()
+  if (!instruction) return { ok: false, error: 'This agent has no instruction yet.' }
+
+  const inputBlock =
+    input.inputs.length === 0
+      ? '(No widgets are wired into this agent yet — it has no inputs to read.)'
+      : input.inputs
+          .map((w, i) => {
+            const title = w.title ? ` "${w.title}"` : ''
+            const body = (w.content || '').replace(/\s+/g, ' ').slice(0, 2000)
+            return `Input ${i + 1} [${w.kind}${title}]:\n${body || '(empty)'}`
+          })
+          .join('\n\n')
+
+  const system =
+    'You are a desk agent: a small, standing AI worker that lives on a visual canvas. ' +
+    'You are given a standing instruction and the current content of the widgets wired into you. ' +
+    'Do exactly what the instruction asks, using only the inputs provided. ' +
+    'Return ONLY the resulting text that should appear as your latest output — no preamble, no labels, ' +
+    'no meta-commentary about being an AI. Be concise and useful. ' +
+    'If the inputs do not give you enough to act on, say briefly what is missing.'
+
+  const user = `Standing instruction:\n${instruction}\n\nWired inputs:\n${inputBlock}\n\nProduce your output now.`
+
+  try {
+    const resp = await c.messages.create({
+      model: resolveModel('desk_agent'),
+      max_tokens: 1024,
+      system,
+      messages: [{ role: 'user', content: user }]
+    })
+    if ((resp.stop_reason as string) === 'refusal') {
+      return { ok: false, error: 'Claude declined this agent run.' }
+    }
+    if ((resp.stop_reason as string) === 'model_context_window_exceeded') {
+      return { ok: false, error: 'The wired inputs are too large for one run.' }
+    }
+    const text = resp.content
+      .filter((b) => b.type === 'text')
+      .map((b) => ('text' in b ? b.text : ''))
+      .join('')
+      .trim()
+    if (!text) return { ok: false, error: 'The agent returned nothing.' }
+    return { ok: true, output: text }
+  } catch (e) {
+    return { ok: false, error: (e as Error).message }
+  }
+}

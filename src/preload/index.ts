@@ -643,6 +643,19 @@ const api = {
   // the kit's conventions. Phase 2C — single-turn agent invocation
   // returning ActionProposal[] for review-and-apply.
   agents: {
+    // Desk agents (canvas widget): run a placed agent's standing instruction
+    // over the widgets wired into it. Distinct from the Agent OS create/invoke
+    // flow below.
+    run: (
+      agentId: string,
+      taskId: string,
+      instruction: string
+    ): Promise<{
+      ok: boolean
+      output?: string
+      needsApiKey?: boolean
+      error?: string
+    }> => ipcRenderer.invoke('agents:run', agentId, taskId, instruction),
     create: (input: {
       slug: string
       description: string

@@ -23,7 +23,11 @@ const AUTO_ROUTING: Record<AIPurpose, string> = {
   // Transform wires fire reactively whenever a wired source changes, so they
   // must be cheap by default. Haiku handles "summarize / extract / rewrite"
   // verbs well; the global model-mode override still applies.
-  wire_transform: HAIKU
+  wire_transform: HAIKU,
+  // Desk agents reason over MULTIPLE wired inputs against a standing
+  // instruction — that judgement benefits from Sonnet. Runs are user-triggered
+  // or interval-throttled (min 30s), not per-keystroke, so the cost is bounded.
+  desk_agent: SONNET
 }
 
 let currentMode: ModelMode = 'auto'

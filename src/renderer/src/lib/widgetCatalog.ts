@@ -374,6 +374,17 @@ export const WIDGET_CATALOG: WidgetCatalogEntry[] = [
     defaultHeight: 380,
     defaultContent: '',
     isWebBased: false
+  },
+  {
+    kind: 'agent',
+    category: 'Tools',
+    label: 'Desk agent',
+    icon: 'smart_toy',
+    hint: 'A standing AI agent. Wire widgets INTO it as inputs, give it an instruction and a trigger, and it works on its own',
+    defaultWidth: 320,
+    defaultHeight: 300,
+    defaultContent: '',
+    isWebBased: false
   }
 ]
 
