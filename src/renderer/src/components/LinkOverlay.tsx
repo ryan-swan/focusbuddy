@@ -3,6 +3,7 @@ import type { WidgetLink, WireType } from '@shared/types'
 import { useLinksStore } from '../stores/links'
 import { useWidgetStore } from '../stores/widgets'
 import { runWireNow, useWireRunStore } from '../lib/wireEngine'
+import { useAgentRunStore } from '../lib/deskAgentEngine'
 import Icon from './Icon'
 
 // Per-wire-type presentation. context is a quiet dashed line; transform is a
@@ -160,7 +161,11 @@ export default function LinkOverlay({ ghost }: Props): JSX.Element | null {
   const remove = useLinksStore((s) => s.remove)
   const updateWire = useLinksStore((s) => s.update)
   const running = useWireRunStore((s) => s.running)
+  const firing = useWireRunStore((s) => s.firing)
   const wireErrors = useWireRunStore((s) => s.errors)
+  // A wire connected to a working desk agent lights up its whole bundle while
+  // the agent thinks (inputs feeding in, outputs about to fire).
+  const agentRunning = useAgentRunStore((s) => s.running)
   // Subscribe to canvas state so re-renders happen on pan, zoom, layout
   // changes, and widget store updates. The DOM-read approach is robust to
   // stale dragOverride but still needs to re-render when widgets are
@@ -354,6 +359,11 @@ export default function LinkOverlay({ ghost }: Props): JSX.Element | null {
           >
             <path d="M 0 1 L 9 5 L 0 9 z" fill="rgb(var(--accent))" />
           </marker>
+          {/* Soft glow used by the electric firing effect — blurs the bright
+              core into a halo so a firing wire reads as live current. */}
+          <filter id="fb-wire-glow" x="-60%" y="-60%" width="220%" height="220%">
+            <feGaussianBlur stdDeviation="3" />
+          </filter>
         </defs>
         {segments.map((seg) => {
           const isSelected = seg.link.id === selectedLinkId
@@ -361,11 +371,17 @@ export default function LinkOverlay({ ghost }: Props): JSX.Element | null {
           const type = seg.link.type
           const meta = WIRE_META[type]
           const isReactive = type === 'transform' || type === 'mirror'
-          const isRunning = !!running[seg.link.id]
+          // "Firing" = the wire is actively passing information: a transform
+          // running, a delivery pulse, or either endpoint being a working agent.
+          const isFiring =
+            !!running[seg.link.id] ||
+            !!firing[seg.link.id] ||
+            !!agentRunning[seg.link.sourceWidgetId] ||
+            !!agentRunning[seg.link.targetWidgetId]
           // A disabled reactive wire reads as a faint dotted line.
           const disabled = isReactive && !seg.link.enabled
           return (
-            <g key={seg.link.id} data-link-line data-wire-type={type}>
+            <g key={seg.link.id} data-link-line data-wire-type={type} data-firing={isFiring || undefined}>
               {/* Wide invisible hitbox underneath the visible curve. */}
               <path
                 d={d}
@@ -378,58 +394,96 @@ export default function LinkOverlay({ ghost }: Props): JSX.Element | null {
                   handleClickLine(seg.link, { x: seg.mx, y: seg.my })
                 }}
               />
+              {/* Electric firing effect (rendered UNDER the base wire so the
+                  glow haloes it): a pulsing blurred halo, a fast stream of
+                  current dots, and a bright comet racing source → target. */}
+              {isFiring && (
+                <>
+                  <path
+                    d={d}
+                    fill="none"
+                    stroke="rgb(var(--accent))"
+                    strokeWidth={7}
+                    strokeOpacity={0.35}
+                    strokeLinecap="round"
+                    filter="url(#fb-wire-glow)"
+                    style={{ pointerEvents: 'none' }}
+                  >
+                    <animate
+                      attributeName="stroke-opacity"
+                      values="0.18;0.5;0.18"
+                      dur="0.4s"
+                      repeatCount="indefinite"
+                    />
+                  </path>
+                  <path
+                    d={d}
+                    fill="none"
+                    stroke="rgb(var(--accent))"
+                    strokeWidth={2.5}
+                    strokeOpacity={0.95}
+                    strokeLinecap="round"
+                    strokeDasharray="1.5 9"
+                    style={{ pointerEvents: 'none' }}
+                  >
+                    <animate
+                      attributeName="stroke-dashoffset"
+                      from="21"
+                      to="0"
+                      dur="0.38s"
+                      repeatCount="indefinite"
+                    />
+                  </path>
+                  <path
+                    d={d}
+                    fill="none"
+                    stroke="#ffffff"
+                    strokeWidth={3}
+                    strokeOpacity={0.95}
+                    strokeLinecap="round"
+                    strokeDasharray="16 1600"
+                    filter="url(#fb-wire-glow)"
+                    style={{ pointerEvents: 'none' }}
+                  >
+                    <animate
+                      attributeName="stroke-dashoffset"
+                      from="1616"
+                      to="0"
+                      dur="0.7s"
+                      repeatCount="indefinite"
+                    />
+                  </path>
+                </>
+              )}
               <path
                 d={d}
                 fill="none"
                 stroke="rgb(var(--accent))"
-                strokeOpacity={disabled ? 0.3 : isSelected ? 0.95 : isReactive ? 0.75 : 0.5}
-                strokeWidth={isSelected ? 2.5 : isReactive ? 2 : 1.5}
+                strokeOpacity={
+                  disabled ? 0.3 : isFiring ? 0.95 : isSelected ? 0.95 : isReactive ? 0.75 : 0.5
+                }
+                strokeWidth={isFiring ? 2.5 : isSelected ? 2.5 : isReactive ? 2 : 1.5}
                 strokeLinecap="round"
-                strokeDasharray={disabled ? '2 5' : meta.dash}
+                strokeDasharray={disabled ? '2 5' : isFiring ? undefined : meta.dash}
                 markerEnd={isReactive ? 'url(#fb-wire-arrow)' : undefined}
                 style={{
                   pointerEvents: 'none',
                   transition: 'stroke-opacity 120ms ease'
                 }}
-              >
-                {/* Flowing dashes while a transform is mid-run. */}
-                {isRunning && (
-                  <animate
-                    attributeName="stroke-dashoffset"
-                    from="24"
-                    to="0"
-                    dur="0.6s"
-                    repeatCount="indefinite"
-                  />
-                )}
-              </path>
-              {/* When running, overlay a dashed travelling segment for the pulse. */}
-              {isRunning && (
-                <path
-                  d={d}
-                  fill="none"
-                  stroke="rgb(var(--accent))"
-                  strokeOpacity={0.9}
-                  strokeWidth={2.5}
-                  strokeLinecap="round"
-                  strokeDasharray="6 18"
-                  style={{ pointerEvents: 'none' }}
-                >
-                  <animate
-                    attributeName="stroke-dashoffset"
-                    from="24"
-                    to="0"
-                    dur="0.5s"
-                    repeatCount="indefinite"
-                  />
-                </path>
+              />
+              {/* Source endpoint — a pulsing spark ring while firing. */}
+              {isFiring && (
+                <circle cx={seg.x1} cy={seg.y1} r={2} fill="none" stroke="rgb(var(--accent))" strokeWidth={1.5}>
+                  <animate attributeName="r" values="2;9" dur="0.7s" repeatCount="indefinite" />
+                  <animate attributeName="stroke-opacity" values="0.9;0" dur="0.7s" repeatCount="indefinite" />
+                </circle>
               )}
               <circle
                 cx={seg.x1}
                 cy={seg.y1}
-                r={isSelected ? 4 : 3}
+                r={isFiring ? 4 : isSelected ? 4 : 3}
                 fill="rgb(var(--accent))"
-                fillOpacity={disabled ? 0.4 : isSelected ? 1 : 0.8}
+                fillOpacity={disabled ? 0.4 : isFiring ? 1 : isSelected ? 1 : 0.8}
                 style={{ pointerEvents: 'none' }}
               />
             </g>

@@ -110,6 +110,15 @@ test('a mirror wire copies source content into the target on change', async () =
   await srcArea.fill('MIRRORED-PAYLOAD')
   await srcArea.blur()
 
+  // The wire visibly "fires" (electric pulse) when it delivers — the firing
+  // group carries data-firing while the spark animates.
+  await expect
+    .poll(() => window.locator('[data-link-line][data-firing]').count(), {
+      timeout: 6_000,
+      intervals: [150, 250, 400]
+    })
+    .toBeGreaterThan(0)
+
   // Engine debounce (900ms) + write. Poll the target content via the API.
   await expect
     .poll(

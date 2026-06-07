@@ -37,6 +37,9 @@ const COOLDOWN_MS = 3500
 interface WireRunState {
   // wireId -> true while its transform is inflight (drives the pulse on the wire).
   running: Record<string, boolean>
+  // wireId -> a token while a brief delivery pulse is animating. Used for fast
+  // events (a mirror write) that complete instantly but should still spark.
+  firing: Record<string, number>
   // wireId -> last error message, surfaced on the wire editor.
   errors: Record<string, string>
   // wireId -> timestamp of the last successful run (for a subtle "just ran" tick).
@@ -44,10 +47,16 @@ interface WireRunState {
   setRunning: (wireId: string, on: boolean) => void
   setError: (wireId: string, error: string | null) => void
   markRan: (wireId: string, at: number) => void
+  // Flash a wire's electric pulse for `ms` (default ~900ms) — for instant
+  // deliveries that have no inflight window of their own.
+  pulseWire: (wireId: string, ms?: number) => void
 }
 
-export const useWireRunStore = create<WireRunState>((set) => ({
+let pulseCounter = 0
+
+export const useWireRunStore = create<WireRunState>((set, get) => ({
   running: {},
+  firing: {},
   errors: {},
   lastRunAt: {},
   setRunning: (wireId, on) =>
@@ -59,7 +68,19 @@ export const useWireRunStore = create<WireRunState>((set) => ({
       else delete errors[wireId]
       return { errors }
     }),
-  markRan: (wireId, at) => set((s) => ({ lastRunAt: { ...s.lastRunAt, [wireId]: at } }))
+  markRan: (wireId, at) => set((s) => ({ lastRunAt: { ...s.lastRunAt, [wireId]: at } })),
+  pulseWire: (wireId, ms = 900) => {
+    const token = ++pulseCounter
+    set((s) => ({ firing: { ...s.firing, [wireId]: token } }))
+    setTimeout(() => {
+      if (get().firing[wireId] !== token) return
+      set((s) => {
+        const firing = { ...s.firing }
+        delete firing[wireId]
+        return { firing }
+      })
+    }, ms)
+  }
 }))
 
 // Per-wire debounce timers and a "supersede" generation so a newer trigger
@@ -130,6 +151,7 @@ async function runWire(wireId: string, gen: number): Promise<void> {
   if (deliverDirect) {
     const src = effectiveContent(source)
     if (src === target.content) return
+    runStore.pulseWire(wire.id) // electric spark for the (instant) delivery
     writeCooldown.set(target.id, Date.now())
     await widgets.update(target.id, { content: src })
     runStore.markRan(wire.id, Date.now())
