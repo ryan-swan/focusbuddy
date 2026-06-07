@@ -51,7 +51,8 @@ export const AUTO_ROUTING_DISPLAY: Record<AIPurpose, { model: string; cost: stri
   body_double: { model: 'Haiku', cost: '$' },
   smart_stack: { model: 'Sonnet', cost: '$$' },
   living_page: { model: 'Haiku', cost: '$' },
-  wire_transform: { model: 'Haiku', cost: '$' }
+  wire_transform: { model: 'Haiku', cost: '$' },
+  desk_agent: { model: 'Sonnet', cost: '$$' }
 }
 
 function readFromStorage(): ModelMode {

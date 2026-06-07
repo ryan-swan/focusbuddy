@@ -40,6 +40,7 @@ import ScratchpadWidget from './widgets/ScratchpadWidget'
 import ShapeWidget from './widgets/ShapeWidget'
 import CardWidget from './widgets/CardWidget'
 import CustomBlockWidget from './widgets/CustomBlockWidget'
+import AgentWidget from './widgets/AgentWidget'
 import ZoomControls from './ZoomControls'
 import CanvasEdgeIndicators from './CanvasEdgeIndicators'
 import { useEdgePan } from '../lib/useEdgePan'
@@ -168,6 +169,8 @@ function renderWidget(w: Widget): JSX.Element | null {
       return <CardWidget widget={w} />
     case 'custom-block':
       return <CustomBlockWidget widget={w} />
+    case 'agent':
+      return <AgentWidget widget={w} />
     case 'section':
       return <SectionWidget widget={w} renderChild={renderWidget} />
     case 'webview':

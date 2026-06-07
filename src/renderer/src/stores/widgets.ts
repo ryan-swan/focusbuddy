@@ -4,6 +4,7 @@ import { recordTrail } from '../lib/trail'
 import { sectionCreate, widgetOpen } from '../lib/audioBeep'
 import { useLinksStore } from './links'
 import { notifyWireSource } from '../lib/wireEngine'
+import { notifyAgentInputChanged } from '../lib/deskAgentEngine'
 
 interface WidgetStore {
   widgets: Widget[]
@@ -232,9 +233,11 @@ export const useWidgetStore = create<WidgetStore>((set, get) => ({
       })
     }
     // Live wires: a content change may drive reactive (transform / mirror)
-    // wires leaving this widget. The engine debounces + guards against loops.
+    // wires leaving this widget, and may trigger any onChange desk agents this
+    // widget is wired into. Both engines debounce + guard against loops.
     if (patch.content !== undefined) {
       void notifyWireSource(id)
+      notifyAgentInputChanged(id)
     }
   },
   remove: async (id) => {

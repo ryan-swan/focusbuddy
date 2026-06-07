@@ -81,6 +81,12 @@ export type WidgetKind =
   // the user lays out themselves; doubles as a data-entry form. Layout + values
   // serialised to widget.content as JSON; can be saved as a reusable template.
   | 'custom-block'
+  // Desk agent — a standing AI agent placed on the canvas. Its "senses" are the
+  // live wires drawn INTO it (each wired-in widget's content is an input); it
+  // holds a standing instruction and a trigger (manual / interval / on a wired
+  // input changing), runs with a visible kill switch, and keeps a run log in its
+  // own body. Config + history serialised to widget.content as JSON.
+  | 'agent'
 
 export type ContextMenuAction =
   | 'createStickyFromSelection'
@@ -467,6 +473,7 @@ export type AIPurpose =
   | 'smart_stack'
   | 'living_page'
   | 'wire_transform'
+  | 'desk_agent'
 
 // "Live wire" semantics for an inter-widget link. A dead line becomes a pipe:
 //   context   — passive. The target's AI is told this source is a related
