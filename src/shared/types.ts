@@ -87,6 +87,10 @@ export type WidgetKind =
   // input changing), runs with a visible kill switch, and keeps a run log in its
   // own body. Config + history serialised to widget.content as JSON.
   | 'agent'
+  // Portal — a live window into ANOTHER task's desk. Shows a shrunk,
+  // content-aware miniature of the target desk, refreshed periodically; click to
+  // dive in. The target task id is serialised to widget.content as JSON.
+  | 'portal'
 
 export type ContextMenuAction =
   | 'createStickyFromSelection'

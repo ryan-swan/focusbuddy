@@ -385,6 +385,17 @@ export const WIDGET_CATALOG: WidgetCatalogEntry[] = [
     defaultHeight: 300,
     defaultContent: '',
     isWebBased: false
+  },
+  {
+    kind: 'portal',
+    category: 'Layout',
+    label: 'Portal',
+    icon: 'picture_in_picture',
+    hint: 'A live window into another task’s desk — watch it at a glance and click to dive in',
+    defaultWidth: 300,
+    defaultHeight: 240,
+    defaultContent: '',
+    isWebBased: false
   }
 ]
 
