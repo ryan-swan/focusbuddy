@@ -5,6 +5,7 @@ import { sectionCreate, widgetOpen } from '../lib/audioBeep'
 import { useLinksStore } from './links'
 import { notifyWireSource } from '../lib/wireEngine'
 import { notifyAgentInputChanged } from '../lib/deskAgentEngine'
+import { recordSnapshotSoon } from '../lib/timeTravel'
 
 interface WidgetStore {
   widgets: Widget[]
@@ -105,6 +106,8 @@ export const useWidgetStore = create<WidgetStore>((set, get) => ({
     const widgets = await window.api.widgets.listByTask(taskId)
     if (get().loadingFor === taskId) {
       set({ widgets, loadingFor: null })
+      // Baseline snapshot for time-travel (dedup keeps it cheap on re-open).
+      recordSnapshotSoon(taskId)
     }
   },
   clear: () =>
@@ -189,6 +192,7 @@ export const useWidgetStore = create<WidgetStore>((set, get) => ({
   create: async (draft) => {
     const widget = await window.api.widgets.create(draft)
     set({ widgets: [...get().widgets, widget] })
+    recordSnapshotSoon(widget.taskId)
     recordTrail('widget_added', widget.taskId, {
       widgetId: widget.id,
       kind: widget.kind,
@@ -239,14 +243,17 @@ export const useWidgetStore = create<WidgetStore>((set, get) => ({
       void notifyWireSource(id)
       notifyAgentInputChanged(id)
     }
+    recordSnapshotSoon(updated.taskId)
   },
   remove: async (id) => {
+    const removedTaskId = get().widgets.find((w) => w.id === id)?.taskId
     await window.api.widgets.delete(id)
     set({ widgets: get().widgets.filter((w) => w.id !== id) })
     // The DB cascade already dropped any widget_links referencing this id;
     // mirror that into the local links store so the SVG overlay doesn't
     // render a dangling line until the next loadForTask.
     useLinksStore.getState().pruneByWidget(id)
+    recordSnapshotSoon(removedTaskId)
   },
   archive: async (id) => {
     await window.api.widgets.update(id, { archived: true })

@@ -78,6 +78,7 @@ import {
 } from '../lib/nodeCanvasOrigin'
 import MindmapStartingKit from './MindmapStartingKit'
 import SyncWidgetPicker from './SyncWidgetPicker'
+import HistoryPanel from './HistoryPanel'
 import CanvasBreadcrumb from './CanvasBreadcrumb'
 import type { StandardApp } from '../lib/standardApps'
 import {
@@ -217,6 +218,7 @@ export default function Canvas(): JSX.Element {
   // Bumped when the user dismisses the starting kit, to re-evaluate visibility.
   const [kitDismissTick, setKitDismissTick] = useState(0)
   const [syncPickerOpen, setSyncPickerOpen] = useState(false)
+  const [historyOpen, setHistoryOpen] = useState(false)
   const widgets = useWidgetStore((s) => s.widgets)
   // Auto-offer the starting kit on a freshly-explored, still-EMPTY node canvas.
   // "Empty" ignores the auto-created minimap + any pinned chrome.
@@ -2008,6 +2010,17 @@ export default function Canvas(): JSX.Element {
             onBringSynced={activeTaskId ? () => setSyncPickerOpen(true) : undefined}
             disabled={!activeTaskId}
           />
+          {activeTaskId && (
+            <button
+              onClick={() => setHistoryOpen(true)}
+              className="btn-ghost"
+              title="Time travel — scrub this desk's history"
+              data-testid="open-history"
+            >
+              <Icon name="history" size={14} />
+              <span>History</span>
+            </button>
+          )}
         </div>
 
         <div
@@ -2332,6 +2345,9 @@ export default function Canvas(): JSX.Element {
       )}
       {syncPickerOpen && activeTaskId && (
         <SyncWidgetPicker targetTaskId={activeTaskId} onClose={() => setSyncPickerOpen(false)} />
+      )}
+      {historyOpen && activeTaskId && (
+        <HistoryPanel taskId={activeTaskId} onClose={() => setHistoryOpen(false)} />
       )}
       {ctxMenu && (
         <CanvasContextMenu

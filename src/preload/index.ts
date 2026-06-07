@@ -27,6 +27,7 @@ import type {
   NodePatch,
   SetupSuggestResponse,
   SmartStackResponse,
+  SnapshotMeta,
   Template,
   TrailSummaryResponse,
   VaultEntryDraft,
@@ -96,6 +97,18 @@ const api = {
     ): Promise<WidgetLink | null> => ipcRenderer.invoke('widgetLinks:update', id, patch),
     delete: (id: string): Promise<boolean> =>
       ipcRenderer.invoke('widgetLinks:delete', id)
+  },
+  snapshots: {
+    create: (taskId: string, label?: string): Promise<SnapshotMeta> =>
+      ipcRenderer.invoke('snapshots:create', taskId, label),
+    list: (taskId: string): Promise<SnapshotMeta[]> =>
+      ipcRenderer.invoke('snapshots:list', taskId),
+    get: (id: string): Promise<{ meta: SnapshotMeta; widgets: Widget[] } | null> =>
+      ipcRenderer.invoke('snapshots:get', id),
+    restore: (id: string): Promise<{ taskId: string; widgets: Widget[] } | null> =>
+      ipcRenderer.invoke('snapshots:restore', id),
+    branch: (id: string, title: string): Promise<{ taskId: string } | null> =>
+      ipcRenderer.invoke('snapshots:branch', id, title)
   },
   wires: {
     runTransform: (
