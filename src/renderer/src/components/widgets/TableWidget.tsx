@@ -70,13 +70,14 @@ export default function TableWidget({ widget, inline = false }: Props): JSX.Elem
   // sees something usable immediately.
   const provisionedRef = useRef(false)
   useEffect(() => {
-    if (tableId) {
-      void ensureTable(tableId).then(() => void ensureRows(tableId))
-      return
-    }
-    if (provisionedRef.current) return
-    provisionedRef.current = true
-    void (async () => {
+    // Provision a fresh backing table and repoint the widget at it. Used both
+    // for a brand-new table widget (no content) AND to SELF-HEAL a widget whose
+    // content points at a table that doesn't exist — e.g. the AI emitted a
+    // create-widget(table) with an invented id, which otherwise leaves the
+    // widget stuck on "Loading table…" forever.
+    const provision = async (): Promise<void> => {
+      if (provisionedRef.current) return
+      provisionedRef.current = true
       const created = await createTable({
         taskId: widget.taskId,
         title: widget.title || 'Untitled table',
@@ -97,8 +98,17 @@ export default function TableWidget({ widget, inline = false }: Props): JSX.Elem
           ]
         }
       })
-      await updateWidget(widget.id, { content: created.id, title: created.title })
-    })()
+      await updateWidget(widget.id, { content: created.id, title: widget.title || created.title })
+    }
+
+    if (tableId) {
+      void ensureTable(tableId).then((t) => {
+        if (t) void ensureRows(tableId)
+        else void provision() // dangling id → heal into a real table
+      })
+      return
+    }
+    void provision()
   }, [tableId, ensureTable, ensureRows, createTable, updateWidget, widget.id, widget.taskId, widget.title])
 
   // ── In-table AI assistant state ─────────────────────────────────────────
