@@ -32,8 +32,13 @@ jobs:
 
       # node-mac-haptics is in optionalDependencies, so a failed build of that
       # macOS-only module does NOT fail the install on Windows.
+      #
+      # `npm install` (not `npm ci`): the lockfile is generated on macOS and the
+      # @esbuild/@rollup platform-binary set can drift between Node/npm versions,
+      # which makes the stricter `npm ci` refuse to run. `npm install` reconciles
+      # instead of failing, which is what we want for a build runner.
       - name: Install dependencies
-        run: npm ci
+        run: npm install --no-audit --no-fund
 
       # npm built better-sqlite3 against system Node's ABI; rebuild it against
       # Electron's ABI (electron-builder runs with npmRebuild:false).
