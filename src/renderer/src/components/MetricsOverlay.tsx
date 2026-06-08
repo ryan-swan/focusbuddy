@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useWidgetStore } from '../stores/widgets'
 import { useLinksStore } from '../stores/links'
+import { metricsStatus } from '../lib/metricsStatus'
 import Icon from './Icon'
 
 // Dev performance overlay. Toggle with Cmd/Ctrl+Shift+M. Shows per-process RAM +
@@ -25,6 +26,7 @@ function fmtMB(mb: number): string {
 export default function MetricsOverlay(): JSX.Element | null {
   const [open, setOpen] = useState(false)
   const [procs, setProcs] = useState<ProcMetric[]>([])
+  const [status, setStatus] = useState<string | null>(null)
   const widgets = useWidgetStore((s) => s.widgets)
   const links = useLinksStore((s) => s.links)
 
@@ -45,11 +47,30 @@ export default function MetricsOverlay(): JSX.Element | null {
     if (!open) return
     let alive = true
     const tick = async (): Promise<void> => {
+      // The metrics:get handler lives in the main process and the `metrics`
+      // namespace in the preload — neither hot-reloads. If you added the
+      // overlay during a running session, `window.api.metrics` won't exist
+      // until a full app restart (not a Cmd+R reload). Say that out loud
+      // instead of silently rendering zeros.
+      const getter = window.api?.metrics?.get
+      if (typeof getter !== 'function') {
+        if (alive) {
+          setProcs([])
+          setStatus(metricsStatus({ hasGetter: false, count: 0 }))
+        }
+        return
+      }
       try {
-        const m = await window.api.metrics.get()
-        if (alive) setProcs(m)
-      } catch {
-        /* ignore */
+        const m = await getter()
+        if (alive) {
+          setProcs(m)
+          setStatus(metricsStatus({ hasGetter: true, count: m.length }))
+        }
+      } catch (err) {
+        if (alive) {
+          setProcs([])
+          setStatus(metricsStatus({ hasGetter: true, threw: err instanceof Error ? err.message : String(err), count: 0 }))
+        }
       }
     }
     void tick()
@@ -95,6 +116,15 @@ export default function MetricsOverlay(): JSX.Element | null {
           <Icon name="close" size={12} />
         </button>
       </div>
+
+      {status && (
+        <div
+          className="px-2.5 py-2 border-b border-amber-800/60 bg-amber-950/40 text-amber-300 text-[10px] leading-snug"
+          data-testid="metrics-status"
+        >
+          {status}
+        </div>
+      )}
 
       <div className="px-2.5 py-2 space-y-0.5 border-b border-stone-800">
         <Row label="Total RAM" value={fmtMB(totalMem)} warn={totalMem > 3072} />
