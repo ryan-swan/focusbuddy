@@ -1657,6 +1657,8 @@ export async function runDeskAgent(input: {
   persona?: string
   // webContents id of a wired browser the agent may DRIVE to research.
   browserWcId?: number
+  // The widgets this agent's output is auto-delivered into.
+  outputs?: Array<{ kind: string; title: string }>
 }): Promise<DeskAgentResult> {
   const c = getClient()
   if (!c) {
@@ -1695,14 +1697,25 @@ export async function runDeskAgent(input: {
     // app — not you — decides how your output updates other widgets, and it
     // never deletes or overwrites existing data. Just produce the content.
     'You never manage how your output is written into other widgets; the app applies it safely ' +
-    '(it updates tables and notes without erasing existing data). Just produce the content itself.' +
+    '(it updates tables and notes without erasing existing data). ' +
+    'If your instruction says to record, save or write your findings somewhere (a page, a note, a table), ' +
+    'do NOT ask the user for access and do NOT say you cannot write to it — just produce the findings as ' +
+    'your output and the app delivers them into the linked widget for you.' +
     (input.browserWcId
-      ? ' You can DRIVE the wired browser to research: use read_current_page to read what is on screen, ' +
-        'open_url to visit a page, and web_search to find sources. Browse as needed, then write your output. ' +
-        'Do not ask the user to paste page content — read it yourself with the tools.'
+      ? ' A browser is wired to you and you CAN control it. Use read_current_page to read the page on screen, ' +
+        'open_url to visit a page, and web_search to find sources. Never claim you cannot browse the web or ' +
+        'access a URL, and never ask the user to paste page content — read it yourself with these tools, then ' +
+        'write your findings.'
       : '')
 
-  const user = `Standing instruction:\n${instruction}\n\nWired inputs:\n${inputBlock}\n\nProduce your output now.`
+  const outputBlock =
+    input.outputs && input.outputs.length > 0
+      ? `\n\nYour output is automatically saved into: ${input.outputs
+          .map((o) => `a ${o.kind}${o.title ? ` "${o.title}"` : ''}`)
+          .join(', ')}. Produce the findings; you do not need to access those widgets.`
+      : ''
+
+  const user = `Standing instruction:\n${instruction}\n\nWired inputs:\n${inputBlock}${outputBlock}\n\nProduce your output now.`
 
   try {
     // Browser research loop — when a browser is wired in, the agent can call
