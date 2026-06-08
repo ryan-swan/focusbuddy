@@ -10,11 +10,16 @@ toolchain; everything else is plain `npm`.
 
 ## 1. Install the prerequisites
 
-1. **Node.js 20 LTS** from <https://nodejs.org>. During the installer, tick
-   "Automatically install the necessary tools (native modules)" — that pulls in
-   the Visual Studio Build Tools (the C++ compiler) and Python, which is what
-   `better-sqlite3` needs to build. Node 20 matches what CI uses; avoid odd Node
-   versions so the native ABI lines up.
+1. **Node.js 20 LTS** from <https://nodejs.org> — specifically the **20.x**
+   line, not the "Current"/latest button. The repo pins Node 20 in `.nvmrc`
+   and `package.json` `engines`. This matters: Node 22+ changed the native-module
+   ABI, and a too-new Node is the most common "conflicting node version" failure
+   when `better-sqlite3` is rebuilt. If you already installed Node 22/24, either
+   switch to 20 (use `nvm-windows`: `nvm install 20 && nvm use 20`) or accept
+   that you may need the newer build toolchain — Node 20 is the path of least
+   resistance. During the installer, tick "Automatically install the necessary
+   tools (native modules)" — that pulls in the Visual Studio Build Tools (the
+   C++ compiler) and Python, which is what `better-sqlite3` needs to build.
 2. **Git** from <https://git-scm.com>, if it isn't already installed.
 
 If you skipped the build-tools checkbox, install them afterwards from an
@@ -52,17 +57,27 @@ failed to build and carry on. That is expected and harmless on Windows.
 
 ## 4. Build the native module for Electron
 
-`npm install` built `better-sqlite3` for plain Node. Rebuild it against
-Electron's ABI so the app's main process can load it:
+`npm install` built `better-sqlite3` for plain Node, but the app loads it inside
+Electron, which has a different ABI. If you skip this step the app starts and
+then dies with a "was compiled against a different Node.js version" /
+NODE_MODULE_VERSION error. Rebuild it against Electron's ABI:
+
+```powershell
+npm run rebuild
+```
+
+That runs `electron-builder install-app-deps`, which auto-detects the installed
+Electron version and arch and rebuilds the native modules for it. It either
+downloads a prebuilt Electron binary or compiles one (which is why you installed
+the C++ tools in step 1). It takes a minute the first time, and you only need to
+re-run it after changing the Electron version or reinstalling `node_modules`.
+
+If `npm run rebuild` errors for any reason, the narrower fallback rebuilds just
+the one module:
 
 ```powershell
 npm run rebuild:win
 ```
-
-This either downloads a prebuilt Electron binary for `better-sqlite3` or compiles
-one (which is why you installed the C++ tools in step 1). It takes a minute the
-first time. You only need to re-run it after changing the Electron version or
-reinstalling `node_modules`.
 
 ## 5. (Optional) Add an API key for the AI features
 
@@ -125,8 +140,16 @@ control, file import, and the entire widget set.
 
 ## Troubleshooting
 
-- **`'env' is not recognized`** — you're on an old checkout. Pull the latest
-  `rebrand/archeon`; the dev scripts are now cross-platform (`scripts/dev.cjs`).
+- **`'env' is not recognized` (running `npm run dev`)** — you're on an old
+  checkout from before the cross-platform fix. Run `git pull` on
+  `rebrand/archeon`; the dev scripts now go through `scripts/dev.cjs`. This is
+  the "Mac-specific thing in the config" — the old `dev` script literally began
+  with the Unix-only `env -u` command.
+- **"conflicting node version" / node-gyp build failure during `npm install` or
+  rebuild** — you're on Node 22+ with the older `node-gyp`. `git pull` (the
+  `node-gyp` override is now v11, which supports newer Node), delete
+  `node_modules` and `package-lock.json` is NOT needed, just re-run
+  `npm install`. The surest fix is still to run Node 20 to match `.nvmrc`.
 - **`better-sqlite3` fails to load / "was compiled against a different Node.js
   version"** — re-run `npm run rebuild:win`. If it fails to compile, the C++
   build tools from step 1 aren't installed.
