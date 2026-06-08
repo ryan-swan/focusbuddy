@@ -1,4 +1,4 @@
-import { app, ipcMain, BrowserWindow, type WebContents } from 'electron'
+import { app, ipcMain, BrowserWindow, webContents as allWebContents, type WebContents } from 'electron'
 import { consumePendingAuthHandoff } from '../authProtocol'
 import {
   checkForUpdates,
@@ -520,6 +520,35 @@ export function registerIpcHandlers(): void {
       // workingSetSize is in KB → MB.
       memMB: Math.round((m.memory?.workingSetSize ?? 0) / 1024)
     }))
+  })
+
+  // Map every live webContents to the OS process it runs in, so the overlay can
+  // label each renderer ('Tab') row with the widget that owns it. app.getAppMetrics
+  // gives RAM/CPU keyed by OS pid; webContents.getOSProcessId() is the bridge.
+  // The renderer joins osPid → process row, and webContentsId → widget via the
+  // webview registry. type 'window' is the app's own UI window.
+  ipcMain.handle('metrics:webContents', () => {
+    return allWebContents.getAllWebContents().map((wc) => {
+      let osPid = 0
+      let title = ''
+      let url = ''
+      try {
+        osPid = wc.getOSProcessId()
+      } catch {
+        /* process gone */
+      }
+      try {
+        title = wc.getTitle()
+      } catch {
+        /* destroyed */
+      }
+      try {
+        url = wc.getURL()
+      } catch {
+        /* destroyed */
+      }
+      return { webContentsId: wc.id, osPid, type: wc.getType(), title, url }
+    })
   })
 
   // Inspect what a widget contributes when wired into an agent — for a portal,

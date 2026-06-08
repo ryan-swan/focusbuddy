@@ -797,7 +797,10 @@ const api = {
   metrics: {
     get: (): Promise<
       Array<{ pid: number; type: string; name: string; cpu: number; memMB: number }>
-    > => ipcRenderer.invoke('metrics:get')
+    > => ipcRenderer.invoke('metrics:get'),
+    webContents: (): Promise<
+      Array<{ webContentsId: number; osPid: number; type: string; title: string; url: string }>
+    > => ipcRenderer.invoke('metrics:webContents')
   },
   // Mind-mapper AI pipeline. Three thin wrappers over Claude:
   //   expand → child branches for a node
