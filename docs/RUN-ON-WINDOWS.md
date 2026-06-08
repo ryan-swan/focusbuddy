@@ -63,21 +63,18 @@ then dies with a "was compiled against a different Node.js version" /
 NODE_MODULE_VERSION error. Rebuild it against Electron's ABI:
 
 ```powershell
-npm run rebuild
-```
-
-That runs `electron-builder install-app-deps`, which auto-detects the installed
-Electron version and arch and rebuilds the native modules for it. It either
-downloads a prebuilt Electron binary or compiles one (which is why you installed
-the C++ tools in step 1). It takes a minute the first time, and you only need to
-re-run it after changing the Electron version or reinstalling `node_modules`.
-
-If `npm run rebuild` errors for any reason, the narrower fallback rebuilds just
-the one module:
-
-```powershell
 npm run rebuild:win
 ```
+
+That runs `electron-rebuild -f -w better-sqlite3`, which rebuilds exactly that
+one module for the installed Electron version. It either downloads a prebuilt
+Electron binary or compiles one (which is why you installed the C++ tools in
+step 1). It takes a minute the first time, and you only need to re-run it after
+changing the Electron version or reinstalling `node_modules`.
+
+Use `rebuild:win`, not `npm run rebuild`. The latter (`electron-builder
+install-app-deps`) tries to rebuild *every* native dependency and can hang on
+the optional macOS haptics module. The targeted command avoids that entirely.
 
 ## 5. (Optional) Add an API key for the AI features
 
