@@ -794,6 +794,11 @@ const api = {
     ): Promise<{ ok: true } | { ok: false; error: string }> =>
       ipcRenderer.invoke('agents:revealInFinder', path)
   },
+  metrics: {
+    get: (): Promise<
+      Array<{ pid: number; type: string; name: string; cpu: number; memMB: number }>
+    > => ipcRenderer.invoke('metrics:get')
+  },
   // Mind-mapper AI pipeline. Three thin wrappers over Claude:
   //   expand → child branches for a node
   //   listAgents → static enumeration of .claude/agents/*.md

@@ -1,4 +1,4 @@
-import { ipcMain, BrowserWindow, type WebContents } from 'electron'
+import { app, ipcMain, BrowserWindow, type WebContents } from 'electron'
 import { consumePendingAuthHandoff } from '../authProtocol'
 import {
   checkForUpdates,
@@ -506,6 +506,21 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('agents:designProfile', (_e, description: string) =>
     designAgentProfile(description)
   )
+
+  // Dev metrics — per-process RAM + CPU for the whole Electron app, so the perf
+  // overlay can show exactly what each browser process costs.
+  ipcMain.handle('metrics:get', () => {
+    return app.getAppMetrics().map((m) => ({
+      pid: m.pid,
+      // 'Browser' is the main process; 'Tab' is a renderer (the main window AND
+      // each <webview>); plus GPU / Utility / etc.
+      type: m.type,
+      name: m.name ?? '',
+      cpu: Math.round((m.cpu?.percentCPUUsage ?? 0) * 10) / 10,
+      // workingSetSize is in KB → MB.
+      memMB: Math.round((m.memory?.workingSetSize ?? 0) / 1024)
+    }))
+  })
 
   // Inspect what a widget contributes when wired into an agent — for a portal,
   // its aggregated desk(s). Powers tests + a future "preview feed" affordance.
