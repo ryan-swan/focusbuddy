@@ -51,3 +51,8 @@ test('the metrics overlay toggles and shows real process metrics + live counts',
   await window.keyboard.press('Meta+Shift+M')
   await expect(window.locator('[data-testid="metrics-overlay"]')).toHaveCount(0)
 })
+
+// Note: the "metrics IPC unavailable → status banner" branch is covered by
+// tests/unit/metricsStatus.test.ts, not here. window.api is a frozen
+// contextBridge object, so a fresh-launch e2e cannot faithfully simulate the
+// stale-preload condition (you can't delete or override the namespace).
