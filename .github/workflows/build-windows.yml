@@ -1,0 +1,73 @@
+name: Build Windows installer
+
+# Why this exists: better-sqlite3 ships a native binding that is compiled
+# per-OS against Electron's ABI. You cannot cross-build the Windows binding
+# from a Mac, so the Windows NSIS installer has to be produced on a Windows
+# runner. This workflow does that — rebuild the native module for Electron,
+# package with electron-builder, and (on a tag) publish to the same GitHub
+# Releases channel macOS already uses, so electron-updater drives auto-update
+# on both platforms from one place.
+
+on:
+  # Manual run from the Actions tab — produces an unsigned/unpublished
+  # installer you can download from the run's artifacts.
+  workflow_dispatch:
+  # Tag push (e.g. v2.6.0) — produces the installer AND publishes it to the
+  # GitHub Release for that tag.
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      # node-mac-haptics is in optionalDependencies, so a failed build of that
+      # macOS-only module does NOT fail the install on Windows.
+      - name: Install dependencies
+        run: npm ci
+
+      # npm built better-sqlite3 against system Node's ABI; rebuild it against
+      # Electron's ABI (electron-builder runs with npmRebuild:false).
+      - name: Rebuild native modules for Electron
+        run: npm run rebuild:win
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Build renderer + main
+        run: npm run build
+
+      # Publish only on a tag push; manual runs stay unpublished. Code signing
+      # happens automatically when CSC_LINK + CSC_KEY_PASSWORD secrets are set
+      # (CSC_LINK = a base64-encoded .pfx or a path; CSC_KEY_PASSWORD = its
+      # password). With no cert configured the installer is built unsigned.
+      - name: Package Windows installer
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
+        shell: bash
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            npx electron-builder --win --publish always
+          else
+            npx electron-builder --win --publish never
+          fi
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: haptyx-windows-installer
+          path: |
+            release/*.exe
+            release/latest.yml
+          if-no-files-found: error

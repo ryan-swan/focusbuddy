@@ -92,6 +92,32 @@ dmg:
       type: link
       path: /Applications
 
+# ── Windows ──────────────────────────────────────────────────────────────────
+# Produces an NSIS installer. MUST be built on a Windows runner (the native
+# better-sqlite3 binding is compiled per-OS; you cannot cross-build it from a
+# Mac). See .github/workflows/build-windows.yml. Code signing is via the
+# CSC_LINK + CSC_KEY_PASSWORD env vars electron-builder reads automatically
+# (point CSC_LINK at a base64 .pfx / a file path, CSC_KEY_PASSWORD at its
+# password). With no cert set the installer is produced unsigned (SmartScreen
+# will warn until you sign with an OV/EV cert).
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  # The haptyx:// deep link is registered by the installer on Windows too
+  # (declared once under `protocols:` above).
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Haptyx
+  # electron-updater on Windows reads the same GitHub Releases channel as macOS,
+  # so a published `latest.yml` / `latest-mac.yml` drives auto-update on both.
+
 # Don't run the native-module rebuild step — we'll pre-rebuild
 # better-sqlite3 + node-mac-haptics ourselves via `npm run rebuild`
 # (the existing `electron-builder install-app-deps` shortcut). The
