@@ -457,7 +457,15 @@ export function registerIpcHandlers(): void {
       const inputs = await Promise.all(
         inputWidgets.map((w) => describeWidgetForAgent(w, liveInputs?.[w.id]))
       )
-      return runDeskAgent({ instruction, inputs, persona, browserWcId })
+      // Where this agent's output is auto-delivered, so it doesn't ask the user
+      // for "access" to write the linked page/note/table — it just produces the
+      // content and the app writes it.
+      const outputs = links
+        .filter((l) => l.sourceWidgetId === agentId)
+        .map((l) => getWidget(l.targetWidgetId))
+        .filter((w): w is NonNullable<ReturnType<typeof getWidget>> => !!w && !w.archived)
+        .map((w) => ({ kind: w.kind, title: w.title ?? '' }))
+      return runDeskAgent({ instruction, inputs, persona, browserWcId, outputs })
     }
   )
 
