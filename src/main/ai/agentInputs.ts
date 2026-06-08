@@ -1,13 +1,12 @@
-import { getTable, listRows } from '../db/tables'
 import type { Widget } from '@shared/types'
+import { summariseWidget } from './widgetSummary'
+import { aggregatePortalContent } from './portalAggregate'
 
 // Turn a wired-in widget into readable content a desk agent can actually reason
-// over. The naive version handed the model whatever was in widget.content, which
-// for a browser is just a URL and for a table is just an opaque id — so the
-// agent would say "I only see a link, I can't browse the web". Here we resolve
-// each kind to real content, and crucially we FETCH the page for a browser so a
-// research agent has the actual text to work with (the fetch happens in the main
-// process, which has network access and isn't bound by the renderer CSP).
+// over. Most kinds use the shared, network-free summariser; two are special:
+// a browser is FETCHED (or uses its live page text) so a research agent has the
+// real page, and a portal is AGGREGATED so an agent wired to it sees that whole
+// desk (and any desks inherited into the portal).
 
 function htmlToText(html: string): string {
   let s = html
@@ -57,25 +56,6 @@ async function fetchPageText(url: string): Promise<string> {
   }
 }
 
-function tiptapText(s: string): string {
-  const out: string[] = []
-  const re = /"text"\s*:\s*"((?:[^"\\]|\\.)*)"/g
-  let m: RegExpExecArray | null
-  while ((m = re.exec(s)) && out.length < 200) out.push(m[1])
-  return out.join(' ').replace(/\\n/g, ' ')
-}
-
-function tableText(tableId: string): string {
-  const table = getTable(tableId)
-  if (!table) return '(table not found)'
-  const cols = table.schema.columns
-  const header = cols.map((c) => c.label).join(' | ')
-  const rows = listRows(tableId)
-    .slice(0, 40)
-    .map((r) => cols.map((c) => r.cells[c.id] ?? '').join(' | '))
-  return [`Table "${table.title}"`, header, ...rows].join('\n')
-}
-
 export interface AgentInput {
   kind: string
   title: string
@@ -84,43 +64,17 @@ export interface AgentInput {
 
 export async function describeWidgetForAgent(w: Widget, liveText?: string): Promise<AgentInput> {
   const base = { kind: w.kind, title: w.title ?? '' }
-  const raw = w.content ?? ''
-  switch (w.kind) {
-    case 'webview': {
-      // Prefer the live, authenticated, rendered page text captured from the
-      // mounted webview; only fall back to a server-side fetch when it wasn't
-      // available (page not mounted).
-      const page = liveText && liveText.trim() ? liveText : await fetchPageText(raw)
-      return { ...base, content: `Browser tab at ${raw || '(no URL)'}\n\n${page}` }
-    }
-    case 'table':
-      return { ...base, content: raw ? tableText(raw) : '(empty table)' }
-    case 'page':
-      return { ...base, content: tiptapText(raw) || '(empty document)' }
-    case 'field':
-      try {
-        const p = JSON.parse(raw || '{}') as { def?: { label?: string }; value?: unknown }
-        return { ...base, content: `${p.def?.label ?? 'Field'}: ${JSON.stringify(p.value ?? '')}` }
-      } catch {
-        return { ...base, content: raw }
-      }
-    case 'card':
-      try {
-        const p = JSON.parse(raw || '{}') as { title?: string; body?: string }
-        return { ...base, content: `${p.title ?? ''}\n${p.body ?? ''}`.trim() }
-      } catch {
-        return { ...base, content: raw }
-      }
-    case 'agent':
-      try {
-        return { ...base, content: (JSON.parse(raw || '{}') as { lastOutput?: string }).lastOutput ?? '' }
-      } catch {
-        return { ...base, content: '' }
-      }
-    case 'file':
-    case 'image':
-      return { ...base, content: raw ? `File/link: ${raw}` : '(empty file)' }
-    default:
-      return { ...base, content: raw }
+  // Browser: real page text (live or fetched), the one async case.
+  if (w.kind === 'webview') {
+    const raw = w.content ?? ''
+    const page = liveText && liveText.trim() ? liveText : await fetchPageText(raw)
+    return { ...base, content: `Browser tab at ${raw || '(no URL)'}\n\n${page}` }
   }
+  // Portal: aggregate the whole desk it points at, plus anything inherited into
+  // it (control room). Cycle + depth guards live in the aggregator.
+  if (w.kind === 'portal') {
+    return { ...base, content: aggregatePortalContent(w) }
+  }
+  // Everything else: the shared, network-free summary.
+  return { ...base, content: summariseWidget(w) }
 }

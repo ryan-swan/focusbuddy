@@ -4,6 +4,7 @@ import WidgetFrame from './WidgetFrame'
 import Icon from '../Icon'
 import DeskMiniature from '../DeskMiniature'
 import { useWidgetStore } from '../../stores/widgets'
+import { useLinksStore } from '../../stores/links'
 import { useNodeStore } from '../../stores/nodes'
 
 // Portal — a live window into ANOTHER task's desk. Pick a task and the portal
@@ -32,10 +33,37 @@ interface Props {
 
 export default function PortalWidget({ widget, inline = false }: Props): JSX.Element {
   const update = useWidgetStore((s) => s.update)
+  const widgets = useWidgetStore((s) => s.widgets)
+  const links = useLinksStore((s) => s.links)
   const nodes = useNodeStore((s) => s.nodes)
   const setActive = useNodeStore((s) => s.setActive)
 
   const cfg = parse(widget.content)
+
+  // Control room: what this portal inherits — everything wired INTO it. A wired
+  // source that is itself a portal contributes its whole desk.
+  const incoming = useMemo(
+    () => links.filter((l) => l.targetWidgetId === widget.id),
+    [links, widget.id]
+  )
+  const inheritedLabels = useMemo(
+    () =>
+      incoming.map((l) => {
+        const src = widgets.find((w) => w.id === l.sourceWidgetId)
+        if (!src) return 'a source'
+        if (src.kind === 'portal') {
+          try {
+            const t = (JSON.parse(src.content || '{}') as { targetTaskId?: string }).targetTaskId
+            return nodes.find((n) => n.id === t)?.title || 'a desk'
+          } catch {
+            return 'a desk'
+          }
+        }
+        return src.title || src.kind
+      }),
+    [incoming, widgets, nodes]
+  )
+  const inheritCount = incoming.length
   const [targetWidgets, setTargetWidgets] = useState<Widget[]>([])
 
   const wrapRef = useRef<HTMLDivElement | null>(null)
@@ -94,7 +122,44 @@ export default function PortalWidget({ widget, inline = false }: Props): JSX.Ele
   }
 
   let body: JSX.Element
-  if (!cfg.targetTaskId) {
+  if (!cfg.targetTaskId && inheritCount > 0) {
+    // Rollup aggregator: no target desk of its own, but inherits wired sources.
+    // Whatever it's wired into receives all of these combined.
+    body = (
+      <div className="h-full w-full flex flex-col bg-stone-50 dark:bg-stone-950" data-testid="portal-widget">
+        <div className="px-2.5 py-1.5 border-b border-stone-200 dark:border-stone-800 flex items-center gap-1.5">
+          <Icon name="hub" size={13} className="text-accent shrink-0" />
+          <span className="text-[12px] font-medium text-stone-800 dark:text-stone-100 flex-1">
+            Rollup
+          </span>
+          <button
+            onClick={() => pick('')}
+            title="Point at a desk instead"
+            className="inline-flex items-center justify-center h-5 w-5 rounded text-stone-500 hover:text-accent hover:bg-stone-200/70 dark:hover:bg-stone-700/70 shrink-0"
+            data-testid="portal-change"
+          >
+            <Icon name="swap_horiz" size={13} />
+          </button>
+        </div>
+        <div className="flex-1 min-h-0 overflow-y-auto p-2.5" data-testid="portal-rollup">
+          <div className="text-[10px] text-stone-500 dark:text-stone-400 mb-1.5">
+            Combines {inheritCount} source{inheritCount === 1 ? '' : 's'} into one feed:
+          </div>
+          <div className="space-y-1">
+            {inheritedLabels.map((label, i) => (
+              <div
+                key={i}
+                className="flex items-center gap-1.5 text-[11px] text-stone-700 dark:text-stone-200"
+              >
+                <Icon name="arrow_forward" size={11} className="text-accent shrink-0" />
+                <span className="truncate">{label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    )
+  } else if (!cfg.targetTaskId) {
     // Desk picker.
     body = (
       <div className="h-full w-full flex flex-col bg-white dark:bg-stone-900" data-testid="portal-widget">
@@ -136,6 +201,15 @@ export default function PortalWidget({ widget, inline = false }: Props): JSX.Ele
           >
             {targetNode?.title || 'Untitled desk'}
           </button>
+          {inheritCount > 0 && (
+            <span
+              className="inline-flex items-center gap-0.5 text-[9px] text-accent shrink-0"
+              title={`Also inherits: ${inheritedLabels.join(', ')}`}
+              data-testid="portal-inherits"
+            >
+              <Icon name="hub" size={10} />+{inheritCount}
+            </span>
+          )}
           <button
             onClick={openTarget}
             title="Open this desk"
