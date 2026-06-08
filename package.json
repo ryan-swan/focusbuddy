@@ -6,10 +6,10 @@
   "main": "./out/main/index.js",
   "author": "michael@saasmouth.agency",
   "scripts": {
-    "dev": "env -u ELECTRON_RUN_AS_NODE electron-vite dev",
+    "dev": "node scripts/dev.cjs dev",
     "build": "electron-vite build",
-    "preview": "env -u ELECTRON_RUN_AS_NODE electron-vite preview",
-    "start": "env -u ELECTRON_RUN_AS_NODE electron-vite preview",
+    "preview": "node scripts/dev.cjs preview",
+    "start": "node scripts/dev.cjs preview",
     "typecheck:node": "tsc --noEmit -p tsconfig.node.json --composite false",
     "typecheck:web": "tsc --noEmit -p tsconfig.web.json --composite false",
     "typecheck": "npm run typecheck:node && npm run typecheck:web",
