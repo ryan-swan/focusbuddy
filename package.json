@@ -28,7 +28,8 @@
     "node": ">=20.0.0 <23.0.0"
   },
   "overrides": {
-    "node-gyp": "^11.2.0"
+    "node-gyp": "^11.2.0",
+    "@electron/node-gyp": "10.2.0-electron.2"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.32.1",
@@ -69,7 +70,7 @@
     "autoprefixer": "^10.4.20",
     "electron": "^33.2.0",
     "electron-builder": "^25.1.8",
-    "@electron/rebuild": "^3.7.1",
+    "@electron/rebuild": "^3.7.2",
     "electron-vite": "^2.3.0",
     "happy-dom": "^20.9.0",
     "postcss": "^8.4.49",
