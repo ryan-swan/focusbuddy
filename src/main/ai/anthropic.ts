@@ -1657,8 +1657,9 @@ export async function runDeskAgent(input: {
   persona?: string
   // webContents id of a wired browser the agent may DRIVE to research.
   browserWcId?: number
-  // The widgets this agent's output is auto-delivered into.
-  outputs?: Array<{ kind: string; title: string }>
+  // The widgets this agent's output is auto-delivered into, with the format each
+  // one expects.
+  outputs?: Array<{ kind: string; title: string; format?: string }>
 }): Promise<DeskAgentResult> {
   const c = getClient()
   if (!c) {
@@ -1708,11 +1709,21 @@ export async function runDeskAgent(input: {
         'write your findings.'
       : '')
 
+  const outs = input.outputs ?? []
+  // What format to write in. If every target wants the same shape, target it
+  // directly; if they differ, write Markdown and the app reshapes per target
+  // (a table gets rows, a number field gets the number, a page gets a document).
+  const formats = Array.from(new Set(outs.map((o) => o.format).filter(Boolean)))
   const outputBlock =
-    input.outputs && input.outputs.length > 0
-      ? `\n\nYour output is automatically saved into: ${input.outputs
-          .map((o) => `a ${o.kind}${o.title ? ` "${o.title}"` : ''}`)
-          .join(', ')}. Produce the findings; you do not need to access those widgets.`
+    outs.length > 0
+      ? `\n\nYour output is automatically saved into these linked widgets, each in its own format:\n` +
+        outs
+          .map((o) => `- a ${o.kind}${o.title ? ` "${o.title}"` : ''}: provide ${o.format ?? 'plain text'}`)
+          .join('\n') +
+        (formats.length <= 1
+          ? `\n\nWrite your output as ${formats[0] ?? 'plain text'}.`
+          : `\n\nThese formats differ, so write your findings as well-structured Markdown; the app reshapes it for each widget automatically.`) +
+        ` You never access those widgets yourself; just produce the content.`
       : ''
 
   const user = `Standing instruction:\n${instruction}\n\nWired inputs:\n${inputBlock}${outputBlock}\n\nProduce your output now.`
