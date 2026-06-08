@@ -684,6 +684,8 @@ const api = {
       needsApiKey?: boolean
       error?: string
     }> => ipcRenderer.invoke('agents:designProfile', description),
+    previewInput: (widgetId: string): Promise<{ kind?: string; content: string }> =>
+      ipcRenderer.invoke('agents:previewInput', widgetId),
     create: (input: {
       slug: string
       description: string

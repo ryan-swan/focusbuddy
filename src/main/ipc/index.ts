@@ -465,6 +465,15 @@ export function registerIpcHandlers(): void {
     designAgentProfile(description)
   )
 
+  // Inspect what a widget contributes when wired into an agent — for a portal,
+  // its aggregated desk(s). Powers tests + a future "preview feed" affordance.
+  ipcMain.handle('agents:previewInput', async (_e, widgetId: string) => {
+    const w = getWidget(widgetId)
+    if (!w) return { content: '' }
+    const d = await describeWidgetForAgent(w)
+    return { kind: d.kind, content: d.content }
+  })
+
   ipcMain.handle('templates:list', () => listTemplates())
   ipcMain.handle(
     'templates:createFromTask',
