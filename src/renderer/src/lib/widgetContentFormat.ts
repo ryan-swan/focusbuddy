@@ -1,4 +1,5 @@
 import type { Widget } from '@shared/types'
+import { coerceCellValue } from './actionExecutor'
 
 // Format-aware delivery. When a wire or a desk agent pushes text into a linked
 // widget, the text must land in the SHAPE that widget kind stores — otherwise a
@@ -130,10 +131,15 @@ export function coerceToWidgetContent(target: Widget, text: string): string | nu
       return JSON.stringify({ ...prev, label: firstLine(text).slice(0, 60) })
     }
     case 'field': {
-      // Keep the field's definition, set its value. No def yet → skip.
-      const prev = safeParse<{ def?: unknown; value?: unknown }>(target.content)
+      // Keep the field's definition, set its value COERCED to the field's type
+      // (a number field gets a number, a checkbox gets a boolean, a date a
+      // timestamp, a select an option id). Same coercion tables use. No def → skip.
+      const prev = safeParse<{ def?: { type?: string; config?: unknown }; value?: unknown }>(
+        target.content
+      )
       if (!prev?.def) return null
-      return JSON.stringify({ def: prev.def, value: text })
+      const value = coerceCellValue((prev.def.type as never) ?? 'text-short', text, prev.def.config as never)
+      return JSON.stringify({ def: prev.def, value })
     }
 
     // ── URL-based widgets: only if the text is actually a URL ─────────────────

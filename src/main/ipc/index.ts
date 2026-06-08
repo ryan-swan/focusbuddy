@@ -235,6 +235,40 @@ import type {
   WireType
 } from '@shared/types'
 
+// A plain-language description of the content format a wired output widget
+// expects, so a desk agent can produce the right shape for each one.
+function outputFormatHint(w: { kind: string; content: string | null }): string {
+  switch (w.kind) {
+    case 'markdown':
+      return 'Markdown'
+    case 'page':
+      return 'a document written in Markdown (headings, bullet lists, paragraphs)'
+    case 'sticky':
+    case 'note':
+      return 'plain text'
+    case 'card':
+      return 'a short title on the first line, then the body'
+    case 'table':
+      return 'a list of items, one per line (the app turns them into typed table rows)'
+    case 'mindmap':
+      return 'an outline: the first line is the root, then one item per line'
+    case 'field': {
+      try {
+        const t = (JSON.parse(w.content || '{}') as { def?: { type?: string } }).def?.type
+        if (t === 'number') return 'a single number'
+        if (t === 'date') return 'a date'
+        if (t === 'checkbox') return 'yes or no'
+        if (t === 'single-select' || t === 'multi-select') return 'one of the field’s options'
+      } catch {
+        /* fall through */
+      }
+      return 'a short single value'
+    }
+    default:
+      return 'plain text'
+  }
+}
+
 export function registerIpcHandlers(): void {
   // ── Body-double cross-window relay ──────────────────────────────────────
   // BroadcastChannel is per-renderer-process — fine for two browser tabs,
@@ -457,14 +491,14 @@ export function registerIpcHandlers(): void {
       const inputs = await Promise.all(
         inputWidgets.map((w) => describeWidgetForAgent(w, liveInputs?.[w.id]))
       )
-      // Where this agent's output is auto-delivered, so it doesn't ask the user
-      // for "access" to write the linked page/note/table — it just produces the
-      // content and the app writes it.
+      // Where this agent's output is auto-delivered + the FORMAT each target
+      // expects, so the agent produces the right shape and doesn't ask the user
+      // for "access" to write the linked page/note/table/field.
       const outputs = links
         .filter((l) => l.sourceWidgetId === agentId)
         .map((l) => getWidget(l.targetWidgetId))
         .filter((w): w is NonNullable<ReturnType<typeof getWidget>> => !!w && !w.archived)
-        .map((w) => ({ kind: w.kind, title: w.title ?? '' }))
+        .map((w) => ({ kind: w.kind, title: w.title ?? '', format: outputFormatHint(w) }))
       return runDeskAgent({ instruction, inputs, persona, browserWcId, outputs })
     }
   )

@@ -113,6 +113,39 @@ test('an agent feeds a page as a real document', async () => {
   expect(flat).toContain('item one')
 })
 
+test('an agent feeds a number field a typed number, not a string', async () => {
+  launched = await launchApp()
+  const { window } = launched
+  await waitForReady(window)
+  const ids = await window.evaluate(async (content: string) => {
+    const api = (window as unknown as { api: typeof window.api }).api
+    const task = await api.nodes.create({ parentId: null, kind: 'task', title: 'Fmt field' })
+    const field = await api.widgets.create({
+      taskId: task.id, kind: 'field', title: 'Count',
+      content: JSON.stringify({ def: { id: 'f1', type: 'number', label: 'Count', config: {} }, value: null }),
+      x: 480, y: 200, width: 220, height: 140
+    })
+    const agent = await api.widgets.create({
+      taskId: task.id, kind: 'agent', title: 'Agent', content,
+      x: 120, y: 200, width: 340, height: 320
+    })
+    await api.widgetLinks.create(agent.id, field.id, task.id)
+    return { taskId: task.id, fieldId: field.id }
+  }, AGENT('42'))
+
+  await openAndTrigger(window, /Fmt field/)
+  await expect
+    .poll(async () => {
+      const c = await widgetContent(window, ids.taskId, ids.fieldId)
+      try {
+        return JSON.parse(c || '{}').value
+      } catch {
+        return undefined
+      }
+    }, { timeout: 8_000, intervals: [400, 700] })
+    .toBe(42)
+})
+
 test('an agent feeds a mindmap as a node tree', async () => {
   launched = await launchApp()
   const { window } = launched
