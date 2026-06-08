@@ -1,8 +1,15 @@
-import { dialog, nativeImage } from 'electron'
+import { dialog, nativeImage, shell } from 'electron'
 import { exec, execFile } from 'child_process'
 import { promisify } from 'util'
 import { basename, extname, join } from 'path'
 import { readFileSync, existsSync, rmSync } from 'fs'
+
+// The rich integration (bundle-id, icon capture, running-state, focus/unminimise
+// via AppleScript, the mirror-mode punch-through) is macOS-only. On other
+// platforms the app launcher degrades to "launcher only": pick an executable and
+// launch it via shell.openPath, with no icon/running enrichment. Guarded so the
+// app never runs a missing macOS command on Windows/Linux.
+const isMac = process.platform === 'darwin'
 
 const execAsync = promisify(exec)
 // execFile variant that CAPTURES stdout, with NO shell — arguments are passed
@@ -34,20 +41,26 @@ export async function pickLocalApp(): Promise<PickedLocalApp | null> {
   // entirely (the live-mirror punch-through feature requires `transparent:
   // true` on the main window). Without a parent, the dialog opens as a
   // modal panel above the active window, which works reliably regardless.
-  const opts: Electron.OpenDialogOptions = {
-    title: 'Add local app',
-    defaultPath: '/Applications',
-    properties: ['openFile'],
-    filters: [{ name: 'Applications', extensions: ['app'] }]
-  }
+  const opts: Electron.OpenDialogOptions = isMac
+    ? {
+        title: 'Add local app',
+        defaultPath: '/Applications',
+        properties: ['openFile'],
+        filters: [{ name: 'Applications', extensions: ['app'] }]
+      }
+    : {
+        title: 'Add local app',
+        properties: ['openFile'],
+        filters: [{ name: 'Programs', extensions: ['exe', 'lnk', 'bat', 'cmd'] }]
+      }
   try {
     const result = await dialog.showOpenDialog(opts)
     if (result.canceled || result.filePaths.length === 0) return null
     const appPath = result.filePaths[0]
     // Defensive: the picker filter is advisory on macOS — users can navigate
     // around it with shortcuts and pick a non-.app file. Reject anything that
-    // isn't an actual .app bundle path.
-    if (extname(appPath) !== '.app') return null
+    // isn't an actual .app bundle path (macOS only).
+    if (isMac && extname(appPath) !== '.app') return null
     return buildPickedFromPath(appPath)
   } catch (err) {
     // Surface to main-process console so dev-server tail catches it. The
@@ -60,6 +73,16 @@ export async function pickLocalApp(): Promise<PickedLocalApp | null> {
 }
 
 async function buildPickedFromPath(appPath: string): Promise<PickedLocalApp> {
+  // Off macOS: launcher-only. No bundle id, no icon capture (those are
+  // AppleScript / macOS-specific). The title is the executable name.
+  if (!isMac) {
+    return {
+      title: basename(appPath).replace(/\.(exe|lnk|bat|cmd)$/i, ''),
+      appPath,
+      bundleId: null,
+      iconPngBase64: null
+    }
+  }
   const title = basename(appPath).replace(/\.app$/, '')
   const [bundleId, iconPngBase64] = await Promise.all([
     readBundleId(appPath),
@@ -105,6 +128,7 @@ async function readBundleId(appPath: string): Promise<string | null> {
 // PNG so the renderer doesn't pay a per-render IPC cost.
 
 async function captureAppIcon(appPath: string): Promise<string | null> {
+  if (!isMac) return null // icon extraction is macOS-only (sips/iconutil)
   if (!existsSync(appPath)) return null
   // We deliberately do NOT use Electron's app.getFileIcon — Electron 33 on
   // macOS Sonoma+ crashes the main process with a fatal NOTREACHED CHECK when
@@ -217,6 +241,13 @@ export async function launchLocalApp(input: {
   bundleId: string | null
   title?: string
 }): Promise<{ ok: true } | { ok: false; error: string }> {
+  // Off macOS: cross-platform launch via the OS shell. shell.openPath returns
+  // an empty string on success or an error message.
+  if (!isMac) {
+    if (!input.appPath) return { ok: false, error: 'No app path on the connected app.' }
+    const err = await shell.openPath(input.appPath)
+    return err ? { ok: false, error: err } : { ok: true }
+  }
   let opened = false
   if (input.bundleId) {
     try {
@@ -311,6 +342,7 @@ export async function isLocalAppRunning(input: {
   appPath: string | null
   title: string
 }): Promise<boolean> {
+  if (!isMac) return false // running-state detection uses AppleScript (macOS)
   const name = input.appPath ? basename(input.appPath).replace(/\.app$/, '') : input.title
   if (!name) return false
   // Escape double quotes in the app name for the AppleScript literal.
@@ -330,7 +362,7 @@ export async function isLocalAppRunning(input: {
 // isn't a .app bundle or doesn't exist.
 export async function describeLocalApp(appPath: string): Promise<PickedLocalApp | null> {
   if (!existsSync(appPath)) return null
-  if (extname(appPath) !== '.app') return null
+  if (isMac && extname(appPath) !== '.app') return null
   return buildPickedFromPath(appPath)
 }
 
