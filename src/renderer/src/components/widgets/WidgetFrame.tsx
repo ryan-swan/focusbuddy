@@ -16,6 +16,7 @@ import {
 import { chimeIn, chimeOut } from '../../lib/audioBeep'
 import { useZonePosition } from '../../lib/pinLayout'
 import { LinkDragContext } from '../../lib/linkDragContext'
+import { widgetDisplayName } from '../../lib/widgetDisplayName'
 import Icon from '../Icon'
 import AgeHalo from '../AgeHalo'
 import { SectionLayoutContext } from './sectionLayoutContext'
@@ -73,6 +74,26 @@ export default function WidgetFrame({
   const clearSelection = useWidgetStore((s) => s.clearSelection)
   const beginGroupDrag = useWidgetStore((s) => s.beginGroupDrag)
   const setGroupDelta = useWidgetStore((s) => s.setGroupDelta)
+  // ── Rename ────────────────────────────────────────────────────────────────
+  // Every widget can be named. Until the user types a name, the header shows a
+  // name inherited from the widget's own content (first line of a note, a
+  // browser's hostname); double-click the header label to set a manual name.
+  const [titleEditing, setTitleEditing] = useState(false)
+  const [titleDraft, setTitleDraft] = useState('')
+  // Manual double-click detection. The native `dblclick` event is unreliable on
+  // the header because the first click re-renders the frame (active-state change)
+  // and swaps the label node, so the browser never pairs the two clicks. A ref
+  // timestamp survives the re-render where a node-bound listener wouldn't.
+  const lastTitleClickRef = useRef(0)
+  function beginRename(): void {
+    setTitleDraft(widget.title?.trim() ?? '')
+    setTitleEditing(true)
+  }
+  function commitTitle(): void {
+    const next = titleDraft.trim()
+    if (next !== (widget.title || '')) void update(widget.id, { title: next })
+    setTitleEditing(false)
+  }
   const endGroupDrag = useWidgetStore((s) => s.endGroupDrag)
   // groupDrag is read live in the member-follow effect below; subscribe so the
   // effect re-runs on every delta tick.
@@ -483,6 +504,10 @@ export default function WidgetFrame({
       minWidth={180}
       minHeight={120}
       dragHandleClassName={draggableHandleClass}
+      // The header label is a drag handle, but the rename affordance inside it
+      // must NOT start a drag — otherwise react-draggable swallows the
+      // double-click that opens the editor. `cancel` excludes it from dragging.
+      cancel=".widget-nodrag"
       disableDragging={dragDisabled}
       enableResizing={
         useControlled
@@ -784,9 +809,65 @@ export default function WidgetFrame({
                 <Icon name="link" size={11} />
               </span>
             )}
-            {headerLabel}
+            {titleEditing ? (
+              <input
+                autoFocus
+                value={titleDraft}
+                onChange={(e) => setTitleDraft(e.target.value)}
+                onMouseDown={(e) => e.stopPropagation()}
+                onClick={(e) => e.stopPropagation()}
+                onBlur={commitTitle}
+                onKeyDown={(e) => {
+                  e.stopPropagation()
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    commitTitle()
+                  } else if (e.key === 'Escape') {
+                    e.preventDefault()
+                    setTitleEditing(false)
+                  }
+                }}
+                placeholder={widgetDisplayName(widget, headerLabel)}
+                aria-label="Widget name"
+                className="widget-nodrag min-w-0 flex-1 bg-transparent border-b border-accent/60 outline-none text-[10px] uppercase tracking-[0.08em] font-medium text-stone-800 dark:text-stone-100 placeholder:text-stone-400 placeholder:normal-case"
+              />
+            ) : (
+              <span
+                data-testid={`widget-title-${widget.id}`}
+                onClick={(e) => {
+                  // Two clicks within 350ms = rename. The first click still
+                  // propagates so the widget activates normally.
+                  const now = Date.now()
+                  if (now - lastTitleClickRef.current < 350) {
+                    e.stopPropagation()
+                    lastTitleClickRef.current = 0
+                    beginRename()
+                  } else {
+                    lastTitleClickRef.current = now
+                  }
+                }}
+                title="Double-click to rename"
+                className="widget-nodrag truncate cursor-text"
+              >
+                {widgetDisplayName(widget, headerLabel)}
+              </span>
+            )}
           </span>
           <div className="flex items-center gap-0.5">
+            {!titleEditing && (
+              <button
+                onMouseDown={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  beginRename()
+                }}
+                className="widget-nodrag h-5 w-5 rounded inline-flex items-center justify-center text-stone-400 opacity-50 hover:opacity-100 hover:bg-stone-300/60 hover:text-accent transition-opacity"
+                aria-label="Rename widget"
+                title="Rename"
+              >
+                <Icon name="edit" size={12} />
+              </button>
+            )}
             {!isChildOfSection && !isPinned && linkDrag && (
               <button
                 // mousedown stopPropagation prevents react-rnd from

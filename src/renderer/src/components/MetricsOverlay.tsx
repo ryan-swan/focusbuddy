@@ -3,6 +3,8 @@ import { createPortal } from 'react-dom'
 import { useWidgetStore } from '../stores/widgets'
 import { useLinksStore } from '../stores/links'
 import { metricsStatus } from '../lib/metricsStatus'
+import { widgetDisplayName, hostnameOf } from '../lib/widgetDisplayName'
+import { lookupWebview } from '../lib/webviewRegistry'
 import Icon from './Icon'
 
 // Dev performance overlay. Toggle with Cmd/Ctrl+Shift+M. Shows per-process RAM +
@@ -19,6 +21,14 @@ interface ProcMetric {
   memMB: number
 }
 
+interface WcMetric {
+  webContentsId: number
+  osPid: number
+  type: string
+  title: string
+  url: string
+}
+
 function fmtMB(mb: number): string {
   return mb >= 1024 ? `${(mb / 1024).toFixed(2)} GB` : `${mb} MB`
 }
@@ -26,6 +36,7 @@ function fmtMB(mb: number): string {
 export default function MetricsOverlay(): JSX.Element | null {
   const [open, setOpen] = useState(false)
   const [procs, setProcs] = useState<ProcMetric[]>([])
+  const [wcs, setWcs] = useState<WcMetric[]>([])
   const [status, setStatus] = useState<string | null>(null)
   const widgets = useWidgetStore((s) => s.widgets)
   const links = useLinksStore((s) => s.links)
@@ -66,6 +77,14 @@ export default function MetricsOverlay(): JSX.Element | null {
           setProcs(m)
           setStatus(metricsStatus({ hasGetter: true, count: m.length }))
         }
+        // Best-effort: map renderer processes to their owning widget. Older
+        // builds (stale preload) won't have this; the rows just fall back to
+        // the process type then.
+        const wcGetter = window.api?.metrics?.webContents
+        if (typeof wcGetter === 'function') {
+          const w = await wcGetter()
+          if (alive) setWcs(w)
+        }
       } catch (err) {
         if (alive) {
           setProcs([])
@@ -94,6 +113,26 @@ export default function MetricsOverlay(): JSX.Element | null {
 
   const browsers = widgets.filter((w) => w.kind === 'webview' && !w.archived).length
   const liveWidgets = widgets.filter((w) => !w.archived).length
+
+  // Join renderer processes to the widget that owns them. A process can host
+  // more than one webContents (same-site renderers share), so labels accumulate.
+  const labelByPid = new Map<number, string[]>()
+  for (const wc of wcs) {
+    if (!wc.osPid) continue
+    let label = ''
+    if (wc.type === 'window') {
+      label = 'This window'
+    } else {
+      const entry = lookupWebview(wc.webContentsId)
+      const widget = entry ? widgets.find((w) => w.id === entry.widgetId) : undefined
+      label = widget ? widgetDisplayName(widget) : hostnameOf(wc.url) || wc.title || ''
+    }
+    if (!label) continue
+    const arr = labelByPid.get(wc.osPid) ?? []
+    if (!arr.includes(label)) arr.push(label)
+    labelByPid.set(wc.osPid, arr)
+  }
+  const labelFor = (pid: number): string | null => labelByPid.get(pid)?.join(', ') ?? null
 
   const Row = ({ label, value, warn }: { label: string; value: string; warn?: boolean }): JSX.Element => (
     <div className="flex items-center justify-between gap-4">
@@ -153,17 +192,27 @@ export default function MetricsOverlay(): JSX.Element | null {
       <div className="px-2.5 py-2">
         <div className="text-[9px] uppercase tracking-wider text-stone-500 mb-1">Top processes by RAM</div>
         <div className="space-y-0.5">
-          {top.map((p) => (
-            <div key={p.pid} className="flex items-center justify-between gap-2">
-              <span className="text-stone-400 truncate">
-                {p.type}
-                {p.name ? ` · ${p.name}` : ''}
-              </span>
-              <span className="text-stone-200 shrink-0">
-                {fmtMB(p.memMB)} · {p.cpu}%
-              </span>
-            </div>
-          ))}
+          {top.map((p) => {
+            const label = labelFor(p.pid)
+            return (
+              <div key={p.pid} className="flex items-center justify-between gap-2">
+                <span className="truncate">
+                  {label ? (
+                    <span className="text-stone-200">{label}</span>
+                  ) : (
+                    <span className="text-stone-400">
+                      {p.type}
+                      {p.name ? ` · ${p.name}` : ''}
+                    </span>
+                  )}
+                  {label && <span className="text-stone-500"> · {p.type === 'Tab' ? 'renderer' : p.type}</span>}
+                </span>
+                <span className="text-stone-200 shrink-0">
+                  {fmtMB(p.memMB)} · {p.cpu}%
+                </span>
+              </div>
+            )
+          })}
         </div>
       </div>
 

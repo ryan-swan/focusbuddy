@@ -39,6 +39,9 @@ test('the metrics overlay toggles and shows real process metrics + live counts',
   await expect(overlay).toBeVisible()
   await expect(overlay).toContainText('Total RAM')
   await expect(overlay).toContainText('Top processes by RAM')
+  // Renderer processes are now labeled by what owns them: the app's own UI
+  // window resolves to "This window" instead of a bare "Tab".
+  await expect(overlay).toContainText('This window')
 
   // Live counts reflect the seeded desk: 1 browser, 1 wire.
   await expect(window.locator('[data-testid="metrics-browsers"]')).toHaveText('1')
