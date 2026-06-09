@@ -21,6 +21,7 @@ import { useSharesStore } from '../stores/shares'
 import { useAccountStore } from '../stores/account'
 import { acceptShareIntoWorkspace, type ShareSnap } from '../lib/acceptShare'
 import SharedBadge from './SharedBadge'
+import SharedRecipientBadges from './SharedRecipientBadges'
 import Icon from './Icon'
 
 // MIME used when dragging a Connected App row from the sidebar onto the canvas.
@@ -298,6 +299,7 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
   const sharesLoaded = useSharesStore((s) => s.loaded)
   const removeFromInbox = useSharesStore((s) => s.removeFromInbox)
   const outgoingShares = useSharesStore((s) => s.outgoing)
+  const recipientsByEntity = useSharesStore((s) => s.recipientsByEntity)
   const account = useAccountStore((s) => s.account)
   const [sharedOpen, setSharedOpen] = useState(true)
 
@@ -962,6 +964,8 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
                         </span>
                         {node.sharedFromHandle ? (
                           <SharedBadge handle={node.sharedFromHandle} />
+                        ) : recipientsByEntity[node.id]?.length ? (
+                          <SharedRecipientBadges recipients={recipientsByEntity[node.id]} />
                         ) : (
                           sharedOutIds.has(node.id) && (
                             <SharedBadge

@@ -21,6 +21,12 @@ export interface MintShareInput {
   expiresAt: number | null
 }
 
+export interface ShareRecipientDto {
+  email: string
+  handle: string | null
+  status: 'invited' | 'accepted'
+}
+
 export interface LookupShareResult {
   token: string
   kind: ShareableKind
@@ -72,6 +78,48 @@ export class ShareService {
       throw new Error(`Share service error (${res.status}).`)
     }
     return (await res.json()) as LookupShareResult
+  }
+
+  // Owner invites someone to a share by email. Server records the recipient
+  // and emails them the viewer link. Owner-authenticated.
+  async invite(
+    token: string,
+    email: string,
+    sessionToken: string
+  ): Promise<{ recipient: ShareRecipientDto; emailDelivered: boolean }> {
+    const res = await fetch(`${this.baseUrl}/share/invite`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${sessionToken}` },
+      body: JSON.stringify({ token, email })
+    })
+    const body = (await res.json().catch(() => ({}))) as {
+      ok?: boolean
+      recipient?: ShareRecipientDto
+      emailDelivered?: boolean
+      error?: string
+    }
+    if (!res.ok || !body.ok || !body.recipient) {
+      throw new Error(body.error || `Invite failed (${res.status}).`)
+    }
+    return { recipient: body.recipient, emailDelivered: !!body.emailDelivered }
+  }
+
+  // List recipients for one or more of the owner's shares (for the avatars).
+  async recipients(
+    tokens: string[],
+    sessionToken: string
+  ): Promise<Record<string, ShareRecipientDto[]>> {
+    if (tokens.length === 0) return {}
+    const res = await fetch(
+      `${this.baseUrl}/share/recipients?tokens=${encodeURIComponent(tokens.join(','))}`,
+      { headers: { Authorization: `Bearer ${sessionToken}` } }
+    )
+    const body = (await res.json().catch(() => ({}))) as {
+      ok?: boolean
+      byToken?: Record<string, ShareRecipientDto[]>
+    }
+    if (!res.ok || !body.ok) return {}
+    return body.byToken ?? {}
   }
 
   // Owner revokes a share. The hosted side stops resolving it but the
