@@ -360,26 +360,38 @@ export default function Canvas(): JSX.Element {
   const createdMinimapForRef = useRef<Set<string>>(new Set())
   useEffect(() => {
     if (!activeTaskId) return
-    if (widgetsLoadingFor !== null) return // still loading
+    if (widgetsLoadingFor !== null) return // wait until loadForTask has populated widgets
+
+    const mine = useWidgetStore
+      .getState()
+      .widgets.filter((w) => w.kind === 'minimap' && w.taskId === activeTaskId)
+      // Oldest first, so dedup deterministically keeps the same minimap across
+      // reloads rather than a different one each time.
+      .sort((a, b) => a.createdAt - b.createdAt)
+
+    // ALWAYS dedup to exactly one minimap, however the extras arose (a load
+    // race, an old session's bug, a stray re-add). This runs on every pass and
+    // is NOT gated by createdMinimapForRef — the previous version returned early
+    // when the task was already in the ref, so a duplicate created afterwards
+    // (on add / load / reload) was never healed. Keep the oldest, delete the rest.
+    if (mine.length > 1) {
+      for (const extra of mine.slice(1)) {
+        void useWidgetStore.getState().remove(extra.id)
+      }
+    }
+    if (mine.length >= 1) {
+      createdMinimapForRef.current.add(activeTaskId)
+      return
+    }
+
+    // No minimap exists. Create one unless the user dismissed it, or a create
+    // is already pending this session (the ref guards the async gap between
+    // calling createWidget and the store reflecting the new widget, so we don't
+    // fire a second create before the first lands).
     if (createdMinimapForRef.current.has(activeTaskId)) return
     const dismissed = localStorage.getItem(`fb-minimap-dismissed:${activeTaskId}`) === '1'
     if (dismissed) {
       createdMinimapForRef.current.add(activeTaskId)
-      return
-    }
-    const mine = useWidgetStore
-      .getState()
-      .widgets.filter((w) => w.kind === 'minimap' && w.taskId === activeTaskId)
-    if (mine.length >= 1) {
-      createdMinimapForRef.current.add(activeTaskId)
-      // Self-heal: a load-race in an earlier session could have created several
-      // minimaps (the user saw four). Keep exactly one, delete the rest. This
-      // also stops new dupes accumulating on every refresh.
-      if (mine.length > 1) {
-        for (const extra of mine.slice(1)) {
-          void useWidgetStore.getState().remove(extra.id)
-        }
-      }
       return
     }
     createdMinimapForRef.current.add(activeTaskId)
@@ -395,8 +407,8 @@ export default function Canvas(): JSX.Element {
       pinned: true,
       pinnedZone: 'br'
     })
-    // Suppress noise about widgetIds — included in deps to re-evaluate
-    // after widgets load completes, but we use the getState() snapshot.
+    // widgetIds is in deps to re-evaluate after widgets load; we read the
+    // getState() snapshot rather than the joined string itself.
     void widgetIds
   }, [activeTaskId, widgetsLoadingFor, widgetIds, createWidget])
 
