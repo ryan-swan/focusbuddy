@@ -10,20 +10,43 @@ interface CardData {
   title: string
   body: string
   accent: string
+  // When true the whole card fills with a soft tint of the accent instead of
+  // showing only the accent bar — a calmer, more callout-like look.
+  bgFill?: boolean
+  // Optional emoji on the title row.
+  icon?: string
 }
 
 const ACCENTS = ['#6366f1', '#0ea5e9', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#64748b']
+const ICONS = ['💡', '⭐', '🔥', '✅', '⚠️', '📌', '🎯', '❤️', '🚀', '📝', '🔑', '💬']
 const DEFAULT: CardData = { title: '', body: '', accent: ACCENTS[0] }
 
 function parse(content: string): CardData {
   if (!content) return { ...DEFAULT }
   try {
     const p = JSON.parse(content) as Partial<CardData>
-    return { title: p.title ?? '', body: p.body ?? '', accent: p.accent ?? DEFAULT.accent }
+    return {
+      title: p.title ?? '',
+      body: p.body ?? '',
+      accent: p.accent ?? DEFAULT.accent,
+      bgFill: p.bgFill ?? false,
+      icon: p.icon ?? ''
+    }
   } catch {
     // Legacy / plain-text content becomes the body.
     return { ...DEFAULT, body: content }
   }
+}
+
+// A hex accent at low alpha, for the full-fill background tint. Works on both
+// light and dark themes because the alpha is low enough to read either way.
+function tint(hex: string, alpha: number): string {
+  const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex)
+  if (!m) return 'transparent'
+  const r = parseInt(m[1], 16)
+  const g = parseInt(m[2], 16)
+  const b = parseInt(m[3], 16)
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`
 }
 
 interface Props {
@@ -35,6 +58,7 @@ export default function CardWidget({ widget, inline = false }: Props): JSX.Eleme
   const update = useWidgetStore((s) => s.update)
   const [data, setData] = useState<CardData>(() => parse(widget.content))
   const [pickAccent, setPickAccent] = useState(false)
+  const [pickIcon, setPickIcon] = useState(false)
   const lastSaved = useRef(widget.content)
 
   useEffect(() => {
@@ -60,16 +84,53 @@ export default function CardWidget({ widget, inline = false }: Props): JSX.Eleme
   const set = (patch: Partial<CardData>): void => setData((d) => ({ ...d, ...patch }))
 
   const content = (
-    <div className="group relative h-full w-full flex flex-col bg-white dark:bg-stone-900">
+    <div
+      className={`group relative h-full w-full flex flex-col ${data.bgFill ? '' : 'bg-white dark:bg-stone-900'}`}
+      style={data.bgFill ? { backgroundColor: tint(data.accent, 0.14) } : undefined}
+    >
       <div className="h-1.5 w-full shrink-0" style={{ backgroundColor: data.accent }} />
       <div className="flex-1 min-h-0 flex flex-col gap-1.5 p-3">
-        <input
-          value={data.title}
-          onChange={(e) => set({ title: e.target.value })}
-          onMouseDown={(e) => e.stopPropagation()}
-          placeholder="Title"
-          className="w-full bg-transparent text-[15px] font-semibold text-stone-900 dark:text-stone-100 placeholder:text-stone-400 focus:outline-none"
-        />
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={() => setPickIcon((v) => !v)}
+            onMouseDown={(e) => e.stopPropagation()}
+            className={`shrink-0 h-6 w-6 inline-flex items-center justify-center rounded text-[15px] leading-none ${
+              data.icon ? '' : 'opacity-0 group-hover:opacity-100 text-stone-400 hover:bg-stone-200/60 dark:hover:bg-stone-700/60'
+            } transition-opacity`}
+            title="Card icon"
+            aria-label="Card icon"
+            data-testid="card-icon-button"
+          >
+            {data.icon || '☺'}
+          </button>
+          <input
+            value={data.title}
+            onChange={(e) => set({ title: e.target.value })}
+            onMouseDown={(e) => e.stopPropagation()}
+            placeholder="Title"
+            className="flex-1 bg-transparent text-[15px] font-semibold text-stone-900 dark:text-stone-100 placeholder:text-stone-400 focus:outline-none"
+          />
+        </div>
+        {pickIcon && (
+          <div
+            className="flex flex-wrap gap-1 p-1.5 rounded-lg bg-white dark:bg-stone-800 shadow-xl border border-stone-200 dark:border-stone-700 max-w-[220px]"
+            onMouseDown={(e) => e.stopPropagation()}
+            data-testid="card-icon-picker"
+          >
+            {ICONS.map((ic) => (
+              <button
+                key={ic}
+                onClick={() => {
+                  set({ icon: data.icon === ic ? '' : ic })
+                  setPickIcon(false)
+                }}
+                className="h-6 w-6 inline-flex items-center justify-center rounded text-[15px] hover:bg-stone-200/60 dark:hover:bg-stone-700/60"
+              >
+                {ic}
+              </button>
+            ))}
+          </div>
+        )}
         <textarea
           value={data.body}
           onChange={(e) => set({ body: e.target.value })}
@@ -91,21 +152,27 @@ export default function CardWidget({ widget, inline = false }: Props): JSX.Eleme
         />
         {pickAccent && (
           <div
-            className="absolute right-0 mt-1 flex gap-1 p-1.5 rounded-lg bg-white dark:bg-stone-800 shadow-xl border border-stone-200 dark:border-stone-700 z-10"
+            className="absolute right-0 mt-1 flex flex-col gap-1.5 p-1.5 rounded-lg bg-white dark:bg-stone-800 shadow-xl border border-stone-200 dark:border-stone-700 z-10"
             onMouseDown={(e) => e.stopPropagation()}
           >
-            {ACCENTS.map((c) => (
-              <button
-                key={c}
-                onClick={() => {
-                  set({ accent: c })
-                  setPickAccent(false)
-                }}
-                className="h-5 w-5 rounded-full ring-1 ring-black/10"
-                style={{ backgroundColor: c }}
-                aria-label={`Accent ${c}`}
-              />
-            ))}
+            <div className="flex gap-1">
+              {ACCENTS.map((c) => (
+                <button
+                  key={c}
+                  onClick={() => set({ accent: c })}
+                  className={`h-5 w-5 rounded-full ring-1 ring-black/10 ${data.accent === c ? 'ring-2 ring-offset-1 ring-stone-500' : ''}`}
+                  style={{ backgroundColor: c }}
+                  aria-label={`Accent ${c}`}
+                />
+              ))}
+            </div>
+            <button
+              onClick={() => set({ bgFill: !data.bgFill })}
+              data-testid="card-fill-toggle"
+              className="text-[11px] text-stone-600 dark:text-stone-300 hover:text-stone-900 dark:hover:text-stone-100 text-left px-1 py-0.5 rounded hover:bg-stone-100 dark:hover:bg-stone-700/60"
+            >
+              {data.bgFill ? '✓ Fill background' : 'Fill background'}
+            </button>
           </div>
         )}
       </div>

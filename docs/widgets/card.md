@@ -165,3 +165,4 @@ canvas.
 ## Implementation log
 
 - 2026-06-09, SME doc created; no implementation started yet.
+- 2026-06-10, Shipped full-background fill (a soft accent-tint toggle in the colour popover) and an optional emoji icon on the title row. Rich body with links and basic formatting remains open from the launch-blocking tier.

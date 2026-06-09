@@ -196,3 +196,4 @@ lives on a wired, AI-native, local-first canvas.
 ## Implementation log
 
 - 2026-06-09, SME doc created; no implementation started yet.
+- 2026-06-10, Shipped "Copy as markdown" in the toolbar (raw getMarkdown string to the clipboard). The slash-command insert menu and the documented boundary versus the page widget remain open from the launch-blocking tier.
