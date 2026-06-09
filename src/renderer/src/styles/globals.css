@@ -1057,8 +1057,10 @@ body {
    exactly like the base theme does. */
 .futuristic.focus-session-active aside,
 .futuristic .focus-session-active aside {
-  opacity: 0.22 !important;
-  filter: blur(2px);
+  /* Keep the navigation sidebar legible even in the cinematic futuristic dim.
+     It was 0.22 + 2px blur, which made folders and tasks impossible to read. */
+  opacity: 0.6 !important;
+  filter: none;
   transition: opacity 600ms cubic-bezier(0.2, 0.8, 0.2, 1),
     filter 600ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
@@ -1461,7 +1463,12 @@ body {
 
 /* Focus Session (5-Minute Promise) — dims the shell so the canvas feels held in spotlight.
    Triggered by adding `focus-session-active` to <html> from FocusSessionOverlay. */
-.focus-session-active aside,
+/* Header and footer are peripheral chrome, so they de-emphasise hard during a
+   focus session. The sidebar is NAVIGATION — dimming it to near-invisible (it
+   was 0.28 + blur) made folders and tasks unreadable, which reads as a bug
+   rather than ambience. Keep the sidebar clearly legible and clickable; it
+   still reads as "backgrounded" at 0.62 without a blur, and hover brings it to
+   full. */
 .focus-session-active header,
 .focus-session-active footer {
   opacity: 0.28;
@@ -1469,10 +1476,15 @@ body {
     filter 700ms cubic-bezier(0.22, 1, 0.36, 1);
   filter: saturate(0.45) blur(0.5px);
 }
+.focus-session-active aside {
+  opacity: 0.62;
+  transition: opacity 700ms cubic-bezier(0.22, 1, 0.36, 1);
+  filter: none;
+}
 .focus-session-active aside:hover,
 .focus-session-active header:hover,
 .focus-session-active footer:hover {
-  opacity: 0.85;
+  opacity: 1;
   filter: saturate(1) blur(0);
 }
 .focus-session-active .desk-paper {
