@@ -135,6 +135,10 @@ export interface FbNode {
   // about the work itself (open / in_progress / done / parked); archived
   // is about whether the node should be visible in day-to-day surfaces.
   archived: boolean
+  // Handle of the person who shared this node with you, set when the node
+  // was reconstructed from an accepted share. Null for your own nodes. The
+  // sidebar uses it to show a "Shared by <handle>" badge + avatar.
+  sharedFromHandle: string | null
 }
 
 export interface NodeDraft {
@@ -147,6 +151,9 @@ export interface NodeDraft {
   importance?: AxisValue
   estimateMinutes?: number | null
   dueDate?: number | null
+  // Set when reconstructing a node from an accepted share — stamps the
+  // sharer's handle so the UI can badge it.
+  sharedFromHandle?: string | null
 }
 
 export interface NodePatch {

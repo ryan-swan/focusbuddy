@@ -18,6 +18,9 @@ import AddConnectedAppDialog from './AddConnectedAppDialog'
 import ShareDialog from './ShareDialog'
 import CanvasContextMenu, { type CtxMenuItem } from './CanvasContextMenu'
 import { useSharesStore } from '../stores/shares'
+import { useAccountStore } from '../stores/account'
+import { acceptShareIntoWorkspace, type ShareSnap } from '../lib/acceptShare'
+import SharedBadge from './SharedBadge'
 import Icon from './Icon'
 
 // MIME used when dragging a Connected App row from the sidebar onto the canvas.
@@ -294,7 +297,45 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
   const refreshShares = useSharesStore((s) => s.refresh)
   const sharesLoaded = useSharesStore((s) => s.loaded)
   const removeFromInbox = useSharesStore((s) => s.removeFromInbox)
+  const outgoingShares = useSharesStore((s) => s.outgoing)
+  const account = useAccountStore((s) => s.account)
   const [sharedOpen, setSharedOpen] = useState(true)
+
+  // Entity ids the owner has shared OUT (active, non-revoked links) — drives a
+  // "shared with others" avatar on the owner's own folders/tasks so it's clear
+  // at a glance which items are shared. The avatar uses the owner's handle.
+  const sharedOutIds = useMemo(
+    () => new Set(outgoingShares.filter((s) => !s.revoked).map((s) => s.entityId)),
+    [outgoingShares]
+  )
+  const ownerHandle =
+    (account?.handle && account.handle.trim()) ||
+    (account?.email ? account.email.split('@')[0] : '') ||
+    'You'
+  const [acceptingId, setAcceptingId] = useState<string | null>(null)
+
+  // Reconstruct a shared copy-item into the recipient's own workspace and open
+  // it. This is the action that actually delivers a shared folder/task — the
+  // inbox row alone is just a notification.
+  async function acceptIntoWorkspace(item: {
+    id: string
+    snapshot: unknown
+    kind: string
+  }): Promise<void> {
+    if (acceptingId) return
+    setAcceptingId(item.id)
+    try {
+      const res = await acceptShareIntoWorkspace(item.snapshot as ShareSnap)
+      await refreshShares()
+      await removeFromInbox(item.id)
+      if (res.rootKind === 'folder') goProject(res.rootNodeId)
+      else goTask(res.rootNodeId)
+    } catch (err) {
+      alert(`Could not add this to your workspace: ${(err as Error).message}`)
+    } finally {
+      setAcceptingId(null)
+    }
+  }
   const [templatesOpen, setTemplatesOpen] = useState(true)
 
   const templates = useTemplateStore((s) => s.templates)
@@ -640,7 +681,7 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
                 // automatically. Accepted shares appear in this section.
                 const url = window.prompt(
                   'Paste a share link:',
-                  'https://fb.app/share/…'
+                  'https://focusbuddy-viewer.vercel.app/share/…'
                 )
                 if (!url) return
                 const m = url.match(/\/share\/([a-z0-9]+)/i)
@@ -709,6 +750,19 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
                           {item.scope === 'copy' ? 'can copy' : 'view only'}
                         </div>
                       </div>
+                      {item.scope === 'copy' && (
+                        <button
+                          onClick={() => void acceptIntoWorkspace(item)}
+                          disabled={acceptingId === item.id}
+                          className="icon-btn !h-5 !w-5 text-accent disabled:opacity-50"
+                          title="Add to my workspace"
+                        >
+                          <Icon
+                            name={acceptingId === item.id ? 'hourglass_empty' : 'add_to_photos'}
+                            size={12}
+                          />
+                        </button>
+                      )}
                       <button
                         onClick={() => void removeFromInbox(item.id)}
                         className="icon-btn !h-5 !w-5 opacity-0 group-hover:opacity-100"
@@ -906,6 +960,17 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
                         >
                           {node.title}
                         </span>
+                        {node.sharedFromHandle ? (
+                          <SharedBadge handle={node.sharedFromHandle} />
+                        ) : (
+                          sharedOutIds.has(node.id) && (
+                            <SharedBadge
+                              handle={ownerHandle}
+                              label="Shared with others"
+                              testid="shared-out-badge"
+                            />
+                          )
+                        )}
                         {!isFolder && node.dueDate != null && node.status !== 'done' && (() => {
                           const daysLeft = Math.ceil((node.dueDate - Date.now()) / 86_400_000)
                           const overdue = daysLeft < 0

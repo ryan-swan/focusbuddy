@@ -23,6 +23,7 @@ interface NodeRow {
   resume_updated_at: number | null
   due_date: number | null
   archived: number | null
+  shared_from_handle: string | null
 }
 
 function rowToNode(row: NodeRow): FbNode {
@@ -46,7 +47,8 @@ function rowToNode(row: NodeRow): FbNode {
     resumeMarkdown: row.resume_markdown,
     resumeUpdatedAt: row.resume_updated_at,
     dueDate: row.due_date,
-    archived: row.archived === 1
+    archived: row.archived === 1,
+    sharedFromHandle: row.shared_from_handle ?? null
   }
 }
 
@@ -79,8 +81,8 @@ export function createNode(draft: NodeDraft): FbNode {
   const id = randomUUID()
   const now = Date.now()
   db.prepare(
-    `INSERT INTO nodes (id, parent_id, kind, title, description, status, priority, interest, importance, sort_order, created_at, updated_at, estimate_minutes, extensions_minutes, due_date)
-     VALUES (@id, @parentId, @kind, @title, @description, 'open', @priority, @interest, @importance, @sortOrder, @now, @now, @estimateMinutes, 0, @dueDate)`
+    `INSERT INTO nodes (id, parent_id, kind, title, description, status, priority, interest, importance, sort_order, created_at, updated_at, estimate_minutes, extensions_minutes, due_date, shared_from_handle)
+     VALUES (@id, @parentId, @kind, @title, @description, 'open', @priority, @interest, @importance, @sortOrder, @now, @now, @estimateMinutes, 0, @dueDate, @sharedFromHandle)`
   ).run({
     id,
     parentId: draft.parentId,
@@ -93,6 +95,7 @@ export function createNode(draft: NodeDraft): FbNode {
     sortOrder: nextSortOrder(draft.parentId),
     estimateMinutes: draft.estimateMinutes ?? null,
     dueDate: draft.dueDate ?? null,
+    sharedFromHandle: draft.sharedFromHandle ?? null,
     now
   })
   const created = getNode(id)

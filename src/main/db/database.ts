@@ -271,6 +271,9 @@ export function getDb(): Database.Database {
   ensureColumn(db, 'nodes', 'resume_markdown', 'TEXT')
   ensureColumn(db, 'nodes', 'resume_updated_at', 'INTEGER')
   ensureColumn(db, 'nodes', 'due_date', 'INTEGER')
+  // Set on nodes reconstructed from a share someone sent you. Drives the
+  // "Shared by <handle>" badge + avatar in the sidebar. Null = your own node.
+  ensureColumn(db, 'nodes', 'shared_from_handle', 'TEXT')
   // Soft-archive flag for nodes — separate from task `status` so folders
   // can be put away without messing with the work-state of their tasks.
   ensureColumn(db, 'nodes', 'archived', 'INTEGER NOT NULL DEFAULT 0')
