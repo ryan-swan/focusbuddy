@@ -9,14 +9,13 @@ name: Build Windows installer
 # on both platforms from one place.
 
 on:
-  # Manual run from the Actions tab — produces an unsigned/unpublished
-  # installer you can download from the run's artifacts.
+  # Manual run from the Actions tab (or `gh workflow run`) — produces the
+  # installer as a run artifact, which we download and attach to the matching
+  # GitHub Release by hand. This is the ONLY trigger on purpose: a `push: tags`
+  # trigger that auto-published collided with the hand-uploaded release assets
+  # and failed the publish step on every tag (v2.5.3–v2.5.5), generating noise
+  # without affecting the actual installer. The dispatch build is what ships.
   workflow_dispatch:
-  # Tag push (e.g. v2.6.0) — produces the installer AND publishes it to the
-  # GitHub Release for that tag.
-  push:
-    tags:
-      - 'v*'
 
 jobs:
   build:
