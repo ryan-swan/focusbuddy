@@ -63,6 +63,37 @@ export default function ShareDialog({
   // The most recently minted link — surfaced prominently so the user sees
   // what to copy without scrolling the existing-links list.
   const [fresh, setFresh] = useState<ShareLink | null>(null)
+  // Invite-by-email state.
+  const invite = useSharesStore((s) => s.invite)
+  const recipientsByEntity = useSharesStore((s) => s.recipientsByEntity)
+  const [inviteEmail, setInviteEmail] = useState('')
+  const [inviteBusy, setInviteBusy] = useState(false)
+  const [inviteMsg, setInviteMsg] = useState<string | null>(null)
+
+  // The token an email invite attaches to: the freshly minted link, else the
+  // most recent existing link for this entity. Invites need a live token.
+  const inviteToken = fresh?.token ?? outgoing.find((s) => !s.revoked)?.token ?? null
+  const entityRecipients = recipientsByEntity[entityId] ?? []
+
+  async function handleInvite(): Promise<void> {
+    const email = inviteEmail.trim().toLowerCase()
+    if (!email.includes('@') || !inviteToken || inviteBusy) return
+    setInviteBusy(true)
+    setInviteMsg(null)
+    try {
+      const { emailDelivered } = await invite(inviteToken, email)
+      setInviteEmail('')
+      setInviteMsg(
+        emailDelivered
+          ? `Invite sent to ${email}.`
+          : `${email} added — email will send once the mail provider is configured.`
+      )
+    } catch (err) {
+      setInviteMsg((err as Error).message)
+    } finally {
+      setInviteBusy(false)
+    }
+  }
 
   // Refresh shares once on mount. Sidebar already loads them when the
   // app boots, so this is a "catch up if something else minted a link
@@ -281,6 +312,54 @@ export default function ShareDialog({
                   <Icon name="content_copy" size={12} />
                 </button>
               </div>
+            </div>
+          )}
+
+          {/* Invite by email — sends a link + lands the share in their inbox */}
+          {inviteToken && (
+            <div className="rounded-md border border-stone-200 dark:border-stone-700 p-2.5 space-y-2">
+              <div className="text-[10px] uppercase tracking-wider font-semibold text-stone-500 dark:text-stone-400">
+                Invite by email
+              </div>
+              <div className="flex items-center gap-1.5">
+                <input
+                  type="email"
+                  value={inviteEmail}
+                  onChange={(e) => setInviteEmail(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') void handleInvite()
+                  }}
+                  placeholder="name@example.com"
+                  data-testid="invite-email"
+                  className="flex-1 text-[12px] px-2 py-1.5 rounded border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 text-stone-800 dark:text-stone-100 outline-none focus:border-accent"
+                />
+                <button
+                  onClick={() => void handleInvite()}
+                  disabled={inviteBusy || !inviteEmail.includes('@')}
+                  data-testid="invite-send"
+                  className="text-[12px] px-2.5 py-1.5 rounded bg-accent text-white hover:brightness-110 disabled:opacity-50 inline-flex items-center gap-1"
+                >
+                  <Icon name={inviteBusy ? 'autorenew' : 'send'} size={12} className={inviteBusy ? 'animate-spin' : ''} />
+                  Invite
+                </button>
+              </div>
+              {inviteMsg && (
+                <div className="text-[11px] text-stone-500 dark:text-stone-400">{inviteMsg}</div>
+              )}
+              {entityRecipients.length > 0 && (
+                <div className="space-y-0.5 pt-1 border-t border-stone-100 dark:border-stone-800">
+                  {entityRecipients.map((r) => (
+                    <div key={r.email} className="flex items-center justify-between gap-2 text-[11px]">
+                      <span className="truncate text-stone-700 dark:text-stone-200">
+                        {(r.handle && r.handle.trim()) || r.email}
+                      </span>
+                      <span className={r.status === 'accepted' ? 'text-emerald-500' : 'text-stone-400'}>
+                        {r.status === 'accepted' ? 'joined' : 'invited'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
