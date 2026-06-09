@@ -183,3 +183,4 @@ rather than a lonelier copy of an OS note.
 ## Implementation log
 
 - 2026-06-09, SME doc created; no implementation started yet.
+- 2026-06-10, Shipped auto-grow: the sticky grows by its text overflow (grow-only, capped at 640px) so a longer note stays readable without scrolling. Checklist mode and minimal rich text (bold + bullet) remain open from the launch-blocking tier.

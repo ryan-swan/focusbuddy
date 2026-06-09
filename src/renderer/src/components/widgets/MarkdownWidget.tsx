@@ -112,6 +112,17 @@ const TOOLBAR: ToolbarBtn[] = [
     icon: 'horizontal_rule',
     title: 'Divider',
     run: (e) => e.chain().focus().setHorizontalRule().run()
+  },
+  {
+    // Copy the raw markdown source to the clipboard so the note travels out of
+    // Haptyx as portable text (paste into GitHub, Obsidian, a PR, anywhere).
+    icon: 'content_copy',
+    title: 'Copy as markdown',
+    run: (e) => {
+      const storage = e.storage as { markdown?: { getMarkdown: () => string } }
+      const md = storage.markdown?.getMarkdown() ?? ''
+      void navigator.clipboard.writeText(md)
+    }
   }
 ]
 

@@ -21,9 +21,27 @@ export default function StickyWidget({ widget, inline = false }: Props): JSX.Ele
   const textRef = useRef(widget.content)
   textRef.current = text
   const saveTimerRef = useRef<number | null>(null)
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null)
   // Right-click "Create + connect" menu position. Opens on contextmenu
   // over the textarea (or the sticky body). Closes on click-away.
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; selectionText?: string } | null>(null)
+
+  // Auto-grow: when the typed text overflows the visible area, grow the sticky
+  // by exactly the overflow so the whole note is readable without scrolling.
+  // Grow-only (never shrinks below a manual resize) and capped so a runaway
+  // paste can't fill the canvas. Measuring overflow (scrollHeight - clientHeight)
+  // avoids guessing the frame chrome height.
+  const MAX_STICKY_HEIGHT = 640
+  useEffect(() => {
+    if (inline) return
+    const ta = textareaRef.current
+    if (!ta || ta.clientHeight === 0) return
+    const overflow = ta.scrollHeight - ta.clientHeight
+    if (overflow > 4) {
+      const target = Math.min(MAX_STICKY_HEIGHT, widget.height + overflow)
+      if (target > widget.height) void update(widget.id, { height: Math.round(target) })
+    }
+  }, [text, widget.height, widget.id, inline, update])
 
   useEffect(() => {
     setText(widget.content)
@@ -84,6 +102,7 @@ export default function StickyWidget({ widget, inline = false }: Props): JSX.Ele
         ))}
       </div>
       <textarea
+        ref={textareaRef}
         value={text}
         onChange={(e) => setText(e.target.value)}
         placeholder="Write a note..."
