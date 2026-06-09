@@ -18,10 +18,17 @@ export function generateShareToken(): string {
   return out
 }
 
-// The viewer URL — points at the future hosted viewer. In local-mock mode
-// the URL is "informational" (copies to clipboard, but won't resolve until
-// the server ships). The format is finalised now so links shared today
-// continue to work later.
+// The viewer base URL where share links resolve. Defaults to the hosted
+// viewer; override at build time with VITE_VIEWER_URL (e.g. a custom domain
+// like https://view.haptyx.app). Trailing slashes are trimmed so the
+// `${base}/share/${token}` join is always clean.
+const VIEWER_BASE = (
+  (import.meta.env.VITE_VIEWER_URL as string | undefined) ||
+  'https://focusbuddy-viewer.vercel.app'
+).replace(/\/+$/, '')
+
+// The viewer URL for a share token. This is what the user copies and sends,
+// so it must point at the real viewer, not a placeholder.
 export function viewerUrlFor(token: string): string {
-  return `https://fb.app/share/${token}`
+  return `${VIEWER_BASE}/share/${token}`
 }

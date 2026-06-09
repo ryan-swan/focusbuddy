@@ -17,6 +17,9 @@ interface ImportMetaEnv {
   // real backend. Defaults to https://signal.fb.app + wss://signal.fb.app/ws.
   readonly VITE_SIGNAL_HTTP_URL?: string
   readonly VITE_SIGNAL_WS_URL?: string
+  // Base URL of the hosted share viewer. Used to build the share links the
+  // user copies. Defaults to https://focusbuddy-viewer.vercel.app.
+  readonly VITE_VIEWER_URL?: string
 }
 
 interface ImportMeta {
