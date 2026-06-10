@@ -141,6 +141,26 @@ export const useCapabilityStore = create<CapabilityStore>((set, get) => ({
         headers: { authorization: `Bearer ${token}` }
       })
       if (!res.ok) {
+        if (res.status === 401) {
+          // The session token is expired or revoked. Staying here would leave
+          // the user silently stranded on whatever plan we last cached (almost
+          // always Free), with no signal that re-auth would fix it. Clear the
+          // dead session so the app reflects signed-out and the sign-in prompt
+          // becomes reachable, and resolve capabilities to the signed-out Free
+          // map explicitly.
+          set({
+            tier: 'free',
+            effectiveTier: 'free',
+            storedTier: 'free',
+            trial: DEFAULT_TRIAL,
+            capabilities: localMap('free'),
+            loadedAt: Date.now(),
+            error: 'session-expired'
+          })
+          const acct = useAccountStore.getState()
+          if (acct.sessionToken) void acct.signOut()
+          return
+        }
         set({ error: `HTTP ${res.status}` })
         return
       }

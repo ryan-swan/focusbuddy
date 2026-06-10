@@ -7,6 +7,7 @@ import { getTable } from '../db/tables'
 import { getRecentHistory } from '../db/browsing'
 import { getRecentActivity } from '../db/activity'
 import { markdownToTiptap } from './markdownToTiptap'
+import { extractJson, salvageEnvelope } from './chatJson'
 import { resolveModel } from './modelRouting'
 import { resolveAnthropicKey } from '../settingsStore'
 import type {
@@ -316,17 +317,31 @@ function buildSystemPrompt(taskId: string | null): string {
 //
 // Returns { reply, proposals }. If the model returned NO valid JSON the
 // caller treats the entire text as the reply with no proposals.
-function parseChatJson(raw: string): {
+export function parseChatJson(raw: string): {
   reply: string
   proposals: ActionProposal[]
+  truncated: boolean
 } | null {
+  let parsed: { reply?: unknown; actions?: unknown } | null = null
+  let truncated = false
   const jsonStr = extractJson(raw)
-  if (!jsonStr) return null
-  let parsed: { reply?: unknown; actions?: unknown }
-  try {
-    parsed = JSON.parse(jsonStr) as { reply?: unknown; actions?: unknown }
-  } catch {
-    return null
+  if (jsonStr) {
+    try {
+      parsed = JSON.parse(jsonStr) as { reply?: unknown; actions?: unknown }
+    } catch {
+      parsed = null
+    }
+  }
+  if (!parsed) {
+    // The whole envelope did not parse, which is almost always because the
+    // model hit its output token limit mid-JSON. The actions that finished
+    // before the cutoff are still complete objects, so salvage those rather
+    // than dropping the entire response (which used to dump raw JSON into the
+    // chat as prose).
+    const salv = salvageEnvelope(raw)
+    if (!salv) return null
+    parsed = salv
+    truncated = true
   }
   const reply = typeof parsed.reply === 'string' ? parsed.reply : ''
   const actionsRaw = Array.isArray(parsed.actions) ? parsed.actions : []
@@ -513,7 +528,7 @@ function parseChatJson(raw: string): {
       }
     }
   }
-  return { reply, proposals }
+  return { reply, proposals, truncated }
 }
 
 export async function sendChat(req: ChatRequest): Promise<ChatResponse> {
@@ -537,8 +552,12 @@ export async function sendChat(req: ChatRequest): Promise<ChatResponse> {
     // here) and is bulletproof. Same approach for chat: prompt mandates a
     // {reply, actions} JSON envelope; parser extracts both.
     const resp = await c.messages.create({
+      // 2048 was too tight: a "build me a workspace" request that emits several
+      // todo lists plus a table and rows runs past it, the JSON gets cut off
+      // mid-object, and the old parser fell back to printing the raw JSON. Give
+      // the build envelope real headroom.
       model: resolveModel('chat'),
-      max_tokens: 2048,
+      max_tokens: 8192,
       system,
       messages: msgs
     })
@@ -556,18 +575,39 @@ export async function sendChat(req: ChatRequest): Promise<ChatResponse> {
 
     const parsed = parseChatJson(text)
     if (parsed) {
+      let content = parsed.reply || (parsed.proposals.length > 0 ? "Here's what I can set up:" : '')
+      if (parsed.truncated && parsed.proposals.length > 0) {
+        // We recovered the actions that finished before the cutoff. Tell the
+        // user the rest was dropped so they can ask for it rather than silently
+        // getting a partial build.
+        const n = parsed.proposals.length
+        content +=
+          `${content ? '\n\n' : ''}Your request was large, so I set up the first ${n} item${n === 1 ? '' : 's'} that fit. Ask me to continue for the rest, or break the request into smaller parts.`
+      }
       return {
         ok: true,
-        message: {
-          role: 'assistant',
-          content: parsed.reply || (parsed.proposals.length > 0 ? "Here's what I can set up:" : ''),
-          ts: Date.now()
-        },
+        message: { role: 'assistant', content, ts: Date.now() },
         proposals: parsed.proposals.length > 0 ? parsed.proposals : undefined
       }
     }
-    // Fallback — model didn't return JSON. Treat the entire text as a plain
-    // chat reply with no proposals. Better than a blank message.
+    // No usable JSON came back. If the model was cut off at the token limit,
+    // say so plainly. If it returned a JSON-shaped blob we still could not
+    // read, show a friendly error rather than dumping raw JSON into the chat.
+    // Only genuine prose (the model chose to chat) is passed through as-is.
+    if ((resp.stop_reason as string) === 'max_tokens') {
+      return {
+        ok: false,
+        error:
+          'Your request produced more than I could fit in one response. Try asking for a smaller workspace, or split it across two messages.'
+      }
+    }
+    if (text.trimStart().startsWith('{') || text.trimStart().startsWith('```')) {
+      return {
+        ok: false,
+        error:
+          "I couldn't read my own response that time. Try again, or ask for a smaller set of items."
+      }
+    }
     return {
       ok: true,
       message: { role: 'assistant', content: text, ts: Date.now() }
@@ -634,15 +674,6 @@ const VALID_KINDS: WidgetKind[] = [
   'timer'
 ]
 
-function extractJson(text: string): string | null {
-  // Allow Claude to wrap in markdown ```json ... ``` or just return raw JSON
-  const fence = /```(?:json)?\s*([\s\S]*?)```/i.exec(text)
-  if (fence) return fence[1].trim()
-  const start = text.indexOf('{')
-  const end = text.lastIndexOf('}')
-  if (start >= 0 && end > start) return text.slice(start, end + 1)
-  return null
-}
 
 export async function suggestSetupWidgets(taskId: string): Promise<SetupSuggestResponse> {
   const c = getClient()

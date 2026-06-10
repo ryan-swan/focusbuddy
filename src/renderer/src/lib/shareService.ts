@@ -77,7 +77,20 @@ export class ShareService {
     if (!res.ok) {
       throw new Error(`Share service error (${res.status}).`)
     }
-    return (await res.json()) as LookupShareResult
+    // The server wraps the share in an { ok, record } envelope. Read
+    // `record`, but tolerate a flat shape too so a future server change or
+    // an older host can't break resolution. Without this the desktop read
+    // `snapshot` off the top level (always undefined), which surfaced later
+    // as a cryptic "Cannot read properties of undefined (reading 'title')"
+    // when the empty snapshot was reconstructed.
+    const body = (await res.json()) as
+      | { ok?: boolean; record?: LookupShareResult }
+      | LookupShareResult
+    const record = (body as { record?: LookupShareResult }).record ?? (body as LookupShareResult)
+    if (!record || !record.snapshot) {
+      throw new Error('This share could not be read. It may be from an incompatible version, or the link may have expired.')
+    }
+    return record
   }
 
   // Owner invites someone to a share by email. Server records the recipient

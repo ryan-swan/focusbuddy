@@ -94,9 +94,35 @@ async function createWidgetsFor(taskId: string, widgets: SerWidget[] | undefined
 // navigate to it. `opts.parentFolderId` lets the recipient drop the share into
 // an existing folder instead of the default "Shared with me".
 export async function acceptShareIntoWorkspace(
-  snapshot: ShareSnap,
+  rawSnapshot: ShareSnap | unknown,
   opts?: { parentFolderId?: string | null }
 ): Promise<{ rootNodeId: string; rootKind: 'folder' | 'task' }> {
+  // Normalize the input before touching it. Depending on the path a share
+  // travelled (paste-link lookup, the inbox poller, an older build), the
+  // caller may hand us the bare snapshot, the server's
+  // { token, kind, snapshot, ... } record envelope, or nothing at all. Read
+  // defensively so a shape mismatch produces a clear message rather than a raw
+  // "Cannot read properties of undefined (reading 'title')".
+  let snap = rawSnapshot as Record<string, unknown> | null | undefined
+  if (
+    snap &&
+    typeof snap === 'object' &&
+    snap.snapshot &&
+    typeof snap.snapshot === 'object' &&
+    !('folder' in snap) &&
+    !('task' in snap) &&
+    !('widget' in snap)
+  ) {
+    // It is a record envelope — unwrap to the real snapshot.
+    snap = snap.snapshot as Record<string, unknown>
+  }
+  if (!snap || typeof snap !== 'object' || !('kind' in snap)) {
+    throw new Error(
+      'This share could not be read. It may be from an incompatible version, or the link may have expired.'
+    )
+  }
+  const snapshot = snap as unknown as ShareSnap
+
   const createNode = useNodeStore.getState().create
   const handle = (snapshot.fromHandle || 'someone').trim() || 'someone'
   const parentId =
@@ -105,6 +131,9 @@ export async function acceptShareIntoWorkspace(
       : await ensureSharedFolder()
 
   if (snapshot.kind === 'folder') {
+    if (!snapshot.folder) {
+      throw new Error('This shared folder is missing its contents and cannot be added.')
+    }
     const folder = await createNode({
       parentId,
       kind: 'folder',
@@ -128,6 +157,9 @@ export async function acceptShareIntoWorkspace(
   }
 
   if (snapshot.kind === 'task') {
+    if (!snapshot.task) {
+      throw new Error('This shared task is missing its contents and cannot be added.')
+    }
     const task = await createNode({
       parentId,
       kind: 'task',
@@ -142,6 +174,9 @@ export async function acceptShareIntoWorkspace(
   }
 
   // widget: wrap it in a task so it has a desk to live on.
+  if (!snapshot.widget) {
+    throw new Error('This shared item is missing its contents and cannot be added.')
+  }
   const task = await createNode({
     parentId,
     kind: 'task',
