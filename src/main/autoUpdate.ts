@@ -8,8 +8,21 @@
 // `npm run dist:release`, then publishes both to a draft release.
 // Installed copies poll for updates on boot + every 4h.
 
-import { app, autoUpdater as nativeAutoUpdater, BrowserWindow } from 'electron'
+import { app, autoUpdater as nativeAutoUpdater, BrowserWindow, shell } from 'electron'
 import { autoUpdater, type UpdateInfo, type ProgressInfo } from 'electron-updater'
+
+// macOS builds are ad-hoc signed (no Apple Developer ID), and Squirrel.Mac
+// refuses to apply an update unless it is signed by the same Developer ID. So
+// on macOS we do NOT auto-download or auto-install (that path always fails and
+// surfaces as a scary "update check failed" error after the download stages);
+// instead we detect the new version and offer a one-click download of the
+// release. Windows installs in place as normal.
+const IS_MAC = process.platform === 'darwin'
+const RELEASES_URL = 'https://github.com/saasmouth/focusbuddy/releases/latest'
+
+export function openDownloadPage(): void {
+  void shell.openExternal(RELEASES_URL)
+}
 
 export type UpdateState =
   | { kind: 'idle' }
@@ -69,8 +82,12 @@ export function installAutoUpdater(): void {
   // event loop being installed by a third-party module.
   nativeAutoUpdater.removeAllListeners()
 
-  autoUpdater.autoDownload = true
-  autoUpdater.autoInstallOnAppQuit = true
+  // On macOS we only DETECT updates (autoDownload off) because staging the
+  // download for Squirrel.Mac fails on an ad-hoc signature; the renderer turns
+  // the "available" state into a one-click download instead. On Windows the
+  // full download-and-install-on-quit flow works.
+  autoUpdater.autoDownload = !IS_MAC
+  autoUpdater.autoInstallOnAppQuit = !IS_MAC
   // Don't run on dev builds (no signature → updater refuses).
   autoUpdater.forceDevUpdateConfig = false
 

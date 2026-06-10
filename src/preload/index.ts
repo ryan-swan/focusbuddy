@@ -57,6 +57,9 @@ import type {
 type VaultResult = { ok: true } | { ok: false; error: string }
 
 const api = {
+  // The host OS, so the renderer can tailor flows that differ by platform
+  // (e.g. macOS updates are download-to-replace rather than in-place install).
+  platform: process.platform as NodeJS.Platform,
   nodes: {
     list: (): Promise<FbNode[]> => ipcRenderer.invoke('nodes:list'),
     get: (id: string): Promise<FbNode | null> => ipcRenderer.invoke('nodes:get', id),
@@ -996,6 +999,10 @@ const api = {
     getState: (): Promise<UpdateState> => ipcRenderer.invoke('update:get-state'),
     check: (): Promise<{ ok: true }> => ipcRenderer.invoke('update:check'),
     installAndRestart: (): Promise<{ ok: true }> => ipcRenderer.invoke('update:install-and-restart'),
+    // Open the latest release in the browser. Used on macOS where ad-hoc
+    // signing prevents in-place auto-install, so the update is a one-click
+    // download instead.
+    openDownload: (): Promise<{ ok: true }> => ipcRenderer.invoke('update:open-download'),
     onState: (cb: (state: UpdateState) => void): (() => void) => {
       const handler = (_: unknown, s: UpdateState): void => cb(s)
       ipcRenderer.on('update:state', handler)

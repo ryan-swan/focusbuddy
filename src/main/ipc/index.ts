@@ -4,7 +4,8 @@ import { consumePendingAuthHandoff } from '../authProtocol'
 import {
   checkForUpdates,
   getCurrentUpdateState,
-  installUpdateAndRestart
+  installUpdateAndRestart,
+  openDownloadPage
 } from '../autoUpdate'
 import {
   clearSecret,
@@ -1111,6 +1112,10 @@ export function registerIpcHandlers(): void {
   })
   ipcMain.handle('update:install-and-restart', () => {
     installUpdateAndRestart()
+    return { ok: true }
+  })
+  ipcMain.handle('update:open-download', () => {
+    openDownloadPage()
     return { ok: true }
   })
 
