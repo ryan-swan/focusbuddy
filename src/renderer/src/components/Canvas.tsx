@@ -68,6 +68,7 @@ import {
   SECTION_MIN_W,
   SECTION_MIN_H
 } from '../lib/sectionGeometry'
+import { spawnPositionFor } from '../lib/spawnPosition'
 import { lookupWebview } from '../lib/webviewRegistry'
 import {
   getOrigin,
@@ -1354,16 +1355,11 @@ export default function Canvas(): JSX.Element {
   }
 
   function handleClickAdd(entry: WidgetCatalogEntry): void {
-    const rect = dropRef.current?.getBoundingClientRect()
-    if (!rect) {
-      void placeWidget(entry, 80, 80)
-      return
-    }
-    const screenCenterX = rect.width / 2
-    const screenCenterY = rect.height / 2
-    const center = screenToCanvas(screenCenterX, screenCenterY)
-    const jitter = (): number => (Math.random() - 0.5) * 80
-    void placeWidget(entry, center.x - entry.defaultWidth / 2 + jitter(), center.y - entry.defaultHeight / 2 + jitter())
+    // Snap the new widget beside the last-touched widget (right, else left),
+    // falling back to the centre of the current viewport. Replaces the old
+    // centre-plus-jitter drop that often landed off-screen.
+    const { x, y } = spawnPositionFor(entry.defaultWidth, entry.defaultHeight)
+    void placeWidget(entry, x, y)
   }
 
   async function handleImportFile(): Promise<void> {

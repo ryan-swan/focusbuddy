@@ -16,6 +16,7 @@ import { useFocusSessionStore } from '../stores/focusSession'
 import { useTablesStore } from '../stores/tables'
 import { useLinksStore } from '../stores/links'
 import { catalogFor } from './widgetCatalog'
+import { spawnPositionFor } from './spawnPosition'
 
 // Palette for auto-assigning select option colors when the AI doesn't specify.
 const SELECT_COLORS = [
@@ -109,6 +110,7 @@ async function applyCreateWidget(
     kind: p.widgetKind as WidgetKind,
     title: p.title ?? '',
     content,
+    ...spawnPositionFor(entry?.defaultWidth ?? 280, entry?.defaultHeight ?? 200),
     width: entry?.defaultWidth,
     height: entry?.defaultHeight,
     color: p.widgetKind === 'sticky' ? '#fef08a' : null
@@ -135,6 +137,7 @@ async function applyOpenUrl(
     kind: 'webview',
     title: p.title ?? '',
     content: p.url,
+    ...spawnPositionFor(entry?.defaultWidth ?? 360, entry?.defaultHeight ?? 280),
     width: entry?.defaultWidth,
     height: entry?.defaultHeight,
     color: null
@@ -165,6 +168,7 @@ async function applyCreateTodoList(
     kind: 'markdown',
     title: p.title,
     content: md,
+    ...spawnPositionFor(entry?.defaultWidth ?? 280, entry?.defaultHeight ?? 220),
     width: entry?.defaultWidth,
     height: entry?.defaultHeight,
     color: null
@@ -185,6 +189,7 @@ async function applyCreatePage(
     kind: 'page',
     title: p.title,
     content: p.content, // already serialized Tiptap JSON
+    ...spawnPositionFor(entry?.defaultWidth ?? 360, entry?.defaultHeight ?? 320),
     width: entry?.defaultWidth,
     height: entry?.defaultHeight,
     color: null
@@ -460,6 +465,7 @@ async function applyCreateTable(
     kind: 'table',
     title: p.title,
     content: table.id,
+    ...spawnPositionFor(entry?.defaultWidth ?? 420, entry?.defaultHeight ?? 320),
     width: entry?.defaultWidth,
     height: entry?.defaultHeight,
     color: null
@@ -654,6 +660,7 @@ async function applyCreateField(
     kind: 'field',
     title: p.label,
     content,
+    ...spawnPositionFor(entry?.defaultWidth ?? 240, entry?.defaultHeight ?? 160),
     width: entry?.defaultWidth,
     height: entry?.defaultHeight,
     color: null
