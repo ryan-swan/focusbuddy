@@ -9,7 +9,8 @@ import {
   STICKY_BULLET_RE,
   hasChecklist as hasChecklistText,
   toggleCheckLine,
-  toggleChecklist
+  toggleChecklist,
+  splitStickyBlocks
 } from '../../lib/stickyText'
 
 const COLORS = ['#fef08a', '#fbcfe8', '#bae6fd', '#bbf7d0', '#fed7aa']
@@ -104,7 +105,6 @@ export default function StickyWidget({ widget, inline = false }: Props): JSX.Ele
   }, [update, widget.id])
 
   const bgColor = widget.color ?? '#fef08a'
-  const lines = text.split('\n')
   const hasChecklist = hasChecklistText(text)
 
   // Toggle a single checklist line between done and not, by its line index.
@@ -169,7 +169,37 @@ export default function StickyWidget({ widget, inline = false }: Props): JSX.Ele
       {text.trim() === '' ? (
         <span className="text-stone-700/40">Write a note…</span>
       ) : (
-        lines.map((line, idx) => {
+        splitStickyBlocks(text).map((block, bi) => {
+          if (block.type === 'table') {
+            return (
+              <div key={`t${bi}`} className="my-1 overflow-auto" data-testid={`sticky-table-${bi}`}>
+                <table className="border-collapse text-[0.85em] font-sans">
+                  <thead>
+                    <tr>
+                      {block.headers.map((h, hi) => (
+                        <th key={hi} className="border border-black/20 px-1.5 py-0.5 bg-black/[0.04] text-left font-semibold align-top">
+                          {renderInline(h)}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {block.rows.map((row, ri) => (
+                      <tr key={ri}>
+                        {block.headers.map((_, ci) => (
+                          <td key={ci} className="border border-black/20 px-1.5 py-0.5 align-top">
+                            {renderInline(row[ci] ?? '')}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )
+          }
+          const idx = block.index
+          const line = block.text
           const trimmed = line.trim()
           const check = CHECK_RE.exec(trimmed)
           if (check) {

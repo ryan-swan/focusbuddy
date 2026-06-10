@@ -2,7 +2,8 @@ import { describe, it, expect } from 'vitest'
 import {
   hasChecklist,
   toggleCheckLine,
-  toggleChecklist
+  toggleChecklist,
+  splitStickyBlocks
 } from '../../src/renderer/src/lib/stickyText'
 
 describe('stickyText', () => {
@@ -45,5 +46,49 @@ describe('stickyText', () => {
 
   it('preserves blank lines when converting', () => {
     expect(toggleChecklist('a\n\nb')).toBe('[ ] a\n\n[ ] b')
+  })
+})
+
+describe('splitStickyBlocks (markdown tables in stickies)', () => {
+  it('parses a pasted markdown table into a table block with headers and rows', () => {
+    const text = '| Name | Age |\n|---|---|\n| Alice | 30 |\n| Bob | 25 |'
+    const blocks = splitStickyBlocks(text)
+    expect(blocks).toHaveLength(1)
+    expect(blocks[0]).toEqual({
+      type: 'table',
+      headers: ['Name', 'Age'],
+      rows: [
+        ['Alice', '30'],
+        ['Bob', '25']
+      ]
+    })
+  })
+
+  it('keeps surrounding lines as line blocks and a table in the middle', () => {
+    const text = 'before\n| A | B |\n| --- | --- |\n| 1 | 2 |\nafter'
+    const blocks = splitStickyBlocks(text)
+    expect(blocks.map((b) => b.type)).toEqual(['line', 'table', 'line'])
+    expect(blocks[0]).toEqual({ type: 'line', text: 'before', index: 0 })
+    // "after" is line index 4 in the original text — checkbox toggling relies on this.
+    expect(blocks[2]).toEqual({ type: 'line', text: 'after', index: 4 })
+  })
+
+  it('preserves the original line index for a checkbox after a table', () => {
+    const text = '| H |\n|---|\n| x |\n[ ] task'
+    const blocks = splitStickyBlocks(text)
+    const line = blocks.find((b) => b.type === 'line') as { type: 'line'; text: string; index: number }
+    expect(line.text).toBe('[ ] task')
+    expect(line.index).toBe(3)
+  })
+
+  it('does not treat a lone pipe line or a header without a separator as a table', () => {
+    expect(splitStickyBlocks('| just one row |').every((b) => b.type === 'line')).toBe(true)
+    expect(splitStickyBlocks('a | b | c').every((b) => b.type === 'line')).toBe(true)
+  })
+
+  it('accepts colon-aligned separators', () => {
+    const text = '| L | R |\n|:--|--:|\n| 1 | 2 |'
+    const blocks = splitStickyBlocks(text)
+    expect(blocks[0].type).toBe('table')
   })
 })

@@ -5,6 +5,8 @@ import TaskList from '@tiptap/extension-task-list'
 import TaskItem from '@tiptap/extension-task-item'
 import Placeholder from '@tiptap/extension-placeholder'
 import Link from '@tiptap/extension-link'
+import { TableKit } from '@tiptap/extension-table'
+import { Markdown } from 'tiptap-markdown'
 import type { Editor } from '@tiptap/react'
 import type { Widget } from '@shared/types'
 import WidgetFrame from './WidgetFrame'
@@ -91,6 +93,12 @@ export default function PageWidget({ widget, inline = false }: Props): JSX.Eleme
         TaskList,
         TaskItem.configure({ nested: true }),
         Link.configure({ openOnClick: false }),
+        // GFM tables — render + edit, stored natively in the page's Tiptap JSON.
+        TableKit.configure({ table: { resizable: false } }),
+        // Lets a pasted |---|---| markdown table (or markdown in general) become
+        // real nodes. The page still stores Tiptap JSON via getJSON; this only
+        // affects how pasted text is interpreted, so tables paste in cleanly.
+        Markdown.configure({ html: false, transformPastedText: true, transformCopiedText: false }),
         Placeholder.configure({
           placeholder: isLiving
             ? 'Living page — set a query above to populate this.'
