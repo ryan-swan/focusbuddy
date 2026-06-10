@@ -21,9 +21,11 @@ function labelFor(w: Widget): string {
 
 export default function WidgetDock(): JSX.Element | null {
   const widgets = useWidgetStore((s) => s.widgets)
-  const setFocused = useWidgetStore((s) => s.setFocused)
+  // Clicking a dock item centers that widget on the canvas at 100% (the same
+  // "go to this widget" the minimap uses), rather than opening focus mode.
+  const zoomToWidget = useWidgetStore((s) => s.zoomToWidget)
   const remove = useWidgetStore((s) => s.remove)
-  const focusedId = useWidgetStore((s) => s.focusedWidgetId)
+  const activeId = useWidgetStore((s) => s.activeWidgetId)
 
   // Sections are spatial markers — don't clutter the dock with them.
   const dockable = widgets.filter((w) => w.kind !== 'section')
@@ -37,14 +39,14 @@ export default function WidgetDock(): JSX.Element | null {
         </span>
         {dockable.map((w) => {
           const entry = catalogFor(w.kind)
-          const isFocused = focusedId === w.id
+          const isActive = activeId === w.id
           return (
             <div key={w.id} className="group relative shrink-0">
               <button
-                onClick={() => setFocused(w.id)}
-                title={labelFor(w)}
+                onClick={() => zoomToWidget(w.id)}
+                title={`Go to ${labelFor(w)} on the canvas`}
                 className={`inline-flex items-center gap-1.5 pl-2 pr-2.5 py-1 rounded-md border transition-colors text-xs max-w-[180px] ${
-                  isFocused
+                  isActive
                     ? 'border-stone-900 dark:border-stone-100 bg-stone-900 dark:bg-stone-100 text-stone-50 dark:text-stone-900'
                     : 'border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-800 text-stone-800 dark:text-stone-200 hover:bg-stone-100 dark:hover:bg-stone-700 hover:border-stone-500 dark:hover:border-stone-500'
                 }`}
