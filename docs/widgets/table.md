@@ -138,3 +138,14 @@ once at parity, ours is better in kind rather than a cheaper clone.
 - 2026-06-09, SME doc created as the flagship example for the widget
   master-of-destiny program. No table-specific implementation started yet; the
   launch-blocking tier is the first work to schedule.
+- 2026-06-10, Closed the import-friction gap. Imports now read CSV, JSON, XLS,
+  and XLSX (SheetJS in the main process, src/main/gridImport.ts). A new
+  per-table Import button opens a mapping wizard (TableImportDialog) that maps
+  each file column onto an existing column, a new column, or skip, then upserts:
+  pick a primary-key column and a matching incoming value updates that row in
+  place while everything else is appended. New columns are created on apply. The
+  matching and coercion are a pure planner (src/renderer/src/lib/tableImport.ts)
+  with unit coverage (tests/unit/tableImport.test.ts, 8 cases) plus a grid-reader
+  suite that round-trips a real xlsx (tests/unit/gridImport.test.ts, 7 cases).
+  This delivers the "import/paste friction" gap item ahead of the launch-polish
+  paste-a-grid work.

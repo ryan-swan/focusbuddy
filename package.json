@@ -1,6 +1,6 @@
 {
   "name": "focusbuddy",
-  "version": "2.5.10",
+  "version": "2.5.11",
   "private": true,
   "description": "Task-scoped digital work environment for people with ADHD and high distractibility.",
   "main": "./out/main/index.js",
@@ -53,6 +53,7 @@
     "react-rnd": "^10.4.13",
     "remark-gfm": "^4.0.1",
     "tiptap-markdown": "^0.9.0",
+    "xlsx": "^0.18.5",
     "zustand": "^5.0.1"
   },
   "optionalDependencies": {
@@ -60,6 +61,7 @@
   },
   "devDependencies": {
     "@electron-toolkit/tsconfig": "^1.0.1",
+    "@electron/rebuild": "^3.7.2",
     "@playwright/test": "^1.60.0",
     "@types/better-sqlite3": "^7.6.11",
     "@types/node": "^22.9.0",
@@ -70,7 +72,6 @@
     "autoprefixer": "^10.4.20",
     "electron": "^33.2.0",
     "electron-builder": "^25.1.8",
-    "@electron/rebuild": "^3.7.2",
     "electron-vite": "^2.3.0",
     "happy-dom": "^20.9.0",
     "postcss": "^8.4.49",

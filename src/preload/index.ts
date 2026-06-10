@@ -951,6 +951,14 @@ const api = {
   // as a manually-created widget.
   fileImport: {
     pick: (): Promise<string | null> => ipcRenderer.invoke('fileImport:pick'),
+    // Table import wizard: pick a tabular file, then read it into a grid.
+    pickGrid: (): Promise<string | null> => ipcRenderer.invoke('fileImport:pickGrid'),
+    parseGrid: (
+      path: string
+    ): Promise<
+      | { ok: true; grid: { headers: string[]; rows: Array<Record<string, string>> } }
+      | { ok: false; error: string }
+    > => ipcRenderer.invoke('fileImport:parseGrid', path),
     run: (args: {
       path: string
       preferredTextKind?: 'page' | 'markdown' | 'note'
