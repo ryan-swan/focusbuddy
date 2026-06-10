@@ -53,7 +53,7 @@ export interface ImportError {
   reason: 'cancelled' | 'unsupported' | 'parse' | 'read' | 'docx_not_supported'
 }
 
-const ALL_EXTENSIONS = ['txt', 'md', 'markdown', 'csv', 'json'] as const
+const ALL_EXTENSIONS = ['txt', 'md', 'markdown', 'csv', 'json', 'xls', 'xlsx'] as const
 type SupportedExt = (typeof ALL_EXTENSIONS)[number]
 
 function pickExt(path: string): SupportedExt | 'docx' | 'doc' | null {
@@ -76,8 +76,24 @@ export async function pickFileForImport(): Promise<string | null> {
     properties: ['openFile'],
     filters: [
       { name: 'Documents', extensions: ['txt', 'md', 'markdown'] },
-      { name: 'Spreadsheets / Data', extensions: ['csv', 'json'] },
-      { name: 'All importable', extensions: ['txt', 'md', 'markdown', 'csv', 'json'] }
+      { name: 'Spreadsheets / Data', extensions: ['csv', 'json', 'xls', 'xlsx'] },
+      { name: 'All importable', extensions: ['txt', 'md', 'markdown', 'csv', 'json', 'xls', 'xlsx'] }
+    ]
+  })
+  if (res.canceled || res.filePaths.length === 0) return null
+  return res.filePaths[0]
+}
+
+/**
+ * File picker scoped to tabular formats, for the "import into this table"
+ * wizard. Returns the absolute path or null if cancelled.
+ */
+export async function pickGridFileForImport(): Promise<string | null> {
+  const res = await dialog.showOpenDialog({
+    title: 'Import into table',
+    properties: ['openFile'],
+    filters: [
+      { name: 'Spreadsheets / Data', extensions: ['csv', 'json', 'xls', 'xlsx'] }
     ]
   })
   if (res.canceled || res.filePaths.length === 0) return null
@@ -120,10 +136,21 @@ export async function importFile(
       reason: 'read'
     }
   }
-  const title = basename(path).replace(/\.(txt|md|markdown|csv|json)$/i, '')
+  const title = basename(path).replace(/\.(txt|md|markdown|csv|json|xls|xlsx)$/i, '')
 
   if (ext === 'csv') {
     return parseCsvAsTable(raw, title, path)
+  }
+  if (ext === 'xls' || ext === 'xlsx') {
+    // Spreadsheets self-elect as a table, same as CSV. The binary read happens
+    // inside parseGridFromFile (SheetJS), so the utf-8 `raw` above is ignored.
+    const { parseGridFromFile, gridToTableDraft } = await import('./gridImport')
+    const res = await parseGridFromFile(path)
+    if (!res.ok) return { ok: false, error: res.error, reason: 'parse' }
+    if (res.grid.headers.length === 0) {
+      return { ok: false, error: 'The spreadsheet appears to be empty.', reason: 'parse' }
+    }
+    return gridToTableDraft(res.grid, title, path)
   }
   if (ext === 'json') {
     return parseJsonAsTableOrPage(raw, title, path)

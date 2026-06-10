@@ -557,7 +557,7 @@ export async function sendChat(req: ChatRequest): Promise<ChatResponse> {
       // mid-object, and the old parser fell back to printing the raw JSON. Give
       // the build envelope real headroom.
       model: resolveModel('chat'),
-      max_tokens: 8192,
+      max_tokens: 16384,
       system,
       messages: msgs
     })
@@ -746,7 +746,7 @@ Return the JSON now. 4–7 suggestions. Specific URLs where possible.`
   try {
     const resp = await c.messages.create({
       model: resolveModel('setup'),
-      max_tokens: 1500,
+      max_tokens: 8192,
       system,
       messages: [{ role: 'user', content: userMsg }]
     })
@@ -1216,7 +1216,7 @@ Return the JSON now.`
   try {
     const resp = await c.messages.create({
       model: resolveModel('setup'),
-      max_tokens: 4000,
+      max_tokens: 16384,
       system,
       messages: [{ role: 'user', content: userMsg }]
     })
@@ -1547,7 +1547,7 @@ export async function suggestTableRows(
   try {
     const resp = await c.messages.create({
       model: resolveModel('setup'),
-      max_tokens: 1500,
+      max_tokens: 8192,
       system,
       messages: [{ role: 'user', content: user }]
     })

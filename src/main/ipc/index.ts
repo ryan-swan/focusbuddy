@@ -125,6 +125,7 @@ import { getVoiceCommandPrefs, setVoiceCommandPrefs } from '../voiceCommandPref'
 import {
   importFile,
   pickFileForImport,
+  pickGridFileForImport,
   type ImportTargetKind
 } from '../fileImport'
 import {
@@ -1028,6 +1029,13 @@ export function registerIpcHandlers(): void {
     (_e, args: { path: string; preferredTextKind?: ImportTargetKind }) =>
       importFile(args.path, args.preferredTextKind ?? 'page')
   )
+  // Table import wizard — pick a tabular file and read it into a normalised
+  // { headers, rows } grid the renderer maps onto an existing table.
+  ipcMain.handle('fileImport:pickGrid', () => pickGridFileForImport())
+  ipcMain.handle('fileImport:parseGrid', async (_e, path: string) => {
+    const { parseGridFromFile } = await import('../gridImport')
+    return parseGridFromFile(path)
+  })
 
   // Streaming variant — proposals + reply text arrive on a per-request
   // channel `voiceCommand:stream:<reqId>` so the renderer can correlate

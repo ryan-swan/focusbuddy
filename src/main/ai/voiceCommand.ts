@@ -117,7 +117,7 @@ export async function runVoiceCommand(
   try {
     const resp = await client.messages.create({
       model: resolveModel('setup'),
-      max_tokens: 2048,
+      max_tokens: 8192,
       system,
       messages: [{ role: 'user', content: userMsg }]
     })
@@ -608,7 +608,7 @@ export async function runVoiceCommandStreaming(
   try {
     const stream = client.messages.stream({
       model: resolveModel('setup'),
-      max_tokens: 2048,
+      max_tokens: 8192,
       system,
       messages: [{ role: 'user', content: userMsg }]
     })

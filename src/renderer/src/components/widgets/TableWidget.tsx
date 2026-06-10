@@ -14,6 +14,8 @@ import {
   defaultValue
 } from '@shared/fields'
 import WidgetFrame from './WidgetFrame'
+import TableImportDialog from './TableImportDialog'
+import type { ParsedGrid } from '../../lib/tableImport'
 import { useTablesStore } from '../../stores/tables'
 import { useWidgetStore } from '../../stores/widgets'
 import FieldEditor from '../fields/FieldEditor'
@@ -119,6 +121,11 @@ export default function TableWidget({ widget, inline = false }: Props): JSX.Elem
   // more hooks than during the previous render" and blanks the app.
   const [aiOpen, setAiOpen] = useState(false)
   const [aiPrompt, setAiPrompt] = useState('')
+  // File import wizard: the parsed grid (null = closed), the file label for the
+  // header, and any pick/parse error to surface inline.
+  const [importGrid, setImportGrid] = useState<ParsedGrid | null>(null)
+  const [importFileLabel, setImportFileLabel] = useState('')
+  const [importError, setImportError] = useState<string | null>(null)
   // Per-cell right-click "Create + connect" menu. The column label +
   // cell text are passed into the menu so the user-facing copy can
   // change ("Create new sticky from this cell" etc.). The spawn helper
@@ -224,6 +231,25 @@ export default function TableWidget({ widget, inline = false }: Props): JSX.Elem
 
   function renameTable(title: string): void {
     void updateTable(table!.id, { title })
+  }
+
+  // Open the import wizard: pick a tabular file, read it into a grid, then show
+  // the column-mapping dialog. CSV, JSON, XLS, and XLSX are supported.
+  async function handleImport(): Promise<void> {
+    setImportError(null)
+    const path = await window.api.fileImport.pickGrid()
+    if (!path) return
+    const res = await window.api.fileImport.parseGrid(path)
+    if (!res.ok) {
+      setImportError(res.error)
+      return
+    }
+    if (res.grid.headers.length === 0) {
+      setImportError('No columns found in that file.')
+      return
+    }
+    setImportFileLabel(path.split(/[\\/]/).pop() ?? 'file')
+    setImportGrid(res.grid)
   }
 
   // ── In-table AI assistant handlers ──────────────────────────────────────
@@ -366,6 +392,15 @@ export default function TableWidget({ widget, inline = false }: Props): JSX.Elem
           {rows.length} {rows.length === 1 ? 'row' : 'rows'}
         </span>
         <button
+          onClick={() => void handleImport()}
+          data-testid="table-import-button"
+          className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium text-stone-500 dark:text-stone-400 hover:text-accent hover:bg-accent/10 transition-colors"
+          title="Import CSV, JSON, XLS, or XLSX — map columns and upsert by a key"
+        >
+          <Icon name="upload_file" size={12} />
+          <span>Import</span>
+        </button>
+        <button
           onClick={() => setAiOpen((v) => !v)}
           className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium transition-colors ${
             aiOpen
@@ -378,6 +413,24 @@ export default function TableWidget({ widget, inline = false }: Props): JSX.Elem
           <span>AI</span>
         </button>
       </div>
+      {importError && (
+        <div className="px-2.5 py-1 text-[11px] text-red-500 bg-red-50 dark:bg-red-950/30 border-b border-red-100 dark:border-red-900" data-testid="import-error">
+          {importError}
+        </div>
+      )}
+      {importGrid && table && (
+        <TableImportDialog
+          tableId={table.id}
+          schema={table.schema}
+          rows={rows.map((r) => ({ id: r.id, cells: r.cells }))}
+          grid={importGrid}
+          fileLabel={importFileLabel}
+          onClose={() => setImportGrid(null)}
+          onApplied={() => {
+            setImportGrid(null)
+          }}
+        />
+      )}
       {/* View switcher — pill of six view options. The active view is
           highlighted; clicking switches without losing data. Each non-
           table view uses TableSchema.viewConfig to remember which column
