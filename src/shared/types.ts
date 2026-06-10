@@ -91,6 +91,12 @@ export type WidgetKind =
   // content-aware miniature of the target desk, refreshed periodically; click to
   // dive in. The target task id is serialised to widget.content as JSON.
   | 'portal'
+  // Living doc — a read-only document that writes itself. The user gives it a
+  // brief (stored in livingQuery), and the AI keeps it as a running summary of
+  // the OTHER widgets on the same desk, regenerated on demand and auto-refreshed
+  // when source widgets change (see livingPageScheduler). content is serialized
+  // Tiptap JSON, system-owned (never hand-edited). Reuses the living* fields.
+  | 'living-doc'
 
 export type ContextMenuAction =
   | 'createStickyFromSelection'

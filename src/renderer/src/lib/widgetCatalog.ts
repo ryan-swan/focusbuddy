@@ -396,6 +396,17 @@ export const WIDGET_CATALOG: WidgetCatalogEntry[] = [
     defaultHeight: 240,
     defaultContent: '',
     isWebBased: false
+  },
+  {
+    kind: 'living-doc',
+    category: 'Notes',
+    label: 'Living Doc',
+    icon: 'auto_awesome',
+    hint: 'A doc that writes itself — give it a brief and it keeps a living summary of this desk',
+    defaultWidth: 500,
+    defaultHeight: 400,
+    defaultContent: '',
+    isWebBased: false
   }
 ]
 

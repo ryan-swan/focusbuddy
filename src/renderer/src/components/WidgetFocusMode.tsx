@@ -9,6 +9,7 @@ import LocalAppLauncherWidget from './widgets/LocalAppLauncherWidget'
 import FileWidget from './widgets/FileWidget'
 import FieldWidget from './widgets/FieldWidget'
 import PageWidget from './widgets/PageWidget'
+import LivingDocWidget from './widgets/LivingDocWidget'
 import TableWidget from './widgets/TableWidget'
 import CalculatorWidget from './widgets/CalculatorWidget'
 import ColorWidget from './widgets/ColorWidget'
@@ -43,6 +44,8 @@ function renderInline(w: Widget): JSX.Element | null {
       return <FieldWidget widget={w} inline />
     case 'page':
       return <PageWidget widget={w} inline />
+    case 'living-doc':
+      return <LivingDocWidget widget={w} inline />
     case 'table':
       return <TableWidget widget={w} inline />
     case 'calculator':
