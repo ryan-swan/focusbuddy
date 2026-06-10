@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useAccountStore } from '../stores/account'
+import { useSignInPrompt } from '../stores/signInPrompt'
 import Icon from './Icon'
 
 // LaunchSignInModal — appears on app boot when the user isn't signed in
@@ -28,6 +29,10 @@ export default function LaunchSignInModal(): JSX.Element | null {
   const signupAction = useAccountStore((s) => s.signup)
   const loginAction = useAccountStore((s) => s.login)
   const setSkipped = useAccountStore((s) => s.setSkipped)
+  // Manual open requested from elsewhere (Settings account section, etc.).
+  // When set, the modal shows even if the user previously skipped.
+  const manualOpen = useSignInPrompt((s) => s.open)
+  const closeManual = useSignInPrompt((s) => s.close)
   // Manually dismissed in this session — we don't want it to re-appear
   // if some other state change fires after the user closed it.
   const [dismissedThisSession, setDismissedThisSession] = useState(false)
@@ -59,8 +64,12 @@ export default function LaunchSignInModal(): JSX.Element | null {
   //  - User dismissed in this session.
   if (bootStatus !== 'ready') return null
   if (account) return null
-  if (dismissedThisSession) return null
-  if (skippedAt && Date.now() - skippedAt < SKIP_TTL_MS) return null
+  // A manual open (from Settings) overrides the skip/dismiss throttling — the
+  // user explicitly asked to sign in, so always show it in that case.
+  if (!manualOpen) {
+    if (dismissedThisSession) return null
+    if (skippedAt && Date.now() - skippedAt < SKIP_TTL_MS) return null
+  }
 
   async function handleSubmit(e: React.FormEvent): Promise<void> {
     e.preventDefault()
@@ -104,6 +113,14 @@ export default function LaunchSignInModal(): JSX.Element | null {
   async function handleSkip(): Promise<void> {
     await setSkipped(true)
     setDismissedThisSession(true)
+    closeManual()
+  }
+
+  // Close without recording a week-long skip — used by the X when the modal
+  // was opened on demand from Settings.
+  function handleClose(): void {
+    setDismissedThisSession(true)
+    closeManual()
   }
 
   return createPortal(
@@ -142,6 +159,15 @@ export default function LaunchSignInModal(): JSX.Element | null {
                 : 'Create an account to receive shares and sync across your devices.'}
             </p>
           </div>
+          <button
+            type="button"
+            onClick={handleClose}
+            aria-label="Close"
+            data-testid="signin-close"
+            className="shrink-0 h-7 w-7 inline-flex items-center justify-center rounded-md text-stone-400 hover:text-stone-100 hover:bg-white/[0.06] transition-colors"
+          >
+            <Icon name="close" size={16} />
+          </button>
         </div>
 
         {/* Mode toggle */}

@@ -27,6 +27,7 @@ import {
 } from '../lib/modelPrefs'
 import { haptic } from '../lib/haptics'
 import Icon from './Icon'
+import AccountSection from './settings/AccountSection'
 import ApiKeysSection from './settings/ApiKeysSection'
 import NavigationSection from './settings/NavigationSection'
 
@@ -494,6 +495,8 @@ export default function SettingsPanel({
           ))}
         </div>
       </div>
+
+      <AccountSection />
 
       <ApiKeysSection />
 
