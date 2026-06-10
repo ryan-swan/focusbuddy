@@ -128,6 +128,24 @@ function createCommandCenter(): BrowserWindow {
     return { action: 'deny' }
   })
 
+  // The app shell never navigates its own top frame. If a dropped tab/link or
+  // an errant click tries to navigate the host window to another origin (the
+  // classic "drop a URL and it replaces your whole app" failure), block it and
+  // open it in the user's browser instead. Webview widgets are separate
+  // webContents and are unaffected by this guard.
+  win.webContents.on('will-navigate', (e, url) => {
+    let sameOrigin = false
+    try {
+      sameOrigin = new URL(url).origin === new URL(win.webContents.getURL()).origin
+    } catch {
+      sameOrigin = false
+    }
+    if (!sameOrigin) {
+      e.preventDefault()
+      if (/^https?:\/\//i.test(url)) shell.openExternal(url)
+    }
+  })
+
   if (isDev && process.env['ELECTRON_RENDERER_URL']) {
     win.loadURL(process.env['ELECTRON_RENDERER_URL'])
     win.webContents.once('did-finish-load', () => {

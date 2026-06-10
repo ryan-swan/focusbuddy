@@ -69,6 +69,7 @@ import {
   SECTION_MIN_H
 } from '../lib/sectionGeometry'
 import { spawnPositionFor } from '../lib/spawnPosition'
+import { firstHttpUrl } from '../lib/dropUrl'
 import { lookupWebview } from '../lib/webviewRegistry'
 import {
   getOrigin,
@@ -1489,7 +1490,13 @@ export default function Canvas(): JSX.Element {
       types.includes(DRAG_MIME) ||
       types.includes('text/fb-task-link') ||
       types.includes(CONNECTED_APP_DRAG_MIME) ||
-      types.includes('Files')
+      types.includes('Files') ||
+      // A tab or link dragged from an external browser. text/uri-list is the
+      // precise signal; text/plain is the fallback some browsers use. Accepting
+      // the drag here (preventDefault) is what stops the OS default of trying
+      // to navigate the app window to the dropped URL.
+      types.includes('text/uri-list') ||
+      types.includes('text/plain')
     ) {
       e.preventDefault()
       e.dataTransfer.dropEffect = 'copy'
@@ -1531,6 +1538,37 @@ export default function Canvas(): JSX.Element {
         offset += 24 // cascade subsequent drops slightly so they don't stack exactly
       }
       return
+    }
+    // External browser tab or link drop. Dragging a tab out of Chrome / Edge /
+    // Safari (or a link) puts the URL on text/uri-list, with text/plain as a
+    // fallback. Open it as a browser (webview) widget at the cursor, mirroring
+    // the file-drop behaviour. Read uri-list first because that is the precise
+    // type a dragged tab provides, and only accept real http(s) URLs so a stray
+    // text drag does nothing.
+    if (activeTaskId) {
+      const droppedUrl =
+        firstHttpUrl(e.dataTransfer.getData('text/uri-list')) ??
+        firstHttpUrl(e.dataTransfer.getData('text/plain'))
+      if (droppedUrl) {
+        e.preventDefault()
+        const entry = catalogFor('webview')
+        const width = entry?.defaultWidth ?? 560
+        const height = entry?.defaultHeight ?? 400
+        const rect = e.currentTarget.getBoundingClientRect()
+        const cursor = screenToCanvas(e.clientX - rect.left, e.clientY - rect.top)
+        await createWidget({
+          taskId: activeTaskId,
+          kind: 'webview',
+          title: '',
+          content: droppedUrl,
+          x: Math.round(cursor.x - width / 2),
+          y: Math.round(cursor.y - 20),
+          width,
+          height,
+          color: null
+        })
+        return
+      }
     }
     // Dragged Connected App from sidebar → spawn a webview widget bound to it.
     // Bound widgets share the app's session partition (so logged-in cookies
