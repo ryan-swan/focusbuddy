@@ -29,8 +29,14 @@ interface SignalConfig {
 
 const LOCAL_HTTP = 'http://localhost:8787'
 const LOCAL_WS = 'ws://localhost:8787/ws'
-const PROD_HTTP = 'https://api.focusbuddy.app'
-const PROD_WS = 'wss://api.focusbuddy.app/ws'
+// The deployed signal server. This is the FALLBACK used when a build does not
+// set VITE_SIGNAL_HTTP_URL. It must point at a host that actually exists: the
+// old default api.focusbuddy.app was never deployed, so any build that missed
+// the env var (the Windows CI build did) could not reach the server at all and
+// signup/login failed with "can't connect". When api.focusbuddy.app is set up
+// as a DNS alias to this host, this can move back to it.
+const PROD_HTTP = 'https://focusbuddy-signal.fly.dev'
+const PROD_WS = 'wss://focusbuddy-signal.fly.dev/ws'
 
 function readEnv(): SignalConfig {
   const explicit = import.meta.env.VITE_USE_REMOTE_SIGNAL

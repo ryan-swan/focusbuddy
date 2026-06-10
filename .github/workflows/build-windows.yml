@@ -47,7 +47,16 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      # Bake the live backend into the renderer, exactly like the local macOS
+      # build does. Without these the build falls back to signalConfig's default
+      # host, so the Windows app could not reach the server at all (signup,
+      # login, sharing, and plan checks all failed with "can't connect").
       - name: Build renderer + main
+        env:
+          VITE_USE_REMOTE_SIGNAL: 'true'
+          VITE_SIGNAL_HTTP_URL: 'https://focusbuddy-signal.fly.dev'
+          VITE_SIGNAL_WS_URL: 'wss://focusbuddy-signal.fly.dev/ws'
+          VITE_VIEWER_URL: 'https://focusbuddy-viewer.vercel.app'
         run: npm run build
 
       # Publish only on a tag push; manual runs stay unpublished. Code signing
