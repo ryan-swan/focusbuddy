@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
 import { useWidgetStore } from '../../stores/widgets'
 import { computeSectionFrame, effectiveLayout } from '../../lib/sectionGeometry'
 import type { Widget } from '@shared/types'
@@ -7,15 +6,11 @@ import WidgetFrame from './WidgetFrame'
 import WidgetPreview from '../WidgetPreview'
 import Icon from '../Icon'
 
-// The hover magnifier sizes itself to the widget's real on-canvas dimensions,
-// only shrinking (never enlarging) what's too big to stay legible. So a sticky
-// shows at its true 100% size; a browser shows larger than the sticky but
-// capped so it stays readable.
-function magnifierScale(w: Widget): number {
-  const MAX_W = 520
-  const MAX_H = 380
-  return Math.min(MAX_W / Math.max(1, w.width), MAX_H / Math.max(1, w.height), 1)
-}
+// The hover-magnifier preview popup is deprecated for now. The minimap
+// thumbnails are still live previews and a click still jumps the camera to a
+// widget; we just no longer pop a floating magnified card on hover. The
+// Magnifier component and its sizing helper were removed with this change and
+// live in git history if we want them back.
 
 interface Props {
   widget: Widget
@@ -219,25 +214,6 @@ function MinimapBody({
   }, [bbox, panX, panY, zoom, viewportWidth, viewportHeight, scale])
 
   const zoomToWidget = useWidgetStore((s) => s.zoomToWidget)
-  const setFocused = useWidgetStore((s) => s.setFocused)
-
-  // Hover magnifier: which widget is hovered + the screen rect of its thumbnail
-  // so the popup can anchor beside it. A short hide delay bridges the gap from
-  // the thumbnail to the (portalled) magnifier so it doesn't flicker shut.
-  const [hovered, setHovered] = useState<{ id: string; rect: DOMRect } | null>(null)
-  const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const cancelHide = (): void => {
-    if (hideTimer.current) {
-      clearTimeout(hideTimer.current)
-      hideTimer.current = null
-    }
-  }
-  const scheduleHide = (): void => {
-    cancelHide()
-    hideTimer.current = setTimeout(() => setHovered(null), 160)
-  }
-  useEffect(() => cancelHide, [])
-  const hoveredWidget = hovered ? visible.find((w) => w.id === hovered.id) ?? null : null
 
   const draggingRef = useRef(false)
   function panFromMinimapPoint(e: React.MouseEvent<SVGSVGElement>): void {
@@ -341,11 +317,6 @@ function MinimapBody({
                 width={ww}
                 height={hh}
                 data-testid={`minimap-thumb-${w.id}`}
-                onMouseEnter={(e) => {
-                  cancelHide()
-                  setHovered({ id: w.id, rect: e.currentTarget.getBoundingClientRect() })
-                }}
-                onMouseLeave={scheduleHide}
                 onMouseDown={(e) => e.stopPropagation()}
                 onClick={(e) => {
                   e.stopPropagation()
@@ -386,106 +357,6 @@ function MinimapBody({
           />
         )}
       </svg>
-      {hovered &&
-        hoveredWidget &&
-        createPortal(
-          <Magnifier
-            widget={hoveredWidget}
-            anchor={hovered.rect}
-            onEnter={cancelHide}
-            onLeave={scheduleHide}
-            onZoom={() => {
-              zoomToWidget(hoveredWidget.id)
-              setHovered(null)
-            }}
-            onOpen={() => {
-              setFocused(hoveredWidget.id)
-              setHovered(null)
-            }}
-          />,
-          document.body
-        )}
-    </div>
-  )
-}
-
-// The hover magnifier: a floating, legible preview of one widget, sized to its
-// real dimensions (shrunk only if too big), anchored beside its minimap
-// thumbnail and clamped to the viewport. Offers a jump-to (zoom to 100% and
-// centre) and an open-focused action so the user can read or act without
-// hunting for the widget on the canvas.
-function Magnifier({
-  widget,
-  anchor,
-  onEnter,
-  onLeave,
-  onZoom,
-  onOpen
-}: {
-  widget: Widget
-  anchor: DOMRect
-  onEnter: () => void
-  onLeave: () => void
-  onZoom: () => void
-  onOpen: () => void
-}): JSX.Element {
-  const s = magnifierScale(widget)
-  const w = Math.round(widget.width * s)
-  const h = Math.round(widget.height * s)
-  const GAP = 12
-  const HEADER = 30
-  // Prefer placing the magnifier to the LEFT of the thumbnail (the minimap
-  // usually lives bottom-right); fall back to the right if there isn't room.
-  let left = anchor.left - w - GAP
-  if (left < GAP) left = Math.min(anchor.right + GAP, window.innerWidth - w - GAP)
-  left = Math.max(GAP, Math.min(left, window.innerWidth - w - GAP))
-  let top = anchor.top - HEADER
-  top = Math.max(GAP, Math.min(top, window.innerHeight - h - HEADER - GAP))
-
-  return (
-    <div
-      data-testid="minimap-magnifier"
-      onMouseEnter={onEnter}
-      onMouseLeave={onLeave}
-      className="fixed z-[400] rounded-lg overflow-hidden bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-700 shadow-2xl"
-      style={{ left, top, width: w }}
-    >
-      <div className="flex items-center justify-between px-2 py-1 bg-stone-100/80 dark:bg-stone-800/80 border-b border-stone-200 dark:border-stone-700">
-        <span className="text-[10px] uppercase tracking-[0.12em] text-stone-500 dark:text-stone-400 truncate">
-          {widget.title || widget.kind}
-        </span>
-        <div className="flex items-center gap-0.5 shrink-0">
-          <button
-            onClick={onZoom}
-            title="Jump to this widget (100%)"
-            className="inline-flex items-center justify-center h-5 w-5 rounded text-stone-500 hover:text-accent hover:bg-stone-200/70 dark:hover:bg-stone-700/70"
-            data-testid="magnify-zoom"
-          >
-            <Icon name="my_location" size={13} />
-          </button>
-          <button
-            onClick={onOpen}
-            title="Open in focus mode"
-            className="inline-flex items-center justify-center h-5 w-5 rounded text-stone-500 hover:text-accent hover:bg-stone-200/70 dark:hover:bg-stone-700/70"
-            data-testid="magnify-open"
-          >
-            <Icon name="open_in_full" size={13} />
-          </button>
-        </div>
-      </div>
-      {/* The preview at the widget's real size, scaled to fit the magnifier. */}
-      <div style={{ width: w, height: h, overflow: 'hidden' }}>
-        <div
-          style={{
-            width: widget.width,
-            height: widget.height,
-            transform: `scale(${s})`,
-            transformOrigin: 'top left'
-          }}
-        >
-          <WidgetPreview widget={widget} />
-        </div>
-      </div>
     </div>
   )
 }
