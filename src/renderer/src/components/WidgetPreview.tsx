@@ -149,6 +149,17 @@ export default function WidgetPreview({ widget }: { widget: Widget }): JSX.Eleme
           </div>
         </div>
       )
+    case 'living-doc':
+      return (
+        <div className="h-full w-full p-2 bg-white dark:bg-stone-900 overflow-hidden">
+          <div className="text-[11px] font-semibold text-accent mb-1 truncate">
+            {widget.livingQuery || 'Living Doc'}
+          </div>
+          <div className="text-[11px] text-stone-500 dark:text-stone-400 leading-snug">
+            {tiptapText(c).slice(0, 300) || 'Will fill from this desk'}
+          </div>
+        </div>
+      )
     case 'shape': {
       const s = safeParse<{ fill: string; label: string }>(c)
       return (

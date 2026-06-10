@@ -1300,21 +1300,22 @@ export async function regenerateLivingPage(
 
   const w = getWidget(widgetId)
   if (!w) return { ok: false, error: 'Widget not found' }
-  if (w.kind !== 'page') return { ok: false, error: 'Widget is not a page' }
+  // Both a living Page and the dedicated Living Doc widget run through here.
+  const isLivingKind = (k: string): boolean => k === 'page' || k === 'living-doc'
+  if (!isLivingKind(w.kind)) return { ok: false, error: 'Widget is not a living document' }
   if (!w.livingQuery || !w.livingQuery.trim()) {
-    return { ok: false, error: 'Living query is empty — set a query first' }
+    return { ok: false, error: 'Living query is empty — set a brief first' }
   }
 
   const task = getNode(w.taskId)
   if (!task || task.kind !== 'task') return { ok: false, error: 'Task not found' }
 
   const allWidgets = listWidgetsByTask(w.taskId)
-  // Exclude self + every other living page on the same canvas so we don't
-  // loop or self-reference. The user can still LINK pages explicitly via
-  // Inter-Widget Links (next feature), but the AI summary never sees other
-  // living pages' generated bodies.
+  // Exclude self + every other living document on the same canvas (a living
+  // Page or a Living Doc) so we don't loop or self-reference. The AI summary
+  // never sees another living document's generated body.
   const source = allWidgets.filter(
-    (other) => other.id !== w.id && !(other.kind === 'page' && other.livingQuery)
+    (other) => other.id !== w.id && !(isLivingKind(other.kind) && other.livingQuery)
   )
 
   if (source.length === 0) {
