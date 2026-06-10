@@ -503,6 +503,21 @@ const api = {
     ): Promise<{ ok: true } | { ok: false; error: string }> =>
       ipcRenderer.invoke('files:openExternal', url)
   },
+  // Document export — write a self-contained, styled HTML string out as a
+  // standalone .html file or a printed PDF, each through the native save dialog.
+  // Used by the markdown widget's Export buttons.
+  exportDoc: {
+    html: (input: {
+      html: string
+      suggestedName: string
+    }): Promise<{ ok: true; path: string } | { ok: false }> =>
+      ipcRenderer.invoke('export:html', input),
+    pdf: (input: {
+      html: string
+      suggestedName: string
+    }): Promise<{ ok: true; path: string } | { ok: false }> =>
+      ipcRenderer.invoke('export:pdf', input)
+  },
   // Voice / video note AI pipeline. Three independent stages — record
   // → transcribe, transcript → processed text, transcript → action
   // proposals. Each returns a tagged-union result; renderer branches on

@@ -166,3 +166,4 @@ canvas.
 
 - 2026-06-09, SME doc created; no implementation started yet.
 - 2026-06-10, Shipped full-background fill (a soft accent-tint toggle in the colour popover) and an optional emoji icon on the title row. Rich body with links and basic formatting remains open from the launch-blocking tier.
+- 2026-06-10, Launch-blocking tier complete. The card body now renders markdown-lite: inline **bold**, *italic*, "- " bullets, and links, both [text](url) and bare URLs, which render as clickable links that open in the user's browser. Clicking the body enters a raw textarea for editing and clicking away renders it again. The parsing lives in lib/inlineMarkdown.ts with unit coverage (tests/unit/inlineMarkdown.test.ts), including the acceptance of a pasted URL plus a bold phrase both rendering. With the earlier full-fill and icon work this clears the Sufficient tier for card.

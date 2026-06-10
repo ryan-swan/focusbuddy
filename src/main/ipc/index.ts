@@ -1,4 +1,5 @@
-import { app, ipcMain, BrowserWindow, webContents as allWebContents, type WebContents } from 'electron'
+import { app, ipcMain, BrowserWindow, dialog, webContents as allWebContents, type WebContents } from 'electron'
+import { writeFile } from 'node:fs/promises'
 import { consumePendingAuthHandoff } from '../authProtocol'
 import {
   checkForUpdates,
@@ -736,6 +737,50 @@ export function registerIpcHandlers(): void {
   )
   ipcMain.handle('files:get', (_e, id: string) => getFile(id))
   ipcMain.handle('files:delete', (_e, id: string) => deleteFile(id))
+
+  // Document export — the markdown widget (and any rich-text surface) hands us
+  // a fully self-contained, styled HTML string. We save it as a standalone
+  // .html file, or render it in a hidden window and printToPDF for a clean PDF,
+  // writing either through the native save dialog so the user picks the spot.
+  ipcMain.handle(
+    'export:html',
+    async (_e, input: { html: string; suggestedName: string }) => {
+      const name = input.suggestedName.replace(/\.html?$/i, '') || 'note'
+      const parent = BrowserWindow.getFocusedWindow()
+      const opts = { defaultPath: `${name}.html`, filters: [{ name: 'HTML', extensions: ['html'] }] }
+      const { canceled, filePath } = parent
+        ? await dialog.showSaveDialog(parent, opts)
+        : await dialog.showSaveDialog(opts)
+      if (canceled || !filePath) return { ok: false as const }
+      await writeFile(filePath, input.html, 'utf8')
+      return { ok: true as const, path: filePath }
+    }
+  )
+  ipcMain.handle(
+    'export:pdf',
+    async (_e, input: { html: string; suggestedName: string }) => {
+      const name = input.suggestedName.replace(/\.pdf$/i, '') || 'note'
+      const parent = BrowserWindow.getFocusedWindow()
+      const opts = { defaultPath: `${name}.pdf`, filters: [{ name: 'PDF', extensions: ['pdf'] }] }
+      const { canceled, filePath } = parent
+        ? await dialog.showSaveDialog(parent, opts)
+        : await dialog.showSaveDialog(opts)
+      if (canceled || !filePath) return { ok: false as const }
+      const render = new BrowserWindow({ show: false, webPreferences: { sandbox: true } })
+      try {
+        await render.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(input.html))
+        const pdf = await render.webContents.printToPDF({
+          printBackground: true,
+          pageSize: 'A4',
+          margins: { marginType: 'default' }
+        })
+        await writeFile(filePath, pdf)
+      } finally {
+        render.destroy()
+      }
+      return { ok: true as const, path: filePath }
+    }
+  )
   ipcMain.handle('files:read', (_e, id: string) => {
     const r = readFileBytes(id)
     if (!r) return null

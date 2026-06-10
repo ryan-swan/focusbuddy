@@ -193,7 +193,17 @@ editors. The wikilink-that-pans-the-canvas and the select-and-let-an-agent-rewri
 moves are the ones nobody else can copy, because they only exist when the note
 lives on a wired, AI-native, local-first canvas.
 
+## Identity versus the page widget
+
+Markdown is the portable single-note surface. It holds one note as markdown,
+exports and copies out as clean markdown, HTML, or PDF, and is the right pick
+when the content should travel out of Haptyx unchanged. Page is the rich
+multi-block document, a Notion-style canvas with living-page AI generation, for
+work that stays inside the app and grows into sections. The picker hint on each
+now states this in one line so a first-time user can choose without guessing.
+
 ## Implementation log
 
 - 2026-06-09, SME doc created; no implementation started yet.
 - 2026-06-10, Shipped "Copy as markdown" in the toolbar (raw getMarkdown string to the clipboard). The slash-command insert menu and the documented boundary versus the page widget remain open from the launch-blocking tier.
+- 2026-06-10, Launch-blocking tier complete. Added a slash insert menu (heading 1-3, bullet, numbered, task list, quote, code block, divider, link) mirroring the page widget, plus Export as HTML and Export as PDF from the toolbar. Export serialises the editor to a self-contained styled document and writes it through the native save dialog, with PDF rendered by an offscreen printToPDF in the main process. The identity boundary versus page is documented above and surfaced as a one-line hint on both catalog entries. This clears the Strong tier for markdown.

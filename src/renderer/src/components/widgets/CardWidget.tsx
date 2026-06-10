@@ -1,7 +1,52 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { Widget } from '@shared/types'
 import WidgetFrame from './WidgetFrame'
 import { useWidgetStore } from '../../stores/widgets'
+import { parseInline } from '../../lib/inlineMarkdown'
+
+// Render the card body's markdown-lite as JSX: **bold**, *italic*, links (both
+// [text](url) and bare URLs) that open in the user's browser, and "- " bullets.
+function renderBody(body: string): ReactNode {
+  const openLink = (href: string): void => {
+    void window.api.files.openExternal(href)
+  }
+  const inline = (s: string, keyBase: string): ReactNode[] =>
+    parseInline(s).map((t, i) => {
+      const k = `${keyBase}-${i}`
+      if (t.type === 'bold') return <strong key={k}>{t.value}</strong>
+      if (t.type === 'italic') return <em key={k}>{t.value}</em>
+      if (t.type === 'link')
+        return (
+          <a
+            key={k}
+            href={t.href}
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              openLink(t.href)
+            }}
+            className="text-accent underline hover:text-accent/80 cursor-pointer"
+          >
+            {t.text}
+          </a>
+        )
+      return <span key={k}>{t.value}</span>
+    })
+  return body.split('\n').map((line, idx) => {
+    const bullet = /^[-*]\s+(.*)$/.exec(line.trim())
+    if (bullet) {
+      return (
+        <div key={idx} className="flex items-start gap-1.5">
+          <span className="mt-[-1px] shrink-0">•</span>
+          <span>{inline(bullet[1], `b${idx}`)}</span>
+        </div>
+      )
+    }
+    if (line.trim() === '') return <div key={idx}>&nbsp;</div>
+    return <div key={idx}>{inline(line, `l${idx}`)}</div>
+  })
+}
 
 // A clean titled card — an accent bar, a bold editable title and a multi-line
 // body. A step up from a sticky for structured callouts. Persists as JSON.
@@ -59,6 +104,10 @@ export default function CardWidget({ widget, inline = false }: Props): JSX.Eleme
   const [data, setData] = useState<CardData>(() => parse(widget.content))
   const [pickAccent, setPickAccent] = useState(false)
   const [pickIcon, setPickIcon] = useState(false)
+  // The body shows rendered rich text (bold, italic, clickable links, bullets)
+  // and flips to a raw textarea while editing. Empty bodies start editable.
+  const [bodyEditing, setBodyEditing] = useState(false)
+  const bodyRef = useRef<HTMLTextAreaElement | null>(null)
   const lastSaved = useRef(widget.content)
 
   useEffect(() => {
@@ -131,13 +180,32 @@ export default function CardWidget({ widget, inline = false }: Props): JSX.Eleme
             ))}
           </div>
         )}
-        <textarea
-          value={data.body}
-          onChange={(e) => set({ body: e.target.value })}
-          onMouseDown={(e) => e.stopPropagation()}
-          placeholder="Write something…"
-          className="flex-1 min-h-0 w-full resize-none bg-transparent text-[13px] leading-relaxed text-stone-700 dark:text-stone-300 placeholder:text-stone-400 focus:outline-none"
-        />
+        {bodyEditing || data.body.trim() === '' ? (
+          <textarea
+            ref={bodyRef}
+            value={data.body}
+            autoFocus={bodyEditing}
+            onChange={(e) => set({ body: e.target.value })}
+            onMouseDown={(e) => e.stopPropagation()}
+            onBlur={() => setBodyEditing(false)}
+            placeholder="Write something… **bold**, *italic*, paste a link"
+            className="flex-1 min-h-0 w-full resize-none bg-transparent text-[13px] leading-relaxed text-stone-700 dark:text-stone-300 placeholder:text-stone-400 focus:outline-none"
+          />
+        ) : (
+          <div
+            data-testid="card-body-rendered"
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              // A link handles its own click; clicking elsewhere edits.
+              if ((e.target as HTMLElement).closest('a')) return
+              setBodyEditing(true)
+              requestAnimationFrame(() => bodyRef.current?.focus())
+            }}
+            className="flex-1 min-h-0 w-full overflow-auto text-[13px] leading-relaxed text-stone-700 dark:text-stone-300 cursor-text whitespace-pre-wrap"
+          >
+            {renderBody(data.body)}
+          </div>
+        )}
       </div>
 
       {/* Accent picker (hover) */}

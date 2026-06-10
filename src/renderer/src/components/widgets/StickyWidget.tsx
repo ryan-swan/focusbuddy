@@ -1,8 +1,16 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { Widget } from '@shared/types'
 import WidgetFrame from './WidgetFrame'
 import { useWidgetStore } from '../../stores/widgets'
 import ConnectedToolMenu from '../ConnectedToolMenu'
+import Icon from '../Icon'
+import {
+  STICKY_CHECK_RE,
+  STICKY_BULLET_RE,
+  hasChecklist as hasChecklistText,
+  toggleCheckLine,
+  toggleChecklist
+} from '../../lib/stickyText'
 
 const COLORS = ['#fef08a', '#fbcfe8', '#bae6fd', '#bbf7d0', '#fed7aa']
 
@@ -11,37 +19,58 @@ interface Props {
   inline?: boolean
 }
 
+// Render one line's inline markdown-lite: **bold** becomes bold. Everything
+// else is plain text. Kept deliberately tiny so a sticky stays a sticky and
+// never turns into a full editor.
+function renderInline(s: string): ReactNode[] {
+  const out: ReactNode[] = []
+  const re = /\*\*(.+?)\*\*/g
+  let last = 0
+  let key = 0
+  let m: RegExpExecArray | null
+  while ((m = re.exec(s)) !== null) {
+    if (m.index > last) out.push(s.slice(last, m.index))
+    out.push(<strong key={key++}>{m[1]}</strong>)
+    last = m.index + m[0].length
+  }
+  if (last < s.length) out.push(s.slice(last))
+  return out.length ? out : [s]
+}
+
+const CHECK_RE = STICKY_CHECK_RE
+const BULLET_RE = STICKY_BULLET_RE
+
 export default function StickyWidget({ widget, inline = false }: Props): JSX.Element {
   const update = useWidgetStore((s) => s.update)
   const [text, setText] = useState(widget.content)
   const lastSavedRef = useRef(widget.content)
   // Mirror the latest text each render so the unmount-flush closure reads the
-  // CURRENT value (closing over `text` would capture a stale one); hold the
-  // debounce timer in a ref so the flush effect can cancel + flush it.
+  // CURRENT value; hold the debounce timer in a ref so the flush can cancel it.
   const textRef = useRef(widget.content)
   textRef.current = text
   const saveTimerRef = useRef<number | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
-  // Right-click "Create + connect" menu position. Opens on contextmenu
-  // over the textarea (or the sticky body). Closes on click-away.
+  const scrollRef = useRef<HTMLDivElement | null>(null)
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; selectionText?: string } | null>(null)
+  // A sticky shows a rendered view (bold, bullets, tickable checkboxes) and
+  // flips to a raw textarea while the user is editing. New / empty stickies
+  // start in edit mode so they are immediately typeable.
+  const [editing, setEditing] = useState(widget.content.trim() === '')
 
-  // Auto-grow: when the typed text overflows the visible area, grow the sticky
-  // by exactly the overflow so the whole note is readable without scrolling.
-  // Grow-only (never shrinks below a manual resize) and capped so a runaway
-  // paste can't fill the canvas. Measuring overflow (scrollHeight - clientHeight)
-  // avoids guessing the frame chrome height.
+  // Auto-grow: grow the note by whatever its content overflows, in whichever
+  // view is showing, so a longer note stays readable without manual resizing.
+  // Grow-only and capped so a runaway paste can't fill the canvas.
   const MAX_STICKY_HEIGHT = 640
   useEffect(() => {
     if (inline) return
-    const ta = textareaRef.current
-    if (!ta || ta.clientHeight === 0) return
-    const overflow = ta.scrollHeight - ta.clientHeight
+    const el = scrollRef.current
+    if (!el || el.clientHeight === 0) return
+    const overflow = el.scrollHeight - el.clientHeight
     if (overflow > 4) {
       const target = Math.min(MAX_STICKY_HEIGHT, widget.height + overflow)
       if (target > widget.height) void update(widget.id, { height: Math.round(target) })
     }
-  }, [text, widget.height, widget.id, inline, update])
+  }, [text, editing, widget.height, widget.id, inline, update])
 
   useEffect(() => {
     setText(widget.content)
@@ -61,9 +90,8 @@ export default function StickyWidget({ widget, inline = false }: Props): JSX.Ele
   }, [text, widget.id, update])
 
   // Flush any pending save on unmount. The canvas remounts every widget when
-  // layoutVersion bumps (pin/unpin/group/auto-arrange/AI-accept); without this,
-  // the un-debounced tail of what you just typed is silently lost. Mirrors the
-  // unmount-flush already present in MarkdownWidget.
+  // layoutVersion bumps; without this the un-debounced tail of what you just
+  // typed is silently lost.
   useEffect(() => {
     return () => {
       if (saveTimerRef.current !== null) {
@@ -76,19 +104,135 @@ export default function StickyWidget({ widget, inline = false }: Props): JSX.Ele
   }, [update, widget.id])
 
   const bgColor = widget.color ?? '#fef08a'
+  const lines = text.split('\n')
+  const hasChecklist = hasChecklistText(text)
 
-  // The body uses the user's chosen pastel as its fill in light/dark/atelier
-  // modes. In futuristic mode a CSS override below replaces the fill with
-  // a deep violet glass; the user's pastel choice is then preserved as a
-  // 3px top accent strip via `--fb-sticky-tint` so each note remains
-  // distinguishable without breaking the theme's cohesion.
+  // Toggle a single checklist line between done and not, by its line index.
+  function toggleCheck(lineIndex: number): void {
+    setText(toggleCheckLine(text, lineIndex))
+  }
+
+  // Toolbar action: turn the body into a checklist, or strip the checkboxes if
+  // it already is one.
+  function toggleChecklistMode(): void {
+    setText(toggleChecklist(text))
+  }
+
+  // Wrap the textarea selection in ** ** (or insert a bold placeholder). Edit
+  // mode only, since it acts on the textarea selection.
+  function applyBold(): void {
+    const ta = textareaRef.current
+    if (!ta) return
+    const start = ta.selectionStart
+    const end = ta.selectionEnd
+    const sel = text.slice(start, end) || 'bold'
+    const next = `${text.slice(0, start)}**${sel}**${text.slice(end)}`
+    setText(next)
+    requestAnimationFrame(() => {
+      ta.focus()
+      ta.setSelectionRange(start + 2, start + 2 + sel.length)
+    })
+  }
+
+  // Prefix the current line with "- " to make it a bullet.
+  function applyBullet(): void {
+    const ta = textareaRef.current
+    if (!ta) return
+    const pos = ta.selectionStart
+    const lineStart = text.lastIndexOf('\n', pos - 1) + 1
+    const next = `${text.slice(0, lineStart)}- ${text.slice(lineStart)}`
+    setText(next)
+    requestAnimationFrame(() => {
+      ta.focus()
+      ta.setSelectionRange(pos + 2, pos + 2)
+    })
+  }
+
+  const toolbarBtn =
+    'h-5 w-5 inline-flex items-center justify-center rounded text-stone-700/70 hover:text-stone-900 hover:bg-black/10 transition-colors'
+
+  const rendered = (
+    <div
+      className={`fb-sticky-rendered w-full flex-1 font-hand text-stone-900 cursor-text whitespace-pre-wrap ${
+        inline ? 'text-2xl' : 'text-lg'
+      }`}
+      onMouseDown={(e) => {
+        // Let a checkbox click through; otherwise a click drops into edit mode.
+        if ((e.target as HTMLElement).closest('[data-sticky-check]')) return
+      }}
+      onClick={(e) => {
+        if ((e.target as HTMLElement).closest('[data-sticky-check]')) return
+        setEditing(true)
+        requestAnimationFrame(() => textareaRef.current?.focus())
+      }}
+    >
+      {text.trim() === '' ? (
+        <span className="text-stone-700/40">Write a note…</span>
+      ) : (
+        lines.map((line, idx) => {
+          const trimmed = line.trim()
+          const check = CHECK_RE.exec(trimmed)
+          if (check) {
+            const done = check[1].toLowerCase() === 'x'
+            return (
+              <div key={idx} className="flex items-start gap-1.5 leading-snug">
+                <button
+                  data-sticky-check
+                  data-testid={`sticky-check-${idx}`}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    toggleCheck(idx)
+                  }}
+                  className="mt-0.5 shrink-0 text-stone-700 hover:text-stone-900"
+                  aria-label={done ? 'Mark not done' : 'Mark done'}
+                >
+                  <Icon name={done ? 'check_box' : 'check_box_outline_blank'} size={16} />
+                </button>
+                <span className={done ? 'line-through opacity-55' : ''}>{renderInline(check[2])}</span>
+              </div>
+            )
+          }
+          const bullet = BULLET_RE.exec(trimmed)
+          if (bullet) {
+            return (
+              <div key={idx} className="flex items-start gap-1.5 leading-snug">
+                <span className="mt-[-1px] shrink-0">•</span>
+                <span>{renderInline(bullet[1])}</span>
+              </div>
+            )
+          }
+          if (trimmed === '') return <div key={idx}>&nbsp;</div>
+          return <div key={idx}>{renderInline(line)}</div>
+        })
+      )}
+    </div>
+  )
+
+  const editor = (
+    <textarea
+      ref={textareaRef}
+      value={text}
+      autoFocus={editing}
+      onChange={(e) => setText(e.target.value)}
+      onBlur={() => setEditing(false)}
+      placeholder="Write a note… **bold**, - bullet, [ ] task"
+      onContextMenu={(e) => {
+        if (e.shiftKey) return
+        e.preventDefault()
+        const sel = window.getSelection()?.toString() ?? ''
+        setCtxMenu({ x: e.clientX, y: e.clientY, selectionText: sel })
+      }}
+      className={`fb-sticky-textarea w-full flex-1 resize-none bg-transparent text-stone-900 font-hand focus:outline-none placeholder:text-stone-700/40 ${
+        inline ? 'text-2xl' : 'text-lg'
+      }`}
+    />
+  )
+
   const content = (
     <div
       data-fb-sticky-body
       className="fb-sticky-body h-full w-full p-3 flex flex-col gap-2"
-      style={
-        { backgroundColor: bgColor, '--fb-sticky-tint': bgColor } as React.CSSProperties
-      }
+      style={{ backgroundColor: bgColor, '--fb-sticky-tint': bgColor } as React.CSSProperties}
     >
       <div className="flex items-center gap-1">
         {COLORS.map((c) => (
@@ -100,27 +244,26 @@ export default function StickyWidget({ widget, inline = false }: Props): JSX.Ele
             aria-label={`Color ${c}`}
           />
         ))}
+        <span className="mx-0.5 h-3.5 w-px bg-black/10" aria-hidden />
+        <button onClick={applyBold} className={toolbarBtn} title="Bold (**text**)" aria-label="Bold" data-testid="sticky-bold">
+          <Icon name="format_bold" size={13} />
+        </button>
+        <button onClick={applyBullet} className={toolbarBtn} title="Bullet line" aria-label="Bullet" data-testid="sticky-bullet">
+          <Icon name="format_list_bulleted" size={13} />
+        </button>
+        <button
+          onClick={toggleChecklistMode}
+          className={`${toolbarBtn} ${hasChecklist ? 'text-accent' : ''}`}
+          title={hasChecklist ? 'Remove checkboxes' : 'Make a checklist'}
+          aria-label="Checklist"
+          data-testid="sticky-checklist"
+        >
+          <Icon name="checklist" size={13} />
+        </button>
       </div>
-      <textarea
-        ref={textareaRef}
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        placeholder="Write a note..."
-        onContextMenu={(e) => {
-          // Right-click → offer "Create + connect" menu seeded with the
-          // current text selection. We deliberately don't preventDefault
-          // unconditionally; if the user is in a long sticky and wants
-          // the standard browser cut/copy/paste menu, holding Shift
-          // bypasses ours.
-          if (e.shiftKey) return
-          e.preventDefault()
-          const sel = window.getSelection()?.toString() ?? ''
-          setCtxMenu({ x: e.clientX, y: e.clientY, selectionText: sel })
-        }}
-        className={`fb-sticky-textarea w-full flex-1 resize-none bg-transparent text-stone-900 font-hand focus:outline-none placeholder:text-stone-700/40 ${
-          inline ? 'text-2xl' : 'text-lg'
-        }`}
-      />
+      <div ref={scrollRef} className="flex-1 min-h-0 overflow-auto flex flex-col">
+        {editing ? editor : rendered}
+      </div>
       {ctxMenu && (
         <ConnectedToolMenu
           sourceWidgetId={widget.id}
