@@ -5,6 +5,7 @@ import Link from '@tiptap/extension-link'
 import TaskList from '@tiptap/extension-task-list'
 import TaskItem from '@tiptap/extension-task-item'
 import Placeholder from '@tiptap/extension-placeholder'
+import { TableKit } from '@tiptap/extension-table'
 import { Markdown } from 'tiptap-markdown'
 import type { Editor } from '@tiptap/react'
 import type { Widget } from '@shared/types'
@@ -152,12 +153,16 @@ export default function MarkdownWidget({ widget, inline = false }: Props): JSX.E
         }),
         TaskList,
         TaskItem.configure({ nested: true }),
+        // GFM tables. Pasting a |---|---| markdown table renders a real table;
+        // it round-trips through the stored markdown as HTML, which is why the
+        // Markdown extension below runs with html: true.
+        TableKit.configure({ table: { resizable: false } }),
         Placeholder.configure({
           placeholder:
-            'Type or paste markdown. ⌘B bold · ⌘I italic · type "# " for a heading · "- " for a list · "[ ] " for a task'
+            'Type or paste markdown. ⌘B bold · ⌘I italic · type "# " for a heading · "- " for a list · "[ ] " for a task · paste a |---| table'
         }),
         Markdown.configure({
-          html: false,
+          html: true,
           tightLists: true,
           bulletListMarker: '-',
           linkify: true,

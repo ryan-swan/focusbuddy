@@ -7,6 +7,52 @@
 export const STICKY_CHECK_RE = /^\[( |x|X)\]\s?(.*)$/
 export const STICKY_BULLET_RE = /^[-*]\s+(.*)$/
 
+// A GFM table row: starts (after optional space) with a pipe and has a closing
+// pipe. A separator row is the "|---|---|" line (dashes, optional colons, pipes).
+const TABLE_ROW_RE = /^\s*\|(.+)\|\s*$/
+function isSeparatorRow(line: string): boolean {
+  if (!/-/.test(line)) return false
+  return /^\s*\|?[\s:|-]+\|?\s*$/.test(line) && /\|/.test(line)
+}
+function splitCells(rowLine: string): string[] {
+  const m = TABLE_ROW_RE.exec(rowLine)
+  const inner = m ? m[1] : rowLine.replace(/^\s*\|/, '').replace(/\|\s*$/, '')
+  return inner.split('|').map((c) => c.trim())
+}
+
+export type StickyBlock =
+  | { type: 'table'; headers: string[]; rows: string[][] }
+  // `index` is the original line number, so checkbox toggling stays correct.
+  | { type: 'line'; text: string; index: number }
+
+// Split a sticky body into blocks so the rendered view can show a pasted
+// markdown table as a real table while everything else stays line-by-line. A
+// table is a "| ... |" row immediately followed by a "|---|---|" separator.
+export function splitStickyBlocks(text: string): StickyBlock[] {
+  const lines = text.split('\n')
+  const blocks: StickyBlock[] = []
+  let i = 0
+  while (i < lines.length) {
+    const line = lines[i]
+    const next = lines[i + 1]
+    if (TABLE_ROW_RE.test(line) && next !== undefined && isSeparatorRow(next)) {
+      const headers = splitCells(line)
+      const rows: string[][] = []
+      let j = i + 2
+      while (j < lines.length && TABLE_ROW_RE.test(lines[j]) && !isSeparatorRow(lines[j])) {
+        rows.push(splitCells(lines[j]))
+        j++
+      }
+      blocks.push({ type: 'table', headers, rows })
+      i = j
+      continue
+    }
+    blocks.push({ type: 'line', text: line, index: i })
+    i++
+  }
+  return blocks
+}
+
 export function hasChecklist(text: string): boolean {
   return text.split('\n').some((l) => STICKY_CHECK_RE.test(l.trim()))
 }
