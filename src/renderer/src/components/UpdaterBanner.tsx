@@ -31,6 +31,9 @@ type UpdateState =
 
 export default function UpdaterBanner(): JSX.Element | null {
   const [state, setState] = useState<UpdateState>({ kind: 'idle' })
+  // macOS cannot auto-install (ad-hoc signature), so there an available update
+  // is a one-click download of the release rather than an in-place install.
+  const isMac = window.api.platform === 'darwin'
 
   useEffect(() => {
     // Pull whatever state was missed before this component mounted.
@@ -58,6 +61,22 @@ export default function UpdaterBanner(): JSX.Element | null {
   }
 
   if (state.kind === 'available') {
+    // macOS: download the release in the browser (no in-place install).
+    if (isMac) {
+      return (
+        <button
+          onClick={() => { void window.api.update.openDownload() }}
+          className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-accent hover:bg-accent/10 font-medium"
+          title={`Download Haptyx v${state.version}`}
+          data-testid="updater-download"
+        >
+          <Icon name="download" size={11} />
+          <span>Download v{state.version}</span>
+        </button>
+      )
+    }
+    // Windows: the download starts automatically (autoDownload), so this is
+    // passive until the `ready` state arrives.
     return (
       <span
         className="inline-flex items-center gap-1 text-accent"
@@ -79,6 +98,21 @@ export default function UpdaterBanner(): JSX.Element | null {
   }
 
   if (state.kind === 'ready') {
+    // macOS never reaches a real in-place install (ad-hoc signature), so if a
+    // ready state ever arrives there, fall back to the download path too.
+    if (isMac) {
+      return (
+        <button
+          onClick={() => { void window.api.update.openDownload() }}
+          className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-accent hover:bg-accent/10 font-medium"
+          title={`Download Haptyx v${state.version}`}
+          data-testid="updater-download"
+        >
+          <Icon name="download" size={11} />
+          <span>Download v{state.version}</span>
+        </button>
+      )
+    }
     return (
       <button
         onClick={() => { void window.api.update.installAndRestart() }}
