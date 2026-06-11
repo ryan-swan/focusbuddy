@@ -6,7 +6,8 @@
 // widgets relative to the source, not the click point.
 
 import type { Widget } from '@shared/types'
-import type { MenuContext } from './types'
+import type { CtxMenuItem } from '../../components/CanvasContextMenu'
+import type { FrameCallbacks, MenuContext } from './types'
 
 interface ClickPoint {
   clientX: number
@@ -16,7 +17,13 @@ interface ClickPoint {
 export function buildContextForWidget(
   widget: Widget,
   e: ClickPoint,
-  opts?: { granularity?: string; payload?: Record<string, unknown>; selectionText?: string }
+  opts?: {
+    granularity?: string
+    payload?: Record<string, unknown>
+    selectionText?: string
+    frame?: FrameCallbacks
+    headerExtras?: CtxMenuItem[]
+  }
 ): MenuContext {
   const text = opts?.selectionText?.trim() ? opts.selectionText : undefined
   return {
@@ -27,7 +34,9 @@ export function buildContextForWidget(
       : undefined,
     taskId: widget.taskId,
     canvasPoint: { x: 0, y: 0 },
-    clientPoint: { x: e.clientX, y: e.clientY }
+    clientPoint: { x: e.clientX, y: e.clientY },
+    frame: opts?.frame,
+    headerExtras: opts?.headerExtras
   }
 }
 

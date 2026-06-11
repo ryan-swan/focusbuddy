@@ -105,24 +105,27 @@ export function buildOrganise(ctx: MenuContext): MenuContribution[] {
     }
   ]
   if (w.parentSectionId) {
+    // Prefer the frame's full eject (which repositions the widget below the
+    // section and avoids overlap) when available; otherwise the plain detach.
     out.push({
       id: 'core/organise/eject',
       section: MenuSection.Organise,
       priority: 1,
-      label: 'Remove from section',
+      label: 'Move out of section',
       icon: 'logout',
-      onSelect: (c) => ejectFromSection(c)
+      onSelect: (c) =>
+        c.frame?.onEjectFromSection ? c.frame.onEjectFromSection() : ejectFromSection(c)
     })
   }
   return out
 }
 
 export function buildShare(ctx: MenuContext): MenuContribution[] {
+  const out: MenuContribution[] = []
   const multiHasText =
     ctx.object.type === 'multi' && ctx.object.widgets.some((w) => w.content.trim())
-  if (!multiHasText && !workingText(ctx).text.trim()) return []
-  return [
-    {
+  if (multiHasText || workingText(ctx).text.trim()) {
+    out.push({
       id: 'core/share/copy',
       section: MenuSection.Share,
       priority: 0,
@@ -130,22 +133,83 @@ export function buildShare(ctx: MenuContext): MenuContribution[] {
       icon: 'content_copy',
       shortcut: '⌘C',
       onSelect: (c) => copyText(c)
-    }
-  ]
+    })
+  }
+  if (ctx.frame) {
+    out.push({
+      id: 'core/share/share-dialog',
+      section: MenuSection.Share,
+      priority: 1,
+      label: 'Share...',
+      icon: 'share',
+      onSelect: (c) => c.frame?.onShare()
+    })
+  }
+  return out
 }
 
 export function buildAdvanced(ctx: MenuContext): MenuContribution[] {
   if (ctx.object.type !== 'widget') return []
-  return [
-    {
-      id: 'core/advanced/duplicate',
+  const out: MenuContribution[] = []
+  if (ctx.frame) {
+    // Use the frame's existing, tested actions so make-task / synced duplicate /
+    // unlink behave exactly as they did in the old header menu.
+    out.push({
+      id: 'core/advanced/make-task',
       section: MenuSection.Advanced,
       priority: 0,
-      label: 'Duplicate',
+      label: 'Make this a task...',
+      icon: 'task_alt',
+      onSelect: (c) => c.frame?.onMakeTask()
+    })
+    out.push({
+      id: 'core/advanced/duplicate-synced',
+      section: MenuSection.Advanced,
+      priority: 1,
+      label: 'Duplicate (keep synced)',
+      icon: 'link',
+      onSelect: (c) => c.frame?.onDuplicateSynced()
+    })
+    out.push({
+      id: 'core/advanced/duplicate-independent',
+      section: MenuSection.Advanced,
+      priority: 2,
+      label: 'Duplicate (independent copy)',
       icon: 'content_copy',
-      onSelect: (c) => duplicateWidget(c)
+      onSelect: (c) => c.frame?.onDuplicateIndependent()
+    })
+    if (ctx.frame.onDuplicateToFolder) {
+      out.push({
+        id: 'core/advanced/duplicate-folder',
+        section: MenuSection.Advanced,
+        priority: 3,
+        label: 'Duplicate into another folder / task...',
+        icon: 'drive_file_move',
+        onSelect: (c) => c.frame?.onDuplicateToFolder?.()
+      })
     }
-  ]
+    if (ctx.frame.onUnlinkSynced) {
+      out.push({
+        id: 'core/advanced/unlink',
+        section: MenuSection.Advanced,
+        priority: 4,
+        label: 'Unlink from synced copies',
+        icon: 'link_off',
+        onSelect: (c) => c.frame?.onUnlinkSynced?.()
+      })
+    }
+    return out
+  }
+  // No frame (e.g. a content-body menu): the generic duplicate.
+  out.push({
+    id: 'core/advanced/duplicate',
+    section: MenuSection.Advanced,
+    priority: 0,
+    label: 'Duplicate',
+    icon: 'content_copy',
+    onSelect: (c) => duplicateWidget(c)
+  })
+  return out
 }
 
 export function buildDestructive(ctx: MenuContext): MenuContribution[] {

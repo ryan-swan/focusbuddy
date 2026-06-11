@@ -1,7 +1,11 @@
 import { useContext, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Rnd } from 'react-rnd'
-import CanvasContextMenu, { type CtxMenuItem } from '../CanvasContextMenu'
+import { type CtxMenuItem } from '../CanvasContextMenu'
+import UnifiedWidgetMenu from '../contextMenu/UnifiedWidgetMenu'
+import { buildContextForWidget } from '../../lib/contextMenu/buildContext'
+import type { FrameCallbacks } from '../../lib/contextMenu/types'
+import { FrameCallbacksProvider } from '../../lib/contextMenu/frameContext'
 import MakeTaskDialog from '../MakeTaskDialog'
 import ShareDialog from '../ShareDialog'
 import type { PinZone, Widget } from '@shared/types'
@@ -58,7 +62,6 @@ export default function WidgetFrame({
   const update = useWidgetStore((s) => s.update)
   const remove = useWidgetStore((s) => s.remove)
   const bringToFront = useWidgetStore((s) => s.bringToFront)
-  const archive = useWidgetStore((s) => s.archive)
   const createWidget = useWidgetStore((s) => s.create)
   const setFocused = useWidgetStore((s) => s.setFocused)
   const setActive = useWidgetStore((s) => s.setActive)
@@ -270,6 +273,64 @@ export default function WidgetFrame({
       const eb = effectiveBounds(s, all)
       return { ...s, width: eb.width, height: eb.height }
     })
+  }
+
+  // Duplicate the widget. SYNCED copies share a syncGroupId so content / title /
+  // colour mirror across every copy; INDEPENDENT copies are a one-time snapshot.
+  // Extracted from the old header menu verbatim so the unified menu drives the
+  // exact same behaviour.
+  function duplicateWidgetCopy(synced: boolean): void {
+    void (async () => {
+      let groupId: string | undefined
+      if (synced) {
+        groupId = widget.syncGroupId ?? crypto.randomUUID()
+        if (!widget.syncGroupId) await update(widget.id, { syncGroupId: groupId })
+      }
+      await createWidget({
+        taskId: widget.taskId,
+        kind: widget.kind,
+        title: widget.title,
+        content: widget.content,
+        x: widget.x + 30,
+        y: widget.y + 30,
+        width: widget.width,
+        height: widget.height,
+        color: widget.color,
+        sourceAppId: widget.sourceAppId,
+        mode: widget.mode,
+        syncGroupId: groupId
+      })
+    })()
+  }
+
+  // Move the widget out of its parent section, dropping it directly below the
+  // section and de-overlapping against top-level siblings.
+  function ejectFromSectionFrame(): void {
+    if (!isChildOfSection || !parent) return
+    const ws = useWidgetStore.getState().widgets
+    const canvasX = Math.round(parent.x + SECTION_PADDING + widget.x)
+    const canvasY = Math.round(parent.y + parent.height + 24)
+    const topLevelSiblings = ws.filter((w) => w.id !== widget.id && !w.pinned && !w.parentSectionId)
+    const placed = findNonOverlapPosition(
+      { x: canvasX, y: canvasY, width: widget.width, height: widget.height },
+      effectiveSiblingsForCheck(topLevelSiblings, ws)
+    )
+    void update(widget.id, { parentSectionId: null, x: placed.x, y: placed.y })
+    bumpLayout()
+  }
+
+  // The frame management actions the unified context menu offers. Each is
+  // present only when it applies to this widget.
+  const frameCallbacks: FrameCallbacks = {
+    onMakeTask: () => setMakeTaskOpen(true),
+    onShare: () => setShareOpen(true),
+    onDuplicateSynced: () => duplicateWidgetCopy(true),
+    onDuplicateIndependent: () => duplicateWidgetCopy(false),
+    onDuplicateToFolder: !isChildOfSection && !isSection ? () => setMakeTaskOpen(true) : undefined,
+    onEjectFromSection: isChildOfSection && parent ? ejectFromSectionFrame : undefined,
+    onUnlinkSynced: widget.syncGroupId
+      ? () => void update(widget.id, { syncGroupId: null })
+      : undefined
   }
 
   function commitDrop(newX: number, newY: number): void {
@@ -941,144 +1002,22 @@ export default function WidgetFrame({
             </button>
           </div>
         </div>
-        <div className="flex-1 min-h-0">{children}</div>
+        <div className="flex-1 min-h-0">
+          <FrameCallbacksProvider value={frameCallbacks}>{children}</FrameCallbacksProvider>
+        </div>
       </div>
       {headerCtxMenu && (
-        <CanvasContextMenu
-          x={headerCtxMenu.x}
-          y={headerCtxMenu.y}
-          items={(() => {
-            const items: CtxMenuItem[] = []
-            // Kind-specific extras go first so they're discoverable at the
-            // top of the menu (e.g. "Pin to Apps" for a browser widget).
-            if (headerMenuExtras && headerMenuExtras.length > 0) {
-              items.push(...headerMenuExtras)
-              items.push({ separator: true })
-            }
-            items.push({
-              label: 'Make this a task…',
-              icon: 'task_alt',
-              onClick: () => setMakeTaskOpen(true)
-            })
-            items.push({
-              label: 'Share…',
-              icon: 'share',
-              onClick: () => setShareOpen(true)
-            })
-            // Eject from section — only when this widget is a child of a
-            // section. Gives a path out of compact / grid / stack layouts
-            // where the Rnd drag is disabled and the user can't simply
-            // pull the widget out by hand.
-            if (isChildOfSection && parent) {
-              items.push({
-                label: 'Move out of section',
-                icon: 'logout',
-                onClick: () => {
-                  const ws = useWidgetStore.getState().widgets
-                  // Drop the ejected widget directly below the parent
-                  // section, anchored to the section's left edge offset
-                  // by the widget's current in-section x position. This
-                  // keeps the visual association obvious without landing
-                  // on top of any sibling widgets — findNonOverlapPosition
-                  // bumps it further if there's still a clash.
-                  const canvasX = Math.round(parent.x + SECTION_PADDING + widget.x)
-                  const canvasY = Math.round(parent.y + parent.height + 24)
-                  const topLevelSiblings = ws.filter(
-                    (w) => w.id !== widget.id && !w.pinned && !w.parentSectionId
-                  )
-                  const placed = findNonOverlapPosition(
-                    { x: canvasX, y: canvasY, width: widget.width, height: widget.height },
-                    effectiveSiblingsForCheck(topLevelSiblings, ws)
-                  )
-                  void update(widget.id, {
-                    parentSectionId: null,
-                    x: placed.x,
-                    y: placed.y
-                  })
-                  bumpLayout()
-                }
-              })
-              items.push({ separator: true })
-            }
-            items.push({ separator: true })
-            // Duplicate — the user chooses synced (default, autolinked) or an
-            // independent point-in-time copy. SYNCED: both share a syncGroupId,
-            // so content / title / colour edits mirror across every copy,
-            // including copies later moved to other tasks. INDEPENDENT: no
-            // syncGroupId — a snapshot that never affects the original.
-            const duplicateWidget = (synced: boolean): void => {
-              void (async () => {
-                let groupId: string | undefined
-                if (synced) {
-                  groupId = widget.syncGroupId ?? crypto.randomUUID()
-                  if (!widget.syncGroupId) {
-                    await update(widget.id, { syncGroupId: groupId })
-                  }
-                }
-                await createWidget({
-                  taskId: widget.taskId,
-                  kind: widget.kind,
-                  title: widget.title,
-                  content: widget.content,
-                  x: widget.x + 30,
-                  y: widget.y + 30,
-                  width: widget.width,
-                  height: widget.height,
-                  color: widget.color,
-                  sourceAppId: widget.sourceAppId,
-                  mode: widget.mode,
-                  syncGroupId: groupId
-                })
-              })()
-            }
-            items.push({
-              label: 'Duplicate (keep synced)',
-              icon: 'link',
-              onClick: () => duplicateWidget(true)
-            })
-            items.push({
-              label: 'Duplicate (independent copy)',
-              icon: 'content_copy',
-              onClick: () => duplicateWidget(false)
-            })
-            if (!isChildOfSection && !isSection) {
-              items.push({
-                // Bridges "duplicate" → a copy in ANOTHER folder as a new task.
-                // Opens the Make-a-task dialog, where you pick any folder (or
-                // create one) and choose synced vs independent. Same-task
-                // duplicates stay on the two items above.
-                label: 'Duplicate into another folder / task…',
-                icon: 'drive_file_move',
-                onClick: () => setMakeTaskOpen(true)
-              })
-            }
-            if (widget.syncGroupId) {
-              items.push({
-                label: 'Unlink from synced copies',
-                icon: 'link_off',
-                onClick: () => void update(widget.id, { syncGroupId: null })
-              })
-            }
-            items.push({
-              label: 'Bring to front',
-              icon: 'flip_to_front',
-              onClick: () => {
-                void bringToFront(widget.id)
-              }
-            })
-            items.push({ separator: true })
-            items.push({
-              label: 'Archive',
-              icon: 'inventory_2',
-              onClick: () => {
-                // Soft-delete — recoverable from the Archive view. Distinct
-                // from the close-X button which (today) calls confirm()
-                // and is harsher.
-                void archive(widget.id)
-              }
-            })
-            return items
-          })()}
+        // Every widget's header right-click now resolves through the one unified
+        // menu. The frame management actions (make-task, share, synced /
+        // independent duplicate, eject, unlink, archive) are supplied as
+        // callbacks so their behaviour is identical to the old header menu, and
+        // any kind-specific rows ride in as headerExtras.
+        <UnifiedWidgetMenu
+          menuContext={buildContextForWidget(
+            widget,
+            { clientX: headerCtxMenu.x, clientY: headerCtxMenu.y },
+            { frame: frameCallbacks, headerExtras: headerMenuExtras }
+          )}
           onClose={() => setHeaderCtxMenu(null)}
         />
       )}
