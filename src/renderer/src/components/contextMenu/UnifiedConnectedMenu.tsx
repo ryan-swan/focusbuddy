@@ -19,6 +19,10 @@ export interface UnifiedConnectedMenuProps {
     selectionText?: string
     imageUrl?: string
   }
+  // Sub-object granularity (e.g. a table 'cell') and its payload, so per-widget
+  // providers can offer cell/row/node actions for what was actually clicked.
+  granularity?: string
+  payload?: Record<string, unknown>
 }
 
 export default function UnifiedConnectedMenu(props: UnifiedConnectedMenuProps): JSX.Element | null {
@@ -28,7 +32,12 @@ export default function UnifiedConnectedMenu(props: UnifiedConnectedMenuProps): 
   const menuContext = buildContextForWidget(
     widget,
     { clientX: props.x, clientY: props.y },
-    { selectionText: props.selectionContext?.selectionText, frame }
+    {
+      selectionText: props.selectionContext?.selectionText,
+      frame,
+      granularity: props.granularity,
+      payload: props.payload
+    }
   )
   return <UnifiedWidgetMenu menuContext={menuContext} onClose={props.onClose} />
 }

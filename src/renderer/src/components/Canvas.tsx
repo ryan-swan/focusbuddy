@@ -34,6 +34,7 @@ import LoadMeter from './LoadMeter'
 import CanvasContextMenu, { type CtxMenuItem } from './CanvasContextMenu'
 import AiAssistPreview from './contextMenu/AiAssistPreview'
 import WidgetSetupPreview from './contextMenu/WidgetSetupPreview'
+import BrowserContextMenu from './contextMenu/BrowserContextMenu'
 // Side-effect import registers the core widget context-action providers (sticky
 // checklist, living-doc regenerate, ...) for the unified context menu.
 import '../lib/contextMenu'
@@ -2416,6 +2417,8 @@ export default function Canvas(): JSX.Element {
       <AiAssistPreview />
       {/* The per-widget AI setup preview (Build with AI). Also body-portalled. */}
       <WidgetSetupPreview />
+      {/* The unified menu for non-editable right-clicks inside browser widgets. */}
+      <BrowserContextMenu />
       {showExtensionPrompt && (
         <ExtensionPrompt
           task={activeTask}

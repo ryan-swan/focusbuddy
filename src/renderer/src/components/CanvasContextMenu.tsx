@@ -19,39 +19,80 @@ interface Props {
   onClose: () => void
 }
 
+// The menu is fully keyboard navigable. Open it and the panel takes focus;
+// arrow keys move the highlight, type-ahead jumps to a label, Enter or the
+// right arrow opens a submenu and moves focus into it, the left arrow or Escape
+// steps back out, and Escape on the root closes everything. Mouse and hover
+// behave exactly as before.
 export default function CanvasContextMenu({ x, y, items, onClose }: Props): JSX.Element {
   useEffect(() => {
-    function onKey(e: KeyboardEvent): void {
-      if (e.key === 'Escape') onClose()
-    }
     function onMouseDown(e: MouseEvent): void {
       const target = e.target as Element | null
       if (target && !target.closest('[data-canvas-ctx-menu]')) onClose()
     }
-    window.addEventListener('keydown', onKey)
-    // Small delay so the right-click that just fired doesn't get caught by the mousedown listener
-    const armId = window.setTimeout(() => {
-      window.addEventListener('mousedown', onMouseDown)
-    }, 50)
+    // Small delay so the right-click that just opened the menu isn't caught.
+    const armId = window.setTimeout(() => window.addEventListener('mousedown', onMouseDown), 50)
     return () => {
-      window.removeEventListener('keydown', onKey)
       window.removeEventListener('mousedown', onMouseDown)
       window.clearTimeout(armId)
     }
   }, [onClose])
 
-  // Portal to document.body so we escape any CSS transform stacking context
-  // higher up the tree. position:fixed is computed relative to the nearest
-  // transformed ancestor (not the viewport) — for menus opened from widget
-  // headers, the ancestor is the canvas's pan+zoomed container, so without
-  // portalling the menu lands at a transformed location instead of where
-  // the user clicked.
-  const menuRef = useRef<HTMLDivElement | null>(null)
+  return <MenuPanel items={items} x={x} y={y} onClose={onClose} isRoot autoFocus />
+}
+
+interface PanelProps {
+  items: CtxMenuItem[]
+  x: number
+  y: number
+  onClose: () => void
+  isRoot: boolean
+  autoFocus: boolean
+  // Called when this submenu wants to hand focus back to its parent (Left arrow).
+  onStepOut?: () => void
+  // Hover bridging between a parent row and this submenu.
+  onPointerEnter?: () => void
+  onPointerLeave?: () => void
+}
+
+function MenuPanel({
+  items,
+  x,
+  y,
+  onClose,
+  isRoot,
+  autoFocus,
+  onStepOut,
+  onPointerEnter,
+  onPointerLeave
+}: PanelProps): JSX.Element {
+  const panelRef = useRef<HTMLDivElement | null>(null)
+  const rowRefs = useRef<(HTMLDivElement | null)[]>([])
   const [pos, setPos] = useState({ left: x, top: y })
-  // Clamp the menu inside the viewport — right-clicking near the right/bottom
-  // edge previously pushed the menu (and any tall submenu) off-screen.
+  const [active, setActive] = useState<number>(-1)
+  const [openIndex, setOpenIndex] = useState<number | null>(null)
+  const [openByKeyboard, setOpenByKeyboard] = useState(false)
+  const [subPos, setSubPos] = useState<{ left: number; top: number } | null>(null)
+  const closeTimer = useRef<number | null>(null)
+  const typeBuf = useRef('')
+  const typeTimer = useRef<number | null>(null)
+
+  function isNav(i: number): boolean {
+    const it = items[i]
+    return !!it && !it.separator && !it.disabled
+  }
+  function navIndices(): number[] {
+    return items.map((_, i) => i).filter(isNav)
+  }
+
+  useEffect(() => {
+    if (autoFocus) panelRef.current?.focus()
+  }, [autoFocus])
+
+  // Clamp the panel inside the viewport. Submenus also flip left when opening
+  // right would run off-screen.
   useLayoutEffect(() => {
-    const el = menuRef.current
+    const el = panelRef.current
     if (!el) return
     const r = el.getBoundingClientRect()
     setPos({
@@ -60,33 +101,6 @@ export default function CanvasContextMenu({ x, y, items, onClose }: Props): JSX.
     })
   }, [x, y, items])
 
-  return createPortal(
-    <div
-      ref={menuRef}
-      data-canvas-ctx-menu
-      className="fixed z-[260] bg-white dark:bg-stone-800 rounded-md shadow-2xl border border-stone-200 dark:border-stone-700 py-1 min-w-[210px] max-h-[85vh] overflow-y-auto text-sm"
-      style={{ left: pos.left, top: pos.top }}
-      onContextMenu={(e) => e.preventDefault()}
-    >
-      {items.map((item, i) => (
-        <MenuItem key={i} item={item} onSelect={onClose} />
-      ))}
-    </div>,
-    document.body
-  )
-}
-
-function MenuItem({ item, onSelect }: { item: CtxMenuItem; onSelect: () => void }): JSX.Element {
-  const [open, setOpen] = useState(false)
-  const rowRef = useRef<HTMLDivElement | null>(null)
-  const subRef = useRef<HTMLDivElement | null>(null)
-  const closeTimer = useRef<number | null>(null)
-  const [subPos, setSubPos] = useState<{ left: number; top: number } | null>(null)
-
-  // The submenu now lives in a <body> portal (see below), so hovering off the
-  // parent row onto the submenu crosses a DOM gap that would normally fire
-  // mouseleave and close it. A short close delay that either side can cancel
-  // bridges that gap.
   const cancelClose = (): void => {
     if (closeTimer.current !== null) {
       window.clearTimeout(closeTimer.current)
@@ -95,104 +109,199 @@ function MenuItem({ item, onSelect }: { item: CtxMenuItem; onSelect: () => void 
   }
   const scheduleClose = (): void => {
     cancelClose()
-    closeTimer.current = window.setTimeout(() => setOpen(false), 140)
+    closeTimer.current = window.setTimeout(() => setOpenIndex(null), 140)
   }
   useEffect(() => cancelClose, [])
 
-  const hasChildren = !!item.children?.length
+  function openSub(i: number, byKeyboard: boolean): void {
+    cancelClose()
+    setOpenIndex(i)
+    setOpenByKeyboard(byKeyboard)
+  }
+  function closeSub(focusSelf: boolean): void {
+    setOpenIndex(null)
+    setOpenByKeyboard(false)
+    if (focusSelf) panelRef.current?.focus()
+  }
 
-  // Position the portalled submenu beside its row, flipping left when opening
-  // right would run off-screen and clamping vertically so a long list stays on
-  // screen (it scrolls internally past 70vh).
-  //
-  // Why portal at all: the root menu is `overflow-y-auto` so long catalogs
-  // scroll. But a container with overflow-y set forces overflow-x to clip as
-  // well, which hid any submenu extending sideways out of the parent (the
-  // regression). Portalling each submenu to <body> escapes that clip entirely.
+  function activate(i: number): void {
+    const it = items[i]
+    if (!it || it.disabled) return
+    if (it.children?.length) openSub(i, true)
+    else if (it.onClick) {
+      it.onClick()
+      onClose()
+    }
+  }
+
+  function move(dir: 1 | -1): void {
+    const idxs = navIndices()
+    if (!idxs.length) return
+    const cur = idxs.indexOf(active)
+    setActive(cur === -1 ? (dir > 0 ? idxs[0] : idxs[idxs.length - 1]) : idxs[(cur + dir + idxs.length) % idxs.length])
+  }
+
+  function typeAhead(ch: string): void {
+    typeBuf.current += ch.toLowerCase()
+    if (typeTimer.current) window.clearTimeout(typeTimer.current)
+    typeTimer.current = window.setTimeout(() => (typeBuf.current = ''), 600)
+    const match = navIndices().find((i) => (items[i].label ?? '').toLowerCase().startsWith(typeBuf.current))
+    if (match != null) setActive(match)
+  }
+
+  function onKeyDown(e: React.KeyboardEvent): void {
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault()
+        e.stopPropagation()
+        move(1)
+        break
+      case 'ArrowUp':
+        e.preventDefault()
+        e.stopPropagation()
+        move(-1)
+        break
+      case 'Home': {
+        e.preventDefault()
+        const a = navIndices()
+        if (a.length) setActive(a[0])
+        break
+      }
+      case 'End': {
+        e.preventDefault()
+        const a = navIndices()
+        if (a.length) setActive(a[a.length - 1])
+        break
+      }
+      case 'ArrowRight':
+        if (active >= 0 && items[active]?.children?.length) {
+          e.preventDefault()
+          e.stopPropagation()
+          openSub(active, true)
+        }
+        break
+      case 'ArrowLeft':
+        if (!isRoot) {
+          e.preventDefault()
+          e.stopPropagation()
+          onStepOut?.()
+        }
+        break
+      case 'Escape':
+        e.preventDefault()
+        e.stopPropagation()
+        onClose()
+        break
+      case 'Enter':
+      case ' ':
+        if (active >= 0) {
+          e.preventDefault()
+          e.stopPropagation()
+          activate(active)
+        }
+        break
+      default:
+        if (e.key.length === 1 && !e.metaKey && !e.ctrlKey && !e.altKey) {
+          e.preventDefault()
+          typeAhead(e.key)
+        }
+    }
+  }
+
+  // Position the open submenu beside its row, flipping left if needed.
   useLayoutEffect(() => {
-    if (!open || !rowRef.current) {
+    if (openIndex == null) {
       setSubPos(null)
       return
     }
-    const anchor = rowRef.current.getBoundingClientRect()
-    const w = subRef.current?.offsetWidth ?? 200
-    const h = subRef.current?.offsetHeight ?? 0
+    const row = rowRefs.current[openIndex]
+    if (!row) return
+    const anchor = row.getBoundingClientRect()
+    const w = 200
     let left = anchor.right - 2
     if (left + w > window.innerWidth - 8) left = Math.max(8, anchor.left - w + 2)
-    let top = anchor.top - 5
-    if (h && top + h > window.innerHeight - 8) top = Math.max(8, window.innerHeight - h - 8)
+    const top = Math.max(8, anchor.top - 5)
     setSubPos({ left, top })
-  }, [open])
+  }, [openIndex])
 
-  if (item.separator) {
-    return <div className="my-1 h-px bg-stone-200 dark:bg-stone-700" />
-  }
-
-  return (
+  return createPortal(
     <div
-      ref={rowRef}
-      className="relative"
-      onMouseEnter={() => {
-        if (hasChildren) {
-          cancelClose()
-          setOpen(true)
-        }
-      }}
-      onMouseLeave={() => {
-        if (hasChildren) scheduleClose()
-      }}
+      ref={panelRef}
+      data-canvas-ctx-menu
+      role="menu"
+      tabIndex={-1}
+      className="fixed z-[260] bg-white dark:bg-stone-800 rounded-md shadow-2xl border border-stone-200 dark:border-stone-700 py-1 min-w-[210px] max-h-[85vh] overflow-y-auto text-sm outline-none"
+      style={{ left: pos.left, top: pos.top }}
+      onKeyDown={onKeyDown}
+      onContextMenu={(e) => e.preventDefault()}
+      onMouseEnter={onPointerEnter}
+      onMouseLeave={onPointerLeave}
     >
-      <button
-        onClick={
-          hasChildren
-            ? undefined
-            : () => {
-                item.onClick?.()
-                onSelect()
-              }
-        }
-        disabled={item.disabled}
-        className={`w-full text-left px-3 py-1.5 flex items-center gap-2 ${
-          item.disabled ? 'text-stone-400 dark:text-stone-600 cursor-not-allowed' : 'text-stone-800 dark:text-stone-200 hover:bg-stone-100 dark:hover:bg-stone-700'
-        }`}
-      >
-        {item.icon ? (
-          <Icon name={item.icon} size={14} className="text-stone-500 dark:text-stone-400" />
-        ) : (
-          <span className="w-3.5" />
-        )}
-        <span className="flex-1 truncate">{item.label}</span>
-        {item.shortcut && (
-          <span className="text-[11px] text-stone-500 dark:text-stone-400 font-mono">{item.shortcut}</span>
-        )}
-        {hasChildren && (
-          <Icon name="chevron_right" size={14} className="text-stone-500 dark:text-stone-400" />
-        )}
-      </button>
-      {hasChildren &&
-        open &&
-        createPortal(
+      {items.map((item, i) => {
+        if (item.separator) return <div key={i} role="separator" className="my-1 h-px bg-stone-200 dark:bg-stone-700" />
+        const hasChildren = !!item.children?.length
+        return (
           <div
-            ref={subRef}
-            data-canvas-ctx-menu
-            onMouseEnter={cancelClose}
-            onMouseLeave={scheduleClose}
-            onContextMenu={(e) => e.preventDefault()}
-            className="fixed z-[270] bg-white dark:bg-stone-800 rounded-md shadow-2xl border border-stone-200 dark:border-stone-700 py-1 min-w-[190px] max-h-[70vh] overflow-y-auto text-sm"
-            style={{
-              left: subPos?.left ?? -9999,
-              top: subPos?.top ?? -9999,
-              // Hidden for the first (unmeasured) frame; useLayoutEffect sets the
-              // real position before the browser paints, so there's no flash.
-              visibility: subPos ? 'visible' : 'hidden'
+            key={i}
+            ref={(el) => (rowRefs.current[i] = el)}
+            className="relative"
+            onMouseEnter={() => {
+              setActive(i)
+              if (hasChildren) openSub(i, false)
+            }}
+            onMouseLeave={() => {
+              if (hasChildren) scheduleClose()
             }}
           >
-            {item.children?.map((c, i) => (
-              <MenuItem key={i} item={c} onSelect={onSelect} />
-            ))}
-          </div>,
-          document.body
-        )}
-    </div>
+            <button
+              role="menuitem"
+              aria-haspopup={hasChildren || undefined}
+              aria-expanded={hasChildren ? openIndex === i : undefined}
+              aria-disabled={item.disabled || undefined}
+              onClick={
+                hasChildren
+                  ? () => openSub(i, false)
+                  : () => {
+                      if (item.disabled) return
+                      item.onClick?.()
+                      onClose()
+                    }
+              }
+              disabled={item.disabled && !hasChildren}
+              className={`w-full text-left px-3 py-1.5 flex items-center gap-2 ${
+                item.disabled
+                  ? 'text-stone-400 dark:text-stone-600 cursor-not-allowed'
+                  : `text-stone-800 dark:text-stone-200 ${active === i ? 'bg-stone-100 dark:bg-stone-700' : 'hover:bg-stone-100 dark:hover:bg-stone-700'}`
+              }`}
+            >
+              {item.icon ? (
+                <Icon name={item.icon} size={14} className="text-stone-500 dark:text-stone-400" />
+              ) : (
+                <span className="w-3.5" />
+              )}
+              <span className="flex-1 truncate">{item.label}</span>
+              {item.shortcut && (
+                <span className="text-[11px] text-stone-500 dark:text-stone-400 font-mono">{item.shortcut}</span>
+              )}
+              {hasChildren && <Icon name="chevron_right" size={14} className="text-stone-500 dark:text-stone-400" />}
+            </button>
+          </div>
+        )
+      })}
+      {openIndex != null && items[openIndex]?.children?.length && subPos && (
+        <MenuPanel
+          items={items[openIndex].children as CtxMenuItem[]}
+          x={subPos.left}
+          y={subPos.top}
+          onClose={onClose}
+          isRoot={false}
+          autoFocus={openByKeyboard}
+          onStepOut={() => closeSub(true)}
+          onPointerEnter={cancelClose}
+          onPointerLeave={scheduleClose}
+        />
+      )}
+    </div>,
+    document.body
   )
 }

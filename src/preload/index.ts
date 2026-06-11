@@ -293,7 +293,13 @@ const api = {
     }): Promise<{
       ok: boolean
       kind?: string
-      applyAs?: 'sticky-checklist' | 'note-lines' | 'markdown-bullets' | 'card-bullets' | 'mindmap-nodes'
+      applyAs?:
+        | 'sticky-checklist'
+        | 'note-lines'
+        | 'markdown-bullets'
+        | 'card-bullets'
+        | 'mindmap-nodes'
+        | 'diagram-nodes'
       noun?: string
       items?: Array<{ id: string; text: string }>
       error?: string
@@ -468,6 +474,23 @@ const api = {
       const handler = (_: unknown, payload: ContextMenuPayload): void => cb(payload)
       ipcRenderer.on('context-menu:action', handler)
       return () => ipcRenderer.removeListener('context-menu:action', handler)
+    },
+    // Fired when a NON-editable right-click happens inside a browser widget. The
+    // renderer opens the unified Haptyx menu for the classified target.
+    onWebviewContextMenu: (
+      cb: (payload: {
+        webContentsId: number
+        x: number
+        y: number
+        selectionText?: string
+        linkURL?: string
+        srcURL?: string
+        mediaType?: string
+      }) => void
+    ): (() => void) => {
+      const handler = (_: unknown, payload: Parameters<typeof cb>[0]): void => cb(payload)
+      ipcRenderer.on('webview:context-menu', handler)
+      return () => ipcRenderer.removeListener('webview:context-menu', handler)
     }
   },
   // Cross-window IPC bus used by the body-double BridgeMatcher. Two

@@ -12,7 +12,6 @@ import { installFocusTracker } from './streamdeckActions'
 import { installActivityTracker } from './activityTracker'
 import { registerHaptyxAuthProtocol } from './authProtocol'
 import { installAutoUpdater } from './autoUpdate'
-import type { ContextMenuAction } from '@shared/types'
 
 loadEnv({ path: join(app.getAppPath(), '.env') })
 loadEnv({ path: join(app.getAppPath(), '..', '.env') })
@@ -167,24 +166,6 @@ function createCommandCenter(): BrowserWindow {
   return win
 }
 
-function dispatchContextAction(
-  action: ContextMenuAction,
-  webContentsId: number,
-  params: Electron.ContextMenuParams
-): void {
-  const mainWin = BrowserWindow.getAllWindows()[0]
-  if (!mainWin) return
-  mainWin.webContents.send('context-menu:action', {
-    action,
-    webContentsId,
-    x: params.x,
-    y: params.y,
-    selectionText: params.selectionText || undefined,
-    linkURL: params.linkURL || undefined,
-    srcURL: params.srcURL || undefined
-  })
-}
-
 app.on('web-contents-created', (_, contents) => {
   // Only attach to <webview> tag contents — not the main window's React renderer
   if (contents.getType() !== 'webview') return
@@ -239,67 +220,49 @@ app.on('web-contents-created', (_, contents) => {
   })
 
   contents.on('context-menu', (_event, params) => {
-    const menu = new Menu()
-    const wcId = contents.id
-    let added = 0
-
-    if (params.selectionText && params.selectionText.trim().length > 0) {
-      menu.append(
-        new MenuItem({
-          label: 'Create sticky from selection',
-          click: () => dispatchContextAction('createStickyFromSelection', wcId, params)
-        })
-      )
-      menu.append(
-        new MenuItem({
-          label: 'Create note from selection',
-          click: () => dispatchContextAction('createNoteFromSelection', wcId, params)
-        })
-      )
+    // Editable fields keep a NATIVE menu so spellcheck suggestions, undo/redo,
+    // cut/copy/paste, select-all, and password-manager autofill all behave as
+    // the user expects inside the embedded browser. Replacing these with our own
+    // menu would silently break them, which the design forbids.
+    if (params.isEditable) {
+      const menu = new Menu()
+      for (const suggestion of params.dictionarySuggestions.slice(0, 5)) {
+        menu.append(new MenuItem({ label: suggestion, click: () => contents.replaceMisspelling(suggestion) }))
+      }
+      if (params.dictionarySuggestions.length > 0) menu.append(new MenuItem({ type: 'separator' }))
+      if (params.misspelledWord) {
+        menu.append(
+          new MenuItem({
+            label: 'Add to dictionary',
+            click: () => contents.session.addWordToSpellCheckerDictionary(params.misspelledWord)
+          })
+        )
+        menu.append(new MenuItem({ type: 'separator' }))
+      }
+      menu.append(new MenuItem({ role: 'undo' }))
+      menu.append(new MenuItem({ role: 'redo' }))
       menu.append(new MenuItem({ type: 'separator' }))
-      added += 2
-    }
-
-    if (params.linkURL) {
-      menu.append(
-        new MenuItem({
-          label: 'Open link in new Browser widget',
-          click: () => dispatchContextAction('openLinkInNewBrowser', wcId, params)
-        })
-      )
-      added += 1
-    }
-
-    if (params.mediaType === 'image' && params.srcURL) {
-      menu.append(
-        new MenuItem({
-          label: 'Save image to canvas',
-          click: () => dispatchContextAction('saveImageToCanvas', wcId, params)
-        })
-      )
-      added += 1
-    }
-
-    if (params.mediaType === 'video' && params.srcURL) {
-      menu.append(
-        new MenuItem({
-          label: 'Save video to canvas',
-          click: () => dispatchContextAction('saveVideoToCanvas', wcId, params)
-        })
-      )
-      added += 1
-    }
-
-    if (added === 0) return // nothing FocusBuddy-relevant; let default behaviour (none) occur
-
-    // System edit items below for usability when text is selected/editable
-    if (params.editFlags.canCopy) {
-      menu.append(new MenuItem({ type: 'separator' }))
+      menu.append(new MenuItem({ role: 'cut' }))
       menu.append(new MenuItem({ role: 'copy' }))
+      menu.append(new MenuItem({ role: 'paste' }))
+      menu.append(new MenuItem({ role: 'selectAll' }))
+      menu.popup()
+      return
     }
-    if (params.editFlags.canPaste) menu.append(new MenuItem({ role: 'paste' }))
 
-    menu.popup()
+    // Non-editable content: suppress the native menu and hand off to the
+    // renderer's unified Haptyx menu, which classifies the target (text / image
+    // / link / video / empty) and offers the same sections as everywhere else.
+    const mainWin = BrowserWindow.getAllWindows()[0]
+    mainWin?.webContents.send('webview:context-menu', {
+      webContentsId: contents.id,
+      x: params.x,
+      y: params.y,
+      selectionText: params.selectionText || undefined,
+      linkURL: params.linkURL || undefined,
+      srcURL: params.srcURL || undefined,
+      mediaType: params.mediaType
+    })
   })
 })
 
