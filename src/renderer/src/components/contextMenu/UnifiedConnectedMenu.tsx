@@ -7,6 +7,7 @@
 
 import { useWidgetStore } from '../../stores/widgets'
 import { buildContextForWidget } from '../../lib/contextMenu/buildContext'
+import { useFrameCallbacks } from '../../lib/contextMenu/frameContext'
 import UnifiedWidgetMenu from './UnifiedWidgetMenu'
 
 export interface UnifiedConnectedMenuProps {
@@ -22,11 +23,12 @@ export interface UnifiedConnectedMenuProps {
 
 export default function UnifiedConnectedMenu(props: UnifiedConnectedMenuProps): JSX.Element | null {
   const widget = useWidgetStore((s) => s.widgets.find((w) => w.id === props.sourceWidgetId))
+  const frame = useFrameCallbacks()
   if (!widget) return null
   const menuContext = buildContextForWidget(
     widget,
     { clientX: props.x, clientY: props.y },
-    { selectionText: props.selectionContext?.selectionText }
+    { selectionText: props.selectionContext?.selectionText, frame }
   )
   return <UnifiedWidgetMenu menuContext={menuContext} onClose={props.onClose} />
 }

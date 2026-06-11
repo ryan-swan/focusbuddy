@@ -127,7 +127,11 @@ export function resolveMenu(ctx: MenuContext): CtxMenuItem[] {
 
   const slots: CtxMenuItem[] = []
 
-  // 1. Context
+  // 1. Context — kind-specific header extras (a widget's own rows) first, then
+  // the registered context-band rows.
+  if (ctx.headerExtras && ctx.headerExtras.length) {
+    slots.push(...ctx.headerExtras)
+  }
   const ctxSlots = contextSlots(wc.context, ctx)
   slots.push(...ctxSlots)
 

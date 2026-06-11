@@ -40,6 +40,19 @@ export interface MenuSelection {
   sourceKind: WidgetKind
 }
 
+// Widget-frame management actions, supplied by WidgetFrame so the unified menu
+// can offer them without reimplementing (and risking) their logic. Each is
+// present only when it applies to the widget that was clicked.
+export interface FrameCallbacks {
+  onMakeTask: () => void
+  onShare: () => void
+  onDuplicateSynced: () => void
+  onDuplicateIndependent: () => void
+  onDuplicateToFolder?: () => void
+  onEjectFromSection?: () => void
+  onUnlinkSynced?: () => void
+}
+
 export interface MenuContext {
   object: ObjectKind
   // The granularity inside a widget, e.g. { granularity: 'cell', payload: {...} }.
@@ -49,6 +62,13 @@ export interface MenuContext {
   // Canvas-space and screen-space coordinates of the click.
   canvasPoint: { x: number; y: number }
   clientPoint: { x: number; y: number }
+  // Widget-frame management actions, when this menu is for a single widget that
+  // sits in a frame. Lets the unified menu carry make-task, share, duplicate,
+  // eject, and unlink without porting their logic out of WidgetFrame.
+  frame?: FrameCallbacks
+  // Raw kind-specific rows a widget passes through (the old headerMenuExtras),
+  // prepended to the Context band.
+  headerExtras?: import('../../components/CanvasContextMenu').CtxMenuItem[]
 }
 
 // The unit every provider emits. It mirrors the field vocabulary of

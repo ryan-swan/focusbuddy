@@ -162,6 +162,69 @@ describe('resolveMenu — AI Assist gating', () => {
   })
 })
 
+describe('resolveMenu — frame actions (unified header menu)', () => {
+  function allLabels(items: CtxMenuItem[]): string[] {
+    const out: string[] = []
+    for (const it of items) {
+      if (it.label) out.push(it.label)
+      if (it.children) out.push(...allLabels(it.children))
+    }
+    return out
+  }
+
+  function frameCtx(w: Widget, frame: Partial<MenuContext['frame']>): MenuContext {
+    return {
+      object: { type: 'widget', widget: w },
+      taskId: 't-1',
+      canvasPoint: { x: 0, y: 0 },
+      clientPoint: { x: 10, y: 10 },
+      frame: {
+        onMakeTask: () => {},
+        onShare: () => {},
+        onDuplicateSynced: () => {},
+        onDuplicateIndependent: () => {},
+        ...frame
+      } as MenuContext['frame']
+    }
+  }
+
+  it('surfaces make-task, share, and synced/independent duplicate when frame callbacks are present', () => {
+    const items = resolveMenu(frameCtx(widget('timer', ''), {}))
+    const labels = allLabels(items)
+    expect(labels).toContain('Make this a task...')
+    expect(labels).toContain('Share...')
+    expect(labels).toContain('Duplicate (keep synced)')
+    expect(labels).toContain('Duplicate (independent copy)')
+    // Destructive still last and present (Archive/Delete folded under Remove).
+    expect(['Archive', 'Delete', 'Remove']).toContain(topLevel(items).at(-1)?.label)
+    // Ceiling still holds with the frame actions.
+    expect(topLevel(items).length).toBeLessThanOrEqual(8)
+  })
+
+  it('only shows eject and unlink when the widget is in a section or synced', () => {
+    const plain = allLabels(resolveMenu(frameCtx(widget('note', 'x'), {})))
+    expect(plain).not.toContain('Move out of section')
+    expect(plain).not.toContain('Unlink from synced copies')
+
+    // In real usage WidgetFrame provides onEjectFromSection only when the widget
+    // is in a section (parentSectionId set), and onUnlinkSynced only when it has
+    // a syncGroupId, so the test mirrors that.
+    const sectioned: Widget = { ...widget('note', 'x'), parentSectionId: 'sec-1', syncGroupId: 'g-1' }
+    const rich = allLabels(
+      resolveMenu(frameCtx(sectioned, { onEjectFromSection: () => {}, onUnlinkSynced: () => {} }))
+    )
+    expect(rich).toContain('Move out of section')
+    expect(rich).toContain('Unlink from synced copies')
+  })
+
+  it('prepends header extras into the context band', () => {
+    const ctx = frameCtx(widget('webview', ''), {})
+    ctx.headerExtras = [{ label: 'Pin to Apps', icon: 'push_pin', onClick: () => {} }]
+    const items = resolveMenu(ctx)
+    expect(topLevel(items)[0]?.label).toBe('Pin to Apps')
+  })
+})
+
 describe('resolveMenu — multi-selection', () => {
   it('exposes bulk actions and no single-item-only sections', () => {
     const ctx: MenuContext = {
