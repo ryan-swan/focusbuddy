@@ -7,6 +7,7 @@ import { useVaultStore } from '../../stores/vault'
 import { catalogFor } from '../../lib/widgetCatalog'
 import { registerWebview, unregisterWebviewByWidgetId } from '../../lib/webviewRegistry'
 import { autofillWebview } from '../../lib/vaultAutofill'
+import { normalizeUrl } from '../../lib/browserUrl'
 import Icon from '../Icon'
 import ConnectedToolMenu from '../contextMenu/UnifiedConnectedMenu'
 
@@ -18,17 +19,6 @@ function hostnameOf(url: string): string {
   }
 }
 
-function normalizeUrl(input: string): string | null {
-  let url = input.trim()
-  if (!url) return null
-  if (!/^https?:\/\//i.test(url)) url = `https://${url}`
-  try {
-    new URL(url)
-    return url
-  } catch {
-    return null
-  }
-}
 
 // Stored viewport presets the user can snap a browser window to. Sizes are
 // the common device classes (CSS px) so a page renders the way it would on
