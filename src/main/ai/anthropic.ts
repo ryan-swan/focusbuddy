@@ -1469,6 +1469,147 @@ export interface TableRowsSuggestion {
   needsApiKey?: boolean
 }
 
+// ── Per-widget AI setup ──────────────────────────────────────────────────────
+//
+// Generalises the table's "suggest rows" into a single flow that drafts, for
+// any supported widget, a short list of items to add in that widget's own
+// format. The renderer previews the items, the user ticks the ones they want,
+// and they are applied natively (a sticky gets checklist lines, a note gets
+// note lines, markdown gets bullets, a card gets body points). Table and page
+// keep their own richer flows; this covers the text-family widgets and gives
+// every one of them the same "build with AI, approve the draft" experience.
+
+export interface WidgetSetupItem {
+  id: string
+  text: string
+}
+
+export type WidgetSetupApplyAs =
+  | 'sticky-checklist'
+  | 'note-lines'
+  | 'markdown-bullets'
+  | 'card-bullets'
+
+export interface WidgetSetupDraft {
+  ok: boolean
+  kind?: string
+  applyAs?: WidgetSetupApplyAs
+  // The plural noun shown in the preview header, e.g. "tasks" or "notes".
+  noun?: string
+  items?: WidgetSetupItem[]
+  needsApiKey?: boolean
+  error?: string
+}
+
+const WIDGET_SETUP_KINDS: Record<
+  string,
+  { applyAs: WidgetSetupApplyAs; noun: string; guidance: string }
+> = {
+  sticky: {
+    applyAs: 'sticky-checklist',
+    noun: 'tasks',
+    guidance: 'a short, actionable checklist task of a few words'
+  },
+  note: {
+    applyAs: 'note-lines',
+    noun: 'notes',
+    guidance: 'a concise note or idea, one thought per item'
+  },
+  markdown: {
+    applyAs: 'markdown-bullets',
+    noun: 'points',
+    guidance: 'a concise content point that fleshes out the document'
+  },
+  card: {
+    applyAs: 'card-bullets',
+    noun: 'points',
+    guidance: 'a single key point for the card body'
+  }
+}
+
+export function widgetSetupIsSupported(kind: string): boolean {
+  return kind in WIDGET_SETUP_KINDS
+}
+
+export async function suggestWidgetSetup(input: {
+  widgetId: string
+  prompt?: string
+}): Promise<WidgetSetupDraft> {
+  const c = getClient()
+  if (!c) {
+    return {
+      ok: false,
+      needsApiKey: true,
+      error: 'No Anthropic API key set. Open Settings, then AI and API keys, to paste one.'
+    }
+  }
+  const w = getWidget(input.widgetId)
+  if (!w) return { ok: false, error: 'Widget not found.' }
+  const cfg = WIDGET_SETUP_KINDS[w.kind]
+  if (!cfg) return { ok: false, error: `AI setup is not available for ${w.kind} widgets yet.` }
+
+  const task = getNode(w.taskId)
+  const siblings = listWidgetsByTask(w.taskId).filter((o) => o.id !== w.id)
+  const prompt = (input.prompt || '').trim()
+
+  const system =
+    `You are an in-widget AI assistant. You propose a short list of items to add to a ${w.kind} ` +
+    'widget, in the format that widget expects. Reply with a SINGLE JSON object of the exact shape ' +
+    '{ "items": ["...", "..."] } and nothing else. No prose, no code fences. Each item is ' +
+    `${cfg.guidance}. Propose between 3 and 8 items. Do not repeat anything already present.`
+
+  const ctxParts = [
+    task && task.kind === 'task'
+      ? `Task: ${task.title}${task.description ? `\nTask notes: ${task.description}` : ''}`
+      : '',
+    w.title ? `Widget title: ${w.title}` : '',
+    (w.content || '').trim()
+      ? `Current contents:\n"""\n${(w.content || '').slice(0, 1500)}\n"""`
+      : 'The widget is currently empty.',
+    siblings.length ? `Other widgets on the canvas:\n${summarizeWidgets(siblings)}` : '',
+    prompt
+      ? `The user asks: ${prompt}`
+      : 'No explicit instruction was given; infer what would be most useful to add.'
+  ].filter(Boolean)
+
+  const user = `${ctxParts.join('\n\n')}\n\nReturn the JSON list of ${cfg.noun} to add now.`
+
+  try {
+    const resp = await c.messages.create({
+      model: resolveModel('setup'),
+      max_tokens: 1500,
+      system,
+      messages: [{ role: 'user', content: user }]
+    })
+    if ((resp.stop_reason as string) === 'refusal') {
+      return { ok: false, error: 'Claude declined this request.' }
+    }
+    const text = resp.content
+      .filter((b) => b.type === 'text')
+      .map((b) => ('text' in b ? b.text : ''))
+      .join('')
+      .trim()
+    const json = extractJson(text)
+    if (!json) return { ok: false, error: 'Claude did not return a usable list.' }
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(json)
+    } catch {
+      return { ok: false, error: 'Claude returned malformed JSON.' }
+    }
+    const rawItems = (parsed as { items?: unknown })?.items
+    if (!Array.isArray(rawItems)) return { ok: false, error: 'Claude did not return an items list.' }
+    const items: WidgetSetupItem[] = rawItems
+      .filter((x): x is string => typeof x === 'string' && x.trim().length > 0)
+      .slice(0, 12)
+      .map((t, i) => ({ id: `s${i}`, text: t.trim() }))
+    if (items.length === 0) return { ok: false, error: 'Claude returned no items.' }
+    return { ok: true, kind: w.kind, applyAs: cfg.applyAs, noun: cfg.noun, items }
+  } catch (e) {
+    return { ok: false, error: (e as Error).message }
+  }
+}
+
 export async function suggestTableRows(
   tableId: string,
   prompt: string,

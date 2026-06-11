@@ -1,0 +1,186 @@
+// The per-widget AI setup preview. Mounted once at the app root, it listens to
+// the widgetSetup store, runs ai:suggestWidgetSetup, and shows the drafted
+// items with a tick box each. The user approves the ones they want and applies
+// them in the widget's native format. An optional instruction box refines the
+// draft. Nothing is written until the user clicks Add.
+
+import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
+import Icon from '../Icon'
+import { useWidgetSetup } from '../../stores/widgetSetup'
+import { applyWidgetSetup, type WidgetSetupApplyAs } from '../../lib/widgetSetup'
+
+interface DraftItem {
+  id: string
+  text: string
+}
+
+type Status = 'loading' | 'ready' | 'error'
+
+export default function WidgetSetupPreview(): JSX.Element | null {
+  const { open, widgetId, close } = useWidgetSetup()
+  const [status, setStatus] = useState<Status>('loading')
+  const [items, setItems] = useState<DraftItem[]>([])
+  const [approved, setApproved] = useState<Set<string>>(new Set())
+  const [applyAs, setApplyAs] = useState<WidgetSetupApplyAs | null>(null)
+  const [noun, setNoun] = useState('items')
+  const [error, setError] = useState<string | null>(null)
+  const [prompt, setPrompt] = useState('')
+  const ranFor = useRef<string | null>(null)
+
+  async function run(refinePrompt: string): Promise<void> {
+    if (!widgetId) return
+    setStatus('loading')
+    setError(null)
+    const r = await window.api.ai.suggestWidgetSetup({ widgetId, prompt: refinePrompt || undefined })
+    if (r.ok && r.items && r.items.length) {
+      setItems(r.items)
+      setApproved(new Set(r.items.map((i) => i.id))) // default: everything ticked
+      setApplyAs(r.applyAs ?? null)
+      setNoun(r.noun ?? 'items')
+      setStatus('ready')
+    } else {
+      setError(
+        r.needsApiKey
+          ? 'No Anthropic API key is set. Add one in Settings, AI, API keys.'
+          : r.error || 'AI setup could not draft anything.'
+      )
+      setStatus('error')
+    }
+  }
+
+  // Auto-run once per opened widget.
+  useEffect(() => {
+    if (open && widgetId && ranFor.current !== widgetId) {
+      ranFor.current = widgetId
+      setPrompt('')
+      void run('')
+    }
+    if (!open) ranFor.current = null
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, widgetId])
+
+  if (!open || !widgetId) return null
+
+  function toggle(id: string): void {
+    setApproved((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  async function add(): Promise<void> {
+    if (!applyAs) return
+    const chosen = items.filter((i) => approved.has(i.id)).map((i) => i.text)
+    if (chosen.length) await applyWidgetSetup(widgetId as string, applyAs, chosen)
+    close()
+  }
+
+  const approvedCount = items.filter((i) => approved.has(i.id)).length
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[300] flex items-center justify-center bg-black/40 p-4"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) close()
+      }}
+    >
+      <div
+        data-testid="widget-setup-preview"
+        className="w-full max-w-lg max-h-[85vh] overflow-hidden flex flex-col rounded-lg bg-white dark:bg-stone-900 shadow-2xl border border-stone-200 dark:border-stone-700"
+      >
+        <div className="flex items-center gap-2 px-4 py-3 border-b border-stone-200 dark:border-stone-700">
+          <Icon name="auto_awesome" size={18} className="text-accent" />
+          <span className="font-medium text-stone-900 dark:text-stone-100">Build with AI</span>
+          <button
+            onClick={close}
+            className="ml-auto h-7 w-7 inline-flex items-center justify-center rounded hover:bg-stone-100 dark:hover:bg-stone-800 text-stone-500"
+            aria-label="Close"
+          >
+            <Icon name="close" size={16} />
+          </button>
+        </div>
+
+        <div className="px-4 py-3 overflow-y-auto flex-1 flex flex-col gap-3">
+          <div className="flex gap-2">
+            <input
+              data-testid="widget-setup-prompt"
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') void run(prompt)
+              }}
+              placeholder="Optional: tell the AI what to focus on, then press Enter"
+              className="flex-1 rounded border border-stone-300 dark:border-stone-700 bg-transparent px-2 py-1.5 text-sm text-stone-900 dark:text-stone-100 focus:outline-none focus:border-accent"
+            />
+            <button
+              onClick={() => void run(prompt)}
+              disabled={status === 'loading'}
+              className="px-3 py-1.5 rounded border border-stone-300 dark:border-stone-700 text-sm text-stone-800 dark:text-stone-200 disabled:opacity-50"
+            >
+              Redraft
+            </button>
+          </div>
+
+          {status === 'loading' && (
+            <div className="flex items-center gap-2 text-sm text-stone-500 py-6 justify-center">
+              <Icon name="autorenew" size={16} className="animate-spin" />
+              Drafting suggestions
+            </div>
+          )}
+
+          {status === 'error' && (
+            <div data-testid="widget-setup-error" className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/40 rounded px-3 py-2">
+              {error}
+            </div>
+          )}
+
+          {status === 'ready' && (
+            <div className="flex flex-col gap-1">
+              <span className="text-xs uppercase tracking-wide text-stone-500">
+                Proposed {noun}, tick the ones to add
+              </span>
+              <div data-testid="widget-setup-items" className="flex flex-col">
+                {items.map((it) => (
+                  <label
+                    key={it.id}
+                    className="flex items-start gap-2 py-1.5 px-1 rounded hover:bg-stone-50 dark:hover:bg-stone-800 cursor-pointer"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={approved.has(it.id)}
+                      onChange={() => toggle(it.id)}
+                      className="mt-1"
+                      data-testid={`widget-setup-item-${it.id}`}
+                    />
+                    <span className="text-sm text-stone-900 dark:text-stone-100">{it.text}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="flex items-center gap-2 px-4 py-3 border-t border-stone-200 dark:border-stone-700">
+          <button
+            data-testid="widget-setup-add"
+            onClick={() => void add()}
+            disabled={status !== 'ready' || approvedCount === 0}
+            className="px-3 py-1.5 rounded bg-accent text-white text-sm font-medium disabled:opacity-50"
+          >
+            {approvedCount > 0 ? `Add ${approvedCount}` : 'Add'}
+          </button>
+          <button
+            onClick={close}
+            className="ml-auto px-3 py-1.5 rounded text-sm text-stone-500 hover:text-stone-800 dark:hover:text-stone-200"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body
+  )
+}
