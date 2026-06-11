@@ -1,8 +1,8 @@
 import { test, expect } from '@playwright/test'
 import { launchApp, type LaunchedApp, waitForReady } from './_helpers'
 
-// Markdown-table support across MarkdownWidget, PageWidget, and StickyWidget.
-// Each test boots with an isolated hermetic userData directory.
+// Markdown-table support across MarkdownWidget, PageWidget, StickyWidget, and
+// NoteWidget. Each test boots with an isolated hermetic userData directory.
 
 let launched: LaunchedApp | null = null
 
@@ -391,6 +391,63 @@ test('ST-4 — sticky widget renders a markdown table as [data-testid="sticky-ta
   // mode shows the original |---| markup.
   expect(textareaContent, 'textarea contains raw markdown table pipes').toContain('| H1 | H2 |')
   expect(textareaContent, 'textarea contains separator row').toContain('|---|')
+})
+
+// ─── Step 4b — NoteWidget: render a pasted markdown table as a real table ─────
+
+test('NT-4b — note widget renders a markdown table and edit mode shows the raw markdown', async () => {
+  const NOTE_TABLE =
+    '| Competitor | Price |\n|---|---|\n| Sunsama | $20/mo ($16 annual) |\n| Akiflow | $19–34/mo |'
+  launched = await launchApp()
+  const { window } = launched
+  const { widgetId } = await seedWidget(launched, 'note', NOTE_TABLE, 'NoteTableTest')
+  await openTask(launched, 'NoteTableTest')
+
+  // Wait for the note's rendered view to mount (non-empty content => not editing).
+  await window.waitForFunction(
+    (wid: string) =>
+      !!document.querySelector(`[data-widget-id="${wid}"] .fb-note-rendered`),
+    widgetId,
+    { timeout: 8_000 }
+  )
+
+  const tableTestId = await window.evaluate(
+    (wid: string) =>
+      !!document.querySelector(`[data-widget-id="${wid}"] [data-testid="note-table-0"]`),
+    widgetId
+  )
+  expect(tableTestId, '[data-testid="note-table-0"] is present in the note rendered view').toBe(true)
+
+  const cells = await tableCellTexts(launched, widgetId, '[data-testid="note-table-0"] table')
+  console.log('[NT-4b] note table cell texts observed:', cells)
+
+  expect(cells, 'header Competitor present').toContain('Competitor')
+  expect(cells, 'header Price present').toContain('Price')
+  expect(cells, 'data Sunsama present').toContain('Sunsama')
+  // The price cell with its own parentheses must survive intact.
+  expect(cells, 'price-with-parens cell intact').toContain('$20/mo ($16 annual)')
+  expect(cells, 'data Akiflow present').toContain('Akiflow')
+
+  // Clicking the rendered view flips into the textarea, which shows the raw
+  // markdown — the note is still editable, the table is just a display layer.
+  await window.evaluate((wid: string) => {
+    const rendered = document.querySelector(
+      `[data-widget-id="${wid}"] .fb-note-rendered`
+    ) as HTMLElement | null
+    if (!rendered) throw new Error('fb-note-rendered not found')
+    rendered.click()
+  }, widgetId)
+  await window.waitForTimeout(300)
+
+  const textareaContent = await window.evaluate((wid: string) => {
+    const ta = document.querySelector(
+      `[data-widget-id="${wid}"] textarea`
+    ) as HTMLTextAreaElement | null
+    return ta?.value ?? null
+  }, widgetId)
+  console.log('[NT-4b] note textarea value in edit mode:', textareaContent)
+  expect(textareaContent, 'textarea contains the raw pipe table').toContain('| Competitor | Price |')
+  expect(textareaContent, 'textarea contains the separator row').toContain('|---|')
 })
 
 // ─── Step 5 — StickyWidget: no regression for normal content ─────────────────

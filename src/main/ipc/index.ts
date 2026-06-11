@@ -212,6 +212,7 @@ import {
   runDeskAgent,
   runTransformWire,
   sendChat,
+  transformText,
   suggestPageContent,
   suggestSetupWidgets,
   suggestTableRows,
@@ -593,6 +594,11 @@ export function registerIpcHandlers(): void {
   )
   ipcMain.handle('ai:suggestPageContent', (_e, prompt: string) =>
     suggestPageContent(prompt)
+  )
+  ipcMain.handle(
+    'ai:transformText',
+    (_e, input: { text: string; instruction: string; kind?: string }) =>
+      transformText(input)
   )
   ipcMain.handle(
     'ai:suggestTableRows',

@@ -1,0 +1,94 @@
+// Unified context-menu type model.
+//
+// One vocabulary for every right-click in Haptyx. A surface computes a
+// MenuContext describing what was clicked, providers emit MenuContribution
+// rows against the eight canonical sections, and resolveMenu folds those into
+// the CtxMenuItem[] that the existing CanvasContextMenu renderer draws. The
+// renderer is never rewritten; this is purely the resolution layer that sits
+// in front of it (see docs/context-menu-system-spec.md sections 1 and 2).
+
+import type { Widget, WidgetKind } from '@shared/types'
+
+// The eight canonical sections, in fixed order. The numeric value doubles as
+// the sort key so identical ordering is a property of the data, not something
+// each surface has to reproduce. Destructive is always last.
+export enum MenuSection {
+  Context = 0, // 1. Context-specific actions for the exact object clicked
+  AiAssist = 1, // 2. AI Assist
+  Create = 2, // 3. Create + connect a new widget
+  Convert = 3, // 4. Convert / reinterpret as another kind
+  Organise = 4, // 5. Section membership, layering, grouping
+  Share = 5, // 6. Share, copy out, export
+  Advanced = 6, // 7. Power-user / rarely needed
+  Destructive = 7 // 8. Archive, delete, remove, unlink (ALWAYS LAST)
+}
+
+// What the user right-clicked. The object identifies the target; the optional
+// sub narrows it to a granularity inside a widget (a table cell, a mind-map
+// node); selection carries any highlighted text or media so AI Assist and
+// Create can both inherit it.
+export type ObjectKind =
+  | { type: 'empty-canvas' }
+  | { type: 'widget'; widget: Widget }
+  | { type: 'multi'; widgets: Widget[] }
+
+export interface MenuSelection {
+  text?: string
+  imageUrl?: string
+  linkUrl?: string
+  sourceWidgetId: string
+  sourceKind: WidgetKind
+}
+
+export interface MenuContext {
+  object: ObjectKind
+  // The granularity inside a widget, e.g. { granularity: 'cell', payload: {...} }.
+  sub?: { granularity: string; payload: Record<string, unknown> }
+  selection?: MenuSelection
+  taskId: string
+  // Canvas-space and screen-space coordinates of the click.
+  canvasPoint: { x: number; y: number }
+  clientPoint: { x: number; y: number }
+}
+
+// The unit every provider emits. It mirrors the field vocabulary of
+// CtxMenuItem so the final mapping is near-identity, and adds the routing
+// metadata the resolver needs: which section it joins, its group and priority
+// within that section, a predicate that hides it when false, and an enabled
+// gate that shows it disabled-with-reason when the predicate passes but enabled
+// is false.
+export interface MenuContribution {
+  id: string // stable, namespaced: "core/duplicate", "<pluginId>/<action>"
+  section: MenuSection
+  group?: string
+  priority: number // lower sorts first; most-common = lowest number
+  label: string
+  icon?: string
+  shortcut?: string
+  danger?: boolean // forces the Destructive band; cannot live elsewhere
+  predicate?: (ctx: MenuContext) => boolean // false HIDES the row
+  enabled?: (ctx: MenuContext) => boolean // passes predicate + false => shown disabled
+  disabledReason?: (ctx: MenuContext) => string | undefined
+  onSelect?: (ctx: MenuContext) => void | Promise<void>
+  children?: MenuContribution[]
+}
+
+// A widget provider contributes Context-band rows for a (kind, granularity)
+// pair, and may suppress universal sections it does not want for that object.
+export type UniversalKey =
+  | 'ai-assist'
+  | 'create'
+  | 'convert'
+  | 'organise'
+  | 'share'
+  | 'advanced'
+  | 'destructive'
+
+export interface WidgetContribution {
+  // Context-band rows. These are the only rows allowed into section 1.
+  context: MenuContribution[]
+  // Set a key to false to omit that universal section for this object.
+  suppress?: Partial<Record<UniversalKey, boolean>>
+}
+
+export type WidgetContextProvider = (ctx: MenuContext) => WidgetContribution

@@ -1604,6 +1604,73 @@ export interface WireTransformResult {
   error?: string
 }
 
+// AI Assist transform. The universal AI Assist submenu (Expand, Simplify,
+// Summarise, Rewrite, Fix Grammar, Improve Clarity, Continue Writing, Change
+// Tone, Translate, Custom Prompt) routes every action through this one bounded
+// call. It returns plain transformed text the renderer previews before applying
+// in place; it never returns a proposal envelope. Modeled on runTransformWire.
+export interface AiAssistResult {
+  ok: boolean
+  result?: string
+  needsApiKey?: boolean
+  error?: string
+}
+
+export async function transformText(input: {
+  text: string
+  instruction: string
+  // The widget kind is passed so the model can respect the surface, e.g. keep
+  // markdown in a markdown widget. Advisory only.
+  kind?: string
+}): Promise<AiAssistResult> {
+  const c = getClient()
+  if (!c) {
+    return {
+      ok: false,
+      needsApiKey: true,
+      error: 'No Anthropic API key set. Open Settings, then AI and API keys, to paste one.'
+    }
+  }
+  const instruction = (input.instruction || '').trim()
+  if (!instruction) return { ok: false, error: 'No AI Assist instruction was given.' }
+  const text = (input.text || '').slice(0, 12000)
+  if (!text.trim()) return { ok: false, error: 'There is no text to work on.' }
+
+  const surface = input.kind ? ` The text comes from a ${input.kind} widget; preserve its formatting conventions.` : ''
+  const system =
+    'You are an inline writing assistant inside a visual workspace. You receive a block of text and an instruction, ' +
+    'and you return the rewritten text that will be applied in place.' +
+    surface +
+    ' Return ONLY the resulting text. No preamble, no labels, no quotes, no explanation, no markdown code fences. ' +
+    'The first character of your reply is the first character of the result. Preserve the original language unless the instruction is to translate.'
+
+  const user = `Instruction: ${instruction}\n\nText:\n"""\n${text}\n"""\n\nReturn the resulting text now.`
+
+  try {
+    const resp = await c.messages.create({
+      model: resolveModel('wire_transform'),
+      max_tokens: 4096,
+      system,
+      messages: [{ role: 'user', content: user }]
+    })
+    if ((resp.stop_reason as string) === 'refusal') {
+      return { ok: false, error: 'Claude declined this request.' }
+    }
+    if ((resp.stop_reason as string) === 'model_context_window_exceeded') {
+      return { ok: false, error: 'The selected text is too large for this action.' }
+    }
+    const out = resp.content
+      .filter((b) => b.type === 'text')
+      .map((b) => ('text' in b ? b.text : ''))
+      .join('')
+      .trim()
+    if (!out) return { ok: false, error: 'Claude returned an empty result.' }
+    return { ok: true, result: out }
+  } catch (e) {
+    return { ok: false, error: (e as Error).message }
+  }
+}
+
 export async function runTransformWire(input: {
   sourceContent: string
   verb: string

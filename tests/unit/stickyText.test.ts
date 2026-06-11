@@ -91,4 +91,33 @@ describe('splitStickyBlocks (markdown tables in stickies)', () => {
     const blocks = splitStickyBlocks(text)
     expect(blocks[0].type).toBe('table')
   })
+
+  it('parses the real 5-column competitor table (the exact pasted case)', () => {
+    const text = [
+      '| Competitor | Category | Price | What they own | What they lack vs Haptyx |',
+      '|---|---|---|---|---|',
+      '| Sunsama | Daily planner ritual | $20/mo ($16 annual) | Calm guided planning | No canvas, no macros, no spatial context, work happens elsewhere |',
+      '| Akiflow | Task consolidation + calendar | $19–34/mo | Universal task inbox | Same — it schedules work, doesn’t host it |',
+      '| Notion | Docs/database everything | $0–15/seat | Ubiquity, templates | Pages not space; notorious ADHD trap (organising > doing) |'
+    ].join('\n')
+    const blocks = splitStickyBlocks(text)
+    expect(blocks).toHaveLength(1)
+    const t = blocks[0]
+    expect(t.type).toBe('table')
+    if (t.type !== 'table') return
+    expect(t.headers).toEqual([
+      'Competitor',
+      'Category',
+      'Price',
+      'What they own',
+      'What they lack vs Haptyx'
+    ])
+    expect(t.rows).toHaveLength(3)
+    // Every body row keeps all five columns — the prices with their own
+    // parentheses and the comma-heavy "what they lack" cell stay intact.
+    expect(t.rows.every((r) => r.length === 5)).toBe(true)
+    expect(t.rows[0][2]).toBe('$20/mo ($16 annual)')
+    expect(t.rows[0][4]).toBe('No canvas, no macros, no spatial context, work happens elsewhere')
+    expect(t.rows[1][0]).toBe('Akiflow')
+  })
 })

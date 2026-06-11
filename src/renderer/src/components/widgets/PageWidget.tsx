@@ -12,7 +12,7 @@ import type { Widget } from '@shared/types'
 import WidgetFrame from './WidgetFrame'
 import { useWidgetStore } from '../../stores/widgets'
 import Icon from '../Icon'
-import ConnectedToolMenu from '../ConnectedToolMenu'
+import ConnectedToolMenu from '../contextMenu/UnifiedConnectedMenu'
 
 function formatAge(ts: number | null): string {
   if (!ts) return 'never'
