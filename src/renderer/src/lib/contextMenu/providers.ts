@@ -47,8 +47,9 @@ registerWidgetContextActions('sticky', (ctx) => {
   }
 })
 
-// The remaining text-family widgets get Build with AI as their context action.
-for (const kind of ['note', 'markdown', 'card'] as const) {
+// The remaining widgets the generator supports get Build with AI as their
+// context action. Mindmap drafts branch labels and appends them as nodes.
+for (const kind of ['note', 'markdown', 'card', 'mindmap'] as const) {
   registerWidgetContextActions(kind, (ctx) => {
     if (ctx.object.type !== 'widget') return { context: [] }
     return { context: [buildWithAiRow(ctx.object.widget.id)] }

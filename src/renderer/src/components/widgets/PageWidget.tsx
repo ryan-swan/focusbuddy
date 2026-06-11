@@ -200,13 +200,13 @@ export default function PageWidget({ widget, inline = false }: Props): JSX.Eleme
   }
 
   async function enableLivingMode(): Promise<void> {
-    const q = prompt(
-      'What should this living page summarize?',
-      'A running summary of everything on this task.'
-    )
-    if (!q || !q.trim()) return
-    await update(widget.id, { livingQuery: q.trim(), livingPaused: false })
-    setQueryDraft(q.trim())
+    // Electron has no window.prompt (it returns null), so asking for the query
+    // up front silently did nothing and Make living appeared broken. Instead we
+    // enter living mode with a sensible default query and generate immediately;
+    // the inline query bar above the page lets the user refine it and regenerate.
+    const defaultQuery = 'A running summary of everything on this task.'
+    await update(widget.id, { livingQuery: defaultQuery, livingPaused: false })
+    setQueryDraft(defaultQuery)
     // Kick an immediate first generation so the page isn't empty.
     setTimeout(() => void regenerateLiving(), 50)
   }
