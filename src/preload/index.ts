@@ -287,6 +287,19 @@ const api = {
       error?: string
       needsApiKey?: boolean
     }> => ipcRenderer.invoke('ai:transformText', input),
+    // Local usage snapshot (aggregate counts only) the renderer reports to the
+    // signal server for the admin Analytics tab.
+    collectTelemetry: (): Promise<{
+      appVersion: string
+      platform: string
+      widgetTotal: number
+      widgetsByKind: Record<string, number>
+      taskCount: number
+      folderCount: number
+      focusSessions: number
+      focusMinutes: number
+      aiCalls: number
+    }> => ipcRenderer.invoke('telemetry:collect'),
     suggestWidgetSetup: (input: {
       widgetId: string
       prompt?: string

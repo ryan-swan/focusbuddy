@@ -368,6 +368,13 @@ export function getDb(): Database.Database {
       ON agent_outcomes (action);
     CREATE INDEX IF NOT EXISTS idx_agent_outcomes_at
       ON agent_outcomes (at DESC);
+
+    -- Small key/value counters for local usage telemetry (e.g. cumulative AI
+    -- call count). Aggregate numbers only, never content.
+    CREATE TABLE IF NOT EXISTS usage_counters (
+      key TEXT PRIMARY KEY,
+      value INTEGER NOT NULL DEFAULT 0
+    );
   `)
   return db
 }
