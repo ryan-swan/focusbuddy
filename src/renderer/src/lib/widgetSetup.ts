@@ -12,9 +12,11 @@ export type WidgetSetupApplyAs =
   | 'markdown-bullets'
   | 'card-bullets'
   | 'mindmap-nodes'
+  | 'diagram-nodes'
 
 // Text-format kinds whose items are appended to the widget's text content.
-type TextApplyAs = Exclude<WidgetSetupApplyAs, 'mindmap-nodes'>
+// Structured kinds (mindmap, diagram) are handled by their own JSON appliers.
+type TextApplyAs = Exclude<WidgetSetupApplyAs, 'mindmap-nodes' | 'diagram-nodes'>
 
 // Turn the approved item texts into a block of content in a text widget's
 // format. Mindmap is handled separately because its content is JSON.
@@ -92,6 +94,39 @@ function makeNodeId(): string {
   return `n-${Math.random().toString(36).slice(2)}`
 }
 
+// Append the approved labels to a diagram's JSON as new React-Flow shape nodes,
+// laid out in a staggered grid so they do not stack. Preserves existing nodes
+// and edges. Defends against empty/malformed content.
+export function applyDiagramNodes(content: string, labels: string[]): string {
+  interface RFNode {
+    id: string
+    type: string
+    position: { x: number; y: number }
+    data: { label: string; shape: string; color: string }
+  }
+  let state: { nodes?: RFNode[]; edges?: unknown[] } | null = null
+  try {
+    state = JSON.parse(content)
+  } catch {
+    state = null
+  }
+  if (!state || typeof state !== 'object') state = { nodes: [], edges: [] }
+  const nodes = Array.isArray(state.nodes) ? (state.nodes as RFNode[]) : []
+  const edges = Array.isArray(state.edges) ? state.edges : []
+  const base = nodes.length
+  const clean = labels.map((l) => l.trim()).filter(Boolean)
+  const added: RFNode[] = clean.map((label, k) => {
+    const seq = base + k
+    return {
+      id: makeNodeId(),
+      type: 'shape',
+      position: { x: 60 + (seq % 5) * 170, y: 60 + (seq % 6) * 110 },
+      data: { label, shape: 'rounded', color: '#dbeafe' }
+    }
+  })
+  return JSON.stringify({ nodes: [...nodes, ...added], edges })
+}
+
 // Append the approved items to the widget, preserving whatever is already there.
 export async function applyWidgetSetup(
   widgetId: string,
@@ -103,6 +138,11 @@ export async function applyWidgetSetup(
   if (!w) return
   if (applyAs === 'mindmap-nodes') {
     const nextJson = applyMindmapNodes(w.content || '', items)
+    await store.update(widgetId, { content: nextJson })
+    return
+  }
+  if (applyAs === 'diagram-nodes') {
+    const nextJson = applyDiagramNodes(w.content || '', items)
     await store.update(widgetId, { content: nextJson })
     return
   }

@@ -83,13 +83,19 @@ test('right-click a table cell → Create + connect menu seeded with the cell te
   const cell = cellInput.locator('xpath=ancestor::td[1]')
   await cell.click({ button: 'right' })
 
-  // Menu must show the column label and a sticky-from-this-cell option.
+  // The cell now opens the unified menu: real row actions (Add row inlined, the
+  // rest under More actions) plus Create seeded from the cell text.
   const menu = window.locator('[data-canvas-ctx-menu]').first()
-  await expect(menu).toContainText('Topic', { timeout: 4_000 })
-  await expect(menu).toContainText('Sticky from this cell')
+  await expect(menu).toContainText('Add row', { timeout: 4_000 })
+  await expect(menu).toContainText('More actions')
+  await expect(menu).toContainText('Create')
+  // Delete row is a real action, folded under More actions.
+  await menu.getByText('More actions', { exact: true }).hover()
+  await expect(window.locator('[data-canvas-ctx-menu]').getByText('Delete row', { exact: true })).toBeVisible({ timeout: 3_000 })
 
-  // Click "Sticky from this cell"
-  await menu.getByText('Sticky from this cell').click()
+  // Create a sticky from the cell via Create > Sticky (seeds the cell text).
+  await menu.getByText('Create', { exact: true }).hover()
+  await window.locator('[data-canvas-ctx-menu]').getByText('Sticky', { exact: true }).first().click()
   await window.waitForTimeout(700)
 
   // Verify: a new sticky widget exists on the task, its content is

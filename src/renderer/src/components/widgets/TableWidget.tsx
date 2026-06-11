@@ -23,11 +23,7 @@ import RelationConfigEditor from '../fields/RelationConfigEditor'
 import { coerceCellValue } from '../../lib/actionExecutor'
 import Icon from '../Icon'
 import { ListView, CardsView, KanbanView, CalendarView, GanttView } from './TableViews'
-import CanvasContextMenu, { type CtxMenuItem } from '../CanvasContextMenu'
-import {
-  CREATE_AND_CONNECT_MENU,
-  createConnectedTool
-} from '../../lib/createConnectedTool'
+import UnifiedConnectedMenu from '../contextMenu/UnifiedConnectedMenu'
 
 // All available views with the icon + label that drive the switcher pill.
 const VIEW_OPTIONS: Array<{ id: TableViewMode; label: string; icon: string }> = [
@@ -135,6 +131,7 @@ export default function TableWidget({ widget, inline = false }: Props): JSX.Elem
     y: number
     columnLabel: string
     cellText: string
+    rowId: string
   } | null>(null)
   const [aiCount, setAiCount] = useState(5)
   // When true, the AI is asked to generate as many rows as the prompt
@@ -589,7 +586,8 @@ export default function TableWidget({ widget, inline = false }: Props): JSX.Elem
                         x: e.clientX,
                         y: e.clientY,
                         columnLabel: col.label,
-                        cellText: cellStr
+                        cellText: cellStr,
+                        rowId: row.id
                       })
                     }}
                   >
@@ -851,50 +849,25 @@ export default function TableWidget({ widget, inline = false }: Props): JSX.Elem
           </div>
         </div>
       )}
-      {cellCtxMenu && (() => {
-        const baseItems: CtxMenuItem[] = [
-          {
-            label: `Cell · ${cellCtxMenu.columnLabel}`,
-            icon: 'view_column',
-            disabled: true
-          },
-          { separator: true }
-        ]
-        const spawnItems: CtxMenuItem[] = CREATE_AND_CONNECT_MENU.map((entry) => {
-          // For text-receiving kinds, prefix the menu item so the
-          // user-facing copy reflects what will be seeded.
-          const isTextKind = ['sticky', 'note', 'markdown', 'page'].includes(entry.kind)
-          const label =
-            isTextKind && cellCtxMenu.cellText
-              ? `${entry.label} from this cell`
-              : entry.label
-          return {
-            label,
-            icon: entry.icon,
-            onClick: () => {
-              const content =
-                entry.seedContent ??
-                (isTextKind && cellCtxMenu.cellText
-                  ? cellCtxMenu.cellText.slice(0, 1000)
-                  : undefined)
-              void createConnectedTool({
-                sourceWidgetId: widget.id,
-                kind: entry.kind,
-                content
-              })
-              setCellCtxMenu(null)
-            }
-          }
-        })
-        return (
-          <CanvasContextMenu
-            x={cellCtxMenu.x}
-            y={cellCtxMenu.y}
-            items={[...baseItems, ...spawnItems]}
-            onClose={() => setCellCtxMenu(null)}
-          />
-        )
-      })()}
+      {cellCtxMenu && (
+        // The cell right-click now resolves through the unified menu. The cell
+        // text becomes the selection (so AI Assist and Create both work on it),
+        // and the cell/row granularity lets the table provider offer row
+        // actions. This retires the bespoke per-cell create list.
+        <UnifiedConnectedMenu
+          sourceWidgetId={widget.id}
+          x={cellCtxMenu.x}
+          y={cellCtxMenu.y}
+          selectionContext={{ selectionText: cellCtxMenu.cellText }}
+          granularity="cell"
+          payload={{
+            rowId: cellCtxMenu.rowId,
+            columnLabel: cellCtxMenu.columnLabel,
+            tableId: tableId ?? ''
+          }}
+          onClose={() => setCellCtxMenu(null)}
+        />
+      )}
     </div>
   )
 

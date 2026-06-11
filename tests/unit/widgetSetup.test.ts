@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { formatSetupItems, applyMindmapNodes } from '../../src/renderer/src/lib/widgetSetup'
+import { formatSetupItems, applyMindmapNodes, applyDiagramNodes } from '../../src/renderer/src/lib/widgetSetup'
 
 describe('formatSetupItems — applies AI setup items in each widget format', () => {
   it('formats a sticky as tickable checklist lines', () => {
@@ -69,5 +69,30 @@ describe('applyMindmapNodes — appends AI branches as root children in native J
     const next = applyMindmapNodes('{}', ['a', 'b', 'c'])
     const ids = JSON.parse(next).root.children.map((k: { id: string }) => k.id)
     expect(new Set(ids).size).toBe(3)
+  })
+})
+
+describe('applyDiagramNodes — appends AI nodes as native React-Flow shape nodes', () => {
+  it('appends shape nodes with labels, preserving existing nodes and edges', () => {
+    const existing = JSON.stringify({
+      nodes: [{ id: 'a', type: 'shape', position: { x: 0, y: 0 }, data: { label: 'Start', shape: 'rounded', color: '#fff' } }],
+      edges: [{ id: 'e1', source: 'a', target: 'a' }]
+    })
+    const next = JSON.parse(applyDiagramNodes(existing, ['Plan', 'Build', 'Ship']))
+    expect(next.nodes.map((n: { data: { label: string } }) => n.data.label)).toEqual(['Start', 'Plan', 'Build', 'Ship'])
+    expect(next.edges).toHaveLength(1) // edges preserved
+    // Appended nodes are well-formed shape nodes with a position and unique ids.
+    const appended = next.nodes.slice(1)
+    expect(appended.every((n: { type: string; position: { x: number } }) => n.type === 'shape' && typeof n.position.x === 'number')).toBe(true)
+    const ids = next.nodes.map((n: { id: string }) => n.id)
+    expect(new Set(ids).size).toBe(ids.length)
+  })
+
+  it('builds a valid graph from empty or malformed content', () => {
+    for (const bad of ['', 'not json', '{}']) {
+      const next = JSON.parse(applyDiagramNodes(bad, ['One', 'Two']))
+      expect(next.nodes.map((n: { data: { label: string } }) => n.data.label)).toEqual(['One', 'Two'])
+      expect(Array.isArray(next.edges)).toBe(true)
+    }
   })
 })

@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { Rnd } from 'react-rnd'
 import { type CtxMenuItem } from '../CanvasContextMenu'
 import UnifiedWidgetMenu from '../contextMenu/UnifiedWidgetMenu'
-import { buildContextForWidget } from '../../lib/contextMenu/buildContext'
+import { buildContextForWidget, buildContextForMulti } from '../../lib/contextMenu/buildContext'
 import type { FrameCallbacks } from '../../lib/contextMenu/types'
 import { FrameCallbacksProvider } from '../../lib/contextMenu/frameContext'
 import MakeTaskDialog from '../MakeTaskDialog'
@@ -1008,16 +1008,25 @@ export default function WidgetFrame({
       </div>
       {headerCtxMenu && (
         // Every widget's header right-click now resolves through the one unified
-        // menu. The frame management actions (make-task, share, synced /
-        // independent duplicate, eject, unlink, archive) are supplied as
-        // callbacks so their behaviour is identical to the old header menu, and
-        // any kind-specific rows ride in as headerExtras.
+        // menu. When this widget is part of a 2+ selection, the menu shows the
+        // bulk multi-selection actions instead of the single-widget menu. The
+        // frame management actions (make-task, share, synced / independent
+        // duplicate, eject, unlink, archive) are supplied as callbacks so their
+        // behaviour is identical to the old header menu, and any kind-specific
+        // rows ride in as headerExtras.
         <UnifiedWidgetMenu
-          menuContext={buildContextForWidget(
-            widget,
-            { clientX: headerCtxMenu.x, clientY: headerCtxMenu.y },
-            { frame: frameCallbacks, headerExtras: headerMenuExtras }
-          )}
+          menuContext={(() => {
+            const selIds = useWidgetStore.getState().selectedIds
+            if (selIds.length > 1 && selIds.includes(widget.id)) {
+              const sel = allWidgets.filter((w) => selIds.includes(w.id))
+              return buildContextForMulti(sel, { clientX: headerCtxMenu.x, clientY: headerCtxMenu.y })
+            }
+            return buildContextForWidget(
+              widget,
+              { clientX: headerCtxMenu.x, clientY: headerCtxMenu.y },
+              { frame: frameCallbacks, headerExtras: headerMenuExtras }
+            )
+          })()}
           onClose={() => setHeaderCtxMenu(null)}
         />
       )}

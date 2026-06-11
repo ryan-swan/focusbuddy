@@ -208,6 +208,22 @@ function DiagramInner({ widget, inline = false }: Props): JSX.Element {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [widget.id])
 
+  // Reflect external content updates that arrive after mount, such as Build
+  // with AI appending nodes from the context menu. parseState only runs once on
+  // init, so without this a menu-driven update would not appear until remount.
+  // The guard against lastSavedRef means a local edit (which writes the same
+  // content) never triggers a reset mid-interaction.
+  useEffect(() => {
+    if (widget.content && widget.content !== lastSavedRef.current) {
+      const next = parseState(widget.content)
+      lastSavedRef.current = widget.content
+      setNodes(next.nodes)
+      setEdges(next.edges)
+      seq.current = next.nodes.length
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [widget.content])
+
   // Label edits dispatched from ShapeNode.
   useEffect(() => {
     function onLabel(e: Event): void {

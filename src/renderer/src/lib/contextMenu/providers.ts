@@ -8,6 +8,8 @@ import { MenuSection, type MenuContribution } from './types'
 import { registerWidgetContextActions } from './registry'
 import { useWidgetStore } from '../../stores/widgets'
 import { useWidgetSetup } from '../../stores/widgetSetup'
+import { useTablesStore } from '../../stores/tables'
+import { createConnectedTool } from '../createConnectedTool'
 import { hasChecklist, toggleChecklist } from '../stickyText'
 
 // "Build with AI" drafts a list of items to add in the widget's own format and
@@ -48,8 +50,8 @@ registerWidgetContextActions('sticky', (ctx) => {
 })
 
 // The remaining widgets the generator supports get Build with AI as their
-// context action. Mindmap drafts branch labels and appends them as nodes.
-for (const kind of ['note', 'markdown', 'card', 'mindmap'] as const) {
+// context action. Mindmap drafts branches; diagram drafts nodes.
+for (const kind of ['note', 'markdown', 'card', 'mindmap', 'diagram'] as const) {
   registerWidgetContextActions(kind, (ctx) => {
     if (ctx.object.type !== 'widget') return { context: [] }
     return { context: [buildWithAiRow(ctx.object.widget.id)] }
@@ -75,6 +77,104 @@ registerWidgetContextActions('living-doc', (ctx) => {
     ],
     suppress: { 'ai-assist': true }
   }
+})
+
+// Table cell: real row actions on the cell that was right-clicked, plus the
+// universal sections seeded from the cell text (Create a sticky from this cell,
+// AI Assist on the cell, ...). Operates through the tables store directly.
+registerWidgetContextActions('table', 'cell', (ctx) => {
+  if (ctx.object.type !== 'widget') return { context: [] }
+  const tableId = (ctx.sub?.payload?.tableId as string) || ctx.object.widget.content
+  const rowId = ctx.sub?.payload?.rowId as string | undefined
+  const rows: MenuContribution[] = [
+    {
+      id: 'table/add-row',
+      section: MenuSection.Context,
+      priority: 0,
+      label: 'Add row',
+      icon: 'add',
+      onSelect: () => void useTablesStore.getState().addRow(tableId)
+    }
+  ]
+  if (rowId) {
+    rows.push({
+      id: 'table/duplicate-row',
+      section: MenuSection.Context,
+      priority: 1,
+      label: 'Duplicate row',
+      icon: 'content_copy',
+      onSelect: () => {
+        const store = useTablesStore.getState()
+        const tableRows = store.rows[tableId] ?? []
+        const src = tableRows.find((r) => r.id === rowId)
+        void store.addRow(tableId, src ? { ...src.cells } : {})
+      }
+    })
+    rows.push({
+      id: 'table/delete-row',
+      section: MenuSection.Context,
+      priority: 2,
+      label: 'Delete row',
+      icon: 'delete',
+      danger: true,
+      onSelect: () => void useTablesStore.getState().deleteRow(rowId)
+    })
+  }
+  return { context: rows }
+})
+
+// Browser widget: target-aware actions for a right-click inside the embedded
+// page (non-editable content). The selection text already flows into AI Assist
+// and Create via the menu context; these add the link / image / video actions.
+registerWidgetContextActions('webview', 'browser-target', (ctx) => {
+  if (ctx.object.type !== 'widget') return { context: [] }
+  const w = ctx.object.widget
+  const p = ctx.sub?.payload ?? {}
+  const linkURL = p.linkURL as string | undefined
+  const srcURL = p.srcURL as string | undefined
+  const mediaType = p.mediaType as string | undefined
+  const rows: MenuContribution[] = []
+  if (linkURL) {
+    rows.push({
+      id: 'webview/open-link',
+      section: MenuSection.Context,
+      priority: 0,
+      label: 'Open link in new browser',
+      icon: 'open_in_new',
+      onSelect: () => void createConnectedTool({ sourceWidgetId: w.id, kind: 'webview', content: linkURL })
+    })
+    rows.push({
+      id: 'webview/copy-link',
+      section: MenuSection.Context,
+      priority: 3,
+      label: 'Copy link',
+      icon: 'link',
+      onSelect: () => {
+        void navigator.clipboard.writeText(linkURL).catch(() => {})
+      }
+    })
+  }
+  if (srcURL && mediaType === 'image') {
+    rows.push({
+      id: 'webview/save-image',
+      section: MenuSection.Context,
+      priority: 1,
+      label: 'Save image to desk',
+      icon: 'image',
+      onSelect: () => void createConnectedTool({ sourceWidgetId: w.id, kind: 'image', content: srcURL })
+    })
+  }
+  if (srcURL && mediaType === 'video') {
+    rows.push({
+      id: 'webview/save-video',
+      section: MenuSection.Context,
+      priority: 1,
+      label: 'Save video to desk',
+      icon: 'movie',
+      onSelect: () => void createConnectedTool({ sourceWidgetId: w.id, kind: 'video', content: srcURL })
+    })
+  }
+  return { context: rows }
 })
 
 export const CORE_PROVIDERS_REGISTERED = true
