@@ -10,6 +10,18 @@
 
 import { app, autoUpdater as nativeAutoUpdater, BrowserWindow, shell } from 'electron'
 import { autoUpdater, type UpdateInfo, type ProgressInfo } from 'electron-updater'
+import { spawn } from 'node:child_process'
+import {
+  createWriteStream,
+  mkdtempSync,
+  readdirSync,
+  writeFileSync,
+  chmodSync
+} from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import https from 'node:https'
+import { macAssetUrl, appBundlePath, MAC_INSTALL_SCRIPT } from './updaterInstall'
 
 // macOS builds are ad-hoc signed (no Apple Developer ID), and Squirrel.Mac
 // refuses to apply an update unless it is signed by the same Developer ID. So
@@ -22,6 +34,94 @@ const RELEASES_URL = 'https://github.com/saasmouth/focusbuddy/releases/latest'
 
 export function openDownloadPage(): void {
   void shell.openExternal(RELEASES_URL)
+}
+
+// Stream a URL to a file, following GitHub's redirect to its asset CDN and
+// reporting download progress as a percent.
+function downloadFile(url: string, dest: string, onProgress: (pct: number) => void): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const req = https.get(url, { headers: { 'User-Agent': 'Haptyx-Updater' } }, (res) => {
+      const status = res.statusCode ?? 0
+      if (status >= 300 && status < 400 && res.headers.location) {
+        res.resume()
+        downloadFile(res.headers.location, dest, onProgress).then(resolve, reject)
+        return
+      }
+      if (status !== 200) {
+        res.resume()
+        reject(new Error(`Download failed with HTTP ${status}.`))
+        return
+      }
+      const total = Number(res.headers['content-length'] || 0)
+      let got = 0
+      const file = createWriteStream(dest)
+      res.on('data', (chunk: Buffer) => {
+        got += chunk.length
+        if (total) onProgress(Math.min(99, Math.round((got / total) * 100)))
+      })
+      res.pipe(file)
+      file.on('finish', () => file.close(() => resolve()))
+      file.on('error', reject)
+    })
+    req.on('error', reject)
+  })
+}
+
+// One-click download and self-replace for macOS, since the ad-hoc signature
+// blocks Squirrel's silent install. Downloads the release zip itself, unpacks
+// it, and hands off to a detached helper that swaps the app and relaunches.
+// Falls back to opening the releases page if anything is not as expected.
+export async function downloadAndInstallMacUpdate(): Promise<void> {
+  if (!IS_MAC) {
+    openDownloadPage()
+    return
+  }
+  const version =
+    current.kind === 'available' || current.kind === 'ready' ? current.version : null
+  if (!version) {
+    openDownloadPage()
+    return
+  }
+  // Only attempt an in-place swap when we are a real .app bundle.
+  const targetApp = appBundlePath(process.execPath)
+  if (!targetApp) {
+    openDownloadPage()
+    return
+  }
+
+  try {
+    broadcast({ kind: 'downloading', percent: 0 })
+    const url = macAssetUrl(version, process.arch)
+    const work = mkdtempSync(join(tmpdir(), 'haptyx-update-'))
+    const zipPath = join(work, 'update.zip')
+    await downloadFile(url, zipPath, (pct) => broadcast({ kind: 'downloading', percent: pct }))
+
+    const unzipDir = join(work, 'unpacked')
+    await new Promise<void>((resolve, reject) => {
+      const p = spawn('ditto', ['-x', '-k', zipPath, unzipDir])
+      p.on('error', reject)
+      p.on('exit', (code) => (code === 0 ? resolve() : reject(new Error(`Unpack failed (ditto ${code}).`))))
+    })
+    const appName = readdirSync(unzipDir).find((n) => n.endsWith('.app'))
+    if (!appName) throw new Error('No app bundle was found in the downloaded update.')
+    const newApp = join(unzipDir, appName)
+
+    const script = join(work, 'install.sh')
+    writeFileSync(script, MAC_INSTALL_SCRIPT, { mode: 0o755 })
+    chmodSync(script, 0o755)
+    const child = spawn('/bin/bash', [script, String(process.pid), newApp, targetApp], {
+      detached: true,
+      stdio: 'ignore'
+    })
+    child.unref()
+
+    // Quit shortly so the helper can take over the bundle. The banner shows the
+    // ready state in the meantime.
+    broadcast({ kind: 'ready', version })
+    setTimeout(() => app.quit(), 500)
+  } catch (e) {
+    broadcast({ kind: 'error', message: (e as Error).message })
+  }
 }
 
 export type UpdateState =

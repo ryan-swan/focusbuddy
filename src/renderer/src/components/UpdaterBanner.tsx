@@ -61,17 +61,19 @@ export default function UpdaterBanner(): JSX.Element | null {
   }
 
   if (state.kind === 'available') {
-    // macOS: download the release in the browser (no in-place install).
+    // macOS: one-click download and self-replace, since the ad-hoc signature
+    // blocks Squirrel's silent install. The app fetches the release, swaps
+    // itself in place, and relaunches.
     if (isMac) {
       return (
         <button
-          onClick={() => { void window.api.update.openDownload() }}
+          onClick={() => { void window.api.update.downloadAndInstall() }}
           className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-accent hover:bg-accent/10 font-medium"
-          title={`Download Haptyx v${state.version}`}
+          title={`Update Haptyx to v${state.version} and relaunch`}
           data-testid="updater-download"
         >
           <Icon name="download" size={11} />
-          <span>Download v{state.version}</span>
+          <span>Update to v{state.version}</span>
         </button>
       )
     }
@@ -98,19 +100,18 @@ export default function UpdaterBanner(): JSX.Element | null {
   }
 
   if (state.kind === 'ready') {
-    // macOS never reaches a real in-place install (ad-hoc signature), so if a
-    // ready state ever arrives there, fall back to the download path too.
+    // macOS one-click flow: the swap helper has taken over and the app is about
+    // to quit and relaunch, so show a passive installing label rather than a
+    // button.
     if (isMac) {
       return (
-        <button
-          onClick={() => { void window.api.update.openDownload() }}
-          className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-accent hover:bg-accent/10 font-medium"
-          title={`Download Haptyx v${state.version}`}
-          data-testid="updater-download"
+        <span
+          className="inline-flex items-center gap-1 text-accent"
+          data-testid="updater-installing"
         >
-          <Icon name="download" size={11} />
-          <span>Download v{state.version}</span>
-        </button>
+          <Icon name="download" size={11} className="animate-pulse" />
+          <span>Installing v{state.version}</span>
+        </span>
       )
     }
     return (

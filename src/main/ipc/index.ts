@@ -5,7 +5,8 @@ import {
   checkForUpdates,
   getCurrentUpdateState,
   installUpdateAndRestart,
-  openDownloadPage
+  openDownloadPage,
+  downloadAndInstallMacUpdate
 } from '../autoUpdate'
 import {
   clearSecret,
@@ -1127,6 +1128,10 @@ export function registerIpcHandlers(): void {
   })
   ipcMain.handle('update:open-download', () => {
     openDownloadPage()
+    return { ok: true }
+  })
+  ipcMain.handle('update:download-and-install', () => {
+    void downloadAndInstallMacUpdate()
     return { ok: true }
   })
 
