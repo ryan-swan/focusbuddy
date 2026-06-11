@@ -1489,6 +1489,7 @@ export type WidgetSetupApplyAs =
   | 'note-lines'
   | 'markdown-bullets'
   | 'card-bullets'
+  | 'mindmap-nodes'
 
 export interface WidgetSetupDraft {
   ok: boolean
@@ -1524,6 +1525,11 @@ const WIDGET_SETUP_KINDS: Record<
     applyAs: 'card-bullets',
     noun: 'points',
     guidance: 'a single key point for the card body'
+  },
+  mindmap: {
+    applyAs: 'mindmap-nodes',
+    noun: 'branches',
+    guidance: 'a concise mind-map branch label of a few words'
   }
 }
 

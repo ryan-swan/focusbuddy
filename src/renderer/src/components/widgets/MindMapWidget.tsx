@@ -1,6 +1,7 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ActionProposal, Widget, WidgetKind } from '@shared/types'
 import WidgetFrame from './WidgetFrame'
+import UnifiedConnectedMenu from '../contextMenu/UnifiedConnectedMenu'
 import Icon from '../Icon'
 import { useWidgetStore } from '../../stores/widgets'
 import { useNodeStore } from '../../stores/nodes'
@@ -206,6 +207,19 @@ export default function MindMapWidget({ widget, inline = false }: Props): JSX.El
     void update(widget.id, { content: JSON.stringify(next) })
   }
 
+  // Reflect external content updates that arrive after mount, such as Build
+  // with AI appending branch nodes from the context menu. parsePersisted only
+  // runs once on init, so without this a menu-driven update would not appear
+  // until the widget remounted. The guard compares against what we last
+  // persisted so a local edit (which writes the identical content) is a no-op.
+  useEffect(() => {
+    if (widget.content && widget.content !== JSON.stringify(persisted.current)) {
+      const incoming = parsePersisted(widget.content)
+      persisted.current = incoming
+      setState(incoming)
+    }
+  }, [widget.content])
+
   // ── Selected node lookup ─────────────────────────────────────────────────
   const selected = useMemo(() => {
     if (!state.selectedId) return null
@@ -216,6 +230,8 @@ export default function MindMapWidget({ widget, inline = false }: Props): JSX.El
     'expand' | 'agents' | 'invoke' | 'creating-agent' | null
   >(null)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
+  // Position of the unified right-click menu, or null when closed.
+  const [mindCtxMenu, setMindCtxMenu] = useState<{ x: number; y: number } | null>(null)
   // The agent-creation wizard is a modal; the slug is the suggested
   // starting point when the user first opens it.
   const [agentWizardOpen, setAgentWizardOpen] = useState(false)
@@ -1017,7 +1033,25 @@ export default function MindMapWidget({ widget, inline = false }: Props): JSX.El
 
   // ── Render ───────────────────────────────────────────────────────────────
   const body = (
-    <div className="h-full w-full flex bg-stone-50 dark:bg-stone-900 overflow-hidden">
+    <div
+      className="h-full w-full flex bg-stone-50 dark:bg-stone-900 overflow-hidden"
+      onContextMenu={(e) => {
+        // Right-click anywhere in the mind map opens the unified menu, which is
+        // where "Build with AI" lives. Shift-right-click falls through to the
+        // native menu.
+        if (e.shiftKey) return
+        e.preventDefault()
+        setMindCtxMenu({ x: e.clientX, y: e.clientY })
+      }}
+    >
+      {mindCtxMenu && (
+        <UnifiedConnectedMenu
+          sourceWidgetId={widget.id}
+          x={mindCtxMenu.x}
+          y={mindCtxMenu.y}
+          onClose={() => setMindCtxMenu(null)}
+        />
+      )}
       <div className="flex-1 min-w-0 overflow-auto relative">
         {/* Breadcrumb — only when drilled in. The user clicks any
             segment to step back up. Double-clicking a node in the

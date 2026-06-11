@@ -11,9 +11,14 @@ export type WidgetSetupApplyAs =
   | 'note-lines'
   | 'markdown-bullets'
   | 'card-bullets'
+  | 'mindmap-nodes'
 
-// Turn the approved item texts into a block of content in the widget's format.
-export function formatSetupItems(applyAs: WidgetSetupApplyAs, items: string[]): string {
+// Text-format kinds whose items are appended to the widget's text content.
+type TextApplyAs = Exclude<WidgetSetupApplyAs, 'mindmap-nodes'>
+
+// Turn the approved item texts into a block of content in a text widget's
+// format. Mindmap is handled separately because its content is JSON.
+export function formatSetupItems(applyAs: TextApplyAs, items: string[]): string {
   const clean = items.map((t) => t.trim()).filter(Boolean)
   if (clean.length === 0) return ''
   switch (applyAs) {
@@ -28,6 +33,65 @@ export function formatSetupItems(applyAs: WidgetSetupApplyAs, items: string[]): 
   }
 }
 
+// Append the approved labels to a mind map's JSON as new children of the root,
+// preserving the rest of the persisted state. Defends against an empty or
+// malformed content by starting from a minimal valid tree.
+export function applyMindmapNodes(content: string, labels: string[]): string {
+  interface Node {
+    id: string
+    label: string
+    kind: string
+    children: Node[]
+    attachedWidgetIds: string[]
+    assignedAgentSlugs: string[]
+    pendingChildren: Node[]
+  }
+  let state: { root?: Node; [k: string]: unknown } | null = null
+  try {
+    state = JSON.parse(content)
+  } catch {
+    state = null
+  }
+  if (!state || typeof state !== 'object' || !state.root) {
+    state = {
+      root: {
+        id: 'root',
+        label: 'New idea',
+        kind: 'idea',
+        children: [],
+        attachedWidgetIds: [],
+        assignedAgentSlugs: [],
+        pendingChildren: []
+      },
+      selectedId: 'root',
+      viewRootId: 'root',
+      agentSuggestions: {},
+      agentConversations: {},
+      agentStats: {}
+    }
+  }
+  const root = state.root as Node
+  const newChildren: Node[] = labels
+    .map((l) => l.trim())
+    .filter(Boolean)
+    .map((label) => ({
+      id: makeNodeId(),
+      label,
+      kind: 'idea',
+      children: [],
+      attachedWidgetIds: [],
+      assignedAgentSlugs: [],
+      pendingChildren: []
+    }))
+  root.children = [...(root.children ?? []), ...newChildren]
+  return JSON.stringify(state)
+}
+
+function makeNodeId(): string {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) return crypto.randomUUID()
+  return `n-${Math.random().toString(36).slice(2)}`
+}
+
 // Append the approved items to the widget, preserving whatever is already there.
 export async function applyWidgetSetup(
   widgetId: string,
@@ -37,6 +101,11 @@ export async function applyWidgetSetup(
   const store = useWidgetStore.getState()
   const w = store.widgets.find((x) => x.id === widgetId)
   if (!w) return
+  if (applyAs === 'mindmap-nodes') {
+    const nextJson = applyMindmapNodes(w.content || '', items)
+    await store.update(widgetId, { content: nextJson })
+    return
+  }
   const block = formatSetupItems(applyAs, items)
   if (!block) return
   const existing = (w.content || '').replace(/\s+$/, '')

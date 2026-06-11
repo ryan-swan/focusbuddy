@@ -293,7 +293,7 @@ const api = {
     }): Promise<{
       ok: boolean
       kind?: string
-      applyAs?: 'sticky-checklist' | 'note-lines' | 'markdown-bullets' | 'card-bullets'
+      applyAs?: 'sticky-checklist' | 'note-lines' | 'markdown-bullets' | 'card-bullets' | 'mindmap-nodes'
       noun?: string
       items?: Array<{ id: string; text: string }>
       error?: string
