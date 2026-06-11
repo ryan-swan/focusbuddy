@@ -34,6 +34,7 @@ import {
   listWidgetsByTask,
   updateWidget
 } from '../db/widgets'
+import { collectTelemetry, recordAiCall } from '../db/telemetry'
 import {
   createLink,
   deleteLink,
@@ -579,37 +580,59 @@ export function registerIpcHandlers(): void {
   )
   ipcMain.handle('templates:delete', (_e, id: string) => deleteTemplate(id))
 
-  ipcMain.handle('chat:send', (_e, req: ChatRequest) => sendChat(req))
+  ipcMain.handle('chat:send', (_e, req: ChatRequest) => {
+    recordAiCall()
+    return sendChat(req)
+  })
   ipcMain.handle('chat:hasApiKey', () => Boolean(resolveAnthropicKey()))
   ipcMain.handle('chat:proactiveWelcome', (_e, taskId: string) =>
     generateProactiveWelcome(taskId)
   )
-  ipcMain.handle('resume:generate', (_e, taskId: string) => generateResume(taskId))
-  ipcMain.handle('setup:suggest', (_e, taskId: string) => suggestSetupWidgets(taskId))
+  ipcMain.handle('resume:generate', (_e, taskId: string) => {
+    recordAiCall()
+    return generateResume(taskId)
+  })
+  ipcMain.handle('setup:suggest', (_e, taskId: string) => {
+    recordAiCall()
+    return suggestSetupWidgets(taskId)
+  })
   ipcMain.handle(
     'setup:buildFromPrompt',
-    (_e, input: { prompt: string; taskId: string | null }) =>
-      buildFromPrompt(input)
+    (_e, input: { prompt: string; taskId: string | null }) => {
+      recordAiCall()
+      return buildFromPrompt(input)
+    }
   )
-  ipcMain.handle('livingPage:regenerate', (_e, widgetId: string) =>
-    regenerateLivingPage(widgetId)
-  )
-  ipcMain.handle('ai:suggestPageContent', (_e, prompt: string) =>
-    suggestPageContent(prompt)
-  )
+  ipcMain.handle('livingPage:regenerate', (_e, widgetId: string) => {
+    recordAiCall()
+    return regenerateLivingPage(widgetId)
+  })
+  ipcMain.handle('ai:suggestPageContent', (_e, prompt: string) => {
+    recordAiCall()
+    return suggestPageContent(prompt)
+  })
+  // Telemetry snapshot for the renderer to report to the signal server.
+  ipcMain.handle('telemetry:collect', () => collectTelemetry())
   ipcMain.handle(
     'ai:transformText',
-    (_e, input: { text: string; instruction: string; kind?: string }) =>
-      transformText(input)
+    (_e, input: { text: string; instruction: string; kind?: string }) => {
+      recordAiCall()
+      return transformText(input)
+    }
   )
   ipcMain.handle(
     'ai:suggestWidgetSetup',
-    (_e, input: { widgetId: string; prompt?: string }) => suggestWidgetSetup(input)
+    (_e, input: { widgetId: string; prompt?: string }) => {
+      recordAiCall()
+      return suggestWidgetSetup(input)
+    }
   )
   ipcMain.handle(
     'ai:suggestTableRows',
-    (_e, tableId: string, prompt: string, count: number) =>
-      suggestTableRows(tableId, prompt, count)
+    (_e, tableId: string, prompt: string, count: number) => {
+      recordAiCall()
+      return suggestTableRows(tableId, prompt, count)
+    }
   )
 
   ipcMain.handle(

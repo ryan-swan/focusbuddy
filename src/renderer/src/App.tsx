@@ -8,6 +8,7 @@ import {
 import Sidebar from './components/Sidebar'
 import MainPane from './components/MainPane'
 import ChatPanel from './components/ChatPanel'
+import TelemetryReporter from './components/TelemetryReporter'
 import Icon from './components/Icon'
 import SettingsPanel from './components/SettingsPanel'
 import Footer from './components/Footer'
@@ -196,6 +197,8 @@ export default function App(): JSX.Element {
 
   return (
     <div className="fb-app-shell flex flex-col">
+      {/* Reports aggregate usage telemetry while signed in (admin Analytics). */}
+      <TelemetryReporter />
       <header className="titlebar-drag fb-glass-chrome h-10 flex items-center justify-between px-3 border-b border-[color:var(--glass-chrome-border)] transition-colors">
         <div className="titlebar-nodrag flex items-center gap-2">
           {sidebarCollapsed && (
