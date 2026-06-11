@@ -40,31 +40,31 @@ async function sendUpdateState(
 }
 
 /**
- * Install a spy on 'update:open-download' IPC handler. The real handler opens
- * a browser URL — in tests we swap it out for a flag setter so no browser
- * window spawns. Returns a function that reads and returns the invocation count.
+ * Spy on the macOS one-click updater IPC. The real handler downloads the
+ * release and swaps the app, which we must not do in a test, so we replace it
+ * with a counter. Returns a reader for the invocation count.
  */
-async function installOpenDownloadSpy(l: LaunchedApp): Promise<void> {
+async function installDownloadInstallSpy(l: LaunchedApp): Promise<void> {
   await l.app.evaluate(({ ipcMain }) => {
     interface SpyGlobal {
-      __fb_open_download_calls: number
+      __fb_download_install_calls: number
     }
     const g = globalThis as unknown as SpyGlobal
-    g.__fb_open_download_calls = 0
-    ipcMain.removeHandler('update:open-download')
-    ipcMain.handle('update:open-download', () => {
-      g.__fb_open_download_calls += 1
+    g.__fb_download_install_calls = 0
+    ipcMain.removeHandler('update:download-and-install')
+    ipcMain.handle('update:download-and-install', () => {
+      g.__fb_download_install_calls += 1
       return { ok: true as const }
     })
   })
 }
 
-async function readOpenDownloadCallCount(l: LaunchedApp): Promise<number> {
+async function readDownloadInstallCallCount(l: LaunchedApp): Promise<number> {
   return l.app.evaluate(() => {
     interface SpyGlobal {
-      __fb_open_download_calls: number
+      __fb_download_install_calls: number
     }
-    return (globalThis as unknown as SpyGlobal).__fb_open_download_calls ?? 0
+    return (globalThis as unknown as SpyGlobal).__fb_download_install_calls ?? 0
   })
 }
 
@@ -85,7 +85,7 @@ test('window.api.platform is darwin on the test machine', async () => {
   expect(platform).toBe('darwin')
 })
 
-test('available state on macOS renders the Download button with correct version label', async () => {
+test('available state on macOS renders the one-click Update button with the version', async () => {
   launched = await launchApp()
   const { window } = launched
   await waitForReady(window)
@@ -94,15 +94,15 @@ test('available state on macOS renders the Download button with correct version 
 
   const btn = window.locator('[data-testid="updater-download"]')
   await expect(btn).toBeVisible({ timeout: 5_000 })
-  await expect(btn).toContainText('Download v9.9.9')
+  await expect(btn).toContainText('Update to v9.9.9')
 })
 
-test('clicking the Download button invokes the update:open-download IPC handler', async () => {
+test('clicking the Update button invokes the update:download-and-install IPC handler', async () => {
   launched = await launchApp()
   const { window } = launched
   await waitForReady(window)
 
-  await installOpenDownloadSpy(launched)
+  await installDownloadInstallSpy(launched)
   await sendUpdateState(launched, { kind: 'available', version: '9.9.9' })
 
   const btn = window.locator('[data-testid="updater-download"]')
@@ -112,7 +112,7 @@ test('clicking the Download button invokes the update:open-download IPC handler'
   // Give the IPC round-trip time to complete.
   await window.waitForTimeout(300)
 
-  const calls = await readOpenDownloadCallCount(launched)
+  const calls = await readDownloadInstallCallCount(launched)
   expect(calls).toBe(1)
 })
 
@@ -131,18 +131,18 @@ test('error state renders the retry affordance without crashing', async () => {
   ).toBeVisible({ timeout: 5_000 })
 })
 
-test('ready state on macOS also renders the Download button, not an Install button', async () => {
+test('ready state on macOS shows the passive installing label, not an Install button', async () => {
   launched = await launchApp()
   const { window } = launched
   await waitForReady(window)
 
   await sendUpdateState(launched, { kind: 'ready', version: '9.9.9' })
 
-  // On macOS the ready state should show the same download-to-replace path,
-  // not the Windows in-place install button.
-  const dlBtn = window.locator('[data-testid="updater-download"]')
-  await expect(dlBtn).toBeVisible({ timeout: 5_000 })
-  await expect(dlBtn).toContainText('Download v9.9.9')
+  // On macOS the one-click flow synthesises a ready state right before the swap
+  // helper relaunches, so we show a passive installing label.
+  const installing = window.locator('[data-testid="updater-installing"]')
+  await expect(installing).toBeVisible({ timeout: 5_000 })
+  await expect(installing).toContainText('Installing v9.9.9')
 
   // The Windows-style "Install" button must NOT appear.
   const installBtn = window.locator('button', { hasText: /^install v/i })

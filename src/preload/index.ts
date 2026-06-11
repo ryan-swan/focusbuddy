@@ -1025,6 +1025,10 @@ const api = {
     // signing prevents in-place auto-install, so the update is a one-click
     // download instead.
     openDownload: (): Promise<{ ok: true }> => ipcRenderer.invoke('update:open-download'),
+    // macOS one-click: the app downloads the release and swaps itself in place,
+    // then relaunches. Progress flows through the normal update:state events.
+    downloadAndInstall: (): Promise<{ ok: true }> =>
+      ipcRenderer.invoke('update:download-and-install'),
     onState: (cb: (state: UpdateState) => void): (() => void) => {
       const handler = (_: unknown, s: UpdateState): void => cb(s)
       ipcRenderer.on('update:state', handler)
