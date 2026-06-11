@@ -76,15 +76,18 @@ test('right-click on a sticky → Create + Connect → new tool and persisted li
   await window.getByRole('button', { name: 'Right-click test' }).first().click()
   await window.waitForSelector('[data-canvas-surface="true"]', { timeout: 5_000 })
 
-  // Locate the sticky textarea by its widget id and right-click. Use the
-  // first textarea inside the source sticky's frame.
+  // Enter edit mode (the sticky's context menu lives on the textarea), then
+  // right-click it to open the unified menu.
   const sourceFrame = window.locator(`[data-widget-id="${seeded.stickyId}"]`)
   await expect(sourceFrame).toBeVisible({ timeout: 5_000 })
+  await sourceFrame.locator('.fb-sticky-rendered').click()
   const textarea = sourceFrame.locator('textarea').first()
+  await expect(textarea).toBeVisible({ timeout: 4_000 })
   await textarea.click({ button: 'right' })
 
-  // Menu pops up — click "Note" (different kind from source so we can
-  // verify the spawn picked the right entry).
+  // The unified menu nests the spawn offerings under Create. Hover it, then
+  // click "Note" (a different kind from the source so the spawn is verifiable).
+  await window.locator('[data-canvas-ctx-menu]').getByText('Create', { exact: true }).hover()
   const noteItem = window.locator('[data-canvas-ctx-menu]').getByText('Note', { exact: true }).first()
   await expect(noteItem).toBeVisible({ timeout: 4_000 })
   await noteItem.click()

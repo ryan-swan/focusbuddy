@@ -32,6 +32,10 @@ import AiBuilderDialog from './AiBuilderDialog'
 import type { AiBuildSuggestion } from '@shared/types'
 import LoadMeter from './LoadMeter'
 import CanvasContextMenu, { type CtxMenuItem } from './CanvasContextMenu'
+import AiAssistPreview from './contextMenu/AiAssistPreview'
+// Side-effect import registers the core widget context-action providers (sticky
+// checklist, living-doc regenerate, ...) for the unified context menu.
+import '../lib/contextMenu'
 import FloatingToolbar, { type ToolbarAction } from './FloatingToolbar'
 import MinimapWidget from './widgets/MinimapWidget'
 import VoiceRecorderWidget from './widgets/VoiceRecorderWidget'
@@ -2406,6 +2410,9 @@ export default function Canvas(): JSX.Element {
           onClose={() => setCtxMenu(null)}
         />
       )}
+      {/* The single AI Assist preview for the unified context menu. Portals to
+          body, so its placement in the tree does not matter. */}
+      <AiAssistPreview />
       {showExtensionPrompt && (
         <ExtensionPrompt
           task={activeTask}

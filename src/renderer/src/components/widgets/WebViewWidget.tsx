@@ -8,7 +8,7 @@ import { catalogFor } from '../../lib/widgetCatalog'
 import { registerWebview, unregisterWebviewByWidgetId } from '../../lib/webviewRegistry'
 import { autofillWebview } from '../../lib/vaultAutofill'
 import Icon from '../Icon'
-import ConnectedToolMenu from '../ConnectedToolMenu'
+import ConnectedToolMenu from '../contextMenu/UnifiedConnectedMenu'
 
 function hostnameOf(url: string): string {
   try {

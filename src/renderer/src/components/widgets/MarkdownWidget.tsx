@@ -12,7 +12,7 @@ import type { Widget } from '@shared/types'
 import { useWidgetStore } from '../../stores/widgets'
 import WidgetFrame from './WidgetFrame'
 import Icon from '../Icon'
-import ConnectedToolMenu from '../ConnectedToolMenu'
+import ConnectedToolMenu from '../contextMenu/UnifiedConnectedMenu'
 
 interface Props {
   widget: Widget

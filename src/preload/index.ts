@@ -276,7 +276,17 @@ const api = {
       }>
       error?: string
       needsApiKey?: boolean
-    }> => ipcRenderer.invoke('ai:suggestTableRows', tableId, prompt, count)
+    }> => ipcRenderer.invoke('ai:suggestTableRows', tableId, prompt, count),
+    transformText: (input: {
+      text: string
+      instruction: string
+      kind?: string
+    }): Promise<{
+      ok: boolean
+      result?: string
+      error?: string
+      needsApiKey?: boolean
+    }> => ipcRenderer.invoke('ai:transformText', input)
   },
   history: {
     record: (url: string, title: string, taskId: string | null): Promise<void> =>

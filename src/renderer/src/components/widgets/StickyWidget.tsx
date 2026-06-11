@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { Widget } from '@shared/types'
 import WidgetFrame from './WidgetFrame'
 import { useWidgetStore } from '../../stores/widgets'
-import ConnectedToolMenu from '../ConnectedToolMenu'
+import ConnectedToolMenu from '../contextMenu/UnifiedConnectedMenu'
 import Icon from '../Icon'
 import {
   STICKY_CHECK_RE,
