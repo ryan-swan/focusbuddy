@@ -29,9 +29,26 @@
 import { test, expect } from '@playwright/test'
 import { launchApp, waitForReady, type LaunchedApp } from './_helpers'
 
-const SIGNAL_BASE = 'https://focusbuddy-signal.fly.dev'
+// These tests sign up real accounts against a signal server. They must NEVER
+// run against production, where they were polluting the live customer database
+// with @example.com test accounts. The base now comes from an explicit env var
+// pointing at a throwaway or local server, and the whole file is skipped when it
+// is not set, so a default test run cannot touch production. See
+// rules/no-fakery.md.
+const SIGNAL_BASE = process.env.E2E_SIGNAL_BASE ?? ''
 
 let launched: LaunchedApp | null = null
+
+test.beforeEach(() => {
+  test.skip(
+    !SIGNAL_BASE,
+    'E2E_SIGNAL_BASE not set — skipping live-signup invite tests so they cannot pollute production. Point it at a throwaway/local signal server to run them.'
+  )
+  test.skip(
+    /focusbuddy-signal\.fly\.dev/.test(SIGNAL_BASE),
+    'Refusing to run account-creating tests against the production signal server.'
+  )
+})
 
 test.afterEach(async () => {
   if (launched) {
