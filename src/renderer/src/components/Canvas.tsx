@@ -33,6 +33,7 @@ import type { AiBuildSuggestion } from '@shared/types'
 import LoadMeter from './LoadMeter'
 import CanvasContextMenu, { type CtxMenuItem } from './CanvasContextMenu'
 import AiAssistPreview from './contextMenu/AiAssistPreview'
+import WidgetSetupPreview from './contextMenu/WidgetSetupPreview'
 // Side-effect import registers the core widget context-action providers (sticky
 // checklist, living-doc regenerate, ...) for the unified context menu.
 import '../lib/contextMenu'
@@ -2413,6 +2414,8 @@ export default function Canvas(): JSX.Element {
       {/* The single AI Assist preview for the unified context menu. Portals to
           body, so its placement in the tree does not matter. */}
       <AiAssistPreview />
+      {/* The per-widget AI setup preview (Build with AI). Also body-portalled. */}
+      <WidgetSetupPreview />
       {showExtensionPrompt && (
         <ExtensionPrompt
           task={activeTask}

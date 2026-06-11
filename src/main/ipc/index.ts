@@ -213,6 +213,7 @@ import {
   runTransformWire,
   sendChat,
   transformText,
+  suggestWidgetSetup,
   suggestPageContent,
   suggestSetupWidgets,
   suggestTableRows,
@@ -599,6 +600,10 @@ export function registerIpcHandlers(): void {
     'ai:transformText',
     (_e, input: { text: string; instruction: string; kind?: string }) =>
       transformText(input)
+  )
+  ipcMain.handle(
+    'ai:suggestWidgetSetup',
+    (_e, input: { widgetId: string; prompt?: string }) => suggestWidgetSetup(input)
   )
   ipcMain.handle(
     'ai:suggestTableRows',

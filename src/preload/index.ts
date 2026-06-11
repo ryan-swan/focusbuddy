@@ -286,7 +286,19 @@ const api = {
       result?: string
       error?: string
       needsApiKey?: boolean
-    }> => ipcRenderer.invoke('ai:transformText', input)
+    }> => ipcRenderer.invoke('ai:transformText', input),
+    suggestWidgetSetup: (input: {
+      widgetId: string
+      prompt?: string
+    }): Promise<{
+      ok: boolean
+      kind?: string
+      applyAs?: 'sticky-checklist' | 'note-lines' | 'markdown-bullets' | 'card-bullets'
+      noun?: string
+      items?: Array<{ id: string; text: string }>
+      error?: string
+      needsApiKey?: boolean
+    }> => ipcRenderer.invoke('ai:suggestWidgetSetup', input)
   },
   history: {
     record: (url: string, title: string, taskId: string | null): Promise<void> =>
