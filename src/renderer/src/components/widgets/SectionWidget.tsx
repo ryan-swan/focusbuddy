@@ -505,6 +505,18 @@ export default function SectionWidget({
               }
             })
             items.push({
+              label: 'Section layout',
+              icon: 'dashboard_customize',
+              children: LAYOUT_OPTIONS.map((opt) => ({
+                label: opt.value === layout ? `${opt.label} ✓` : opt.label,
+                icon: opt.icon,
+                onClick: () => {
+                  void update(widget.id, { layout: opt.value })
+                  bumpLayout()
+                }
+              }))
+            })
+            items.push({
               label: 'Bring to front',
               icon: 'flip_to_front',
               onClick: () => {

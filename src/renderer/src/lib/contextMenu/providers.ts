@@ -79,48 +79,155 @@ registerWidgetContextActions('living-doc', (ctx) => {
   }
 })
 
-// Table cell: real row actions on the cell that was right-clicked, plus the
+// Table: "Add row" applies anywhere on the table (header or a cell), so it is a
+// wildcard. The cell provider below adds the row-specific actions that need to
+// know WHICH row was clicked.
+registerWidgetContextActions('table', (ctx) => {
+  if (ctx.object.type !== 'widget') return { context: [] }
+  const tableId = ctx.object.widget.content
+  return {
+    context: [
+      {
+        id: 'table/add-row',
+        section: MenuSection.Context,
+        priority: 0,
+        label: 'Add row',
+        icon: 'add',
+        onSelect: () => void useTablesStore.getState().addRow(tableId)
+      }
+    ]
+  }
+})
+
+// Table cell: row-specific actions on the cell that was right-clicked, plus the
 // universal sections seeded from the cell text (Create a sticky from this cell,
 // AI Assist on the cell, ...). Operates through the tables store directly.
 registerWidgetContextActions('table', 'cell', (ctx) => {
   if (ctx.object.type !== 'widget') return { context: [] }
   const tableId = (ctx.sub?.payload?.tableId as string) || ctx.object.widget.content
   const rowId = ctx.sub?.payload?.rowId as string | undefined
-  const rows: MenuContribution[] = [
-    {
-      id: 'table/add-row',
-      section: MenuSection.Context,
-      priority: 0,
-      label: 'Add row',
-      icon: 'add',
-      onSelect: () => void useTablesStore.getState().addRow(tableId)
-    }
-  ]
-  if (rowId) {
-    rows.push({
-      id: 'table/duplicate-row',
-      section: MenuSection.Context,
-      priority: 1,
-      label: 'Duplicate row',
-      icon: 'content_copy',
-      onSelect: () => {
-        const store = useTablesStore.getState()
-        const tableRows = store.rows[tableId] ?? []
-        const src = tableRows.find((r) => r.id === rowId)
-        void store.addRow(tableId, src ? { ...src.cells } : {})
+  if (!rowId) return { context: [] }
+  return {
+    context: [
+      {
+        id: 'table/duplicate-row',
+        section: MenuSection.Context,
+        priority: 1,
+        label: 'Duplicate row',
+        icon: 'content_copy',
+        onSelect: () => {
+          const store = useTablesStore.getState()
+          const tableRows = store.rows[tableId] ?? []
+          const src = tableRows.find((r) => r.id === rowId)
+          void store.addRow(tableId, src ? { ...src.cells } : {})
+        }
+      },
+      {
+        id: 'table/delete-row',
+        section: MenuSection.Context,
+        priority: 2,
+        label: 'Delete row',
+        icon: 'delete',
+        danger: true,
+        onSelect: () => void useTablesStore.getState().deleteRow(rowId)
       }
-    })
-    rows.push({
-      id: 'table/delete-row',
-      section: MenuSection.Context,
-      priority: 2,
-      label: 'Delete row',
-      icon: 'delete',
-      danger: true,
-      onSelect: () => void useTablesStore.getState().deleteRow(rowId)
-    })
+    ]
   }
-  return { context: rows }
+})
+
+// Link / file widgets: their content is a URL or file path, so offer Open and
+// Copy. Covers files, images, video, PDFs, the Google document kinds, email,
+// and the browser widget's own address.
+const LINK_KINDS = ['file', 'image', 'video', 'pdf', 'gdoc', 'gsheet', 'gslide', 'email', 'webview'] as const
+for (const kind of LINK_KINDS) {
+  registerWidgetContextActions(kind, (ctx) => {
+    if (ctx.object.type !== 'widget') return { context: [] }
+    const url = (ctx.object.widget.content || '').trim()
+    if (!url) return { context: [] }
+    const isHttp = /^https?:\/\//i.test(url)
+    return {
+      context: [
+        {
+          id: `${kind}/open-external`,
+          section: MenuSection.Context,
+          priority: 0,
+          label: isHttp ? 'Open in browser' : 'Open',
+          icon: 'open_in_new',
+          onSelect: () => void window.api.files.openExternal(url)
+        },
+        {
+          id: `${kind}/copy-url`,
+          section: MenuSection.Context,
+          priority: 1,
+          label: isHttp ? 'Copy URL' : 'Copy path',
+          icon: 'content_copy',
+          onSelect: () => {
+            void navigator.clipboard.writeText(url).catch(() => {})
+          }
+        }
+      ]
+    }
+  })
+}
+
+// Color swatch: copy the hex value.
+registerWidgetContextActions('color', (ctx) => {
+  if (ctx.object.type !== 'widget') return { context: [] }
+  const hex = (ctx.object.widget.content || '#fbbf24').trim()
+  return {
+    context: [
+      {
+        id: 'color/copy',
+        section: MenuSection.Context,
+        priority: 0,
+        label: `Copy ${hex}`,
+        icon: 'content_copy',
+        onSelect: () => {
+          void navigator.clipboard.writeText(hex).catch(() => {})
+        }
+      }
+    ]
+  }
+})
+
+// Section container: switch the child layout.
+registerWidgetContextActions('section', (ctx) => {
+  if (ctx.object.type !== 'widget') return { context: [] }
+  const w = ctx.object.widget
+  const setLayout = (layout: 'free' | 'grid' | 'stacks' | 'list'): void => {
+    void useWidgetStore.getState().update(w.id, { layout })
+    useWidgetStore.getState().bumpLayoutVersion()
+  }
+  const opt = (
+    value: 'free' | 'grid' | 'stacks' | 'list',
+    label: string,
+    icon: string,
+    priority: number
+  ): MenuContribution => ({
+    id: `section/layout/${value}`,
+    section: MenuSection.Context,
+    priority,
+    label,
+    icon,
+    onSelect: () => setLayout(value)
+  })
+  return {
+    context: [
+      {
+        id: 'section/layout',
+        section: MenuSection.Context,
+        priority: 0,
+        label: 'Section layout',
+        icon: 'dashboard_customize',
+        children: [
+          opt('free', 'Free', 'open_with', 0),
+          opt('grid', 'Grid', 'grid_view', 1),
+          opt('stacks', 'Stacks', 'view_agenda', 2),
+          opt('list', 'List', 'format_list_bulleted', 3)
+        ]
+      }
+    ]
+  }
 })
 
 // Browser widget: target-aware actions for a right-click inside the embedded
