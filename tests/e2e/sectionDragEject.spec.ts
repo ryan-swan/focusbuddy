@@ -107,18 +107,11 @@ test('right-click "Move out of section" ejects a grid child to the canvas', asyn
   await headerEl.click({ button: 'right' })
   await window.waitForTimeout(300)
 
-  // Find and click "Move out of section" inside the CanvasContextMenu portal
-  // (rendered with data-canvas-ctx-menu attribute).
-  const moved = await window.evaluate(() => {
-    const menu = document.querySelector('[data-canvas-ctx-menu]')
-    if (!menu) return false
-    const items = Array.from(menu.querySelectorAll('button'))
-    const btn = items.find((el) => el.textContent?.toLowerCase().includes('move out of section'))
-    if (!btn) return false
-    btn.click()
-    return true
-  })
-  expect(moved).toBe(true)
+  // "Move out of section" lives in the unified Organise submenu. Open it, then
+  // click the eject item (getByText throws if the item is absent, which is the
+  // assertion that the contextual action is present for a section child).
+  await window.locator('[data-canvas-ctx-menu]').getByText('Organise', { exact: true }).hover()
+  await window.getByText('Move out of section', { exact: true }).click()
   await window.waitForTimeout(400)
 
   // Verify the child no longer has a parentSectionId
@@ -467,16 +460,9 @@ test('free layout: right-click "Move out of section" ejects child to canvas', as
   await childEl.click({ button: 'right' })
   await window.waitForTimeout(300)
 
-  const moved = await window.evaluate(() => {
-    const menu = document.querySelector('[data-canvas-ctx-menu]')
-    if (!menu) return false
-    const items = Array.from(menu.querySelectorAll('button'))
-    const btn = items.find((el) => el.textContent?.toLowerCase().includes('move out of section'))
-    if (!btn) return false
-    btn.click()
-    return true
-  })
-  expect(moved).toBe(true)
+  // Eject now lives in the unified Organise submenu — open it, then click.
+  await window.locator('[data-canvas-ctx-menu]').getByText('Organise', { exact: true }).hover()
+  await window.getByText('Move out of section', { exact: true }).click()
   await window.waitForTimeout(400)
 
   const result = await window.evaluate(
