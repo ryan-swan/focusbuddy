@@ -1070,6 +1070,16 @@ const api = {
       ipcRenderer.on('update:state', handler)
       return () => ipcRenderer.removeListener('update:state', handler)
     }
+  },
+  app: {
+    // Whether this launch followed an update (authoritative; main-process
+    // persisted). Drives the first-run "What's new" modal.
+    getLaunchInfo: (): Promise<{
+      version: string
+      previousVersion: string | null
+      wasUpdated: boolean
+      firstInstall: boolean
+    }> => ipcRenderer.invoke('app:get-launch-info')
   }
 }
 

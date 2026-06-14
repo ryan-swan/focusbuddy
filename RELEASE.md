@@ -9,6 +9,16 @@ footer. Mac reads `latest-mac.yml`; Windows reads `latest.yml`.
 
 A release is **not done** until `npm run release:verify` exits 0.
 
+Two things it enforces, both of which used to be forgotten:
+
+1. The complete auto-update asset set is published (see below). A missing
+   `latest-mac.yml` silently breaks updates.
+2. The in-app **What's New** is updated for this release. The newest versioned
+   entry in `src/renderer/src/lib/changelog.ts` must equal the released version,
+   with a `summary` and `links` so the first-run "What's new in vX.Y.Z" modal has
+   something to show. So every release, before building, add or refresh the top
+   changelog entry and set its `version` to the new package.json version.
+
 The recurring failure this prevents: uploading only the installer (the `.zip` /
 `.exe`) and forgetting the per-platform update manifest. When `latest-mac.yml`
 is missing, every Mac client's update check 404s and silently fails — the app

@@ -9,6 +9,9 @@ import Sidebar from './components/Sidebar'
 import MainPane from './components/MainPane'
 import ChatPanel from './components/ChatPanel'
 import TelemetryReporter from './components/TelemetryReporter'
+import ReleaseModal from './components/ReleaseModal'
+import Tooltip from './components/Tooltip'
+import { getPendingReleaseEntry, advanceRunVersion, type ChangelogEntry } from './lib/changelog'
 import Icon from './components/Icon'
 import SettingsPanel from './components/SettingsPanel'
 import Footer from './components/Footer'
@@ -60,6 +63,10 @@ export default function App(): JSX.Element {
   const [chatCollapsed, setChatCollapsed] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState<{ x: number; y: number } | null>(null)
   const [smartStackOpen, setSmartStackOpen] = useState(false)
+  // First-run "What's new in vX.Y.Z" modal — shown once on the first launch
+  // after an update. Resolved on mount; a fresh install sets the baseline
+  // silently so it never appears retroactively.
+  const [releaseEntry, setReleaseEntry] = useState<ChangelogEntry | null>(null)
   // AI Command Bar — the "AI is the OS" entry point. Opened from the
   // header button or Cmd+Shift+K. Owned at App level so any future hook
   // can summon it (a stuck-detector nudge, a contextual "did you mean…"
@@ -115,6 +122,25 @@ export default function App(): JSX.Element {
     void consumeAndSubscribe()
     return () => { detach?.() }
   }, [adoptHandoff])
+
+  // First launch after an update → show the "What's new" modal once for this
+  // version. The main process says authoritatively whether this boot followed
+  // an update; we then advance the run-version marker so the next update is
+  // detected. A fresh install shows nothing.
+  useEffect(() => {
+    let cancelled = false
+    const decide = (wasUpdated: boolean): void => {
+      if (cancelled) return
+      const entry = getPendingReleaseEntry({ wasUpdated })
+      if (entry) setReleaseEntry(entry)
+      advanceRunVersion()
+    }
+    void window.api.app
+      .getLaunchInfo()
+      .then((info) => decide(!!info?.wasUpdated))
+      .catch(() => decide(false))
+    return () => { cancelled = true }
+  }, [])
 
   useEffect(() => {
     void refresh()
@@ -199,12 +225,18 @@ export default function App(): JSX.Element {
     <div className="fb-app-shell flex flex-col">
       {/* Reports aggregate usage telemetry while signed in (admin Analytics). */}
       <TelemetryReporter />
+      {/* First-run "What's new in vX.Y.Z" after an update. */}
+      {releaseEntry && (
+        <ReleaseModal entry={releaseEntry} onClose={() => setReleaseEntry(null)} />
+      )}
       <header className="titlebar-drag fb-glass-chrome h-10 flex items-center justify-between px-3 border-b border-[color:var(--glass-chrome-border)] transition-colors">
         <div className="titlebar-nodrag flex items-center gap-2">
           {sidebarCollapsed && (
-            <button onClick={expandSidebar} className="icon-btn" title="Show workspace panel">
-              <Icon name="keyboard_double_arrow_right" size={16} />
-            </button>
+            <Tooltip content="Show the workspace panel — your folders, tasks and projects" placement="bottom">
+              <button onClick={expandSidebar} className="icon-btn" aria-label="Show workspace panel">
+                <Icon name="keyboard_double_arrow_right" size={16} />
+              </button>
+            </Tooltip>
           )}
           {/* "Local · encrypted" — the trust chip. Reflects whether the
               user has set up the vault (and unlocked it). Reinforces the
@@ -261,75 +293,90 @@ export default function App(): JSX.Element {
               entry point. Sits prominently in the header so it's the
               first affordance the eye lands on. Cmd+Shift+K opens it
               from anywhere. */}
-          <button
-            onClick={() => setAiBarOpen(true)}
-            className="h-7 px-2.5 inline-flex items-center gap-1.5 rounded-md text-[11px] font-medium text-stone-700 dark:text-stone-200 hover:bg-stone-100 dark:hover:bg-white/[0.06] border border-transparent hover:border-stone-200 dark:hover:border-white/[0.06] transition-colors"
-            title="AI command bar — describe what you want and AI builds it (⌘⇧K)"
-            aria-label="AI command bar"
+          <Tooltip
+            content="Ask AI — describe what you want in plain English and Haptyx builds it on your desk (⌘⇧K)"
+            placement="bottom"
           >
-            <Icon name="auto_awesome" size={12} className="text-accent" />
-            <span>Ask AI</span>
-            <kbd className="text-[9px] font-mono opacity-60 ml-0.5">⌘⇧K</kbd>
-          </button>
-          <button
-            onClick={() => canSmartStack && setSmartStackOpen(true)}
-            disabled={!canSmartStack}
-            className={`icon-btn ${canSmartStack ? '!text-accent' : ''}`}
-            title={
+            <button
+              onClick={() => setAiBarOpen(true)}
+              className="h-7 px-2.5 inline-flex items-center gap-1.5 rounded-md text-[11px] font-medium text-stone-700 dark:text-stone-200 hover:bg-stone-100 dark:hover:bg-white/[0.06] border border-transparent hover:border-stone-200 dark:hover:border-white/[0.06] transition-colors"
+              aria-label="AI command bar"
+            >
+              <Icon name="auto_awesome" size={12} className="text-accent" />
+              <span>Ask AI</span>
+              <kbd className="text-[9px] font-mono opacity-60 ml-0.5">⌘⇧K</kbd>
+            </button>
+          </Tooltip>
+          <Tooltip
+            placement="bottom"
+            content={
               canSmartStack
-                ? `Smart Stack — let AI group your ${unsectionedCount} unsectioned widgets into related sections`
+                ? `Smart Stack — let AI group your ${unsectionedCount} loose objects into related sections`
                 : activeTaskId
-                  ? 'Need at least 3 unsectioned widgets on the canvas to find groups'
-                  : 'Pick a task with widgets to Smart Stack'
+                  ? 'Smart Stack needs at least 3 loose objects on the canvas to find groups'
+                  : 'Smart Stack — pick a task with objects first'
             }
-            aria-label="Smart Stack"
           >
-            <Icon name="hub" size={16} filled={canSmartStack} />
-          </button>
-          <button
-            onClick={() => setBodyDoubleOpen(true)}
-            className="icon-btn relative"
-            title={
+            <button
+              onClick={() => canSmartStack && setSmartStackOpen(true)}
+              disabled={!canSmartStack}
+              className={`icon-btn ${canSmartStack ? '!text-accent' : ''}`}
+              aria-label="Smart Stack"
+            >
+              <Icon name="hub" size={16} filled={canSmartStack} />
+            </button>
+          </Tooltip>
+          <Tooltip
+            placement="bottom"
+            content={
               peerStatus === 'idle'
                 ? 'Body double — pair with someone to feel less alone while you work'
                 : peerStatus === 'looking'
                   ? 'Body double — searching for a partner…'
                   : peerStatus === 'matched'
                     ? 'Body double — partner found, click to greet'
-                    : 'Body double — session active, click to open panel'
+                    : 'Body double — session active, click to open the panel'
             }
-            aria-label="Body double"
           >
-            <Icon
-              name="diversity_3"
-              size={16}
-              filled={peerStatus !== 'idle'}
-              className={peerStatus !== 'idle' ? 'text-accent' : ''}
-            />
-            {/* Presence dot when a session is active */}
-            {peerStatus === 'connected' && (
-              <span className="absolute top-1 right-1 inline-flex h-1.5 w-1.5">
-                <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-70 animate-ping" />
-                <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
-              </span>
-            )}
-            {peerStatus === 'matched' && (
-              <span className="absolute top-1 right-1 h-1.5 w-1.5 rounded-full bg-accent" />
-            )}
-          </button>
-          <button
-            ref={settingsBtnRef}
-            onClick={toggleSettings}
-            className="icon-btn"
-            title="Appearance settings"
-            aria-label="Appearance settings"
-          >
-            <Icon name="settings" size={16} />
-          </button>
-          {chatCollapsed && (
-            <button onClick={expandChat} className="icon-btn" title="Show assistant panel">
-              <Icon name="keyboard_double_arrow_left" size={16} />
+            <button
+              onClick={() => setBodyDoubleOpen(true)}
+              className="icon-btn relative"
+              aria-label="Body double"
+            >
+              <Icon
+                name="diversity_3"
+                size={16}
+                filled={peerStatus !== 'idle'}
+                className={peerStatus !== 'idle' ? 'text-accent' : ''}
+              />
+              {/* Presence dot when a session is active */}
+              {peerStatus === 'connected' && (
+                <span className="absolute top-1 right-1 inline-flex h-1.5 w-1.5">
+                  <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-70 animate-ping" />
+                  <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                </span>
+              )}
+              {peerStatus === 'matched' && (
+                <span className="absolute top-1 right-1 h-1.5 w-1.5 rounded-full bg-accent" />
+              )}
             </button>
+          </Tooltip>
+          <Tooltip content="Appearance settings — theme, accent colour and font" placement="bottom">
+            <button
+              ref={settingsBtnRef}
+              onClick={toggleSettings}
+              className="icon-btn"
+              aria-label="Appearance settings"
+            >
+              <Icon name="settings" size={16} />
+            </button>
+          </Tooltip>
+          {chatCollapsed && (
+            <Tooltip content="Show the assistant panel" placement="bottom">
+              <button onClick={expandChat} className="icon-btn" aria-label="Show assistant panel">
+                <Icon name="keyboard_double_arrow_left" size={16} />
+              </button>
+            </Tooltip>
           )}
         </div>
       </header>

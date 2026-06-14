@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { CHANGELOG, hasUnseenChanges } from '../lib/changelog'
 import Icon from './Icon'
+import Tooltip from './Tooltip'
 import WhatsNewPanel from './WhatsNewPanel'
 import TermsModal from './TermsModal'
 import UpdaterBanner from './UpdaterBanner'
@@ -31,15 +32,19 @@ export default function Footer(): JSX.Element {
         <div className="flex items-center gap-2 truncate">
           <span>© {year} Haptyx</span>
           <span className="text-stone-300 dark:text-stone-700">·</span>
-          <button
-            type="button"
-            onClick={() => { void window.api.update.check() }}
-            className="text-stone-400 dark:text-stone-500 font-mono hover:text-stone-700 dark:hover:text-stone-200 transition-colors"
-            title={`Haptyx ${appVersion} · build ${buildDate} · click to check for updates`}
+          <Tooltip
+            placement="top"
+            content={`Haptyx ${appVersion}${buildDate ? ` · build ${buildDate}` : ''} — click to check for updates`}
           >
-            v{appVersion}
-            {buildDate && ` · ${buildDate}`}
-          </button>
+            <button
+              type="button"
+              onClick={() => { void window.api.update.check() }}
+              className="text-stone-400 dark:text-stone-500 font-mono hover:text-stone-700 dark:hover:text-stone-200 transition-colors"
+            >
+              v{appVersion}
+              {buildDate && ` · ${buildDate}`}
+            </button>
+          </Tooltip>
           <UpdaterBanner />
           <TrialBadge />
         </div>
@@ -51,16 +56,19 @@ export default function Footer(): JSX.Element {
             Terms of Use
           </button>
           <span className="text-stone-300 dark:text-stone-700">·</span>
-          <button
-            onClick={() => window.open('https://haptyx.app/help', '_blank', 'noopener,noreferrer')}
-            className="px-2 py-1 rounded hover:bg-stone-100 dark:hover:bg-stone-800 hover:text-stone-900 dark:hover:text-stone-100 transition-colors flex items-center gap-1"
-          >
-            <Icon name="help_outline" size={12} />
-            Help & support
-          </button>
+          <Tooltip placement="top" content="Open the Haptyx help centre in your browser — guides for every feature">
+            <button
+              onClick={() => window.open('https://haptyx.app/help', '_blank', 'noopener,noreferrer')}
+              className="px-2 py-1 rounded hover:bg-stone-100 dark:hover:bg-stone-800 hover:text-stone-900 dark:hover:text-stone-100 transition-colors flex items-center gap-1"
+            >
+              <Icon name="help_outline" size={12} />
+              Help & support
+            </button>
+          </Tooltip>
           <span className="text-stone-300 dark:text-stone-700">·</span>
           <button
             onClick={() => setShowWhatsNew(true)}
+            title="See everything that's changed across releases"
             className="relative px-2 py-1 rounded hover:bg-stone-100 dark:hover:bg-stone-800 hover:text-stone-900 dark:hover:text-stone-100 transition-colors flex items-center gap-1"
           >
             <Icon name="auto_awesome" size={12} className={unseen ? 'text-accent' : ''} />

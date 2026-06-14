@@ -76,6 +76,25 @@ verify_yml "latest-mac.yml"
 echo "[3/3] windows metadata integrity"
 verify_yml "latest.yml"
 
+# 4. The in-app "What's new" must be updated for this release. The newest
+#    versioned entry in the desktop changelog must equal the released version,
+#    otherwise users who update get an empty / stale What's New modal. This is
+#    the concrete enforcement of "update What's New on every release".
+echo "[4/4] changelog freshness"
+CHANGELOG_FILE="$(cd "$(dirname "$0")/.." && pwd)/src/renderer/src/lib/changelog.ts"
+if [ ! -f "$CHANGELOG_FILE" ]; then
+  note "could not find changelog at ${CHANGELOG_FILE}"
+  fail=1
+else
+  newest=$(grep -oE "version: '[0-9]+\.[0-9]+\.[0-9]+'" "$CHANGELOG_FILE" | head -1 | sed -E "s/version: '([0-9.]+)'/\1/")
+  if [ "$newest" = "$VERSION" ]; then
+    note "ok   changelog newest entry is ${VERSION}"
+  else
+    note "STALE  changelog newest versioned entry is '${newest:-none}', expected ${VERSION} — add/refresh the top entry in changelog.ts"
+    fail=1
+  fi
+fi
+
 if [ "$fail" -ne 0 ]; then
   echo
   echo "RELEASE INCOMPLETE — auto-update would 404 or be rejected. Fix the assets above before calling ${TAG} done."
@@ -83,4 +102,4 @@ if [ "$fail" -ne 0 ]; then
 fi
 
 echo
-echo "RELEASE OK — ${TAG} has a complete, verified updater asset set for mac + win."
+echo "RELEASE OK — ${TAG} has a complete, verified updater asset set for mac + win, and an up-to-date What's New."
