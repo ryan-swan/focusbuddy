@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { Rnd } from 'react-rnd'
 import { type CtxMenuItem } from '../CanvasContextMenu'
 import UnifiedWidgetMenu from '../contextMenu/UnifiedWidgetMenu'
+import WidgetSetupAffordance from './WidgetSetupAffordance'
 import { buildContextForWidget, buildContextForMulti } from '../../lib/contextMenu/buildContext'
 import type { FrameCallbacks } from '../../lib/contextMenu/types'
 import { FrameCallbacksProvider } from '../../lib/contextMenu/frameContext'
@@ -1002,8 +1003,9 @@ export default function WidgetFrame({
             </button>
           </div>
         </div>
-        <div className="flex-1 min-h-0">
+        <div className="relative flex-1 min-h-0">
           <FrameCallbacksProvider value={frameCallbacks}>{children}</FrameCallbacksProvider>
+          <WidgetSetupAffordance widget={widget} />
         </div>
       </div>
       {headerCtxMenu && (
