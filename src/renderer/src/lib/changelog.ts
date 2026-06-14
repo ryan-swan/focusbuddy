@@ -36,6 +36,21 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.29',
+    date: '2026-06-14T22:00:00Z',
+    title: 'v2.5.29 — A clearer, more consistent interface',
+    tag: 'design',
+    summary:
+      'First step of a UX clean-up. The create action is now an obvious accent "+ Widget" button, the two near-identical AI build buttons are merged into one, AI uses a single icon throughout, and collapsed side panels show a labelled tab instead of a bare arrow so you can tell what is hidden.',
+    highlights: [
+      'The toolbar\'s create action is now a clearly highlighted "+ Widget" button, in every theme, instead of a faint "+ Add".',
+      'The two similar "Build with AI" and "AI Setup" buttons on the canvas are merged into a single "Build with AI". The task-scoped setup suggestions are still available from each task in the sidebar.',
+      'AI is now shown with one consistent icon across the toolbar and AI controls.',
+      'When the workspace or assistant panel is collapsed, the toggle now reads "Workspace" or "Assistant" instead of an ambiguous arrow.'
+    ],
+    links: [{ label: 'Finding your way around', href: `${HELP_BASE}/getting-around` }]
+  },
+  {
     version: '2.5.28',
     date: '2026-06-14T20:00:00Z',
     title: 'v2.5.28 — Working help links + recent improvements',
