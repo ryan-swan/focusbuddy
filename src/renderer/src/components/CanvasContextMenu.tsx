@@ -25,10 +25,22 @@ interface Props {
 // steps back out, and Escape on the root closes everything. Mouse and hover
 // behave exactly as before.
 export default function CanvasContextMenu({ x, y, items, onClose }: Props): JSX.Element {
+  // Keep the latest onClose in a ref so the dismiss listener can be attached
+  // ONCE and never re-armed. Depending on `onClose` (a fresh arrow on every
+  // parent render) used to reset the 50ms arm on each re-render, so the
+  // mousedown listener could fail to attach at all — that is why clicking
+  // outside did not dismiss the menu, and why a second right-click stacked a new
+  // menu on top of the old one instead of replacing it.
+  const onCloseRef = useRef(onClose)
+  onCloseRef.current = onClose
   useEffect(() => {
     function onMouseDown(e: MouseEvent): void {
+      // Ignore the right button: a right-click elsewhere is about to open/move a
+      // menu, and that flow replaces this one. Closing here would race the
+      // re-open and leave nothing. Left/middle clicks outside dismiss.
+      if (e.button === 2) return
       const target = e.target as Element | null
-      if (target && !target.closest('[data-canvas-ctx-menu]')) onClose()
+      if (target && !target.closest('[data-canvas-ctx-menu]')) onCloseRef.current()
     }
     // Small delay so the right-click that just opened the menu isn't caught.
     const armId = window.setTimeout(() => window.addEventListener('mousedown', onMouseDown), 50)
@@ -36,7 +48,7 @@ export default function CanvasContextMenu({ x, y, items, onClose }: Props): JSX.
       window.removeEventListener('mousedown', onMouseDown)
       window.clearTimeout(armId)
     }
-  }, [onClose])
+  }, [])
 
   return <MenuPanel items={items} x={x} y={y} onClose={onClose} isRoot autoFocus />
 }

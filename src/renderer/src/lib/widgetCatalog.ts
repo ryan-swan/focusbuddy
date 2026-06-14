@@ -138,8 +138,10 @@ export const WIDGET_CATALOG: WidgetCatalogEntry[] = [
     label: 'Browser',
     icon: 'public',
     hint: 'Any URL — a focused browser tab for this task',
-    defaultWidth: 560,
-    defaultHeight: 400,
+    // Open at Laptop size (1366 × 768) so sites render their desktop layout
+    // instead of a cramped mobile one. The size presets can change it after.
+    defaultWidth: 1366,
+    defaultHeight: 768,
     defaultContent: '',
     urlPlaceholder: 'https://…',
     isWebBased: true

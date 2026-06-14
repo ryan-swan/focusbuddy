@@ -787,19 +787,21 @@ export default function WidgetFrame({
             return
           }
           // Suppress the click that fires immediately after a drag-end —
-          // react-rnd doesn't natively distinguish them. A drop is NOT a
-          // request to centre the camera; the user just placed the widget
-          // and would be disoriented by a pan.
+          // react-rnd doesn't natively distinguish them.
           if (performance.now() - dragJustEnded.current < 250) return
-          // Deliberate click → centre the camera on the widget. Pinned
-          // widgets are always visible (docked to a screen corner) so
-          // centering them would jump to whatever stale world-space coord
-          // they had before pinning — just activate them.
-          if (isPinned) {
-            setActive(widget.id)
-          } else {
-            focusOn(widget.id)
-          }
+          // A single click only ACTIVATES the widget — it never shifts the
+          // world under you. Centring is a deliberate double-click (below).
+          // This is what fixes "the camera drifts after I move it": a click
+          // after a pan used to re-centre the camera on the clicked widget.
+          setActive(widget.id)
+        }}
+        onDoubleClick={(e) => {
+          // Deliberate double-click → centre the camera on this widget. Pinned
+          // widgets are screen-docked, so centring would jump to a stale
+          // world-space coord — just activate those.
+          e.stopPropagation()
+          if (isPinned) setActive(widget.id)
+          else focusOn(widget.id)
         }}
         className={`h-full w-full flex flex-col rounded-[12px] overflow-hidden border bg-white dark:bg-stone-900 fb-spring-snap ${
           selected
