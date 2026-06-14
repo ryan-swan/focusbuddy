@@ -35,6 +35,7 @@ import {
   updateWidget
 } from '../db/widgets'
 import { collectTelemetry, recordAiCall } from '../db/telemetry'
+import { getLaunchInfo } from '../launchVersion'
 import {
   createLink,
   deleteLink,
@@ -1157,6 +1158,11 @@ export function registerIpcHandlers(): void {
     void downloadAndInstallMacUpdate()
     return { ok: true }
   })
+
+  // First-run detection for the "What's new" modal: did this launch follow an
+  // update? Authoritative because main persists the last-run version in
+  // userData (the renderer can't tell a fresh install from an upgrade).
+  ipcMain.handle('app:get-launch-info', () => getLaunchInfo())
 
   // ── Settings: API-key vault ──────────────────────────────────────────────
   // Replaces the old "edit projects/focusbuddy/.env and restart" flow with

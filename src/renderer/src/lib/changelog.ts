@@ -2,15 +2,60 @@
 // Add a new entry every time a meaningful feature ships. Keep dates absolute (ISO).
 // The footer's "What's new" button shows an indicator dot when the most recent
 // entry's date is newer than the user's last-seen timestamp (localStorage).
+//
+// RELEASE DISCIPLINE: every release must add/refresh the top entry and set its
+// `version` to the new package.json version. The release gate
+// (scripts/verify-release-assets.sh) FAILS if the newest entry's `version` does
+// not match the released version, so an out-of-date What's New blocks the
+// release. The first-run "What's new in vX.Y.Z" modal reads the entry whose
+// `version` equals the running app version.
+
+// Base for per-feature support articles on the brochure help centre.
+export const HELP_BASE = 'https://haptyx.app/help'
+
+export interface ChangelogLink {
+  label: string
+  href: string // a haptyx.app/help/<slug> support page (opened in the browser)
+}
 
 export interface ChangelogEntry {
   date: string // ISO yyyy-mm-dd (or full ISO datetime)
   title: string
   highlights: string[]
   tag?: 'feature' | 'polish' | 'fix' | 'design'
+  // Set on every shipped release so the first-run modal can match the running
+  // app version. Older historical entries may omit it.
+  version?: string
+  // One short paragraph shown at the top of the first-run modal. Plain prose.
+  summary?: string
+  // "Learn more" support links shown in the modal and the What's New panel.
+  links?: ChangelogLink[]
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '2.5.26',
+    date: '2026-06-14T12:00:00Z',
+    title: 'v2.5.26 — In-app help, tooltips, and recent UX upgrades',
+    tag: 'feature',
+    summary:
+      'This update makes Haptyx easier to learn as you go. Hover the toolbar and AI controls to see what each one does, get a short summary like this one after every update, and open the new help centre for step-by-step guides. It also gathers up the interface improvements from the last few releases so they are easy to find.',
+    highlights: [
+      'New: hover tooltips on the top toolbar and the AI controls explain what each button does, so you no longer have to guess from an icon.',
+      'New: after every update, a short "What\'s new" summary like this one appears on first open, with links through to help articles.',
+      'New: a help centre at haptyx.app/help with guides for the features below, reachable from the footer\'s Help and Support link.',
+      'Right-click menus are now genuinely contextual per object — a file offers Open and Copy URL, a colour offers Copy hex, a table offers Add row, and a section offers a layout choice, instead of one generic menu.',
+      'Build with AI works on more objects — describe what you want and Haptyx drafts the contents for you to approve.',
+      'Sharing a folder or task by email now tracks who you invited and whether they have opened it, visible to your admin.',
+      'Updating on Mac is now a reliable one-click install from the footer.'
+    ],
+    links: [
+      { label: 'Finding your way around', href: `${HELP_BASE}/getting-around` },
+      { label: 'Right-click menus', href: `${HELP_BASE}/right-click-menus` },
+      { label: 'Build with AI', href: `${HELP_BASE}/ai-assistant` },
+      { label: 'Sharing and invites', href: `${HELP_BASE}/sharing-and-invites` }
+    ]
+  },
   {
     date: '2026-06-06T12:00:00Z',
     title: 'v2.5 — Shapes, Cards, Custom Blocks & multi-select',
@@ -462,6 +507,69 @@ export function hasUnseenChanges(): boolean {
   if (CHANGELOG.length === 0) return false
   const newestMs = new Date(CHANGELOG[0].date).getTime()
   return newestMs > lastSeen
+}
+
+// ── First-run "What's new in vX.Y.Z" release modal ──────────────────────────
+// Distinct from the timestamp-based unseen dot above: this fires ONCE per app
+// version, on the first launch after an update, and shows that version's
+// summary + highlights + support links. Keyed by version so it survives a
+// localStorage clock change and never re-shows for a version already seen.
+
+const RELEASE_SEEN_KEY = 'fb.app.releaseModalVersion' // version whose modal was shown
+const LAST_RUN_KEY = 'fb.app.lastRunVersion' // version the app last booted as
+
+// The running app version, injected at build time. 'dev' in unpackaged dev.
+declare const __APP_VERSION__: string | undefined
+export function getAppVersion(): string {
+  return typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : 'dev'
+}
+
+export function getReleaseEntryForVersion(version: string): ChangelogEntry | null {
+  return CHANGELOG.find((e) => e.version === version) ?? null
+}
+
+// The newest entry that declares a version — used by the release gate to assert
+// the changelog was updated for the release.
+export function newestVersionedEntry(): ChangelogEntry | null {
+  return CHANGELOG.find((e) => !!e.version) ?? null
+}
+
+function getReleaseSeenVersion(): string | null {
+  if (typeof localStorage === 'undefined') return null
+  return localStorage.getItem(RELEASE_SEEN_KEY)
+}
+
+// The release entry to auto-show now, or null. "After an update" is decided two
+// ways, either is sufficient: the main process reports wasUpdated (authoritative
+// — it persists the last-run version in userData), or the renderer's own
+// last-run-version marker differs from the current version (covers every update
+// after the first, and is what the e2e/unit tests drive). A fresh install has
+// neither, so it shows nothing. The release-seen marker prevents re-showing on a
+// reload within the same version. Pure (no writes); caller then advances the
+// run version via advanceRunVersion().
+export function getPendingReleaseEntry(opts?: { wasUpdated?: boolean }): ChangelogEntry | null {
+  const cur = getAppVersion()
+  if (cur === 'dev') return null
+  if (getReleaseSeenVersion() === cur) return null
+  const entry = getReleaseEntryForVersion(cur)
+  if (!entry) return null
+  const lastRun = typeof localStorage !== 'undefined' ? localStorage.getItem(LAST_RUN_KEY) : null
+  const updatedByHistory = lastRun !== null && lastRun !== cur
+  if (!(opts?.wasUpdated || updatedByHistory)) return null
+  return entry
+}
+
+// Record the current version as seen so the modal does not fire again for it.
+export function markReleaseSeen(version?: string): void {
+  if (typeof localStorage === 'undefined') return
+  localStorage.setItem(RELEASE_SEEN_KEY, version ?? getAppVersion())
+}
+
+// Record the current version as the last one booted. Call once per launch after
+// deciding whether to show the modal, so the NEXT update is detected.
+export function advanceRunVersion(): void {
+  if (typeof localStorage === 'undefined') return
+  localStorage.setItem(LAST_RUN_KEY, getAppVersion())
 }
 
 export function formatRelativeTime(iso: string): string {
