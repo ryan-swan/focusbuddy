@@ -63,6 +63,49 @@ test('theme studio switches the UI font and sets a custom accent live', async ()
   expect(persisted.custom).toBe('#0ea5e9')
 })
 
+test('gemstone theme applies live and re-tints to a gem accent', async () => {
+  launched = await launchApp()
+  const { window } = launched
+  await waitForReady(window)
+
+  await window.getByRole('button', { name: 'Appearance settings' }).click()
+  await window.locator('[data-testid="open-theme-studio"]').click()
+  await expect(window.locator('[data-testid="theme-builder"]')).toBeVisible()
+
+  // Selecting Gemstone toggles the .gemstone class onto the document root and
+  // resolves to a dark effective theme. The class is what every .gemstone CSS
+  // rule keys off, so its presence proves the reskin is live, not just stored.
+  await window.locator('[data-testid="themestudio-mode-gemstone"]').click()
+  await window.waitForTimeout(700) // ride out the theme ritual veil
+  const themeState = await window.evaluate(() => {
+    const root = document.documentElement
+    return {
+      hasGemstone: root.classList.contains('gemstone'),
+      isDark: root.classList.contains('dark'),
+      persisted: localStorage.getItem('fb.theme.mode')
+    }
+  })
+  expect(themeState.hasGemstone).toBe(true)
+  expect(themeState.isDark).toBe(true)
+  expect(themeState.persisted).toBe('gemstone')
+
+  // The Ruby preset accent (added for Gemstone) resolves to its dark-variant
+  // rgb triplet and drives the shared --accent token the whole theme reads.
+  await window.locator('[data-testid="themestudio-accent-ruby"]').click()
+  await window.waitForTimeout(700)
+  const accent = await window.evaluate(() => {
+    const root = document.documentElement
+    return {
+      dataAccent: root.getAttribute('data-accent'),
+      accent: getComputedStyle(root).getPropertyValue('--accent').trim(),
+      stillGemstone: root.classList.contains('gemstone')
+    }
+  })
+  expect(accent.dataAccent).toBe('ruby')
+  expect(accent.accent).toBe('248 113 132') // ruby dark base
+  expect(accent.stillGemstone).toBe(true)
+})
+
 test('theme studio deep customisation drives background, glass and icon vars', async () => {
   launched = await launchApp()
   const { window } = launched

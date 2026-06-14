@@ -155,6 +155,12 @@ export default function ThemeBuilder({
                 theme to use a custom accent.
               </p>
             )}
+            {mode === 'gemstone' && (
+              <p className="text-[10px] text-stone-500 dark:text-stone-400 mt-1.5 leading-snug">
+                Gemstone re-tints its sparkle and refraction to your accent. The Emerald, Ruby
+                and Sapphire accents below are tuned to it.
+              </p>
+            )}
           </section>
 
           {/* Accent */}

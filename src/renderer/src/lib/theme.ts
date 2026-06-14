@@ -1,11 +1,19 @@
 import { useEffect, useState } from 'react'
 import { futuristicPowerOn, futuristicPowerOff } from './audioBeep'
 
-export type ThemeMode = 'light' | 'dark' | 'auto' | 'futuristic' | 'atelier'
-// The five hand-tuned presets, plus 'custom' for a user-chosen accent (any
-// hex). The presets carry a light/dark palette pair; 'custom' is resolved at
-// apply-time from the stored hex with an auto-derived hover.
-export type PresetAccent = 'violet' | 'blue' | 'emerald' | 'rose' | 'heritage'
+export type ThemeMode = 'light' | 'dark' | 'auto' | 'futuristic' | 'atelier' | 'gemstone'
+// The hand-tuned presets, plus 'custom' for a user-chosen accent (any hex).
+// The presets carry a light/dark palette pair; 'custom' is resolved at
+// apply-time from the stored hex with an auto-derived hover. ruby + sapphire are
+// the gem accents that pair with the Gemstone theme (emerald already exists).
+export type PresetAccent =
+  | 'violet'
+  | 'blue'
+  | 'emerald'
+  | 'rose'
+  | 'heritage'
+  | 'ruby'
+  | 'sapphire'
 export type AccentColor = PresetAccent | 'custom'
 
 // Curated, accessibility-first interface faces. Free for everyone — this is
@@ -43,6 +51,17 @@ const ACCENT_PALETTES: Record<PresetAccent, { light: AccentPalette; dark: Accent
   heritage: {
     light: { base: '180 138 70', hover: '156 113 53' },
     dark: { base: '201 169 97', hover: '224 196 137' }
+  },
+  // Ruby — a warm, deep jewel red, richer than rose. Sapphire — a royal blue,
+  // deeper than the plain blue accent. Both are tuned to glow on the Gemstone
+  // theme's near-black ground while staying legible in light mode.
+  ruby: {
+    light: { base: '201 31 58', hover: '168 22 44' },
+    dark: { base: '248 113 132', hover: '252 150 165' }
+  },
+  sapphire: {
+    light: { base: '30 78 216', hover: '30 58 138' },
+    dark: { base: '110 160 250', hover: '150 190 255' }
   }
 }
 
@@ -56,6 +75,8 @@ export const ACCENT_OPTIONS: Array<{ value: PresetAccent; label: string; preview
   { value: 'violet', label: 'Violet', preview: '#7c3aed' },
   { value: 'blue', label: 'Blue', preview: '#2563eb' },
   { value: 'emerald', label: 'Emerald', preview: '#059669' },
+  { value: 'ruby', label: 'Ruby', preview: '#c91f3a' },
+  { value: 'sapphire', label: 'Sapphire', preview: '#1e4ed8' },
   { value: 'rose', label: 'Rose', preview: '#e11d48' },
   { value: 'heritage', label: 'Heritage', preview: '#b48a46' }
 ]
@@ -230,11 +251,16 @@ export const THEME_OPTIONS: Array<{ value: ThemeMode; label: string; icon: strin
   // content surfaces, heritage-gold accent locked in. Hairline borders,
   // restrained typography, no bright colors anywhere. The "I'm in the
   // exclusive club" theme.
-  { value: 'atelier', label: 'Atelier', icon: 'workspace_premium' }
+  { value: 'atelier', label: 'Atelier', icon: 'workspace_premium' },
+  // Gemstone — the jewel theme. Onyx-black ground, faceted glass surfaces,
+  // prismatic light refraction on edges, and a slow, whisper-soft sparkle.
+  // Pairs with the emerald / ruby / sapphire gem accents. The "this is
+  // exquisite" theme.
+  { value: 'gemstone', label: 'Gemstone', icon: 'diamond' }
 ]
 
 export function getEffectiveTheme(mode: ThemeMode): 'light' | 'dark' {
-  if (mode === 'futuristic' || mode === 'atelier') return 'dark'
+  if (mode === 'futuristic' || mode === 'atelier' || mode === 'gemstone') return 'dark'
   if (mode === 'auto') {
     if (typeof window === 'undefined') return 'light'
     return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
@@ -250,6 +276,7 @@ export function applyTheme(mode: ThemeMode, accent: AccentColor, customHex?: str
   root.classList.toggle('dark', effective === 'dark')
   root.classList.toggle('futuristic', mode === 'futuristic')
   root.classList.toggle('atelier', mode === 'atelier')
+  root.classList.toggle('gemstone', mode === 'gemstone')
   // Atelier locks the accent to heritage gold — overriding the user's pick.
   // We don't persist this back; if they switch off atelier, their preferred
   // accent returns. (atelier IS the look — the whole point is the cohesion.)
