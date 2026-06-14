@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import Icon from './Icon'
+import { PRICING_URL } from '../lib/siteUrls'
 import {
   useStoredTier,
   useTrial,
@@ -91,7 +92,7 @@ function TierPickerModal({ onClose }: { onClose: () => void }): JSX.Element {
     onClose()
   }
   const openPricing = (): void => {
-    window.open('https://haptyx.app/pricing', '_blank', 'noopener,noreferrer')
+    window.open(PRICING_URL, '_blank', 'noopener,noreferrer')
     stayOnFree() // record acknowledgment so we don't immediately re-pop
   }
   return (

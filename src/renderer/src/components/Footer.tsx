@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { CHANGELOG, hasUnseenChanges } from '../lib/changelog'
 import Icon from './Icon'
 import Tooltip from './Tooltip'
+import { HELP_BASE } from '../lib/siteUrls'
 import WhatsNewPanel from './WhatsNewPanel'
 import TermsModal from './TermsModal'
 import UpdaterBanner from './UpdaterBanner'
@@ -58,7 +59,7 @@ export default function Footer(): JSX.Element {
           <span className="text-stone-300 dark:text-stone-700">·</span>
           <Tooltip placement="top" content="Open the Haptyx help centre in your browser — guides for every feature">
             <button
-              onClick={() => window.open('https://haptyx.app/help', '_blank', 'noopener,noreferrer')}
+              onClick={() => window.open(HELP_BASE, '_blank', 'noopener,noreferrer')}
               className="px-2 py-1 rounded hover:bg-stone-100 dark:hover:bg-stone-800 hover:text-stone-900 dark:hover:text-stone-100 transition-colors flex items-center gap-1"
             >
               <Icon name="help_outline" size={12} />
