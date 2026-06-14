@@ -233,8 +233,13 @@ export default function App(): JSX.Element {
         <div className="titlebar-nodrag flex items-center gap-2">
           {sidebarCollapsed && (
             <Tooltip content="Show the workspace panel — your folders, tasks and projects" placement="bottom">
-              <button onClick={expandSidebar} className="icon-btn" aria-label="Show workspace panel">
-                <Icon name="keyboard_double_arrow_right" size={16} />
+              <button
+                onClick={expandSidebar}
+                className="h-7 px-2 inline-flex items-center gap-1 rounded-md text-[11px] font-medium text-stone-600 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-white/[0.06] border border-stone-200/70 dark:border-white/10 transition-colors"
+                aria-label="Show workspace panel"
+              >
+                <Icon name="keyboard_double_arrow_right" size={14} />
+                <span>Workspace</span>
               </button>
             </Tooltip>
           )}
@@ -373,8 +378,13 @@ export default function App(): JSX.Element {
           </Tooltip>
           {chatCollapsed && (
             <Tooltip content="Show the assistant panel" placement="bottom">
-              <button onClick={expandChat} className="icon-btn" aria-label="Show assistant panel">
-                <Icon name="keyboard_double_arrow_left" size={16} />
+              <button
+                onClick={expandChat}
+                className="h-7 px-2 inline-flex items-center gap-1 rounded-md text-[11px] font-medium text-stone-600 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-white/[0.06] border border-stone-200/70 dark:border-white/10 transition-colors"
+                aria-label="Show assistant panel"
+              >
+                <span>Assistant</span>
+                <Icon name="keyboard_double_arrow_left" size={14} />
               </button>
             </Tooltip>
           )}

@@ -2012,21 +2012,17 @@ export default function Canvas(): JSX.Element {
             <Icon name={status.icon} size={14} />
             <span>{status.label}</span>
           </button>
+          {/* One AI build entry on the canvas (was two near-identical buttons,
+              "Build with AI" + "AI Setup"). The task-scoped suggestion flow
+              still lives on each task in the sidebar; this is the freeform
+              "describe what you want" builder. Single auto_awesome AI icon. */}
           <button
             onClick={() => setShowAiBuilder(true)}
-            className="btn-ghost"
-            title="Describe what you want to build — AI suggests pages, tables, fields, files"
-          >
-            <Icon name="auto_fix_high" size={14} className="text-accent" />
-            <span>Build with AI</span>
-          </button>
-          <button
-            onClick={() => setShowAISetup(true)}
-            className="btn-ghost"
-            title="Let the AI suggest widgets you need to start this task"
+            className="btn-ghost !text-accent"
+            title="Build with AI — describe what you want and AI drafts the widgets for this task"
           >
             <Icon name="auto_awesome" size={14} className="text-accent" />
-            <span>AI Setup</span>
+            <span>Build with AI</span>
           </button>
           <FivePromiseButton taskId={activeTask.id} />
           <button
