@@ -36,6 +36,21 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.32',
+    date: '2026-06-15T14:00:00Z',
+    title: 'v2.5.32 — Menu, camera and browser fixes',
+    tag: 'fix',
+    summary:
+      'A batch of interaction fixes: right-click menus now close when you click away and no longer stack copies, clicking a widget no longer makes the canvas drift, double-clicking centres it again, and new browsers open at a sensible laptop size.',
+    highlights: [
+      'Right-click menus close when you click elsewhere, instead of needing the Esc key, and a second right-click repositions the one menu rather than stacking duplicates.',
+      'Clicking a widget no longer shifts the canvas under you. To centre on a widget, double-click it; for a browser, double-click its title bar.',
+      'New browser widgets open at laptop size (1366 × 768) so sites show their full desktop layout instead of a cramped mobile one. You can still snap to other sizes from the browser\'s size menu.',
+      'Note, page and markdown widgets keep a fixed size and scroll when their content runs long.'
+    ],
+    links: [{ label: 'Right-click menus', href: `${HELP_BASE}/right-click-menus` }]
+  },
+  {
     version: '2.5.31',
     date: '2026-06-15T09:00:00Z',
     title: 'v2.5.31 — Set up with AI on empty widgets',
