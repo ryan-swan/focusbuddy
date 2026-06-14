@@ -1,63 +1,101 @@
 # Haptyx desktop — release workflow
 
-The desktop app polls **GitHub Releases** for updates. When you publish a new release, every installed copy detects it within 4 hours (or instantly via the "v2.3.0" pill in the footer → "check for updates" click), downloads in the background, and shows an **Install v2.x.x** button in the footer when ready.
+The desktop app auto-updates from **GitHub Releases**. electron-updater on each
+client fetches the update manifest from the newest release and, if it names a
+higher version, downloads the payload and offers an **Install** button in the
+footer. Mac reads `latest-mac.yml`; Windows reads `latest.yml`.
+
+## THE RULE (non-negotiable)
+
+A release is **not done** until `npm run release:verify` exits 0.
+
+The recurring failure this prevents: uploading only the installer (the `.zip` /
+`.exe`) and forgetting the per-platform update manifest. When `latest-mac.yml`
+is missing, every Mac client's update check 404s and silently fails — the app
+looks fine but can never update itself. The manifest, not the installer, is what
+the updater reads, so the installer alone is a broken release.
+
+Therefore:
+
+- Never hand-upload release assets with a bare `gh release upload <zip>`. Use
+  `npm run release:mac`, which uploads the **complete** mac set and then runs the
+  gate.
+- Every release must ship, per platform, all of: the installer, its `.blockmap`,
+  and the manifest `.yml`. The gate enforces the full set for mac **and** win.
+- The final step of any release, by a human or an agent, is `npm run
+  release:verify`. If it is red, the release is not finished — fix the assets and
+  re-run until it is green. "It built" and "the zip uploaded" are not "it can
+  update."
 
 ## Cut a release
 
 ```bash
-# 1. Make sure everything is committed + ON A TAG
-git status                # working tree clean
-git tag v2.3.0            # SemVer tag matching package.json version
-git push origin v2.3.0    # push the tag to GitHub
-
-# 2. Authenticate to GitHub (one-time per shell)
-export GH_TOKEN=ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-# Token needs `public_repo` or `repo` scope.
-# Create one at https://github.com/settings/tokens
-
-# 3. Build + publish the zip + latest-mac.yml to GitHub Releases as a draft
 cd projects/focusbuddy
-npm run dist:release
 
-# 4. Open the draft on GitHub, add release notes, click "Publish release".
-# That's it — installed copies will pick it up.
+# 1. Bump version in package.json, commit, tag, push the branch.
+# 2. Build the signed mac zip (produces zip + blockmap + latest-mac.yml in release/).
+VITE_USE_REMOTE_SIGNAL=true \
+VITE_SIGNAL_HTTP_URL=https://focusbuddy-signal.fly.dev \
+VITE_SIGNAL_WS_URL=wss://focusbuddy-signal.fly.dev/ws \
+VITE_VIEWER_URL=https://focusbuddy-viewer.vercel.app \
+  npm run dist:zip
+
+# 3. Build Windows via CI and wait for it, then create the release with the mac zip:
+gh workflow run build-windows.yml --ref rebrand/archeon
+gh release create vX.Y.Z release/Haptyx-X.Y.Z-mac-arm64.zip --title "Haptyx X.Y.Z" --notes "..."
+
+# 4. Attach the COMPLETE mac update set + run the gate (this is the step that
+#    used to be skipped). Defaults the version from package.json:
+npm run release:mac
+
+# 5. Attach the Windows installer + its manifest from the CI artifact:
+gh run download <run-id> -n haptyx-windows-installer -D /tmp/win
+gh release upload vX.Y.Z /tmp/win/Haptyx-X.Y.Z-win-x64.exe /tmp/win/latest.yml --clobber
+
+# 6. FINAL GATE — the release is not done until this is green:
+npm run release:verify
 ```
 
-## What gets published
+`npm run release:mac` uploads `Haptyx-X.Y.Z-mac-arm64.zip`, its `.blockmap`, and
+`latest-mac.yml` (with `--clobber`, so re-running is safe), then runs the gate.
+`npm run release:verify` independently re-checks the whole release for both
+platforms: every asset reachable (HTTP 200) and the sha512 inside each manifest
+matching the binary GitHub actually serves.
 
-electron-builder uploads three artifacts to the draft release:
+## What gets published (the complete set)
 
-- `Haptyx-2.3.0-mac-arm64.zip` — the app bundle (what installs)
-- `Haptyx-2.3.0-mac-arm64.zip.blockmap` — delta-update metadata (smaller patches on the next version)
-- `latest-mac.yml` — the manifest electron-updater reads to know "is there a new version?"
+Per the arm64 zip target, electron-builder writes three mac files into
+`release/`, and all three must reach the release:
 
-The `latest-mac.yml` is what `autoUpdater.checkForUpdates()` fetches from
-`https://github.com/saasmouth/focusbuddy/releases/latest/download/latest-mac.yml`.
-The version, file URLs, and SHA512 hashes inside drive the update flow.
+- `Haptyx-X.Y.Z-mac-arm64.zip` — the app bundle that installs
+- `Haptyx-X.Y.Z-mac-arm64.zip.blockmap` — differential-update map
+- `latest-mac.yml` — the manifest electron-updater reads; **its absence is the
+  bug that breaks updates**
+
+Windows (built in CI) contributes:
+
+- `Haptyx-X.Y.Z-win-x64.exe` — the installer
+- `latest.yml` — the Windows update manifest
 
 ## How the in-app side works
 
-- On boot, after 30s, `installAutoUpdater()` calls `checkForUpdates()`. Repeats every 4h.
-- The version pill in the footer (`v2.3.0 · 2026-06-01`) is also a button — clicking forces an immediate check.
-- State transitions broadcast via `update:state` IPC. The renderer's `UpdaterBanner` subscribes and shows:
-  - `checking` → faint pulsing dot
-  - `available` → "Update available · v2.3.1" (auto-download in progress)
-  - `downloading` → "Downloading · NN%"
-  - `ready` → **"Install v2.3.1"** button → calls `quitAndInstall(true, true)` → relaunches into the new version
-  - `error` → "Update check failed — retry"
+- On boot, `installAutoUpdater()` calls `checkForUpdates()`, then repeats on an
+  interval. The footer version pill is also a manual "check now" button.
+- State transitions broadcast via `update:state` IPC; the renderer's
+  `UpdaterBanner` shows checking / available / downloading / **Install** / error.
+- `quitAndInstall(true, true)` relaunches into the new version.
 
-The "stays as a chip in the footer" design is deliberate — no modal popup. The user installs when they want.
+## Signing
 
-## What if I don't want auto-updates yet?
+The app is **ad-hoc signed** (`build/adhoc-sign.cjs`). electron-updater verifies
+the downloaded payload's sha512 against the manifest, which is why a correct,
+matching `latest-mac.yml` is mandatory. With a real Apple cert later, the same
+flow continues to work.
 
-`autoUpdater.autoDownload = false` would gate the download behind a manual click. Currently it's `true`. Easy toggle in `src/main/autoUpdate.ts`.
+## Scripts
 
-## Notarization / signing
-
-Right now the app is **ad-hoc signed** (via `build/adhoc-sign.cjs`). Once we have an Apple Developer cert and notarization wired up, the same flow continues to work — electron-updater verifies signatures against the cert, so a signed update replaces an ad-hoc signed install seamlessly.
-
-## What doesn't work yet
-
-- **Windows / Linux**: the publish config publishes only mac-arm64 zip. Add `--win nsis` / `--linux AppImage` to the release command when we ship those.
-- **Delta updates**: electron-builder writes the blockmap, but full-replace is what happens until we have at least two consecutive releases on the channel.
-- **Dev builds**: `installAutoUpdater()` is a no-op when `app.isPackaged === false`. Run a packaged build (`npm run dist:zip`) to exercise the flow locally.
+- `scripts/release-mac.sh [version]` — upload the full mac set, then gate. Refuses
+  to proceed if `latest-mac.yml` is missing or names a different version.
+- `scripts/verify-release-assets.sh [version]` — the standalone completeness gate
+  used by `npm run release:verify`. Runs on macOS and Linux/CI (uses `openssl`).
+  Version defaults to `package.json`.
