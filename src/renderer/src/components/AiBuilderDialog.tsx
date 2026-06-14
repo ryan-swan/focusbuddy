@@ -10,6 +10,11 @@ interface Props {
   // Called when the user clicks "Add selected" — the picked subset is
   // returned. Caller spawns the widgets on the canvas (Canvas owns layout).
   onAccept: (selected: AiBuildSuggestion[]) => Promise<void>
+  // When the Ask AI command bar has already prepared suggestions, it opens this
+  // dialog preloaded with them so the user goes straight to the preview/pick
+  // step instead of re-typing a prompt.
+  initialSuggestions?: AiBuildSuggestion[]
+  initialIntent?: string
 }
 
 type State =
@@ -26,9 +31,24 @@ type State =
 // Layout: split. Left side = the prompt input (top) + intent summary; right
 // side = scrollable suggestion cards with checkboxes. Bottom action bar with
 // "Generate again" and "Add selected".
-export default function AiBuilderDialog({ taskId, onClose, onAccept }: Props): JSX.Element {
+export default function AiBuilderDialog({
+  taskId,
+  onClose,
+  onAccept,
+  initialSuggestions,
+  initialIntent
+}: Props): JSX.Element {
   const [prompt, setPrompt] = useState('')
-  const [state, setState] = useState<State>({ stage: 'prompt' })
+  const [state, setState] = useState<State>(
+    initialSuggestions && initialSuggestions.length > 0
+      ? {
+          stage: 'ready',
+          intent: initialIntent ?? '',
+          suggestions: initialSuggestions,
+          selected: new Set(initialSuggestions.map((s) => s.id))
+        }
+      : { stage: 'prompt' }
+  )
   const inputRef = useRef<HTMLTextAreaElement | null>(null)
   // Magnetic refs for primary actions — the generate + apply buttons feel
   // like they're pulled toward your cursor as you approach them.
