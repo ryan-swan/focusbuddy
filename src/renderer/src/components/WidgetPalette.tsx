@@ -90,14 +90,22 @@ export default function WidgetPalette({
         ref={buttonRef}
         onClick={() => !disabled && setOpen((v) => !v)}
         disabled={disabled}
-        className={`btn-ghost ${open ? 'bg-stone-200/70 dark:bg-stone-700/70' : ''}`}
-        title="Add a desk object"
+        // Accent-tinted so the primary "create something" action is the most
+        // visible control in the toolbar, in every theme (it keys off the
+        // --accent token, not a fixed stone colour). Labelled "Widget" so its
+        // purpose is explicit rather than a generic "Add".
+        className={`inline-flex items-center gap-1.5 h-7 px-2.5 rounded-md text-[12px] font-semibold border transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+          open
+            ? 'bg-accent/25 border-accent/60 text-accent'
+            : 'bg-accent/10 border-accent/40 text-accent hover:bg-accent/20 hover:border-accent/60'
+        }`}
+        title="Add a widget to your desk"
         aria-haspopup="dialog"
         aria-expanded={open}
         data-testid="palette-add-button"
       >
         <Icon name="add" size={14} />
-        <span>Add</span>
+        <span>Widget</span>
       </button>
       {open && popoverPos && createPortal(
         <div
