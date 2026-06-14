@@ -100,7 +100,7 @@ export default function FieldWidget({ widget, inline = false }: Props): JSX.Elem
   // Picker — shown when no type chosen yet.
   if (!state) {
     const body = (
-      <div className="h-full w-full bg-stone-50 dark:bg-stone-900 p-3 overflow-y-auto">
+      <div className="min-h-full w-full bg-stone-50 dark:bg-stone-900 p-3">
         <div className="flex items-center gap-1.5 mb-3">
           <Icon name="tune" size={14} className="text-accent shrink-0" />
           <div className="text-[11px] uppercase tracking-wider font-semibold text-stone-600 dark:text-stone-300">
@@ -136,7 +136,7 @@ export default function FieldWidget({ widget, inline = false }: Props): JSX.Elem
 
   const body = (
     <div
-      className="h-full w-full bg-white dark:bg-stone-900 p-3 flex flex-col gap-2.5 overflow-y-auto"
+      className="min-h-full w-full bg-white dark:bg-stone-900 p-3 flex flex-col gap-2.5"
       onContextMenu={(e) => {
         // Right-click anywhere on the field body opens the "Create +
         // connect" menu. Shift bypass restores the native menu on

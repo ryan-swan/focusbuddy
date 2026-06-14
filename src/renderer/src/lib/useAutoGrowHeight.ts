@@ -14,43 +14,22 @@ import type { Widget, WidgetKind } from '@shared/types'
 // measurement matches and it stops. Skipped for section children (the section
 // lays them out) and pinned widgets (screen-docked).
 
-// Which kinds grow to fit their content. The exceptions keep a fixed size and
-// manage their own content, so they are NOT auto-grown (and the frame must not
-// clip them):
-//   - long-form text you scroll: note, page, markdown, living-doc
-//   - a fixed browser/embedded viewport: webview, gdoc, gsheet, gslide, email
-//   - media with their own fit/aspect + controls: file, pdf, image, video
-//   - their own internal scroll or pan-canvas: table, mindmap, diagram,
-//     scratchpad, streamdeck
-//   - geometry computed elsewhere: section (from children), minimap/portal
-//     (derived), shape (a freely-resized vector)
-const FIXED_SCROLL_OR_DERIVED: ReadonlySet<WidgetKind> = new Set<WidgetKind>([
-  'note',
-  'page',
-  'markdown',
-  'living-doc',
-  'webview',
-  'gdoc',
-  'gsheet',
-  'gslide',
-  'email',
-  'file',
-  'pdf',
-  'image',
-  'video',
-  'table',
-  'mindmap',
-  'diagram',
-  'scratchpad',
-  'streamdeck',
-  'section',
-  'minimap',
-  'portal',
-  'shape'
+// Which kinds grow to fit their content. This is an explicit ALLOWLIST: a kind
+// auto-grows only once its widget renders natural-height content (and has been
+// verified), so adding the behaviour is opt-in per widget and can never clip a
+// kind that still manages its own size. Everything not listed keeps its current
+// behaviour — long-form text (note/page/markdown/living-doc) scrolls, the
+// browser + embedded viewports keep their size, media keeps its fit, and the
+// internal-scroll / pan-canvas / geometry-computed kinds are unchanged.
+const AUTO_GROW_KINDS: ReadonlySet<WidgetKind> = new Set<WidgetKind>([
+  'sticky',
+  'card',
+  'field',
+  'task-link'
 ])
 
 export function autoGrowsHeight(kind: WidgetKind): boolean {
-  return !FIXED_SCROLL_OR_DERIVED.has(kind)
+  return AUTO_GROW_KINDS.has(kind)
 }
 
 const MIN_H = 120

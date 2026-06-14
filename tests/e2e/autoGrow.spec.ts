@@ -68,6 +68,36 @@ test('AG-2 — a card with short content stays small', async () => {
   expect(h).toBeLessThan(260)
 })
 
+test('AG-4 — a field picker grows to fit its type grid', async () => {
+  launched = await launchApp()
+  const { window } = launched
+  await waitForReady(window)
+  const id = await window.evaluate(async () => {
+    const api = (window as unknown as { api: typeof window.api }).api
+    const t = await api.nodes.create({ parentId: null, kind: 'task', title: 'FieldGrowTest' })
+    // No content → the field shows its (tall) type picker grid.
+    const w = await api.widgets.create({
+      taskId: t.id,
+      kind: 'field',
+      title: '',
+      content: '',
+      x: 200,
+      y: 200,
+      width: 280,
+      height: 120
+    })
+    return w.id
+  })
+  await window.reload()
+  await waitForReady(window)
+  await window.getByRole('button', { name: /FieldGrowTest/ }).first().click()
+  await window.waitForSelector('[data-canvas-surface="true"]', { timeout: 8000 })
+  await window.waitForSelector(`[data-widget-id="${id}"]`, { timeout: 8000 })
+  await window.waitForTimeout(600)
+  const h = await heightOf(launched, id)
+  expect(h).toBeGreaterThan(180)
+})
+
 test('AG-3 — a sticky with long content grows instead of scrolling', async () => {
   launched = await launchApp()
   const { window } = launched

@@ -36,6 +36,20 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.34',
+    date: '2026-06-15T20:00:00Z',
+    title: 'v2.5.34 — More widgets grow to fit their content',
+    tag: 'feature',
+    summary:
+      'Continuing the auto-sizing work, field widgets and task links now grow to fit their content too, alongside stickies and cards. The widgets that genuinely manage their own size keep doing so on purpose.',
+    highlights: [
+      'Field widgets and task links join stickies and cards in growing to fit their content rather than hiding it behind a scrollbar.',
+      'The widgets that should keep a fixed size and scroll or pan are left that way deliberately: long-form notes, pages and markdown, the browser and embedded documents, media, tables, mind maps, diagrams and the agent chat.',
+      'All of this runs on the one shared sizing mechanism, so a widget either grows consistently or keeps its own size — never a different behaviour in different places.'
+    ],
+    links: [{ label: 'Finding your way around', href: `${HELP_BASE}/getting-around` }]
+  },
+  {
     version: '2.5.33',
     date: '2026-06-15T18:00:00Z',
     title: 'v2.5.33 — Widgets grow to fit their content',
