@@ -10,8 +10,10 @@
 // release. The first-run "What's new in vX.Y.Z" modal reads the entry whose
 // `version` equals the running app version.
 
-// Base for per-feature support articles on the brochure help centre.
-export const HELP_BASE = 'https://haptyx.app/help'
+// Base for per-feature support articles on the brochure help centre. Single
+// source of truth lives in siteUrls.ts; re-exported here for the entries below.
+import { HELP_BASE } from './siteUrls'
+export { HELP_BASE }
 
 export interface ChangelogLink {
   label: string
@@ -33,6 +35,25 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '2.5.28',
+    date: '2026-06-14T20:00:00Z',
+    title: 'v2.5.28 — Working help links + recent improvements',
+    tag: 'polish',
+    summary:
+      'The in-app Help and Support links now open the live help centre, and the recent improvements are gathered here in case you are coming from an older version. Hover the toolbar to learn the controls, and updating on Mac is now reliable.',
+    highlights: [
+      'The Help and Support link and the "Learn more" links now open the live help centre, instead of a web address that was not connected yet.',
+      'Mac updates are reliable: updating prompts for your administrator password when needed and completes, and never loops on the old version.',
+      'Hover tooltips on the top toolbar and AI controls explain what each one does, and a short What\'s new summary appears after each update.',
+      'Right-click menus are contextual per object, and Build with AI works across more of them.'
+    ],
+    links: [
+      { label: 'Finding your way around', href: `${HELP_BASE}/getting-around` },
+      { label: 'Right-click menus', href: `${HELP_BASE}/right-click-menus` },
+      { label: 'Sharing and invites', href: `${HELP_BASE}/sharing-and-invites` }
+    ]
+  },
   {
     version: '2.5.27',
     date: '2026-06-14T18:00:00Z',
@@ -57,7 +78,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     highlights: [
       'New: hover tooltips on the top toolbar and the AI controls explain what each button does, so you no longer have to guess from an icon.',
       'New: after every update, a short "What\'s new" summary like this one appears on first open, with links through to help articles.',
-      'New: a help centre at haptyx.app/help with guides for the features below, reachable from the footer\'s Help and Support link.',
+      'New: a help centre with guides for the features below, reachable from the footer\'s Help and Support link.',
       'Right-click menus are now genuinely contextual per object — a file offers Open and Copy URL, a colour offers Copy hex, a table offers Add row, and a section offers a layout choice, instead of one generic menu.',
       'Build with AI works on more objects — describe what you want and Haptyx drafts the contents for you to approve.',
       'Sharing a folder or task by email now tracks who you invited and whether they have opened it, visible to your admin.',

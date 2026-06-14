@@ -1,6 +1,7 @@
 import Icon from './Icon'
 import { useUpgradePromptStore } from '../stores/upgradePrompt'
 import { useStoredTier } from '../stores/capabilities'
+import { PRICING_URL } from '../lib/siteUrls'
 
 // Single global modal for capability gates. Driven by useUpgradePromptStore;
 // any gated action calls promptUpgrade('<reason>') and this renders. Mounted
@@ -18,7 +19,7 @@ export default function UpgradePromptModal(): JSX.Element | null {
 
   const tierName = requiredTier === 'team' ? 'Team' : 'Pro'
   const openPricing = (): void => {
-    window.open('https://haptyx.app/pricing', '_blank', 'noopener,noreferrer')
+    window.open(PRICING_URL, '_blank', 'noopener,noreferrer')
     dismiss()
   }
 
