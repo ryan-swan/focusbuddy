@@ -4,6 +4,7 @@ import { Rnd } from 'react-rnd'
 import { type CtxMenuItem } from '../CanvasContextMenu'
 import UnifiedWidgetMenu from '../contextMenu/UnifiedWidgetMenu'
 import WidgetSetupAffordance from './WidgetSetupAffordance'
+import { useAutoGrowHeight, autoGrowsHeight } from '../../lib/useAutoGrowHeight'
 import { buildContextForWidget, buildContextForMulti } from '../../lib/contextMenu/buildContext'
 import type { FrameCallbacks } from '../../lib/contextMenu/types'
 import { FrameCallbacksProvider } from '../../lib/contextMenu/frameContext'
@@ -146,6 +147,11 @@ export default function WidgetFrame({
   // key-change re-mount. Re-mounting is fatal for <webview> children
   // because Electron creates a fresh process and the URL fully reloads.
   const rndRef = useRef<Rnd | null>(null)
+  // Auto-grow: the body's content height drives the widget height for kinds that
+  // grow (everything except long-form text, the browser, and the geometry-
+  // computed kinds). Self-gates by kind / section-child / pinned.
+  const bodyRef = useRef<HTMLDivElement>(null)
+  useAutoGrowHeight(widget, bodyRef)
 
   // Scale the widget by a multiplicative factor (1.5 = +50%, 1/1.5 = -50%
   // symmetric inverse). Used by the header +/− buttons and the legacy
@@ -1005,7 +1011,12 @@ export default function WidgetFrame({
             </button>
           </div>
         </div>
-        <div className="relative flex-1 min-h-0">
+        <div
+          ref={bodyRef}
+          className={`relative flex-1 min-h-0 ${
+            autoGrowsHeight(widget.kind) && !isChildOfSection && !isPinned ? 'overflow-hidden' : ''
+          }`}
+        >
           <FrameCallbacksProvider value={frameCallbacks}>{children}</FrameCallbacksProvider>
           <WidgetSetupAffordance widget={widget} />
         </div>
