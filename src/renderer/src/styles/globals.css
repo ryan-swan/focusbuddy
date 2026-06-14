@@ -1581,3 +1581,414 @@ body {
 .dark ::-webkit-scrollbar-thumb:hover {
   background: rgba(168, 162, 158, 0.4);
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   GEMSTONE — the jewel theme.
+
+   Onyx-black ground, faceted glass surfaces, prismatic light refraction along
+   every edge, and a slow whisper-soft sparkle drifting across the room. The
+   facets and refraction are fixed spectral colour (the diamond quality), while
+   every glow re-tints to the chosen accent, so emerald, ruby and sapphire each
+   recolour the light without changing the structure. Built to feel premium and
+   beautiful to work inside, not busy.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.gemstone {
+  color-scheme: dark;
+  /* The prismatic spectrum, reused on every refraction edge and glint. A
+     travelling gradient: emerald → sapphire → amethyst → ruby → topaz, fading
+     to nothing at both ends so a 200%-wide copy can shimmer through. */
+  --gem-spectrum: linear-gradient(
+    100deg,
+    rgba(52, 211, 153, 0) 0%,
+    rgba(52, 211, 153, 0.6) 12%,
+    rgba(56, 189, 248, 0.6) 30%,
+    rgba(167, 139, 250, 0.55) 48%,
+    rgba(251, 113, 133, 0.55) 66%,
+    rgba(250, 204, 21, 0.5) 82%,
+    rgba(52, 211, 153, 0) 100%
+  );
+}
+
+/* ── The room ──────────────────────────────────────────────────────────────
+   Onyx base with jewel-tone washes caught in the dark, plus broad conic facet
+   slices radiating from the crown, as light moves across a cut stone. */
+.gemstone body {
+  background:
+    /* faceted crown — broad spectral slices from just above the top edge */
+    conic-gradient(
+      from 200deg at 50% -12%,
+      rgba(56, 189, 248, 0.06) 0deg,
+      transparent 26deg,
+      rgba(167, 139, 250, 0.055) 52deg,
+      transparent 82deg,
+      rgba(52, 211, 153, 0.05) 110deg,
+      transparent 142deg,
+      rgba(251, 113, 133, 0.045) 168deg,
+      transparent 200deg,
+      rgba(56, 189, 248, 0.05) 232deg,
+      transparent 270deg,
+      rgba(167, 139, 250, 0.045) 312deg,
+      transparent 348deg
+    ),
+    /* jewel washes — emerald crown, sapphire and ruby at the lower corners */
+    radial-gradient(ellipse 72% 46% at 50% -2%, rgba(52, 211, 153, 0.13) 0%, transparent 60%),
+    radial-gradient(ellipse 56% 42% at 10% 98%, rgba(56, 189, 248, 0.1) 0%, transparent 64%),
+    radial-gradient(ellipse 56% 42% at 90% 98%, rgba(251, 113, 133, 0.085) 0%, transparent 64%),
+    /* accent-tinted core glow rising from the floor */
+    radial-gradient(ellipse 90% 60% at 50% 112%, rgba(var(--accent), 0.1) 0%, transparent 60%),
+    #06070c !important;
+  background-attachment: fixed !important;
+  position: relative;
+}
+
+/* Faceted crystalline lattice — fine diagonal cuts over the whole room, drifting
+   slowly so the facets feel like they catch and release the light. Whisper
+   opacity; reads as material, not as a grid. */
+.gemstone body::after {
+  content: '';
+  position: fixed;
+  inset: -64px;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.55;
+  background-image:
+    repeating-linear-gradient(60deg, rgba(255, 255, 255, 0.014) 0 1px, transparent 1px 72px),
+    repeating-linear-gradient(-60deg, rgba(255, 255, 255, 0.014) 0 1px, transparent 1px 72px),
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.009) 0 1px, transparent 1px 124px);
+  animation: gem-facet-drift 42s ease-in-out infinite alternate;
+}
+
+/* Sparkle field A — glints scattered across the whole viewport, breathing
+   between dim and bright on a slow, irregular pulse. */
+.gemstone body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background-image:
+    radial-gradient(circle 1.5px at 17% 21%, rgba(255, 255, 255, 0.95), transparent 62%),
+    radial-gradient(circle 1px at 71% 15%, rgba(206, 240, 255, 0.85), transparent 62%),
+    radial-gradient(circle 1.3px at 39% 63%, rgba(255, 238, 246, 0.85), transparent 62%),
+    radial-gradient(circle 1px at 85% 57%, rgba(214, 255, 233, 0.8), transparent 62%),
+    radial-gradient(circle 1.4px at 57% 87%, rgba(255, 255, 255, 0.9), transparent 62%),
+    radial-gradient(circle 1px at 8% 79%, rgba(223, 233, 255, 0.8), transparent 62%),
+    radial-gradient(circle 1.2px at 93% 86%, rgba(255, 246, 214, 0.78), transparent 62%),
+    radial-gradient(circle 1px at 47% 9%, rgba(235, 226, 255, 0.78), transparent 62%);
+  animation: gem-sparkle-a 5.4s ease-in-out infinite;
+}
+
+@keyframes gem-sparkle-a {
+  0%, 100% { opacity: 0.28; }
+  44% { opacity: 0.95; }
+  62% { opacity: 0.5; }
+}
+
+@keyframes gem-sparkle-b {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 0.16; }
+}
+
+@keyframes gem-facet-drift {
+  0% { transform: translate3d(0, 0, 0); }
+  100% { transform: translate3d(26px, 18px, 0); }
+}
+
+/* A travelling spectral shimmer for refraction edges — the 200%-wide gem
+   spectrum slides through the 1px (or hairline) window of an edge. */
+@keyframes gem-refract {
+  0% { background-position: 200% 0; }
+  100% { background-position: -100% 0; }
+}
+
+/* The active-widget halo pulses on a gem-pulse rather than the violet one. */
+.gemstone .widget-glow {
+  animation: futuristic-pulse 2.6s ease-in-out infinite;
+}
+
+/* ── Glass chrome — header + sidebar ──────────────────────────────────────
+   Deep onyx glass. Each carries a travelling prismatic hairline along its
+   inner edge, so the chrome looks like the bevelled rim of a cut stone. */
+.gemstone header {
+  border-color: rgba(255, 255, 255, 0.05) !important;
+  background: rgba(9, 10, 17, 0.66) !important;
+  backdrop-filter: saturate(155%) blur(30px) !important;
+  -webkit-backdrop-filter: saturate(155%) blur(30px) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05) !important;
+  position: relative;
+}
+.gemstone header::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  pointer-events: none;
+  background-image: var(--gem-spectrum);
+  background-size: 200% 100%;
+  opacity: 0.7;
+  animation: gem-refract 11s linear infinite;
+}
+
+.gemstone aside {
+  background: rgba(9, 10, 17, 0.6) !important;
+  backdrop-filter: saturate(155%) blur(30px) !important;
+  -webkit-backdrop-filter: saturate(155%) blur(30px) !important;
+  border-color: rgba(255, 255, 255, 0.05) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04) !important;
+  position: relative;
+}
+.gemstone aside::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  width: 1px;
+  pointer-events: none;
+  background-image: var(--gem-spectrum);
+  background-size: 100% 200%;
+  opacity: 0.45;
+  animation: gem-refract 14s linear infinite reverse;
+}
+
+/* Sidebar's sticky section bands fade into the glass. */
+.gemstone aside .bg-stone-50,
+.gemstone aside .bg-stone-900 {
+  background: transparent !important;
+}
+
+/* Dashboard / soft cards — faceted onyx glass that lifts on hover with an
+   accent-tinted halo. */
+.gemstone .fb-glass-soft,
+.gemstone [class*='rounded-xl'][class*='backdrop-blur'] {
+  background-color: rgba(255, 255, 255, 0.028) !important;
+  border-color: rgba(255, 255, 255, 0.055) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 1px 2px rgba(0, 0, 0, 0.34),
+    0 16px 40px -16px rgba(0, 0, 0, 0.55) !important;
+  backdrop-filter: blur(30px) !important;
+  -webkit-backdrop-filter: blur(30px) !important;
+  transition:
+    transform 240ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    box-shadow 240ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    border-color 240ms cubic-bezier(0.2, 0.8, 0.2, 1) !important;
+}
+
+.gemstone .fb-glass-soft:hover,
+.gemstone [class*='rounded-xl'][class*='backdrop-blur']:hover {
+  transform: translateY(-1px);
+  border-color: rgba(255, 255, 255, 0.09) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.07),
+    0 0 0 1px rgba(var(--accent), 0.12),
+    0 12px 32px -8px rgba(var(--accent), 0.2),
+    0 24px 56px -24px rgba(0, 0, 0, 0.62) !important;
+}
+
+/* Floating chrome — command pill, minimap, zoom, right-rail. */
+.gemstone .fb-glass-chrome {
+  background-color: rgba(13, 15, 24, 0.74) !important;
+  border-color: rgba(255, 255, 255, 0.07) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.07),
+    0 1px 2px rgba(0, 0, 0, 0.34),
+    0 16px 48px -12px rgba(0, 0, 0, 0.6) !important;
+  backdrop-filter: blur(30px) !important;
+  -webkit-backdrop-filter: blur(30px) !important;
+}
+
+/* Desk surface — near-black onyx glass with a faint accent breath at centre
+   and a sparkle field of its own (phase-offset from the room's), so the canvas
+   itself twinkles while you work. */
+.gemstone .desk-paper {
+  background:
+    radial-gradient(ellipse 52% 36% at 50% 50%, rgba(var(--accent), 0.04) 0%, transparent 66%),
+    #05060a !important;
+  position: relative;
+}
+.gemstone .desk-paper::before,
+.gemstone .desk-paper::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+/* faint jewel vignette in the corners of the desk */
+.gemstone .desk-paper::before {
+  background:
+    radial-gradient(ellipse 40% 50% at 0% 0%, rgba(52, 211, 153, 0.05) 0%, transparent 60%),
+    radial-gradient(ellipse 40% 50% at 100% 100%, rgba(56, 189, 248, 0.045) 0%, transparent 60%);
+}
+/* desk sparkle field B */
+.gemstone .desk-paper::after {
+  background-image:
+    radial-gradient(circle 1.3px at 28% 34%, rgba(255, 255, 255, 0.9), transparent 60%),
+    radial-gradient(circle 1px at 63% 26%, rgba(214, 245, 255, 0.82), transparent 60%),
+    radial-gradient(circle 1.2px at 78% 70%, rgba(255, 235, 245, 0.82), transparent 60%),
+    radial-gradient(circle 1px at 44% 78%, rgba(226, 255, 238, 0.8), transparent 60%),
+    radial-gradient(circle 1px at 15% 62%, rgba(232, 232, 255, 0.78), transparent 60%);
+  animation: gem-sparkle-b 6.7s ease-in-out infinite;
+}
+
+/* Drag grid — register marks in faint accent, matched to the gem ground. */
+.fb-canvas-dragging.gemstone .desk-paper,
+.gemstone .fb-canvas-dragging .desk-paper {
+  background:
+    linear-gradient(to right, rgba(var(--accent), 0.06) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(var(--accent), 0.06) 1px, transparent 1px),
+    radial-gradient(ellipse 52% 36% at 50% 50%, rgba(var(--accent), 0.04) 0%, transparent 66%),
+    #05060a !important;
+  background-size: 24px 24px, 24px 24px, auto, auto !important;
+}
+
+/* Primary buttons — a polished gem cabochon in the accent colour, with a
+   bright top bevel and an accent halo that brightens on hover. */
+.gemstone .btn-primary {
+  background: linear-gradient(
+    180deg,
+    rgba(var(--accent), 0.98),
+    rgba(var(--accent-hover), 0.98)
+  ) !important;
+  border: none !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    0 0 0 1px rgba(var(--accent), 0.34),
+    0 1px 2px rgba(0, 0, 0, 0.34),
+    0 12px 32px -8px rgba(var(--accent), 0.42) !important;
+  transition:
+    box-shadow 200ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    transform 120ms cubic-bezier(0.2, 0.8, 0.2, 1) !important;
+}
+.gemstone .btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.34),
+    0 0 0 1px rgba(var(--accent), 0.55),
+    0 1px 2px rgba(0, 0, 0, 0.34),
+    0 16px 40px -8px rgba(var(--accent), 0.58) !important;
+}
+
+.gemstone .text-accent {
+  text-shadow: 0 0 12px rgba(var(--accent), 0.4);
+}
+
+.gemstone .border-stone-200,
+.gemstone .border-stone-300,
+.gemstone .border-stone-700,
+.gemstone .border-stone-800 {
+  border-color: rgba(255, 255, 255, 0.055) !important;
+}
+
+/* ── Desk objects (widgets) — faceted gem glass ───────────────────────────
+   Each widget is a small cut stone: deep onyx body, a bright top bevel, and a
+   thin prismatic refraction line tracing the very top edge. */
+.gemstone [data-widget-id] {
+  background-color: rgba(14, 16, 28, 0.93) !important;
+  border-color: rgba(255, 255, 255, 0.07) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 1px 2px rgba(0, 0, 0, 0.44),
+    0 12px 32px -12px rgba(0, 0, 0, 0.6) !important;
+  position: relative;
+}
+/* prismatic top-edge refraction — sits just inside the rounded corners */
+.gemstone [data-widget-id]::before {
+  content: '';
+  position: absolute;
+  left: 9px;
+  right: 9px;
+  top: 0;
+  height: 1px;
+  pointer-events: none;
+  z-index: 2;
+  background-image: var(--gem-spectrum);
+  background-size: 200% 100%;
+  opacity: 0.5;
+  animation: gem-refract 13s linear infinite;
+}
+
+/* widget header strip */
+.gemstone [data-widget-id] > div[class*='cursor-move'] {
+  background: rgba(255, 255, 255, 0.03) !important;
+  border-color: rgba(255, 255, 255, 0.05) !important;
+  color: rgb(186, 230, 218) !important;
+}
+
+/* widget content bodies — unify the stone/white shades to gem-glass */
+.gemstone [data-widget-id] .bg-white,
+.gemstone [data-widget-id] [class*='bg-white']:not([class*='bg-white/']),
+.gemstone [data-widget-id] [class*='bg-stone-50']:not([class*='bg-stone-50/']),
+.gemstone [data-widget-id] [class*='bg-stone-100']:not([class*='bg-stone-100/']),
+.gemstone [data-widget-id] [class*='bg-stone-200']:not([class*='bg-stone-200/']),
+.gemstone [data-widget-id] .dark\:bg-stone-900,
+.gemstone [data-widget-id] [class*='bg-stone-900']:not([class*='bg-stone-900/']),
+.gemstone [data-widget-id] [class*='bg-stone-800']:not([class*='bg-stone-800/']),
+.gemstone [data-widget-id] [class*='bg-stone-700']:not([class*='bg-stone-700/']) {
+  background-color: rgba(14, 16, 28, 0.86) !important;
+}
+
+.gemstone [data-widget-id] [class*='bg-white\\/'],
+.gemstone [data-widget-id] [class*='bg-stone-900\\/'] {
+  background-color: rgba(14, 16, 28, 0.78) !important;
+}
+
+/* widget text */
+.gemstone [data-widget-id] .text-stone-900,
+.gemstone [data-widget-id] [class*='text-stone-900'],
+.gemstone [data-widget-id] [class*='text-stone-800'] {
+  color: rgb(228, 234, 240) !important;
+}
+.gemstone [data-widget-id] [class*='text-stone-700'],
+.gemstone [data-widget-id] [class*='text-stone-600'] {
+  color: rgb(196, 204, 216) !important;
+}
+.gemstone [data-widget-id] [class*='text-stone-500'],
+.gemstone [data-widget-id] [class*='text-stone-400'] {
+  color: rgb(142, 152, 174) !important;
+}
+
+.gemstone [data-widget-id] [class*='border-stone-200'],
+.gemstone [data-widget-id] [class*='border-stone-300'],
+.gemstone [data-widget-id] [class*='border-stone-700'],
+.gemstone [data-widget-id] [class*='border-stone-800'] {
+  border-color: rgba(255, 255, 255, 0.07) !important;
+}
+
+/* sticky — user's colour survives as a top accent strip */
+.gemstone [data-widget-kind="sticky"] .fb-sticky-body {
+  background-color: rgba(18, 20, 34, 0.93) !important;
+  border-top: 3px solid var(--fb-sticky-tint, rgb(var(--accent))) !important;
+  box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.04);
+}
+.gemstone [data-widget-kind="sticky"] .fb-sticky-textarea {
+  color: rgb(228, 234, 240) !important;
+}
+.gemstone [data-widget-kind="sticky"] .fb-sticky-textarea::placeholder {
+  color: rgba(196, 204, 216, 0.45) !important;
+}
+.gemstone [data-widget-kind="sticky"] .fb-sticky-body > div > button {
+  border-color: rgba(255, 255, 255, 0.14) !important;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.05);
+}
+
+/* calculator — match the futuristic recessed-glass treatment */
+.gemstone [data-widget-kind="calculator"] > div {
+  background-color: rgba(14, 16, 28, 0.93) !important;
+}
+
+/* Respect reduced-motion — hold the sparkle and refraction still. */
+@media (prefers-reduced-motion: reduce) {
+  .gemstone body::before,
+  .gemstone body::after,
+  .gemstone .desk-paper::after,
+  .gemstone header::after,
+  .gemstone aside::after,
+  .gemstone [data-widget-id]::before {
+    animation: none !important;
+  }
+}
