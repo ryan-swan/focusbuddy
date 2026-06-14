@@ -36,6 +36,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.30',
+    date: '2026-06-14T23:30:00Z',
+    title: 'v2.5.30 — One "Ask AI"',
+    tag: 'design',
+    summary:
+      'There is now a single "Ask AI" everywhere — the header, the canvas toolbar, and Cmd+Shift+K all open the same command bar. Describing what you want now builds it on your desk in one flow, instead of preparing objects and then asking you to open a separate builder.',
+    highlights: [
+      'The canvas "Build with AI" button is now "Ask AI", and opens the same command bar as the header button and Cmd+Shift+K.',
+      'Asking AI to add objects now hands them straight to the builder preview on your desk to pick and place, rather than a message telling you to open another builder.'
+    ],
+    links: [{ label: 'Finding your way around', href: `${HELP_BASE}/getting-around` }]
+  },
+  {
     version: '2.5.29',
     date: '2026-06-14T22:00:00Z',
     title: 'v2.5.29 — A clearer, more consistent interface',

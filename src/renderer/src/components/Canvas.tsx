@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNodeStore } from '../stores/nodes'
 import { useWidgetStore } from '../stores/widgets'
+import { useAiCommandBar } from '../stores/aiCommandBar'
 import { useConnectedAppsStore } from '../stores/connectedApps'
 import { CONNECTED_APP_DRAG_MIME } from './Sidebar'
 import StickyWidget from './widgets/StickyWidget'
@@ -313,6 +314,14 @@ export default function Canvas(): JSX.Element {
   // AI Setup (which is task-context-driven and uses the older suggestion
   // format).
   const [showAiBuilder, setShowAiBuilder] = useState(false)
+  // When the Ask AI command bar prepares object suggestions it stashes them in
+  // the store; we open the builder preview here, preloaded, so the user goes
+  // straight to picking and placing (no second prompt, no dead-end alert).
+  const aiBuildHandoff = useAiCommandBar((s) => s.handoff)
+  const clearAiBuildHandoff = useAiCommandBar((s) => s.setHandoff)
+  useEffect(() => {
+    if (aiBuildHandoff && aiBuildHandoff.suggestions.length > 0) setShowAiBuilder(true)
+  }, [aiBuildHandoff])
   const welcomedTasksRef = useRef<Set<string>>(new Set())
   const [ctxMenu, setCtxMenu] = useState<{
     screenX: number
@@ -2012,17 +2021,16 @@ export default function Canvas(): JSX.Element {
             <Icon name={status.icon} size={14} />
             <span>{status.label}</span>
           </button>
-          {/* One AI build entry on the canvas (was two near-identical buttons,
-              "Build with AI" + "AI Setup"). The task-scoped suggestion flow
-              still lives on each task in the sidebar; this is the freeform
-              "describe what you want" builder. Single auto_awesome AI icon. */}
+          {/* The single "Ask AI" entry, same command bar as the header (and
+              Cmd+Shift+K). It prepares object suggestions, then hands them to
+              the builder preview on the canvas for one-click placement. */}
           <button
-            onClick={() => setShowAiBuilder(true)}
+            onClick={() => useAiCommandBar.getState().setOpen(true)}
             className="btn-ghost !text-accent"
-            title="Build with AI — describe what you want and AI drafts the widgets for this task"
+            title="Ask AI — describe what you want and AI builds it on this desk (⌘⇧K)"
           >
             <Icon name="auto_awesome" size={14} className="text-accent" />
-            <span>Build with AI</span>
+            <span>Ask AI</span>
           </button>
           <FivePromiseButton taskId={activeTask.id} />
           <button
@@ -2390,7 +2398,12 @@ export default function Canvas(): JSX.Element {
       {showAiBuilder && (
         <AiBuilderDialog
           taskId={activeTaskId ?? null}
-          onClose={() => setShowAiBuilder(false)}
+          initialSuggestions={aiBuildHandoff?.suggestions}
+          initialIntent={aiBuildHandoff?.intent}
+          onClose={() => {
+            setShowAiBuilder(false)
+            clearAiBuildHandoff(null)
+          }}
           onAccept={handleAiBuilderAccept}
         />
       )}

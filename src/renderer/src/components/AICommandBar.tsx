@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import type { ChatMessage, NodeDraft } from '@shared/types'
 import { useNodeStore } from '../stores/nodes'
 import { useViewStore } from '../stores/view'
+import { useAiCommandBar } from '../stores/aiCommandBar'
 import Icon from './Icon'
 
 // AICommandBar — the "AI as the primary OS" surface. Lives in the header.
@@ -204,15 +205,13 @@ export default function AICommandBar({ open, onClose }: Props): JSX.Element | nu
         setError(res.error || 'The builder couldn\'t apply those objects.')
         return
       }
-      // Spawning is owned by the existing AiBuilderDialog accept path; for
-      // the command-bar one-shot flow we just route the user there with
-      // the suggestions preloaded would be cleanest. Simpler v1: show the
-      // user we've prepared them and ask them to confirm in the canvas.
-      window.alert(
-        `Prepared ${res.suggestions.length} object${
-          res.suggestions.length === 1 ? '' : 's'
-        }. Open the AI Builder on the canvas to place them.`
-      )
+      // Hand the prepared suggestions to the canvas builder preview, preloaded,
+      // so the user picks and places them there in one step. Replaces the old
+      // dead-end alert that told the user to go open another builder.
+      useAiCommandBar.getState().setHandoff({
+        suggestions: res.suggestions,
+        intent: res.intent ?? ''
+      })
       goTask(activeTaskId)
       onClose()
     } catch (err) {

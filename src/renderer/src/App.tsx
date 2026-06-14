@@ -12,6 +12,7 @@ import TelemetryReporter from './components/TelemetryReporter'
 import ReleaseModal from './components/ReleaseModal'
 import Tooltip from './components/Tooltip'
 import { getPendingReleaseEntry, advanceRunVersion, type ChangelogEntry } from './lib/changelog'
+import { useAiCommandBar } from './stores/aiCommandBar'
 import Icon from './components/Icon'
 import SettingsPanel from './components/SettingsPanel'
 import Footer from './components/Footer'
@@ -71,7 +72,11 @@ export default function App(): JSX.Element {
   // header button or Cmd+Shift+K. Owned at App level so any future hook
   // can summon it (a stuck-detector nudge, a contextual "did you mean…"
   // suggestion, etc.) without prop-drilling.
-  const [aiBarOpen, setAiBarOpen] = useState(false)
+  // Command bar open state lives in a store so any surface (header, Cmd+Shift+K,
+  // the canvas toolbar) can summon the one "Ask AI".
+  const aiBarOpen = useAiCommandBar((s) => s.open)
+  const setAiBarOpen = useAiCommandBar((s) => s.setOpen)
+  const toggleAiBar = useAiCommandBar((s) => s.toggle)
   // Peer body double — controlled HERE rather than inside its own
   // component so the dialog can be summoned from anywhere (button in
   // chrome, future keyboard shortcut, future "you've been stuck for 20
@@ -191,7 +196,7 @@ export default function App(): JSX.Element {
     function onKey(e: KeyboardEvent): void {
       if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'k') {
         e.preventDefault()
-        setAiBarOpen((v) => !v)
+        toggleAiBar()
       }
     }
     window.addEventListener('keydown', onKey)
