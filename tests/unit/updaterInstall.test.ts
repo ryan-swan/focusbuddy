@@ -3,7 +3,12 @@ import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, chmodS
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { spawnSync } from 'node:child_process'
-import { macAssetUrl, appBundlePath, MAC_INSTALL_SCRIPT } from '../../src/main/updaterInstall'
+import {
+  macAssetUrl,
+  appBundlePath,
+  isTranslocated,
+  MAC_INSTALL_SCRIPT
+} from '../../src/main/updaterInstall'
 
 describe('macAssetUrl', () => {
   it('builds the release asset URL for a version and arch', () => {
@@ -24,63 +29,92 @@ describe('appBundlePath', () => {
   })
 })
 
-// Exercise the real swap helper against throwaway directories. This is the
-// risky part of the updater (it replaces the app bundle), so we prove the swap
-// and the restore-on-failure behaviour rather than trust the script by reading.
+describe('isTranslocated', () => {
+  it('flags an App Translocation mount', () => {
+    expect(
+      isTranslocated('/private/var/folders/xy/AppTranslocation/ABC/d/Haptyx.app/Contents/MacOS/Haptyx')
+    ).toBe(true)
+  })
+  it('flags a randomised /private/var/folders run path', () => {
+    expect(isTranslocated('/private/var/folders/ab/cd/T/Haptyx.app/Contents/MacOS/Haptyx')).toBe(true)
+  })
+  it('does NOT flag a normal /Applications install', () => {
+    expect(isTranslocated('/Applications/Haptyx.app/Contents/MacOS/Haptyx')).toBe(false)
+  })
+  it('does NOT flag a user-folder install', () => {
+    expect(isTranslocated('/Users/me/Applications/Haptyx.app/Contents/MacOS/Haptyx')).toBe(false)
+  })
+})
+
+// Exercise the real swap helper against throwaway directories. This is the risky
+// part of the updater (it replaces the app bundle), so we prove the swap, the
+// restore-on-failure, the admin-elevation retry, and the manual-download
+// fallback rather than trust the script by reading.
 const runnable = process.platform === 'darwin' || process.platform === 'linux'
 
 describe.runIf(runnable)('MAC_INSTALL_SCRIPT swap behaviour', () => {
-  function setup(): { work: string; scriptPath: string; env: NodeJS.ProcessEnv; target: string; fresh: string } {
+  function setup(): {
+    work: string
+    scriptPath: string
+    env: NodeJS.ProcessEnv
+    target: string
+    fresh: string
+    openLog: string
+    osaLog: string
+  } {
     const work = mkdtempSync(join(tmpdir(), 'haptyx-swap-'))
-    // A fake "installed" bundle and a fake "downloaded" bundle.
     const target = join(work, 'Haptyx.app')
     const fresh = join(work, 'new', 'Haptyx.app')
     mkdirSync(target, { recursive: true })
     mkdirSync(fresh, { recursive: true })
     writeFileSync(join(target, 'VERSION'), 'old')
     writeFileSync(join(fresh, 'VERSION'), 'new')
-    // Shim out `open`, `xattr` and `ditto`'s GUI side effects. We provide a fake
-    // `open` and `xattr` on PATH so no Finder window spawns; ditto exists on mac
-    // and we let the real one run there, but on linux we shim it to cp -a.
     const bin = join(work, 'bin')
     mkdirSync(bin)
-    const noop = '#!/bin/bash\nexit 0\n'
-    writeFileSync(join(bin, 'open'), noop, { mode: 0o755 })
-    writeFileSync(join(bin, 'xattr'), noop, { mode: 0o755 })
-    chmodSync(join(bin, 'open'), 0o755)
-    chmodSync(join(bin, 'xattr'), 0o755)
+    const openLog = join(work, 'open.log')
+    const osaLog = join(work, 'osa.log')
+    const sh = (name: string, body: string): void => {
+      writeFileSync(join(bin, name), body, { mode: 0o755 })
+      chmodSync(join(bin, name), 0o755)
+    }
+    // `open` records what it was asked to open so we can assert the manual
+    // fallback opens the releases URL; it never actually launches anything.
+    sh('open', `#!/bin/bash\necho "$@" >> "${openLog}"\nexit 0\n`)
+    sh('xattr', '#!/bin/bash\nexit 0\n')
+    // `osascript` must NEVER show a real password dialog in a test. We record
+    // that elevation was attempted and fail (simulating a declined / impossible
+    // prompt), which exercises the manual-download fallback.
+    sh('osascript', `#!/bin/bash\necho "$@" >> "${osaLog}"\nexit 1\n`)
     if (process.platform !== 'darwin') {
-      // ditto is macOS-only; emulate `ditto SRC DST` with cp -a.
-      writeFileSync(join(bin, 'ditto'), '#!/bin/bash\ncp -a "$1" "$2"\n', { mode: 0o755 })
-      chmodSync(join(bin, 'ditto'), 0o755)
+      sh('ditto', '#!/bin/bash\ncp -a "$1" "$2"\n')
     }
     const scriptPath = join(work, 'install.sh')
     writeFileSync(scriptPath, MAC_INSTALL_SCRIPT, { mode: 0o755 })
     chmodSync(scriptPath, 0o755)
     const env = { ...process.env, PATH: `${bin}:${process.env.PATH ?? ''}` }
-    return { work, scriptPath, env, target, fresh }
+    return { work, scriptPath, env, target, fresh, openLog, osaLog }
   }
 
   it('swaps the new bundle into the target after the watched process exits', () => {
     const { scriptPath, env, target, fresh } = setup()
-    // PID 1 never dies, so use a definitely-dead PID: spawn `true` and reap it.
-    const dead = spawnSync('bash', ['-c', 'exit 0'])
-    void dead
-    // A PID that does not exist so the wait loop exits immediately.
-    const r = spawnSync('bash', [scriptPath, '999999', fresh, target], { env, timeout: 30_000 })
+    const r = spawnSync('bash', [scriptPath, '999999', fresh, target, ''], { env, timeout: 30_000 })
     expect(r.status).toBe(0)
     expect(existsSync(target)).toBe(true)
     expect(readFileSync(join(target, 'VERSION'), 'utf8')).toBe('new')
   })
 
-  it('restores the old bundle if the swap copy fails', () => {
-    const { work, scriptPath, env, target } = setup()
-    // Point at a non-existent new app so ditto/cp fails.
+  it('attempts admin elevation, then restores + opens releases when every swap fails', () => {
+    const { work, scriptPath, env, target, openLog, osaLog } = setup() // osascript fails
     const missing = join(work, 'does-not-exist.app')
-    const r = spawnSync('bash', [scriptPath, '999999', missing, target], { env, timeout: 30_000 })
-    void r
-    // The target must still exist with the OLD content (restored), never lost.
+    const url = 'https://github.com/saasmouth/focusbuddy/releases/latest'
+    spawnSync('bash', [scriptPath, '999999', missing, target, url], { env, timeout: 30_000 })
+    // The elevated retry was attempted (the script did not give up unprivileged).
+    expect(existsSync(osaLog)).toBe(true)
+    expect(readFileSync(osaLog, 'utf8')).toContain('administrator privileges')
+    // The old bundle survives, never lost.
     expect(existsSync(target)).toBe(true)
     expect(readFileSync(join(target, 'VERSION'), 'utf8')).toBe('old')
+    // And the user is routed to a manual download instead of looping silently.
+    expect(readFileSync(openLog, 'utf8')).toContain(url)
   })
 })

@@ -34,6 +34,20 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.27',
+    date: '2026-06-14T18:00:00Z',
+    title: 'v2.5.27 — More reliable updates on Mac',
+    tag: 'fix',
+    summary:
+      'Fixes a Mac update loop where the app would download an update, ask for permission, then reopen on the same old version and offer the update again. Updating now asks for your administrator password when it needs to, and if it still cannot replace the app in place, it sends you to the download page to install manually instead of looping.',
+    highlights: [
+      'Mac updates that need elevated permission now prompt for your administrator password and complete, instead of silently failing and reopening the old version.',
+      'If Haptyx is running from a read-only or quarantined location (for example launched from Downloads), it now tells you to move it into Applications rather than trying an update that can never succeed.',
+      'When an in-place update genuinely cannot be applied, the app opens the download page so you can install the new version by hand, rather than looping on the same version.'
+    ],
+    links: [{ label: 'Finding your way around', href: `${HELP_BASE}/getting-around` }]
+  },
+  {
     version: '2.5.26',
     date: '2026-06-14T12:00:00Z',
     title: 'v2.5.26 — In-app help, tooltips, and recent UX upgrades',

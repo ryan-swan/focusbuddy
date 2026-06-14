@@ -21,7 +21,7 @@ import {
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import https from 'node:https'
-import { macAssetUrl, appBundlePath, MAC_INSTALL_SCRIPT } from './updaterInstall'
+import { macAssetUrl, appBundlePath, isTranslocated, MAC_INSTALL_SCRIPT } from './updaterInstall'
 
 // macOS builds are ad-hoc signed (no Apple Developer ID), and Squirrel.Mac
 // refuses to apply an update unless it is signed by the same Developer ID. So
@@ -88,6 +88,19 @@ export async function downloadAndInstallMacUpdate(): Promise<void> {
     openDownloadPage()
     return
   }
+  // A translocated (quarantined) app runs from a read-only path, so an in-place
+  // swap can never succeed — it would just relaunch the same old build and loop.
+  // Tell the user to move Haptyx to Applications and open the download page,
+  // rather than attempting a doomed swap.
+  if (isTranslocated(process.execPath)) {
+    broadcast({
+      kind: 'error',
+      message:
+        'Move Haptyx into your Applications folder, then update again — macOS is running it from a read-only location, which blocks in-place updates.'
+    })
+    openDownloadPage()
+    return
+  }
 
   try {
     broadcast({ kind: 'downloading', percent: 0 })
@@ -109,7 +122,7 @@ export async function downloadAndInstallMacUpdate(): Promise<void> {
     const script = join(work, 'install.sh')
     writeFileSync(script, MAC_INSTALL_SCRIPT, { mode: 0o755 })
     chmodSync(script, 0o755)
-    const child = spawn('/bin/bash', [script, String(process.pid), newApp, targetApp], {
+    const child = spawn('/bin/bash', [script, String(process.pid), newApp, targetApp, RELEASES_URL], {
       detached: true,
       stdio: 'ignore'
     })
