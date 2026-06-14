@@ -134,11 +134,11 @@ export default function CardWidget({ widget, inline = false }: Props): JSX.Eleme
 
   const content = (
     <div
-      className={`group relative h-full w-full flex flex-col ${data.bgFill ? '' : 'bg-white dark:bg-stone-900'}`}
+      className={`group relative min-h-full w-full flex flex-col ${data.bgFill ? '' : 'bg-white dark:bg-stone-900'}`}
       style={data.bgFill ? { backgroundColor: tint(data.accent, 0.14) } : undefined}
     >
       <div className="h-1.5 w-full shrink-0" style={{ backgroundColor: data.accent }} />
-      <div className="flex-1 min-h-0 flex flex-col gap-1.5 p-3">
+      <div className="flex-1 flex flex-col gap-1.5 p-3">
         <div className="flex items-center gap-1.5">
           <button
             onClick={() => setPickIcon((v) => !v)}

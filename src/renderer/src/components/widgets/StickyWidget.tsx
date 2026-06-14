@@ -252,7 +252,9 @@ export default function StickyWidget({ widget, inline = false }: Props): JSX.Ele
         const sel = window.getSelection()?.toString() ?? ''
         setCtxMenu({ x: e.clientX, y: e.clientY, selectionText: sel })
       }}
-      className={`fb-sticky-textarea w-full flex-1 resize-none bg-transparent text-stone-900 font-hand focus:outline-none placeholder:text-stone-700/40 ${
+      // field-sizing: content (fb-sticky-textarea, globals.css) grows the
+      // textarea with its text so the sticky auto-grows instead of scrolling.
+      className={`fb-sticky-textarea w-full min-h-[2.5rem] resize-none bg-transparent text-stone-900 font-hand focus:outline-none placeholder:text-stone-700/40 ${
         inline ? 'text-2xl' : 'text-lg'
       }`}
     />
@@ -261,7 +263,7 @@ export default function StickyWidget({ widget, inline = false }: Props): JSX.Ele
   const content = (
     <div
       data-fb-sticky-body
-      className="fb-sticky-body h-full w-full p-3 flex flex-col gap-2"
+      className="fb-sticky-body min-h-full w-full p-3 flex flex-col gap-2"
       style={{ backgroundColor: bgColor, '--fb-sticky-tint': bgColor } as React.CSSProperties}
     >
       <div className="flex items-center gap-1">
@@ -291,7 +293,7 @@ export default function StickyWidget({ widget, inline = false }: Props): JSX.Ele
           <Icon name="checklist" size={13} />
         </button>
       </div>
-      <div ref={scrollRef} className="flex-1 min-h-0 overflow-auto flex flex-col">
+      <div ref={scrollRef} className="flex flex-col">
         {editing ? editor : rendered}
       </div>
       {ctxMenu && (

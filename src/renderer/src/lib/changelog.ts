@@ -36,6 +36,20 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.33',
+    date: '2026-06-15T18:00:00Z',
+    title: 'v2.5.33 — Widgets grow to fit their content',
+    tag: 'feature',
+    summary:
+      'Widgets now size themselves to their content instead of hiding it behind a scrollbar. This release turns it on for stickies and cards, built on a shared mechanism the other content widgets will adopt next. Long-form text (notes, pages, markdown) and the browser keep a fixed size and scroll, as before.',
+    highlights: [
+      'Stickies and cards grow taller as you add content and shrink back as you remove it, so you are not constantly resizing them by hand.',
+      'Built on one shared sizing mechanism in the widget frame, so the remaining content widgets can adopt it consistently rather than each behaving differently.',
+      'Notes, pages and markdown keep a fixed size and scroll their content, and browsers keep their chosen viewport — these are deliberately not auto-grown.'
+    ],
+    links: [{ label: 'Finding your way around', href: `${HELP_BASE}/getting-around` }]
+  },
+  {
     version: '2.5.32',
     date: '2026-06-15T14:00:00Z',
     title: 'v2.5.32 — Menu, camera and browser fixes',
