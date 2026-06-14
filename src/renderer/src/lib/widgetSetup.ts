@@ -5,6 +5,7 @@
 // Kept pure (formatSetupItems) so the formatting is unit-testable.
 
 import { useWidgetStore } from '../stores/widgets'
+import type { Widget } from '@shared/types'
 
 export type WidgetSetupApplyAs =
   | 'sticky-checklist'
@@ -13,10 +14,72 @@ export type WidgetSetupApplyAs =
   | 'card-bullets'
   | 'mindmap-nodes'
   | 'diagram-nodes'
+  // Structured kinds (the empty-widget setup assistant) — carry a typed payload,
+  // not the flat item list.
+  | 'page-doc'
+  | 'webview-url'
+
+// The draft shape the setup preview/apply consumes. Mirrors the main-process
+// WidgetSetupDraft (kept in sync by hand; the IPC return type is the contract).
+export interface SetupDraft {
+  applyAs?: WidgetSetupApplyAs
+  items?: Array<{ id: string; text: string }>
+  pageContent?: object
+  url?: string
+  summary?: string
+}
+
+// Widget kinds the setup assistant supports. Kept in sync with the main process
+// WIDGET_SETUP_KINDS; the main process is the authoritative gate (an unsupported
+// kind returns an error from suggestWidgetSetup).
+export const SETUP_SUPPORTED_KINDS: ReadonlySet<string> = new Set([
+  'sticky',
+  'note',
+  'markdown',
+  'card',
+  'mindmap',
+  'diagram',
+  'page',
+  'webview'
+])
+
+export function isSetupSupported(kind: string): boolean {
+  return SETUP_SUPPORTED_KINDS.has(kind)
+}
+
+// Whether a widget is "empty" enough to offer the proactive "Set up with AI"
+// affordance. Conservative: only when the widget clearly has no real content,
+// so a populated widget is never nagged.
+export function isWidgetEmptyForSetup(widget: Widget): boolean {
+  if (!isSetupSupported(widget.kind)) return false
+  if (widget.archived || widget.livingQuery) return false
+  const content = (widget.content || '').trim()
+  if (widget.kind === 'page') {
+    if (!content) return true
+    try {
+      const doc = JSON.parse(content) as { content?: unknown[] }
+      const nodes = Array.isArray(doc.content) ? doc.content : []
+      if (nodes.length === 0) return true
+      // A fresh page is often a single empty paragraph.
+      if (nodes.length === 1) {
+        const only = nodes[0] as { type?: string; content?: unknown[] }
+        return only.type === 'paragraph' && (!only.content || only.content.length === 0)
+      }
+      return false
+    } catch {
+      return false
+    }
+  }
+  // webview, text kinds, mindmap, diagram: empty when there is no content.
+  return content.length === 0
+}
 
 // Text-format kinds whose items are appended to the widget's text content.
 // Structured kinds (mindmap, diagram) are handled by their own JSON appliers.
-type TextApplyAs = Exclude<WidgetSetupApplyAs, 'mindmap-nodes' | 'diagram-nodes'>
+type TextApplyAs = Exclude<
+  WidgetSetupApplyAs,
+  'mindmap-nodes' | 'diagram-nodes' | 'page-doc' | 'webview-url'
+>
 
 // Turn the approved item texts into a block of content in a text widget's
 // format. Mindmap is handled separately because its content is JSON.
@@ -146,9 +209,40 @@ export async function applyWidgetSetup(
     await store.update(widgetId, { content: nextJson })
     return
   }
+  // Structured kinds (page, webview, …) are applied by applyStructuredSetup, not
+  // here. Guard so the text formatter only sees the text apply-as values.
+  if (applyAs === 'page-doc' || applyAs === 'webview-url') return
   const block = formatSetupItems(applyAs, items)
   if (!block) return
   const existing = (w.content || '').replace(/\s+$/, '')
   const next = existing ? `${existing}\n${block}` : block
   await store.update(widgetId, { content: next })
+}
+
+// Apply a STRUCTURED setup draft (page document, browser URL, …) to a widget.
+// Unlike the text appliers above this REPLACES the empty widget's content with
+// the proposed setup, which is the point of the empty-widget assistant. Writes
+// directly through the widget store, the same path the AI builder accept uses.
+export async function applyStructuredSetup(widgetId: string, draft: SetupDraft): Promise<boolean> {
+  const store = useWidgetStore.getState()
+  const w = store.widgets.find((x) => x.id === widgetId)
+  if (!w) return false
+  if (draft.applyAs === 'page-doc') {
+    if (!draft.pageContent || typeof draft.pageContent !== 'object') return false
+    await store.update(widgetId, { content: JSON.stringify(draft.pageContent) })
+    return true
+  }
+  if (draft.applyAs === 'webview-url') {
+    const url = (draft.url || '').trim()
+    if (!/^https?:\/\/\S+$/i.test(url)) return false
+    await store.update(widgetId, { content: url })
+    return true
+  }
+  return false
+}
+
+// True when the draft is a structured kind (handled by applyStructuredSetup)
+// rather than the flat item list (applyWidgetSetup).
+export function isStructuredApplyAs(applyAs: WidgetSetupApplyAs | null | undefined): boolean {
+  return applyAs === 'page-doc' || applyAs === 'webview-url'
 }

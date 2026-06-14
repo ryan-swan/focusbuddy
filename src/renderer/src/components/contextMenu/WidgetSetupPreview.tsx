@@ -8,7 +8,13 @@ import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import Icon from '../Icon'
 import { useWidgetSetup } from '../../stores/widgetSetup'
-import { applyWidgetSetup, type WidgetSetupApplyAs } from '../../lib/widgetSetup'
+import {
+  applyWidgetSetup,
+  applyStructuredSetup,
+  isStructuredApplyAs,
+  type WidgetSetupApplyAs,
+  type SetupDraft
+} from '../../lib/widgetSetup'
 
 interface DraftItem {
   id: string
@@ -16,6 +22,24 @@ interface DraftItem {
 }
 
 type Status = 'loading' | 'ready' | 'error'
+
+// Pull heading texts out of a Tiptap doc for the page-setup preview.
+function extractDocHeadings(doc: unknown): string[] {
+  const out: string[] = []
+  const walk = (node: unknown): void => {
+    if (!node || typeof node !== 'object') return
+    const n = node as { type?: string; content?: unknown[] }
+    if (n.type === 'heading' && Array.isArray(n.content)) {
+      const text = n.content
+        .map((c) => (c && typeof c === 'object' ? ((c as { text?: string }).text ?? '') : ''))
+        .join('')
+      if (text) out.push(text)
+    }
+    if (Array.isArray(n.content)) n.content.forEach(walk)
+  }
+  walk(doc)
+  return out
+}
 
 export default function WidgetSetupPreview(): JSX.Element | null {
   const { open, widgetId, close } = useWidgetSetup()
@@ -26,14 +50,22 @@ export default function WidgetSetupPreview(): JSX.Element | null {
   const [noun, setNoun] = useState('items')
   const [error, setError] = useState<string | null>(null)
   const [prompt, setPrompt] = useState('')
+  // Structured draft (page document, browser URL, …) when applyAs is structured.
+  const [structured, setStructured] = useState<SetupDraft | null>(null)
   const ranFor = useRef<string | null>(null)
 
   async function run(refinePrompt: string): Promise<void> {
     if (!widgetId) return
     setStatus('loading')
     setError(null)
+    setStructured(null)
     const r = await window.api.ai.suggestWidgetSetup({ widgetId, prompt: refinePrompt || undefined })
-    if (r.ok && r.items && r.items.length) {
+    if (r.ok && isStructuredApplyAs(r.applyAs)) {
+      // Structured kinds: a single proposed setup the user confirms.
+      setApplyAs(r.applyAs ?? null)
+      setStructured({ applyAs: r.applyAs, pageContent: r.pageContent, url: r.url, summary: r.summary })
+      setStatus('ready')
+    } else if (r.ok && r.items && r.items.length) {
       setItems(r.items)
       setApproved(new Set(r.items.map((i) => i.id))) // default: everything ticked
       setApplyAs(r.applyAs ?? null)
@@ -73,12 +105,18 @@ export default function WidgetSetupPreview(): JSX.Element | null {
 
   async function add(): Promise<void> {
     if (!applyAs) return
+    if (structured) {
+      await applyStructuredSetup(widgetId as string, structured)
+      close()
+      return
+    }
     const chosen = items.filter((i) => approved.has(i.id)).map((i) => i.text)
     if (chosen.length) await applyWidgetSetup(widgetId as string, applyAs, chosen)
     close()
   }
 
   const approvedCount = items.filter((i) => approved.has(i.id)).length
+  const canApply = status === 'ready' && (structured ? true : approvedCount > 0)
 
   return createPortal(
     <div
@@ -93,7 +131,7 @@ export default function WidgetSetupPreview(): JSX.Element | null {
       >
         <div className="flex items-center gap-2 px-4 py-3 border-b border-stone-200 dark:border-stone-700">
           <Icon name="auto_awesome" size={18} className="text-accent" />
-          <span className="font-medium text-stone-900 dark:text-stone-100">Build with AI</span>
+          <span className="font-medium text-stone-900 dark:text-stone-100">Set up with AI</span>
           <button
             onClick={close}
             className="ml-auto h-7 w-7 inline-flex items-center justify-center rounded hover:bg-stone-100 dark:hover:bg-stone-800 text-stone-500"
@@ -137,7 +175,44 @@ export default function WidgetSetupPreview(): JSX.Element | null {
             </div>
           )}
 
-          {status === 'ready' && (
+          {status === 'ready' && structured && (
+            <div className="flex flex-col gap-2">
+              {structured.summary && (
+                <p className="text-sm text-stone-700 dark:text-stone-200">{structured.summary}</p>
+              )}
+              {structured.applyAs === 'page-doc' && (
+                <div className="rounded-md border border-stone-200 dark:border-stone-700 p-3">
+                  <div className="text-[10px] uppercase tracking-wide text-stone-400 mb-1.5">
+                    Page outline
+                  </div>
+                  {(() => {
+                    const headings = extractDocHeadings(structured.pageContent)
+                    return headings.length ? (
+                      <ul className="space-y-1">
+                        {headings.map((h, i) => (
+                          <li key={i} className="text-sm text-stone-800 dark:text-stone-100">
+                            {h}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <span className="text-sm text-stone-500">A starter document.</span>
+                    )
+                  })()}
+                </div>
+              )}
+              {structured.applyAs === 'webview-url' && (
+                <div className="rounded-md border border-stone-200 dark:border-stone-700 p-3">
+                  <div className="text-[10px] uppercase tracking-wide text-stone-400 mb-1.5">
+                    Open this address
+                  </div>
+                  <div className="text-sm text-accent break-all">{structured.url}</div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {status === 'ready' && !structured && (
             <div className="flex flex-col gap-1">
               <span className="text-xs uppercase tracking-wide text-stone-500">
                 Proposed {noun}, tick the ones to add
@@ -167,10 +242,10 @@ export default function WidgetSetupPreview(): JSX.Element | null {
           <button
             data-testid="widget-setup-add"
             onClick={() => void add()}
-            disabled={status !== 'ready' || approvedCount === 0}
+            disabled={!canApply}
             className="px-3 py-1.5 rounded bg-accent text-white text-sm font-medium disabled:opacity-50"
           >
-            {approvedCount > 0 ? `Add ${approvedCount}` : 'Add'}
+            {structured ? 'Set up' : approvedCount > 0 ? `Add ${approvedCount}` : 'Add'}
           </button>
           <button
             onClick={close}

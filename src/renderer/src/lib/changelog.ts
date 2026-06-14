@@ -36,6 +36,21 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.31',
+    date: '2026-06-15T09:00:00Z',
+    title: 'v2.5.31 — Set up with AI on empty widgets',
+    tag: 'feature',
+    summary:
+      'Every empty widget now offers to set itself up. Drop a page, a browser, a sticky or a mind map and a quiet "Set up with AI" appears on it; click it and Haptyx proposes what that widget should become based on the task you are working on, for you to approve. This is the first step of a system that will cover every widget kind.',
+    highlights: [
+      'A "Set up with AI" prompt appears on an empty widget and disappears the moment it has real content.',
+      'It is task-aware: it reads what you are working on and the other objects on your desk to propose something genuinely useful, which you approve before anything is written.',
+      'Empty pages get a drafted document outline, and empty browsers get the most useful address to open. Empty stickies, notes, cards, mind maps and diagrams get their existing AI draft, now reachable without the right-click menu.',
+      'Built on one shared setup framework so the remaining widget kinds (tables, sections and more) can join it next.'
+    ],
+    links: [{ label: 'Finding your way around', href: `${HELP_BASE}/getting-around` }]
+  },
+  {
     version: '2.5.30',
     date: '2026-06-14T23:30:00Z',
     title: 'v2.5.30 — One "Ask AI"',

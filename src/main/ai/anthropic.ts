@@ -1491,6 +1491,10 @@ export type WidgetSetupApplyAs =
   | 'card-bullets'
   | 'mindmap-nodes'
   | 'diagram-nodes'
+  // Structured kinds (the empty-widget setup assistant). Each carries a typed
+  // payload on the draft instead of the flat `items` list.
+  | 'page-doc' // pageContent: a Tiptap document
+  | 'webview-url' // url: a single web address
 
 export interface WidgetSetupDraft {
   ok: boolean
@@ -1499,14 +1503,38 @@ export interface WidgetSetupDraft {
   // The plural noun shown in the preview header, e.g. "tasks" or "notes".
   noun?: string
   items?: WidgetSetupItem[]
+  // Structured payloads — present only for the matching applyAs.
+  pageContent?: object // applyAs 'page-doc'
+  url?: string // applyAs 'webview-url'
+  // A one-line, human summary of what the assistant proposes, shown above the
+  // structured preview (e.g. "A research page with sections for ...").
+  summary?: string
   needsApiKey?: boolean
   error?: string
 }
 
 const WIDGET_SETUP_KINDS: Record<
   string,
-  { applyAs: WidgetSetupApplyAs; noun: string; guidance: string }
+  { applyAs: WidgetSetupApplyAs; noun: string; guidance: string; structured?: boolean }
 > = {
+  // Structured kinds carry a typed payload (see suggestStructuredWidgetSetup),
+  // not the flat `items` list. The empty-widget setup assistant covers these.
+  page: {
+    applyAs: 'page-doc',
+    noun: 'page',
+    structured: true,
+    guidance:
+      'a starter document structure for this page: a top-level heading, then a few section headings, ' +
+      'each followed by a short paragraph or a bullet/todo list that fits the task'
+  },
+  webview: {
+    applyAs: 'webview-url',
+    noun: 'address',
+    structured: true,
+    guidance:
+      'the single most useful web address (a full https:// URL) to open for this task — a real, ' +
+      'well-known site, never a guessed or invented domain'
+  },
   sticky: {
     applyAs: 'sticky-checklist',
     noun: 'tasks',
@@ -1564,6 +1592,11 @@ export async function suggestWidgetSetup(input: {
   const siblings = listWidgetsByTask(w.taskId).filter((o) => o.id !== w.id)
   const prompt = (input.prompt || '').trim()
 
+  // Structured kinds (page, webview, …) return a typed payload, not a flat list.
+  if (cfg.structured) {
+    return suggestStructuredWidgetSetup({ widget: w, task, siblings, prompt, cfg, client: c })
+  }
+
   const system =
     `You are an in-widget AI assistant. You propose a short list of items to add to a ${w.kind} ` +
     'widget, in the format that widget expects. Reply with a SINGLE JSON object of the exact shape ' +
@@ -1617,6 +1650,92 @@ export async function suggestWidgetSetup(input: {
       .map((t, i) => ({ id: `s${i}`, text: t.trim() }))
     if (items.length === 0) return { ok: false, error: 'Claude returned no items.' }
     return { ok: true, kind: w.kind, applyAs: cfg.applyAs, noun: cfg.noun, items }
+  } catch (e) {
+    return { ok: false, error: (e as Error).message }
+  }
+}
+
+// The empty-widget setup assistant for STRUCTURED kinds (page, webview, …). It
+// returns a typed payload (a Tiptap document, a URL, …) rather than the flat
+// item list the text kinds use. One shared shape: every reply is a JSON object
+// with a one-line `summary` plus the kind-specific payload key.
+async function suggestStructuredWidgetSetup(input: {
+  widget: NonNullable<ReturnType<typeof getWidget>>
+  task: ReturnType<typeof getNode>
+  siblings: ReturnType<typeof listWidgetsByTask>
+  prompt: string
+  cfg: { applyAs: WidgetSetupApplyAs; noun: string; guidance: string; structured?: boolean }
+  client: Anthropic
+}): Promise<WidgetSetupDraft> {
+  const { widget: w, task, siblings, prompt, cfg, client } = input
+
+  // The single JSON shape the model must return, per kind.
+  const payloadSpec =
+    cfg.applyAs === 'page-doc'
+      ? '"pageContent" is a Tiptap document: { "type": "doc", "content": [ ... ] } using only ' +
+        'these node types: heading (attrs.level 1-3), paragraph, bulletList/listItem, ' +
+        'taskList/taskItem (attrs.checked false), and text. Keep it focused, 4-10 nodes.'
+      : '"url" is a single full https:// web address to a real, well-known site.'
+
+  const system =
+    'You set up a single empty widget for the user, based on what they are working on. ' +
+    `This is a ${w.kind} widget. Propose ${cfg.guidance}. ` +
+    'Reply with a SINGLE JSON object and nothing else (no prose, no code fences) of the shape ' +
+    `{ "summary": "one short sentence describing what you are proposing", ${
+      cfg.applyAs === 'page-doc' ? '"pageContent": { ... }' : '"url": "https://..."'
+    } }. ${payloadSpec}`
+
+  const ctxParts = [
+    task && task.kind === 'task'
+      ? `Task: ${task.title}${task.description ? `\nTask notes: ${task.description}` : ''}`
+      : '',
+    w.title ? `Widget title: ${w.title}` : '',
+    siblings.length ? `Other widgets on the desk:\n${summarizeWidgets(siblings)}` : '',
+    prompt ? `The user asks: ${prompt}` : 'No explicit instruction; infer what is most useful.'
+  ].filter(Boolean)
+  const user = `${ctxParts.join('\n\n')}\n\nReturn the JSON now.`
+
+  try {
+    const resp = await client.messages.create({
+      model: resolveModel('setup'),
+      max_tokens: cfg.applyAs === 'page-doc' ? 4096 : 800,
+      system,
+      messages: [{ role: 'user', content: user }]
+    })
+    const stop = resp.stop_reason as string
+    if (stop === 'refusal') return { ok: false, error: 'Claude declined this request.' }
+    if (stop === 'model_context_window_exceeded') {
+      return { ok: false, error: 'The request was too large for the model.' }
+    }
+    const text = resp.content
+      .filter((b) => b.type === 'text')
+      .map((b) => ('text' in b ? b.text : ''))
+      .join('')
+      .trim()
+    const json = extractJson(text)
+    if (!json) return { ok: false, error: 'Claude did not return usable setup.' }
+    let parsed: { summary?: unknown; pageContent?: unknown; url?: unknown }
+    try {
+      parsed = JSON.parse(json)
+    } catch {
+      return { ok: false, error: 'Claude returned malformed JSON.' }
+    }
+    const summary = typeof parsed.summary === 'string' ? parsed.summary.trim() : undefined
+
+    if (cfg.applyAs === 'page-doc') {
+      const doc = parsed.pageContent
+      if (!doc || typeof doc !== 'object' || (doc as { type?: string }).type !== 'doc') {
+        return { ok: false, error: 'Claude did not return a valid page document.' }
+      }
+      return { ok: true, kind: w.kind, applyAs: 'page-doc', noun: cfg.noun, pageContent: doc as object, summary }
+    }
+
+    // webview-url
+    const url = typeof parsed.url === 'string' ? parsed.url.trim() : ''
+    if (!/^https?:\/\/\S+$/i.test(url)) {
+      return { ok: false, error: 'Claude did not return a valid web address.' }
+    }
+    return { ok: true, kind: w.kind, applyAs: 'webview-url', noun: cfg.noun, url, summary }
   } catch (e) {
     return { ok: false, error: (e as Error).message }
   }

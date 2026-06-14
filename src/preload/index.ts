@@ -313,8 +313,13 @@ const api = {
         | 'card-bullets'
         | 'mindmap-nodes'
         | 'diagram-nodes'
+        | 'page-doc'
+        | 'webview-url'
       noun?: string
       items?: Array<{ id: string; text: string }>
+      pageContent?: object
+      url?: string
+      summary?: string
       error?: string
       needsApiKey?: boolean
     }> => ipcRenderer.invoke('ai:suggestWidgetSetup', input)
