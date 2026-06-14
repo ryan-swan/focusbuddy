@@ -43,7 +43,7 @@ export default function TaskLinkWidget({ widget, inline = false }: Props): JSX.E
   const path = task ? projectPath(nodes, task.id) : []
 
   const body = (
-    <div className="h-full w-full flex flex-col bg-white dark:bg-stone-900 p-3 gap-1.5">
+    <div className="min-h-full w-full flex flex-col bg-white dark:bg-stone-900 p-3 gap-1.5">
       {task ? (
         <>
           <div className="flex items-center gap-2">
