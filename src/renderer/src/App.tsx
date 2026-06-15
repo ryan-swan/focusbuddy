@@ -29,6 +29,8 @@ import VoiceCommandFAB from './components/VoiceCommandFAB'
 import MetricsOverlay from './components/MetricsOverlay'
 import LaunchSignInModal from './components/LaunchSignInModal'
 import UpgradePromptModal from './components/UpgradePromptModal'
+import FirstRunOnboarding from './components/FirstRunOnboarding'
+import { useOnboarding } from './stores/onboarding'
 import { usePeerBodyDoubleStore } from './stores/peerBodyDouble'
 import { useNodeStore } from './stores/nodes'
 import { useTemplateStore } from './stores/templates'
@@ -152,6 +154,9 @@ export default function App(): JSX.Element {
     void refreshTemplates()
     void refreshVaultMeta()
     void accountInit()
+    // First-run onboarding gate — decides (once) whether this is a fresh
+    // install that should see the welcome flow, or an existing user to skip.
+    void useOnboarding.getState().init()
     // Living-page auto-regen scheduler — subscribes to the widget store and
     // debounces regens whenever source widgets in a task change. Installs
     // once per app process; no teardown needed because it's a singleton.
@@ -440,6 +445,7 @@ export default function App(): JSX.Element {
         onOpenSmartStack={() => canSmartStack && setSmartStackOpen(true)}
         canSmartStack={canSmartStack}
       />
+      <FirstRunOnboarding />
       <LaunchSignInModal />
       <UpgradePromptModal />
       <MetricsOverlay />
