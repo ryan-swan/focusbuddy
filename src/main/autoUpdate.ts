@@ -102,21 +102,30 @@ export async function downloadAndInstallMacUpdate(): Promise<void> {
     return
   }
 
+  const arch = process.arch
   try {
     broadcast({ kind: 'downloading', percent: 0 })
-    const url = macAssetUrl(version, process.arch)
+    const url = macAssetUrl(version, arch)
     const work = mkdtempSync(join(tmpdir(), 'haptyx-update-'))
     const zipPath = join(work, 'update.zip')
-    await downloadFile(url, zipPath, (pct) => broadcast({ kind: 'downloading', percent: pct }))
+    try {
+      await downloadFile(url, zipPath, (pct) => broadcast({ kind: 'downloading', percent: pct }))
+    } catch (e) {
+      // Name the asset and arch so a 404 (e.g. an Intel Mac asking for an
+      // arch we don't ship, or a release missing its mac zip) is obvious from
+      // the banner rather than a bare "failed".
+      const msg = (e as Error).message
+      throw new Error(`Couldn't download the ${arch} update for v${version} (${msg}) Asset: ${url}`)
+    }
 
     const unzipDir = join(work, 'unpacked')
     await new Promise<void>((resolve, reject) => {
       const p = spawn('ditto', ['-x', '-k', zipPath, unzipDir])
       p.on('error', reject)
-      p.on('exit', (code) => (code === 0 ? resolve() : reject(new Error(`Unpack failed (ditto ${code}).`))))
+      p.on('exit', (code) => (code === 0 ? resolve() : reject(new Error(`Couldn't unpack the downloaded update (ditto exit ${code}).`))))
     })
     const appName = readdirSync(unzipDir).find((n) => n.endsWith('.app'))
-    if (!appName) throw new Error('No app bundle was found in the downloaded update.')
+    if (!appName) throw new Error('The downloaded update did not contain an app bundle.')
     const newApp = join(unzipDir, appName)
 
     const script = join(work, 'install.sh')

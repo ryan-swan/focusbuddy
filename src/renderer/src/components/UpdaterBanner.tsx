@@ -127,15 +127,39 @@ export default function UpdaterBanner(): JSX.Element | null {
   }
 
   if (state.kind === 'error') {
+    // Two escapes, never a dead end. "Retry" re-runs the check (fixes transient
+    // network blips). "Download manually" opens the releases page — the reliable
+    // path when the in-app self-update can't complete (an old ad-hoc-signed
+    // build whose updater can't replace itself, a blocked swap, a 404 on an
+    // arch we don't ship). Without the manual escape, retry just loops the user
+    // back into the same failure.
+    // Show the real reason inline (truncated), not just on hover — a hidden
+    // error message is exactly what made past update failures hard to diagnose.
+    const reason = (state.message || '').replace(/\s+/g, ' ').trim()
+    const shortReason = reason.length > 64 ? `${reason.slice(0, 64)}…` : reason
     return (
-      <button
-        onClick={() => { void window.api.update.check() }}
-        className="inline-flex items-center gap-1 text-red-400 hover:text-red-300"
-        title={state.message}
-      >
+      <span className="inline-flex items-center gap-1.5 text-red-400" title={reason}>
         <Icon name="error_outline" size={11} />
-        <span>Update check failed — retry</span>
-      </button>
+        <span className="text-red-400/90">
+          Update failed{shortReason ? `: ${shortReason}` : ''}
+        </span>
+        <button
+          onClick={() => { void window.api.update.check() }}
+          className="hover:text-red-300 underline-offset-2 underline"
+          data-testid="updater-retry"
+        >
+          retry
+        </button>
+        <span aria-hidden className="text-red-400/50">·</span>
+        <button
+          onClick={() => { void window.api.update.openDownload() }}
+          className="hover:text-red-300 underline-offset-2 underline"
+          title="Open the releases page to download and install the latest version manually"
+          data-testid="updater-manual-download"
+        >
+          download manually
+        </button>
+      </span>
     )
   }
 
