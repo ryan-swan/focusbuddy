@@ -36,6 +36,21 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.37',
+    date: '2026-06-15T23:45:00Z',
+    title: 'v2.5.37 — Back up your work, and change your vault password',
+    tag: 'feature',
+    summary:
+      'Two pieces of peace of mind. You can now export a portable backup of everything and restore it later or on another machine, and the app quietly keeps automatic snapshots. The vault also gains a way to change your master password.',
+    highlights: [
+      'Backup and restore: export a single portable snapshot of all your work from Settings, and restore it later or on another machine. The app also keeps automatic snapshots in the background and rotates the last seven, so a mishap is recoverable.',
+      'Restoring is careful: it snapshots your current data first, so even a restore you regret can be undone, and it asks before replacing anything.',
+      'Vault: change your master password whenever you like. Every stored entry is safely re-encrypted under the new password in one step.',
+      'A note on keys: API keys live in your system keychain, not in the backup file, so re-enter them after restoring on a new machine.'
+    ],
+    links: [{ label: 'Finding your way around', href: `${HELP_BASE}/getting-around` }]
+  },
+  {
     version: '2.5.36',
     date: '2026-06-15T23:30:00Z',
     title: 'v2.5.36 — The AI command bar understands you again',
