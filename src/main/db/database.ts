@@ -253,9 +253,15 @@ function ensureColumn(
   }
 }
 
+// The on-disk path of the live database. Single source of truth so the backup
+// module and getDb never drift on where the data actually lives.
+export function databaseFilePath(): string {
+  return join(app.getPath('userData'), 'focusbuddy.db')
+}
+
 export function getDb(): Database.Database {
   if (db) return db
-  const dbPath = join(app.getPath('userData'), 'focusbuddy.db')
+  const dbPath = databaseFilePath()
   db = new Database(dbPath)
   db.pragma('journal_mode = WAL')
   db.pragma('foreign_keys = ON')

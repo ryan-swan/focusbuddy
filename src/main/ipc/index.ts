@@ -186,6 +186,13 @@ import {
 import { currentEnergy, logEnergy, recentEnergy } from '../db/energy'
 import { fireHaptic, isHapticsAvailable, type HapticFeel } from '../haptics'
 import {
+  backupInfo,
+  createBackup,
+  defaultExportName,
+  restoreFromFile,
+  validateBackupFile
+} from '../db/backup'
+import {
   changeMasterPassword,
   createEntry,
   createVault,
@@ -791,6 +798,74 @@ export function registerIpcHandlers(): void {
   // a fully self-contained, styled HTML string. We save it as a standalone
   // .html file, or render it in a hidden window and printToPDF for a clean PDF,
   // writing either through the native save dialog so the user picks the spot.
+  // ── Workspace backup / export / restore ─────────────────────────────────
+  // A backup is one consistent SQLite snapshot. Export writes it where the user
+  // chooses; restore validates a chosen file, snapshots current data for safety,
+  // swaps it in, and reports back so the renderer can reload onto the new data.
+  ipcMain.handle('backup:info', () => backupInfo())
+  ipcMain.handle('backup:export', async () => {
+    const parent = BrowserWindow.getFocusedWindow()
+    const opts = {
+      title: 'Export a FocusBuddy backup',
+      defaultPath: defaultExportName(),
+      filters: [{ name: 'FocusBuddy backup', extensions: ['fbbackup'] }]
+    }
+    const { canceled, filePath } = parent
+      ? await dialog.showSaveDialog(parent, opts)
+      : await dialog.showSaveDialog(opts)
+    if (canceled || !filePath) return { ok: false as const, canceled: true as const }
+    try {
+      await createBackup(filePath)
+      return { ok: true as const, path: filePath }
+    } catch (e) {
+      return { ok: false as const, error: (e as Error).message }
+    }
+  })
+  ipcMain.handle('backup:restore', async () => {
+    const parent = BrowserWindow.getFocusedWindow()
+    const open = parent
+      ? await dialog.showOpenDialog(parent, {
+          title: 'Restore from a FocusBuddy backup',
+          properties: ['openFile'],
+          filters: [{ name: 'FocusBuddy backup', extensions: ['fbbackup', 'db'] }]
+        })
+      : await dialog.showOpenDialog({
+          title: 'Restore from a FocusBuddy backup',
+          properties: ['openFile'],
+          filters: [{ name: 'FocusBuddy backup', extensions: ['fbbackup', 'db'] }]
+        })
+    if (open.canceled || open.filePaths.length === 0) {
+      return { ok: false as const, canceled: true as const }
+    }
+    const src = open.filePaths[0]
+    const valid = validateBackupFile(src)
+    if (!valid.ok) return { ok: false as const, error: valid.error }
+
+    // Destructive: replacing all current data. Confirm explicitly first.
+    const confirmOpts = {
+      type: 'warning' as const,
+      buttons: ['Cancel', 'Replace my data'],
+      defaultId: 0,
+      cancelId: 0,
+      title: 'Restore from backup',
+      message: 'Replace all your current data with this backup?',
+      detail:
+        'Your current data will be snapshotted first (you can recover it from the backups folder), then replaced. FocusBuddy will reload when done.'
+    }
+    const { response } = parent
+      ? await dialog.showMessageBox(parent, confirmOpts)
+      : await dialog.showMessageBox(confirmOpts)
+    if (response !== 1) return { ok: false as const, canceled: true as const }
+
+    const result = await restoreFromFile(src)
+    if (!result.ok) return { ok: false as const, error: result.error }
+    return { ok: true as const, safetyBackupPath: result.safetyBackupPath }
+  })
+  ipcMain.handle('backup:revealFolder', () => {
+    electronShell.openPath(backupInfo().dir)
+    return { ok: true as const }
+  })
+
   ipcMain.handle(
     'export:html',
     async (_e, input: { html: string; suggestedName: string }) => {

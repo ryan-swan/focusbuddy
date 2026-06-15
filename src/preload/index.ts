@@ -484,6 +484,17 @@ const api = {
     decrypt: (iv: string, ciphertext: string): Promise<string | null> =>
       ipcRenderer.invoke('vault:decrypt', iv, ciphertext)
   },
+  backup: {
+    info: (): Promise<{ dir: string; count: number; lastBackupMs: number | null }> =>
+      ipcRenderer.invoke('backup:info'),
+    export: (): Promise<
+      { ok: true; path: string } | { ok: false; canceled?: boolean; error?: string }
+    > => ipcRenderer.invoke('backup:export'),
+    restore: (): Promise<
+      { ok: true; safetyBackupPath: string } | { ok: false; canceled?: boolean; error?: string }
+    > => ipcRenderer.invoke('backup:restore'),
+    revealFolder: (): Promise<{ ok: true }> => ipcRenderer.invoke('backup:revealFolder')
+  },
   templates: {
     list: (): Promise<Template[]> => ipcRenderer.invoke('templates:list'),
     createFromTask: (

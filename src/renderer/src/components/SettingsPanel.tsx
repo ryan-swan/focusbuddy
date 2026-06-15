@@ -29,6 +29,7 @@ import { haptic } from '../lib/haptics'
 import Icon from './Icon'
 import AccountSection from './settings/AccountSection'
 import ApiKeysSection from './settings/ApiKeysSection'
+import BackupSection from './settings/BackupSection'
 import NavigationSection from './settings/NavigationSection'
 
 interface Props {
@@ -499,6 +500,8 @@ export default function SettingsPanel({
       <AccountSection />
 
       <ApiKeysSection />
+
+      <BackupSection />
 
       <NavigationSection />
 
