@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useAccountStore } from '../stores/account'
 import { useSignInPrompt } from '../stores/signInPrompt'
+import { useOnboarding } from '../stores/onboarding'
 import Icon from './Icon'
 
 // LaunchSignInModal — appears on app boot when the user isn't signed in
@@ -33,6 +34,7 @@ export default function LaunchSignInModal(): JSX.Element | null {
   // When set, the modal shows even if the user previously skipped.
   const manualOpen = useSignInPrompt((s) => s.open)
   const closeManual = useSignInPrompt((s) => s.close)
+  const onboardingStatus = useOnboarding((s) => s.status)
   // Manually dismissed in this session — we don't want it to re-appear
   // if some other state change fires after the user closed it.
   const [dismissedThisSession, setDismissedThisSession] = useState(false)
@@ -64,6 +66,9 @@ export default function LaunchSignInModal(): JSX.Element | null {
   //  - User dismissed in this session.
   if (bootStatus !== 'ready') return null
   if (account) return null
+  // Don't stack on top of first-run onboarding. A fresh user does the welcome +
+  // API-key + starter flow first; the account prompt waits until that's done.
+  if (!manualOpen && onboardingStatus === 'active') return null
   // A manual open (from Settings) overrides the skip/dismiss throttling — the
   // user explicitly asked to sign in, so always show it in that case.
   if (!manualOpen) {

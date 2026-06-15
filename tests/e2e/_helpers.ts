@@ -78,7 +78,11 @@ export async function launchApp(): Promise<LaunchedApp> {
  * "FOCUSBUDDY" after the futuristic-theme rebrand — matched via regex
  * so a future rename doesn't break every spec again).
  */
-export async function waitForReady(window: Page): Promise<void> {
+export async function waitForReady(
+  window: Page,
+  opts: { dismissModals?: boolean } = {}
+): Promise<void> {
+  const dismissModals = opts.dismissModals ?? true
   // Wait for window.api so renderer-side IPC calls inside the test are
   // safe to make immediately after this resolves.
   await window.waitForFunction(
@@ -94,6 +98,20 @@ export async function waitForReady(window: Page): Promise<void> {
   await expect(
     window.getByRole('heading', { name: /^(focusbuddy|haptyx)$/i, level: 2 })
   ).toBeVisible({ timeout: 10_000 })
+
+  if (!dismissModals) return
+
+  // First-run onboarding — a fresh test DB triggers it, and its full-screen
+  // overlay would intercept pointer events for every UI-driving spec. Click
+  // through to dismiss (welcome → skip key → start blank). Best-effort; absent
+  // for an existing-data DB. Specs that assert on onboarding pass
+  // { dismissModals: false }.
+  const onb = window.locator('[role="dialog"][aria-label="Welcome to Haptyx"]')
+  if (await onb.isVisible().catch(() => false)) {
+    await window.getByRole('button', { name: 'Get started' }).click().catch(() => {})
+    await window.getByRole('button', { name: 'Skip for now' }).click().catch(() => {})
+    await window.locator('[data-testid="onboarding-start-blank"]').click().catch(() => {})
+  }
 
   // Sign-in modal — dismiss with "Continue without account" so subsequent
   // interactions don't get pointer-intercepted by the modal overlay.
