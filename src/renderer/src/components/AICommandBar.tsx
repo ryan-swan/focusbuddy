@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import type { ChatMessage, NodeDraft } from '@shared/types'
+import type { NodeDraft } from '@shared/types'
 import { useNodeStore } from '../stores/nodes'
 import { useViewStore } from '../stores/view'
 import { useAiCommandBar } from '../stores/aiCommandBar'
@@ -112,12 +112,16 @@ export default function AICommandBar({ open, onClose }: Props): JSX.Element | nu
     setError(null)
     setIntent(null)
     try {
-      const messages: ChatMessage[] = [
-        { role: 'system', content: ROUTER_SYSTEM, ts: Date.now() },
-        { role: 'user', content: text.trim(), ts: Date.now() }
-      ]
-      const res = await window.api.chat.send({ taskId: activeTaskId, messages })
-      if (!res.ok || !res.message) {
+      // Route via the dedicated raw-completion endpoint, NOT chat.send. chat.send
+      // imposes the workspace-build system prompt and runs the {reply, proposals}
+      // envelope parser over the result, both of which discard ROUTER_SYSTEM and
+      // mangle the small intent JSON we need here. routeCommand applies our
+      // system prompt and returns the model's text verbatim.
+      const res = await window.api.ai.routeCommand({
+        system: ROUTER_SYSTEM,
+        text: text.trim()
+      })
+      if (!res.ok || !res.text) {
         setError(
           res.needsApiKey
             ? 'Add your Anthropic API key in Settings to use the AI command bar.'
@@ -125,7 +129,7 @@ export default function AICommandBar({ open, onClose }: Props): JSX.Element | nu
         )
         return
       }
-      const raw = res.message.content.trim()
+      const raw = res.text.trim()
       const cleaned = raw
         .replace(/^```(?:json)?\s*/i, '')
         .replace(/\s*```\s*$/i, '')

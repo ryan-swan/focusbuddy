@@ -27,7 +27,11 @@ const AUTO_ROUTING: Record<AIPurpose, string> = {
   // Desk agents reason over MULTIPLE wired inputs against a standing
   // instruction — that judgement benefits from Sonnet. Runs are user-triggered
   // or interval-throttled (min 30s), not per-keystroke, so the cost is bounded.
-  desk_agent: SONNET
+  desk_agent: SONNET,
+  // The command bar's intent router — a tight classify into one of four shapes,
+  // returning a small JSON object. Haiku is fast and plenty for classification,
+  // and this fires on every command-bar submit, so cheap matters.
+  command_route: HAIKU
 }
 
 let currentMode: ModelMode = 'auto'
