@@ -472,6 +472,11 @@ const api = {
       ipcRenderer.invoke('vault:updateEntry', id, patch),
     deleteEntry: (id: string): Promise<boolean> =>
       ipcRenderer.invoke('vault:deleteEntry', id),
+    changeMasterPassword: (
+      currentPassword: string,
+      newPassword: string
+    ): Promise<VaultResult> =>
+      ipcRenderer.invoke('vault:changeMasterPassword', currentPassword, newPassword),
     encrypt: (
       plaintext: string
     ): Promise<{ iv: string; ciphertext: string } | null> =>

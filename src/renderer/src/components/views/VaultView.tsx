@@ -31,6 +31,14 @@ export default function VaultView(): JSX.Element {
   if (!meta.exists) return <CreateVaultPanel />
   if (!unlocked) return <UnlockVaultPanel />
 
+  return <UnlockedVaultView onLock={lock} />
+}
+
+// ── Unlocked view shell — header (lock + change password) and the entry list ──
+
+function UnlockedVaultView({ onLock }: { onLock: () => Promise<void> }): JSX.Element {
+  const [changingPassword, setChangingPassword] = useState(false)
+
   return (
     <div className="h-full overflow-auto desk-paper no-tod">
       <div className="max-w-3xl mx-auto px-6 py-6 space-y-4">
@@ -47,9 +55,17 @@ export default function VaultView(): JSX.Element {
             </p>
           </div>
           <button
+            onClick={() => setChangingPassword(true)}
+            className="btn-ghost"
+            title="Change your master password — re-encrypts every entry under the new key"
+          >
+            <Icon name="password" size={14} />
+            <span>Change password</span>
+          </button>
+          <button
             onClick={() => {
               chimeOut()
-              void lock()
+              void onLock()
             }}
             className="btn-ghost"
             title="Lock vault (clears the master key from memory)"
@@ -61,6 +77,10 @@ export default function VaultView(): JSX.Element {
 
         <UnlockedVault />
       </div>
+
+      {changingPassword && (
+        <ChangeMasterPasswordDialog onClose={() => setChangingPassword(false)} />
+      )}
     </div>
   )
 }
@@ -503,6 +523,145 @@ function Field({
       >
         {value}
       </span>
+    </div>
+  )
+}
+
+// ── Change master password dialog ────────────────────────────────────────────
+
+function ChangeMasterPasswordDialog({ onClose }: { onClose: () => void }): JSX.Element {
+  const changeMasterPassword = useVaultStore((s) => s.changeMasterPassword)
+  const entryCount = useVaultStore((s) => s.entries.length)
+  const [current, setCurrent] = useState('')
+  const [next, setNext] = useState('')
+  const [confirm, setConfirm] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent): void {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+
+  async function submit(): Promise<void> {
+    if (busy) return
+    setError(null)
+    if (!current) {
+      setError('Enter your current master password.')
+      return
+    }
+    if (next.length < 8) {
+      setError('New master password must be at least 8 characters.')
+      return
+    }
+    if (next !== confirm) {
+      setError('New passwords don\'t match.')
+      return
+    }
+    if (next === current) {
+      setError('The new password is the same as the current one.')
+      return
+    }
+    setBusy(true)
+    try {
+      const r = await changeMasterPassword(current, next)
+      if (!r.ok) {
+        setError(r.error)
+        return
+      }
+      chimeIn()
+      onClose()
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-[180] flex items-center justify-center bg-stone-900/40 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="bg-white dark:bg-stone-900 w-full max-w-md mx-4 rounded-lg shadow-2xl border border-stone-200 dark:border-stone-700 overflow-hidden flex flex-col"
+      >
+        <div className="px-5 py-4 border-b border-stone-200 dark:border-stone-700 flex items-center justify-between gap-2 shrink-0">
+          <div className="flex items-center gap-2">
+            <Icon name="password" size={18} className="text-accent" />
+            <h3 className="text-base font-semibold text-stone-900 dark:text-stone-100">
+              Change master password
+            </h3>
+          </div>
+          <button onClick={onClose} className="icon-btn">
+            <Icon name="close" size={16} />
+          </button>
+        </div>
+        <div className="px-5 py-4 space-y-3">
+          <p className="text-[12px] text-stone-500 dark:text-stone-400 leading-relaxed">
+            This re-encrypts {entryCount === 1 ? 'your 1 entry' : `all ${entryCount} entries`} under
+            a new key. There is no recovery if you forget the new password.
+          </p>
+          <PasswordInput label="Current password" value={current} onChange={setCurrent} autoFocus />
+          <PasswordInput label="New password" value={next} onChange={setNext} placeholder="At least 8 characters" />
+          <PasswordInput label="Confirm new password" value={confirm} onChange={setConfirm} onEnter={submit} />
+          {error && (
+            <div className="text-xs text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800/40 rounded p-2">
+              {error}
+            </div>
+          )}
+        </div>
+        <div className="px-5 py-3 border-t border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 flex justify-end gap-2">
+          <button onClick={onClose} className="btn-ghost">
+            Cancel
+          </button>
+          <button
+            onClick={() => void submit()}
+            disabled={busy || !current || !next || !confirm}
+            className="btn-primary"
+          >
+            <Icon name="password" size={14} />
+            <span>{busy ? 'Re-encrypting…' : 'Change password'}</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function PasswordInput({
+  label,
+  value,
+  onChange,
+  placeholder,
+  autoFocus,
+  onEnter
+}: {
+  label: string
+  value: string
+  onChange: (v: string) => void
+  placeholder?: string
+  autoFocus?: boolean
+  onEnter?: () => void
+}): JSX.Element {
+  return (
+    <div>
+      <label className="block text-[11px] uppercase tracking-wider text-stone-500 dark:text-stone-400 font-medium mb-1.5">
+        {label}
+      </label>
+      <input
+        type="password"
+        autoFocus={autoFocus}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && onEnter) void onEnter()
+        }}
+        placeholder={placeholder}
+        className="w-full bg-white dark:bg-stone-800 border border-stone-300 dark:border-stone-600 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-stone-700 dark:focus:border-stone-400 focus:ring-2 focus:ring-stone-200 dark:focus:ring-stone-700"
+      />
     </div>
   )
 }
