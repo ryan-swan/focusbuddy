@@ -4,6 +4,7 @@ import { existsSync } from 'fs'
 import { pathToFileURL } from 'url'
 import { config as loadEnv } from 'dotenv'
 import { closeDb, getDb } from './db/database'
+import { autoBackupOnLaunch } from './db/backup'
 import { registerIpcHandlers } from './ipc'
 import { decidePopup } from './popupRouter'
 import { cleanWebviewUserAgent } from './userAgent'
@@ -271,6 +272,10 @@ app.whenReady().then(() => {
     app.setAppUserModelId('agency.saasmouth.focusbuddy')
   }
   getDb()
+  // Rotating safety-net snapshot of the database, at most once per 12h. Runs
+  // async, never blocks boot, and is the recovery path if the live DB is later
+  // lost or corrupted.
+  autoBackupOnLaunch()
   // Harden the main renderer's session too (voice/video-note media stays
   // granted; dangerous device/location permissions are denied).
   applyPermissionPolicy(session.defaultSession)
