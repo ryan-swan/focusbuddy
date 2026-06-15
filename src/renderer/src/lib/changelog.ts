@@ -36,6 +36,20 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.36',
+    date: '2026-06-15T23:30:00Z',
+    title: 'v2.5.36 — The AI command bar understands you again',
+    tag: 'fix',
+    summary:
+      'The "Ask AI" command bar was quietly sending your request down the wrong path, so it often missed your intent and fell back to a generic answer. It now classifies what you asked for reliably and routes you to the right build.',
+    highlights: [
+      'Typing a request into the command bar now correctly recognises whether you want a whole workspace, a few objects added to the current task, or a plain answer, instead of degrading to a generic reply.',
+      'The classification runs on a fast, low-cost model so the command bar responds quickly.',
+      'No change to how you use it: open with the header button, the canvas Ask AI button, or Cmd+Shift+K, type what you want, and confirm what it proposes.'
+    ],
+    links: [{ label: 'Finding your way around', href: `${HELP_BASE}/getting-around` }]
+  },
+  {
     version: '2.5.35',
     date: '2026-06-15T22:00:00Z',
     title: 'v2.5.35 — Gemstone theme, and clearer updates',
