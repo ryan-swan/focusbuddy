@@ -186,6 +186,7 @@ import {
 import { currentEnergy, logEnergy, recentEnergy } from '../db/energy'
 import { fireHaptic, isHapticsAvailable, type HapticFeel } from '../haptics'
 import {
+  changeMasterPassword,
   createEntry,
   createVault,
   decryptWithMaster,
@@ -748,6 +749,11 @@ export function registerIpcHandlers(): void {
     (_e, id: string, patch: VaultEntryPatch) => updateEntry(id, patch)
   )
   ipcMain.handle('vault:deleteEntry', (_e, id: string) => deleteEntry(id))
+  ipcMain.handle(
+    'vault:changeMasterPassword',
+    (_e, currentPassword: string, newPassword: string) =>
+      changeMasterPassword(currentPassword, newPassword)
+  )
   ipcMain.handle('vault:encrypt', (_e, plaintext: string) => encryptWithMaster(plaintext))
   ipcMain.handle('vault:decrypt', (_e, iv: string, ciphertext: string) =>
     decryptWithMaster(iv, ciphertext)

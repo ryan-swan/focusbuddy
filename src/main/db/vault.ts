@@ -161,6 +161,104 @@ export function unlockVault(
   }
 }
 
+/**
+ * Rotate the master password. Verifies the current password, derives a fresh key
+ * from the new password against a NEW salt (and the latest iteration count, so an
+ * older vault's KDF cost is upgraded in passing), then re-encrypts the verifier
+ * AND every entry's secret under the new key.
+ *
+ * Correctness is the whole point here: a half-rotated vault, some entries under
+ * the old key and some under the new, is unrecoverable. So every secret is
+ * re-encrypted in memory FIRST (a decryption failure aborts before any write),
+ * and the meta row plus all entry rows are rewritten inside a single
+ * transaction that rolls back entirely on any error. On success the session
+ * stays unlocked under the new key.
+ */
+export function changeMasterPassword(
+  currentPassword: string,
+  newPassword: string
+): { ok: true } | { ok: false; error: string } {
+  if (!newPassword || newPassword.length < 8) {
+    return { ok: false, error: 'New master password must be at least 8 characters.' }
+  }
+  const meta = getVaultMeta()
+  if (!meta.exists) return { ok: false, error: 'No vault yet. Create one first.' }
+
+  // Verify the current password against the stored verifier.
+  const oldSalt = Buffer.from(meta.salt, 'base64')
+  const oldKey = deriveKey(currentPassword, oldSalt, meta.iterations)
+  try {
+    if (aesGcmDecrypt(oldKey, meta.verifierIv, meta.verifierCiphertext) !== VERIFIER_PLAINTEXT) {
+      oldKey.fill(0)
+      return { ok: false, error: 'Current master password is incorrect.' }
+    }
+  } catch {
+    oldKey.fill(0)
+    return { ok: false, error: 'Current master password is incorrect.' }
+  }
+
+  const newSalt = randomBytes(SALT_LEN_BYTES)
+  const newKey = deriveKey(newPassword, newSalt, ITERATIONS)
+
+  const db = getDb()
+  const rows = db
+    .prepare('SELECT id, iv, ciphertext FROM vault_entries')
+    .all() as Array<{ id: string; iv: string; ciphertext: string }>
+
+  // Re-encrypt every secret under the new key up front. If any entry can't be
+  // decrypted with the old key, abort before touching the database.
+  const reEncrypted: Array<{ id: string; iv: string; ciphertext: string }> = []
+  try {
+    for (const r of rows) {
+      const secret = aesGcmDecrypt(oldKey, r.iv, r.ciphertext)
+      const enc = aesGcmEncrypt(newKey, secret)
+      reEncrypted.push({ id: r.id, iv: enc.iv, ciphertext: enc.ciphertext })
+    }
+  } catch {
+    oldKey.fill(0)
+    newKey.fill(0)
+    return {
+      ok: false,
+      error: 'Could not re-encrypt an existing entry, so nothing was changed. Your vault is unchanged.'
+    }
+  }
+
+  const newVerifier = aesGcmEncrypt(newKey, VERIFIER_PLAINTEXT)
+  const now = Date.now()
+
+  try {
+    const apply = db.transaction(() => {
+      db.prepare(
+        `UPDATE vault_meta SET salt = @salt, verifier_iv = @iv, verifier_ciphertext = @ct,
+           iterations = @it, updated_at = @now WHERE id = 1`
+      ).run({
+        salt: newSalt.toString('base64'),
+        iv: newVerifier.iv,
+        ct: newVerifier.ciphertext,
+        it: ITERATIONS,
+        now
+      })
+      const upd = db.prepare(
+        'UPDATE vault_entries SET iv = @iv, ciphertext = @ct, updated_at = @now WHERE id = @id'
+      )
+      for (const e of reEncrypted) {
+        upd.run({ id: e.id, iv: e.iv, ct: e.ciphertext, now })
+      }
+    })
+    apply()
+  } catch (e) {
+    oldKey.fill(0)
+    newKey.fill(0)
+    return { ok: false, error: `Re-keying failed and was rolled back: ${(e as Error).message}` }
+  }
+
+  // Keep the session unlocked under the new key.
+  if (cachedKey) cachedKey.fill(0)
+  oldKey.fill(0)
+  cachedKey = newKey
+  return { ok: true }
+}
+
 // ── Entry CRUD ───────────────────────────────────────────────────────────────
 
 interface EntryRow {
