@@ -36,6 +36,20 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.35',
+    date: '2026-06-15T22:00:00Z',
+    title: 'v2.5.35 — Gemstone theme, and clearer updates',
+    tag: 'design',
+    summary:
+      'A new Gemstone theme inspired by emerald, ruby, sapphire, onyx and diamond. An onyx-black room with faceted glass, a soft drifting sparkle and prismatic light along every edge, all re-tinting to your chosen accent. This release also makes update problems explain themselves instead of failing silently.',
+    highlights: [
+      'Gemstone joins the base themes in the Theme studio: deep onyx ground, faceted surfaces, a whisper-soft sparkle and travelling spectral refraction on the header, sidebar and every widget.',
+      'Two new gem accents, Ruby and Sapphire, sit beside Emerald. Gemstone re-tints its glow and refraction to whichever accent you pick, so the room recolours without changing shape.',
+      'When an update cannot complete it now shows the real reason on screen rather than a bare failure, and always offers a one-click manual download so you are never stuck retrying the same error.'
+    ],
+    links: [{ label: 'Finding your way around', href: `${HELP_BASE}/getting-around` }]
+  },
+  {
     version: '2.5.34',
     date: '2026-06-15T20:00:00Z',
     title: 'v2.5.34 — More widgets grow to fit their content',
