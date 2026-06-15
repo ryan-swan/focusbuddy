@@ -215,6 +215,7 @@ import {
   runDeskAgent,
   runTransformWire,
   sendChat,
+  routeCommandBar,
   transformText,
   suggestWidgetSetup,
   suggestPageContent,
@@ -611,6 +612,10 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('ai:suggestPageContent', (_e, prompt: string) => {
     recordAiCall()
     return suggestPageContent(prompt)
+  })
+  ipcMain.handle('ai:routeCommand', (_e, input: { system: string; text: string }) => {
+    recordAiCall()
+    return routeCommandBar(input)
   })
   // Telemetry snapshot for the renderer to report to the signal server.
   ipcMain.handle('telemetry:collect', () => collectTelemetry())

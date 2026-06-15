@@ -491,6 +491,7 @@ export type AIPurpose =
   | 'living_page'
   | 'wire_transform'
   | 'desk_agent'
+  | 'command_route'
 
 // Desk time-travel: metadata for one canvas snapshot (the full widget payload
 // lives in the DB and is fetched on demand).
