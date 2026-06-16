@@ -29,6 +29,11 @@ import type {
   MailAccountPublic,
   MailListItem,
   MailFullMessage,
+  DocType,
+  DocumentDraft,
+  DocumentMeta,
+  DocumentPatch,
+  FbDocument,
   ModelMode,
   NodeDraft,
   NodePatch,
@@ -1045,6 +1050,28 @@ const api = {
       ipcRenderer.invoke('mail:get', uid),
     markSeen: (uid: number): Promise<{ ok: true } | { ok: false; error: string }> =>
       ipcRenderer.invoke('mail:markSeen', uid)
+  },
+  // Office documents — standalone doc / sheet / slides files, created with AI
+  // and edited full-screen. CRUD plus the AI "create" generator.
+  documents: {
+    list: (): Promise<DocumentMeta[]> => ipcRenderer.invoke('documents:list'),
+    get: (id: string): Promise<FbDocument | null> => ipcRenderer.invoke('documents:get', id),
+    create: (draft: DocumentDraft): Promise<FbDocument> =>
+      ipcRenderer.invoke('documents:create', draft),
+    update: (id: string, patch: DocumentPatch): Promise<FbDocument | null> =>
+      ipcRenderer.invoke('documents:update', id, patch),
+    delete: (id: string): Promise<boolean> => ipcRenderer.invoke('documents:delete', id),
+    generate: (input: {
+      docType: DocType
+      prompt: string
+      audience?: string
+    }): Promise<{
+      ok: boolean
+      title?: string
+      body?: unknown
+      error?: string
+      needsApiKey?: boolean
+    }> => ipcRenderer.invoke('documents:generate', input)
   },
   // haptyx:// deep-link auth handoff. The brochure at haptyx.app/account/*
   // signs the user in against the signal server, then redirects to

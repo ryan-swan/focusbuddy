@@ -31,7 +31,11 @@ const AUTO_ROUTING: Record<AIPurpose, string> = {
   // The command bar's intent router — a tight classify into one of four shapes,
   // returning a small JSON object. Haiku is fast and plenty for classification,
   // and this fires on every command-bar submit, so cheap matters.
-  command_route: HAIKU
+  command_route: HAIKU,
+  // Office-document generation (the "Create with AI" flow for docs, sheets and
+  // slides). The user reads and then edits the result, so quality matters;
+  // Sonnet is the right default, with the global model-mode override available.
+  document: SONNET
 }
 
 let currentMode: ModelMode = 'auto'

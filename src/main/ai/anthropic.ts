@@ -1487,6 +1487,166 @@ export async function suggestPageContent(
   }
 }
 
+// ── Create with AI: office documents (doc / sheet / slides) ──────────────────
+//
+// The heart of the AI-first documents flow. The user describes what they want
+// and (optionally) who it is for, and the model returns a complete, structured
+// FIRST DRAFT in the right shape for the surface: a Tiptap document for a doc,
+// a { columns, rows } grid for a sheet, a { slides[] } deck for slides. The
+// renderer drops the result straight into an editable surface — this is the
+// "get started with AI, then edit" loop, not a chat reply.
+
+export interface DocumentGenResult {
+  ok: boolean
+  title?: string
+  // Shape depends on docType; the renderer/db treat it as the document body.
+  body?: unknown
+  error?: string
+  needsApiKey?: boolean
+}
+
+// Pull the first JSON object out of a model reply, tolerating stray prose or a
+// ```json fence the model may add despite instructions.
+function extractJsonObject(text: string): unknown {
+  let s = text.trim()
+  const fence = s.match(/```(?:json)?\s*([\s\S]*?)```/i)
+  if (fence) s = fence[1].trim()
+  const start = s.indexOf('{')
+  const end = s.lastIndexOf('}')
+  if (start === -1 || end === -1 || end <= start) throw new Error('No JSON object in response.')
+  return JSON.parse(s.slice(start, end + 1))
+}
+
+export async function generateDocument(input: {
+  docType: 'doc' | 'sheet' | 'slides'
+  prompt: string
+  audience?: string
+}): Promise<DocumentGenResult> {
+  const c = getClient()
+  if (!c)
+    return {
+      ok: false,
+      needsApiKey: true,
+      error: 'No Anthropic API key set. Open Settings → AI · API keys to paste one.'
+    }
+  const topic = input.prompt.trim()
+  if (!topic) return { ok: false, error: 'Describe what you want to create.' }
+  const audienceLine = input.audience?.trim()
+    ? ` The intended audience is ${input.audience.trim()}; pitch the level, tone and detail for them.`
+    : ''
+
+  const style =
+    ' Write in plain, confident, human prose. Do not use em dashes or emoji. Do not use a bold label followed by a colon as a heading substitute; write real sentences.'
+
+  try {
+    if (input.docType === 'doc') {
+      const system =
+        'You draft a complete, well-structured business document in Markdown.' +
+        audienceLine +
+        ' Put the document title on the FIRST line as a single H1 (# Title). Then write the body using ## for section headings, prose paragraphs, and - for bullets only where a real list is warranted. Aim for a genuinely useful first draft the user will edit, not an outline of placeholders. Reply with raw Markdown only: no preamble, no code fences.' +
+        style
+      const resp = await c.messages.create({
+        model: resolveModel('document'),
+        max_tokens: 3000,
+        system,
+        messages: [{ role: 'user', content: topic }]
+      })
+      if ((resp.stop_reason as string) === 'refusal')
+        return { ok: false, error: 'Claude declined this request. Try rephrasing it.' }
+      const text = resp.content
+        .filter((b) => b.type === 'text')
+        .map((b) => ('text' in b ? b.text : ''))
+        .join('\n')
+        .trim()
+      if (!text) return { ok: false, error: 'Empty response from model.' }
+      const lines = text.split('\n')
+      let title = topic.slice(0, 80)
+      let bodyMd = text
+      if (lines[0]?.startsWith('# ')) {
+        title = lines[0].replace(/^#\s+/, '').trim()
+        bodyMd = lines.slice(1).join('\n').trim()
+      }
+      return { ok: true, title, body: markdownToTiptap(bodyMd) }
+    }
+
+    if (input.docType === 'sheet') {
+      const system =
+        'You design a spreadsheet as structured data.' +
+        audienceLine +
+        ' Reply with ONLY a JSON object of the form {"title": string, "columns": string[], "rows": string[][]}. Use 2 to 8 short column headers. Provide 6 to 20 rows, each an array with exactly one string cell per column, filled with realistic, useful example data (not "example 1"). For a computed cell such as a total or a rate, put a spreadsheet formula starting with = that references cells in A1 style, for example "=SUM(B2:B9)". No markdown, no code fences, no prose outside the JSON.'
+      const resp = await c.messages.create({
+        model: resolveModel('document'),
+        max_tokens: 2500,
+        system,
+        messages: [{ role: 'user', content: topic }]
+      })
+      if ((resp.stop_reason as string) === 'refusal')
+        return { ok: false, error: 'Claude declined this request. Try rephrasing it.' }
+      const text = resp.content
+        .filter((b) => b.type === 'text')
+        .map((b) => ('text' in b ? b.text : ''))
+        .join('\n')
+      const parsed = extractJsonObject(text) as {
+        title?: string
+        columns?: string[]
+        rows?: string[][]
+      }
+      const columns = Array.isArray(parsed.columns) && parsed.columns.length ? parsed.columns : ['A', 'B', 'C']
+      const width = columns.length
+      const rows = Array.isArray(parsed.rows)
+        ? parsed.rows.map((r) => {
+            const row = Array.isArray(r) ? r.map((cell) => String(cell ?? '')) : []
+            while (row.length < width) row.push('')
+            return row.slice(0, width)
+          })
+        : []
+      return {
+        ok: true,
+        title: parsed.title || topic.slice(0, 80),
+        body: { columns, rows }
+      }
+    }
+
+    // slides
+    const system =
+      'You design a clear, well-paced slide deck.' +
+      audienceLine +
+      ' Reply with ONLY a JSON object of the form {"title": string, "slides": [{"title": string, "bullets": string[], "notes": string, "layout": "title"|"bullets"|"section"}]}. Produce 5 to 10 slides that tell a coherent story with a beginning, middle and end. The first slide layout must be "title". Keep bullets to at most 6 short points per slide, and use an empty bullets array for title and section slides. Write one to three sentences of speaker notes per slide saying what to actually say. No markdown, no code fences, no prose outside the JSON.' +
+      style
+    const resp = await c.messages.create({
+      model: resolveModel('document'),
+      max_tokens: 3000,
+      system,
+      messages: [{ role: 'user', content: topic }]
+    })
+    if ((resp.stop_reason as string) === 'refusal')
+      return { ok: false, error: 'Claude declined this request. Try rephrasing it.' }
+    const text = resp.content
+      .filter((b) => b.type === 'text')
+      .map((b) => ('text' in b ? b.text : ''))
+      .join('\n')
+    const parsed = extractJsonObject(text) as {
+      title?: string
+      slides?: Array<{ title?: string; bullets?: string[]; notes?: string; layout?: string }>
+    }
+    const slides = (Array.isArray(parsed.slides) ? parsed.slides : []).map((s, i) => ({
+      id: `${Date.now().toString(36)}-${i}`,
+      title: s.title || `Slide ${i + 1}`,
+      bullets: Array.isArray(s.bullets) ? s.bullets.map((b) => String(b)) : [],
+      notes: typeof s.notes === 'string' ? s.notes : '',
+      layout: (['title', 'bullets', 'section'].includes(String(s.layout))
+        ? s.layout
+        : i === 0
+          ? 'title'
+          : 'bullets') as 'title' | 'bullets' | 'section'
+    }))
+    if (!slides.length) return { ok: false, error: 'The deck came back empty. Try a more specific prompt.' }
+    return { ok: true, title: parsed.title || topic.slice(0, 80), body: { slides } }
+  } catch (e) {
+    return { ok: false, error: (e as Error).message }
+  }
+}
+
 // ── In-widget AI: Table row suggestion ───────────────────────────────────────
 //
 // Loads the target table's schema, asks the model for rows fitting that

@@ -524,6 +524,7 @@ export type AIPurpose =
   | 'wire_transform'
   | 'desk_agent'
   | 'command_route'
+  | 'document'
 
 // Desk time-travel: metadata for one canvas snapshot (the full widget payload
 // lives in the DB and is fetched on demand).
@@ -1074,4 +1075,68 @@ export interface MailFullMessage {
   text: string
   html: string | null
   attachments: { filename: string; size: number; contentType: string }[]
+}
+
+// ── Office documents (doc / sheet / slides) ─────────────────────────────────
+// Standalone files created and edited as first-class artifacts. One table, one
+// list, one AI-create flow; the body shape switches on docType.
+
+export type DocType = 'doc' | 'sheet' | 'slides'
+
+// A spreadsheet body: named columns and a grid of string cells. A cell whose
+// value starts with '=' is a formula evaluated at render time.
+export interface SheetBody {
+  columns: string[]
+  rows: string[][]
+}
+
+// One slide in a deck. `bullets` is the body content; `notes` are speaker
+// notes (also where AI can draft what to say).
+export interface Slide {
+  id: string
+  title: string
+  bullets: string[]
+  notes: string
+  layout: 'title' | 'bullets' | 'section'
+}
+
+export interface SlidesBody {
+  slides: Slide[]
+}
+
+// A 'doc' body is a Tiptap document JSON (the same shape PageWidget stores);
+// it is opaque to everything except the editor, so it is typed loosely here.
+export type DocBody = { type: 'doc'; content?: unknown[] } | Record<string, unknown>
+
+// The full document, body included.
+export interface FbDocument {
+  id: string
+  docType: DocType
+  title: string
+  body: DocBody | SheetBody | SlidesBody
+  archived: boolean
+  createdAt: number
+  updatedAt: number
+}
+
+// List row — everything except the (potentially large) body.
+export interface DocumentMeta {
+  id: string
+  docType: DocType
+  title: string
+  archived: boolean
+  createdAt: number
+  updatedAt: number
+}
+
+export interface DocumentDraft {
+  docType: DocType
+  title: string
+  body?: DocBody | SheetBody | SlidesBody
+}
+
+export interface DocumentPatch {
+  title?: string
+  body?: DocBody | SheetBody | SlidesBody
+  archived?: boolean
 }
