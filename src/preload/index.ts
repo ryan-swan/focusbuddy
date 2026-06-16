@@ -16,6 +16,9 @@ import type {
   DashboardLayout,
   EnergyLevel,
   EnergyLogEntry,
+  TimeBlock,
+  TimeBlockDraft,
+  TimeBlockPatch,
   FbNode,
   HapticFeel,
   FocusSession,
@@ -452,6 +455,15 @@ const api = {
       ipcRenderer.invoke('energy:current'),
     recent: (hours: number): Promise<EnergyLogEntry[]> =>
       ipcRenderer.invoke('energy:recent', hours)
+  },
+  timeBlocks: {
+    list: (fromMs: number, toMs: number): Promise<TimeBlock[]> =>
+      ipcRenderer.invoke('timeblocks:list', fromMs, toMs),
+    create: (draft: TimeBlockDraft): Promise<TimeBlock> =>
+      ipcRenderer.invoke('timeblocks:create', draft),
+    update: (id: string, patch: TimeBlockPatch): Promise<TimeBlock | null> =>
+      ipcRenderer.invoke('timeblocks:update', id, patch),
+    delete: (id: string): Promise<boolean> => ipcRenderer.invoke('timeblocks:delete', id)
   },
   vault: {
     meta: (): Promise<VaultMeta> => ipcRenderer.invoke('vault:meta'),

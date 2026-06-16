@@ -381,6 +381,21 @@ export function getDb(): Database.Database {
       key TEXT PRIMARY KEY,
       value INTEGER NOT NULL DEFAULT 0
     );
+
+    -- Calendar time blocks — a booked stretch of time, optionally tied to a
+    -- task. Deleting a task removes its blocks (ON DELETE CASCADE).
+    CREATE TABLE IF NOT EXISTS time_blocks (
+      id TEXT PRIMARY KEY,
+      task_id TEXT REFERENCES nodes(id) ON DELETE CASCADE,
+      title TEXT NOT NULL DEFAULT '',
+      start_ms INTEGER NOT NULL,
+      duration_min INTEGER NOT NULL,
+      status TEXT NOT NULL DEFAULT 'planned' CHECK (status IN ('planned', 'done')),
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_time_blocks_start ON time_blocks (start_ms);
+    CREATE INDEX IF NOT EXISTS idx_time_blocks_task ON time_blocks (task_id);
   `)
   return db
 }
