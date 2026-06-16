@@ -38,7 +38,7 @@ export interface ExecuteResult {
   ok: boolean
   error?: string
   // Set when the failure is fixable by enabling Accessibility for
-  // FocusBuddy. The renderer surfaces a one-click "Open System Settings"
+  // PlexiDesk. The renderer surfaces a one-click "Open System Settings"
   // affordance instead of a generic error.
   needsAccessibility?: boolean
 }
@@ -46,8 +46,8 @@ export interface ExecuteResult {
 // ─── Focus handoff ─────────────────────────────────────────────────────
 //
 // THE central UX fix for the Stream Deck: when the user clicks a button
-// in FocusBuddy, FocusBuddy itself becomes the frontmost app. If we then
-// fire ⌘C the copy goes to FocusBuddy (which has nothing meaningful
+// in PlexiDesk, PlexiDesk itself becomes the frontmost app. If we then
+// fire ⌘C the copy goes to PlexiDesk (which has nothing meaningful
 // selected). For the Stream Deck to work as a real macro pad, we have
 // to hand focus BACK to whatever app the user was in before clicking.
 //
@@ -60,18 +60,18 @@ export interface ExecuteResult {
 //      target app, wait a beat for it to focus, then send the keys.
 //   3. After actions that move the user's attention (Cmd+Shift+4
 //      screenshot, key combos, type-text) we leave the user where they
-//      ended up — we DON'T re-activate FocusBuddy.
+//      ended up — we DON'T re-activate PlexiDesk.
 
-// Cached process name of the app frontmost just before FocusBuddy
+// Cached process name of the app frontmost just before PlexiDesk
 // stole focus. Updated on every browser-window-focus.
 let previousFrontmostApp: string | null = null
 
 function getOurBundleName(): string {
-  // The macOS process name FocusBuddy presents as. In dev this is
+  // The macOS process name PlexiDesk presents as. In dev this is
   // "Electron"; in a packaged release it's the productName from the
-  // electron-builder config (usually "FocusBuddy"). app.name is the
+  // electron-builder config (usually "PlexiDesk"). app.name is the
   // canonical answer for both.
-  return app.name || 'FocusBuddy'
+  return app.name || 'PlexiDesk'
 }
 
 async function getFrontmostNonSelf(): Promise<string | null> {
@@ -103,7 +103,7 @@ async function getFrontmostNonSelf(): Promise<string | null> {
 }
 
 // Install focus tracker. Called once from main on app ready. Whenever
-// FocusBuddy is about to gain focus, we capture what was frontmost
+// PlexiDesk is about to gain focus, we capture what was frontmost
 // (so the next keystroke action knows where to send keys).
 export function installFocusTracker(): void {
   if (!isMac) return
@@ -115,7 +115,7 @@ export function installFocusTracker(): void {
   }
   app.on('browser-window-focus', () => void refresh())
   // Also snapshot on a slow timer so the cache stays fresh even if the
-  // user is alt-tabbing rapidly outside FocusBuddy.
+  // user is alt-tabbing rapidly outside PlexiDesk.
   setInterval(() => {
     if (BrowserWindow.getFocusedWindow() === null) void refresh()
   }, 1500).unref()
@@ -175,8 +175,8 @@ function accessibilityPromptError(): ExecuteResult {
   return {
     ok: false,
     error:
-      'FocusBuddy needs Accessibility permission to send keystrokes. ' +
-      'Open System Settings → Privacy & Security → Accessibility and toggle FocusBuddy on.',
+      'PlexiDesk needs Accessibility permission to send keystrokes. ' +
+      'Open System Settings → Privacy & Security → Accessibility and toggle PlexiDesk on.',
     needsAccessibility: true
   }
 }
@@ -256,7 +256,7 @@ async function openApp(action: OpenAppAction): Promise<void> {
   if (!target) throw new Error('Open-app target is empty.')
   if (isMac) {
     // `open -a` handles both .app paths and app names. Quiet (-g) keeps
-    // FocusBuddy in the foreground; user can remove that flag in their
+    // PlexiDesk in the foreground; user can remove that flag in their
     // macro if they want the app to come to front.
     await execFileAsync('open', ['-a', target])
     return
@@ -274,7 +274,7 @@ async function openUrl(action: OpenUrlAction): Promise<void> {
 async function keyCombo(action: KeyComboAction): Promise<void> {
   if (!action.key) throw new Error('Key is empty.')
   // Critical: hand focus back to the previous app FIRST, otherwise the
-  // keystroke goes to FocusBuddy and your ⌘C / ⌘V / ⌘⇧4 all no-op.
+  // keystroke goes to PlexiDesk and your ⌘C / ⌘V / ⌘⇧4 all no-op.
   await focusPreviousApp()
   const code = specialKeyCode(action.key)
   const using = modifiersClause(action.modifiers)
@@ -291,7 +291,7 @@ async function keyCombo(action: KeyComboAction): Promise<void> {
 async function typeText(action: TypeTextAction): Promise<void> {
   if (!action.text) return
   // Hand focus back so the typing lands in the user's previous window,
-  // not FocusBuddy itself.
+  // not PlexiDesk itself.
   await focusPreviousApp()
   // Split on newlines so each line becomes its own keystroke; AppleScript
   // handles newlines inside a string but interpretation varies by app.
@@ -568,10 +568,10 @@ export async function openSettingsAppPlain(): Promise<boolean> {
   }
 }
 
-// Reveal the FocusBuddy.app bundle in Finder so the user can drag-drop
+// Reveal the PlexiDesk.app bundle in Finder so the user can drag-drop
 // it into the Accessibility list. In dev mode this reveals Electron.app
 // (because that's the actual binary running). In packaged release,
-// reveals FocusBuddy.app. Either way, the user can drag the revealed
+// reveals PlexiDesk.app. Either way, the user can drag the revealed
 // item into the Accessibility list as a foolproof way to add the app.
 export async function revealAppBundleInFinder(): Promise<{
   ok: boolean

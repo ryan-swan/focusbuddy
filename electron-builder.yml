@@ -2,10 +2,18 @@
 # Produces an unsigned macOS .zip + .dmg in `release/`.
 # Notarization/signing left off for v1 — once we have an Apple
 # Developer cert, add `mac.identity` + `mac.notarize` here.
+# appId stays app.haptyx.desktop on purpose: it is the OS/LaunchServices upgrade
+# identity, so keeping it lets an existing Haptyx install upgrade IN PLACE to the
+# renamed PlexiDesk build (preserving granted permissions) rather than appearing
+# as a second app.
 appId: app.haptyx.desktop
-productName: Haptyx
-copyright: Copyright © 2026 Haptyx
-artifactName: ${productName}-${version}-${os}-${arch}.${ext}
+productName: PlexiDesk
+copyright: Copyright © 2026 PlexiDesk
+# Asset filenames stay "Haptyx-…" (NOT ${productName}) on purpose: shipped clients
+# hardcode the Haptyx-<ver> update URL (updaterInstall.ts) and the brochure +
+# release scripts expect it. Decoupling the file name from the product name keeps
+# auto-update working across the rename. The bundle INSIDE the zip is PlexiDesk.app.
+artifactName: Haptyx-${version}-${os}-${arch}.${ext}
 
 directories:
   output: release
@@ -114,7 +122,7 @@ nsis:
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: true
   createStartMenuShortcut: true
-  shortcutName: Haptyx
+  shortcutName: PlexiDesk
   # electron-updater on Windows reads the same GitHub Releases channel as macOS,
   # so a published `latest.yml` / `latest-mac.yml` drives auto-update on both.
 

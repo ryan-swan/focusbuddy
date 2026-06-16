@@ -36,6 +36,20 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.39',
+    date: '2026-06-16T16:00:00Z',
+    title: 'v2.5.39 — Say hello to PlexiDesk',
+    tag: 'feature',
+    summary:
+      'The app has a new name: PlexiDesk. Same product, same data, nothing for you to do. This release also makes the built-in browser work with far more sites, and lets you drag tasks straight onto the calendar.',
+    highlights: [
+      'New name, your data intact: FocusBuddy / Haptyx is now PlexiDesk. Your existing tasks, vault and settings carry over exactly as they were, and updates keep working as normal.',
+      'The browser handles more of the web: it runs on a much newer engine, so you hit far fewer "verify you are human" checks, and menus that open a new tab — like Google Docs "open a file" — now work instead of doing nothing.',
+      'Plan your day on the calendar: drag any task or folder onto the Week view to book time for it, and jump straight back to the task or folder from its calendar block.'
+    ],
+    links: [{ label: 'Finding your way around', href: `${HELP_BASE}/getting-around` }]
+  },
+  {
     version: '2.5.38',
     date: '2026-06-16T09:00:00Z',
     title: 'v2.5.38 — Book time to focus, and a warmer first run',

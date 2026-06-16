@@ -26,9 +26,9 @@ interface Props {
 //   2. "Open System Settings app" → uses `open -a "System Settings"` —
 //      no URL processing. Just opens Settings. The user navigates the
 //      sidebar manually following the steps shown.
-//   3. "Show me the FocusBuddy app" → uses `open -R` to reveal the
+//   3. "Show me the PlexiDesk app" → uses `open -R` to reveal the
 //      running .app bundle in Finder. In dev mode this is Electron.app
-//      (the dev binary), in prod it's FocusBuddy.app. The user drags
+//      (the dev binary), in prod it's PlexiDesk.app. The user drags
 //      it into the Accessibility list — the foolproof way to add it.
 //
 // While the modal is open we poll the trust state every 1.5s so the
@@ -136,7 +136,7 @@ export default function AccessibilityPrompt({ open, onClose }: Props): JSX.Eleme
               <Icon name="key" size={14} />
             </div>
             <h3 className="text-[14px] font-semibold text-stone-100 flex-1">
-              Allow FocusBuddy to control your keyboard
+              Allow PlexiDesk to control your keyboard
             </h3>
             <button
               onClick={onClose}
@@ -148,7 +148,7 @@ export default function AccessibilityPrompt({ open, onClose }: Props): JSX.Eleme
           </div>
           <p className="text-[11px] text-stone-400 leading-snug">
             macOS blocks synthetic keystrokes (⌘C, ⌘V, ⌘⇧4, type-text) until
-            FocusBuddy is granted <strong className="text-stone-200">Accessibility</strong>{' '}
+            PlexiDesk is granted <strong className="text-stone-200">Accessibility</strong>{' '}
             permission. Three ways to grant it, in order of how reliable they
             are on different macOS versions:
           </p>
@@ -262,7 +262,7 @@ export default function AccessibilityPrompt({ open, onClose }: Props): JSX.Eleme
                   <li>
                     Look for{' '}
                     <strong className="text-white">
-                      {revealedBundleName || 'FocusBuddy'}
+                      {revealedBundleName || 'PlexiDesk'}
                     </strong>{' '}
                     in the list:
                     <ul className="mt-1 ml-4 text-[10px] text-stone-400 space-y-0.5 list-disc">
@@ -289,10 +289,10 @@ export default function AccessibilityPrompt({ open, onClose }: Props): JSX.Eleme
                 }}
               >
                 <strong className="text-indigo-200">Dev-mode note:</strong> when
-                running FocusBuddy from{' '}
+                running PlexiDesk from{' '}
                 <code className="bg-black/30 px-1 rounded">npm run dev</code>, the
                 app appears in the Accessibility list as{' '}
-                <strong>"Electron"</strong> (the dev binary), not "FocusBuddy".
+                <strong>"Electron"</strong> (the dev binary), not "PlexiDesk".
                 The <strong>Show me the app</strong> button reveals exactly
                 the bundle macOS sees — drag-dropping that file is foolproof.
               </div>

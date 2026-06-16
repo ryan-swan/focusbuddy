@@ -438,7 +438,7 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('streamdeck:openSettingsApp', () => openSettingsAppPlain())
   // Reveal the running app's .app bundle in Finder so the user can
   // drag it into the Accessibility list. In dev mode this is
-  // Electron.app; in production it's FocusBuddy.app.
+  // Electron.app; in production it's PlexiDesk.app.
   ipcMain.handle('streamdeck:revealAppInFinder', () => revealAppBundleInFinder())
   // Universal SpeedDeck — same buttons across every task, every folder.
   // The renderer reads on widget mount and writes on every edit; this

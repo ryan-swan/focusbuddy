@@ -23,6 +23,22 @@ loadEnv({ path: join(app.getAppPath(), '..', '.env') })
 // picks up the override on first access.
 if (process.env.FB_TEST_USER_DATA) {
   app.setPath('userData', process.env.FB_TEST_USER_DATA)
+} else if (app.isPackaged) {
+  // Data-safe rename: the app was renamed Haptyx → PlexiDesk, which would
+  // otherwise move userData from "…/Application Support/Haptyx" to "…/PlexiDesk"
+  // and orphan every existing user's database, vault and settings. So if the
+  // legacy Haptyx data directory exists, keep using it in place (no copy, no
+  // move — zero risk). Fresh installs (no legacy dir) use the default PlexiDesk
+  // directory. Cross-platform: getPath('appData') is the per-user app-data root
+  // on macOS and Windows alike. Must run BEFORE app.whenReady()/getDb().
+  try {
+    const legacyUserData = join(app.getPath('appData'), 'Haptyx')
+    if (existsSync(legacyUserData)) {
+      app.setPath('userData', legacyUserData)
+    }
+  } catch {
+    // If anything goes wrong, fall through to the default path rather than crash.
+  }
 }
 
 // Register `fb-file://` as a privileged custom protocol so renderers can use it
