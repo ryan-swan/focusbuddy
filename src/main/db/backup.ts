@@ -53,7 +53,7 @@ function timestamp(): string {
 }
 
 export function defaultExportName(): string {
-  return `FocusBuddy-backup-${timestamp()}.${BACKUP_EXT}`
+  return `PlexiDesk-backup-${timestamp()}.${BACKUP_EXT}`
 }
 
 /** Consistent online snapshot of the live database to destPath. */
@@ -62,7 +62,7 @@ export async function createBackup(destPath: string): Promise<void> {
 }
 
 /**
- * Validate that a file is a usable FocusBuddy database before we let the user
+ * Validate that a file is a usable PlexiDesk database before we let the user
  * restore from it: open read-only, run an integrity check, and confirm a core
  * table exists. Returns a reason on failure so the UI can explain rather than
  * silently refuse.
@@ -85,7 +85,7 @@ export function validateBackupFile(
       .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='nodes'")
       .get()
     if (!core) {
-      return { ok: false, error: 'That file is a database, but not a FocusBuddy backup.' }
+      return { ok: false, error: 'That file is a database, but not a PlexiDesk backup.' }
     }
     return { ok: true }
   } catch (e) {

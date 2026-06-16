@@ -43,7 +43,7 @@ export default function ReleaseModal({ entry, onClose }: Props): JSX.Element {
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
-        aria-label={`What's new in Haptyx ${versionLabel}`}
+        aria-label={`What's new in PlexiDesk ${versionLabel}`}
       >
         <div className="flex items-start justify-between gap-3 border-b border-stone-200/70 px-5 py-4 dark:border-white/10">
           <div>

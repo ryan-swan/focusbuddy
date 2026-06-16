@@ -986,7 +986,7 @@ function DeckContextMenu(props: DeckCtxMenuProps): JSX.Element {
       <DeckMenuItem
         icon="share"
         label="Copy deck JSON"
-        sub="Paste-share with another FocusBuddy user"
+        sub="Paste-share with another PlexiDesk user"
         onClick={() => run(props.onCopyJson)}
       />
       <DeckMenuItem

@@ -107,7 +107,7 @@ function createCommandCenter(): BrowserWindow {
     height: 900,
     minWidth: 1100,
     minHeight: 680,
-    title: 'Haptyx',
+    title: 'PlexiDesk',
     backgroundColor: '#fbf7ee',
     show: false,
     autoHideMenuBar: true,

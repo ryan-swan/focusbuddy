@@ -190,7 +190,7 @@ function buildWidgetIndex(
 }
 
 function buildSystemPrompt(): string {
-  return `You are FocusBuddy's voice-command interpreter.
+  return `You are PlexiDesk's voice-command interpreter.
 
 The user just spoke an instruction. You decide what concrete workspace actions to propose. You NEVER execute anything — every proposal becomes a card the user clicks Apply or Dismiss on.
 

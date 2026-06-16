@@ -10,7 +10,7 @@
 //   available           → "Update available · vX.Y.Z" (passive — download
 //                         starts automatically because autoDownload=true)
 //   downloading         → "Downloading update · NN%"
-//   ready               → "Install Haptyx vX.Y.Z" button → restarts app
+//   ready               → "Install PlexiDesk vX.Y.Z" button → restarts app
 //   error               → red text + retry link
 //
 // The banner is intentionally tiny — sits in the footer row, not a
@@ -69,7 +69,7 @@ export default function UpdaterBanner(): JSX.Element | null {
         <button
           onClick={() => { void window.api.update.downloadAndInstall() }}
           className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-accent hover:bg-accent/10 font-medium"
-          title={`Update Haptyx to v${state.version} and relaunch`}
+          title={`Update PlexiDesk to v${state.version} and relaunch`}
           data-testid="updater-download"
         >
           <Icon name="download" size={11} />

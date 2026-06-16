@@ -90,13 +90,13 @@ export async function downloadAndInstallMacUpdate(): Promise<void> {
   }
   // A translocated (quarantined) app runs from a read-only path, so an in-place
   // swap can never succeed — it would just relaunch the same old build and loop.
-  // Tell the user to move Haptyx to Applications and open the download page,
+  // Tell the user to move PlexiDesk to Applications and open the download page,
   // rather than attempting a doomed swap.
   if (isTranslocated(process.execPath)) {
     broadcast({
       kind: 'error',
       message:
-        'Move Haptyx into your Applications folder, then update again — macOS is running it from a read-only location, which blocks in-place updates.'
+        'Move PlexiDesk into your Applications folder, then update again — macOS is running it from a read-only location, which blocks in-place updates.'
     })
     openDownloadPage()
     return

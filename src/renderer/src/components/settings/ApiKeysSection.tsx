@@ -74,7 +74,7 @@ export default function ApiKeysSection({ onKeySaved }: Props): JSX.Element {
           helpUrl: 'https://console.anthropic.com/settings/keys',
           helpLabel: 'Get a key from console.anthropic.com →',
           removeWarning:
-            'Remove the Anthropic API key from Haptyx? AI features will stop working until you add it back.',
+            'Remove the Anthropic API key from PlexiDesk? AI features will stop working until you add it back.',
           api: {
             hint: () => window.api.settings.hintAnthropic(),
             save: (p) => window.api.settings.saveAnthropicKey(p),
@@ -94,7 +94,7 @@ export default function ApiKeysSection({ onKeySaved }: Props): JSX.Element {
           helpUrl: 'https://platform.openai.com/api-keys',
           helpLabel: 'Get a key from platform.openai.com →',
           removeWarning:
-            'Remove the OpenAI API key from Haptyx? Voice-note transcription will stop working until you add it back.',
+            'Remove the OpenAI API key from PlexiDesk? Voice-note transcription will stop working until you add it back.',
           api: {
             hint: () => window.api.settings.hintOpenAI(),
             save: (p) => window.api.settings.saveOpenAIKey(p),
@@ -108,7 +108,7 @@ export default function ApiKeysSection({ onKeySaved }: Props): JSX.Element {
 
       <div className="text-[10px] text-stone-500 dark:text-stone-400 leading-relaxed">
         Each key is encrypted with the macOS Keychain and stored locally only.
-        Haptyx never proxies AI calls — your prompts go direct from this Mac
+        PlexiDesk never proxies AI calls — your prompts go direct from this Mac
         to Anthropic / OpenAI.
         {encryption === false && (
           <div className="text-red-600 dark:text-red-400 mt-1">
@@ -125,7 +125,7 @@ export default function ApiKeysSection({ onKeySaved }: Props): JSX.Element {
 function VoiceProviderToggle(): JSX.Element {
   // `null` = haven't heard from main yet. `'unavailable'` = the IPC
   // handler is missing (typically because the main process is running
-  // older code than the renderer — restart Haptyx to pick up the new
+  // older code than the renderer — restart PlexiDesk to pick up the new
   // handlers). Without this state we silently leave the buttons
   // disabled forever and the user has no idea why.
   const [provider, setProvider] = useState<'cloud' | 'local' | 'unavailable' | null>(null)
@@ -142,9 +142,9 @@ function VoiceProviderToggle(): JSX.Element {
         setProvider('unavailable')
         setStatus(
           'Transcription provider preference is unavailable. ' +
-            'This usually means Haptyx needs a full restart to pick up ' +
+            'This usually means PlexiDesk needs a full restart to pick up ' +
             'new IPC handlers (renderer was updated but main process wasn\'t). ' +
-            'Quit Haptyx (⌘Q) and reopen.'
+            'Quit PlexiDesk (⌘Q) and reopen.'
         )
       })
   }, [])
@@ -170,7 +170,7 @@ function VoiceProviderToggle(): JSX.Element {
       )
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
-      setStatus(`Couldn\'t switch: ${msg}. Try restarting Haptyx.`)
+      setStatus(`Couldn\'t switch: ${msg}. Try restarting PlexiDesk.`)
     } finally {
       setBusy(false)
     }
@@ -238,7 +238,7 @@ function ApiKeyRow({
   // Track whether the hint IPC even responded. If main is running older
   // code (no handler for this provider's hint endpoint), the promise
   // rejects and `unavailable` becomes true — we surface a clear "restart
-  // Haptyx" affordance instead of letting the row look operational while
+  // PlexiDesk" affordance instead of letting the row look operational while
   // every subsequent save / test / clear silently fails.
   const [unavailable, setUnavailable] = useState(false)
   const [editing, setEditing] = useState(false)
@@ -285,7 +285,7 @@ function ApiKeyRow({
       const msg = err instanceof Error ? err.message : String(err)
       setStatus({
         kind: 'error',
-        message: `Save failed: ${msg}. If this just appeared, quit Haptyx (⌘Q) and reopen — the renderer has new code that the main process hasn't loaded yet.`
+        message: `Save failed: ${msg}. If this just appeared, quit PlexiDesk (⌘Q) and reopen — the renderer has new code that the main process hasn't loaded yet.`
       })
     }
   }
@@ -341,7 +341,7 @@ function ApiKeyRow({
       </div>
       {unavailable && (
         <div className="text-[11px] text-amber-700 dark:text-amber-300 mb-2 leading-snug bg-amber-500/10 border border-amber-500/20 rounded px-2 py-1.5">
-          Main process is missing this provider's IPC handler. Quit Haptyx (⌘Q) and reopen so it picks up the new code. Saving / testing this key won't work until you do.
+          Main process is missing this provider's IPC handler. Quit PlexiDesk (⌘Q) and reopen so it picks up the new code. Saving / testing this key won't work until you do.
         </div>
       )}
 

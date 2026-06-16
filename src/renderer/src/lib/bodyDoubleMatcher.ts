@@ -2,7 +2,7 @@
 //
 // In production this will be backed by a small hosted matching service +
 // WebRTC for peer-to-peer audio. v1 implements a LOCAL ONLY mock matcher
-// using BroadcastChannel — two FocusBuddy windows on the same machine can
+// using BroadcastChannel — two PlexiDesk windows on the same machine can
 // find each other and exchange chat messages, which is enough to develop
 // and design the UX without standing up a real server.
 //
@@ -41,7 +41,7 @@ export interface Matcher {
 }
 
 // ─── Local mock matcher (BroadcastChannel-based) ────────────────────────────
-// Two FocusBuddy windows on the same machine can talk over a shared
+// Two PlexiDesk windows on the same machine can talk over a shared
 // BroadcastChannel. Production will replace this with a WebSocket-based
 // matcher hitting our hosted signaling service.
 
@@ -71,7 +71,7 @@ const CHANNEL = 'fb-body-double-mock'
 // Transport abstraction for the local-mock matcher. BroadcastChannel
 // works fine between two browser tabs in the SAME renderer process; it
 // does NOT cross Electron window boundaries. The IPC-bus transport
-// (below) routes through main so two FocusBuddy windows on the same
+// (below) routes through main so two PlexiDesk windows on the same
 // machine can pair — which is the common dev case.
 export interface MatcherTransport {
   broadcast: (msg: BroadcastMessage) => void

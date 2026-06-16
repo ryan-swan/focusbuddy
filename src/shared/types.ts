@@ -647,7 +647,7 @@ export interface BodyDoubleChatMessage {
 
 // ── Universal sharing (folders / tasks / widgets) ───────────────────────────
 //
-// Any user-owned entity in FocusBuddy can be shared via a token. The token
+// Any user-owned entity in PlexiDesk can be shared via a token. The token
 // resolves to a read-only view (no auth required) or a "collaborator" copy
 // the recipient owns once they sign up. Same data model for folder, task,
 // and widget — the kind field discriminates so consumers pick the right

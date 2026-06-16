@@ -76,7 +76,7 @@ export default function AccountSection(): JSX.Element {
       ) : (
         <div className="space-y-2.5">
           <p className="text-[11px] text-stone-600 dark:text-stone-300 leading-relaxed">
-            You are using FocusBuddy locally without an account. Sign in to sync
+            You are using PlexiDesk locally without an account. Sign in to sync
             shared folders and tasks across devices and to apply your plan.
           </p>
           <button

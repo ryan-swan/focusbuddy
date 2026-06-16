@@ -31,11 +31,11 @@ export default function Footer(): JSX.Element {
     <>
       <footer className="h-7 px-3 flex items-center justify-between text-[11px] text-stone-500 dark:text-stone-400 border-t border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-900 select-none">
         <div className="flex items-center gap-2 truncate">
-          <span>© {year} Haptyx</span>
+          <span>© {year} PlexiDesk</span>
           <span className="text-stone-300 dark:text-stone-700">·</span>
           <Tooltip
             placement="top"
-            content={`Haptyx ${appVersion}${buildDate ? ` · build ${buildDate}` : ''} — click to check for updates`}
+            content={`PlexiDesk ${appVersion}${buildDate ? ` · build ${buildDate}` : ''} — click to check for updates`}
           >
             <button
               type="button"
@@ -57,7 +57,7 @@ export default function Footer(): JSX.Element {
             Terms of Use
           </button>
           <span className="text-stone-300 dark:text-stone-700">·</span>
-          <Tooltip placement="top" content="Open the Haptyx help centre in your browser — guides for every feature">
+          <Tooltip placement="top" content="Open the PlexiDesk help centre in your browser — guides for every feature">
             <button
               onClick={() => window.open(HELP_BASE, '_blank', 'noopener,noreferrer')}
               className="px-2 py-1 rounded hover:bg-stone-100 dark:hover:bg-stone-800 hover:text-stone-900 dark:hover:text-stone-100 transition-colors flex items-center gap-1"

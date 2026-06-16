@@ -105,7 +105,7 @@ export default function LaunchSignInModal(): JSX.Element | null {
       }
       if (result.code === 'NETWORK') {
         setError(
-          'Could not reach the FocusBuddy server. You can continue without an account and try again later.'
+          'Could not reach the PlexiDesk server. You can continue without an account and try again later.'
         )
         return
       }
@@ -133,7 +133,7 @@ export default function LaunchSignInModal(): JSX.Element | null {
       className="fixed inset-0 z-[280] bg-black/60 backdrop-blur-md flex items-center justify-center p-4"
       role="dialog"
       aria-modal="true"
-      aria-label="Sign in to FocusBuddy"
+      aria-label="Sign in to PlexiDesk"
     >
       <div
         className="w-full max-w-md rounded-2xl p-6 fb-glass-chrome border border-white/[0.08] shadow-2xl"
@@ -156,7 +156,7 @@ export default function LaunchSignInModal(): JSX.Element | null {
           </div>
           <div className="flex-1 min-w-0">
             <h2 className="text-[15px] font-semibold text-stone-100 tracking-[0.04em]">
-              {mode === 'login' ? 'Welcome back' : 'Sign in to FocusBuddy'}
+              {mode === 'login' ? 'Welcome back' : 'Sign in to PlexiDesk'}
             </h2>
             <p className="text-[11px] text-stone-400">
               {mode === 'login'
@@ -287,7 +287,7 @@ export default function LaunchSignInModal(): JSX.Element | null {
               type="button"
               onClick={() => void handleSkip()}
               className="text-[11px] text-stone-400 hover:text-stone-100 transition-colors"
-              title="Use FocusBuddy locally without an account. You can sign in later from Settings."
+              title="Use PlexiDesk locally without an account. You can sign in later from Settings."
             >
               Continue without account
             </button>

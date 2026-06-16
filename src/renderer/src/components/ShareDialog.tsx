@@ -438,9 +438,9 @@ export default function ShareDialog({
           <div className="text-[10px] text-stone-500 dark:text-stone-400 leading-relaxed bg-stone-50 dark:bg-stone-800/50 p-2 rounded">
             <strong className="text-stone-700 dark:text-stone-200">v1 note:</strong>{' '}
             The link points to the future hosted viewer. The token is real and
-            unique — once the FocusBuddy share service ships, the same link
+            unique — once the PlexiDesk share service ships, the same link
             will resolve. For now you can share it manually with someone using
-            FocusBuddy on the same network (they can paste it into{' '}
+            PlexiDesk on the same network (they can paste it into{' '}
             <em>Sidebar → Shared with me → Paste a share link</em>).
           </div>
         </div>

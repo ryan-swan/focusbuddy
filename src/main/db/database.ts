@@ -122,7 +122,7 @@ CREATE TABLE IF NOT EXISTS energy_log (
 );
 
 -- ── Uploaded files (attachments, image/PDF/video/audio widgets) ──────────────
--- We copy any file the user drops onto FocusBuddy into userData/files/<id>.<ext>
+-- We copy any file the user drops onto PlexiDesk into userData/files/<id>.<ext>
 -- so it survives moves of the original. fb_files holds the metadata; the
 -- on-disk path is reconstructed from id + ext at read time.
 CREATE TABLE IF NOT EXISTS fb_files (

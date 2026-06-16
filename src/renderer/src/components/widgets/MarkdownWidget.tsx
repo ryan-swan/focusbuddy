@@ -116,7 +116,7 @@ const TOOLBAR: ToolbarBtn[] = [
   },
   {
     // Copy the raw markdown source to the clipboard so the note travels out of
-    // Haptyx as portable text (paste into GitHub, Obsidian, a PR, anywhere).
+    // PlexiDesk as portable text (paste into GitHub, Obsidian, a PR, anywhere).
     icon: 'content_copy',
     title: 'Copy as markdown',
     run: (e) => {

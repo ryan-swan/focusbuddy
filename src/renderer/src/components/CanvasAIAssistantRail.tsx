@@ -171,7 +171,7 @@ export default function CanvasAIAssistantRail({ projectId }: Props): JSX.Element
         {
           role: 'system',
           content:
-            'You are FocusBuddy\'s in-canvas suggestion assistant. Return ONE short, immediately-actionable response in 3-6 sentences. No preambles.',
+            'You are PlexiDesk\'s in-canvas suggestion assistant. Return ONE short, immediately-actionable response in 3-6 sentences. No preambles.',
           ts: Date.now()
         },
         { role: 'user', content: prompt, ts: Date.now() }

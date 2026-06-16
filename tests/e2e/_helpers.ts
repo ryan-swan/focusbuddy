@@ -96,7 +96,7 @@ export async function waitForReady(
   // one-line edit here. Must NOT match the launch sign-in dialog's
   // "Sign in to FocusBuddy" heading, hence the anchored ^...$ form.
   await expect(
-    window.getByRole('heading', { name: /^(focusbuddy|haptyx)$/i, level: 2 })
+    window.getByRole('heading', { name: /^(focusbuddy|haptyx|plexidesk)$/i, level: 2 })
   ).toBeVisible({ timeout: 10_000 })
 
   if (!dismissModals) return
@@ -106,7 +106,7 @@ export async function waitForReady(
   // through to dismiss (welcome → skip key → start blank). Best-effort; absent
   // for an existing-data DB. Specs that assert on onboarding pass
   // { dismissModals: false }.
-  const onb = window.locator('[role="dialog"][aria-label="Welcome to Haptyx"]')
+  const onb = window.locator('[role="dialog"][aria-label="Welcome to PlexiDesk"]')
   if (await onb.isVisible().catch(() => false)) {
     await window.getByRole('button', { name: 'Get started' }).click().catch(() => {})
     await window.getByRole('button', { name: 'Skip for now' }).click().catch(() => {})

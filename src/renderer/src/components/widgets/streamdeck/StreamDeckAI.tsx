@@ -346,7 +346,7 @@ export default function StreamDeckAI({
     userContent: string
   ): Promise<{ proposals: AIProposal[]; raw: string } | { error: string; raw?: string }> {
     // CRITICAL: the chat IPC strips role:'system' messages and applies
-    // FocusBuddy's generic chat system prompt instead — which makes the
+    // PlexiDesk's generic chat system prompt instead — which makes the
     // model respond conversationally ("I can help you with..."). We
     // work around this by embedding our system prompt as a normal USER
     // message labelled as instructions. The chat-level system prompt
@@ -449,7 +449,7 @@ export default function StreamDeckAI({
 
       if (recentSwitches.length < 8 && log.presses.length < 5) {
         setError(
-          'Not enough activity to analyse yet. Use FocusBuddy + apps for a bit with tracking enabled, then come back.'
+          'Not enough activity to analyse yet. Use PlexiDesk + apps for a bit with tracking enabled, then come back.'
         )
         return
       }
@@ -661,7 +661,7 @@ export default function StreamDeckAI({
                       Watch my workflow to suggest macros
                     </div>
                     <p className="text-[10px] text-stone-400 leading-snug">
-                      FocusBuddy notes the names of apps you switch between
+                      PlexiDesk notes the names of apps you switch between
                       (every 10 seconds) and your SpeedDeck presses — locally,
                       never uploaded. Nothing else is recorded — no keystrokes,
                       no URLs, no window titles.

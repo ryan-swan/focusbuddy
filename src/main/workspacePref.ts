@@ -1,6 +1,6 @@
 // Persisted workspace path override for the agent resolver.
 //
-// When the user explicitly points Haptyx at their workspace via
+// When the user explicitly points PlexiDesk at their workspace via
 // Settings, that path takes priority over all the auto-detected
 // candidates. Lives in `<userData>/workspace.json` as a tiny JSON
 // blob — same pattern as voiceProviderPref.
