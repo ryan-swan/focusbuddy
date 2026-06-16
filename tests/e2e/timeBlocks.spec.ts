@@ -95,3 +95,45 @@ test('TB-2 — booking a block from the week grid renders it and it persists', a
   await window.locator('[data-testid="calendar-mode-week"]').click()
   await expect(window.locator('[data-testid="time-block"]')).toHaveCount(1, { timeout: 6000 })
 })
+
+test('TB-3 — dragging a task onto a day column books a block for that task', async () => {
+  launched = await launchApp()
+  const { window } = launched
+  await waitForReady(window)
+
+  // Seed a task to drag.
+  const taskId = await window.evaluate(async () => {
+    const api = (window as unknown as { api: typeof window.api }).api
+    const t = await api.nodes.create({ parentId: null, kind: 'task', title: 'Write the report' })
+    return t.id
+  })
+  await window.reload()
+  await waitForReady(window)
+
+  await window.getByRole('button', { name: /^Calendar$/ }).first().click()
+  await window.locator('[data-testid="calendar-mode-week"]').click()
+  await expect(window.locator('[data-testid="week-time-grid"]')).toBeVisible({ timeout: 6000 })
+
+  // Simulate the sidebar's HTML5 drag payload (text/fb-node = node id) dropping
+  // onto a day column, the way Sidebar.handleRowDragStart publishes it.
+  await window.evaluate((id) => {
+    const col = document.querySelector('[data-testid="day-col-3"]') as HTMLElement
+    const rect = col.getBoundingClientRect()
+    const dt = new DataTransfer()
+    dt.setData('text/fb-node', id)
+    const base = { bubbles: true, cancelable: true, clientX: rect.left + 20, clientY: rect.top + 160 }
+    col.dispatchEvent(new DragEvent('dragover', { ...base, dataTransfer: dt }))
+    col.dispatchEvent(new DragEvent('drop', { ...base, dataTransfer: dt }))
+  }, taskId)
+
+  // The composer opens pre-filled with that task; confirm the duration to book it.
+  const composer = window.locator('[data-testid="block-composer"]')
+  await expect(composer).toBeVisible({ timeout: 4000 })
+  await expect(composer.locator('[data-testid="composer-task"]')).toHaveValue(taskId)
+  await window.locator('[data-testid="composer-create"]').click()
+
+  // A block for that task now renders, and it carries the task's title.
+  const block = window.locator('[data-testid="time-block"]')
+  await expect(block).toHaveCount(1, { timeout: 4000 })
+  await expect(block).toContainText('Write the report')
+})
