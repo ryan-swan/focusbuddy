@@ -1,4 +1,4 @@
-import { app, ipcMain, BrowserWindow, dialog, webContents as allWebContents, type WebContents } from 'electron'
+import { app, ipcMain, BrowserWindow, dialog, shell, webContents as allWebContents, type WebContents } from 'electron'
 import { writeFile } from 'node:fs/promises'
 import { consumePendingAuthHandoff } from '../authProtocol'
 import {
@@ -14,9 +14,12 @@ import {
   hint,
   resolveAnthropicKey,
   resolveOpenAIKey,
-  setSecret
+  setSecret,
+  setAiMode,
+  type AiMode
 } from '../settingsStore'
 import { invalidateAnthropicClient } from '../ai/anthropic'
+import { getAiStatus, refreshCredits, startTopUp } from '../ai/creditMode'
 import * as mailAccount from '../mail/mailAccount'
 import type { MailAccountConfig } from '../mail/mailAccount'
 import {
@@ -649,6 +652,26 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('ai:routeCommand', (_e, input: { system: string; text: string }) => {
     recordAiCall()
     return routeCommandBar(input)
+  })
+
+  // ── AI source: PlexiDesk credits vs bring-your-own-key ────────────────────
+  // Status snapshot for the settings panel + out-of-credits prompts.
+  ipcMain.handle('ai:getStatus', () => getAiStatus())
+  // Switch source; invalidate the cached client so the next call honours it.
+  ipcMain.handle('ai:setMode', (_e, mode: AiMode) => {
+    setAiMode(mode)
+    invalidateAnthropicClient()
+    return getAiStatus()
+  })
+  // Pull the live balance from the signal server (lazily grants the trial).
+  ipcMain.handle('ai:refreshCredits', () => refreshCredits())
+  // Begin a Stripe checkout for a credit top-up and open it in the browser.
+  ipcMain.handle('ai:topUpCredits', async (_e, amountUsd: number) => {
+    const result = await startTopUp(amountUsd)
+    if (result.ok && result.url) {
+      await shell.openExternal(result.url)
+    }
+    return result
   })
   // Telemetry snapshot for the renderer to report to the signal server.
   ipcMain.handle('telemetry:collect', () => collectTelemetry())
