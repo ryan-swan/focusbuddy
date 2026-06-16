@@ -77,8 +77,8 @@ describe('decidePopup', () => {
     })
   })
 
-  describe('plain target=_blank links', () => {
-    it('denies the popup and forwards the URL to the renderer', () => {
+  describe('new tabs (target=_blank / window.open without features)', () => {
+    it('opens a foreground-tab as a full-content native window (so window.open returns a handle)', () => {
       const result = decidePopup(
         {
           url: 'https://docs.example.com/article',
@@ -88,59 +88,51 @@ describe('decidePopup', () => {
         },
         ctx
       )
-      expect(result.action).toBe('deny')
-      if (result.action !== 'deny') return
-      expect(result.forwardToRenderer?.url).toBe('https://docs.example.com/article')
+      expect(result.action).toBe('allow')
+      if (result.action !== 'allow') return
+      // Full content window, not the compact popup size.
+      expect(result.overrideBrowserWindowOptions.width).toBe(1180)
+      expect(result.overrideBrowserWindowOptions.height).toBe(820)
+      expect(result.overrideBrowserWindowOptions.webPreferences?.session).toBe(FAKE_SESSION)
     })
 
-    it('ignores empty / unframed link clicks (no widget spawn)', () => {
+    it('opens a background-tab as a native window too', () => {
       const result = decidePopup(
-        {
-          url: 'https://x.example',
-          frameName: '',
-          features: '',
-          disposition: 'background-tab'
-        },
+        { url: 'https://x.example', frameName: '', features: '', disposition: 'background-tab' },
         ctx
       )
-      expect(result.action).toBe('deny')
+      expect(result.action).toBe('allow')
     })
 
-    it('rejects non-http URLs to avoid spawning widgets for javascript: or data:', () => {
-      const result = decidePopup(
-        {
-          url: 'javascript:alert(1)',
-          frameName: '_blank',
-          features: '',
-          disposition: 'foreground-tab'
-        },
-        ctx
-      )
-      expect(result.action).toBe('deny')
-      if (result.action !== 'deny') return
-      expect(result.forwardToRenderer).toBeUndefined()
+    it('denies non-http schemes (javascript:, data:, mailto:)', () => {
+      for (const url of ['javascript:alert(1)', 'data:text/html,x', 'mailto:a@b.com']) {
+        const result = decidePopup(
+          { url, frameName: '_blank', features: '', disposition: 'foreground-tab' },
+          ctx
+        )
+        expect(result.action).toBe('deny')
+      }
     })
   })
 
   describe('regression guards', () => {
-    it('does NOT treat foreground-tab as a popup (was the original OAuth-killing bug)', () => {
-      // Before the fix, target=_blank links were being routed through the
-      // renderer's new-window interceptor which killed window.opener.
+    it('a foreground-tab window.open gets a real window handle, not a dead null (the menu-does-nothing bug)', () => {
+      // Google Docs "open a file" calls window.open(url) → foreground-tab. If we
+      // deny, window.open returns null and the menu silently does nothing. It
+      // MUST be allowed so the opener gets a usable handle.
       const result = decidePopup(
         {
-          url: 'https://provider.example/oauth',
-          frameName: '_blank',
+          url: 'https://docs.google.com/document/d/abc/edit',
+          frameName: '',
           features: '',
           disposition: 'foreground-tab'
         },
         ctx
       )
-      // Must NOT be 'allow' — that would skip the renderer widget spawn and
-      // open the link as a real popup, which is the wrong UX for a click.
-      expect(result.action).toBe('deny')
+      expect(result.action).toBe('allow')
     })
 
-    it('does NOT route OAuth popups through the renderer (preserves window.opener)', () => {
+    it('OAuth popups stay compact and keep the session (preserves window.opener)', () => {
       const result = decidePopup(
         {
           url: 'https://provider.example/oauth',
@@ -150,9 +142,9 @@ describe('decidePopup', () => {
         },
         ctx
       )
-      // Must be 'allow' — anything else means window.opener gets nulled and
-      // OAuth postMessage callback fails.
       expect(result.action).toBe('allow')
+      if (result.action !== 'allow') return
+      expect(result.overrideBrowserWindowOptions.width).toBe(520)
     })
   })
 })

@@ -32,31 +32,46 @@ export interface PopupRouterContext {
 }
 
 /**
- * Decide what to do with a window.open / link-click from a <webview>:
- *  - True popups (window.open with features, or disposition='new-window')
- *    → allow as native windows sharing the parent session.
- *  - Plain target=_blank link clicks → deny, forward URL to renderer so the
- *    renderer spawns a canvas widget.
+ * Decide what to do with a window.open / link-click from a <webview>.
  *
- * Pure decision logic — no side effects, no IPC. The caller wires the
- * forwarding into the renderer.
+ * Policy: any request for a new window OR a new tab to a real web URL becomes a
+ * native window that shares the parent session. Returning 'allow' is what gives
+ * the opener a usable window handle. The previous policy denied new tabs (to
+ * spawn a canvas widget instead), but denying makes `window.open()` return
+ * null, which is exactly why app menus that open a tab — Google Docs "open a
+ * file" / "new document", many providers' OAuth — silently did nothing. Real
+ * browser behaviour (a new surface with a live handle) is what makes those
+ * work, so we favour that over the widget-spawn convenience. Dragging a link
+ * onto the canvas to make a widget is a separate, intact flow.
+ *
+ * Non-navigable schemes (javascript:, data:, mailto:, blob:) are always denied.
+ *
+ * Pure decision logic — no side effects, no IPC.
  */
 export function decidePopup(
   details: PopupDetails,
   ctx: PopupRouterContext
 ): PopupDecision {
   const { url, disposition, features, frameName } = details
-  const isPopup =
+  const isHttp = !!url && /^https?:\/\//i.test(url)
+
+  const wantsNewSurface =
     disposition === 'new-window' ||
+    disposition === 'foreground-tab' ||
+    disposition === 'background-tab' ||
     (features && features.length > 0) ||
     (frameName && frameName !== '_blank' && frameName !== '')
 
-  if (isPopup) {
+  if (wantsNewSurface && isHttp) {
+    // A scripted popup (window.open with features, or an explicit new-window)
+    // keeps a compact size; a plain new tab gets a full content window so a
+    // doc/app opening into it isn't crammed into a tiny popup.
+    const compact = disposition === 'new-window' || !!(features && features.length > 0)
     return {
       action: 'allow',
       overrideBrowserWindowOptions: {
-        width: 520,
-        height: 720,
+        width: compact ? 520 : 1180,
+        height: compact ? 720 : 820,
         minWidth: 360,
         minHeight: 480,
         autoHideMenuBar: true,
@@ -72,8 +87,5 @@ export function decidePopup(
     }
   }
 
-  if (url && /^https?:\/\//i.test(url)) {
-    return { action: 'deny', forwardToRenderer: { url } }
-  }
   return { action: 'deny' }
 }
