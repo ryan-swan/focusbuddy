@@ -32,6 +32,7 @@ import UpgradePromptModal from './components/UpgradePromptModal'
 import FirstRunOnboarding from './components/FirstRunOnboarding'
 import { useOnboarding } from './stores/onboarding'
 import { useMessagingStore } from './stores/messaging'
+import { useMailStore } from './stores/mail'
 import { usePeerBodyDoubleStore } from './stores/peerBodyDouble'
 import { useNodeStore } from './stores/nodes'
 import { useTemplateStore } from './stores/templates'
@@ -123,6 +124,14 @@ export default function App(): JSX.Element {
     if (account && sessionToken) void connectMessaging(sessionToken)
     else disconnectMessaging()
   }, [account, sessionToken, connectMessaging, disconnectMessaging])
+
+  // Mail is local (IMAP straight from the desktop), so it loads independently
+  // of PlexiDesk sign-in. Doing it once at startup populates the sidebar's
+  // unread badge and warms the inbox list before the user opens Mail.
+  const loadMailAccount = useMailStore((s) => s.loadAccount)
+  useEffect(() => {
+    void loadMailAccount()
+  }, [loadMailAccount])
 
   // Web→desktop auth handoff. The brochure sign-in flow at haptyx.app/account/*
   // produces a session token, then deep-links to haptyx://auth?token=...
