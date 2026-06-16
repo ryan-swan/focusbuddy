@@ -12,6 +12,7 @@ export type View =
   | { kind: 'task'; taskId: string }
   | { kind: 'connected-app'; appId: string }
   | { kind: 'vault' }
+  | { kind: 'messages' }
 
 interface ViewStore {
   view: View
@@ -23,6 +24,7 @@ interface ViewStore {
   goTask: (taskId: string) => void
   goConnectedApp: (appId: string) => void
   goVault: () => void
+  goMessages: () => void
 }
 
 const STORAGE_KEY = 'fb.view.last'
@@ -89,6 +91,11 @@ export const useViewStore = create<ViewStore>((set) => ({
   },
   goVault: () => {
     const v: View = { kind: 'vault' }
+    persistView(v)
+    set({ view: v })
+  },
+  goMessages: () => {
+    const v: View = { kind: 'messages' }
     persistView(v)
     set({ view: v })
   }
