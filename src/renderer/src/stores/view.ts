@@ -15,6 +15,8 @@ export type View =
   | { kind: 'messages' }
   | { kind: 'inbox' }
   | { kind: 'mail'; openUid?: number }
+  | { kind: 'documents' }
+  | { kind: 'document'; documentId: string }
 
 interface ViewStore {
   view: View
@@ -29,6 +31,8 @@ interface ViewStore {
   goMessages: () => void
   goInbox: () => void
   goMail: (openUid?: number) => void
+  goDocuments: () => void
+  goDocument: (documentId: string) => void
 }
 
 const STORAGE_KEY = 'fb.view.last'
@@ -110,6 +114,16 @@ export const useViewStore = create<ViewStore>((set) => ({
   },
   goMail: (openUid) => {
     const v: View = { kind: 'mail', openUid }
+    persistView(v)
+    set({ view: v })
+  },
+  goDocuments: () => {
+    const v: View = { kind: 'documents' }
+    persistView(v)
+    set({ view: v })
+  },
+  goDocument: (documentId) => {
+    const v: View = { kind: 'document', documentId }
     persistView(v)
     set({ view: v })
   }

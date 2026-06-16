@@ -25,6 +25,15 @@ import {
   getMessage,
   markSeen
 } from '../mail/imap'
+import {
+  listDocuments,
+  getDocument,
+  createDocument,
+  updateDocument,
+  deleteDocument
+} from '../db/documents'
+import { generateDocument } from '../ai/anthropic'
+import type { DocType, DocumentDraft, DocumentPatch } from '@shared/types'
 import Anthropic from '@anthropic-ai/sdk'
 import {
   createNode,
@@ -1345,6 +1354,20 @@ export function registerIpcHandlers(): void {
       return { ok: false as const, error: (err as Error).message }
     }
   })
+
+  // ── Office documents (doc / sheet / slides) ─────────────────────────────
+  ipcMain.handle('documents:list', () => listDocuments())
+  ipcMain.handle('documents:get', (_e, id: string) => getDocument(id))
+  ipcMain.handle('documents:create', (_e, draft: DocumentDraft) => createDocument(draft))
+  ipcMain.handle('documents:update', (_e, id: string, patch: DocumentPatch) =>
+    updateDocument(id, patch)
+  )
+  ipcMain.handle('documents:delete', (_e, id: string) => deleteDocument(id))
+  ipcMain.handle(
+    'documents:generate',
+    (_e, input: { docType: DocType; prompt: string; audience?: string }) =>
+      generateDocument(input)
+  )
 
   ipcMain.handle('settings:hintAnthropic', () => hint('anthropic'))
   ipcMain.handle('settings:hintOpenAI', () => hint('openai'))

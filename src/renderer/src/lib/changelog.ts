@@ -36,6 +36,21 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.43',
+    date: '2026-06-17T00:30:00Z',
+    title: 'v2.5.43 — Documents: create with AI, then make it yours',
+    tag: 'feature',
+    summary:
+      'PlexiDesk now makes documents, spreadsheets and slides, and AI is how you start. Describe what you want and who it is for, and you get a real first draft already open for editing. No blank page to stare at.',
+    highlights: [
+      'Create with AI: in the new Documents area, pick a document, spreadsheet or deck, say what it is about and who it is for, and get a finished first draft you can edit straight away.',
+      'A real editor for each: rich-text documents with formatting and an inline Ask AI, spreadsheets with live formulas (=SUM, =AVERAGE, cell references and ranges, with a clear #ERR rather than a wrong number), and slide decks with a present mode.',
+      'Everything autosaves and lives in your workspace next to your tasks. Turn any of it into work, and start blank whenever you prefer the empty page.',
+      'This is the first step of making AI the way you start, continue and finish work, not a bolt-on. More inline AI for sheets and slides, and sharing, are coming next.'
+    ],
+    links: [{ label: 'Finding your way around', href: `${HELP_BASE}/getting-around` }]
+  },
+  {
     version: '2.5.42',
     date: '2026-06-16T23:30:00Z',
     title: 'v2.5.42 — Your email, inside your workspace',

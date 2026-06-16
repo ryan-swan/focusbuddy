@@ -396,6 +396,23 @@ export function getDb(): Database.Database {
     );
     CREATE INDEX IF NOT EXISTS idx_time_blocks_start ON time_blocks (start_ms);
     CREATE INDEX IF NOT EXISTS idx_time_blocks_task ON time_blocks (task_id);
+
+    -- Office documents — standalone doc / sheet / slides files, each created
+    -- and edited as a first-class artifact (not a canvas widget). The body is
+    -- a JSON blob whose shape depends on doc_type: a Tiptap document for
+    -- 'doc', a { columns, rows } grid for 'sheet', a { slides[] } deck for
+    -- 'slides'. Keeping one table for all three keeps the Documents list,
+    -- sharing and AI-create flow uniform.
+    CREATE TABLE IF NOT EXISTS documents (
+      id TEXT PRIMARY KEY,
+      doc_type TEXT NOT NULL CHECK (doc_type IN ('doc', 'sheet', 'slides')),
+      title TEXT NOT NULL DEFAULT '',
+      body TEXT NOT NULL DEFAULT '{}',
+      archived INTEGER NOT NULL DEFAULT 0,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_documents_updated ON documents (updated_at DESC);
   `)
   return db
 }
