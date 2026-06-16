@@ -1,4 +1,4 @@
-// FocusBuddy changelog — newest first.
+// PlexiDesk changelog — newest first.
 // Add a new entry every time a meaningful feature ships. Keep dates absolute (ISO).
 // The footer's "What's new" button shows an indicator dot when the most recent
 // entry's date is newer than the user's last-seen timestamp (localStorage).
@@ -45,7 +45,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     highlights: [
       'Calendar time-blocking: a new Week view with an hour grid. Click a slot to book a block, attach it to a task or leave it as focus time, drag to reschedule, drag the edge to change its length, and press the bolt to start a focus session for that block.',
       'First-run welcome: a brand-new install now gets a short, skippable setup — connect your AI key (with a one-tap test that it works) and optionally start with a small example workspace so the canvas isn’t empty.',
-      'This is the groundwork for connecting your real calendar and email next, so Haptyx becomes the one place your day runs from.'
+      'This is the groundwork for connecting your real calendar and email next, so PlexiDesk becomes the one place your day runs from.'
     ],
     links: [{ label: 'Finding your way around', href: `${HELP_BASE}/getting-around` }]
   },
@@ -141,7 +141,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     title: 'v2.5.31 — Set up with AI on empty widgets',
     tag: 'feature',
     summary:
-      'Every empty widget now offers to set itself up. Drop a page, a browser, a sticky or a mind map and a quiet "Set up with AI" appears on it; click it and Haptyx proposes what that widget should become based on the task you are working on, for you to approve. This is the first step of a system that will cover every widget kind.',
+      'Every empty widget now offers to set itself up. Drop a page, a browser, a sticky or a mind map and a quiet "Set up with AI" appears on it; click it and PlexiDesk proposes what that widget should become based on the task you are working on, for you to approve. This is the first step of a system that will cover every widget kind.',
     highlights: [
       'A "Set up with AI" prompt appears on an empty widget and disappears the moment it has real content.',
       'It is task-aware: it reads what you are working on and the other objects on your desk to propose something genuinely useful, which you approve before anything is written.',
@@ -206,7 +206,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Fixes a Mac update loop where the app would download an update, ask for permission, then reopen on the same old version and offer the update again. Updating now asks for your administrator password when it needs to, and if it still cannot replace the app in place, it sends you to the download page to install manually instead of looping.',
     highlights: [
       'Mac updates that need elevated permission now prompt for your administrator password and complete, instead of silently failing and reopening the old version.',
-      'If Haptyx is running from a read-only or quarantined location (for example launched from Downloads), it now tells you to move it into Applications rather than trying an update that can never succeed.',
+      'If PlexiDesk is running from a read-only or quarantined location (for example launched from Downloads), it now tells you to move it into Applications rather than trying an update that can never succeed.',
       'When an in-place update genuinely cannot be applied, the app opens the download page so you can install the new version by hand, rather than looping on the same version.'
     ],
     links: [{ label: 'Finding your way around', href: `${HELP_BASE}/getting-around` }]
@@ -217,13 +217,13 @@ export const CHANGELOG: ChangelogEntry[] = [
     title: 'v2.5.26 — In-app help, tooltips, and recent UX upgrades',
     tag: 'feature',
     summary:
-      'This update makes Haptyx easier to learn as you go. Hover the toolbar and AI controls to see what each one does, get a short summary like this one after every update, and open the new help centre for step-by-step guides. It also gathers up the interface improvements from the last few releases so they are easy to find.',
+      'This update makes PlexiDesk easier to learn as you go. Hover the toolbar and AI controls to see what each one does, get a short summary like this one after every update, and open the new help centre for step-by-step guides. It also gathers up the interface improvements from the last few releases so they are easy to find.',
     highlights: [
       'New: hover tooltips on the top toolbar and the AI controls explain what each button does, so you no longer have to guess from an icon.',
       'New: after every update, a short "What\'s new" summary like this one appears on first open, with links through to help articles.',
       'New: a help centre with guides for the features below, reachable from the footer\'s Help and Support link.',
       'Right-click menus are now genuinely contextual per object — a file offers Open and Copy URL, a colour offers Copy hex, a table offers Add row, and a section offers a layout choice, instead of one generic menu.',
-      'Build with AI works on more objects — describe what you want and Haptyx drafts the contents for you to approve.',
+      'Build with AI works on more objects — describe what you want and PlexiDesk drafts the contents for you to approve.',
       'Sharing a folder or task by email now tracks who you invited and whether they have opened it, visible to your admin.',
       'Updating on Mac is now a reliable one-click install from the footer.'
     ],
@@ -278,7 +278,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     title: 'Rich widget suite — files, pages, tables, field widgets',
     tag: 'feature',
     highlights: [
-      'Drop any file from Finder onto the canvas and it spawns a File widget with native preview: images (object-contain), PDFs (Chromium PDF viewer with page nav, zoom, print), video (`<video controls>`), audio (player + filename), generic files (download button). Files copy into FocusBuddy\'s userData so they survive moves of the original.',
+      'Drop any file from Finder onto the canvas and it spawns a File widget with native preview: images (object-contain), PDFs (Chromium PDF viewer with page nav, zoom, print), video (`<video controls>`), audio (player + filename), generic files (download button). Files copy into PlexiDesk\'s userData so they survive moves of the original.',
       'New Page widget — Notion-style document on the canvas. Built on Tiptap (StarterKit + TaskList + Link). Type `/` anywhere for a slash menu with H1, H2, bullet list, numbered list, todo list, code block, quote, divider, and inline AI prompt. The AI prompt opens a small textarea; Cmd+Enter sends to Claude, the response inserts at your cursor.',
       'New Table widget — Airtable-style database. Add/delete rows, add/delete columns, rename inline. Column types: short text, long text, number, checkbox, single-select (with editable options + hex colors), multi-select, date, attachment (drops file into vault automatically), button (runs AI prompt or shell command — shell deferred until security review), relation. Auto-provisions its backing fb_tables row on first render so there\'s no "create table" step.',
       'New Field widget — drop a single typed field on the canvas. Same 11 types as table columns. Edit the label, the value, and per-type config (select options inline, button payload + action, relation target). Same renderer as table cells via the shared `FieldEditor` component — add a new field type in `shared/fields.ts` and it shows up everywhere automatically.',
@@ -293,7 +293,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Connected Apps now supports local Mac apps, not just web URLs. Click + Add app → Local app tab → Choose app → pick anything from /Applications. The picker shows the app\'s real macOS icon, bundle id, and lets you set a display name.',
       'Each local app appears in the sidebar with its native icon (extracted via `nativeImage.createThumbnailFromPath` — bypasses an Electron 33 + macOS Sonoma crash in `app.getFileIcon`).',
       'Drag a local Connected App onto any task canvas → spawns a launcher tile bound to that app. Click the tile → launches if not running, focuses if running, unminimizes if dock-minimized, unhides if Cmd+H-hidden. Always brings you back to the app.',
-      'The tile persists on the canvas regardless of the app\'s state — quit the real app, the tile stays so you can re-launch later. Survives FocusBuddy restarts.',
+      'The tile persists on the canvas regardless of the app\'s state — quit the real app, the tile stays so you can re-launch later. Survives PlexiDesk restarts.',
       'Tried full punch-through window mirroring first (transparent BrowserWindow + AppleScript window positioning + mix-blend-mode click-through to embed the real app live inside the canvas). It worked but was too brittle for MVP — pulled it for the simpler tile.'
     ]
   },
@@ -304,7 +304,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     highlights: [
       'Drag any Connected App row from the sidebar onto a task canvas → spawns a browser widget bound to that app. The widget shares the app\'s session partition with the full-pane view, so logging in once persists everywhere.',
       'Pin a freeform browser widget back to Connected Apps with one click — the "Pin to apps" button in the widget header. Hostname-dedups: if you already have GitHub pinned, hitting Pin on a `github.com/issues/123` widget reuses the existing app instead of creating a duplicate.',
-      'Vault auto-fill — bind a vault entry to any Connected App (key icon in the toolbar opens the binding popover). On did-finish-load, FocusBuddy injects credentials into the page\'s username/password fields using React-compatible value setters so React-built login pages accept them. Idempotent — won\'t stomp values you typed.',
+      'Vault auto-fill — bind a vault entry to any Connected App (key icon in the toolbar opens the binding popover). On did-finish-load, PlexiDesk injects credentials into the page\'s username/password fields using React-compatible value setters so React-built login pages accept them. Idempotent — won\'t stomp values you typed.',
       'Sidebar Connected Apps section now splits into Favourites + a collapsible "More apps (N)" accordion. Apps rank by recency × frequency (log-scaled use count × 1-week recency decay). Pin any app to lock it to the top.',
       'Touch counter — every full-pane open, drag-to-canvas, and bound-widget focus bumps the usage count. Apps you actually use rise to Favourites; ones you stop using sink to More apps.'
     ]

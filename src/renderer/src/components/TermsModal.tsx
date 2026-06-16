@@ -39,9 +39,9 @@ export default function TermsModal({ onClose }: Props): JSX.Element {
           <section>
             <h4 className="text-stone-900 dark:text-stone-100 font-semibold mb-1.5">1. Your data is yours</h4>
             <p>
-              FocusBuddy stores everything locally on your machine — tasks, widgets, browsing
-              history, chat messages, preferences. No data is sent to FocusBuddy servers; there are
-              no FocusBuddy servers. Backups, sync, and export are your responsibility.
+              PlexiDesk stores everything locally on your machine — tasks, widgets, browsing
+              history, chat messages, preferences. No data is sent to PlexiDesk servers; there are
+              no PlexiDesk servers. Backups, sync, and export are your responsibility.
             </p>
           </section>
 
@@ -69,7 +69,7 @@ export default function TermsModal({ onClose }: Props): JSX.Element {
             <h4 className="text-stone-900 dark:text-stone-100 font-semibold mb-1.5">4. Embedded browsers and third-party sites</h4>
             <p>
               Pages you open in browser widgets are loaded directly from the source. Their terms,
-              cookies, and tracking are governed by those sites, not FocusBuddy. Avoid logging in
+              cookies, and tracking are governed by those sites, not PlexiDesk. Avoid logging in
               to anything you wouldn't want stored in this Electron app's profile.
             </p>
           </section>
@@ -86,7 +86,7 @@ export default function TermsModal({ onClose }: Props): JSX.Element {
           <section>
             <h4 className="text-stone-900 dark:text-stone-100 font-semibold mb-1.5">6. ADHD-friendly disclaimer</h4>
             <p>
-              FocusBuddy is a productivity tool, not a medical or therapeutic device. It is not a
+              PlexiDesk is a productivity tool, not a medical or therapeutic device. It is not a
               replacement for medication, therapy, or professional support for ADHD or executive
               dysfunction. If something here helps — great. If it doesn't — your brain isn't
               broken, this tool just isn't the right fit.

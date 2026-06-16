@@ -1,6 +1,6 @@
 // Unified context-menu type model.
 //
-// One vocabulary for every right-click in Haptyx. A surface computes a
+// One vocabulary for every right-click in PlexiDesk. A surface computes a
 // MenuContext describing what was clicked, providers emit MenuContribution
 // rows against the eight canonical sections, and resolveMenu folds those into
 // the CtxMenuItem[] that the existing CanvasContextMenu renderer draws. The

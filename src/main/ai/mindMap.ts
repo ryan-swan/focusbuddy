@@ -166,7 +166,7 @@ export interface AgentInventory {
  *   - Surface "Agents from: <root>" in the suggestion header
  *   - Offer an "Open in Finder" button on the resolved directory
  *   - Show a one-line warning if the source is the userData fallback
- *     ("Pointing at Haptyx's userData — Settings → Workspace to
+ *     ("Pointing at PlexiDesk's userData — Settings → Workspace to
  *     change")
  *
  * Empty agents arrays come back with the resolved path filled in

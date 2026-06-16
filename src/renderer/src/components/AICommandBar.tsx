@@ -42,7 +42,7 @@ const SUGGESTED_PROMPTS = [
   'Draft a SaaS launch checklist'
 ]
 
-const ROUTER_SYSTEM = `You are FocusBuddy's command bar — the entry point for the user's intent. Classify the user's request into one of four shapes, and return ONLY a JSON object (no markdown, no commentary):
+const ROUTER_SYSTEM = `You are PlexiDesk's command bar — the entry point for the user's intent. Classify the user's request into one of four shapes, and return ONLY a JSON object (no markdown, no commentary):
 
 {
   "kind": "create-workspace" | "add-objects" | "answer" | "unclear",

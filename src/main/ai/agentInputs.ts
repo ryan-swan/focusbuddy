@@ -40,7 +40,7 @@ async function fetchPageText(url: string): Promise<string> {
       headers: {
         // A real UA so sites don't serve a bot wall; identify ourselves too.
         'user-agent':
-          'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) FocusBuddyDeskAgent/1.0'
+          'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) PlexiDeskDeskAgent/1.0'
       }
     })
     clearTimeout(timer)

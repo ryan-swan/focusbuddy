@@ -266,7 +266,7 @@ export default function App(): JSX.Element {
               }`}
               title={
                 vaultUnlocked
-                  ? 'Vault unlocked. Your secrets stay on this device — FocusBuddy never sees them.'
+                  ? 'Vault unlocked. Your secrets stay on this device — PlexiDesk never sees them.'
                   : 'Vault is locked. Unlock from the Vault view to use saved credentials.'
               }
             >
@@ -298,7 +298,7 @@ export default function App(): JSX.Element {
           )}
         </div>
         <h1 className="text-[12px] font-semibold tracking-[0.18em] text-stone-900 dark:text-stone-100 select-none flex items-center gap-1.5">
-          <span>FOCUSBUDDY</span>
+          <span>PLEXIDESK</span>
           <span className="text-[9px] font-mono text-accent px-1 py-px rounded bg-accent/10 border border-accent/20">
             2.0
           </span>
@@ -309,7 +309,7 @@ export default function App(): JSX.Element {
               first affordance the eye lands on. Cmd+Shift+K opens it
               from anywhere. */}
           <Tooltip
-            content="Ask AI — describe what you want in plain English and Haptyx builds it on your desk (⌘⇧K)"
+            content="Ask AI — describe what you want in plain English and PlexiDesk builds it on your desk (⌘⇧K)"
             placement="bottom"
           >
             <button

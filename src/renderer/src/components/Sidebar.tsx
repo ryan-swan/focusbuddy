@@ -602,7 +602,7 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
       <div className="px-3 py-3 border-b border-stone-200 dark:border-stone-700 flex items-center justify-between gap-2">
         <h2 className="text-[12px] font-semibold tracking-[0.18em] text-stone-900 dark:text-stone-100 inline-flex items-center gap-1.5">
           <Icon name="auto_awesome" size={13} className="text-accent" />
-          <span>FOCUSBUDDY</span>
+          <span>PLEXIDESK</span>
         </h2>
         <div className="flex items-center gap-1">
           <button
@@ -688,7 +688,7 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
                 if (!url) return
                 const m = url.match(/\/share\/([a-z0-9]+)/i)
                 if (!m) {
-                  alert('That doesn\'t look like a FocusBuddy share link.')
+                  alert('That doesn\'t look like a PlexiDesk share link.')
                   return
                 }
                 // The store's acceptByToken handles both modes — fetching

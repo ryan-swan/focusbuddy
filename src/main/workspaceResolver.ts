@@ -47,7 +47,7 @@ function isDir(path: string): boolean {
  *      used yet but reserved)
  *   5. userData fallback (always works)
  *
- * The userData entry is appended last so an installed Haptyx without
+ * The userData entry is appended last so an installed PlexiDesk without
  * a discovered operator workspace still has SOMEWHERE to put agents.
  */
 export function candidateWorkspaceRoots(): string[] {

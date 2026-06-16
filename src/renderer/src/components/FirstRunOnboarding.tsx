@@ -101,7 +101,7 @@ export default function FirstRunOnboarding(): JSX.Element | null {
     <div
       className="fixed inset-0 z-[240] flex items-center justify-center bg-stone-950/55 backdrop-blur-md"
       role="dialog"
-      aria-label="Welcome to Haptyx"
+      aria-label="Welcome to PlexiDesk"
       aria-modal="true"
     >
       <div className="w-[560px] max-w-[92vw] rounded-2xl bg-[rgba(16,24,39,0.96)] border border-white/10 shadow-2xl overflow-hidden text-stone-100">
@@ -125,7 +125,7 @@ export default function FirstRunOnboarding(): JSX.Element | null {
             >
               <Icon name="auto_awesome" size={24} className="text-white" />
             </div>
-            <h1 className="text-2xl font-semibold mb-2">Welcome to Haptyx</h1>
+            <h1 className="text-2xl font-semibold mb-2">Welcome to PlexiDesk</h1>
             <p className="text-[14px] text-stone-300 leading-relaxed mb-1">
               A glass-canvas workspace where notes, pages, tables, browsers and timers live side by
               side. Describe what you need and the AI builds it onto your desk.

@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 
 // Current pane view — replaces the assumption that the main area always shows a task canvas.
-// As FocusBuddy grows into a workspace OS, the main pane routes between Home Dashboard,
+// As PlexiDesk grows into a workspace OS, the main pane routes between Home Dashboard,
 // All Tasks, per-Project Dashboards, individual Tasks, and Connected Apps.
 
 export type View =

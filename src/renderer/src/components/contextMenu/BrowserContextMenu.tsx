@@ -1,4 +1,4 @@
-// Renders the unified Haptyx menu for a non-editable right-click inside a
+// Renders the unified PlexiDesk menu for a non-editable right-click inside a
 // browser widget. The main process forwards the classified target (text /
 // image / link / video) via webview:context-menu; we look up which browser
 // widget the event came from, translate the in-page coordinates to screen

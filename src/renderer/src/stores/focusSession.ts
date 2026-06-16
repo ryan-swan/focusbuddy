@@ -10,9 +10,9 @@ import { useViewStore } from './view'
 //
 // Engaged-time tracking (the important bit):
 //   The timer counts only seconds during which the user is actually engaged
-//   with the task — meaning FocusBuddy has OS focus AND the current view is
+//   with the task — meaning PlexiDesk has OS focus AND the current view is
 //   the same task the session was started on. If the user alt-tabs to Slack
-//   or switches to a different task inside FocusBuddy, the timer pauses.
+//   or switches to a different task inside PlexiDesk, the timer pauses.
 //   When they return, it resumes. This matches the ADHD-friendly intent of
 //   the 5-Minute Promise — five minutes of *actual* focused work, not five
 //   minutes of wall-clock that quietly expires while you're distracted.
@@ -69,7 +69,7 @@ function stopTicker(): void {
  * Three independent gates, all required:
  *   1. The browser window has OS focus (not behind another app).
  *   2. The document is visible (not minimized, not in a hidden tab).
- *   3. The current view in FocusBuddy is the same task the session is bound
+ *   3. The current view in PlexiDesk is the same task the session is bound
  *      to. Anything else — All Tasks, a Connected App, a different task —
  *      counts as "not engaged with this".
  *
