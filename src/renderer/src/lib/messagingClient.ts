@@ -124,17 +124,46 @@ export async function getUnreadTotal(token: string): Promise<number> {
   return json?.ok ? json.count ?? 0 : 0
 }
 
-// Unified inbox: conversations (DMs + shared spaces) and shares in one feed.
-// Email items will appear here too once Gmail/Outlook is wired.
+// Unified inbox: conversations (DMs + shared spaces), shares, and contact
+// requests in one feed. Email items will appear here too once Gmail/Outlook is
+// wired.
 export interface InboxItem {
-  kind: 'message' | 'share'
-  id: string // conversationId for messages, shareToken for shares
+  kind: 'message' | 'share' | 'contact-request'
+  id: string // conversationId for messages, shareToken for shares, requestId for contact-requests
   title: string
   preview: string
   ts: number
   unread: number
   convKind?: 'dm' | 'space'
   shareKind?: string | null
+}
+
+// ── Contacts: add by email ──────────────────────────────────────────────────
+export async function inviteContact(
+  token: string,
+  email: string
+): Promise<{ ok: boolean; status?: 'requested' | 'invited'; error?: string }> {
+  const json = await req<{ ok: boolean; status?: 'requested' | 'invited' }>(
+    'POST',
+    '/contacts/invite',
+    token,
+    { email }
+  )
+  return json?.ok ? { ok: true, status: json.status } : { ok: false, error: 'Could not send the invite.' }
+}
+
+export async function acceptContact(token: string, requestId: string): Promise<string | null> {
+  const json = await req<{ ok: boolean; conversationId?: string }>(
+    'POST',
+    `/contacts/${requestId}/accept`,
+    token,
+    {}
+  )
+  return json?.ok ? json.conversationId ?? null : null
+}
+
+export async function declineContact(token: string, requestId: string): Promise<void> {
+  await req('POST', `/contacts/${requestId}/decline`, token, {})
 }
 
 export async function getUnifiedInbox(

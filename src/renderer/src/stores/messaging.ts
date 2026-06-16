@@ -28,6 +28,11 @@ interface MessagingStore {
   openConversation: (id: string) => Promise<void>
   startDm: (handle: string) => Promise<{ ok: true; id: string } | { ok: false; error: string }>
   send: (body: string, attachment?: MessageAttachment | null) => Promise<void>
+  inviteContact: (
+    email: string
+  ) => Promise<{ ok: true; status: 'requested' | 'invited' } | { ok: false; error: string }>
+  acceptContactRequest: (requestId: string) => Promise<void>
+  declineContactRequest: (requestId: string) => Promise<void>
 }
 
 export const useMessagingStore = create<MessagingStore>((set, get) => ({
@@ -127,5 +132,29 @@ export const useMessagingStore = create<MessagingStore>((set, get) => ({
       return { messagesByConv: { ...s.messagesByConv, [activeId]: [...existing, message] } }
     })
     await get().refreshConversations()
+  },
+
+  inviteContact: async (email) => {
+    const { token } = get()
+    if (!token) return { ok: false, error: 'Sign in first.' }
+    const r = await api.inviteContact(token, email)
+    if (!r.ok || !r.status) return { ok: false, error: r.error ?? 'Could not send the invite.' }
+    await get().refreshInbox()
+    return { ok: true, status: r.status }
+  },
+
+  acceptContactRequest: async (requestId) => {
+    const { token } = get()
+    if (!token) return
+    const conversationId = await api.acceptContact(token, requestId)
+    await get().refreshConversations()
+    if (conversationId) await get().openConversation(conversationId)
+  },
+
+  declineContactRequest: async (requestId) => {
+    const { token } = get()
+    if (!token) return
+    await api.declineContact(token, requestId)
+    await get().refreshInbox()
   }
 }))
