@@ -36,6 +36,21 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.42',
+    date: '2026-06-16T23:30:00Z',
+    title: 'v2.5.42 — Your email, inside your workspace',
+    tag: 'feature',
+    summary:
+      'PlexiDesk now has Mail. Connect any email account over IMAP and read your inbox right next to your work. No Google or Microsoft sign-in to set up; just your address and an app password, and your mail stays on your machine.',
+    highlights: [
+      'Connect in a minute: pick Gmail, Outlook, iCloud, Fastmail or Yahoo and the server settings fill in for you, or enter any IMAP host yourself. Your password is encrypted on this device with your OS keychain and never leaves it.',
+      'A real inbox: read your messages in a clean two-pane view, with unread mail also flowing into the unified Inbox alongside your PlexiDesk messages and shared items.',
+      'Turn an email into work: one click makes any message a task in All Tasks, with the sender and a snippet already filled in.',
+      'This is plain IMAP for now. Connecting Gmail and Outlook with one-click sign-in is coming later; today it works with the app password those providers give you.'
+    ],
+    links: [{ label: 'Finding your way around', href: `${HELP_BASE}/getting-around` }]
+  },
+  {
     version: '2.5.41',
     date: '2026-06-16T22:30:00Z',
     title: 'v2.5.41 — Add people by email, and chat with anyone you share with',

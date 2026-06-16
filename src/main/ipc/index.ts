@@ -17,6 +17,14 @@ import {
   setSecret
 } from '../settingsStore'
 import { invalidateAnthropicClient } from '../ai/anthropic'
+import * as mailAccount from '../mail/mailAccount'
+import type { MailAccountConfig } from '../mail/mailAccount'
+import {
+  testConnection as testMailConnection,
+  listInbox,
+  getMessage,
+  markSeen
+} from '../mail/imap'
 import Anthropic from '@anthropic-ai/sdk'
 import {
   createNode,
@@ -1275,6 +1283,68 @@ export function registerIpcHandlers(): void {
   // "set" / "•••• abcd" badge. Saving and testing accept plaintext one-way.
 
   ipcMain.handle('settings:encryptionAvailable', () => encryptionAvailable())
+
+  // ── Mail (IMAP) ────────────────────────────────────────────────────────
+  // The user's own mailbox, connected directly from the desktop. The renderer
+  // only ever sees host/port/user (never the password), proposes a config to
+  // save+test, and asks for the message list / one full message on demand.
+  ipcMain.handle('mail:getAccount', () => mailAccount.getPublic())
+
+  ipcMain.handle('mail:saveAccount', async (_e, config: MailAccountConfig) => {
+    try {
+      // Verify the credentials before persisting, so a typo never silently
+      // saves a broken account.
+      const result = await testMailConnection(config)
+      if (!result.ok) return result
+      mailAccount.save(config)
+      return { ok: true as const, account: mailAccount.getPublic() }
+    } catch (err) {
+      return { ok: false as const, error: (err as Error).message }
+    }
+  })
+
+  ipcMain.handle('mail:testAccount', async (_e, config: MailAccountConfig) => {
+    return testMailConnection(config)
+  })
+
+  ipcMain.handle('mail:clearAccount', () => {
+    mailAccount.clear()
+    return { ok: true as const }
+  })
+
+  ipcMain.handle('mail:list', async (_e, limit?: number) => {
+    const config = mailAccount.getFull()
+    if (!config) return { ok: false as const, error: 'No mail account connected.' }
+    try {
+      const items = await listInbox(config, limit ?? 40)
+      return { ok: true as const, items }
+    } catch (err) {
+      return { ok: false as const, error: (err as Error).message }
+    }
+  })
+
+  ipcMain.handle('mail:get', async (_e, uid: number) => {
+    const config = mailAccount.getFull()
+    if (!config) return { ok: false as const, error: 'No mail account connected.' }
+    try {
+      const message = await getMessage(config, uid)
+      if (!message) return { ok: false as const, error: 'Message not found.' }
+      return { ok: true as const, message }
+    } catch (err) {
+      return { ok: false as const, error: (err as Error).message }
+    }
+  })
+
+  ipcMain.handle('mail:markSeen', async (_e, uid: number) => {
+    const config = mailAccount.getFull()
+    if (!config) return { ok: false as const, error: 'No mail account connected.' }
+    try {
+      await markSeen(config, uid)
+      return { ok: true as const }
+    } catch (err) {
+      return { ok: false as const, error: (err as Error).message }
+    }
+  })
 
   ipcMain.handle('settings:hintAnthropic', () => hint('anthropic'))
   ipcMain.handle('settings:hintOpenAI', () => hint('openai'))

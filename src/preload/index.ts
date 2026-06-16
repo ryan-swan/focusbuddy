@@ -25,6 +25,10 @@ import type {
   FocusSessionCompletePatch,
   FocusSessionStartDraft,
   LivingPageRegenerateResponse,
+  MailAccountInput,
+  MailAccountPublic,
+  MailListItem,
+  MailFullMessage,
   ModelMode,
   NodeDraft,
   NodePatch,
@@ -1015,6 +1019,32 @@ const api = {
       ipcRenderer.invoke('settings:clearOpenAIKey'),
     testOpenAIKey: (): Promise<{ ok: boolean; model?: string; error?: string }> =>
       ipcRenderer.invoke('settings:testOpenAIKey')
+  },
+  // Mail (IMAP) — the user's own mailbox, connected straight from the desktop.
+  // The password never crosses this boundary on read; the renderer only ever
+  // sees host/port/user and the message list/body it asks for.
+  mail: {
+    getAccount: (): Promise<MailAccountPublic> => ipcRenderer.invoke('mail:getAccount'),
+    saveAccount: (
+      config: MailAccountInput
+    ): Promise<
+      { ok: true; account: MailAccountPublic } | { ok: false; error: string }
+    > => ipcRenderer.invoke('mail:saveAccount', config),
+    testAccount: (
+      config: MailAccountInput
+    ): Promise<{ ok: true } | { ok: false; error: string }> =>
+      ipcRenderer.invoke('mail:testAccount', config),
+    clearAccount: (): Promise<{ ok: true }> => ipcRenderer.invoke('mail:clearAccount'),
+    list: (
+      limit?: number
+    ): Promise<{ ok: true; items: MailListItem[] } | { ok: false; error: string }> =>
+      ipcRenderer.invoke('mail:list', limit),
+    get: (
+      uid: number
+    ): Promise<{ ok: true; message: MailFullMessage } | { ok: false; error: string }> =>
+      ipcRenderer.invoke('mail:get', uid),
+    markSeen: (uid: number): Promise<{ ok: true } | { ok: false; error: string }> =>
+      ipcRenderer.invoke('mail:markSeen', uid)
   },
   // haptyx:// deep-link auth handoff. The brochure at haptyx.app/account/*
   // signs the user in against the signal server, then redirects to

@@ -1030,3 +1030,48 @@ export interface TemplateDraft {
   sourceTaskId: string | null
   widgets: TemplateWidget[]
 }
+
+// ── Mail (IMAP) ────────────────────────────────────────────────────────────
+// Shapes shared by the main-process IMAP client, the preload bridge and the
+// renderer mail store. The password is never part of any renderer-facing type.
+
+export interface MailAccountInput {
+  host: string
+  port: number
+  secure: boolean
+  user: string
+  password: string
+  email?: string
+}
+
+export interface MailAccountPublic {
+  configured: boolean
+  host: string
+  port: number
+  secure: boolean
+  user: string
+  email?: string
+}
+
+export interface MailListItem {
+  uid: number
+  fromName: string
+  fromAddress: string
+  subject: string
+  date: number
+  seen: boolean
+  flagged: boolean
+  hasAttachments: boolean
+}
+
+export interface MailFullMessage {
+  uid: number
+  fromName: string
+  fromAddress: string
+  to: string
+  subject: string
+  date: number
+  text: string
+  html: string | null
+  attachments: { filename: string; size: number; contentType: string }[]
+}

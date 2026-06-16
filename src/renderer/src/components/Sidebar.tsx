@@ -9,6 +9,7 @@ import { useTemplateStore } from '../stores/templates'
 import SyncIndicator from './SyncIndicator'
 import { useViewStore, type View } from '../stores/view'
 import { useMessagingStore } from '../stores/messaging'
+import { useMailStore, selectMailUnread } from '../stores/mail'
 import { chimeOut } from '../lib/audioBeep'
 import { catalogFor } from '../lib/widgetCatalog'
 import { chimeIn } from '../lib/audioBeep'
@@ -145,7 +146,9 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
   const goCalendar = useViewStore((s) => s.goCalendar)
   const goMessages = useViewStore((s) => s.goMessages)
   const goInbox = useViewStore((s) => s.goInbox)
+  const goMail = useViewStore((s) => s.goMail)
   const unreadMessages = useMessagingStore((s) => s.unreadTotal)
+  const unreadMail = useMailStore(selectMailUnread)
   const goProject = useViewStore((s) => s.goProject)
   const goTask = useViewStore((s) => s.goTask)
   const goConnectedApp = useViewStore((s) => s.goConnectedApp)
@@ -679,6 +682,16 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
               onClick={() => {
                 setActive(null)
                 goMessages()
+              }}
+            />
+            <NavRow
+              icon="mail"
+              label="Mail"
+              active={viewIsActive({ kind: 'mail' })}
+              badge={unreadMail > 0 ? String(unreadMail) : undefined}
+              onClick={() => {
+                setActive(null)
+                goMail()
               }}
             />
             <NavRow
