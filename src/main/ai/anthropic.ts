@@ -10,6 +10,7 @@ import { markdownToTiptap } from './markdownToTiptap'
 import { extractJson, salvageEnvelope } from './chatJson'
 import { resolveModel } from './modelRouting'
 import { resolveAnthropicKey } from '../settingsStore'
+import { shouldUseCredits, getCreditClient, invalidateCreditClient } from './creditMode'
 import type {
   ActionProposal,
   ActivityEvent,
@@ -87,6 +88,15 @@ function sectionsToTiptap(
 let client: { key: string; instance: Anthropic } | null = null
 
 function getClient(): Anthropic | null {
+  // Credit mode first: when the user is signed in and policy says to use
+  // PlexiDesk credits, route through the metered proxy. The proxy client's
+  // own fetch handles the out-of-credits hand-off (auto fall-back to the
+  // personal key in 'auto' mode), so call sites stay oblivious.
+  if (shouldUseCredits()) {
+    const credit = getCreditClient()
+    if (credit) return credit
+  }
+  // BYOK path (and the fall-back when credit mode isn't applicable).
   const key = resolveAnthropicKey()
   if (!key) return null
   if (!client || client.key !== key) {
@@ -99,6 +109,7 @@ function getClient(): Anthropic | null {
  *  picks up the new key without restarting the app. */
 export function invalidateAnthropicClient(): void {
   client = null
+  invalidateCreditClient()
 }
 
 // Model IDs are now resolved per-call via `resolveModel(purpose)` in ./modelRouting.

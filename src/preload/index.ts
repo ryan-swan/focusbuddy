@@ -343,7 +343,38 @@ const api = {
       summary?: string
       error?: string
       needsApiKey?: boolean
-    }> => ipcRenderer.invoke('ai:suggestWidgetSetup', input)
+    }> => ipcRenderer.invoke('ai:suggestWidgetSetup', input),
+    // AI source (PlexiDesk credits vs bring-your-own-key) + credit balance.
+    getStatus: (): Promise<{
+      mode: 'auto' | 'credits' | 'byok'
+      signedIn: boolean
+      hasOwnKey: boolean
+      balanceUsd: number | null
+      outOfCredits: boolean
+      proxyAvailable: boolean
+    }> => ipcRenderer.invoke('ai:getStatus'),
+    setMode: (mode: 'auto' | 'credits' | 'byok'): Promise<{
+      mode: 'auto' | 'credits' | 'byok'
+      signedIn: boolean
+      hasOwnKey: boolean
+      balanceUsd: number | null
+      outOfCredits: boolean
+      proxyAvailable: boolean
+    }> => ipcRenderer.invoke('ai:setMode', mode),
+    refreshCredits: (): Promise<{
+      balanceUsd: number | null
+      outOfCredits: boolean
+      proxyAvailable: boolean
+    }> => ipcRenderer.invoke('ai:refreshCredits'),
+    topUpCredits: (
+      amountUsd: number
+    ): Promise<{
+      ok: boolean
+      action?: 'redirect' | 'pending'
+      url?: string
+      amountUsd?: number
+      error?: string
+    }> => ipcRenderer.invoke('ai:topUpCredits', amountUsd)
   },
   history: {
     record: (url: string, title: string, taskId: string | null): Promise<void> =>

@@ -35,9 +35,19 @@ import { join } from 'node:path'
 // keys just resolve to null).
 export type SecretName = 'anthropic' | 'openai'
 
+// How the app sources AI: 'auto' prefers PlexiDesk credits when the user is
+// signed in and has balance, falling back to their own key; 'credits' forces
+// the metered proxy; 'byok' forces the user's own key. 'auto' is the default
+// so a fresh signup gets the trial-credit experience with zero setup, while a
+// power user who pastes a key keeps using it.
+export type AiMode = 'auto' | 'credits' | 'byok'
+
 interface Envelope {
   // Base64-encoded ciphertext from safeStorage.encryptString.
   keys: Partial<Record<SecretName, string>>
+  // Which AI source the user has chosen. Optional for forward-compat with
+  // pre-credits envelopes (absent → 'auto').
+  aiMode?: AiMode
   // Schema version — lets future migrations detect old envelopes.
   v: 1
 }
@@ -61,6 +71,7 @@ function load(): Envelope {
     const parsed = JSON.parse(raw) as Partial<Envelope>
     cache = {
       keys: parsed.keys && typeof parsed.keys === 'object' ? parsed.keys : {},
+      aiMode: parsed.aiMode === 'credits' || parsed.aiMode === 'byok' ? parsed.aiMode : 'auto',
       v: 1
     }
   } catch (err) {
@@ -150,6 +161,24 @@ export function resolveAnthropicKey(): string | null {
   if (fromStore) return fromStore
   const fromEnv = process.env.ANTHROPIC_API_KEY
   return fromEnv && fromEnv.trim() ? fromEnv.trim() : null
+}
+
+/** Whether the user has stored their own Anthropic key (not the env fallback). */
+export function hasOwnAnthropicKey(): boolean {
+  return Boolean(getSecret('anthropic'))
+}
+
+/** The user's chosen AI source. Defaults to 'auto'. */
+export function getAiMode(): AiMode {
+  load()
+  return cache.aiMode ?? 'auto'
+}
+
+/** Persist the AI-source choice. */
+export function setAiMode(mode: AiMode): void {
+  load()
+  cache.aiMode = mode
+  save()
 }
 
 /**

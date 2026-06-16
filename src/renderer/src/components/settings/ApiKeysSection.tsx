@@ -63,6 +63,12 @@ export default function ApiKeysSection({ onKeySaved }: Props): JSX.Element {
   return (
     <div className="px-3 py-3 border-t border-stone-200 dark:border-stone-700 space-y-3">
       <div className="text-[11px] uppercase tracking-[0.12em] text-stone-500 dark:text-stone-400 font-medium">
+        AI · source
+      </div>
+
+      <AiSourceSection />
+
+      <div className="text-[11px] uppercase tracking-[0.12em] text-stone-500 dark:text-stone-400 font-medium pt-1">
         AI · API keys
       </div>
 
@@ -108,8 +114,9 @@ export default function ApiKeysSection({ onKeySaved }: Props): JSX.Element {
 
       <div className="text-[10px] text-stone-500 dark:text-stone-400 leading-relaxed">
         Each key is encrypted with the macOS Keychain and stored locally only.
-        PlexiDesk never proxies AI calls — your prompts go direct from this Mac
-        to Anthropic / OpenAI.
+        When you use your own key, prompts go direct from this Mac to Anthropic /
+        OpenAI. On PlexiDesk credits, AI prompts route through PlexiDesk's server
+        so we can meter usage against your balance.
         {encryption === false && (
           <div className="text-red-600 dark:text-red-400 mt-1">
             ⚠ System encryption isn't available — saving is disabled.
@@ -118,6 +125,166 @@ export default function ApiKeysSection({ onKeySaved }: Props): JSX.Element {
       </div>
 
       <VoiceProviderToggle />
+    </div>
+  )
+}
+
+interface AiStatusView {
+  mode: 'auto' | 'credits' | 'byok'
+  signedIn: boolean
+  hasOwnKey: boolean
+  balanceUsd: number | null
+  outOfCredits: boolean
+  proxyAvailable: boolean
+}
+
+// AI-source chooser + credit balance. New users default to 'auto', which
+// spends their PlexiDesk trial credits first and falls back to a personal key
+// once the balance is gone. When credits run out the user either tops up here
+// or switches to 'byok'.
+function AiSourceSection(): JSX.Element {
+  const [status, setStatus] = useState<AiStatusView | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [note, setNote] = useState<string | null>(null)
+
+  function refresh(): void {
+    void window.api.ai
+      .getStatus()
+      .then(setStatus)
+      .catch(() => setStatus(null))
+  }
+
+  useEffect(() => {
+    refresh()
+    // Pull the live balance once on open (also lazily grants the trial on the
+    // server the very first time), then re-read the merged status.
+    void window.api.ai
+      .refreshCredits()
+      .then(() => refresh())
+      .catch(() => {})
+  }, [])
+
+  async function pick(mode: 'auto' | 'credits' | 'byok'): Promise<void> {
+    if (busy) return
+    setBusy(true)
+    setNote(null)
+    try {
+      const next = await window.api.ai.setMode(mode)
+      setStatus(next)
+    } catch {
+      setNote('Could not change AI source. Restart PlexiDesk and try again.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function topUp(amountUsd: number): Promise<void> {
+    if (busy) return
+    setBusy(true)
+    setNote(null)
+    try {
+      const r = await window.api.ai.topUpCredits(amountUsd)
+      if (!r.ok) {
+        setNote(r.error ?? 'Could not start checkout.')
+      } else if (r.action === 'pending') {
+        setNote('Credit purchases are not enabled on this build yet.')
+      } else {
+        setNote('Opened the checkout page in your browser.')
+      }
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const balanceLabel =
+    status?.balanceUsd === null || status?.balanceUsd === undefined
+      ? '—'
+      : `$${status.balanceUsd.toFixed(2)}`
+
+  const modes: Array<{ id: 'auto' | 'credits' | 'byok'; label: string; sub: string }> = [
+    { id: 'auto', label: 'Automatic', sub: 'Credits first, then your key' },
+    { id: 'credits', label: 'PlexiDesk credits', sub: 'Metered, prepaid balance' },
+    { id: 'byok', label: 'Your own key', sub: 'Direct to Anthropic' }
+  ]
+
+  return (
+    <div data-testid="ai-source-section">
+      <div className="grid grid-cols-3 gap-1.5 mb-2">
+        {modes.map((m) => (
+          <button
+            key={m.id}
+            onClick={() => void pick(m.id)}
+            disabled={busy || status === null}
+            data-testid={`ai-mode-${m.id}`}
+            className={`text-[11px] px-2 py-1.5 rounded-md border text-left ${
+              status?.mode === m.id
+                ? 'border-accent bg-accent/10 text-stone-900 dark:text-stone-100'
+                : 'border-stone-200 dark:border-stone-700 text-stone-600 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800'
+            } disabled:opacity-50`}
+          >
+            <div className="font-medium">{m.label}</div>
+            <div className="text-[10px] text-stone-500 dark:text-stone-400 mt-0.5 leading-snug">
+              {m.sub}
+            </div>
+          </button>
+        ))}
+      </div>
+
+      {status && status.mode !== 'byok' && (
+        <div className="bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-md px-2.5 py-2 mb-2">
+          {!status.signedIn ? (
+            <div className="text-[11px] text-stone-500 dark:text-stone-400 leading-snug">
+              Sign in to your PlexiDesk account to use credits. New accounts start
+              with $1 of free AI credits.
+            </div>
+          ) : (
+            <>
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] text-stone-600 dark:text-stone-300">
+                  Credit balance
+                </span>
+                <span
+                  data-testid="ai-credit-balance"
+                  className={`text-xs font-mono ${
+                    status.outOfCredits
+                      ? 'text-red-600 dark:text-red-400'
+                      : 'text-stone-800 dark:text-stone-100'
+                  }`}
+                >
+                  {balanceLabel}
+                </span>
+              </div>
+              {status.outOfCredits && (
+                <div className="text-[10px] text-red-600 dark:text-red-400 mt-1 leading-snug">
+                  Credits used up.{' '}
+                  {status.hasOwnKey
+                    ? 'Add more below, or switch to your own key to keep going.'
+                    : 'Add credits below, or add your own Anthropic key under API keys.'}
+                </div>
+              )}
+              <div className="flex gap-1.5 mt-2">
+                {[5, 10, 20].map((amt) => (
+                  <button
+                    key={amt}
+                    onClick={() => void topUp(amt)}
+                    disabled={busy}
+                    data-testid={`ai-topup-${amt}`}
+                    className="flex-1 text-[11px] border border-stone-200 dark:border-stone-700 rounded-md py-1 text-stone-700 dark:text-stone-200 hover:bg-stone-100 dark:hover:bg-stone-800 disabled:opacity-50"
+                  >
+                    Add ${amt}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {note && (
+        <div className="text-[10px] text-stone-500 dark:text-stone-400 mb-2 leading-snug">
+          {note}
+        </div>
+      )}
     </div>
   )
 }

@@ -121,8 +121,13 @@ export default function App(): JSX.Element {
   const connectMessaging = useMessagingStore((s) => s.connect)
   const disconnectMessaging = useMessagingStore((s) => s.disconnect)
   useEffect(() => {
-    if (account && sessionToken) void connectMessaging(sessionToken)
-    else disconnectMessaging()
+    if (account && sessionToken) {
+      void connectMessaging(sessionToken)
+      // Learn the credit balance + whether the server proxy is live as soon as
+      // we're signed in, so the very first AI call routes correctly (credits vs
+      // BYOK) instead of bouncing off a dormant proxy.
+      void window.api.ai.refreshCredits()
+    } else disconnectMessaging()
   }, [account, sessionToken, connectMessaging, disconnectMessaging])
 
   // Mail is local (IMAP straight from the desktop), so it loads independently
