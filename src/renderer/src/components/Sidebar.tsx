@@ -144,6 +144,7 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
   const goAllTasks = useViewStore((s) => s.goAllTasks)
   const goCalendar = useViewStore((s) => s.goCalendar)
   const goMessages = useViewStore((s) => s.goMessages)
+  const goInbox = useViewStore((s) => s.goInbox)
   const unreadMessages = useMessagingStore((s) => s.unreadTotal)
   const goProject = useViewStore((s) => s.goProject)
   const goTask = useViewStore((s) => s.goTask)
@@ -658,6 +659,16 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
               onClick={() => {
                 setActive(null)
                 goCalendar()
+              }}
+            />
+            <NavRow
+              icon="inbox"
+              label="Inbox"
+              active={viewIsActive({ kind: 'inbox' })}
+              badge={unreadMessages > 0 ? String(unreadMessages) : undefined}
+              onClick={() => {
+                setActive(null)
+                goInbox()
               }}
             />
             <NavRow

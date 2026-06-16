@@ -7,6 +7,7 @@ import ConnectedAppView from './views/ConnectedAppView'
 import VaultView from './views/VaultView'
 import CalendarView from './views/CalendarView'
 import MessagesView from './views/MessagesView'
+import InboxView from './views/InboxView'
 
 // The MainPane routes the central area between the OS-level views.
 // Existing Canvas + chat behavior is preserved for the 'task' view; everything else
@@ -30,6 +31,8 @@ export default function MainPane(): JSX.Element {
       return <CalendarView />
     case 'messages':
       return <MessagesView />
+    case 'inbox':
+      return <InboxView />
     default:
       return <HomeDashboard />
   }

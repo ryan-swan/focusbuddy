@@ -36,6 +36,21 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.40',
+    date: '2026-06-16T20:00:00Z',
+    title: 'v2.5.40 — Messages and a unified Inbox',
+    tag: 'feature',
+    summary:
+      'PlexiDesk can now talk to other people. Sign in and message anyone by their handle, share a folder or task into a conversation to work on it together, and see everything that needs you — messages and shared items — in one Inbox.',
+    highlights: [
+      'Messages: find someone by @handle and start a direct message. Conversations sync in real time and keep their history, so you can pick up where you left off.',
+      'Shared-space chat: when you accept a shared folder or task, everyone on it gets a conversation around it, so collaborating has a place to happen.',
+      'Unified Inbox: a single feed of your messages and shared items, with unread counts in the sidebar. Email will join this same Inbox once you connect Gmail or Outlook.',
+      'You need to be signed in to use messaging; everything else in PlexiDesk still works fully offline.'
+    ],
+    links: [{ label: 'Finding your way around', href: `${HELP_BASE}/getting-around` }]
+  },
+  {
     version: '2.5.39',
     date: '2026-06-16T16:00:00Z',
     title: 'v2.5.39 — Say hello to PlexiDesk',

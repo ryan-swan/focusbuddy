@@ -123,3 +123,27 @@ export async function getUnreadTotal(token: string): Promise<number> {
   const json = await req<{ ok: boolean; count?: number }>('GET', '/messaging/unread', token)
   return json?.ok ? json.count ?? 0 : 0
 }
+
+// Unified inbox: conversations (DMs + shared spaces) and shares in one feed.
+// Email items will appear here too once Gmail/Outlook is wired.
+export interface InboxItem {
+  kind: 'message' | 'share'
+  id: string // conversationId for messages, shareToken for shares
+  title: string
+  preview: string
+  ts: number
+  unread: number
+  convKind?: 'dm' | 'space'
+  shareKind?: string | null
+}
+
+export async function getUnifiedInbox(
+  token: string
+): Promise<{ items: InboxItem[]; unread: number }> {
+  const json = await req<{ ok: boolean; items?: InboxItem[]; unread?: number }>(
+    'GET',
+    '/inbox/unified',
+    token
+  )
+  return json?.ok ? { items: json.items ?? [], unread: json.unread ?? 0 } : { items: [], unread: 0 }
+}
