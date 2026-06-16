@@ -21,6 +21,7 @@ export default function MessagesView(): JSX.Element {
   const open = useMessagingStore((s) => s.openConversation)
   const send = useMessagingStore((s) => s.send)
   const startDm = useMessagingStore((s) => s.startDm)
+  const inviteContact = useMessagingStore((s) => s.inviteContact)
   const refresh = useMessagingStore((s) => s.refreshConversations)
 
   const [draft, setDraft] = useState('')
@@ -62,7 +63,26 @@ export default function MessagesView(): JSX.Element {
 
   async function submitNew(): Promise<void> {
     setError(null)
-    const r = await startDm(newHandle)
+    const value = newHandle.trim()
+    if (!value) return
+    // An email address adds a contact (they get a request to accept, or a
+    // sign-up invite if they're not on PlexiDesk yet); a handle starts a DM now.
+    const isEmail = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(value)
+    if (isEmail) {
+      const r = await inviteContact(value)
+      if (!r.ok) {
+        setError(r.error)
+        return
+      }
+      setError(
+        r.status === 'requested'
+          ? 'Request sent — they can accept it in their inbox.'
+          : "Invite sent — they'll get an email to join PlexiDesk."
+      )
+      setNewHandle('')
+      return
+    }
+    const r = await startDm(value)
     if (!r.ok) {
       setError(r.error)
       return
@@ -102,7 +122,7 @@ export default function MessagesView(): JSX.Element {
                 value={newHandle}
                 onChange={(e) => setNewHandle(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && void submitNew()}
-                placeholder="@handle"
+                placeholder="@handle or email"
                 autoFocus
                 data-testid="messages-new-handle"
                 className="flex-1 bg-white dark:bg-stone-800 border border-stone-300 dark:border-stone-600 rounded px-2 py-1 text-[12px]"

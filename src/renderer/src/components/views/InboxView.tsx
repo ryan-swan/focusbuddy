@@ -27,6 +27,8 @@ export default function InboxView(): JSX.Element {
   const items = useMessagingStore((s) => s.inboxItems)
   const refreshInbox = useMessagingStore((s) => s.refreshInbox)
   const openConversation = useMessagingStore((s) => s.openConversation)
+  const acceptContact = useMessagingStore((s) => s.acceptContactRequest)
+  const declineContact = useMessagingStore((s) => s.declineContactRequest)
   const goMessages = useViewStore((s) => s.goMessages)
 
   useEffect(() => {
@@ -81,22 +83,26 @@ export default function InboxView(): JSX.Element {
           <div className="rounded-xl border border-stone-200 dark:border-stone-700 bg-white/85 dark:bg-stone-900/85 overflow-hidden divide-y divide-stone-100 dark:divide-stone-800">
             {items.map((it) => {
               const isMessage = it.kind === 'message'
-              const icon = isMessage
-                ? it.convKind === 'space'
-                  ? 'folder_shared'
-                  : 'forum'
-                : 'folder_shared'
+              const isContact = it.kind === 'contact-request'
+              const icon = isContact
+                ? 'person_add'
+                : isMessage && it.convKind !== 'space'
+                  ? 'forum'
+                  : 'folder_shared'
+              const clickable = isMessage
               return (
-                <button
+                <div
                   key={`${it.kind}:${it.id}`}
                   onClick={() => {
-                    if (isMessage) {
+                    if (clickable) {
                       void openConversation(it.id)
                       goMessages()
                     }
                   }}
                   data-testid="inbox-item"
-                  className="w-full text-left px-4 py-3 flex items-start gap-3 hover:bg-stone-50 dark:hover:bg-stone-800/50 transition-colors"
+                  className={`px-4 py-3 flex items-start gap-3 transition-colors ${
+                    clickable ? 'cursor-pointer hover:bg-stone-50 dark:hover:bg-stone-800/50' : ''
+                  }`}
                 >
                   <div
                     className={`h-8 w-8 rounded-lg inline-flex items-center justify-center shrink-0 ${
@@ -121,7 +127,7 @@ export default function InboxView(): JSX.Element {
                       <span className="ml-auto shrink-0 text-[10px] text-stone-400 dark:text-stone-500">
                         {relTime(it.ts)}
                       </span>
-                      {it.unread > 0 && (
+                      {!isContact && it.unread > 0 && (
                         <span className="shrink-0 text-[10px] font-semibold text-white bg-accent rounded-full px-1.5 py-0.5 min-w-[18px] text-center">
                           {it.unread}
                         </span>
@@ -132,8 +138,29 @@ export default function InboxView(): JSX.Element {
                         {it.preview}
                       </div>
                     )}
+                    {isContact && (
+                      <div className="flex items-center gap-2 mt-1.5">
+                        <button
+                          onClick={() => {
+                            void acceptContact(it.id)
+                            goMessages()
+                          }}
+                          data-testid="contact-accept"
+                          className="btn-primary px-2.5 py-1 text-[11px]"
+                        >
+                          Accept
+                        </button>
+                        <button
+                          onClick={() => void declineContact(it.id)}
+                          data-testid="contact-decline"
+                          className="text-[11px] text-stone-500 dark:text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 px-2 py-1"
+                        >
+                          Decline
+                        </button>
+                      </div>
+                    )}
                   </div>
-                </button>
+                </div>
               )
             })}
           </div>

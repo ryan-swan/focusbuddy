@@ -36,6 +36,20 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.41',
+    date: '2026-06-16T22:30:00Z',
+    title: 'v2.5.41 — Add people by email, and chat with anyone you share with',
+    tag: 'feature',
+    summary:
+      'Connecting on PlexiDesk is now easy. Add someone by their email address, and chat appears with everyone you share a folder or task with once they accept.',
+    highlights: [
+      'Add by email: in Messages, enter an email instead of a handle. If they already use PlexiDesk it arrives as a request to accept in their inbox; if they don\'t, they get an invite to join, and once they sign up your request is waiting for them.',
+      'Share, then chat: anyone you share a folder or task with shows up in your chat list after they accept, plus a shared conversation around that item so you can collaborate on it.',
+      'Accept or decline contact requests right from your Inbox, and a direct message opens as soon as you accept.'
+    ],
+    links: [{ label: 'Finding your way around', href: `${HELP_BASE}/getting-around` }]
+  },
+  {
     version: '2.5.40',
     date: '2026-06-16T20:00:00Z',
     title: 'v2.5.40 — Messages and a unified Inbox',
