@@ -36,6 +36,20 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.38',
+    date: '2026-06-16T09:00:00Z',
+    title: 'v2.5.38 — Book time to focus, and a warmer first run',
+    tag: 'feature',
+    summary:
+      'The calendar can now run your day. Switch it to Week and book stretches of time to focus, tied to your tasks. New installs also get a short welcome that helps you connect AI and start with something on the canvas instead of a blank screen.',
+    highlights: [
+      'Calendar time-blocking: a new Week view with an hour grid. Click a slot to book a block, attach it to a task or leave it as focus time, drag to reschedule, drag the edge to change its length, and press the bolt to start a focus session for that block.',
+      'First-run welcome: a brand-new install now gets a short, skippable setup — connect your AI key (with a one-tap test that it works) and optionally start with a small example workspace so the canvas isn’t empty.',
+      'This is the groundwork for connecting your real calendar and email next, so Haptyx becomes the one place your day runs from.'
+    ],
+    links: [{ label: 'Finding your way around', href: `${HELP_BASE}/getting-around` }]
+  },
+  {
     version: '2.5.37',
     date: '2026-06-15T23:45:00Z',
     title: 'v2.5.37 — Back up your work, and change your vault password',
