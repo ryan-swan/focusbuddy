@@ -19,7 +19,11 @@ on:
 
 jobs:
   build:
-    runs-on: windows-latest
+    # Pinned to windows-2022 on purpose: windows-latest moved to a runner image
+    # with Visual Studio 18, which the node-gyp bundled with Electron 37 does not
+    # recognise ("find VS unknown version undefined"), so the native-module
+    # rebuild fails. windows-2022 ships VS 2022, which node-gyp supports.
+    runs-on: windows-2022
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
