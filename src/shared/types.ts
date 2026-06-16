@@ -179,6 +179,38 @@ export interface NodePatch {
   archived?: boolean
 }
 
+// ── Time blocks (calendar time-blocking) ────────────────────────────────────
+// A booked stretch of time on the calendar, optionally tied to a task. This is
+// how the calendar goes from "tasks shown on their due day" to "I've booked
+// 2-3pm to focus on this", and a block can launch a focus session for its task.
+export type TimeBlockStatus = 'planned' | 'done'
+
+export interface TimeBlock {
+  id: string
+  taskId: string | null // null = a generic focus/time block with no task
+  title: string
+  startMs: number // absolute start time
+  durationMin: number
+  status: TimeBlockStatus
+  createdAt: number
+  updatedAt: number
+}
+
+export interface TimeBlockDraft {
+  taskId?: string | null
+  title?: string
+  startMs: number
+  durationMin: number
+}
+
+export interface TimeBlockPatch {
+  taskId?: string | null
+  title?: string
+  startMs?: number
+  durationMin?: number
+  status?: TimeBlockStatus
+}
+
 export interface Widget {
   id: string
   taskId: string

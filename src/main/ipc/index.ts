@@ -184,6 +184,12 @@ import {
   setDashboardLayout
 } from '../db/dashboardLayouts'
 import { currentEnergy, logEnergy, recentEnergy } from '../db/energy'
+import {
+  createTimeBlock,
+  deleteTimeBlock,
+  listBlocksInRange,
+  updateTimeBlock
+} from '../db/timeBlocks'
 import { fireHaptic, isHapticsAvailable, type HapticFeel } from '../haptics'
 import {
   backupInfo,
@@ -240,6 +246,8 @@ import type {
   ConnectedAppPatch,
   DashboardCardKind,
   EnergyLevel,
+  TimeBlockDraft,
+  TimeBlockPatch,
   FocusSessionCompletePatch,
   FocusSessionStartDraft,
   ModelMode,
@@ -770,6 +778,16 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('energy:log', (_e, level: EnergyLevel) => logEnergy(level))
   ipcMain.handle('energy:current', () => currentEnergy())
   ipcMain.handle('energy:recent', (_e, hours: number) => recentEnergy(hours))
+
+  // ── Calendar time blocks ────────────────────────────────────────────────
+  ipcMain.handle('timeblocks:list', (_e, fromMs: number, toMs: number) =>
+    listBlocksInRange(fromMs, toMs)
+  )
+  ipcMain.handle('timeblocks:create', (_e, draft: TimeBlockDraft) => createTimeBlock(draft))
+  ipcMain.handle('timeblocks:update', (_e, id: string, patch: TimeBlockPatch) =>
+    updateTimeBlock(id, patch)
+  )
+  ipcMain.handle('timeblocks:delete', (_e, id: string) => deleteTimeBlock(id))
 
   // ── Mac haptics ───────────────────────────────────────────────────────────
   ipcMain.handle('haptics:available', () => isHapticsAvailable())
