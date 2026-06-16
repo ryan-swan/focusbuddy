@@ -27,3 +27,15 @@ test('MSG-1 — the Messages view opens from the sidebar and gates on sign-in', 
   ).toBeVisible({ timeout: 6000 })
   await expect(window.getByText(/Sign in to message other people on PlexiDesk/)).toBeVisible()
 })
+
+test('MSG-2 — the unified Inbox opens from the sidebar and gates on sign-in', async () => {
+  launched = await launchApp()
+  const { window } = launched
+  await waitForReady(window)
+
+  await window.getByRole('button', { name: /^Inbox$/ }).first().click()
+  await expect(window.getByRole('heading', { name: 'Inbox' })).toBeVisible({ timeout: 6000 })
+  await expect(
+    window.getByText(/your messages, shared items, and \(soon\) email in one place/i)
+  ).toBeVisible()
+})

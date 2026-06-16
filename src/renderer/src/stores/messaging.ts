@@ -1,5 +1,10 @@
 import { create } from 'zustand'
-import type { ChatMessage, ConversationSummary, MessageAttachment } from '../lib/messagingClient'
+import type {
+  ChatMessage,
+  ConversationSummary,
+  InboxItem,
+  MessageAttachment
+} from '../lib/messagingClient'
 import * as api from '../lib/messagingClient'
 import { connectMessagingSocket, disconnectMessagingSocket } from '../lib/messagingSocket'
 
@@ -11,6 +16,7 @@ interface MessagingStore {
   token: string | null
   conversations: ConversationSummary[]
   messagesByConv: Record<string, ChatMessage[]>
+  inboxItems: InboxItem[]
   activeId: string | null
   unreadTotal: number
   connected: boolean
@@ -18,6 +24,7 @@ interface MessagingStore {
   connect: (token: string) => Promise<void>
   disconnect: () => void
   refreshConversations: () => Promise<void>
+  refreshInbox: () => Promise<void>
   openConversation: (id: string) => Promise<void>
   startDm: (handle: string) => Promise<{ ok: true; id: string } | { ok: false; error: string }>
   send: (body: string, attachment?: MessageAttachment | null) => Promise<void>
@@ -27,6 +34,7 @@ export const useMessagingStore = create<MessagingStore>((set, get) => ({
   token: null,
   conversations: [],
   messagesByConv: {},
+  inboxItems: [],
   activeId: null,
   unreadTotal: 0,
   connected: false,
@@ -62,6 +70,7 @@ export const useMessagingStore = create<MessagingStore>((set, get) => ({
       connected: false,
       conversations: [],
       messagesByConv: {},
+      inboxItems: [],
       activeId: null,
       unreadTotal: 0
     })
@@ -73,6 +82,14 @@ export const useMessagingStore = create<MessagingStore>((set, get) => ({
     const conversations = await api.listConversations(token)
     const unreadTotal = conversations.reduce((sum, c) => sum + c.unreadCount, 0)
     set({ conversations, unreadTotal })
+    void get().refreshInbox()
+  },
+
+  refreshInbox: async () => {
+    const { token } = get()
+    if (!token) return
+    const { items } = await api.getUnifiedInbox(token)
+    set({ inboxItems: items })
   },
 
   openConversation: async (id) => {
