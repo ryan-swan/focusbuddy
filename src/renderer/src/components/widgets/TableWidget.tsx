@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { Widget } from '@shared/types'
 import type {
-  FbRow,
   FieldDefinition,
   FieldType,
   TableSchema,
@@ -25,9 +24,6 @@ import { coerceCellValue } from '../../lib/actionExecutor'
 import Icon from '../Icon'
 import { ListView, CardsView, KanbanView, CalendarView, GanttView } from './TableViews'
 import UnifiedConnectedMenu from '../contextMenu/UnifiedConnectedMenu'
-import TableFilterBar from './TableFilterBar'
-import { applyFilters, groupRows } from '../../lib/tableFilter'
-import type { RowGroup } from '../../lib/tableFilter'
 
 // All available views with the icon + label that drive the switcher pill.
 const VIEW_OPTIONS: Array<{ id: TableViewMode; label: string; icon: string }> = [
@@ -38,15 +34,6 @@ const VIEW_OPTIONS: Array<{ id: TableViewMode; label: string; icon: string }> = 
   { id: 'calendar', label: 'Calendar', icon: 'calendar_month' },
   { id: 'gantt', label: 'Gantt', icon: 'timeline' }
 ]
-
-// Table-view column geometry. The leading column holds the delete-row button,
-// the trailing one holds the add-column button; data columns size to their
-// per-column widthHint and fall back to DEFAULT_COL_WIDTH. Resizing never goes
-// below MIN_COL_WIDTH so a column can't collapse to nothing.
-const ROW_HANDLE_WIDTH = 32
-const ADD_COL_WIDTH = 40
-const DEFAULT_COL_WIDTH = 160
-const MIN_COL_WIDTH = 64
 
 interface Props {
   widget: Widget
@@ -168,23 +155,6 @@ export default function TableWidget({ widget, inline = false }: Props): JSX.Elem
   const [columnsApplied, setColumnsApplied] = useState(false)
   const [aiError, setAiError] = useState<string | null>(null)
 
-  // ── Table-view column manipulation state ────────────────────────────────
-  // Right-click-on-header menu: anchor coords + which column it targets.
-  const [headerMenu, setHeaderMenu] = useState<{
-    x: number
-    y: number
-    columnId: string
-    index: number
-  } | null>(null)
-  // Drag-to-reorder: the column id currently being dragged and the index it
-  // is hovering over, so we can paint a drop indicator.
-  const [dragColId, setDragColId] = useState<string | null>(null)
-  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
-  // Live resize override. While the user drags a column edge we hold the
-  // in-flight width here so the render is smooth, then commit to the schema
-  // (widthHint) on mouse-up. null when no resize is in progress.
-  const [resize, setResize] = useState<{ columnId: string; width: number } | null>(null)
-
   if (!table) {
     const body = (
       <div className="h-full w-full flex items-center justify-center text-[11px] text-stone-500">
@@ -200,7 +170,18 @@ export default function TableWidget({ widget, inline = false }: Props): JSX.Elem
   }
 
   function addColumn(type: FieldType): void {
-    addColumnAt(table!.schema.columns.length, type)
+    const id = `c-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
+    const def: FieldDefinition = {
+      id,
+      type,
+      label: FIELD_TYPE_LABELS[type],
+      config: defaultConfig(type) as never
+    } as FieldDefinition
+    const next: TableSchema = {
+      ...table!.schema,
+      columns: [...table!.schema.columns, def]
+    }
+    void setSchema(table!.id, next)
   }
 
   function removeColumn(columnId: string): void {
@@ -229,81 +210,6 @@ export default function TableWidget({ widget, inline = false }: Props): JSX.Elem
       )
     }
     void setSchema(table!.id, next)
-  }
-
-  // Build a fresh column definition of the given type. Shared by the trailing
-  // "+" adder and the insert-left / insert-right context-menu actions.
-  function makeColumn(type: FieldType): FieldDefinition {
-    const id = `c-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
-    return {
-      id,
-      type,
-      label: FIELD_TYPE_LABELS[type],
-      config: defaultConfig(type) as never
-    } as FieldDefinition
-  }
-
-  // Insert a new column at an explicit position. index === columns.length
-  // appends (same as the trailing adder); index 0 prepends.
-  function addColumnAt(index: number, type: FieldType): void {
-    const cols = [...table!.schema.columns]
-    const at = Math.max(0, Math.min(cols.length, index))
-    cols.splice(at, 0, makeColumn(type))
-    void setSchema(table!.id, { ...table!.schema, columns: cols })
-  }
-
-  // Reorder: pull the dragged column out and re-insert it so it lands before
-  // the column that currently occupies targetIndex. The fromIdx < targetIndex
-  // adjustment accounts for the array shrinking after the splice-out.
-  function moveColumn(fromId: string, targetIndex: number): void {
-    const cols = [...table!.schema.columns]
-    const fromIdx = cols.findIndex((c) => c.id === fromId)
-    if (fromIdx === -1) return
-    const [moved] = cols.splice(fromIdx, 1)
-    let insertAt = fromIdx < targetIndex ? targetIndex - 1 : targetIndex
-    insertAt = Math.max(0, Math.min(cols.length, insertAt))
-    if (insertAt === fromIdx) return // no-op drop onto itself
-    cols.splice(insertAt, 0, moved)
-    void setSchema(table!.id, { ...table!.schema, columns: cols })
-  }
-
-  // Persist a resized width as the column's widthHint.
-  function setColumnWidth(columnId: string, width: number): void {
-    const w = Math.max(MIN_COL_WIDTH, Math.round(width))
-    const next: TableSchema = {
-      ...table!.schema,
-      columns: table!.schema.columns.map((c) =>
-        c.id === columnId ? ({ ...c, widthHint: w } as FieldDefinition) : c
-      )
-    }
-    void setSchema(table!.id, next)
-  }
-
-  // The width a column should render at right now — the live drag value if it
-  // is the one being resized, otherwise its stored hint or the default.
-  function effectiveWidth(col: FieldDefinition): number {
-    if (resize && resize.columnId === col.id) return resize.width
-    return col.widthHint ?? DEFAULT_COL_WIDTH
-  }
-
-  // Begin an edge drag. Listeners live on the document so the pointer can
-  // leave the 5px handle without dropping the gesture; mouse-up commits.
-  function startResize(e: React.MouseEvent, col: FieldDefinition): void {
-    e.preventDefault()
-    e.stopPropagation()
-    const startX = e.clientX
-    const startW = effectiveWidth(col)
-    const onMove = (ev: MouseEvent): void => {
-      setResize({ columnId: col.id, width: Math.max(MIN_COL_WIDTH, startW + ev.clientX - startX) })
-    }
-    const onUp = (ev: MouseEvent): void => {
-      document.removeEventListener('mousemove', onMove)
-      document.removeEventListener('mouseup', onUp)
-      setResize(null)
-      setColumnWidth(col.id, Math.max(MIN_COL_WIDTH, startW + ev.clientX - startX))
-    }
-    document.addEventListener('mousemove', onMove)
-    document.addEventListener('mouseup', onUp)
   }
 
   function setViewMode(mode: TableViewMode): void {
@@ -468,96 +374,6 @@ export default function TableWidget({ widget, inline = false }: Props): JSX.Elem
   const viewConfig: TableViewConfig = table.schema.viewConfig ?? {}
   const currentViewMeta = VIEW_OPTIONS.find((v) => v.id === viewMode) ?? VIEW_OPTIONS[0]
 
-  // Total table width = row-handle + every data column at its effective width
-  // + the add-column gutter. Drives the fixed-layout table so resized columns
-  // are honored exactly and the table scrolls horizontally when it overflows.
-  const totalTableWidth =
-    ROW_HANDLE_WIDTH +
-    ADD_COL_WIDTH +
-    table.schema.columns.reduce((sum, c) => sum + effectiveWidth(c), 0)
-
-  // Rows after the active filter is applied — used by EVERY view so a filter
-  // narrows the data everywhere, not just the table. Grouping is resolved
-  // separately and only drives the table view's row layout.
-  const filteredRows = applyFilters(rows, table.schema, viewConfig.filter)
-  const groupColumn =
-    viewConfig.group?.columnId
-      ? table.schema.columns.find((c) => c.id === viewConfig.group?.columnId) ?? null
-      : null
-  const groups =
-    groupColumn && viewMode === 'table'
-      ? groupRows(filteredRows, groupColumn, viewConfig.group?.direction ?? 'asc')
-      : null
-  const collapsedGroups = new Set(viewConfig.group?.collapsed ?? [])
-
-  function toggleGroupCollapsed(key: string): void {
-    const current = viewConfig.group
-    if (!current) return
-    const collapsed = new Set(current.collapsed ?? [])
-    if (collapsed.has(key)) collapsed.delete(key)
-    else collapsed.add(key)
-    setViewConfig({ ...viewConfig, group: { ...current, collapsed: Array.from(collapsed) } })
-  }
-
-  // One data <tr>. Extracted so the flat list and the grouped list render rows
-  // identically. `idx` only drives the zebra stripe.
-  function renderDataRow(row: FbRow, idx: number): JSX.Element {
-    return (
-      <tr
-        key={row.id}
-        className={`border-b border-stone-200 dark:border-stone-700 group ${
-          idx % 2 === 0
-            ? 'bg-white dark:bg-stone-900'
-            : 'bg-stone-50/60 dark:bg-stone-800/30'
-        } hover:bg-accent/[0.04] dark:hover:bg-accent/[0.08]`}
-      >
-        <td className="w-8 px-1 py-1 text-center border-r border-stone-200 dark:border-stone-700">
-          <button
-            onClick={() => void deleteRow(row.id)}
-            className="text-stone-300 dark:text-stone-600 hover:text-red-600 transition-colors"
-            title="Delete row"
-          >
-            <Icon name="delete" size={13} />
-          </button>
-        </td>
-        {table!.schema.columns.map((col) => (
-          <td
-            key={col.id}
-            className="border-r border-stone-200 dark:border-stone-700 align-top"
-            style={{ minWidth: 140 }}
-            onContextMenu={(e) => {
-              // Shift bypasses our menu and gives the OS clipboard menu.
-              if (e.shiftKey) return
-              e.preventDefault()
-              const rawCell = row.cells[col.id]
-              const cellStr =
-                rawCell == null
-                  ? ''
-                  : typeof rawCell === 'string'
-                    ? rawCell
-                    : String(rawCell)
-              setCellCtxMenu({
-                x: e.clientX,
-                y: e.clientY,
-                columnLabel: col.label,
-                cellText: cellStr,
-                rowId: row.id
-              })
-            }}
-          >
-            <FieldEditor
-              def={col}
-              value={row.cells[col.id] ?? defaultValue(col.type)}
-              variant="cell"
-              onCommit={(next) => commitCell(row.id, col.id, next)}
-            />
-          </td>
-        ))}
-        <td className="border-r border-stone-200 dark:border-stone-700" />
-      </tr>
-    )
-  }
-
   const body = (
     <div className="h-full w-full bg-white dark:bg-stone-900 overflow-auto relative">
       {/* Title row */}
@@ -638,17 +454,6 @@ export default function TableWidget({ widget, inline = false }: Props): JSX.Elem
         })}
       </div>
 
-      {/* Filter + group toolbar. Filtering applies to every view; grouping
-          drives the table view's row layout. State lives in viewConfig so it
-          persists with the schema. */}
-      <TableFilterBar
-        columns={table.schema.columns}
-        viewConfig={viewConfig}
-        setViewConfig={setViewConfig}
-        filteredCount={filteredRows.length}
-        totalCount={rows.length}
-      />
-
       {/* Alternate views — each reads the same schema + rows and routes
           edits back through commitCell / addRow / deleteRow so the data
           contract is identical to the table view. The user can switch
@@ -656,7 +461,7 @@ export default function TableWidget({ widget, inline = false }: Props): JSX.Elem
       {viewMode !== 'table' && viewMode === 'list' && (
         <ListView
           schema={table.schema}
-          rows={filteredRows}
+          rows={rows}
           viewConfig={viewConfig}
           commitCell={commitCell}
           addRow={() => void addRow(table.id)}
@@ -667,7 +472,7 @@ export default function TableWidget({ widget, inline = false }: Props): JSX.Elem
       {viewMode === 'cards' && (
         <CardsView
           schema={table.schema}
-          rows={filteredRows}
+          rows={rows}
           viewConfig={viewConfig}
           commitCell={commitCell}
           addRow={() => void addRow(table.id)}
@@ -678,7 +483,7 @@ export default function TableWidget({ widget, inline = false }: Props): JSX.Elem
       {viewMode === 'kanban' && (
         <KanbanView
           schema={table.schema}
-          rows={filteredRows}
+          rows={rows}
           viewConfig={viewConfig}
           commitCell={commitCell}
           addRow={() => void addRow(table.id)}
@@ -689,7 +494,7 @@ export default function TableWidget({ widget, inline = false }: Props): JSX.Elem
       {viewMode === 'calendar' && (
         <CalendarView
           schema={table.schema}
-          rows={filteredRows}
+          rows={rows}
           viewConfig={viewConfig}
           commitCell={commitCell}
           addRow={() => void addRow(table.id)}
@@ -700,7 +505,7 @@ export default function TableWidget({ widget, inline = false }: Props): JSX.Elem
       {viewMode === 'gantt' && (
         <GanttView
           schema={table.schema}
-          rows={filteredRows}
+          rows={rows}
           viewConfig={viewConfig}
           commitCell={commitCell}
           addRow={() => void addRow(table.id)}
@@ -710,54 +515,21 @@ export default function TableWidget({ widget, inline = false }: Props): JSX.Elem
       )}
       {viewMode === 'table' && (
       <div className="text-[12px]">
-        <table
-          className="border-collapse"
-          style={{ tableLayout: 'fixed', width: totalTableWidth }}
-        >
-          <colgroup>
-            <col style={{ width: ROW_HANDLE_WIDTH }} />
-            {table.schema.columns.map((col) => (
-              <col key={col.id} style={{ width: effectiveWidth(col) }} />
-            ))}
-            <col style={{ width: ADD_COL_WIDTH }} />
-          </colgroup>
+        <table className="w-full border-collapse">
           <thead>
             <tr className="border-b border-stone-300 dark:border-stone-600 bg-stone-100/70 dark:bg-stone-800/60">
-              <th className="px-1 py-1.5" />
-              {table.schema.columns.map((col, index) => (
+              <th className="w-8 px-1 py-1.5" />
+              {table.schema.columns.map((col) => (
                 <ColumnHeader
                   key={col.id}
                   col={col}
-                  index={index}
                   tableId={table.id}
-                  isDragging={dragColId === col.id}
-                  isDragOver={dragOverIndex === index && dragColId !== null && dragColId !== col.id}
                   onRename={(label) => renameColumn(col.id, label)}
                   onRemove={() => removeColumn(col.id)}
                   onSetConfig={(c) => setColumnConfig(col.id, c)}
-                  onContextMenu={(e) => {
-                    e.preventDefault()
-                    setHeaderMenu({ x: e.clientX, y: e.clientY, columnId: col.id, index })
-                  }}
-                  onResizeStart={(e) => startResize(e, col)}
-                  onDragStartCol={() => setDragColId(col.id)}
-                  onDragOverCol={(e) => {
-                    if (!dragColId || dragColId === col.id) return
-                    e.preventDefault()
-                    setDragOverIndex(index)
-                  }}
-                  onDropCol={() => {
-                    if (dragColId && dragColId !== col.id) moveColumn(dragColId, index)
-                    setDragColId(null)
-                    setDragOverIndex(null)
-                  }}
-                  onDragEndCol={() => {
-                    setDragColId(null)
-                    setDragOverIndex(null)
-                  }}
                 />
               ))}
-              <th className="px-1 py-1.5">
+              <th className="w-10 px-1 py-1.5">
                 <ColumnAdder onAdd={addColumn} />
               </th>
             </tr>
@@ -776,37 +548,60 @@ export default function TableWidget({ widget, inline = false }: Props): JSX.Elem
                 </td>
               </tr>
             )}
-            {rows.length > 0 && filteredRows.length === 0 && (
-              <tr>
-                <td
-                  colSpan={table.schema.columns.length + 2}
-                  className="py-8 text-center text-[12px] text-stone-400 dark:text-stone-500"
-                  data-testid="table-no-matches"
-                >
-                  <div className="flex flex-col items-center gap-1">
-                    <Icon name="filter_list_off" size={20} className="text-stone-300 dark:text-stone-600" />
-                    <span>No rows match the current filter.</span>
-                  </div>
+            {rows.map((row, idx) => (
+              <tr
+                key={row.id}
+                className={`border-b border-stone-200 dark:border-stone-700 group ${
+                  idx % 2 === 0
+                    ? 'bg-white dark:bg-stone-900'
+                    : 'bg-stone-50/60 dark:bg-stone-800/30'
+                } hover:bg-accent/[0.04] dark:hover:bg-accent/[0.08]`}
+              >
+                <td className="w-8 px-1 py-1 text-center border-r border-stone-200 dark:border-stone-700">
+                  <button
+                    onClick={() => void deleteRow(row.id)}
+                    className="text-stone-300 dark:text-stone-600 hover:text-red-600 transition-colors"
+                    title="Delete row"
+                  >
+                    <Icon name="delete" size={13} />
+                  </button>
                 </td>
+                {table.schema.columns.map((col) => (
+                  <td
+                    key={col.id}
+                    className="border-r border-stone-200 dark:border-stone-700 align-top"
+                    style={{ minWidth: 140 }}
+                    onContextMenu={(e) => {
+                      // Shift bypasses our menu and gives the OS clipboard menu.
+                      if (e.shiftKey) return
+                      e.preventDefault()
+                      const rawCell = row.cells[col.id]
+                      const cellStr =
+                        rawCell == null
+                          ? ''
+                          : typeof rawCell === 'string'
+                            ? rawCell
+                            : String(rawCell)
+                      setCellCtxMenu({
+                        x: e.clientX,
+                        y: e.clientY,
+                        columnLabel: col.label,
+                        cellText: cellStr,
+                        rowId: row.id
+                      })
+                    }}
+                  >
+                    <FieldEditor
+                      def={col}
+                      value={row.cells[col.id] ?? defaultValue(col.type)}
+                      variant="cell"
+                      onCommit={(next) => commitCell(row.id, col.id, next)}
+                    />
+                  </td>
+                ))}
+                <td className="border-r border-stone-200 dark:border-stone-700" />
               </tr>
-            )}
-            {/* Ungrouped: flat list of filtered rows. */}
-            {!groups && filteredRows.map((row, idx) => renderDataRow(row, idx))}
-            {/* Grouped: a collapsible header row per group, then its rows. */}
-            {groups &&
-              groups.map((g) => {
-                const isCollapsed = collapsedGroups.has(g.key)
-                return (
-                  <GroupRows
-                    key={g.key}
-                    group={g}
-                    collapsed={isCollapsed}
-                    colSpan={table.schema.columns.length + 2}
-                    onToggle={() => toggleGroupCollapsed(g.key)}
-                    renderRow={renderDataRow}
-                  />
-                )
-              })}
+            ))}
             {/* Add-row footer */}
             <tr>
               <td colSpan={table.schema.columns.length + 2} className="p-1.5 border-t border-stone-200 dark:border-stone-700">
@@ -1073,22 +868,6 @@ export default function TableWidget({ widget, inline = false }: Props): JSX.Elem
           onClose={() => setCellCtxMenu(null)}
         />
       )}
-      {headerMenu && (
-        <HeaderContextMenu
-          x={headerMenu.x}
-          y={headerMenu.y}
-          canDelete={table.schema.columns.length > 1}
-          onInsert={(side, type) => {
-            addColumnAt(side === 'left' ? headerMenu.index : headerMenu.index + 1, type)
-            setHeaderMenu(null)
-          }}
-          onDelete={() => {
-            removeColumn(headerMenu.columnId)
-            setHeaderMenu(null)
-          }}
-          onClose={() => setHeaderMenu(null)}
-        />
-      )}
     </div>
   )
 
@@ -1105,39 +884,18 @@ export default function TableWidget({ widget, inline = false }: Props): JSX.Elem
 }
 
 // ── Column header with rename + config + delete popover ──────────────────────
-// Also the anchor for the three column-manipulation gestures: the title button
-// is draggable to reorder columns, a right-edge handle resizes the column, and
-// right-clicking opens the insert/delete context menu (onContextMenu).
 function ColumnHeader({
   col,
-  index: _index,
   tableId,
-  isDragging,
-  isDragOver,
   onRename,
   onRemove,
-  onSetConfig,
-  onContextMenu,
-  onResizeStart,
-  onDragStartCol,
-  onDragOverCol,
-  onDropCol,
-  onDragEndCol
+  onSetConfig
 }: {
   col: FieldDefinition
-  index: number
   tableId: string
-  isDragging: boolean
-  isDragOver: boolean
   onRename: (label: string) => void
   onRemove: () => void
   onSetConfig: (config: unknown) => void
-  onContextMenu: (e: React.MouseEvent) => void
-  onResizeStart: (e: React.MouseEvent) => void
-  onDragStartCol: () => void
-  onDragOverCol: (e: React.DragEvent) => void
-  onDropCol: () => void
-  onDragEndCol: () => void
 }): JSX.Element {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLTableCellElement | null>(null)
@@ -1152,38 +910,16 @@ function ColumnHeader({
   return (
     <th
       ref={ref}
-      onContextMenu={onContextMenu}
-      onDragOver={onDragOverCol}
-      onDrop={onDropCol}
-      className={`text-left px-2 py-1 font-medium text-[11px] text-stone-700 dark:text-stone-200 relative ${
-        isDragging ? 'opacity-40' : ''
-      } ${isDragOver ? 'border-l-2 border-l-accent' : ''}`}
+      className="text-left px-2 py-1 font-medium text-[11px] text-stone-700 dark:text-stone-200 relative"
+      style={{ minWidth: 120 }}
     >
       <button
-        draggable={!open}
-        onDragStart={(e) => {
-          // Reorder gesture. setData makes the drag valid in Electron/Chromium
-          // and the move effect shows the right cursor.
-          e.dataTransfer.effectAllowed = 'move'
-          e.dataTransfer.setData('text/plain', col.id)
-          onDragStartCol()
-        }}
-        onDragEnd={onDragEndCol}
         onClick={() => setOpen((v) => !v)}
-        className="inline-flex items-center gap-1 hover:bg-stone-100 dark:hover:bg-stone-800 rounded px-1 py-0.5 w-full text-left cursor-grab active:cursor-grabbing"
-        title="Click to edit · drag to reorder · right-click for more"
+        className="inline-flex items-center gap-1 hover:bg-stone-100 dark:hover:bg-stone-800 rounded px-1 py-0.5 w-full text-left"
       >
         <Icon name={FIELD_TYPE_ICONS[col.type]} size={11} className="text-stone-400 shrink-0" />
         <span className="truncate">{col.label}</span>
       </button>
-      {/* Resize handle — a thin grab strip on the right edge. Uses raw mouse
-          events (not HTML5 drag) so it never starts a column-reorder. */}
-      <div
-        onMouseDown={onResizeStart}
-        onClick={(e) => e.stopPropagation()}
-        className="absolute top-0 right-0 h-full w-[5px] cursor-col-resize hover:bg-accent/40 z-10"
-        title="Drag to resize column"
-      />
       {open && (
         <div className="absolute z-50 mt-1 left-0 w-56 rounded border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 shadow-lg p-2 space-y-1.5 text-stone-700 dark:text-stone-200 font-normal">
           <input
@@ -1335,108 +1071,6 @@ function ColumnAdder({ onAdd }: { onAdd: (t: FieldType) => void }): JSX.Element 
             </button>
           ))}
         </div>
-      )}
-    </div>
-  )
-}
-
-// ── Header right-click menu — insert left / right + delete ───────────────────
-// A two-level menu: the main view offers insert-left, insert-right and delete;
-// choosing an insert side switches to a field-type picker so the user picks the
-// new column's type at creation time (column type can't be changed afterwards).
-function HeaderContextMenu({
-  x,
-  y,
-  canDelete,
-  onInsert,
-  onDelete,
-  onClose
-}: {
-  x: number
-  y: number
-  canDelete: boolean
-  onInsert: (side: 'left' | 'right', type: FieldType) => void
-  onDelete: () => void
-  onClose: () => void
-}): JSX.Element {
-  const ref = useRef<HTMLDivElement | null>(null)
-  const [mode, setMode] = useState<'main' | 'left' | 'right'>('main')
-  useEffect(() => {
-    function onDown(e: MouseEvent): void {
-      if (!ref.current?.contains(e.target as Node)) onClose()
-    }
-    function onKey(e: KeyboardEvent): void {
-      if (e.key === 'Escape') onClose()
-    }
-    document.addEventListener('mousedown', onDown)
-    document.addEventListener('keydown', onKey)
-    return () => {
-      document.removeEventListener('mousedown', onDown)
-      document.removeEventListener('keydown', onKey)
-    }
-  }, [onClose])
-  // Keep the menu on-screen by clamping its top-left away from the viewport
-  // edges. Width is fixed at 208px (w-52).
-  const left = Math.min(x, window.innerWidth - 216)
-  const top = Math.min(y, window.innerHeight - 320)
-  return (
-    <div
-      ref={ref}
-      className="fixed z-[100] w-52 rounded-md border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 shadow-xl py-1 text-stone-700 dark:text-stone-200"
-      style={{ left, top }}
-      onContextMenu={(e) => e.preventDefault()}
-    >
-      {mode === 'main' ? (
-        <>
-          <button
-            onClick={() => setMode('left')}
-            className="w-full flex items-center gap-2 px-3 py-1.5 text-[12px] hover:bg-stone-100 dark:hover:bg-stone-800 text-left"
-          >
-            <Icon name="keyboard_tab_rtl" size={13} className="text-stone-400" />
-            <span className="flex-1">Insert column left</span>
-            <Icon name="chevron_right" size={13} className="text-stone-400" />
-          </button>
-          <button
-            onClick={() => setMode('right')}
-            className="w-full flex items-center gap-2 px-3 py-1.5 text-[12px] hover:bg-stone-100 dark:hover:bg-stone-800 text-left"
-          >
-            <Icon name="keyboard_tab" size={13} className="text-stone-400" />
-            <span className="flex-1">Insert column right</span>
-            <Icon name="chevron_right" size={13} className="text-stone-400" />
-          </button>
-          <div className="my-1 border-t border-stone-200 dark:border-stone-700" />
-          <button
-            onClick={onDelete}
-            disabled={!canDelete}
-            title={canDelete ? undefined : 'A table needs at least one column'}
-            className="w-full flex items-center gap-2 px-3 py-1.5 text-[12px] text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 text-left disabled:opacity-40 disabled:hover:bg-transparent"
-          >
-            <Icon name="delete" size={13} />
-            <span>Delete column</span>
-          </button>
-        </>
-      ) : (
-        <>
-          <button
-            onClick={() => setMode('main')}
-            className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] uppercase tracking-wider text-stone-400 hover:bg-stone-100 dark:hover:bg-stone-800 text-left"
-          >
-            <Icon name="chevron_left" size={13} />
-            <span>Insert {mode === 'left' ? 'left' : 'right'} — pick type</span>
-          </button>
-          <div className="border-t border-stone-200 dark:border-stone-700 max-h-64 overflow-auto">
-            {(Object.keys(FIELD_TYPE_LABELS) as FieldType[]).map((t) => (
-              <button
-                key={t}
-                onClick={() => onInsert(mode === 'left' ? 'left' : 'right', t)}
-                className="w-full flex items-center gap-2 px-3 py-1.5 text-[12px] hover:bg-stone-100 dark:hover:bg-stone-800 text-left font-normal"
-              >
-                <Icon name={FIELD_TYPE_ICONS[t]} size={12} className="text-stone-400" />
-                <span>{FIELD_TYPE_LABELS[t]}</span>
-              </button>
-            ))}
-          </div>
-        </>
       )}
     </div>
   )

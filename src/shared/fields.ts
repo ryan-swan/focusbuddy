@@ -221,60 +221,6 @@ export interface TableViewConfig {
   // For gantt: ids of start + end date columns. Bars span from start→end.
   ganttStartColumnId?: string
   ganttEndColumnId?: string
-  // Row filtering. When present, only rows that satisfy the rule set are shown
-  // across every view. Empty rules = no filtering. See tableFilter.ts for the
-  // per-type operator catalogue and evaluation semantics.
-  filter?: TableFilterConfig
-  // Row grouping (table view). When columnId is set, the table view splits rows
-  // into collapsible groups keyed by that column's value.
-  group?: TableGroupConfig
-}
-
-// One predicate against one column. The shape of `value` depends on the
-// operator + column type: a string for text/select-id, a number for
-// number/date(ms), a string[] for the multi-select set operators, and absent
-// for the no-argument operators (is-empty, is-checked, etc.).
-export type FilterOperator =
-  | 'is'
-  | 'is-not'
-  | 'contains'
-  | 'not-contains'
-  | 'is-empty'
-  | 'is-not-empty'
-  | 'gt'
-  | 'lt'
-  | 'gte'
-  | 'lte'
-  | 'is-checked'
-  | 'is-unchecked'
-  | 'is-any-of'
-  | 'has-all-of'
-  | 'has-none-of'
-  | 'before'
-  | 'after'
-  | 'on-or-before'
-  | 'on-or-after'
-
-export interface FilterRule {
-  id: string
-  columnId: string
-  operator: FilterOperator
-  value?: string | number | string[] | null
-}
-
-export interface TableFilterConfig {
-  // 'and' = a row must satisfy every rule; 'or' = any one rule.
-  conjunction: 'and' | 'or'
-  rules: FilterRule[]
-}
-
-export interface TableGroupConfig {
-  // Column whose value defines the groups. null/absent = no grouping.
-  columnId: string | null
-  // Group keys the user has collapsed (hidden rows for).
-  collapsed?: string[]
-  // Order of the groups themselves.
-  direction?: 'asc' | 'desc'
 }
 
 export interface FbTable {
