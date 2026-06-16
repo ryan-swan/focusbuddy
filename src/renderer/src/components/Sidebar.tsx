@@ -8,6 +8,7 @@ import { useConnectedAppsStore } from '../stores/connectedApps'
 import { useTemplateStore } from '../stores/templates'
 import SyncIndicator from './SyncIndicator'
 import { useViewStore, type View } from '../stores/view'
+import { useMessagingStore } from '../stores/messaging'
 import { chimeOut } from '../lib/audioBeep'
 import { catalogFor } from '../lib/widgetCatalog'
 import { chimeIn } from '../lib/audioBeep'
@@ -142,6 +143,8 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
   const goHome = useViewStore((s) => s.goHome)
   const goAllTasks = useViewStore((s) => s.goAllTasks)
   const goCalendar = useViewStore((s) => s.goCalendar)
+  const goMessages = useViewStore((s) => s.goMessages)
+  const unreadMessages = useMessagingStore((s) => s.unreadTotal)
   const goProject = useViewStore((s) => s.goProject)
   const goTask = useViewStore((s) => s.goTask)
   const goConnectedApp = useViewStore((s) => s.goConnectedApp)
@@ -655,6 +658,16 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
               onClick={() => {
                 setActive(null)
                 goCalendar()
+              }}
+            />
+            <NavRow
+              icon="forum"
+              label="Messages"
+              active={viewIsActive({ kind: 'messages' })}
+              badge={unreadMessages > 0 ? String(unreadMessages) : undefined}
+              onClick={() => {
+                setActive(null)
+                goMessages()
               }}
             />
             <NavRow

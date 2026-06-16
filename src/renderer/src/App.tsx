@@ -31,6 +31,7 @@ import LaunchSignInModal from './components/LaunchSignInModal'
 import UpgradePromptModal from './components/UpgradePromptModal'
 import FirstRunOnboarding from './components/FirstRunOnboarding'
 import { useOnboarding } from './stores/onboarding'
+import { useMessagingStore } from './stores/messaging'
 import { usePeerBodyDoubleStore } from './stores/peerBodyDouble'
 import { useNodeStore } from './stores/nodes'
 import { useTemplateStore } from './stores/templates'
@@ -111,8 +112,17 @@ export default function App(): JSX.Element {
   // bootStatus to know when it's safe to render.
   const accountInit = useAccountStore((s) => s.init)
   const account = useAccountStore((s) => s.account)
+  const sessionToken = useAccountStore((s) => s.sessionToken)
   const signOut = useAccountStore((s) => s.signOut)
   const adoptHandoff = useAccountStore((s) => s.adoptHandoff)
+  // Messaging: open the persistent, authenticated socket while signed in so
+  // DMs + shared-space chat arrive in real time; tear it down on sign-out.
+  const connectMessaging = useMessagingStore((s) => s.connect)
+  const disconnectMessaging = useMessagingStore((s) => s.disconnect)
+  useEffect(() => {
+    if (account && sessionToken) void connectMessaging(sessionToken)
+    else disconnectMessaging()
+  }, [account, sessionToken, connectMessaging, disconnectMessaging])
 
   // Web→desktop auth handoff. The brochure sign-in flow at haptyx.app/account/*
   // produces a session token, then deep-links to haptyx://auth?token=...
