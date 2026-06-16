@@ -37,8 +37,9 @@ function fmtTime(ms: number): string {
 interface Composer {
   dayIndex: number
   startMs: number
-  prefillTaskId?: string | null
-  prefillTitle?: string
+  // A node (task or folder) dragged onto the grid — booked directly without
+  // the picker.
+  prefillNode?: { id: string; title: string; kind: FbNode['kind'] }
 }
 
 export default function WeekTimeGrid({ weekStart }: { weekStart: Date }): JSX.Element {
@@ -51,6 +52,7 @@ export default function WeekTimeGrid({ weekStart }: { weekStart: Date }): JSX.El
   const startSession = useFocusSessionStore((s) => s.start)
   const setActive = useNodeStore((s) => s.setActive)
   const goTask = useViewStore((s) => s.goTask)
+  const goProject = useViewStore((s) => s.goProject)
 
   const weekFrom = weekStart.getTime()
   const weekTo = weekFrom + 7 * DAY_MS
@@ -59,11 +61,24 @@ export default function WeekTimeGrid({ weekStart }: { weekStart: Date }): JSX.El
     void loadRange(weekFrom, weekTo)
   }, [weekFrom, weekTo, loadRange])
 
-  const tasksById = useMemo(() => {
+  // A block can link to ANY node — a task (focusable) or a folder (jump-to).
+  const nodesById = useMemo(() => {
     const m = new Map<string, FbNode>()
-    for (const n of nodes) if (n.kind === 'task') m.set(n.id, n)
+    for (const n of nodes) m.set(n.id, n)
     return m
   }, [nodes])
+  const tasks = useMemo(() => nodes.filter((n) => n.kind === 'task'), [nodes])
+
+  // Open the node a block links to: tasks open in the canvas, folders open the
+  // project dashboard.
+  function jumpToNode(node: FbNode): void {
+    if (node.kind === 'task') {
+      setActive(node.id)
+      goTask(node.id)
+    } else {
+      goProject(node.id)
+    }
+  }
 
   const [composer, setComposer] = useState<Composer | null>(null)
   const [drag, setDrag] = useState<{ id: string; previewStart: number; previewDur: number } | null>(
@@ -110,13 +125,11 @@ export default function WeekTimeGrid({ weekStart }: { weekStart: Date }): JSX.El
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
     const y = e.clientY - rect.top
     const startMs = snapMs(yToMs(dayIndex, y))
-    if (node.kind === 'task') {
-      setComposer({ dayIndex, startMs, prefillTaskId: node.id })
-    } else {
-      // A folder isn't a focusable task, so book it as a labelled focus block
-      // named after the folder.
-      setComposer({ dayIndex, startMs, prefillTitle: node.title })
-    }
+    setComposer({
+      dayIndex,
+      startMs,
+      prefillNode: { id: node.id, title: node.title, kind: node.kind }
+    })
   }
 
   function beginDrag(
@@ -240,7 +253,8 @@ export default function WeekTimeGrid({ weekStart }: { weekStart: Date }): JSX.El
                   const top =
                     ((startMs - (dStart + START_HOUR * 3_600_000)) / 3_600_000) * HOUR_PX
                   const height = (durMin / 60) * HOUR_PX
-                  const task = block.taskId ? tasksById.get(block.taskId) : null
+                  const linked = block.taskId ? nodesById.get(block.taskId) ?? null : null
+                  const isTaskBlock = !block.taskId || linked?.kind === 'task'
                   const done = block.status === 'done'
                   const isPast = startMs + durMin * 60000 < now
                   return (
@@ -257,16 +271,30 @@ export default function WeekTimeGrid({ weekStart }: { weekStart: Date }): JSX.El
                             : 'bg-accent/15 border-accent/40 text-stone-800 dark:text-stone-100'
                       }`}
                       style={{ top: Math.max(0, top), height: Math.max(16, height) }}
-                      title={`${block.title || task?.title || 'Focus time'} · ${fmtTime(startMs)}`}
+                      title={`${block.title || linked?.title || 'Focus time'} · ${fmtTime(startMs)}`}
                     >
                       <div className={`font-medium truncate ${done ? 'line-through' : ''}`}>
-                        {block.title || task?.title || 'Focus time'}
+                        {block.title || linked?.title || 'Focus time'}
                       </div>
                       <div className="text-[9px] opacity-70 tabular-nums">{fmtTime(startMs)}</div>
 
                       {/* hover actions */}
                       <div className="absolute top-0.5 right-0.5 hidden group-hover/block:flex items-center gap-0.5">
-                        {!done && (
+                        {linked && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              jumpToNode(linked)
+                            }}
+                            onPointerDown={(e) => e.stopPropagation()}
+                            className="h-4 w-4 inline-flex items-center justify-center rounded bg-white/70 dark:bg-stone-900/70 text-stone-600 dark:text-stone-300"
+                            title={linked.kind === 'folder' ? 'Open this folder' : 'Jump to this task'}
+                            data-testid="block-jump"
+                          >
+                            <Icon name={linked.kind === 'folder' ? 'folder_open' : 'open_in_new'} size={9} />
+                          </button>
+                        )}
+                        {!done && isTaskBlock && (
                           <button
                             onClick={(e) => {
                               e.stopPropagation()
@@ -324,9 +352,8 @@ export default function WeekTimeGrid({ weekStart }: { weekStart: Date }): JSX.El
       {composer && (
         <BlockComposer
           startMs={composer.startMs}
-          tasks={[...tasksById.values()].filter((t) => t.status !== 'done')}
-          initialTaskId={composer.prefillTaskId ?? ''}
-          initialTitle={composer.prefillTitle ?? ''}
+          tasks={tasks.filter((t) => t.status !== 'done')}
+          prefillNode={composer.prefillNode}
           onCancel={() => setComposer(null)}
           onCreate={async (taskId, title, durationMin) => {
             await createBlock({ taskId, title, startMs: composer.startMs, durationMin })
@@ -341,20 +368,18 @@ export default function WeekTimeGrid({ weekStart }: { weekStart: Date }): JSX.El
 function BlockComposer({
   startMs,
   tasks,
-  initialTaskId = '',
-  initialTitle = '',
+  prefillNode,
   onCancel,
   onCreate
 }: {
   startMs: number
   tasks: FbNode[]
-  initialTaskId?: string
-  initialTitle?: string
+  prefillNode?: { id: string; title: string; kind: FbNode['kind'] }
   onCancel: () => void
   onCreate: (taskId: string | null, title: string, durationMin: number) => Promise<void>
 }): JSX.Element {
-  const [taskId, setTaskId] = useState<string>(initialTaskId)
-  const [title, setTitle] = useState(initialTitle)
+  const [taskId, setTaskId] = useState<string>('')
+  const [title, setTitle] = useState('')
   const [duration, setDuration] = useState(60)
   const [busy, setBusy] = useState(false)
 
@@ -370,7 +395,13 @@ function BlockComposer({
     if (busy) return
     setBusy(true)
     try {
-      await onCreate(taskId || null, taskId ? '' : title.trim() || 'Focus time', duration)
+      // A dragged node books directly against that node; otherwise use the
+      // picker (a chosen task, or a labelled generic focus block).
+      if (prefillNode) {
+        await onCreate(prefillNode.id, '', duration)
+      } else {
+        await onCreate(taskId || null, taskId ? '' : title.trim() || 'Focus time', duration)
+      }
     } finally {
       setBusy(false)
     }
@@ -394,37 +425,55 @@ function BlockComposer({
           </span>
         </div>
 
-        <label className="block">
-          <span className="text-[10px] uppercase tracking-wider text-stone-500 dark:text-stone-400 font-medium">
-            Task
-          </span>
-          <select
-            value={taskId}
-            onChange={(e) => setTaskId(e.target.value)}
-            className="mt-1 w-full bg-white dark:bg-stone-800 border border-stone-300 dark:border-stone-600 rounded-md px-2 py-1.5 text-sm"
-            data-testid="composer-task"
+        {prefillNode ? (
+          <div
+            className="flex items-center gap-2 rounded-md border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 px-2 py-1.5"
+            data-testid="composer-prefill"
           >
-            <option value="">Focus time (no task)</option>
-            {tasks.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.title}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        {!taskId && (
-          <label className="block">
-            <span className="text-[10px] uppercase tracking-wider text-stone-500 dark:text-stone-400 font-medium">
-              Label (optional)
-            </span>
-            <input
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Focus time"
-              className="mt-1 w-full bg-white dark:bg-stone-800 border border-stone-300 dark:border-stone-600 rounded-md px-2 py-1.5 text-sm"
+            <Icon
+              name={prefillNode.kind === 'folder' ? 'folder' : 'task_alt'}
+              size={14}
+              className="text-accent shrink-0"
             />
-          </label>
+            <span className="text-sm text-stone-800 dark:text-stone-100 truncate">
+              {prefillNode.title}
+            </span>
+          </div>
+        ) : (
+          <>
+            <label className="block">
+              <span className="text-[10px] uppercase tracking-wider text-stone-500 dark:text-stone-400 font-medium">
+                Task
+              </span>
+              <select
+                value={taskId}
+                onChange={(e) => setTaskId(e.target.value)}
+                className="mt-1 w-full bg-white dark:bg-stone-800 border border-stone-300 dark:border-stone-600 rounded-md px-2 py-1.5 text-sm"
+                data-testid="composer-task"
+              >
+                <option value="">Focus time (no task)</option>
+                {tasks.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.title}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            {!taskId && (
+              <label className="block">
+                <span className="text-[10px] uppercase tracking-wider text-stone-500 dark:text-stone-400 font-medium">
+                  Label (optional)
+                </span>
+                <input
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="Focus time"
+                  className="mt-1 w-full bg-white dark:bg-stone-800 border border-stone-300 dark:border-stone-600 rounded-md px-2 py-1.5 text-sm"
+                />
+              </label>
+            )}
+          </>
         )}
 
         <label className="block">

@@ -126,14 +126,18 @@ test('TB-3 — dragging a task onto a day column books a block for that task', a
     col.dispatchEvent(new DragEvent('drop', { ...base, dataTransfer: dt }))
   }, taskId)
 
-  // The composer opens pre-filled with that task; confirm the duration to book it.
+  // The composer opens pre-filled with that task as a read-only chip; confirm
+  // the duration to book it.
   const composer = window.locator('[data-testid="block-composer"]')
   await expect(composer).toBeVisible({ timeout: 4000 })
-  await expect(composer.locator('[data-testid="composer-task"]')).toHaveValue(taskId)
+  await expect(composer.locator('[data-testid="composer-prefill"]')).toContainText('Write the report')
   await window.locator('[data-testid="composer-create"]').click()
 
-  // A block for that task now renders, and it carries the task's title.
+  // A block for that task now renders, carries the task's title, and offers a
+  // jump-to-task button.
   const block = window.locator('[data-testid="time-block"]')
   await expect(block).toHaveCount(1, { timeout: 4000 })
   await expect(block).toContainText('Write the report')
+  await block.hover()
+  await expect(block.locator('[data-testid="block-jump"]')).toBeVisible()
 })
