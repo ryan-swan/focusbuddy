@@ -37,6 +37,8 @@ function fmtTime(ms: number): string {
 interface Composer {
   dayIndex: number
   startMs: number
+  prefillTaskId?: string | null
+  prefillTitle?: string
 }
 
 export default function WeekTimeGrid({ weekStart }: { weekStart: Date }): JSX.Element {
@@ -87,6 +89,34 @@ export default function WeekTimeGrid({ weekStart }: { weekStart: Date }): JSX.El
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
     const y = e.clientY - rect.top
     setComposer({ dayIndex, startMs: snapMs(yToMs(dayIndex, y)) })
+  }
+
+  // Dragging a task or folder from the sidebar onto a day column opens the
+  // composer pre-filled at the dropped time, so you book it by just confirming
+  // how long. The sidebar already publishes the node id as `text/fb-node`.
+  function onColumnDragOver(e: React.DragEvent): void {
+    if (e.dataTransfer.types.includes('text/fb-node')) {
+      e.preventDefault()
+      e.dataTransfer.dropEffect = 'copy'
+    }
+  }
+
+  function onColumnDrop(e: React.DragEvent, dayIndex: number): void {
+    const id = e.dataTransfer.getData('text/fb-node')
+    if (!id) return
+    e.preventDefault()
+    const node = nodes.find((n) => n.id === id)
+    if (!node) return
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+    const y = e.clientY - rect.top
+    const startMs = snapMs(yToMs(dayIndex, y))
+    if (node.kind === 'task') {
+      setComposer({ dayIndex, startMs, prefillTaskId: node.id })
+    } else {
+      // A folder isn't a focusable task, so book it as a labelled focus block
+      // named after the folder.
+      setComposer({ dayIndex, startMs, prefillTitle: node.title })
+    }
   }
 
   function beginDrag(
@@ -190,6 +220,8 @@ export default function WeekTimeGrid({ weekStart }: { weekStart: Date }): JSX.El
                 }`}
                 style={{ height: gridHeight }}
                 onClick={(e) => onColumnClick(e, dayIndex)}
+                onDragOver={onColumnDragOver}
+                onDrop={(e) => onColumnDrop(e, dayIndex)}
                 data-testid={`day-col-${dayIndex}`}
               >
                 {/* hour lines */}
@@ -293,6 +325,8 @@ export default function WeekTimeGrid({ weekStart }: { weekStart: Date }): JSX.El
         <BlockComposer
           startMs={composer.startMs}
           tasks={[...tasksById.values()].filter((t) => t.status !== 'done')}
+          initialTaskId={composer.prefillTaskId ?? ''}
+          initialTitle={composer.prefillTitle ?? ''}
           onCancel={() => setComposer(null)}
           onCreate={async (taskId, title, durationMin) => {
             await createBlock({ taskId, title, startMs: composer.startMs, durationMin })
@@ -307,16 +341,20 @@ export default function WeekTimeGrid({ weekStart }: { weekStart: Date }): JSX.El
 function BlockComposer({
   startMs,
   tasks,
+  initialTaskId = '',
+  initialTitle = '',
   onCancel,
   onCreate
 }: {
   startMs: number
   tasks: FbNode[]
+  initialTaskId?: string
+  initialTitle?: string
   onCancel: () => void
   onCreate: (taskId: string | null, title: string, durationMin: number) => Promise<void>
 }): JSX.Element {
-  const [taskId, setTaskId] = useState<string>('')
-  const [title, setTitle] = useState('')
+  const [taskId, setTaskId] = useState<string>(initialTaskId)
+  const [title, setTitle] = useState(initialTitle)
   const [duration, setDuration] = useState(60)
   const [busy, setBusy] = useState(false)
 
