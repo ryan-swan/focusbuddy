@@ -73,7 +73,7 @@
     "@vitejs/plugin-react": "^4.3.3",
     "@vitest/expect": "^4.1.7",
     "autoprefixer": "^10.4.20",
-    "electron": "^33.2.0",
+    "electron": "^37.10.3",
     "electron-builder": "^25.1.8",
     "electron-vite": "^2.3.0",
     "happy-dom": "^20.9.0",
