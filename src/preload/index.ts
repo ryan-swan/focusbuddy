@@ -183,7 +183,7 @@ const api = {
     openSettingsApp: (): Promise<boolean> =>
       ipcRenderer.invoke('streamdeck:openSettingsApp'),
     // Reveals the running app's bundle in Finder. In dev = Electron.app,
-    // in prod = FocusBuddy.app. The user drags this into Accessibility.
+    // in prod = PlexiDesk.app. The user drags this into Accessibility.
     revealAppInFinder: (): Promise<{
       ok: boolean
       bundleName: string | null

@@ -5,7 +5,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 
 // Activity tracker — observes which apps the user switches between
-// while FocusBuddy is open, plus the user's Stream Deck button presses.
+// while PlexiDesk is open, plus the user's Stream Deck button presses.
 // The AI macro suggestor reads this log to spot repetitive patterns
 // and propose macros that would automate them.
 //
@@ -77,7 +77,7 @@ let lastSeenApp: string | null = null
 async function getFrontmostApp(): Promise<string | null> {
   if (!isMac) return null
   try {
-    const ours = app.name || 'FocusBuddy'
+    const ours = app.name || 'PlexiDesk'
     const script = `tell application "System Events" to return name of first process whose frontmost is true`
     const { stdout } = await execFileAsync('osascript', ['-e', script], {
       timeout: 1500
@@ -173,7 +173,7 @@ export function installActivityTracker(): void {
   const initial = read()
   if (initial.enabled) startPolling()
   // Stop polling when no window is open (avoid background drain when
-  // the user has explicitly closed all FocusBuddy windows on macOS).
+  // the user has explicitly closed all PlexiDesk windows on macOS).
   app.on('window-all-closed', () => stopPolling())
   app.on('browser-window-focus', () => {
     if (read().enabled && !pollHandle) startPolling()

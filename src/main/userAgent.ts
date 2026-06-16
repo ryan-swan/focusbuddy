@@ -20,11 +20,14 @@
 // Pure + side-effect free so it can be unit-tested without booting Electron
 // (same pattern as popupRouter.ts).
 
-/** Tokens we strip: `Electron/<ver>`, `focusbuddy/<ver>`, `Haptyx/<ver>`. */
+/** Tokens we strip: `Electron/<ver>`, and the app-name token, which has been
+ *  `focusbuddy/`, `Haptyx/`, and now `PlexiDesk/` across renames. Strip all so
+ *  the webview presents as plain desktop Chrome regardless of which build. */
 const STRIP_PATTERNS: RegExp[] = [
   / Electron\/[^ ]+/gi,
   / focusbuddy\/[^ ]+/gi,
-  / Haptyx\/[^ ]+/gi
+  / Haptyx\/[^ ]+/gi,
+  / PlexiDesk\/[^ ]+/gi
 ]
 
 /**
