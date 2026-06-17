@@ -32,6 +32,12 @@ export type WidgetKind =
   | 'field' // single field (text, number, select, checkbox, etc.) on canvas
   | 'page' // Tiptap-based Notion-style document
   | 'table' // Notion/Airtable-style database with typed columns
+  // Office documents on the canvas — a doc / spreadsheet / slide deck backed by
+  // the fb_documents store (widget.content holds the document id), embedding the
+  // full editor so the same file can live on a canvas and in the Documents view.
+  | 'doc'
+  | 'sheet'
+  | 'slides'
   // Stream Deck — Elgato-style 10×3 button grid with folder navigation,
   // macros, app launching, media keys, and volume control. Configuration
   // (buttons, folders, action payloads) lives in widget.content as JSON.

@@ -8,9 +8,12 @@ import { useEffect, useRef, useState } from 'react'
 import type { Editor } from '@tiptap/react'
 import Icon from '../../Icon'
 import LinkPopover from './LinkPopover'
+import type { HeadingStyle, HeadingStyles } from './headingStyles'
 
 interface Props {
   editor: Editor
+  headingStyles: HeadingStyles
+  onSetHeadingStyle: (level: number, patch: Partial<HeadingStyle>) => void
   onAskAi: () => void
   onToggleFind: () => void
   onInsertImage: () => void
@@ -35,6 +38,8 @@ const LINE_HEIGHTS = [
 
 export default function Toolbar({
   editor,
+  headingStyles,
+  onSetHeadingStyle,
   onAskAi,
   onToggleFind,
   onInsertImage,
@@ -42,6 +47,7 @@ export default function Toolbar({
   onExportDocx,
   onExportPdf
 }: Props): JSX.Element {
+  const [headingStyleOpen, setHeadingStyleOpen] = useState(false)
   // Force a re-render on every transaction so isActive() reflects the cursor.
   const [, setTick] = useState(0)
   useEffect(() => {
@@ -70,6 +76,10 @@ export default function Toolbar({
         : 'text-stone-600 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800'
     }`
   const Divider = (): JSX.Element => <div className="w-px h-5 bg-stone-200 dark:bg-stone-700 mx-0.5" />
+
+  // Which heading level (if any) the cursor is in, for the heading-style control.
+  const currentHeadingLevel =
+    [1, 2, 3, 4, 5, 6].find((lvl) => editor.isActive('heading', { level: lvl })) ?? null
 
   // Current block type for the select.
   const blockValue = editor.isActive('heading', { level: 1 })
@@ -120,6 +130,29 @@ export default function Toolbar({
         <option value="quote">Quote</option>
         <option value="code">Code</option>
       </select>
+
+      {/* Heading style: when the cursor is in a heading, edit that level's named
+          style so every heading of the level updates at once. */}
+      {currentHeadingLevel && (
+        <div className="relative">
+          <button
+            className={btn(headingStyleOpen)}
+            title={`Edit Heading ${currentHeadingLevel} style (applies to all H${currentHeadingLevel})`}
+            data-testid="doc-heading-style-btn"
+            onClick={() => setHeadingStyleOpen((v) => !v)}
+          >
+            <Icon name="format_size" size={15} />
+          </button>
+          {headingStyleOpen && (
+            <HeadingStylePanel
+              level={currentHeadingLevel}
+              style={headingStyles[currentHeadingLevel] ?? {}}
+              onSet={(patch) => onSetHeadingStyle(currentHeadingLevel, patch)}
+              onClose={() => setHeadingStyleOpen(false)}
+            />
+          )}
+        </div>
+      )}
 
       <select
         className={`${sel} w-16`}
@@ -310,6 +343,83 @@ export default function Toolbar({
           className="inline-flex items-center gap-1.5 text-[12px] px-2.5 py-1 rounded-lg bg-accent/10 text-accent hover:bg-accent/20"
         >
           <Icon name="auto_awesome" size={13} /> Ask AI
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// Popover to edit one heading level's named style (size, colour, bold). Changes
+// apply to every heading of that level via DocEditor's injected CSS.
+function HeadingStylePanel({
+  level,
+  style,
+  onSet,
+  onClose
+}: {
+  level: number
+  style: HeadingStyle
+  onSet: (patch: Partial<HeadingStyle>) => void
+  onClose: () => void
+}): JSX.Element {
+  const ref = useRef<HTMLDivElement | null>(null)
+  useEffect(() => {
+    function onDown(e: MouseEvent): void {
+      if (!ref.current?.contains(e.target as Node)) onClose()
+    }
+    document.addEventListener('mousedown', onDown)
+    return () => document.removeEventListener('mousedown', onDown)
+  }, [onClose])
+  const input =
+    'w-full bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded px-2 py-1 text-[12px] focus:outline-none'
+  return (
+    <div
+      ref={ref}
+      data-testid="doc-heading-style-panel"
+      className="absolute z-50 mt-1 left-0 w-56 rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 shadow-xl p-2.5 space-y-2 font-normal"
+    >
+      <div className="text-[11px] uppercase tracking-wide text-stone-400">
+        Heading {level} style — applies to all H{level}
+      </div>
+      <label className="block text-[11px] text-stone-500 dark:text-stone-400">
+        Size (px)
+        <input
+          type="number"
+          min={10}
+          max={96}
+          value={style.fontSize ?? ''}
+          placeholder="default"
+          onChange={(e) => onSet({ fontSize: e.target.value === '' ? undefined : Number(e.target.value) })}
+          className={input + ' mt-0.5'}
+        />
+      </label>
+      <div className="flex items-center gap-2">
+        <label className="flex items-center gap-1.5 text-[11px] text-stone-500 dark:text-stone-400 cursor-pointer">
+          Colour
+          <input
+            type="color"
+            value={style.color ?? '#1c1917'}
+            onChange={(e) => onSet({ color: e.target.value })}
+            className="h-6 w-8 rounded cursor-pointer"
+          />
+        </label>
+        <button
+          onClick={() => onSet({ bold: !style.bold })}
+          className={`h-7 w-7 inline-flex items-center justify-center rounded text-[13px] ${
+            style.bold ? 'bg-accent/15 text-accent' : 'text-stone-600 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800'
+          }`}
+          title="Bold"
+        >
+          <Icon name="format_bold" size={15} />
+        </button>
+        <button
+          onClick={() => onSet({ italic: !style.italic })}
+          className={`h-7 w-7 inline-flex items-center justify-center rounded text-[13px] ${
+            style.italic ? 'bg-accent/15 text-accent' : 'text-stone-600 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800'
+          }`}
+          title="Italic"
+        >
+          <Icon name="format_italic" size={15} />
         </button>
       </div>
     </div>
