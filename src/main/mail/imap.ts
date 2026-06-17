@@ -9,7 +9,24 @@
 
 import { ImapFlow } from 'imapflow'
 import { simpleParser } from 'mailparser'
+import type { AddressObject } from 'mailparser'
 import type { MailAccountConfig } from './mailAccount'
+
+// Flatten a mailparser address header (a single object or an array of them)
+// into the bare list of email addresses, lower-cased and de-duplicated.
+function collectAddresses(
+  field: AddressObject | AddressObject[] | undefined
+): string[] {
+  if (!field) return []
+  const objs = Array.isArray(field) ? field : [field]
+  const out = new Set<string>()
+  for (const obj of objs) {
+    for (const a of obj.value ?? []) {
+      if (a.address) out.add(a.address.toLowerCase())
+    }
+  }
+  return [...out]
+}
 
 export interface MailListItem {
   uid: number
@@ -38,6 +55,11 @@ export interface MailFullMessage {
   // sandboxed iframe on the renderer side), else null.
   html: string | null
   attachments: { filename: string; size: number; contentType: string }[]
+  // Threading + reply-all support — see the shared MailFullMessage type.
+  messageId: string | null
+  references: string[]
+  toAddresses: string[]
+  ccAddresses: string[]
 }
 
 function buildClient(config: MailAccountConfig): ImapFlow {
@@ -55,10 +77,141 @@ function buildClient(config: MailAccountConfig): ImapFlow {
   })
 }
 
+// ── Warm connection pool ─────────────────────────────────────────────────────
+// Opening a fresh IMAP connection per click meant a full TCP + TLS handshake
+// and a LOGIN round-trip every time the user opened a message — on Gmail that
+// is one to three seconds of dead time before the body even starts loading.
+// A desktop client opens messages in bursts, so we keep ONE authenticated
+// connection warm and reuse it across list/open/markSeen, then let it go idle
+// after a minute of no use. The first operation still pays the connect cost;
+// every operation after it is just a FETCH on an already-open socket.
+
+const IDLE_LOGOUT_MS = 60_000
+
+interface WarmConnection {
+  key: string
+  client: ImapFlow
+  // Resolves once connect() has finished, so concurrent callers share one
+  // connect instead of racing to open several sockets.
+  ready: Promise<void>
+  idleTimer: ReturnType<typeof setTimeout> | null
+}
+
+let warm: WarmConnection | null = null
+
+// Identity of a connection — reconnect from scratch if any of these change.
+function connKey(config: MailAccountConfig): string {
+  return `${config.host}:${config.port}:${config.secure ? 's' : 'p'}:${config.user}`
+}
+
+function clearIdleTimer(conn: WarmConnection): void {
+  if (conn.idleTimer) {
+    clearTimeout(conn.idleTimer)
+    conn.idleTimer = null
+  }
+}
+
+// Drop the warm connection and close its socket. Safe to call repeatedly.
+function dropWarm(conn: WarmConnection | null): void {
+  if (!conn) return
+  clearIdleTimer(conn)
+  if (warm === conn) warm = null
+  conn.client.logout().catch(() => conn.client.close())
+}
+
+function scheduleIdleLogout(conn: WarmConnection): void {
+  clearIdleTimer(conn)
+  conn.idleTimer = setTimeout(() => dropWarm(conn), IDLE_LOGOUT_MS)
+  // Don't let a pending logout timer keep the process alive on quit.
+  conn.idleTimer.unref?.()
+}
+
+// Get an authenticated, ready-to-use client for this account, reusing the warm
+// one when possible. Callers MUST NOT log the client out; call releaseWarm()
+// in a finally to restart the idle countdown instead.
+async function acquireWarm(config: MailAccountConfig): Promise<ImapFlow> {
+  const key = connKey(config)
+
+  // Reuse the existing warm connection when it matches and is still usable.
+  if (warm && warm.key === key && warm.client.usable) {
+    clearIdleTimer(warm)
+    try {
+      await warm.ready
+      if (warm.client.usable) return warm.client
+    } catch {
+      // connect() failed earlier — fall through and rebuild below.
+    }
+  }
+
+  // Different account, or a dead/closed socket: tear the old one down.
+  if (warm) dropWarm(warm)
+
+  const client = buildClient(config)
+  // A dropped socket (server timeout, network blip) must invalidate the warm
+  // slot so the next call reconnects instead of using a dead client.
+  const invalidate = (): void => {
+    if (warm && warm.client === client) {
+      clearIdleTimer(warm)
+      warm = null
+    }
+  }
+  client.on('close', invalidate)
+  client.on('error', invalidate)
+
+  const conn: WarmConnection = {
+    key,
+    client,
+    ready: client.connect(),
+    idleTimer: null
+  }
+  warm = conn
+  try {
+    await conn.ready
+  } catch (err) {
+    invalidate()
+    throw err
+  }
+  return client
+}
+
+// Call after each operation to (re)start the idle countdown on the warm
+// connection. Never logs out inline, so the socket stays hot for the next op.
+function releaseWarm(): void {
+  if (warm) scheduleIdleLogout(warm)
+}
+
+/**
+ * Force the warm connection closed. Call whenever the saved account changes —
+ * a password rotation keeps the same host/user key, so without this the pool
+ * would keep reusing the socket authenticated with the old credentials.
+ */
+export function resetConnection(): void {
+  dropWarm(warm)
+}
+
 /** Turn imapflow / network errors into a short, human message. */
 function explain(err: unknown): string {
-  const msg = err instanceof Error ? err.message : String(err)
-  if (/auth|credential|login|invalid/i.test(msg)) {
+  // imapflow throws a bare `new Error('Command failed')` when the server
+  // rejects a command, and puts the real reason on side fields:
+  //   err.responseText        e.g. "[AUTHENTICATIONFAILED] Invalid credentials (Failure)"
+  //   err.serverResponseCode  e.g. "AUTHENTICATIONFAILED"
+  //   err.authenticationFailed true on a rejected LOGIN/AUTHENTICATE
+  //   err.code                e.g. "ETIMEOUT", "ENOTFOUND", "GREETING_TIMEOUT"
+  // Reading only err.message ("Command failed") loses all of that, so build the
+  // string we classify from the richest detail the error actually carries.
+  const e = (err ?? {}) as {
+    message?: string
+    responseText?: string
+    serverResponseCode?: string
+    authenticationFailed?: boolean
+    code?: string
+  }
+  const baseMsg = err instanceof Error ? err.message : String(err)
+  const msg = [e.responseText, e.serverResponseCode, e.code, baseMsg]
+    .filter((s): s is string => typeof s === 'string' && s.length > 0)
+    .join(' ')
+
+  if (e.authenticationFailed || /auth|credential|login|invalid|password/i.test(msg)) {
     return 'Login was rejected. Check the username and password. Gmail, iCloud and Fastmail need an app-specific password, not your normal one.'
   }
   if (/ENOTFOUND|EAI_AGAIN|getaddrinfo/i.test(msg)) {
@@ -97,8 +250,7 @@ export async function listInbox(
   config: MailAccountConfig,
   limit = 40
 ): Promise<MailListItem[]> {
-  const client = buildClient(config)
-  await client.connect()
+  const client = await acquireWarm(config)
   const lock = await client.getMailboxLock('INBOX')
   const items: MailListItem[] = []
   try {
@@ -127,7 +279,7 @@ export async function listInbox(
     }
   } finally {
     lock.release()
-    await client.logout()
+    releaseWarm()
   }
   // Newest first.
   return items.sort((a, b) => b.date - a.date)
@@ -151,8 +303,7 @@ export async function getMessage(
   config: MailAccountConfig,
   uid: number
 ): Promise<MailFullMessage | null> {
-  const client = buildClient(config)
-  await client.connect()
+  const client = await acquireWarm(config)
   const lock = await client.getMailboxLock('INBOX')
   try {
     const fetched = await client.fetchOne(String(uid), { source: true }, { uid: true })
@@ -165,6 +316,13 @@ export async function getMessage(
         : Array.isArray(parsed.to)
           ? parsed.to.map((t) => t.text).join(', ')
           : ''
+    // mailparser hands References back as a single string or an array; normalise
+    // to a clean array so the reply path can append to it directly.
+    const references = Array.isArray(parsed.references)
+      ? parsed.references
+      : parsed.references
+        ? [parsed.references]
+        : []
     return {
       uid,
       fromName: from?.name || from?.address || 'Unknown sender',
@@ -178,23 +336,68 @@ export async function getMessage(
         filename: a.filename || 'attachment',
         size: a.size || 0,
         contentType: a.contentType || 'application/octet-stream'
-      }))
+      })),
+      messageId: parsed.messageId || null,
+      references,
+      toAddresses: collectAddresses(parsed.to),
+      ccAddresses: collectAddresses(parsed.cc)
     }
   } finally {
     lock.release()
-    await client.logout()
+    releaseWarm()
   }
+}
+
+/**
+ * Pull the plain-text bodies of the user's most recent Sent messages, used to
+ * learn their writing voice for AI reply drafting. Finds the Sent mailbox by
+ * its IMAP special-use flag (Gmail calls it "[Gmail]/Sent Mail", others "Sent")
+ * and falls back to common names. Returns raw bodies; the caller sanitises and
+ * truncates them before anything reaches the model.
+ */
+export async function sampleSent(config: MailAccountConfig, limit = 20): Promise<string[]> {
+  const client = await acquireWarm(config)
+  let path = 'Sent'
+  try {
+    const boxes = await client.list()
+    const sent =
+      boxes.find((b) => b.specialUse === '\\Sent') ||
+      boxes.find((b) => /sent/i.test(b.path))
+    if (sent) path = sent.path
+  } catch {
+    // list() failed — fall back to the literal "Sent" and let the lock below
+    // surface a real error if that mailbox does not exist either.
+  }
+
+  const bodies: string[] = []
+  let lock: Awaited<ReturnType<typeof client.getMailboxLock>> | null = null
+  try {
+    lock = await client.getMailboxLock(path)
+    const total =
+      typeof client.mailbox === 'object' && client.mailbox ? client.mailbox.exists : 0
+    if (!total) return []
+    const start = Math.max(1, total - limit + 1)
+    for await (const msg of client.fetch(`${start}:*`, { uid: true, source: true })) {
+      if (!msg.source) continue
+      const parsed = await simpleParser(msg.source)
+      const text = (parsed.text || '').trim()
+      if (text) bodies.push(text)
+    }
+  } finally {
+    if (lock) lock.release()
+    releaseWarm()
+  }
+  return bodies
 }
 
 /** Mark a message read on the server (so the unread state stays in sync). */
 export async function markSeen(config: MailAccountConfig, uid: number): Promise<void> {
-  const client = buildClient(config)
-  await client.connect()
+  const client = await acquireWarm(config)
   const lock = await client.getMailboxLock('INBOX')
   try {
     await client.messageFlagsAdd(String(uid), ['\\Seen'], { uid: true })
   } finally {
     lock.release()
-    await client.logout()
+    releaseWarm()
   }
 }

@@ -35,7 +35,15 @@ const AUTO_ROUTING: Record<AIPurpose, string> = {
   // Office-document generation (the "Create with AI" flow for docs, sheets and
   // slides). The user reads and then edits the result, so quality matters;
   // Sonnet is the right default, with the global model-mode override available.
-  document: SONNET
+  document: SONNET,
+  // Building a writing-style profile from the user's Sent folder is pure pattern
+  // extraction from text — Haiku is purpose-built for it and runs once per
+  // session, cached thereafter.
+  tone_profile: HAIKU,
+  // Drafting an email reply in the user's voice has to hold two constraints at
+  // once: match the voice faithfully AND never fabricate facts, dates or
+  // commitments. That instruction-following discipline wants Sonnet.
+  email_reply_draft: SONNET
 }
 
 let currentMode: ModelMode = 'auto'
