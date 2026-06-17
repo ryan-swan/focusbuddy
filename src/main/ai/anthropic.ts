@@ -9,6 +9,9 @@ import { getRecentActivity } from '../db/activity'
 import { markdownToTiptap } from './markdownToTiptap'
 import { extractJson, salvageEnvelope } from './chatJson'
 import { resolveModel } from './modelRouting'
+import { migrateSlidesBody } from '@shared/slidesMigrate'
+import { resolveTheme, applyThemeToDeck, BUILTIN_THEMES } from '@shared/slideThemes'
+import type { SlidesBody } from '@shared/types'
 import { resolveAnthropicKey } from '../settingsStore'
 import { shouldUseCredits, getCreditClient, invalidateCreditClient } from './creditMode'
 import type {
@@ -2781,6 +2784,77 @@ export async function fillSheetRange(input: {
     })
     if (!out.length) return { ok: false, error: 'The AI returned no rows.' }
     return { ok: true, rows: out }
+  } catch (e) {
+    return { ok: false, error: (e as Error).message }
+  }
+}
+
+// ── In-editor slides AI: generate a themed, element-based deck ────────────────
+//
+// The model returns a simple {title, theme, slides:[{title,bullets,notes,layout}]}
+// shape (reliable to produce), which we deterministically convert into the v2
+// element model and apply the chosen theme. The renderer previews the result as
+// thumbnails before applying. Modes: a new deck, slides to append, or a redesign
+// of one slide.
+
+export interface SlidesGenResult {
+  ok: boolean
+  body?: SlidesBody
+  error?: string
+  needsApiKey?: boolean
+}
+
+export async function generateSlideElements(input: {
+  mode: 'deck' | 'append' | 'redesign'
+  prompt: string
+}): Promise<SlidesGenResult> {
+  const c = getClient()
+  if (!c) return { ok: false, needsApiKey: true, error: 'No Anthropic API key set. Open Settings → AI · API keys to paste one.' }
+  const topic = input.prompt?.trim()
+  if (!topic) return { ok: false, error: 'Describe what you want.' }
+
+  const themeIds = BUILTIN_THEMES.map((t) => t.id).join(', ')
+  const count = input.mode === 'redesign' ? '1 slide' : input.mode === 'append' ? '2 to 5 slides' : '5 to 10 slides'
+  const system =
+    'You design a clear, well-paced slide deck. Reply with ONLY a JSON object of the form ' +
+    '{"title": string, "theme": string, "slides": [{"title": string, "bullets": string[], "notes": string, "layout": "title"|"title-content"|"section"}]}. ' +
+    `Produce ${count} that tell a coherent story. The first slide of a new deck uses layout "title". ` +
+    'Keep bullets to at most 6 short points per slide; use an empty bullets array for title and section slides. ' +
+    `Choose "theme" from exactly one of: ${themeIds}. ` +
+    'Write one to three sentences of speaker notes per slide. ' +
+    'No markdown, no code fences, no prose outside the JSON. ' +
+    'Write in plain, confident, human prose. Do not use em dashes or emoji. Do not use a bold label followed by a colon as a heading substitute.'
+  try {
+    const resp = await c.messages.create({
+      model: resolveModel('document'),
+      max_tokens: 3000,
+      system,
+      messages: [{ role: 'user', content: topic }]
+    })
+    if ((resp.stop_reason as string) === 'refusal') return { ok: false, error: 'Claude declined this request. Try rephrasing it.' }
+    const text = resp.content.filter((b) => b.type === 'text').map((b) => ('text' in b ? b.text : '')).join('')
+    const parsed = extractJsonObject(text) as {
+      title?: string
+      theme?: string
+      slides?: Array<{ title?: string; bullets?: string[]; notes?: string; layout?: string }>
+    }
+    const rawSlides = Array.isArray(parsed.slides) ? parsed.slides : []
+    if (!rawSlides.length) return { ok: false, error: 'The deck came back empty. Try a more specific prompt.' }
+    const v1: SlidesBody = {
+      slides: rawSlides.map((s, i) => ({
+        id: `ai-${Date.now().toString(36)}-${i}`,
+        title: s.title || `Slide ${i + 1}`,
+        bullets: Array.isArray(s.bullets) ? s.bullets.map((b) => String(b)) : [],
+        notes: typeof s.notes === 'string' ? s.notes : '',
+        layout: (['title', 'title-content', 'section'].includes(String(s.layout)) ? s.layout : i === 0 ? 'title' : 'title-content') as
+          | 'title'
+          | 'title-content'
+          | 'section'
+      }))
+    }
+    const theme = resolveTheme(parsed.theme)
+    const body = applyThemeToDeck(migrateSlidesBody(v1), theme)
+    return { ok: true, body }
   } catch (e) {
     return { ok: false, error: (e as Error).message }
   }

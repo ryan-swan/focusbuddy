@@ -261,10 +261,12 @@ import {
   summarizeRecentTrail,
   suggestDocContent,
   rewriteSelection,
-  fillSheetRange
+  fillSheetRange,
+  generateSlideElements
 } from '../ai/anthropic'
 import { importDocx, exportDocx, exportPdf, pickImage } from '../officeDocx'
 import { importSheet, exportSheet } from '../sheetIo'
+import { exportSlides, importPptx } from '../slidesIo'
 import { getModelMode, setModelMode } from '../ai/modelRouting'
 import { describeWidgetForAgent } from '../ai/agentInputs'
 import type {
@@ -683,6 +685,14 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('ai:fillSheetRange', (_e, input: { prompt: string; headers: string[]; rangeRows: number }) => {
     recordAiCall()
     return fillSheetRange(input)
+  })
+
+  // ── Slides interop + AI ───────────────────────────────────────────────────
+  ipcMain.handle('slides:export', (_e, input: Parameters<typeof exportSlides>[0]) => exportSlides(input))
+  ipcMain.handle('slides:import', () => importPptx())
+  ipcMain.handle('documents:generateSlides', (_e, input: { mode: 'deck' | 'append' | 'redesign'; prompt: string }) => {
+    recordAiCall()
+    return generateSlideElements(input)
   })
 
   // ── AI source: PlexiDesk credits vs bring-your-own-key ────────────────────

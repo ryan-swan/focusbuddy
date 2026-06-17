@@ -1191,18 +1191,129 @@ export interface SheetBodyV2 {
 
 export type SheetBody = SheetBodyV1 | SheetBodyV2
 
-// One slide in a deck. `bullets` is the body content; `notes` are speaker
-// notes (also where AI can draft what to say).
+// ── Slides body ───────────────────────────────────────────────────────────────
+// v1 slides were fixed title + bullets + notes + layout. v2 models each slide as
+// a set of positioned ELEMENTS (text boxes, images, shapes, lines) in a fixed
+// 1280x720 logical space, plus a deck theme and per-slide transition. v1 decks
+// open unchanged and are converted to elements on load by migrateSlidesBody
+// (src/shared/slidesMigrate.ts); the old title/bullets fields are kept optional
+// so a half-migrated body still renders.
+
+export type SlideLayout =
+  | 'title'
+  | 'title-content'
+  | 'two-content'
+  | 'section'
+  | 'blank'
+  | 'image-caption'
+  // legacy value, mapped to 'title-content' on migration
+  | 'bullets'
+
+export type SlideTransition = 'none' | 'fade' | 'slide'
+
+export interface SlideFill {
+  type: 'solid' | 'none'
+  color?: string
+}
+export interface SlideBorder {
+  color: string
+  width: number
+  style?: 'solid' | 'dashed'
+}
+
+// Inline text run inside a text element.
+export interface SlideTextRun {
+  text: string
+  bold?: boolean
+  italic?: boolean
+  underline?: boolean
+  color?: string
+  fontSize?: number
+}
+export interface SlideTextParagraph {
+  runs: SlideTextRun[]
+  align?: 'left' | 'center' | 'right'
+  bulletLevel?: number
+  listStyle?: 'bullet' | 'number' | 'none'
+}
+
+interface SlideElementBase {
+  id: string
+  // Position + size in 1280x720 logical units.
+  x: number
+  y: number
+  w: number
+  h: number
+  z: number
+  rotation?: number
+  // Marks elements that a theme is allowed to restyle (title/body/accent).
+  styleRole?: 'title' | 'body' | 'accent'
+}
+export interface SlideTextElement extends SlideElementBase {
+  type: 'text'
+  paragraphs: SlideTextParagraph[]
+  fontFamily?: string
+  fill?: SlideFill
+  border?: SlideBorder
+  vAlign?: 'top' | 'middle' | 'bottom'
+}
+export interface SlideImageElement extends SlideElementBase {
+  type: 'image'
+  src: string // data: URI or file path
+  fit?: 'contain' | 'cover'
+}
+export interface SlideShapeElement extends SlideElementBase {
+  type: 'shape'
+  shape: 'rect' | 'ellipse' | 'roundRect' | 'triangle'
+  fill?: SlideFill
+  border?: SlideBorder
+}
+export interface SlideLineElement extends SlideElementBase {
+  type: 'line'
+  // x/y is the start; x2/y2 the end. w/h are ignored.
+  x2: number
+  y2: number
+  stroke: string
+  strokeWidth: number
+  arrowEnd?: boolean
+}
+export type SlideElement =
+  | SlideTextElement
+  | SlideImageElement
+  | SlideShapeElement
+  | SlideLineElement
+
+export interface DeckTheme {
+  id: string
+  name: string
+  background: string
+  fontHeading: string
+  fontBody: string
+  accent: string
+  textColor: string
+  titleStyle: { fontSize: number; bold?: boolean; color?: string }
+  bodyStyle: { fontSize: number; color?: string }
+}
+
+// One slide. v1 fields (title/bullets/layout) are optional and retained for
+// backward-compatible reads; v2 rendering uses `elements`.
 export interface Slide {
   id: string
-  title: string
-  bullets: string[]
   notes: string
-  layout: 'title' | 'bullets' | 'section'
+  title?: string
+  bullets?: string[]
+  layout?: SlideLayout
+  elements?: SlideElement[]
+  transition?: SlideTransition
+  background?: SlideFill
+  schemaVersion?: 2
 }
 
 export interface SlidesBody {
   slides: Slide[]
+  theme?: DeckTheme | string
+  schemaVersion?: 2
+  size?: { w: number; h: number }
 }
 
 // A 'doc' body is a Tiptap document JSON (the same shape PageWidget stores);
