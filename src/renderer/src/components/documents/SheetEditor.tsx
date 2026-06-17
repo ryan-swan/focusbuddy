@@ -59,6 +59,7 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
   const [aiOpen, setAiOpen] = useState(false)
   const [liveWidth, setLiveWidth] = useState<{ c: number; w: number } | null>(null)
   const [status, setStatus] = useState<string | null>(null)
+  const [colMenu, setColMenu] = useState<{ c: number; x: number; y: number } | null>(null)
 
   const undoStack = useRef<SheetBodyV2[]>([])
   const redoStack = useRef<SheetBodyV2[]>([])
@@ -183,6 +184,14 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
       if (text) mutateTab((t) => writeMatrix(t, focus.r, focus.c, parseTsv(text)))
       return
     }
+    if (mod && e.key.toLowerCase() === 'a') {
+      // Select the whole used grid so formatting (colour, bold, number format)
+      // can be applied across every cell at once.
+      e.preventDefault()
+      setAnchor({ r: 0, c: 0 })
+      setFocus({ r: maxR, c: maxC })
+      return
+    }
     if (e.key === 'ArrowUp') { e.preventDefault(); move(Math.max(0, r - 1), c, e.shiftKey); return }
     if (e.key === 'ArrowDown') { e.preventDefault(); move(Math.min(maxR, r + 1), c, e.shiftKey); return }
     if (e.key === 'ArrowLeft') { e.preventDefault(); move(r, Math.max(0, c - 1), e.shiftKey); return }
@@ -198,8 +207,12 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
       })
       return
     }
-    // A printable character starts editing with that character.
+    // A printable character starts editing with that character. preventDefault
+    // is essential: without it the same keystroke is ALSO inserted into the
+    // newly-focused cell input, duplicating the first character (1 -> 11, and
+    // = -> ==, which silently broke every formula).
     if (e.key.length === 1 && !mod) {
+      e.preventDefault()
       startEdit(focus, e.key)
     }
   }
@@ -376,8 +389,21 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
             onCancelEdit={() => setEditing(null)}
             onHeaderRename={(c, name) => mutateTab((t) => setColumnName(t, c, name))}
             onColResizeStart={onColResizeStart}
+            onHeaderContextMenu={(c, x, y) => setColMenu({ c, x, y })}
           />
         </div>
+
+        {colMenu && (
+          <ColumnHeaderMenu
+            x={colMenu.x}
+            y={colMenu.y}
+            canDelete={tab.columns.length > 1}
+            onInsertLeft={() => { mutateTab((t) => insertColAt(t, colMenu.c)); setColMenu(null) }}
+            onInsertRight={() => { mutateTab((t) => insertColAt(t, colMenu.c + 1)); setColMenu(null) }}
+            onDelete={() => { mutateTab((t) => deleteColAt(t, colMenu.c)); setColMenu(null) }}
+            onClose={() => setColMenu(null)}
+          />
+        )}
 
         <button
           onClick={() => mutateTab((t) => addRow(t))}
@@ -397,6 +423,69 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
       </div>
 
       <SheetTabStrip body={body} onSwitch={switchTab} onAdd={addTab} onRename={renameTab} onDelete={deleteTab} />
+    </div>
+  )
+}
+
+// Right-click column-header menu: insert a column on either side of the clicked
+// header, or delete it.
+function ColumnHeaderMenu({
+  x,
+  y,
+  canDelete,
+  onInsertLeft,
+  onInsertRight,
+  onDelete,
+  onClose
+}: {
+  x: number
+  y: number
+  canDelete: boolean
+  onInsertLeft: () => void
+  onInsertRight: () => void
+  onDelete: () => void
+  onClose: () => void
+}): JSX.Element {
+  const ref = useRef<HTMLDivElement | null>(null)
+  useEffect(() => {
+    function onDown(e: MouseEvent): void {
+      if (!ref.current?.contains(e.target as Node)) onClose()
+    }
+    function onKey(e: KeyboardEvent): void {
+      if (e.key === 'Escape') onClose()
+    }
+    document.addEventListener('mousedown', onDown)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onDown)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [onClose])
+  const left = Math.min(x, window.innerWidth - 210)
+  const top = Math.min(y, window.innerHeight - 140)
+  const item =
+    'w-full flex items-center gap-2 px-3 py-1.5 text-[12px] hover:bg-stone-100 dark:hover:bg-stone-800 text-left'
+  return (
+    <div
+      ref={ref}
+      data-testid="sheet-col-menu"
+      className="fixed z-[100] w-52 rounded-md border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 shadow-xl py-1 text-stone-700 dark:text-stone-200"
+      style={{ left, top }}
+    >
+      <button className={item} onClick={onInsertLeft}>
+        <Icon name="add" size={13} className="text-stone-400" /> Insert column left
+      </button>
+      <button className={item} onClick={onInsertRight}>
+        <Icon name="add" size={13} className="text-stone-400" /> Insert column right
+      </button>
+      <div className="my-1 border-t border-stone-200 dark:border-stone-700" />
+      <button
+        className={item + ' text-red-600 disabled:opacity-40'}
+        onClick={onDelete}
+        disabled={!canDelete}
+      >
+        <Icon name="delete" size={13} /> Delete column
+      </button>
     </div>
   )
 }

@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useId, useState } from 'react'
 import { EditorContent, useEditor } from '@tiptap/react'
 import { buildDocExtensions } from './editor/extensions'
 import { htmlToDocContent } from '../../lib/docHtml'
 import { sanitizeHtml } from '../../lib/htmlSanitize'
+import { parseDocBody, wrapDocBody, headingCss, type HeadingStyle, type HeadingStyles } from './editor/headingStyles'
 import Toolbar from './editor/Toolbar'
 import DocBubbleMenu from './editor/DocBubbleMenu'
 import FindReplace from './editor/FindReplace'
@@ -36,11 +37,19 @@ export default function DocEditor({ content, title, onChange }: Props): JSX.Elem
   const [busyOffice, setBusyOffice] = useState<string | null>(null)
   const [officeMsg, setOfficeMsg] = useState<string | null>(null)
 
+  // Parse the (possibly legacy) body once into the Tiptap doc + named heading
+  // styles. The body is persisted wrapped as { doc, headingStyles } so heading
+  // styles survive save/reopen; legacy raw-Tiptap bodies still open.
+  const initial = parseDocBody(content)
+  const [headingStyles, setHeadingStyles] = useState<HeadingStyles>(initial.headingStyles)
+  // Stable class to scope the injected heading CSS to this editor instance.
+  const scopeClass = 'doc-hs-' + useId().replace(/[:]/g, '')
+
   const editor = useEditor({
     extensions: buildDocExtensions({ interactive: true }),
-    content: (content as object) ?? { type: 'doc', content: [{ type: 'paragraph' }] },
+    content: (initial.doc as object) ?? { type: 'doc', content: [{ type: 'paragraph' }] },
     onUpdate({ editor }) {
-      onChange(editor.getJSON())
+      onChange(wrapDocBody(editor.getJSON(), headingStyles))
     },
     editorProps: {
       attributes: {
@@ -60,6 +69,16 @@ export default function DocEditor({ content, title, onChange }: Props): JSX.Elem
   })
 
   const ai = useDocAi(editor)
+
+  // Update one heading level's named style and persist it with the document, so
+  // every heading of that level re-renders with the new style at once.
+  function updateHeadingStyle(level: number, patch: Partial<HeadingStyle>): void {
+    setHeadingStyles((prev) => {
+      const next: HeadingStyles = { ...prev, [level]: { ...prev[level], ...patch } }
+      onChange(wrapDocBody(editor?.getJSON() ?? initial.doc, next))
+      return next
+    })
+  }
 
   // Reset the AI instruction box whenever the panel reopens.
   useEffect(() => {
@@ -130,9 +149,13 @@ export default function DocEditor({ content, title, onChange }: Props): JSX.Elem
   if (!editor) return <div />
 
   return (
-    <div className="max-w-3xl mx-auto px-8 py-6 relative">
+    <div className={`max-w-3xl mx-auto px-8 py-6 relative ${scopeClass}`}>
+      {/* Named heading styles: one rule per configured level, scoped to this editor. */}
+      <style dangerouslySetInnerHTML={{ __html: headingCss(scopeClass, headingStyles) }} />
       <Toolbar
         editor={editor}
+        headingStyles={headingStyles}
+        onSetHeadingStyle={updateHeadingStyle}
         onAskAi={ai.openInsert}
         onToggleFind={() => setFindOpen((v) => !v)}
         onInsertImage={() => void insertImage()}

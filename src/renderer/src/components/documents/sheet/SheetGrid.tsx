@@ -26,6 +26,7 @@ interface Props {
   onCancelEdit: () => void
   onHeaderRename: (c: number, name: string) => void
   onColResizeStart: (c: number, e: React.MouseEvent) => void
+  onHeaderContextMenu: (c: number, x: number, y: number) => void
 }
 
 const ROW_HEADER_W = 44
@@ -61,6 +62,11 @@ export default function SheetGrid(props: Props): JSX.Element {
             {tab.columns.map((col, c) => (
               <th
                 key={c}
+                data-testid={`col-header-${c}`}
+                onContextMenu={(e) => {
+                  e.preventDefault()
+                  props.onHeaderContextMenu(c, e.clientX, e.clientY)
+                }}
                 className="relative border-b border-r border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800/60 p-0"
               >
                 <div className="flex items-center">

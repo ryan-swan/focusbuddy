@@ -15,6 +15,8 @@ import FieldWidget from './widgets/FieldWidget'
 import PageWidget from './widgets/PageWidget'
 import LivingDocWidget from './widgets/LivingDocWidget'
 import TableWidget from './widgets/TableWidget'
+import OfficeDocWidget from './widgets/OfficeDocWidget'
+import OfficeDocAddDialog from './widgets/OfficeDocAddDialog'
 import CalculatorWidget from './widgets/CalculatorWidget'
 import ColorWidget from './widgets/ColorWidget'
 import ImageWidget from './widgets/ImageWidget'
@@ -153,6 +155,10 @@ function renderWidget(w: Widget): JSX.Element | null {
       return <PageWidget widget={w} />
     case 'table':
       return <TableWidget widget={w} />
+    case 'doc':
+    case 'sheet':
+    case 'slides':
+      return <OfficeDocWidget widget={w} />
     case 'calculator':
       return <CalculatorWidget widget={w} />
     case 'color':
@@ -229,6 +235,8 @@ export default function Canvas(): JSX.Element {
   }, [activeTaskId])
   // Bumped when the user dismisses the starting kit, to re-evaluate visibility.
   const [kitDismissTick, setKitDismissTick] = useState(0)
+  // Office-document add chooser (create / import / select-existing) + drop point.
+  const [officeAdd, setOfficeAdd] = useState<{ entry: WidgetCatalogEntry; x: number; y: number } | null>(null)
   const [syncPickerOpen, setSyncPickerOpen] = useState(false)
   const [historyOpen, setHistoryOpen] = useState(false)
   const widgets = useWidgetStore((s) => s.widgets)
@@ -1199,6 +1207,12 @@ export default function Canvas(): JSX.Element {
     canvasY: number
   ): Promise<void> {
     if (!activeTaskId) return
+    // Office documents go through a chooser (create new / import a real Office
+    // file / place an existing one) rather than dropping a blank widget.
+    if (entry.kind === 'doc' || entry.kind === 'sheet' || entry.kind === 'slides') {
+      setOfficeAdd({ entry, x: canvasX, y: canvasY })
+      return
+    }
     await createWidget({
       taskId: activeTaskId,
       kind: entry.kind,
@@ -1208,6 +1222,24 @@ export default function Canvas(): JSX.Element {
       width: entry.defaultWidth,
       height: entry.defaultHeight,
       color: entry.kind === 'sticky' ? '#fef08a' : null
+    })
+  }
+
+  // Create an office-document widget pointing at an already-resolved document id
+  // (from create-new / import / select-existing in the add dialog).
+  async function createOfficeWidget(documentId: string): Promise<void> {
+    const add = officeAdd
+    if (!activeTaskId || !add) return
+    setOfficeAdd(null)
+    await createWidget({
+      taskId: activeTaskId,
+      kind: add.entry.kind,
+      content: documentId,
+      x: Math.round(add.x - add.entry.defaultWidth / 2),
+      y: Math.round(add.y - 20),
+      width: add.entry.defaultWidth,
+      height: add.entry.defaultHeight,
+      color: null
     })
   }
 
@@ -2412,6 +2444,13 @@ export default function Canvas(): JSX.Element {
       )}
       {historyOpen && activeTaskId && (
         <HistoryPanel taskId={activeTaskId} onClose={() => setHistoryOpen(false)} />
+      )}
+      {officeAdd && (
+        <OfficeDocAddDialog
+          docType={officeAdd.entry.kind as 'doc' | 'sheet' | 'slides'}
+          onPicked={(id) => void createOfficeWidget(id)}
+          onClose={() => setOfficeAdd(null)}
+        />
       )}
       {ctxMenu && (
         <CanvasContextMenu

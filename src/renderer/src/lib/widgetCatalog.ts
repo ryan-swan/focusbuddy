@@ -111,6 +111,39 @@ export const WIDGET_CATALOG: WidgetCatalogEntry[] = [
     isWebBased: false
   },
   {
+    kind: 'doc',
+    category: 'Notes',
+    label: 'Document',
+    icon: 'article',
+    hint: 'A Word-class document. Create new, open a .docx, or place an existing one.',
+    defaultWidth: 640,
+    defaultHeight: 520,
+    defaultContent: '',
+    isWebBased: false
+  },
+  {
+    kind: 'sheet',
+    category: 'Tools',
+    label: 'Spreadsheet',
+    icon: 'grid_on',
+    hint: 'An Excel-class spreadsheet with formulas. Create new, import .xlsx/.csv, or place an existing one.',
+    defaultWidth: 640,
+    defaultHeight: 460,
+    defaultContent: '',
+    isWebBased: false
+  },
+  {
+    kind: 'slides',
+    category: 'Tools',
+    label: 'Slides',
+    icon: 'slideshow',
+    hint: 'A PowerPoint-class deck. Create new, import .pptx, or place an existing one.',
+    defaultWidth: 720,
+    defaultHeight: 480,
+    defaultContent: '',
+    isWebBased: false
+  },
+  {
     kind: 'streamdeck',
     category: 'Tools',
     label: 'SpeedDeck',
