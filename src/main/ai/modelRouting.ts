@@ -36,6 +36,10 @@ const AUTO_ROUTING: Record<AIPurpose, string> = {
   // slides). The user reads and then edits the result, so quality matters;
   // Sonnet is the right default, with the global model-mode override available.
   document: SONNET,
+  // In-editor doc AI: drafting formatted content and rewriting a selection. The
+  // user reads a preview and then commits it into a document they care about, so
+  // quality matters; Sonnet is the right default.
+  doc_rewrite: SONNET,
   // Building a writing-style profile from the user's Sent folder is pure pattern
   // extraction from text — Haiku is purpose-built for it and runs once per
   // session, cached thereafter.

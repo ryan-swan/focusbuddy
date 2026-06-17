@@ -525,6 +525,7 @@ export type AIPurpose =
   | 'desk_agent'
   | 'command_route'
   | 'document'
+  | 'doc_rewrite'
   | 'tone_profile'
   | 'email_reply_draft'
 

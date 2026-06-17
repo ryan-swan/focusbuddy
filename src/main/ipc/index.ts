@@ -258,8 +258,11 @@ import {
   suggestPageContent,
   suggestSetupWidgets,
   suggestTableRows,
-  summarizeRecentTrail
+  summarizeRecentTrail,
+  suggestDocContent,
+  rewriteSelection
 } from '../ai/anthropic'
+import { importDocx, exportDocx, exportPdf, pickImage } from '../officeDocx'
 import { getModelMode, setModelMode } from '../ai/modelRouting'
 import { describeWidgetForAgent } from '../ai/agentInputs'
 import type {
@@ -656,6 +659,21 @@ export function registerIpcHandlers(): void {
     recordAiCall()
     return routeCommandBar(input)
   })
+  // In-editor document AI: formatted insert + selection rewrite.
+  ipcMain.handle('ai:suggestDocContent', (_e, input: { prompt: string }) => {
+    recordAiCall()
+    return suggestDocContent(input)
+  })
+  ipcMain.handle('ai:rewriteSelection', (_e, input: { text: string; instruction: string }) => {
+    recordAiCall()
+    return rewriteSelection(input)
+  })
+
+  // ── Office interop for the document editor (.docx / PDF / image) ───────────
+  ipcMain.handle('office:importDocx', () => importDocx())
+  ipcMain.handle('office:exportDocx', (_e, input: { html: string; title: string }) => exportDocx(input))
+  ipcMain.handle('office:exportPdf', (_e, input: { html: string; title: string }) => exportPdf(input))
+  ipcMain.handle('office:pickImage', () => pickImage())
 
   // ── AI source: PlexiDesk credits vs bring-your-own-key ────────────────────
   // Status snapshot for the settings panel + out-of-credits prompts.

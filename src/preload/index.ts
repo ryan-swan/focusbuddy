@@ -286,6 +286,15 @@ const api = {
       error?: string
       needsApiKey?: boolean
     }> => ipcRenderer.invoke('ai:suggestPageContent', prompt),
+    suggestDocContent: (input: {
+      prompt: string
+    }): Promise<{ ok: boolean; html?: string; error?: string; needsApiKey?: boolean }> =>
+      ipcRenderer.invoke('ai:suggestDocContent', input),
+    rewriteSelection: (input: {
+      text: string
+      instruction: string
+    }): Promise<{ ok: boolean; html?: string; error?: string; needsApiKey?: boolean }> =>
+      ipcRenderer.invoke('ai:rewriteSelection', input),
     suggestTableRows: (
       tableId: string,
       prompt: string,
@@ -1190,6 +1199,24 @@ const api = {
           reason: 'cancelled' | 'unsupported' | 'parse' | 'read' | 'docx_not_supported'
         }
     > => ipcRenderer.invoke('fileImport:run', args)
+  },
+  // Office interop for the document editor: import .docx, export .docx / PDF,
+  // and pick an image to embed.
+  office: {
+    importDocx: (): Promise<{ ok: boolean; html?: string; fileName?: string; error?: string }> =>
+      ipcRenderer.invoke('office:importDocx'),
+    exportDocx: (input: {
+      html: string
+      title: string
+    }): Promise<{ ok: boolean; path?: string; error?: string }> =>
+      ipcRenderer.invoke('office:exportDocx', input),
+    exportPdf: (input: {
+      html: string
+      title: string
+    }): Promise<{ ok: boolean; path?: string; error?: string }> =>
+      ipcRenderer.invoke('office:exportPdf', input),
+    pickImage: (): Promise<{ ok: boolean; dataUrl?: string; error?: string }> =>
+      ipcRenderer.invoke('office:pickImage')
   },
   // Auto-update bridge. Renderer reads the snapshot via getState on
   // mount, then subscribes via onState to receive every transition.

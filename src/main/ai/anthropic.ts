@@ -2623,3 +2623,99 @@ export async function draftReply(
     return { ok: false, error: (e as Error).message }
   }
 }
+
+// ── In-editor document AI: formatted insert + selection rewrite ──────────────
+//
+// These power the doc editor's Ask AI and selection-rewrite flows. Unlike the
+// markdown-based suggestPageContent, they return CONSTRAINED HTML so colour,
+// alignment, tables and other rich formatting survive into the editor. The
+// renderer sanitizes the HTML and converts it to Tiptap JSON before it is shown
+// as a preview and, only on the user's confirmation, inserted.
+
+export interface DocAiResult {
+  ok: boolean
+  html?: string
+  error?: string
+  needsApiKey?: boolean
+}
+
+// The exact tag/style vocabulary the editor (and its sanitizer) accept. Kept in
+// one constant so both prompts speak the same contract.
+const DOC_HTML_CONTRACT =
+  'Reply with a single HTML fragment and nothing else: no preamble, no code fences, no <html>/<body> wrapper. ' +
+  'Use only these tags: h1, h2, h3, h4, p, ul, ol, li, blockquote, pre, code, table, thead, tbody, tr, th, td, ' +
+  'strong, em, u, s, sub, sup, a, mark, span, img, hr, br. ' +
+  'For colour, font or alignment use an inline style limited to color, background-color, font-family, font-size and text-align ' +
+  '(for example <span style="color: #b91c1c">). Do not use classes, ids, scripts or any other attribute.'
+
+const DOC_STYLE_RULE =
+  ' Write in plain, confident, human prose. Do not use em dashes or emoji. Do not use a bold label followed by a colon as a heading substitute; write real sentences.'
+
+export async function suggestDocContent(input: { prompt: string }): Promise<DocAiResult> {
+  const c = getClient()
+  if (!c) return { ok: false, needsApiKey: true, error: 'No Anthropic API key set. Open Settings → AI · API keys to paste one.' }
+  const prompt = input.prompt?.trim()
+  if (!prompt) return { ok: false, error: 'Describe what you want to write.' }
+
+  const system =
+    'You are a writing assistant embedded in a rich-text document editor. The user asks you to draft content, ' +
+    'which will be previewed and then inserted at their cursor. Produce a genuinely useful, well-structured ' +
+    'draft, not an outline of placeholders. ' +
+    DOC_HTML_CONTRACT +
+    DOC_STYLE_RULE
+  try {
+    const resp = await c.messages.create({
+      model: resolveModel('doc_rewrite'),
+      max_tokens: 2000,
+      system,
+      messages: [{ role: 'user', content: prompt }]
+    })
+    if ((resp.stop_reason as string) === 'refusal')
+      return { ok: false, error: 'Claude declined this request. Try rephrasing it.' }
+    const html = resp.content
+      .filter((b) => b.type === 'text')
+      .map((b) => ('text' in b ? b.text : ''))
+      .join('')
+      .trim()
+    if (!html) return { ok: false, error: 'Empty response from model.' }
+    return { ok: true, html }
+  } catch (e) {
+    return { ok: false, error: (e as Error).message }
+  }
+}
+
+export async function rewriteSelection(input: { text: string; instruction: string }): Promise<DocAiResult> {
+  const c = getClient()
+  if (!c) return { ok: false, needsApiKey: true, error: 'No Anthropic API key set. Open Settings → AI · API keys to paste one.' }
+  const text = input.text?.trim()
+  const instruction = input.instruction?.trim()
+  if (!text) return { ok: false, error: 'Select some text to rewrite first.' }
+  if (!instruction) return { ok: false, error: 'Describe how to change the selection.' }
+
+  const system =
+    'You transform a passage of a document according to an instruction. Return ONLY the transformed passage, ' +
+    'preserving the original meaning unless the instruction says otherwise. Do not add commentary or wrap the result in quotes. ' +
+    DOC_HTML_CONTRACT +
+    DOC_STYLE_RULE
+  try {
+    const resp = await c.messages.create({
+      model: resolveModel('doc_rewrite'),
+      max_tokens: 2000,
+      system,
+      messages: [
+        { role: 'user', content: `Instruction: ${instruction}\n\nPassage:\n${text}` }
+      ]
+    })
+    if ((resp.stop_reason as string) === 'refusal')
+      return { ok: false, error: 'Claude declined this request. Try rephrasing it.' }
+    const html = resp.content
+      .filter((b) => b.type === 'text')
+      .map((b) => ('text' in b ? b.text : ''))
+      .join('')
+      .trim()
+    if (!html) return { ok: false, error: 'Empty response from model.' }
+    return { ok: true, html }
+  } catch (e) {
+    return { ok: false, error: (e as Error).message }
+  }
+}

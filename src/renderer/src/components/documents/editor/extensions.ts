@@ -1,0 +1,102 @@
+// The single source of truth for the document editor's Tiptap schema.
+//
+// Both the live editor (DocEditor) and the headless HTML<->JSON converters
+// (docHtml.ts, used by AI inserts and .docx import/export) build their extension
+// list from here. Sharing one definition is the load-bearing guarantee that a
+// round trip through HTML never silently drops or corrupts a node or mark,
+// because the editor and the converter always agree on the schema.
+
+import type { Extension, Mark, Node } from '@tiptap/core'
+import StarterKit from '@tiptap/starter-kit'
+import {
+  TextStyle,
+  Color,
+  FontFamily,
+  FontSize,
+  LineHeight
+} from '@tiptap/extension-text-style'
+import Highlight from '@tiptap/extension-highlight'
+import TextAlign from '@tiptap/extension-text-align'
+import Subscript from '@tiptap/extension-subscript'
+import Superscript from '@tiptap/extension-superscript'
+import TaskList from '@tiptap/extension-task-list'
+import TaskItem from '@tiptap/extension-task-item'
+import Placeholder from '@tiptap/extension-placeholder'
+import CharacterCount from '@tiptap/extension-character-count'
+import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight'
+import { TableKit } from '@tiptap/extension-table'
+import { Markdown } from 'tiptap-markdown'
+import { createLowlight, common } from 'lowlight'
+import { ResizableImage } from './ResizableImage'
+import { SlashCommand } from './SlashMenu'
+import { SearchHighlight } from './searchHighlight'
+
+const lowlight = createLowlight(common)
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnyExt = Extension<any, any> | Mark<any, any> | Node<any, any>
+
+interface BuildOptions {
+  // The live editor wants the interactive niceties (placeholder, slash menu,
+  // image NodeView). The headless converter only needs the schema, so it omits
+  // them — the resulting document JSON is identical either way.
+  interactive?: boolean
+}
+
+export function buildDocExtensions(opts: BuildOptions = {}): AnyExt[] {
+  const interactive = opts.interactive ?? true
+  const exts: AnyExt[] = [
+    // StarterKit v3 already provides bold, italic, strike, code, underline,
+    // link, bullet/ordered/list-item, blockquote, horizontal-rule, heading and
+    // undo/redo. We turn its plain code block off in favour of the syntax-
+    // highlighted one below, widen headings to H1-H6, and configure links to not
+    // navigate on click (the editor opens an edit popover instead).
+    StarterKit.configure({
+      codeBlock: false,
+      heading: { levels: [1, 2, 3, 4, 5, 6] },
+      link: { openOnClick: false, autolink: true }
+    }) as AnyExt,
+    // Inline text styling, all carried on the textStyle mark so colour, font and
+    // size coexist on one selection and serialise to inline CSS (which is what
+    // .docx import/export round-trips through).
+    TextStyle,
+    Color,
+    FontFamily,
+    FontSize,
+    LineHeight,
+    Highlight.configure({ multicolor: true }),
+    TextAlign.configure({ types: ['heading', 'paragraph'] }),
+    Subscript,
+    Superscript,
+    // Tables with interactive column resizing.
+    TableKit.configure({ table: { resizable: true } }) as AnyExt,
+    TaskList,
+    TaskItem.configure({ nested: true }),
+    CodeBlockLowlight.configure({ lowlight }),
+    // html:true keeps formatting (colour, alignment, tables) when AI/imported
+    // HTML is pasted or inserted, instead of flattening to plain markdown.
+    Markdown.configure({ html: true, transformPastedText: true, transformCopiedText: false }) as AnyExt
+  ]
+
+  if (interactive) {
+    exts.push(
+      ResizableImage.configure({ inline: false, allowBase64: true }) as AnyExt,
+      Placeholder.configure({
+        placeholder: 'Write something, press "/" for commands, or use Ask AI…'
+      }),
+      CharacterCount as AnyExt,
+      SlashCommand as AnyExt,
+      SearchHighlight as AnyExt
+    )
+  } else {
+    // Headless: a plain image node with the identical schema (no NodeView) plus
+    // the character counter, so generateJSON/generateHTML parse images and never
+    // touch React.
+    exts.push(
+      ResizableImage.configure({ inline: false, allowBase64: true }) as AnyExt,
+      CharacterCount as AnyExt
+    )
+  }
+
+  return exts
+}
