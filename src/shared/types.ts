@@ -525,6 +525,23 @@ export type AIPurpose =
   | 'desk_agent'
   | 'command_route'
   | 'document'
+  | 'tone_profile'
+  | 'email_reply_draft'
+
+// Result of asking AI to draft a reply to an open email in the user's voice.
+// `skip` is the expected, non-error outcome for newsletters / no-reply senders /
+// nothing-to-reply-to. `needsApiKey` distinguishes a missing key from a real
+// failure so the UI can point at Settings instead of showing a scary error.
+export interface EmailReplyDraftResult {
+  ok: boolean
+  reply?: string
+  confidence?: number
+  note?: string
+  skip?: boolean
+  skipReason?: string
+  needsApiKey?: boolean
+  error?: string
+}
 
 // Desk time-travel: metadata for one canvas snapshot (the full widget payload
 // lives in the DB and is fetched on demand).
@@ -1075,7 +1092,36 @@ export interface MailFullMessage {
   text: string
   html: string | null
   attachments: { filename: string; size: number; contentType: string }[]
+  // RFC822 Message-ID of this message and the References chain it carried, used
+  // to thread a reply correctly (In-Reply-To + References headers on the way
+  // out). Null when the server/message did not provide them.
+  messageId: string | null
+  references: string[]
+  // Every recipient address on the original (To + Cc), so a "Reply all" can be
+  // pre-populated without re-parsing. Excludes the user's own address at send
+  // time, not here.
+  toAddresses: string[]
+  ccAddresses: string[]
 }
+
+// What the renderer hands the main process to send a message. Sent through the
+// same account the user reads with; the main process derives SMTP from the
+// stored IMAP host and reuses the stored app password.
+export interface MailSendInput {
+  to: string[]
+  cc?: string[]
+  bcc?: string[]
+  subject: string
+  // Plain-text body the user typed. HTML is generated from it on send so the
+  // message has both parts; we do not author raw HTML in the composer.
+  text: string
+  // Threading headers when this is a reply — the original's Message-ID and the
+  // References chain to append it to.
+  inReplyTo?: string | null
+  references?: string[]
+}
+
+export type MailSendResult = { ok: true } | { ok: false; error: string }
 
 // ── Office documents (doc / sheet / slides) ─────────────────────────────────
 // Standalone files created and edited as first-class artifacts. One table, one

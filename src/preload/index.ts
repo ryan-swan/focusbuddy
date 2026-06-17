@@ -29,6 +29,9 @@ import type {
   MailAccountPublic,
   MailListItem,
   MailFullMessage,
+  MailSendInput,
+  MailSendResult,
+  EmailReplyDraftResult,
   DocType,
   DocumentDraft,
   DocumentMeta,
@@ -1080,7 +1083,14 @@ const api = {
     ): Promise<{ ok: true; message: MailFullMessage } | { ok: false; error: string }> =>
       ipcRenderer.invoke('mail:get', uid),
     markSeen: (uid: number): Promise<{ ok: true } | { ok: false; error: string }> =>
-      ipcRenderer.invoke('mail:markSeen', uid)
+      ipcRenderer.invoke('mail:markSeen', uid),
+    send: (input: MailSendInput): Promise<MailSendResult> =>
+      ipcRenderer.invoke('mail:send', input),
+    suggestReply: (incoming: {
+      subject: string
+      from: string
+      body: string
+    }): Promise<EmailReplyDraftResult> => ipcRenderer.invoke('mail:suggestReply', incoming)
   },
   // Office documents — standalone doc / sheet / slides files, created with AI
   // and edited full-screen. CRUD plus the AI "create" generator.

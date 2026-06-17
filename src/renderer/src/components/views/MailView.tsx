@@ -3,6 +3,7 @@ import { useMailStore, selectMailUnread } from '../../stores/mail'
 import { useViewStore } from '../../stores/view'
 import type { MailAccountInput } from '@shared/types'
 import Icon from '../Icon'
+import ComposeDialog from '../ComposeDialog'
 
 // Mail — the IMAP email inbox. The user connects their own mailbox (Gmail,
 // Outlook, iCloud, Fastmail, any IMAP host) and reads it here, inside the
@@ -256,11 +257,30 @@ function SetupForm({ onConnected }: { onConnected: () => void }): JSX.Element {
 function ReadingPane(): JSX.Element {
   const open = useMailStore((s) => s.open)
   const loading = useMailStore((s) => s.loadingOpen)
+  const startCompose = useMailStore((s) => s.startCompose)
+  const replyToOpen = useMailStore((s) => s.replyToOpen)
+  const replyDraft = useMailStore((s) => s.replyDraft)
+  const loadingDraft = useMailStore((s) => s.loadingDraft)
+  const suggestReply = useMailStore((s) => s.suggestReply)
   const [taskState, setTaskState] = useState<'idle' | 'making' | 'done'>('idle')
+  const [taskError, setTaskError] = useState<string | null>(null)
+  const [draftDismissed, setDraftDismissed] = useState(false)
 
   useEffect(() => {
     setTaskState('idle')
+    setTaskError(null)
+    setDraftDismissed(false)
   }, [open?.uid])
+
+  // Open the composer with the AI draft on top of the quoted original.
+  function applyDraft(replyText: string): void {
+    const seed = replyToOpen(false)
+    startCompose({
+      ...(seed ?? {}),
+      text: `${replyText}\n${seed?.text ?? ''}`,
+      aiDrafted: true
+    })
+  }
 
   if (loading && !open) {
     return (
@@ -280,14 +300,33 @@ function ReadingPane(): JSX.Element {
   async function makeTask(): Promise<void> {
     if (!open) return
     setTaskState('making')
+    setTaskError(null)
     const snippet = open.text.trim().slice(0, 400)
-    await window.api.nodes.create({
-      parentId: null,
-      kind: 'task',
-      title: open.subject || '(no subject)',
-      description: `From ${open.fromName} <${open.fromAddress}>\n\n${snippet}`
+    try {
+      await window.api.nodes.create({
+        parentId: null,
+        kind: 'task',
+        title: open.subject || '(no subject)',
+        description: `From ${open.fromName} <${open.fromAddress}>\n\n${snippet}`
+      })
+      setTaskState('done')
+    } catch (e) {
+      // Previously this had no catch, so a failed create left the button stuck
+      // on "Adding…" forever and read as broken. Surface the real error and
+      // let the user try again.
+      setTaskState('idle')
+      setTaskError((e as Error)?.message ?? 'Could not create the task.')
+    }
+  }
+
+  function forwardOpen(): void {
+    if (!open) return
+    const when = open.date ? new Date(open.date).toLocaleString() : ''
+    const header = `---------- Forwarded message ----------\nFrom: ${open.fromName} <${open.fromAddress}>\nDate: ${when}\nSubject: ${open.subject}\n\n`
+    startCompose({
+      subject: /^fwd:/i.test(open.subject) ? open.subject : `Fwd: ${open.subject}`,
+      text: `\n\n${header}${open.text}`
     })
-    setTaskState('done')
   }
 
   return (
@@ -301,7 +340,28 @@ function ReadingPane(): JSX.Element {
           {open.fromAddress && <span className="text-stone-400">&lt;{open.fromAddress}&gt;</span>}
           <span className="ml-auto">{fmtTime(open.date)}</span>
         </div>
-        <div className="flex items-center gap-2 mt-2.5">
+        <div className="flex items-center gap-2 mt-2.5 flex-wrap">
+          <button
+            onClick={() => startCompose(replyToOpen(false) ?? undefined)}
+            className="text-[12px] px-2.5 py-1 rounded-lg border border-stone-300 dark:border-stone-600 text-stone-600 dark:text-stone-300 hover:border-accent inline-flex items-center gap-1.5"
+          >
+            <Icon name="reply" size={13} />
+            Reply
+          </button>
+          <button
+            onClick={() => startCompose(replyToOpen(true) ?? undefined)}
+            className="text-[12px] px-2.5 py-1 rounded-lg border border-stone-300 dark:border-stone-600 text-stone-600 dark:text-stone-300 hover:border-accent inline-flex items-center gap-1.5"
+          >
+            <Icon name="reply_all" size={13} />
+            Reply all
+          </button>
+          <button
+            onClick={forwardOpen}
+            className="text-[12px] px-2.5 py-1 rounded-lg border border-stone-300 dark:border-stone-600 text-stone-600 dark:text-stone-300 hover:border-accent inline-flex items-center gap-1.5"
+          >
+            <Icon name="forward" size={13} />
+            Forward
+          </button>
           <button
             onClick={() => void makeTask()}
             disabled={taskState !== 'idle'}
@@ -317,7 +377,89 @@ function ReadingPane(): JSX.Element {
             </span>
           )}
         </div>
+        {taskError && (
+          <div className="mt-1.5 text-[11px] text-red-600 dark:text-red-400">{taskError}</div>
+        )}
       </div>
+
+      {!draftDismissed && (loadingDraft || replyDraft) && (
+        <div className="border-b border-stone-200 dark:border-stone-800 px-5 py-3 bg-violet-50/50 dark:bg-violet-950/10">
+          {loadingDraft ? (
+            <div className="flex items-center gap-2 text-[12px] text-violet-700 dark:text-violet-300">
+              <Icon name="auto_awesome" size={14} className="animate-pulse" />
+              Drafting a reply in your voice…
+            </div>
+          ) : replyDraft?.ok && replyDraft.reply ? (
+            <div>
+              <div className="flex items-center gap-1.5 mb-1.5">
+                <Icon name="auto_awesome" size={14} className="text-violet-600 dark:text-violet-400" />
+                <span className="text-[11px] uppercase tracking-wider font-medium text-violet-700 dark:text-violet-300">
+                  Suggested reply
+                </span>
+                {typeof replyDraft.confidence === 'number' && (
+                  <span className="text-[10px] text-stone-400">
+                    {Math.round(replyDraft.confidence * 100)}% confident
+                  </span>
+                )}
+              </div>
+              <p className="text-[13px] text-stone-800 dark:text-stone-200 whitespace-pre-wrap leading-relaxed max-h-40 overflow-auto">
+                {replyDraft.reply}
+              </p>
+              {replyDraft.note && (
+                <p className="mt-1 text-[11px] text-stone-500 dark:text-stone-400 italic">
+                  {replyDraft.note}
+                </p>
+              )}
+              <div className="flex items-center gap-2 mt-2">
+                <button
+                  onClick={() => applyDraft(replyDraft.reply as string)}
+                  className="text-[12px] px-2.5 py-1 rounded-lg bg-accent text-white hover:brightness-110 inline-flex items-center gap-1.5"
+                >
+                  <Icon name="edit" size={13} />
+                  Edit and send
+                </button>
+                <button
+                  onClick={() => open && void suggestReply(open)}
+                  className="text-[12px] px-2 py-1 rounded-lg text-stone-500 hover:text-stone-700 dark:hover:text-stone-300"
+                >
+                  Redraft
+                </button>
+                <button
+                  onClick={() => setDraftDismissed(true)}
+                  className="ml-auto text-[12px] px-2 py-1 rounded-lg text-stone-400 hover:text-stone-600 dark:hover:text-stone-300"
+                >
+                  Dismiss
+                </button>
+              </div>
+            </div>
+          ) : replyDraft?.skip ? (
+            <div className="flex items-center gap-2 text-[12px] text-stone-500 dark:text-stone-400">
+              <Icon name="auto_awesome" size={13} />
+              <span>AI saw no reply needed{replyDraft.skipReason ? ` — ${replyDraft.skipReason}` : ''}.</span>
+              <button
+                onClick={() => setDraftDismissed(true)}
+                className="ml-auto text-stone-400 hover:text-stone-600 dark:hover:text-stone-300"
+              >
+                <Icon name="close" size={13} />
+              </button>
+            </div>
+          ) : replyDraft?.needsApiKey ? (
+            <div className="text-[12px] text-stone-500 dark:text-stone-400">
+              Add an Anthropic API key in Settings to get AI reply suggestions.
+            </div>
+          ) : replyDraft?.error ? (
+            <div className="flex items-center gap-2 text-[12px] text-stone-500 dark:text-stone-400">
+              <span>Could not draft a reply. {replyDraft.error}</span>
+              <button
+                onClick={() => open && void suggestReply(open)}
+                className="text-accent hover:underline"
+              >
+                Try again
+              </button>
+            </div>
+          ) : null}
+        </div>
+      )}
 
       <div className="flex-1 overflow-auto">
         {open.html ? (
@@ -367,6 +509,9 @@ export default function MailView(): JSX.Element {
   const refresh = useMailStore((s) => s.refresh)
   const openMessage = useMailStore((s) => s.openMessage)
   const disconnect = useMailStore((s) => s.disconnect)
+  const composing = useMailStore((s) => s.composing)
+  const startCompose = useMailStore((s) => s.startCompose)
+  const closeCompose = useMailStore((s) => s.closeCompose)
 
   const [reconfiguring, setReconfiguring] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
@@ -405,6 +550,13 @@ export default function MailView(): JSX.Element {
               {account?.email}
             </p>
           </div>
+          <button
+            onClick={() => startCompose()}
+            className="icon-btn"
+            title="Compose a new message"
+          >
+            <Icon name="edit_square" size={15} />
+          </button>
           <button onClick={() => void refresh()} className="icon-btn" title="Refresh">
             <Icon name="refresh" size={15} className={loadingList ? 'animate-spin' : ''} />
           </button>
@@ -491,6 +643,10 @@ export default function MailView(): JSX.Element {
       </div>
 
       <ReadingPane />
+
+      {composing && (
+        <ComposeDialog initial={composing} onClose={closeCompose} onSent={() => void refresh()} />
+      )}
     </div>
   )
 }

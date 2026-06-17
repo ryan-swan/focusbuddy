@@ -26,7 +26,8 @@ import {
   testConnection as testMailConnection,
   listInbox,
   getMessage,
-  markSeen
+  markSeen,
+  resetConnection as resetMailConnection
 } from '../mail/imap'
 import {
   listDocuments,
@@ -36,7 +37,9 @@ import {
   deleteDocument
 } from '../db/documents'
 import { generateDocument } from '../ai/anthropic'
-import type { DocType, DocumentDraft, DocumentPatch } from '@shared/types'
+import type { DocType, DocumentDraft, DocumentPatch, MailSendInput } from '@shared/types'
+import { sendMail } from '../mail/smtp'
+import { suggestReply, resetToneCache } from '../mail/aiReply'
 import Anthropic from '@anthropic-ai/sdk'
 import {
   createNode,
@@ -1316,6 +1319,24 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle('settings:encryptionAvailable', () => encryptionAvailable())
 
+  // Turn a nodemailer/SMTP send failure into a short, human message. The auth
+  // case is the common one — Gmail and friends reject a normal password and
+  // need an app-specific one, the same as the IMAP side.
+  function explainSendError(err: unknown): string {
+    const e = (err ?? {}) as { code?: string; responseCode?: number; message?: string }
+    const msg = [e.code, e.message].filter(Boolean).join(' ')
+    if (e.code === 'EAUTH' || e.responseCode === 535 || /auth|credential|password|535/i.test(msg)) {
+      return 'The mail server rejected the login when sending. Gmail, iCloud and Fastmail need an app-specific password, not your normal one.'
+    }
+    if (e.code === 'EENVELOPE' || /no recipients|envelope/i.test(msg)) {
+      return 'The server rejected the recipients. Check the To, Cc and Bcc addresses.'
+    }
+    if (/ECONNECTION|ETIMEDOUT|ECONNREFUSED|timeout|ESOCKET| EDNS|ENOTFOUND/i.test(msg)) {
+      return 'Could not reach the sending server. Check your connection and try again.'
+    }
+    return e.message || 'Sending failed.'
+  }
+
   // ── Mail (IMAP) ────────────────────────────────────────────────────────
   // The user's own mailbox, connected directly from the desktop. The renderer
   // only ever sees host/port/user (never the password), proposes a config to
@@ -1329,6 +1350,11 @@ export function registerIpcHandlers(): void {
       const result = await testMailConnection(config)
       if (!result.ok) return result
       mailAccount.save(config)
+      // Drop any warm connection so the next fetch reconnects with the
+      // just-saved credentials (a password change keeps the same host/user),
+      // and forget the learned tone — it was sampled from the old mailbox.
+      resetMailConnection()
+      resetToneCache()
       return { ok: true as const, account: mailAccount.getPublic() }
     } catch (err) {
       return { ok: false as const, error: (err as Error).message }
@@ -1341,6 +1367,10 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle('mail:clearAccount', () => {
     mailAccount.clear()
+    // Close the live socket and forget the learned tone — the account they both
+    // belonged to is gone.
+    resetMailConnection()
+    resetToneCache()
     return { ok: true as const }
   })
 
@@ -1375,6 +1405,42 @@ export function registerIpcHandlers(): void {
       return { ok: true as const }
     } catch (err) {
       return { ok: false as const, error: (err as Error).message }
+    }
+  })
+
+  ipcMain.handle(
+    'mail:suggestReply',
+    async (_e, incoming: { subject: string; from: string; body: string }) => {
+      const config = mailAccount.getFull()
+      if (!config) return { ok: false as const, error: 'No mail account connected.' }
+      return suggestReply(config, {
+        subject: incoming?.subject ?? '',
+        from: incoming?.from ?? '',
+        body: incoming?.body ?? ''
+      })
+    }
+  )
+
+  ipcMain.handle('mail:send', async (_e, input: MailSendInput) => {
+    const config = mailAccount.getFull()
+    if (!config) return { ok: false as const, error: 'No mail account connected.' }
+    const to = (input.to ?? []).map((a) => a.trim()).filter(Boolean)
+    if (to.length === 0) {
+      return { ok: false as const, error: 'Add at least one recipient.' }
+    }
+    try {
+      await sendMail(config, {
+        to,
+        cc: (input.cc ?? []).map((a) => a.trim()).filter(Boolean),
+        bcc: (input.bcc ?? []).map((a) => a.trim()).filter(Boolean),
+        subject: input.subject ?? '',
+        text: input.text ?? '',
+        inReplyTo: input.inReplyTo,
+        references: input.references
+      })
+      return { ok: true as const }
+    } catch (err) {
+      return { ok: false as const, error: explainSendError(err) }
     }
   })
 

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { AxisValue, BrowsingHistoryEntry, FbNode, NodeKind, Template } from '@shared/types'
 import { useNodeStore } from '../stores/nodes'
 import { useCapabilityEnabled } from '../stores/capabilities'
@@ -56,6 +56,30 @@ export default function NewNodeDialog({
   const templates = useTemplateStore((s) => s.templates)
   const refreshTemplates = useTemplateStore((s) => s.refresh)
   const velocity = useMemo(() => computeVelocity(allNodes), [allNodes])
+
+  // Folders the new task can live in, and existing tasks the user might want to
+  // jump to instead of creating a new one. Both drive the destination controls
+  // we add below for the "+add" flow.
+  const folders = useMemo(() => allNodes.filter((n) => n.kind === 'folder' && !n.archived), [allNodes])
+  const existingTasks = useMemo(
+    () => allNodes.filter((n) => n.kind === 'task' && !n.archived),
+    [allNodes]
+  )
+  const NEW_FOLDER = '__new_folder__'
+  // Where the new task lands. Defaults to the parent we were opened with; for a
+  // top-level "+add" (parentId null) we default to the first folder if one
+  // exists so a stray task does not get orphaned at the root.
+  const [destParent, setDestParent] = useState<string | null>(() => {
+    if (parentId && allNodes.some((n) => n.id === parentId && n.kind === 'folder')) return parentId
+    return null
+  })
+  const [folderPickerOpen, setFolderPickerOpen] = useState(false)
+  const [folderQuery, setFolderQuery] = useState('')
+  const [newFolderName, setNewFolderName] = useState('')
+  // Quick-jump: search existing tasks and switch to one for fast navigation,
+  // instead of creating a new task at all.
+  const [jumpQuery, setJumpQuery] = useState('')
+  const jumpRef = useRef<HTMLDivElement | null>(null)
 
   const [title, setTitle] = useState(node?.title ?? '')
   const [description, setDescription] = useState(node?.description ?? '')
@@ -123,8 +147,32 @@ export default function NewNodeDialog({
         return
       }
 
+      // Resolve where a new task lands. Folders keep the parent they were
+      // opened with; a task uses the destination the user picked, creating a
+      // new folder first when they asked for one.
+      let resolvedParent = parentId
+      if (effectiveKind === 'task') {
+        if (destParent === NEW_FOLDER) {
+          const name = newFolderName.trim()
+          if (!name) {
+            setBusy(false)
+            // Reopen the picker so the missing name is obvious.
+            setFolderPickerOpen(true)
+            return
+          }
+          const folder = await create({
+            parentId: null,
+            kind: 'folder',
+            title: name
+          } as Parameters<typeof create>[0])
+          resolvedParent = folder.id
+        } else {
+          resolvedParent = destParent
+        }
+      }
+
       const created = await create({
-        parentId,
+        parentId: resolvedParent,
         kind: effectiveKind,
         title: title.trim(),
         description: description.trim(),
@@ -222,6 +270,56 @@ export default function NewNodeDialog({
         </div>
 
         <div className="px-5 py-4 space-y-4 overflow-y-auto">
+          {!isEdit && effectiveKind === 'task' && existingTasks.length > 0 && (
+            <div ref={jumpRef}>
+              <label className="block text-[11px] uppercase tracking-wider text-stone-500 dark:text-stone-400 font-medium mb-1.5 flex items-center gap-1.5">
+                <Icon name="bolt" size={12} />
+                Jump to an existing task
+                <span className="normal-case text-stone-400">— or fill in a new one below</span>
+              </label>
+              <input
+                value={jumpQuery}
+                onChange={(e) => setJumpQuery(e.target.value)}
+                placeholder="Search your tasks…"
+                className="w-full bg-white dark:bg-stone-800 border border-stone-300 dark:border-stone-600 rounded-md px-3 py-2 text-sm text-stone-900 dark:text-stone-100 focus:outline-none focus:border-stone-700 dark:focus:border-stone-400 focus:ring-2 focus:ring-stone-200 dark:focus:ring-stone-700"
+              />
+              {jumpQuery.trim() && (
+                <div className="mt-1 max-h-44 overflow-auto rounded-md border border-stone-200 dark:border-stone-700">
+                  {existingTasks
+                    .filter((t) =>
+                      (t.title || '').toLowerCase().includes(jumpQuery.trim().toLowerCase())
+                    )
+                    .slice(0, 30)
+                    .map((t) => {
+                      const folder = allNodes.find((n) => n.id === t.parentId)
+                      return (
+                        <button
+                          key={t.id}
+                          type="button"
+                          onClick={() => {
+                            setActive(t.id)
+                            onClose()
+                          }}
+                          className="w-full text-left px-3 py-1.5 text-sm flex items-center justify-between gap-2 text-stone-800 dark:text-stone-100 hover:bg-stone-100 dark:hover:bg-stone-800"
+                        >
+                          <span className="truncate">{t.title || '(untitled task)'}</span>
+                          {folder && (
+                            <span className="text-[10px] text-stone-400 shrink-0 truncate max-w-[140px]">
+                              {folder.title}
+                            </span>
+                          )}
+                        </button>
+                      )
+                    })}
+                  {existingTasks.filter((t) =>
+                    (t.title || '').toLowerCase().includes(jumpQuery.trim().toLowerCase())
+                  ).length === 0 && (
+                    <div className="px-3 py-1.5 text-[11px] text-stone-400">No tasks match.</div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
           <div>
             <label className="block text-[11px] uppercase tracking-wider text-stone-500 dark:text-stone-400 font-medium mb-1.5">
               {effectiveKind === 'folder' ? 'Project name' : 'Task title'}
@@ -251,6 +349,93 @@ export default function NewNodeDialog({
               className="w-full bg-white dark:bg-stone-800 border border-stone-300 dark:border-stone-600 rounded-md px-3 py-2 text-sm text-stone-900 dark:text-stone-100 focus:outline-none focus:border-stone-700 dark:focus:border-stone-400 focus:ring-2 focus:ring-stone-200 dark:focus:ring-stone-700 resize-none"
             />
           </div>
+
+          {effectiveKind === 'task' && !isEdit && (
+            <div>
+              <label className="block text-[11px] uppercase tracking-wider text-stone-500 dark:text-stone-400 font-medium mb-1.5">
+                Folder
+              </label>
+              {!folderPickerOpen ? (
+                <button
+                  type="button"
+                  onClick={() => setFolderPickerOpen(true)}
+                  className="w-full flex items-center justify-between gap-2 bg-white dark:bg-stone-800 border border-stone-300 dark:border-stone-600 rounded-md px-3 py-2 text-sm text-stone-800 dark:text-stone-100 hover:border-stone-400"
+                >
+                  <span className="truncate flex items-center gap-1.5">
+                    <Icon name="folder" size={14} className="text-stone-400" />
+                    {destParent === NEW_FOLDER
+                      ? newFolderName.trim() || 'New folder…'
+                      : destParent
+                        ? folders.find((f) => f.id === destParent)?.title || '(folder)'
+                        : 'Top level (no folder)'}
+                  </span>
+                  <span className="text-[11px] text-stone-400 shrink-0">Change</span>
+                </button>
+              ) : (
+                <div className="rounded-md border border-stone-200 dark:border-stone-700 overflow-hidden">
+                  <input
+                    autoFocus
+                    value={folderQuery}
+                    onChange={(e) => setFolderQuery(e.target.value)}
+                    placeholder="Search folders…"
+                    className="w-full bg-white dark:bg-stone-800 border-b border-stone-200 dark:border-stone-700 px-3 py-2 text-sm text-stone-900 dark:text-stone-100 focus:outline-none"
+                  />
+                  <div className="max-h-40 overflow-auto">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDestParent(null)
+                        setFolderPickerOpen(false)
+                      }}
+                      className="w-full text-left px-3 py-1.5 text-sm text-stone-700 dark:text-stone-200 hover:bg-stone-100 dark:hover:bg-stone-800"
+                    >
+                      Top level (no folder)
+                    </button>
+                    {folders
+                      .filter((f) =>
+                        (f.title || '').toLowerCase().includes(folderQuery.trim().toLowerCase())
+                      )
+                      .map((f) => (
+                        <button
+                          key={f.id}
+                          type="button"
+                          onClick={() => {
+                            setDestParent(f.id)
+                            setFolderPickerOpen(false)
+                          }}
+                          className={`w-full text-left px-3 py-1.5 text-sm hover:bg-stone-100 dark:hover:bg-stone-800 ${
+                            destParent === f.id
+                              ? 'text-accent bg-accent/[0.06]'
+                              : 'text-stone-800 dark:text-stone-100'
+                          }`}
+                        >
+                          {f.title || '(untitled folder)'}
+                        </button>
+                      ))}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDestParent(NEW_FOLDER)
+                        if (folderQuery.trim()) setNewFolderName(folderQuery.trim())
+                        setFolderPickerOpen(false)
+                      }}
+                      className="w-full text-left px-3 py-1.5 text-sm text-accent border-t border-stone-200 dark:border-stone-700 hover:bg-accent/5"
+                    >
+                      + Create new folder{folderQuery.trim() ? ` "${folderQuery.trim()}"` : '…'}
+                    </button>
+                  </div>
+                </div>
+              )}
+              {destParent === NEW_FOLDER && !folderPickerOpen && (
+                <input
+                  value={newFolderName}
+                  onChange={(e) => setNewFolderName(e.target.value)}
+                  placeholder="New folder name"
+                  className="mt-1.5 w-full bg-white dark:bg-stone-800 border border-stone-300 dark:border-stone-600 rounded-md px-3 py-2 text-sm text-stone-900 dark:text-stone-100 focus:outline-none focus:border-accent"
+                />
+              )}
+            </div>
+          )}
 
           {effectiveKind === 'task' && (
             <>

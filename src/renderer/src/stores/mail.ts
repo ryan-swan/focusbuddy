@@ -3,7 +3,9 @@ import type {
   MailAccountInput,
   MailAccountPublic,
   MailListItem,
-  MailFullMessage
+  MailFullMessage,
+  MailSendInput,
+  EmailReplyDraftResult
 } from '@shared/types'
 
 // Mail store — the IMAP inbox the user connects with their own mailbox. All
@@ -11,6 +13,20 @@ import type {
 // status, the message list (envelope only), and the one open message body, and
 // it drives both the dedicated Mail view and the email rows in the unified
 // Inbox feed.
+
+// Seed values for the compose window — new mail, reply, reply-all or forward.
+// Lives here (not in the component) so any part of the app can open a composer
+// through the store without a circular import.
+export interface ComposeInitial {
+  to?: string[]
+  cc?: string[]
+  bcc?: string[]
+  subject?: string
+  text?: string
+  inReplyTo?: string | null
+  references?: string[]
+  aiDrafted?: boolean
+}
 
 interface MailStore {
   account: MailAccountPublic | null
@@ -21,6 +37,14 @@ interface MailStore {
   loadingList: boolean
   loadingOpen: boolean
   error: string | null
+  // The compose window, when one is open. null = closed.
+  composing: ComposeInitial | null
+  // Proactive AI reply draft for the open message. draftUid ties the draft to
+  // the message it was made for, so a fast click-through never shows a stale
+  // draft against the wrong email.
+  replyDraft: EmailReplyDraftResult | null
+  draftUid: number | null
+  loadingDraft: boolean
 
   loadAccount: () => Promise<void>
   saveAccount: (config: MailAccountInput) => Promise<{ ok: boolean; error?: string }>
@@ -29,6 +53,19 @@ interface MailStore {
   refresh: () => Promise<void>
   openMessage: (uid: number) => Promise<void>
   closeMessage: () => void
+  // Send a message (new, reply, or reply-all). Returns the result so the
+  // composer can show an inline error and stay open on failure.
+  send: (input: MailSendInput) => Promise<{ ok: boolean; error?: string }>
+  // Open / close the compose window.
+  startCompose: (initial?: ComposeInitial) => void
+  closeCompose: () => void
+  // Build reply seed values from the currently-open message. `all` includes the
+  // other recipients (reply-all); otherwise just the original sender.
+  replyToOpen: (all: boolean) => ComposeInitial | null
+  // Ask AI to draft a reply to a message in the user's voice. Runs
+  // automatically when a message is opened (the user opted into proactive
+  // drafts) and can be re-run manually.
+  suggestReply: (msg: MailFullMessage) => Promise<void>
 }
 
 /** Count of unread messages in the current list — a derived selector. */
@@ -44,6 +81,10 @@ export const useMailStore = create<MailStore>((set, get) => ({
   loadingList: false,
   loadingOpen: false,
   error: null,
+  composing: null,
+  replyDraft: null,
+  draftUid: null,
+  loadingDraft: false,
 
   loadAccount: async () => {
     const account = await window.api.mail.getAccount()
@@ -84,7 +125,8 @@ export const useMailStore = create<MailStore>((set, get) => ({
   },
 
   openMessage: async (uid) => {
-    set({ loadingOpen: true, openUid: uid, error: null })
+    // Opening a different message clears any draft for the previous one.
+    set({ loadingOpen: true, openUid: uid, error: null, replyDraft: null, draftUid: null })
     const r = await window.api.mail.get(uid)
     if (!r.ok) {
       set({ loadingOpen: false, error: r.error })
@@ -96,7 +138,65 @@ export const useMailStore = create<MailStore>((set, get) => ({
       messages: s.messages.map((m) => (m.uid === uid ? { ...m, seen: true } : m))
     }))
     void window.api.mail.markSeen(uid)
+    // Proactively draft a reply in the user's voice (their opt-in choice).
+    void get().suggestReply(r.message)
   },
 
-  closeMessage: () => set({ open: null, openUid: null })
+  closeMessage: () =>
+    set({ open: null, openUid: null, replyDraft: null, draftUid: null, loadingDraft: false }),
+
+  send: async (input) => {
+    const r = await window.api.mail.send(input)
+    return r.ok ? { ok: true } : { ok: false, error: r.error }
+  },
+
+  startCompose: (initial) => set({ composing: initial ?? {} }),
+  closeCompose: () => set({ composing: null }),
+
+  replyToOpen: (all) => {
+    const { open, account } = get()
+    if (!open) return null
+    const self = (account?.email || account?.user || '').toLowerCase()
+    const subject = /^re:/i.test(open.subject) ? open.subject : `Re: ${open.subject}`
+    // Reply goes to the original sender. Reply-all adds the other To/Cc
+    // recipients, minus the sender (already in To) and the user's own address.
+    const to = [open.fromAddress].filter(Boolean)
+    let cc: string[] = []
+    if (all) {
+      const senderLc = open.fromAddress.toLowerCase()
+      cc = [...open.toAddresses, ...open.ccAddresses].filter(
+        (a) => a && a.toLowerCase() !== self && a.toLowerCase() !== senderLc
+      )
+      // De-dupe while preserving order.
+      cc = [...new Set(cc)]
+    }
+    // Quote the original under an attribution line, prefixing each line with "> ".
+    const when = open.date ? new Date(open.date).toLocaleString() : ''
+    const quoted = open.text
+      .split('\n')
+      .map((l) => `> ${l}`)
+      .join('\n')
+    const text = `\n\nOn ${when}, ${open.fromName} <${open.fromAddress}> wrote:\n${quoted}\n`
+    // Thread the reply: In-Reply-To is the original Message-ID; References is
+    // the original's chain with the Message-ID appended.
+    const references = open.messageId
+      ? [...open.references, open.messageId]
+      : open.references
+    return { to, cc, subject, text, inReplyTo: open.messageId, references }
+  },
+
+  suggestReply: async (msg) => {
+    set({ loadingDraft: true, replyDraft: null, draftUid: msg.uid })
+    const from = msg.fromAddress
+      ? `${msg.fromName} <${msg.fromAddress}>`
+      : msg.fromName || 'Unknown sender'
+    const r = await window.api.mail.suggestReply({
+      subject: msg.subject,
+      from,
+      body: msg.text
+    })
+    // A newer open may have superseded this draft while the call was in flight.
+    if (get().draftUid !== msg.uid) return
+    set({ replyDraft: r, loadingDraft: false })
+  }
 }))

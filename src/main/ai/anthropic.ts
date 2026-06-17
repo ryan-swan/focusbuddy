@@ -19,6 +19,7 @@ import type {
   BodyDoubleResponse,
   ChatRequest,
   ChatResponse,
+  EmailReplyDraftResult,
   LivingPageRegenerateResponse,
   SetupSuggestResponse,
   SmartStackGroup,
@@ -2440,6 +2441,183 @@ export async function designAgentProfile(description: string): Promise<AgentProf
       name: String(parsed.name).slice(0, 40),
       blurb: String(parsed.blurb ?? '').slice(0, 120),
       systemPrompt: String(parsed.systemPrompt).slice(0, 1200)
+    }
+  } catch (e) {
+    return { ok: false, error: (e as Error).message }
+  }
+}
+
+// ── Mail: tone profiling + reply drafting ───────────────────────────────────
+//
+// Two calls power the proactive "draft a reply in my voice" feature. The first
+// distils the user's Sent-folder samples into a short style descriptor; the
+// second drafts a reply to one incoming email using that descriptor. The hard
+// rule across both is the no-fakery one — describe only the voice that is
+// actually in the samples, and never invent facts, dates or commitments in a
+// reply. The caller sanitises samples + the incoming body before they get here.
+
+/**
+ * Build a compact writing-style profile (100-200 words of plain prose) from a
+ * set of the user's own sent-email bodies. Returns the descriptor string, or an
+ * error result. Routed to Haiku — this is pattern extraction, not reasoning.
+ */
+export async function buildToneProfile(
+  samples: string[]
+): Promise<{ ok: true; profile: string } | { ok: false; needsApiKey?: boolean; error: string }> {
+  const c = getClient()
+  if (!c)
+    return {
+      ok: false,
+      needsApiKey: true,
+      error: 'No Anthropic API key set. Open Settings → AI · API keys to paste one.'
+    }
+  const cleaned = samples.map((s) => s.trim()).filter(Boolean)
+  if (cleaned.length < 3) {
+    return { ok: false, error: 'Not enough sent history to learn a writing style yet.' }
+  }
+
+  const system =
+    'You analyze writing samples and produce a compact style profile. You are given a set of real ' +
+    'sent-email bodies from a single author. Identify genuine, consistently recurring patterns in how ' +
+    'they write — never guess, invent, or generalize from one or two examples.\n\n' +
+    'OUTPUT RULES:\n' +
+    '- Reply with ONLY a plain-text paragraph of 100 to 200 words. No JSON, no headings, no bullets.\n' +
+    '- Cover sentence structure, tone, recurring phrasing or vocabulary habits, and typical openings and closings.\n' +
+    '- Only include a trait you can see repeated across multiple samples. Omit any dimension the samples do not support.\n' +
+    '- Do not mention the author by name or any personal detail. Describe HOW they write, not WHAT they write about.\n' +
+    '- No preamble. Start directly with the style description.'
+
+  // Cap each sample so long signatures or disclaimers do not crowd out signal,
+  // and keep the whole call comfortably inside Haiku's context.
+  const body =
+    `Writing samples (${cleaned.length} emails from the user's Sent folder):\n\n` +
+    cleaned.map((s, i) => `--- Sample ${i + 1} ---\n${s.slice(0, 600)}`).join('\n\n') +
+    '\n\nWrite the style profile now.'
+
+  try {
+    const resp = await c.messages.create({
+      model: resolveModel('tone_profile'),
+      max_tokens: 600,
+      system,
+      messages: [{ role: 'user', content: body }]
+    })
+    if ((resp.stop_reason as string) === 'refusal') {
+      return { ok: false, error: 'Claude declined this request. Try again.' }
+    }
+    if ((resp.stop_reason as string) === 'model_context_window_exceeded') {
+      return { ok: false, error: 'Too many samples for the model context window.' }
+    }
+    const text = resp.content
+      .filter((b) => b.type === 'text')
+      .map((b) => ('text' in b ? b.text : ''))
+      .join('')
+      .trim()
+    if (!text) return { ok: false, error: 'Empty response from model.' }
+    return { ok: true, profile: text }
+  } catch (e) {
+    return { ok: false, error: (e as Error).message }
+  }
+}
+
+/**
+ * Draft a reply to one incoming email in the user's voice, given a style
+ * profile. Returns the reply plus a self-assessed confidence, OR a skip result
+ * for newsletters / no-reply senders / nothing-to-reply-to (an expected, not
+ * error, outcome). Routed to Sonnet for the voice-vs-no-fakery balance.
+ */
+export async function draftReply(
+  incoming: { subject: string; from: string; body: string },
+  toneProfile: string | null
+): Promise<EmailReplyDraftResult> {
+  const c = getClient()
+  if (!c)
+    return {
+      ok: false,
+      needsApiKey: true,
+      error: 'No Anthropic API key set. Open Settings → AI · API keys to paste one.'
+    }
+
+  const system =
+    'You are drafting an email reply on behalf of a user who has opted into AI-assisted replies that ' +
+    'match their personal writing style.\n\n' +
+    'ABSOLUTE CONSTRAINTS:\n' +
+    '1. Write ONLY what the incoming email gives you material to respond to. If it asks something you ' +
+    'cannot answer without inventing information, acknowledge the question and say the user will follow ' +
+    'up — never invent an answer.\n' +
+    '2. Do NOT invent dates, times, numbers, dollar amounts, meeting details, third-party names, ' +
+    'promises, or commitments. You may reflect back ones the incoming email states; you may not add new ones.\n' +
+    '3. Do NOT add pleasantries, sign-offs, or closings the style profile does not show the user using.\n' +
+    '4. If the email is a newsletter, automated notification, marketing message, or from a no-reply ' +
+    'sender, return ONLY {"skip": true, "reason": "..."}. Do not draft a reply.\n' +
+    '5. If the email is too ambiguous or short to reply to substantively, return {"skip": true, "reason": "..."}.\n\n' +
+    'STYLE RULES:\n' +
+    '- Write in exactly the voice described by the style profile, matching sentence length, formality, ' +
+    'and typical opening and closing patterns.\n' +
+    '- Keep the reply proportional to the incoming email. Plain text only, no markdown or HTML.\n\n' +
+    'OUTPUT FORMAT — return a single JSON object, first character {, last character }. No prose outside ' +
+    'the JSON, no markdown fences.\n' +
+    '{"reply": "the full plain-text reply body", "confidence": 0.0-1.0, "note": "one sentence on any ' +
+    'uncertainty or assumptions"}\n' +
+    'OR when declining: {"skip": true, "reason": "one sentence"}'
+
+  const profileText =
+    toneProfile && toneProfile.trim()
+      ? toneProfile.trim()
+      : 'No distinct style sample is available. Write a clear, concise, professional reply.'
+
+  const body =
+    `Style profile for this user:\n${profileText}\n\n` +
+    `Incoming email to reply to:\nSubject: ${incoming.subject}\nFrom: ${incoming.from}\n\n` +
+    `${incoming.body.slice(0, 3000)}\n\nDraft the reply now.`
+
+  try {
+    const resp = await c.messages.create({
+      model: resolveModel('email_reply_draft'),
+      max_tokens: 1024,
+      system,
+      messages: [{ role: 'user', content: body }]
+    })
+    if ((resp.stop_reason as string) === 'refusal') {
+      return { ok: false, error: 'Claude declined to draft this reply.' }
+    }
+    if ((resp.stop_reason as string) === 'model_context_window_exceeded') {
+      return { ok: false, error: 'The email was too long for the model context window.' }
+    }
+    if ((resp.stop_reason as string) === 'max_tokens') {
+      return { ok: false, error: 'The reply draft was cut off. Try a shorter email.' }
+    }
+    const text = resp.content
+      .filter((b) => b.type === 'text')
+      .map((b) => ('text' in b ? b.text : ''))
+      .join('')
+      .trim()
+    if (!text) return { ok: false, error: 'Empty response from model.' }
+
+    let parsed: {
+      reply?: string
+      confidence?: number
+      note?: string
+      skip?: boolean
+      reason?: string
+    }
+    const json = extractJson(text)
+    if (!json) return { ok: false, error: 'Could not parse the reply draft.' }
+    try {
+      parsed = JSON.parse(json)
+    } catch {
+      return { ok: false, error: 'Could not parse the reply draft.' }
+    }
+    if (parsed.skip) {
+      return { ok: true, skip: true, skipReason: parsed.reason || 'No reply needed.' }
+    }
+    if (!parsed.reply || !parsed.reply.trim()) {
+      return { ok: false, error: 'The model returned an empty reply.' }
+    }
+    return {
+      ok: true,
+      reply: parsed.reply.trim(),
+      confidence: typeof parsed.confidence === 'number' ? parsed.confidence : undefined,
+      note: parsed.note
     }
   } catch (e) {
     return { ok: false, error: (e as Error).message }
