@@ -260,9 +260,11 @@ import {
   suggestTableRows,
   summarizeRecentTrail,
   suggestDocContent,
-  rewriteSelection
+  rewriteSelection,
+  fillSheetRange
 } from '../ai/anthropic'
 import { importDocx, exportDocx, exportPdf, pickImage } from '../officeDocx'
+import { importSheet, exportSheet } from '../sheetIo'
 import { getModelMode, setModelMode } from '../ai/modelRouting'
 import { describeWidgetForAgent } from '../ai/agentInputs'
 import type {
@@ -674,6 +676,14 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('office:exportDocx', (_e, input: { html: string; title: string }) => exportDocx(input))
   ipcMain.handle('office:exportPdf', (_e, input: { html: string; title: string }) => exportPdf(input))
   ipcMain.handle('office:pickImage', () => pickImage())
+
+  // ── Spreadsheet interop + AI fill ─────────────────────────────────────────
+  ipcMain.handle('sheet:import', () => importSheet())
+  ipcMain.handle('sheet:export', (_e, input: Parameters<typeof exportSheet>[0]) => exportSheet(input))
+  ipcMain.handle('ai:fillSheetRange', (_e, input: { prompt: string; headers: string[]; rangeRows: number }) => {
+    recordAiCall()
+    return fillSheetRange(input)
+  })
 
   // ── AI source: PlexiDesk credits vs bring-your-own-key ────────────────────
   // Status snapshot for the settings panel + out-of-credits prompts.
