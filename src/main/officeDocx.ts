@@ -7,8 +7,10 @@
 import { dialog, BrowserWindow } from 'electron'
 import { basename, extname } from 'path'
 import { readFile, writeFile } from 'fs/promises'
-import mammoth from 'mammoth'
-import HTMLtoDOCX from '@turbodocx/html-to-docx'
+// mammoth and @turbodocx/html-to-docx are imported lazily inside the functions
+// that use them. They are heavy and have packaging-sensitive transitive deps, so
+// keeping them out of this module's load path means a missing dependency can only
+// ever degrade docx import/export to an error, never crash app startup.
 
 export interface OfficeImportResult {
   ok: boolean
@@ -46,6 +48,7 @@ export async function importDocx(): Promise<OfficeImportResult> {
     return { ok: false, error: 'Only .docx files can be imported (legacy .doc is not supported).' }
   }
   try {
+    const mammoth = (await import('mammoth')).default
     const buffer = await readFile(path)
     const out = await mammoth.convertToHtml({ buffer })
     return { ok: true, html: out.value, fileName: basename(path) }
@@ -65,6 +68,7 @@ export async function exportDocx(input: { html: string; title: string }): Promis
   })
   if (res.canceled || !res.filePath) return { ok: false }
   try {
+    const HTMLtoDOCX = (await import('@turbodocx/html-to-docx')).default
     const fullHtml = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${safe}</title></head><body>${input.html}</body></html>`
     const fileBuffer = (await HTMLtoDOCX(fullHtml, undefined, {
       title: safe,

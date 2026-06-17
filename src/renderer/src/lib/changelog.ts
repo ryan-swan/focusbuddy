@@ -36,6 +36,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.45',
+    date: '2026-06-18T10:00:00Z',
+    title: 'v2.5.45 — Documents reliability fix',
+    tag: 'fix',
+    summary:
+      'A packaging fix for the new Office editors. The 2.5.44 build could fail to start on some installs because a document-export library was missing a dependency; that library now loads only when you actually export, so the app always starts, and the export dependency ships correctly.',
+    highlights: [
+      'Fixed an app-start crash introduced with the new Word/Excel/PowerPoint editors.',
+      'Document, spreadsheet and slide export libraries now load on demand, so an export problem can never stop the app from opening.'
+    ],
+    links: [{ label: 'Finding your way around', href: `${HELP_BASE}/getting-around` }]
+  },
+  {
     version: '2.5.44',
     date: '2026-06-18T08:00:00Z',
     title: 'v2.5.44 — Documents, drastically upgraded',

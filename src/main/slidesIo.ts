@@ -6,8 +6,9 @@
 import { dialog, BrowserWindow } from 'electron'
 import { basename } from 'path'
 import { readFile, writeFile } from 'fs/promises'
-import { unzipSync, strFromU8 } from 'fflate'
-import PptxGenJS from 'pptxgenjs'
+// pptxgenjs and fflate are imported lazily inside the functions that use them,
+// so they stay out of the app's startup require path; a packaging gap can only
+// degrade pptx export/import to an error, never crash launch.
 import type { DeckTheme, Slide, SlidesBody, SlideTextElement } from '@shared/types'
 import { resolveTheme, SLIDE_W, SLIDE_H } from '@shared/slideThemes'
 import { migrateSlidesBody } from '@shared/slidesMigrate'
@@ -37,6 +38,7 @@ const px2pt = (px: number): number => px * 0.75
 // ── PPTX export ───────────────────────────────────────────────────────────────
 export async function exportPptx(body: SlidesBody, _title: string, outPath: string): Promise<SlidesExportResult> {
   try {
+    const PptxGenJS = (await import('pptxgenjs')).default
     const deck = migrateSlidesBody(body)
     const theme = resolveTheme(deck.theme)
     const pptx = new PptxGenJS()
@@ -168,6 +170,7 @@ export async function importPptx(): Promise<SlidesImportResult> {
   if (res.canceled || !res.filePaths[0]) return { ok: false }
   const path = res.filePaths[0]
   try {
+    const { unzipSync, strFromU8 } = await import('fflate')
     const buf = await readFile(path)
     const files = unzipSync(new Uint8Array(buf))
     // Slide XML parts are ppt/slides/slideN.xml; order them numerically.
