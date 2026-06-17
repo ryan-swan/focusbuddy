@@ -1121,7 +1121,16 @@ const api = {
       body?: unknown
       error?: string
       needsApiKey?: boolean
-    }> => ipcRenderer.invoke('documents:generate', input)
+    }> => ipcRenderer.invoke('documents:generate', input),
+    generateSlides: (input: {
+      mode: 'deck' | 'append' | 'redesign'
+      prompt: string
+    }): Promise<{
+      ok: boolean
+      body?: import('@shared/types').SlidesBody
+      error?: string
+      needsApiKey?: boolean
+    }> => ipcRenderer.invoke('documents:generateSlides', input)
   },
   // haptyx:// deep-link auth handoff. The brochure at haptyx.app/account/*
   // signs the user in against the signal server, then redirects to
@@ -1237,6 +1246,20 @@ const api = {
       rangeRows: number
     }): Promise<{ ok: boolean; rows?: string[][]; error?: string; needsApiKey?: boolean }> =>
       ipcRenderer.invoke('ai:fillSheetRange', input)
+  },
+  // Slides Office interop (.pptx/.pdf) + AI deck generation.
+  slides: {
+    export: (input: {
+      body: import('@shared/types').SlidesBody
+      title: string
+      format: 'pptx' | 'pdf'
+    }): Promise<{ ok: boolean; path?: string; error?: string }> => ipcRenderer.invoke('slides:export', input),
+    import: (): Promise<{
+      ok: boolean
+      body?: import('@shared/types').SlidesBody
+      name?: string
+      error?: string
+    }> => ipcRenderer.invoke('slides:import')
   },
   // Auto-update bridge. Renderer reads the snapshot via getState on
   // mount, then subscribes via onState to receive every transition.

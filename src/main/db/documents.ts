@@ -9,6 +9,7 @@ import type {
   SheetBody,
   SlidesBody
 } from '@shared/types'
+import { migrateSlidesBody } from '@shared/slidesMigrate'
 
 // Office documents store — CRUD for standalone doc / sheet / slides files. The
 // body is persisted as a JSON string; the shape depends on doc_type and is
@@ -30,7 +31,11 @@ function parseBody(
   raw: string
 ): DocBody | SheetBody | SlidesBody {
   try {
-    return JSON.parse(raw)
+    const parsed = JSON.parse(raw)
+    // Slides bodies are migrated to the v2 element model on read, so a legacy
+    // deck always opens as editable elements without rewriting the file at rest.
+    if (type === 'slides') return migrateSlidesBody(parsed as SlidesBody)
+    return parsed
   } catch {
     // Corrupt or empty — hand back a valid empty body for the type so the
     // editor still opens rather than throwing.
@@ -43,17 +48,10 @@ export function emptyBody(type: FbDocument['docType']): DocBody | SheetBody | Sl
     return { columns: ['A', 'B', 'C'], rows: Array.from({ length: 8 }, () => ['', '', '']) }
   }
   if (type === 'slides') {
-    return {
-      slides: [
-        {
-          id: randomUUID(),
-          title: 'Title slide',
-          bullets: [],
-          notes: '',
-          layout: 'title' as const
-        }
-      ]
-    }
+    // Build a v1 starter slide and migrate it, so a fresh deck is already v2.
+    return migrateSlidesBody({
+      slides: [{ id: randomUUID(), title: 'Title slide', bullets: [], notes: '', layout: 'title' }]
+    })
   }
   return { type: 'doc', content: [{ type: 'paragraph' }] }
 }
