@@ -36,6 +36,20 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.46',
+    date: '2026-06-18T16:00:00Z',
+    title: 'v2.5.46 — Documents on the canvas, better sheets and headings',
+    tag: 'feature',
+    summary:
+      'Documents, spreadsheets and slides can now live right on a canvas, spreadsheets got real formula fixes, and headings can be styled once and applied everywhere.',
+    highlights: [
+      'Put a document, spreadsheet or slide deck on any canvas as a native widget. Adding one lets you create a new one, import a real Word/Excel/PowerPoint file with its formatting and formulas kept, or place an existing one. The same file opens both on the canvas and in the Documents view.',
+      'Spreadsheets: fixed a bug where the first keystroke in a cell was doubled, which also quietly broke formulas. Formulas now work as you expect, type = and go. Select the whole sheet with Cmd/Ctrl+A to format every cell at once, and right-click a column header to insert or delete columns.',
+      'Documents: set a heading style once, for example Heading 2 at a certain size and colour, and every Heading 2 in the document updates to match.'
+    ],
+    links: [{ label: 'Finding your way around', href: `${HELP_BASE}/getting-around` }]
+  },
+  {
     version: '2.5.45',
     date: '2026-06-18T10:00:00Z',
     title: 'v2.5.45 — Documents reliability fix',
