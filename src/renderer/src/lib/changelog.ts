@@ -36,6 +36,21 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.44',
+    date: '2026-06-18T08:00:00Z',
+    title: 'v2.5.44 — Documents, drastically upgraded',
+    tag: 'feature',
+    summary:
+      'The document, spreadsheet and slide editors grew up. Each is now a real, fully formatted editor with AI that inserts formatted content, and you can open and save genuine Word, Excel and PowerPoint files.',
+    highlights: [
+      'Documents are now Word-class: headings, colour, highlight, fonts and sizes, alignment, lists, links, images, tables, code blocks, find and replace, a selection menu and a slash menu. Ask AI drafts formatted content at your cursor and can rewrite a selection. Open .docx files and export to .docx or PDF.',
+      'Spreadsheets are now Excel-class: cell formatting and number formats, multi-cell selection, copy and paste with real Excel, undo, sort, charts, multiple sheets, and a much bigger formula library (IF, COUNTIF, SUMIF, text functions and more) that still shows a clear #ERR instead of a wrong number. Import and export .xlsx and .csv, and let AI fill a range.',
+      'Slides are now PowerPoint-class: a free canvas with movable text boxes, images and shapes, deck themes and layouts, a presenter view with notes and a timer, and AI that builds or redesigns a deck. Export to .pptx or PDF.',
+      'Everything you already made still opens unchanged. Office file round-trips are best-effort, not pixel-perfect, and we say so in the app.'
+    ],
+    links: [{ label: 'Finding your way around', href: `${HELP_BASE}/getting-around` }]
+  },
+  {
     version: '2.5.43',
     date: '2026-06-17T00:30:00Z',
     title: 'v2.5.43 — Documents: create with AI, then make it yours',
