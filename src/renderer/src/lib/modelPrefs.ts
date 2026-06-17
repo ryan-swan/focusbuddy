@@ -55,6 +55,7 @@ export const AUTO_ROUTING_DISPLAY: Record<AIPurpose, { model: string; cost: stri
   desk_agent: { model: 'Sonnet', cost: '$$' },
   command_route: { model: 'Haiku', cost: '$' },
   document: { model: 'Sonnet', cost: '$$' },
+  doc_rewrite: { model: 'Sonnet', cost: '$$' },
   tone_profile: { model: 'Haiku', cost: '$' },
   email_reply_draft: { model: 'Sonnet', cost: '$$' }
 }

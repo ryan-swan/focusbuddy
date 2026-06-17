@@ -74,7 +74,7 @@ export default function DocumentEditorView({ documentId }: Props): JSX.Element {
       {/* Surface */}
       <div className="flex-1 overflow-auto min-h-0">
         {active.docType === 'doc' && (
-          <DocEditor key={active.id} content={active.body} onChange={(json) => saveBody(json)} />
+          <DocEditor key={active.id} content={active.body} title={active.title} onChange={(json) => saveBody(json)} />
         )}
         {active.docType === 'sheet' && (
           <SheetEditor key={active.id} body={active.body as SheetBody} onChange={(b) => saveBody(b)} />
