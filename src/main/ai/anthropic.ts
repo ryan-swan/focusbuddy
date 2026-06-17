@@ -2719,3 +2719,69 @@ export async function rewriteSelection(input: { text: string; instruction: strin
     return { ok: false, error: (e as Error).message }
   }
 }
+
+// ── In-editor spreadsheet AI: fill a selected range ──────────────────────────
+//
+// The user describes the data they want for a set of columns; the model returns
+// a matrix of cell values (rows of strings) sized to the selection, which may
+// include spreadsheet formulas (a string starting with '='). The renderer
+// previews it, then writes it; any formula is evaluated by the real engine, so
+// the AI cannot smuggle in a fabricated number (a bad formula shows #ERR).
+
+export interface SheetFillResult {
+  ok: boolean
+  rows?: string[][]
+  error?: string
+  needsApiKey?: boolean
+}
+
+export async function fillSheetRange(input: {
+  prompt: string
+  headers: string[]
+  rangeRows: number
+}): Promise<SheetFillResult> {
+  const c = getClient()
+  if (!c) return { ok: false, needsApiKey: true, error: 'No Anthropic API key set. Open Settings → AI · API keys to paste one.' }
+  const prompt = input.prompt?.trim()
+  if (!prompt) return { ok: false, error: 'Describe the data to generate.' }
+  const cols = input.headers.length || 1
+  const rows = Math.max(1, Math.min(200, input.rangeRows || 10))
+
+  const system =
+    'You generate spreadsheet data as JSON. Reply with ONLY a JSON object of the form ' +
+    '{"rows": string[][]}. Each row must be an array of exactly ' +
+    cols +
+    ' string cells, one per column, in the column order given. Produce realistic, useful values ' +
+    '(never "example 1"). For a computed column such as a total, rate or growth, put a real spreadsheet ' +
+    'formula starting with = that references A1-style cells, for example "=B2/B1-1". ' +
+    'No markdown, no code fences, no prose outside the JSON.'
+  const user =
+    `Columns (in order): ${input.headers.join(', ') || 'A'}\n` +
+    `Generate ${rows} rows.\n` +
+    `Request: ${prompt}`
+  try {
+    const resp = await c.messages.create({
+      model: resolveModel('document'),
+      max_tokens: 3000,
+      system,
+      messages: [{ role: 'user', content: user }]
+    })
+    if ((resp.stop_reason as string) === 'refusal')
+      return { ok: false, error: 'Claude declined this request. Try rephrasing it.' }
+    const text = resp.content
+      .filter((b) => b.type === 'text')
+      .map((b) => ('text' in b ? b.text : ''))
+      .join('')
+    const parsed = extractJsonObject(text) as { rows?: unknown }
+    if (!Array.isArray(parsed.rows)) return { ok: false, error: 'The AI did not return rows.' }
+    const out = parsed.rows.map((r) => {
+      const row = Array.isArray(r) ? r.map((cell) => String(cell ?? '')) : []
+      while (row.length < cols) row.push('')
+      return row.slice(0, cols)
+    })
+    if (!out.length) return { ok: false, error: 'The AI returned no rows.' }
+    return { ok: true, rows: out }
+  } catch (e) {
+    return { ok: false, error: (e as Error).message }
+  }
+}

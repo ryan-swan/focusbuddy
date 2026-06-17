@@ -1,0 +1,183 @@
+// The spreadsheet toolbar: undo/redo, cell formatting (bold/italic/underline,
+// colour, fill, align), number formats, structural row/column ops, sort, charts,
+// Office import/export and AI fill. All actions are callbacks owned by
+// SheetEditor; this component only renders controls.
+
+import { useEffect, useRef, useState } from 'react'
+import type { SheetCellFormat, SheetNumberFormat } from '@shared/types'
+import Icon from '../../Icon'
+
+interface Props {
+  onFormat: (patch: Partial<SheetCellFormat>) => void
+  onNumberFormat: (fmt: SheetNumberFormat) => void
+  onInsertRow: () => void
+  onDeleteRow: () => void
+  onInsertCol: () => void
+  onDeleteCol: () => void
+  onSort: (dir: 'asc' | 'desc') => void
+  onInsertChart: (type: 'bar' | 'line' | 'pie') => void
+  onImport: () => void
+  onExport: (format: 'xlsx' | 'csv') => void
+  onAiFill: () => void
+  onUndo: () => void
+  onRedo: () => void
+  canUndo: boolean
+  canRedo: boolean
+}
+
+const NUMBER_FORMATS: Array<{ label: string; fmt: SheetNumberFormat }> = [
+  { label: 'General', fmt: { kind: 'general' } },
+  { label: 'Number (1,234.50)', fmt: { kind: 'number', decimals: 2, thousands: true } },
+  { label: 'Integer (1,234)', fmt: { kind: 'number', decimals: 0, thousands: true } },
+  { label: 'Currency ($)', fmt: { kind: 'currency', decimals: 2, symbol: '$' } },
+  { label: 'Percent (%)', fmt: { kind: 'percent', decimals: 1 } },
+  { label: 'Date (YYYY-MM-DD)', fmt: { kind: 'date', pattern: 'YYYY-MM-DD' } }
+]
+
+export default function SheetToolbar(props: Props): JSX.Element {
+  const [menu, setMenu] = useState<null | 'chart' | 'io'>(null)
+  const ref = useRef<HTMLDivElement | null>(null)
+  useEffect(() => {
+    function onDown(e: MouseEvent): void {
+      if (!ref.current?.contains(e.target as Node)) setMenu(null)
+    }
+    document.addEventListener('mousedown', onDown)
+    return () => document.removeEventListener('mousedown', onDown)
+  }, [])
+
+  const btn =
+    'h-7 min-w-7 px-1 inline-flex items-center justify-center rounded text-[13px] text-stone-600 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800 disabled:opacity-40'
+  const Divider = (): JSX.Element => <div className="w-px h-5 bg-stone-200 dark:bg-stone-700 mx-0.5" />
+  const sel = 'h-7 bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded text-[11px] px-1 text-stone-600 dark:text-stone-300 focus:outline-none'
+
+  return (
+    <div ref={ref} className="flex items-center gap-0.5 flex-wrap px-2 py-1.5 border-b border-stone-200 dark:border-stone-700" data-testid="sheet-toolbar">
+      <button className={btn} title="Undo" onClick={props.onUndo} disabled={!props.canUndo}>
+        <Icon name="undo" size={15} />
+      </button>
+      <button className={btn} title="Redo" onClick={props.onRedo} disabled={!props.canRedo}>
+        <Icon name="redo" size={15} />
+      </button>
+      <Divider />
+
+      <button className={btn} title="Bold" onClick={() => props.onFormat({ bold: true })}>
+        <Icon name="format_bold" size={15} />
+      </button>
+      <button className={btn} title="Italic" onClick={() => props.onFormat({ italic: true })}>
+        <Icon name="format_italic" size={15} />
+      </button>
+      <button className={btn} title="Underline" onClick={() => props.onFormat({ underline: true })}>
+        <Icon name="format_underlined" size={15} />
+      </button>
+      <label className={btn + ' relative cursor-pointer'} title="Text colour">
+        <Icon name="format_color_text" size={15} />
+        <input type="color" className="absolute inset-0 opacity-0 cursor-pointer" onChange={(e) => props.onFormat({ color: e.target.value })} />
+      </label>
+      <label className={btn + ' relative cursor-pointer'} title="Fill colour">
+        <Icon name="format_color_fill" size={15} />
+        <input type="color" className="absolute inset-0 opacity-0 cursor-pointer" onChange={(e) => props.onFormat({ bg: e.target.value })} />
+      </label>
+      <button className={btn} title="Align left" onClick={() => props.onFormat({ align: 'left' })}>
+        <Icon name="format_align_left" size={15} />
+      </button>
+      <button className={btn} title="Align center" onClick={() => props.onFormat({ align: 'center' })}>
+        <Icon name="format_align_center" size={15} />
+      </button>
+      <button className={btn} title="Align right" onClick={() => props.onFormat({ align: 'right' })}>
+        <Icon name="format_align_right" size={15} />
+      </button>
+      <Divider />
+
+      <select
+        className={sel}
+        title="Number format"
+        data-testid="sheet-number-format"
+        defaultValue=""
+        onChange={(e) => {
+          const idx = Number(e.target.value)
+          if (!Number.isNaN(idx) && NUMBER_FORMATS[idx]) props.onNumberFormat(NUMBER_FORMATS[idx].fmt)
+          e.target.value = ''
+        }}
+      >
+        <option value="" disabled>
+          Format
+        </option>
+        {NUMBER_FORMATS.map((f, i) => (
+          <option key={f.label} value={i}>
+            {f.label}
+          </option>
+        ))}
+      </select>
+      <Divider />
+
+      <button className={btn} title="Insert row above" onClick={props.onInsertRow}>
+        <Icon name="add_row_above" size={15} />
+      </button>
+      <button className={btn} title="Delete row" onClick={props.onDeleteRow}>
+        <Icon name="delete" size={15} />
+      </button>
+      <button className={btn} title="Insert column left" onClick={props.onInsertCol}>
+        <Icon name="add_column_left" size={15} />
+      </button>
+      <button className={btn} title="Delete column" onClick={props.onDeleteCol}>
+        <Icon name="delete_sweep" size={15} />
+      </button>
+      <button className={btn} title="Sort ascending" onClick={() => props.onSort('asc')}>
+        <Icon name="arrow_upward" size={15} />
+      </button>
+      <button className={btn} title="Sort descending" onClick={() => props.onSort('desc')}>
+        <Icon name="arrow_downward" size={15} />
+      </button>
+      <Divider />
+
+      <div className="relative">
+        <button className={btn} title="Insert chart" onClick={() => setMenu(menu === 'chart' ? null : 'chart')}>
+          <Icon name="bar_chart" size={15} />
+        </button>
+        {menu === 'chart' && (
+          <div className="absolute left-0 z-50 mt-1 w-36 rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 shadow-xl py-1 text-[12px]">
+            {(['bar', 'line', 'pie'] as const).map((t) => (
+              <button
+                key={t}
+                onClick={() => {
+                  props.onInsertChart(t)
+                  setMenu(null)
+                }}
+                className="w-full text-left px-3 py-1.5 hover:bg-stone-100 dark:hover:bg-stone-800 capitalize"
+              >
+                {t} chart
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="ml-auto flex items-center gap-0.5">
+        <div className="relative">
+          <button className={btn} title="Import / export" onClick={() => setMenu(menu === 'io' ? null : 'io')}>
+            <Icon name="folder_open" size={15} />
+          </button>
+          {menu === 'io' && (
+            <div className="absolute right-0 z-50 mt-1 w-44 rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 shadow-xl py-1 text-[12px]">
+              <button onClick={() => { setMenu(null); props.onImport() }} className="w-full text-left px-3 py-1.5 hover:bg-stone-100 dark:hover:bg-stone-800">
+                <Icon name="upload_file" size={14} className="inline mr-1.5 text-stone-400" /> Import .xlsx / .csv
+              </button>
+              <button onClick={() => { setMenu(null); props.onExport('xlsx') }} className="w-full text-left px-3 py-1.5 hover:bg-stone-100 dark:hover:bg-stone-800">
+                <Icon name="table_chart" size={14} className="inline mr-1.5 text-stone-400" /> Export .xlsx
+              </button>
+              <button onClick={() => { setMenu(null); props.onExport('csv') }} className="w-full text-left px-3 py-1.5 hover:bg-stone-100 dark:hover:bg-stone-800">
+                <Icon name="description" size={14} className="inline mr-1.5 text-stone-400" /> Export .csv
+              </button>
+            </div>
+          )}
+        </div>
+        <button
+          onClick={props.onAiFill}
+          className="inline-flex items-center gap-1.5 text-[12px] px-2.5 py-1 rounded-lg bg-accent/10 text-accent hover:bg-accent/20"
+        >
+          <Icon name="auto_awesome" size={13} /> AI fill
+        </button>
+      </div>
+    </div>
+  )
+}

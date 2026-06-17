@@ -77,7 +77,7 @@ export default function DocumentEditorView({ documentId }: Props): JSX.Element {
           <DocEditor key={active.id} content={active.body} title={active.title} onChange={(json) => saveBody(json)} />
         )}
         {active.docType === 'sheet' && (
-          <SheetEditor key={active.id} body={active.body as SheetBody} onChange={(b) => saveBody(b)} />
+          <SheetEditor key={active.id} body={active.body as SheetBody} title={active.title} onChange={(b) => saveBody(b)} />
         )}
         {active.docType === 'slides' && (
           <SlidesEditor key={active.id} body={active.body as SlidesBody} onChange={(b) => saveBody(b)} />

@@ -73,6 +73,7 @@
     "react-markdown": "^10.1.0",
     "react-resizable-panels": "^2.1.7",
     "react-rnd": "^10.4.13",
+    "recharts": "^3.8.1",
     "remark-gfm": "^4.0.1",
     "tiptap-markdown": "^0.9.0",
     "xlsx": "^0.18.5",

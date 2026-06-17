@@ -1218,6 +1218,26 @@ const api = {
     pickImage: (): Promise<{ ok: boolean; dataUrl?: string; error?: string }> =>
       ipcRenderer.invoke('office:pickImage')
   },
+  // Spreadsheet Office interop (.xlsx/.csv) + AI fill.
+  sheet: {
+    import: (): Promise<{
+      ok: boolean
+      body?: import('@shared/types').SheetBodyV2
+      name?: string
+      error?: string
+    }> => ipcRenderer.invoke('sheet:import'),
+    export: (input: {
+      body: import('@shared/types').SheetBodyV2
+      format: 'xlsx' | 'csv'
+      name: string
+    }): Promise<{ ok: boolean; path?: string; error?: string }> => ipcRenderer.invoke('sheet:export', input),
+    aiFill: (input: {
+      prompt: string
+      headers: string[]
+      rangeRows: number
+    }): Promise<{ ok: boolean; rows?: string[][]; error?: string; needsApiKey?: boolean }> =>
+      ipcRenderer.invoke('ai:fillSheetRange', input)
+  },
   // Auto-update bridge. Renderer reads the snapshot via getState on
   // mount, then subscribes via onState to receive every transition.
   update: {

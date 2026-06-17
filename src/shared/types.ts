@@ -1130,12 +1130,66 @@ export type MailSendResult = { ok: true } | { ok: false; error: string }
 
 export type DocType = 'doc' | 'sheet' | 'slides'
 
-// A spreadsheet body: named columns and a grid of string cells. A cell whose
-// value starts with '=' is a formula evaluated at render time.
-export interface SheetBody {
+// ── Spreadsheet body ────────────────────────────────────────────────────────
+// v1 was a single grid of string cells: { columns, rows }. v2 wraps one or more
+// such grids as named tabs and adds per-cell formatting, column widths, a freeze
+// region and charts. v1 bodies on disk stay valid and are lifted to v2 on open
+// by normalizeBody (src/renderer/src/lib/sheetBody.ts); nothing is rewritten at
+// rest until the user edits. A cell whose value starts with '=' is a formula
+// evaluated at render time; what cannot be computed shows #ERR, never a fake
+// number.
+
+export interface SheetBodyV1 {
   columns: string[]
   rows: string[][]
 }
+
+// How a value should be displayed (the engine still stores the true value).
+export type SheetNumberFormat =
+  | { kind: 'general' }
+  | { kind: 'number'; decimals: number; thousands?: boolean }
+  | { kind: 'currency'; decimals: number; symbol: string }
+  | { kind: 'percent'; decimals: number }
+  | { kind: 'date'; pattern: string }
+
+export interface SheetCellFormat {
+  bold?: boolean
+  italic?: boolean
+  underline?: boolean
+  color?: string // text colour, hex
+  bg?: string // fill colour, hex
+  align?: 'left' | 'center' | 'right'
+  numFmt?: SheetNumberFormat
+}
+
+export interface SheetChartSpec {
+  id: string
+  type: 'bar' | 'line' | 'pie'
+  range: string // e.g. 'A1:C10' on the owning tab
+  title?: string
+  headerRow?: boolean // first row holds series labels
+  headerCol?: boolean // first column holds category labels
+}
+
+export interface SheetTab {
+  id: string
+  name: string
+  columns: string[]
+  rows: string[][]
+  // Sparse per-cell formatting keyed "r,c". Absent = general/default.
+  formats?: Record<string, SheetCellFormat>
+  colWidths?: Record<number, number> // px; absent = default
+  freeze?: { rows: number; cols: number }
+  charts?: SheetChartSpec[]
+}
+
+export interface SheetBodyV2 {
+  version: 2
+  sheets: SheetTab[]
+  activeSheet?: number
+}
+
+export type SheetBody = SheetBodyV1 | SheetBodyV2
 
 // One slide in a deck. `bullets` is the body content; `notes` are speaker
 // notes (also where AI can draft what to say).
