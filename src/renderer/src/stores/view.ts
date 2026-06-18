@@ -18,6 +18,7 @@ export type View =
   | { kind: 'documents' }
   | { kind: 'document'; documentId: string }
   | { kind: 'livedoc'; liveDocId: string }
+  | { kind: 'livecanvas'; liveCanvasId: string }
   | { kind: 'files' }
 
 interface ViewStore {
@@ -36,6 +37,7 @@ interface ViewStore {
   goDocuments: () => void
   goDocument: (documentId: string) => void
   goLiveDoc: (liveDocId: string) => void
+  goLiveCanvas: (liveCanvasId: string) => void
   goFiles: () => void
 }
 
@@ -133,6 +135,11 @@ export const useViewStore = create<ViewStore>((set) => ({
   },
   goLiveDoc: (liveDocId) => {
     const v: View = { kind: 'livedoc', liveDocId }
+    persistView(v)
+    set({ view: v })
+  },
+  goLiveCanvas: (liveCanvasId) => {
+    const v: View = { kind: 'livecanvas', liveCanvasId }
     persistView(v)
     set({ view: v })
   },

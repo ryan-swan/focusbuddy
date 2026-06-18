@@ -44,6 +44,7 @@ export default function DocumentsView(): JSX.Element {
   const remove = useDocumentsStore((s) => s.remove)
   const goDocument = useViewStore((s) => s.goDocument)
   const goLiveDoc = useViewStore((s) => s.goLiveDoc)
+  const goLiveCanvas = useViewStore((s) => s.goLiveCanvas)
   const token = useAccountStore((s) => s.sessionToken)
 
   const [docType, setDocType] = useState<DocType>('doc')
@@ -235,7 +236,7 @@ export default function DocumentsView(): JSX.Element {
               {shared.map((d) => (
                 <div
                   key={d.id}
-                  onClick={() => goLiveDoc(d.id)}
+                  onClick={() => (d.docType === 'canvas' ? goLiveCanvas(d.id) : goLiveDoc(d.id))}
                   className="flex items-center gap-3 rounded-xl border border-stone-200 dark:border-stone-700 bg-white/70 dark:bg-stone-900/70 px-3.5 py-3 cursor-pointer hover:border-accent/50 hover:shadow-sm transition"
                 >
                   <div className="h-9 w-9 rounded-lg bg-accent/10 text-accent inline-flex items-center justify-center shrink-0">

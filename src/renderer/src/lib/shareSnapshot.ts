@@ -1,4 +1,4 @@
-import type { FbNode, Widget } from '@shared/types'
+import type { FbNode, SectionLayout, Widget } from '@shared/types'
 
 // Snapshot shapes — the on-the-wire contract between desktop, signal
 // server, and public viewer. Versioned via `_version` so we can evolve
@@ -90,6 +90,13 @@ export interface SerializedWidget {
   // backing table (schema + rows) so the viewer can render the data
   // without needing a separate fb_tables fetch. Capped to 200 rows.
   tableSnapshot?: SerializedTable
+  // Optional section membership. Carried so a faithful reconstruct (live
+  // canvas) can rebuild section grouping + layout; the one-off share accept
+  // path ignores these, so adding them is backward compatible. parentSectionId
+  // references another SerializedWidget id in the same set; layout is set only
+  // on section widgets (kind === 'section').
+  parentSectionId?: string | null
+  layout?: SectionLayout | null
 }
 
 export interface SerializedTable {
@@ -128,7 +135,11 @@ function serializeWidget(w: Widget): SerializedWidget {
     y: w.y,
     width: w.width,
     height: w.height,
-    color: w.color
+    color: w.color,
+    // Section membership — undefined for plain widgets, so the wire payload and
+    // the existing share-accept path are unaffected.
+    parentSectionId: w.parentSectionId ?? null,
+    layout: w.layout ?? null
   }
 }
 
