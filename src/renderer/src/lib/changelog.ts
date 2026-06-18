@@ -38,14 +38,14 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '2.5.62',
     date: '2026-06-19T16:00:00Z',
-    title: 'v2.5.62 — Collaborate live on a whole desk',
+    title: 'v2.5.62 — Collaborate live on desks and folders',
     tag: 'feature',
     summary:
-      'Live collaboration now covers entire desks, not just documents. Right-click a desk and choose Collaborate live to share the whole board, and the same check-out model keeps everyone out of each other’s way.',
+      'Live collaboration now covers whole desks and whole folders, not just documents. Share a desk or a folder and the same check-out model keeps everyone out of each other’s way while you work together.',
     highlights: [
-      'Right-click a desk and choose Collaborate live to share the whole canvas — widgets, their connector links, sections and table data.',
-      'Whoever checks the board out edits it live; everyone else sees it read-only with who is editing, and can request access.',
-      'The takeover handshake hands editing over without losing work, exactly like live documents, and shared canvases appear in the Documents Shared-live list.'
+      'Right-click a desk and choose Collaborate live to share the whole board — widgets, their connector links, sections and table data.',
+      'Right-click a folder in Files and choose Collaborate live to share it — its files travel to the people you share with, and documents come across ready to open.',
+      'Whoever checks something out edits it live; everyone else sees who is editing and can request access, and the takeover hands editing over without losing work.'
     ],
     links: [{ label: 'Finding your way around', href: `${HELP_BASE}/getting-around` }]
   },
