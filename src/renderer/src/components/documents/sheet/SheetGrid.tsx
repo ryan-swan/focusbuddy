@@ -28,6 +28,12 @@ interface Props {
   onHeaderRename: (c: number, name: string) => void
   onColResizeStart: (c: number, e: React.MouseEvent) => void
   onHeaderContextMenu: (c: number, x: number, y: number) => void
+  // When editing a formula, clicking another cell inserts its reference instead
+  // of moving the selection. The parent exposes the edit input (so it can read
+  // the caret and write the ref) and tells the grid it is in reference mode (so
+  // a cell click keeps the input focused rather than blurring + committing).
+  editInputRef?: React.MutableRefObject<HTMLInputElement | null>
+  formulaRefMode?: boolean
 }
 
 const ROW_HEADER_W = 44
@@ -115,7 +121,14 @@ export default function SheetGrid(props: Props): JSX.Element {
                   <td
                     key={c}
                     data-testid={`cell-${r}-${c}`}
-                    onMouseDown={(e) => props.onCellMouseDown(r, c, e.shiftKey)}
+                    onMouseDown={(e) => {
+                      // In formula reference mode, prevent the default focus
+                      // shift so the edit input keeps focus (no blur -> no
+                      // commit). Clicking inside an input (the editing cell, or
+                      // a header) is left alone so the caret can be placed.
+                      if (props.formulaRefMode && !(e.target instanceof HTMLInputElement)) e.preventDefault()
+                      props.onCellMouseDown(r, c, e.shiftKey)
+                    }}
                     onMouseEnter={() => props.onCellMouseEnter(r, c)}
                     onDoubleClick={() => props.onCellDoubleClick(r, c)}
                     className={`border-b border-r border-stone-200 dark:border-stone-700 p-0 ${
@@ -124,7 +137,10 @@ export default function SheetGrid(props: Props): JSX.Element {
                   >
                     {isEditing ? (
                       <input
-                        ref={editRef}
+                        ref={(el) => {
+                          editRef.current = el
+                          if (props.editInputRef) props.editInputRef.current = el
+                        }}
                         value={props.editValue}
                         onChange={(e) => props.onEditValue(e.target.value)}
                         onKeyDown={(e) => {
