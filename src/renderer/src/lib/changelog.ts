@@ -36,6 +36,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.56',
+    date: '2026-06-19T08:00:00Z',
+    title: 'v2.5.56 — Work on a document together, safely',
+    tag: 'feature',
+    summary:
+      'Share a document live and edit it as a team, with a clear check-out so two people never clobber each other.',
+    highlights: [
+      'Use Collaborate on a document to share it live; whoever opens it checks it out and edits, while others see "Editing — locked by …" and can keep reading along as changes appear.',
+      'Need it yourself? Request access and the current editor gets a note in PlexiInbox to hand over or decline, so editing passes cleanly from one person to the next.'
+    ],
+    links: [{ label: 'Finding your way around', href: `${HELP_BASE}/getting-around` }]
+  },
+  {
     version: '2.5.55',
     date: '2026-06-19T05:30:00Z',
     title: 'v2.5.55 — PlexiInbox separates notifications from email',
