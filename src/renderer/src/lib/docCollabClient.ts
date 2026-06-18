@@ -7,7 +7,7 @@ import { signalConfig } from './signalConfig'
 export interface LiveDocMeta {
   id: string
   ownerAccountId: string
-  docType: 'doc' | 'sheet' | 'slides'
+  docType: 'doc' | 'sheet' | 'slides' | 'canvas'
   title: string
   version: number
   updatedBy: string | null
