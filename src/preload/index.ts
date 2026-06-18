@@ -99,6 +99,7 @@ const api = {
     update: (id: string, patch: WidgetPatch): Promise<Widget | null> =>
       ipcRenderer.invoke('widgets:update', id, patch),
     delete: (id: string): Promise<boolean> => ipcRenderer.invoke('widgets:delete', id),
+    restore: (id: string): Promise<boolean> => ipcRenderer.invoke('widgets:restore', id),
     bringToFront: (id: string): Promise<Widget | null> =>
       ipcRenderer.invoke('widgets:bringToFront', id)
   },

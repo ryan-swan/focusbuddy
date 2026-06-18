@@ -2,10 +2,19 @@ import { create } from 'zustand'
 import type { PinZone, Widget, WidgetDraft, WidgetPatch } from '@shared/types'
 import { recordTrail } from '../lib/trail'
 import { sectionCreate, widgetOpen } from '../lib/audioBeep'
-import { useLinksStore } from './links'
 import { notifyWireSource } from '../lib/wireEngine'
 import { notifyAgentInputChanged } from '../lib/deskAgentEngine'
 import { recordSnapshotSoon } from '../lib/timeTravel'
+import { recordAction, recordActionWithToast } from './actionHistory'
+
+// Set while a multi-widget group drag commits, so the per-widget update() calls
+// don't each push their own undo entry — endGroupDrag records one combined entry.
+let suppressWidgetUndo = false
+
+// Geometry / colour / section-membership are the structural widget edits worth
+// undoing. Text content + title have their own native editing undo, and
+// internal fields (sync group, url, pin) aren't user "actions".
+const UNDOABLE_WIDGET_KEYS: Array<keyof WidgetPatch> = ['x', 'y', 'width', 'height', 'color', 'parentSectionId']
 
 interface WidgetStore {
   widgets: Widget[]
@@ -153,11 +162,25 @@ export const useWidgetStore = create<WidgetStore>((set, get) => ({
     if (!groupDrag || !groupStart) return
     const { dx, dy } = groupDrag
     if (dx === 0 && dy === 0) return
-    await Promise.all(
-      Object.entries(groupStart).map(([id, sp]) =>
-        get().update(id, { x: Math.round(sp.x + dx), y: Math.round(sp.y + dy) })
-      )
-    )
+    const starts = { ...groupStart }
+    const ends: Record<string, { x: number; y: number }> = {}
+    for (const [id, sp] of Object.entries(starts)) ends[id] = { x: Math.round(sp.x + dx), y: Math.round(sp.y + dy) }
+    // Commit the move without per-widget undo entries, then record one combined
+    // entry so a single Cmd-Z reverses the whole group move.
+    const applyPositions = async (positions: Record<string, { x: number; y: number }>): Promise<void> => {
+      suppressWidgetUndo = true
+      try {
+        await Promise.all(Object.entries(positions).map(([id, p]) => get().update(id, p)))
+      } finally {
+        suppressWidgetUndo = false
+      }
+    }
+    await applyPositions(ends)
+    recordAction({
+      label: `Move ${Object.keys(ends).length} widgets`,
+      undo: () => applyPositions(starts),
+      redo: () => applyPositions(ends)
+    })
   },
   // focusOn = make this widget active AND pan the canvas to center it. Used
   // by BringMeBack + explicit "open in focus mode" actions where the widget
@@ -192,6 +215,19 @@ export const useWidgetStore = create<WidgetStore>((set, get) => ({
   create: async (draft) => {
     const widget = await window.api.widgets.create(draft)
     set({ widgets: [...get().widgets, widget] })
+    // Undo a freshly-added widget by trashing it; redo restores it (same id, so
+    // its links survive). We re-add the captured object locally to avoid a fetch.
+    recordAction({
+      label: `Add ${widget.kind}`,
+      undo: async () => {
+        await window.api.widgets.delete(widget.id)
+        set({ widgets: get().widgets.filter((w) => w.id !== widget.id) })
+      },
+      redo: async () => {
+        await window.api.widgets.restore(widget.id)
+        if (!get().widgets.some((w) => w.id === widget.id)) set({ widgets: [...get().widgets, widget] })
+      }
+    })
     recordSnapshotSoon(widget.taskId)
     recordTrail('widget_added', widget.taskId, {
       widgetId: widget.id,
@@ -205,6 +241,28 @@ export const useWidgetStore = create<WidgetStore>((set, get) => ({
     return widget
   },
   update: async (id, patch) => {
+    // Capture the prior values of any structural keys this patch touches, BEFORE
+    // the optimistic set, so we can record an undo for move/resize/recolour/
+    // section-membership. Suppressed during group-drag commit (one combined entry).
+    const undoCapture = (() => {
+      if (suppressWidgetUndo) return null
+      const touched = UNDOABLE_WIDGET_KEYS.filter((k) => k in patch)
+      if (!touched.length) return null
+      const w = get().widgets.find((x) => x.id === id)
+      if (!w) return null
+      const prevPatch: WidgetPatch = {}
+      const redoPatch: WidgetPatch = {}
+      for (const k of touched) {
+        ;(prevPatch as Record<string, unknown>)[k] = (w as unknown as Record<string, unknown>)[k]
+        ;(redoPatch as Record<string, unknown>)[k] = (patch as unknown as Record<string, unknown>)[k]
+      }
+      const label = touched.includes('color')
+        ? 'Recolour widget'
+        : touched.includes('width') || touched.includes('height')
+          ? 'Resize widget'
+          : 'Move widget'
+      return { prevPatch, redoPatch, label }
+    })()
     // Optimistic local update — applies the patch immediately so consumers (Canvas,
     // focus mode, dashboard cards) re-render right away. Critical for the URL persistence
     // case where the user clicks "expand" within IPC roundtrip latency of the last nav.
@@ -243,16 +301,43 @@ export const useWidgetStore = create<WidgetStore>((set, get) => ({
       void notifyWireSource(id)
       notifyAgentInputChanged(id)
     }
+    if (undoCapture) {
+      const { prevPatch, redoPatch, label } = undoCapture
+      recordAction({
+        label,
+        undo: async () => {
+          await window.api.widgets.update(id, prevPatch)
+          set({ widgets: get().widgets.map((w) => (w.id === id ? { ...w, ...prevPatch } : w)) })
+        },
+        redo: async () => {
+          await window.api.widgets.update(id, redoPatch)
+          set({ widgets: get().widgets.map((w) => (w.id === id ? { ...w, ...redoPatch } : w)) })
+        }
+      })
+    }
     recordSnapshotSoon(updated.taskId)
   },
   remove: async (id) => {
-    const removedTaskId = get().widgets.find((w) => w.id === id)?.taskId
-    await window.api.widgets.delete(id)
+    const widget = get().widgets.find((w) => w.id === id)
+    const removedTaskId = widget?.taskId
+    await window.api.widgets.delete(id) // soft-delete (trashed, recoverable)
     set({ widgets: get().widgets.filter((w) => w.id !== id) })
-    // The DB cascade already dropped any widget_links referencing this id;
-    // mirror that into the local links store so the SVG overlay doesn't
-    // render a dangling line until the next loadForTask.
-    useLinksStore.getState().pruneByWidget(id)
+    // Don't prune links: they survive the soft-delete so they return on restore.
+    // The overlay skips links whose endpoint widget isn't present, so a trashed
+    // widget's lines simply hide until it's restored.
+    if (widget) {
+      recordActionWithToast({
+        label: `Delete ${widget.kind}${widget.title ? ` “${widget.title}”` : ''}`,
+        undo: async () => {
+          await window.api.widgets.restore(id)
+          if (!get().widgets.some((w) => w.id === id)) set({ widgets: [...get().widgets, widget] })
+        },
+        redo: async () => {
+          await window.api.widgets.delete(id)
+          set({ widgets: get().widgets.filter((w) => w.id !== id) })
+        }
+      })
+    }
     recordSnapshotSoon(removedTaskId)
   },
   archive: async (id) => {
