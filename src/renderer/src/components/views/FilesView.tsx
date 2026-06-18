@@ -9,6 +9,8 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { FileEntry } from '@shared/fields'
 import { useFileManagerStore, sortEntries, type FileSortKey, type FileViewMode } from '../../stores/fileManager'
 import { useViewStore } from '../../stores/view'
+import { useAccountStore } from '../../stores/account'
+import { promoteFolderToLive } from '../../lib/liveFolderMirror'
 import Icon from '../Icon'
 import CanvasContextMenu, { type CtxMenuItem } from '../CanvasContextMenu'
 
@@ -92,6 +94,8 @@ function formatDate(ms: number): string {
 export default function FilesView(): JSX.Element {
   const store = useFileManagerStore()
   const goDocument = useViewStore((s) => s.goDocument)
+  const goLiveFolder = useViewStore((s) => s.goLiveFolder)
+  const sessionToken = useAccountStore((s) => s.sessionToken)
   const undo = useFileManagerStore((s) => s.undo)
   const redo = useFileManagerStore((s) => s.redo)
   const [renaming, setRenaming] = useState<string | null>(null)
@@ -146,6 +150,21 @@ export default function FilesView(): JSX.Element {
   function entryContextItems(entry: FileEntry): CtxMenuItem[] {
     const items: CtxMenuItem[] = [{ label: 'Open', icon: 'open_in_new', onClick: () => openEntry(entry) }]
     items.push({ label: 'Rename', icon: 'edit', onClick: () => setRenaming(entry.id) })
+    if (entry.kind === 'folder') {
+      // Promote a whole folder to a live, checked-out shared folder. Uploads
+      // its files to the server so members can open them; documents come across
+      // as live-openable copies. Members organise it one at a time.
+      items.push({
+        label: 'Collaborate live',
+        icon: 'group',
+        onClick: () => {
+          if (!sessionToken) return
+          void promoteFolderToLive(entry.id, entry.name, sessionToken).then((res) => {
+            if (res) goLiveFolder(res.liveId)
+          })
+        }
+      })
+    }
     if (entry.kind === 'file') {
       items.push({ label: 'Reveal in Finder', icon: 'folder_open', onClick: () => void window.api.fileManager.reveal(entry.id) })
     }
