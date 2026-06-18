@@ -1,16 +1,14 @@
 import { useEffect, useMemo } from 'react'
 import { useMessagingStore } from '../../stores/messaging'
-import { useMailStore } from '../../stores/mail'
 import { useAccountStore } from '../../stores/account'
 import { useViewStore } from '../../stores/view'
 import { useSignInPrompt } from '../../stores/signInPrompt'
 import Icon from '../Icon'
 
-// Unified inbox — one feed for everything that needs you: direct messages,
-// shared-space activity, items shared with you, and now unread email. Messages
-// and shares come from the signal server; email is local (IMAP straight from
-// the desktop), so the feed merges the two by time. Clicking a row takes you to
-// the right surface — the conversation, or the email in Mail.
+// PlexiInbox — your internal PlexiDesk notifications, and only those: direct
+// and shared-space chat, folders/files/canvases/widgets shared with you, and
+// contact requests. Email is deliberately NOT here; it lives in Mail. Clicking
+// a row takes you to the conversation or the shared item.
 
 function relTime(ms: number): string {
   if (!ms) return ''
@@ -44,67 +42,52 @@ export default function InboxView(): JSX.Element {
   const acceptContact = useMessagingStore((s) => s.acceptContactRequest)
   const declineContact = useMessagingStore((s) => s.declineContactRequest)
   const goMessages = useViewStore((s) => s.goMessages)
-  const goMail = useViewStore((s) => s.goMail)
-
-  const mailAccount = useMailStore((s) => s.account)
-  const mailMessages = useMailStore((s) => s.messages)
-  const refreshMail = useMailStore((s) => s.refresh)
 
   useEffect(() => {
     if (account) void refreshInbox()
   }, [account, refreshInbox])
 
-  // Build the merged, time-sorted feed. Server items keep their accept/decline
-  // affordances; email contributes its unread messages.
+  // Internal notifications only: chat (direct + shared-space), shared items, and
+  // contact requests. Email is intentionally excluded — it lives in Mail.
   const rows = useMemo<Row[]>(() => {
-    const serverRows: Row[] = items.map((it) => {
-      const isMessage = it.kind === 'message'
-      const isContact = it.kind === 'contact-request'
-      const icon = isContact
-        ? 'person_add'
-        : isMessage && it.convKind !== 'space'
-          ? 'forum'
-          : 'folder_shared'
-      return {
-        key: `${it.kind}:${it.id}`,
-        icon,
-        title: it.title,
-        preview: it.preview ?? '',
-        ts: it.ts,
-        unread: it.unread,
-        onClick: isMessage
-          ? () => {
-              void openConversation(it.id)
-              goMessages()
-            }
-          : undefined,
-        contactId: isContact ? it.id : undefined
-      }
-    })
-    const emailRows: Row[] = mailMessages
-      .filter((m) => !m.seen)
-      .map((m) => ({
-        key: `email:${m.uid}`,
-        icon: 'mail',
-        title: m.fromName,
-        preview: m.subject,
-        ts: m.date,
-        unread: 1,
-        onClick: () => goMail(m.uid)
-      }))
-    return [...serverRows, ...emailRows].sort((a, b) => b.ts - a.ts)
-  }, [items, mailMessages, openConversation, goMessages, goMail])
+    return items
+      .map((it) => {
+        const isMessage = it.kind === 'message'
+        const isContact = it.kind === 'contact-request'
+        const icon = isContact
+          ? 'person_add'
+          : isMessage && it.convKind !== 'space'
+            ? 'forum'
+            : 'folder_shared'
+        return {
+          key: `${it.kind}:${it.id}`,
+          icon,
+          title: it.title,
+          preview: it.preview ?? '',
+          ts: it.ts,
+          unread: it.unread,
+          onClick: isMessage
+            ? () => {
+                void openConversation(it.id)
+                goMessages()
+              }
+            : undefined,
+          contactId: isContact ? it.id : undefined
+        }
+      })
+      .sort((a, b) => b.ts - a.ts)
+  }, [items, openConversation, goMessages])
 
-  // The feed is useful if you have a PlexiDesk account OR a connected mailbox.
-  if (!account && !mailAccount) {
+  // PlexiInbox needs a PlexiDesk account (email lives in Mail, separately).
+  if (!account) {
     return (
       <div className="h-full flex items-center justify-center desk-paper no-tod px-6">
         <div className="text-center max-w-sm">
           <Icon name="inbox" size={32} className="text-stone-400 dark:text-stone-500 mx-auto mb-3" />
-          <h1 className="text-lg font-semibold text-stone-900 dark:text-stone-100 mb-1">Inbox</h1>
+          <h1 className="text-lg font-semibold text-stone-900 dark:text-stone-100 mb-1">PlexiInbox</h1>
           <p className="text-[13px] text-stone-500 dark:text-stone-400 mb-4">
-            Sign in to see your messages and shared items here, or connect your email in Mail to
-            bring your inbox in too.
+            Sign in to see your PlexiDesk notifications here, chat messages, shared folders and
+            files, and contact requests. Email is in Mail.
           </p>
           <button onClick={() => requestSignIn()} className="btn-primary mx-auto">
             <Icon name="login" size={14} />
@@ -117,7 +100,6 @@ export default function InboxView(): JSX.Element {
 
   function refreshAll(): void {
     if (account) void refreshInbox()
-    if (mailAccount) void refreshMail()
   }
 
   return (
@@ -128,9 +110,9 @@ export default function InboxView(): JSX.Element {
             <Icon name="inbox" size={20} className="text-accent" />
           </div>
           <div className="flex-1 min-w-0">
-            <h1 className="text-xl font-semibold text-stone-900 dark:text-stone-100">Inbox</h1>
+            <h1 className="text-xl font-semibold text-stone-900 dark:text-stone-100">PlexiInbox</h1>
             <p className="text-[12px] text-stone-500 dark:text-stone-400">
-              Messages, shared items, and email — everything that needs you, in one place.
+              Your PlexiDesk notifications: chat, shared items, and contact requests. Email is in Mail.
             </p>
           </div>
           <button onClick={refreshAll} className="icon-btn" title="Refresh">
@@ -141,11 +123,9 @@ export default function InboxView(): JSX.Element {
         {rows.length === 0 ? (
           <div className="rounded-xl border border-dashed border-stone-300 dark:border-stone-700 p-10 text-center">
             <Icon name="inbox" size={26} className="text-stone-400 dark:text-stone-500 mx-auto mb-2" />
-            <p className="text-sm text-stone-600 dark:text-stone-300">Your inbox is clear.</p>
+            <p className="text-sm text-stone-600 dark:text-stone-300">Your PlexiInbox is clear.</p>
             <p className="text-[12px] text-stone-500 dark:text-stone-400 mt-1">
-              {mailAccount
-                ? 'No unread email, messages, or shares right now.'
-                : 'Start a conversation from Messages, accept a shared folder, or connect your email in Mail.'}
+              No new chat, shared items, or contact requests right now. Email lives in Mail.
             </p>
           </div>
         ) : (
