@@ -54,6 +54,36 @@ describe('actionHistory store', () => {
     expect(useActionHistory.getState().past).toHaveLength(1)
   })
 
+  it('coalesces a batch into one entry; undo reverses all parts in LIFO order', async () => {
+    const calls: string[] = []
+    const h = useActionHistory.getState()
+    h.beginBatch()
+    h.record({ label: 'A', undo: () => void calls.push('undoA'), redo: () => void calls.push('redoA') })
+    h.record({ label: 'B', undo: () => void calls.push('undoB'), redo: () => void calls.push('redoB') })
+    h.endBatch('Apply 2 changes')
+    // One combined entry on the stack, not two.
+    expect(useActionHistory.getState().past.map((e) => e.label)).toEqual(['Apply 2 changes'])
+
+    await useActionHistory.getState().undo()
+    expect(calls).toEqual(['undoB', 'undoA']) // reverse order
+    await useActionHistory.getState().redo()
+    expect(calls).toEqual(['undoB', 'undoA', 'redoA', 'redoB']) // forward on redo
+  })
+
+  it('an empty batch records nothing; a batch with a toast surfaces an action toast', () => {
+    const h = useActionHistory.getState()
+    h.beginBatch()
+    h.endBatch('nothing happened')
+    expect(useActionHistory.getState().past).toEqual([])
+
+    h.beginBatch()
+    h.recordWithToast({ label: 'Delete', undo: () => {}, redo: () => {} })
+    h.record({ label: 'Move', undo: () => {}, redo: () => {} })
+    h.endBatch('Apply all')
+    expect(useActionHistory.getState().past.map((e) => e.label)).toEqual(['Apply all'])
+    expect(useActionHistory.getState().toast).toMatchObject({ kind: 'action', label: 'Apply all' })
+  })
+
   it('awaits async inverses before settling the stacks', async () => {
     const order: string[] = []
     const slow = (): Promise<void> =>

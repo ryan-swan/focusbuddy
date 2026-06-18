@@ -5,6 +5,7 @@ import type { ActionProposal, ChatMessage } from '@shared/types'
 import { useNodeStore } from '../stores/nodes'
 import { useChatStore } from '../stores/chat'
 import { useWidgetStore } from '../stores/widgets'
+import { useActionHistory } from '../stores/actionHistory'
 import { chimeIn } from '../lib/audioBeep'
 import CanvasContextMenu, { type CtxMenuItem } from './CanvasContextMenu'
 import { useModelMode, AUTO_ROUTING_DISPLAY } from '../lib/modelPrefs'
@@ -443,12 +444,30 @@ function ProposalCards({
 
   async function applyAll(): Promise<void> {
     if (busy) return
+    // Confirm before a batch that destroys anything — undo exists as a backstop,
+    // but a one-click bulk delete deserves a heads-up.
+    const destructive = proposals.filter((p) => p.kind === 'delete-widget')
+    if (destructive.length > 0) {
+      const ok = window.confirm(
+        `This will delete ${destructive.length} item${destructive.length > 1 ? 's' : ''} from your canvas. You can undo it afterwards. Apply all ${proposals.length} change${proposals.length > 1 ? 's' : ''}?`
+      )
+      if (!ok) return
+    }
     const resolvedIds = batchResolvedIds.current
-    for (const p of proposals) {
-      // Sequential so error messages from one don't get clobbered by the
-      // next, AND so symbolic-id refs resolve in order (create-table must
-      // run before its add-table-row siblings).
-      await applyOne(p, resolvedIds)
+    // Coalesce the whole batch into one undo entry, so a single Cmd-Z (or the
+    // toast's Undo) reverses the entire "Apply all".
+    useActionHistory.getState().beginBatch()
+    try {
+      for (const p of proposals) {
+        // Sequential so error messages from one don't get clobbered by the
+        // next, AND so symbolic-id refs resolve in order (create-table must
+        // run before its add-table-row siblings).
+        await applyOne(p, resolvedIds)
+      }
+    } finally {
+      useActionHistory
+        .getState()
+        .endBatch(`Apply ${proposals.length} AI change${proposals.length > 1 ? 's' : ''}`)
     }
   }
 
