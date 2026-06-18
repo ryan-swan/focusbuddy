@@ -36,6 +36,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.55',
+    date: '2026-06-19T05:30:00Z',
+    title: 'v2.5.55 — PlexiInbox separates notifications from email',
+    tag: 'polish',
+    summary:
+      'Your Inbox is now PlexiInbox, just your PlexiDesk notifications, with email kept in Mail.',
+    highlights: [
+      'PlexiInbox shows only internal notifications: chat messages, items shared with you (folders, files, canvases and widgets), and contact requests.',
+      'Email no longer mixes into it and stays in Mail, so the two are cleanly separated.'
+    ],
+    links: [{ label: 'Finding your way around', href: `${HELP_BASE}/getting-around` }]
+  },
+  {
     version: '2.5.54',
     date: '2026-06-19T04:30:00Z',
     title: 'v2.5.54 — A friendlier welcome and more undo',
