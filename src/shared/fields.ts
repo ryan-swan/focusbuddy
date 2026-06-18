@@ -333,6 +333,26 @@ export interface FbFile {
   createdAt: number
 }
 
+// A single entry in the file/folder manager: a folder, an imported external
+// file, or a reference to an internal document (doc/sheet/slides) filed into a
+// folder. The manager lists these under a parent and the renderer renders them.
+export interface FileEntry {
+  id: string
+  parentId: string | null
+  kind: 'folder' | 'file' | 'doc'
+  name: string
+  ext?: string
+  mimeType?: string
+  sizeBytes?: number
+  // For kind 'doc': the document it points at, resolved live so renames show.
+  docId?: string
+  docType?: 'doc' | 'sheet' | 'slides'
+  // Number of immediate children (folders only) so the UI can show "3 items".
+  childCount?: number
+  createdAt: number
+  updatedAt: number
+}
+
 export interface FbFileMetaOnly {
   // Same as FbFile but without the resolved storedPath. Used by ingest where
   // the renderer only needs to know "where is it filed" via id + ext.

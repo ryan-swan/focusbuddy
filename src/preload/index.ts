@@ -61,6 +61,7 @@ import type {
 } from '@shared/types'
 import type {
   FbFile,
+  FileEntry,
   FbRow,
   FbRowDraft,
   FbRowPatch,
@@ -622,6 +623,7 @@ const api = {
       buffer: ArrayBuffer
       originalName: string
       mimeType: string
+      parentId?: string | null
     }): Promise<FbFile> => ipcRenderer.invoke('files:ingestBuffer', input),
     get: (id: string): Promise<FbFile | null> => ipcRenderer.invoke('files:get', id),
     delete: (id: string): Promise<boolean> => ipcRenderer.invoke('files:delete', id),
@@ -657,6 +659,29 @@ const api = {
       url: string
     ): Promise<{ ok: true } | { ok: false; error: string }> =>
       ipcRenderer.invoke('files:openExternal', url)
+  },
+  // The file/folder manager: a foldered library over fb_files (folders,
+  // imported files, and references to internal documents).
+  fileManager: {
+    list: (parentId: string | null): Promise<FileEntry[]> =>
+      ipcRenderer.invoke('fileManager:list', parentId),
+    get: (id: string): Promise<FileEntry | null> => ipcRenderer.invoke('fileManager:get', id),
+    path: (id: string | null): Promise<Array<{ id: string; name: string }>> =>
+      ipcRenderer.invoke('fileManager:path', id),
+    createFolder: (parentId: string | null, name: string): Promise<FileEntry> =>
+      ipcRenderer.invoke('fileManager:createFolder', parentId, name),
+    rename: (id: string, name: string): Promise<FileEntry | null> =>
+      ipcRenderer.invoke('fileManager:rename', id, name),
+    move: (id: string, newParentId: string | null): Promise<boolean> =>
+      ipcRenderer.invoke('fileManager:move', id, newParentId),
+    delete: (id: string): Promise<boolean> => ipcRenderer.invoke('fileManager:delete', id),
+    fileDocument: (docId: string, parentId: string | null): Promise<FileEntry | null> =>
+      ipcRenderer.invoke('fileManager:fileDocument', docId, parentId),
+    unfiledDocuments: (): Promise<Array<{ id: string; title: string; docType: string }>> =>
+      ipcRenderer.invoke('fileManager:unfiledDocuments'),
+    pickFiles: (parentId: string | null): Promise<FbFile[]> =>
+      ipcRenderer.invoke('fileManager:pickFiles', parentId),
+    reveal: (id: string): Promise<{ ok: boolean }> => ipcRenderer.invoke('fileManager:reveal', id)
   },
   // Document export — write a self-contained, styled HTML string out as a
   // standalone .html file or a printed PDF, each through the native save dialog.

@@ -139,6 +139,50 @@ export async function pickAndIngestFile(opts: {
 }
 
 /**
+ * Open the native multi-select picker and ingest every chosen file into the
+ * given folder of the file/folder manager. Returns the FbFiles created.
+ */
+export async function pickFilesIntoFolder(parentId: string | null): Promise<FbFile[]> {
+  let result: Electron.OpenDialogReturnValue
+  try {
+    result = await dialog.showOpenDialog({
+      title: 'Add files',
+      properties: ['openFile', 'multiSelections']
+    })
+  } catch (err) {
+    console.error('[fileManager:pick] dialog failed:', err)
+    throw err
+  }
+  if (result.canceled || result.filePaths.length === 0) return []
+  const out: FbFile[] = []
+  for (const sourcePath of result.filePaths) {
+    try {
+      if (!existsSync(sourcePath) || statSync(sourcePath).isDirectory()) continue
+      out.push(
+        ingestFromPath(sourcePath, {
+          originalName: basename(sourcePath),
+          mimeType: mimeFromExt(extname(sourcePath).toLowerCase()),
+          parentId
+        })
+      )
+    } catch (err) {
+      console.error('[fileManager:pick] ingest failed for', sourcePath, err)
+    }
+  }
+  return out
+}
+
+/**
+ * Reveal an ingested file in the OS file browser (Finder / Explorer).
+ */
+export function revealFile(id: string): { ok: boolean } {
+  const file = getFile(id)
+  if (!file || !existsSync(file.storedPath)) return { ok: false }
+  shell.showItemInFolder(file.storedPath)
+  return { ok: true }
+}
+
+/**
  * Open a locally ingested file in the user's default app — Preview for
  * images, Word for .docx, etc. Returns ok=false on a missing file id or
  * shell.openPath returning a non-empty error string.

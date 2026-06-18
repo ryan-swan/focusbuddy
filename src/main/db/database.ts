@@ -267,6 +267,19 @@ export function getDb(): Database.Database {
   db.pragma('foreign_keys = ON')
   db.exec(SCHEMA)
   // Forward-compatible migrations for previously-created DBs
+  // File/folder manager: fb_files grows from a flat attachment store into a
+  // foldered library. parent_id nests entries (null = root), kind tells folder
+  // vs file vs doc-reference, display_name is the editable name (falls back to
+  // original_name), updated_at is the modified time, doc_id/doc_type link an
+  // internal document filed into a folder. Existing rows default to a root-level
+  // file, which is exactly what they were.
+  ensureColumn(db, 'fb_files', 'parent_id', 'TEXT')
+  ensureColumn(db, 'fb_files', 'kind', "TEXT NOT NULL DEFAULT 'file'")
+  ensureColumn(db, 'fb_files', 'display_name', 'TEXT')
+  ensureColumn(db, 'fb_files', 'updated_at', 'INTEGER')
+  ensureColumn(db, 'fb_files', 'doc_id', 'TEXT')
+  ensureColumn(db, 'fb_files', 'doc_type', 'TEXT')
+  ensureColumn(db, 'fb_files', 'sort_order', 'INTEGER')
   ensureColumn(db, 'nodes', 'estimate_minutes', 'INTEGER')
   ensureColumn(db, 'nodes', 'extensions_minutes', 'INTEGER NOT NULL DEFAULT 0')
   ensureColumn(db, 'widgets', 'pinned', 'INTEGER NOT NULL DEFAULT 0')
