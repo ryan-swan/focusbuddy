@@ -36,6 +36,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.47',
+    date: '2026-06-18T18:00:00Z',
+    title: 'v2.5.47 — Heading styles you can actually control',
+    tag: 'feature',
+    summary:
+      'A clear Styles panel for documents. Define what each heading level looks like in one place, and every heading of that level follows.',
+    highlights: [
+      'A new Styles button in the document toolbar opens a panel with Normal text and Heading 1, 2 and 3. Click a name to apply it, and set its bold, italic, size and colour right there.',
+      'Change a level once, for example Heading 2 to bold blue at 18, and every Heading 2 in the document updates to match. The level style now wins even on headings you had already tweaked by hand.'
+    ],
+    links: [{ label: 'Finding your way around', href: `${HELP_BASE}/getting-around` }]
+  },
+  {
     version: '2.5.46',
     date: '2026-06-18T16:00:00Z',
     title: 'v2.5.46 — Documents on the canvas, better sheets and headings',
