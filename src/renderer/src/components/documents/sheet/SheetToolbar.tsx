@@ -6,8 +6,10 @@
 import { useEffect, useRef, useState } from 'react'
 import type { SheetCellFormat, SheetNumberFormat } from '@shared/types'
 import Icon from '../../Icon'
+import FontPicker from '../editor/FontPicker'
 
 interface Props {
+  activeFont?: string
   onFormat: (patch: Partial<SheetCellFormat>) => void
   onNumberFormat: (fmt: SheetNumberFormat) => void
   onInsertRow: () => void
@@ -77,6 +79,7 @@ export default function SheetToolbar(props: Props): JSX.Element {
         <Icon name="format_color_fill" size={15} />
         <input type="color" className="absolute inset-0 opacity-0 cursor-pointer" onChange={(e) => props.onFormat({ bg: e.target.value })} />
       </label>
+      <FontPicker value={props.activeFont} onChange={(v) => props.onFormat({ fontFamily: v })} compact />
       <button className={btn} title="Align left" onClick={() => props.onFormat({ align: 'left' })}>
         <Icon name="format_align_left" size={15} />
       </button>

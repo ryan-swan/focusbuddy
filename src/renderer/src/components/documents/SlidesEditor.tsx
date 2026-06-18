@@ -17,6 +17,7 @@ import {
   setElementText,
   styleTextElement,
   setParagraphAlign,
+  setListStyle,
   elementId
 } from './slides/slideOps'
 import Icon from '../Icon'
@@ -313,6 +314,12 @@ export default function SlidesEditor({ body: rawBody, title, onChange }: Props):
             mutateSlide((s) => updateElement(s, id, (() => {
               const e = (s.elements ?? []).find((x) => x.id === id)
               return e && e.type === 'text' ? setParagraphAlign(e, align) : {}
+            })()))
+          }
+          onSetList={(id, style) =>
+            mutateSlide((s) => updateElement(s, id, (() => {
+              const e = (s.elements ?? []).find((x) => x.id === id)
+              return e && e.type === 'text' ? setListStyle(e, style) : {}
             })()))
           }
           onDelete={(id) => { mutateSlide((s) => deleteElement(s, id)); setSelectedElId(null) }}

@@ -9,6 +9,7 @@ import type { SheetTab } from '@shared/types'
 import { displayCell, type Grid } from '../../../lib/sheetFormula'
 import { formatValue } from '../../../lib/sheetFormat'
 import { cellFormat, colLabel } from '../../../lib/sheetBody'
+import { loadGoogleFont, familyLabel } from '../../../lib/googleFonts'
 import type { CellRange } from './sheetOps'
 
 interface Props {
@@ -100,12 +101,14 @@ export default function SheetGrid(props: Props): JSX.Element {
                 const computed = displayCell(grid, r, c)
                 const shown = formatValue(computed, fmt?.numFmt)
                 const isErr = computed === '#ERR'
+                if (fmt?.fontFamily) loadGoogleFont(familyLabel(fmt.fontFamily))
                 const style: React.CSSProperties = {
                   fontWeight: fmt?.bold ? 700 : undefined,
                   fontStyle: fmt?.italic ? 'italic' : undefined,
                   textDecoration: fmt?.underline ? 'underline' : undefined,
                   color: isErr ? '#ef4444' : fmt?.color,
                   backgroundColor: fmt?.bg,
+                  fontFamily: fmt?.fontFamily || undefined,
                   textAlign: fmt?.align ?? (computed !== '' && Number.isFinite(Number(computed)) ? 'right' : 'left')
                 }
                 return (

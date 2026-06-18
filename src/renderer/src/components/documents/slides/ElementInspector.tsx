@@ -6,6 +6,7 @@
 import type { DeckTheme, Slide, SlideElement, SlideTransition } from '@shared/types'
 import { BUILTIN_THEMES } from '@shared/slideThemes'
 import Icon from '../../Icon'
+import FontPicker from '../editor/FontPicker'
 
 interface Props {
   slide: Slide
@@ -14,6 +15,7 @@ interface Props {
   onUpdateElement: (id: string, patch: Partial<SlideElement>) => void
   onStyleText: (id: string, patch: Partial<{ bold: boolean; italic: boolean; underline: boolean; color: string; fontSize: number }>) => void
   onAlign: (id: string, align: 'left' | 'center' | 'right') => void
+  onSetList: (id: string, style: 'bullet' | 'number' | 'none') => void
   onDelete: (id: string) => void
   onDuplicate: (id: string) => void
   onReorderZ: (id: string, dir: 'forward' | 'back' | 'front' | 'backmost') => void
@@ -119,6 +121,23 @@ export default function ElementInspector(props: Props): JSX.Element {
               value={el.paragraphs[0]?.runs[0]?.fontSize ?? 24}
               onChange={(e) => props.onStyleText(el.id, { fontSize: Number(e.target.value) })}
             />
+          </div>
+          <div className="flex items-center gap-1">
+            <FontPicker value={el.fontFamily} onChange={(v) => props.onUpdateElement(el.id, { fontFamily: v })} compact />
+            <button
+              className={`${btn} ${el.paragraphs[0]?.listStyle === 'bullet' ? 'bg-accent/15 text-accent' : ''}`}
+              title="Bulleted list"
+              onClick={() => props.onSetList(el.id, el.paragraphs[0]?.listStyle === 'bullet' ? 'none' : 'bullet')}
+            >
+              <Icon name="format_list_bulleted" size={14} />
+            </button>
+            <button
+              className={`${btn} ${el.paragraphs[0]?.listStyle === 'number' ? 'bg-accent/15 text-accent' : ''}`}
+              title="Numbered list"
+              onClick={() => props.onSetList(el.id, el.paragraphs[0]?.listStyle === 'number' ? 'none' : 'number')}
+            >
+              <Icon name="format_list_numbered" size={14} />
+            </button>
           </div>
         </div>
       )}

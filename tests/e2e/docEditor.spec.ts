@@ -129,10 +129,8 @@ test('DE-1 — blank doc opens with editor surface and toolbar', async () => {
     await expect(window.getByRole('button', { name: /Italic/i })).toBeVisible()
     await expect(window.getByRole('button', { name: /Ask AI/i })).toBeVisible()
 
-    // Block type select exists with default "Text" / "p" value
-    const blockSelect = window.locator('select[title="Block type"]')
-    await expect(blockSelect).toBeVisible()
-    await expect(blockSelect).toHaveValue('p')
+    // The Styles dropdown button (replaces the old block-type select).
+    await expect(window.locator('[data-testid="doc-styles-btn"]')).toBeVisible()
 
     // Undo / Redo present
     await expect(window.getByRole('button', { name: /Undo/i })).toBeVisible()
@@ -185,14 +183,23 @@ test('DE-2 — toolbar formatting: bold, italic, underline, heading, bullet list
     // The text content is preserved regardless of whether marks were removed
     await expect(surface).toContainText('Format me')
 
-    // Heading 2 via block-type select
-    const blockSelect = window.locator('select[title="Block type"]')
-    await blockSelect.selectOption('h2')
+    // Heading 2 via the Styles panel (row-2 = "Heading 1" which maps to h2).
+    await window.locator('[data-testid="doc-styles-btn"]').click()
+    await expect(window.locator('[data-testid="doc-styles-panel"]')).toBeVisible({ timeout: 3_000 })
+    await window.locator('[data-testid="doc-styles-panel"] [data-testid="doc-style-row-2"] button').first().click()
+    await window.waitForTimeout(300)
     await expect(surface.locator('h2').first()).toContainText('Format me')
 
-    // Back to paragraph
-    await blockSelect.selectOption('p')
+    // Back to Normal text via the Styles panel.
+    await window.locator('[data-testid="doc-styles-btn"]').click()
+    await expect(window.locator('[data-testid="doc-styles-panel"]')).toBeVisible({ timeout: 3_000 })
+    await window.locator('[data-testid="doc-styles-panel"] [data-testid="doc-style-row-0"]').click()
+    await window.waitForTimeout(300)
     await expect(surface.locator('p').first()).toContainText('Format me')
+    // Dismiss the Styles panel by clicking outside it (on the editor surface)
+    // so it doesn't intercept pointer events for the subsequent toolbar clicks.
+    await surface.click({ position: { x: 5, y: 5 } })
+    await expect(window.locator('[data-testid="doc-styles-panel"]')).not.toBeVisible({ timeout: 2_000 })
 
     // Bullet list via toolbar
     await toolbar.getByRole('button', { name: /Bullet list/i }).click()
@@ -257,8 +264,9 @@ test('DE-3 — slash menu: "/" opens menu; Table inserts a table; Heading 2 sets
       .getByText('Heading 2', { exact: true })
       .click()
 
-    // The block-type select should now reflect h2
-    await expect(window.locator('select[title="Block type"]')).toHaveValue('h2', { timeout: 3_000 })
+    // The Styles button label should now reflect a heading (e.g. "Heading 1" which is h2).
+    // Assert via the DOM: the surface should contain an h2 element.
+    await expect(surface.locator('h2').first()).toBeVisible({ timeout: 3_000 })
   } finally {
     await dispose()
   }
