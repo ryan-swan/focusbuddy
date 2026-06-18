@@ -18,7 +18,10 @@ const TYPES: { type: DocType; label: string; icon: string; blurb: string }[] = [
   { type: 'slides', label: 'Slides', icon: 'slideshow', blurb: 'Decks and presentations' }
 ]
 
-function typeIcon(t: DocType): string {
+function typeIcon(t: DocType | 'canvas'): string {
+  // A live canvas (a shared desk) isn't one of the local document TYPES, so map
+  // it to a board icon; everything else looks itself up with a safe fallback.
+  if (t === 'canvas') return 'space_dashboard'
   return TYPES.find((x) => x.type === t)?.icon ?? 'description'
 }
 
