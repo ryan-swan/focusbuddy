@@ -15,7 +15,7 @@
 **Yes — partly, in sequence:**
 
 1. **The browser is already real Chromium**, not "bespoke." It's Electron's `<webview>`. The login failures are **not** because it's fake — they're a handful of fixable defects, the biggest of which is a **missing User-Agent**.
-2. **Most logins are fixed this week** by the four Phase-1 changes already shipped (UA, click-overlay, origin-gated autofill, permissions). Verified GREEN by `haptyx-tester`.
+2. **Most logins are fixed this week** by the four Phase-1 changes already shipped (UA, click-overlay, origin-gated autofill, permissions). Verified GREEN by `plexidesk-tester`.
 3. **A few providers** (some Google/Microsoft enterprise SSO) block *embedded* browsers regardless of UA, by policy. Those need an **external-browser OAuth handoff** (Phase 2).
 4. **Chrome extensions are possible but only on a native `WebContentsView`** (not on `<webview>`), and Electron supports only a **subset** of the extensions API — realistically ad-block + Dark Reader, marketed as a *vetted shelf*, **never Web-Store parity** (Phases 3-4).
 
@@ -132,4 +132,4 @@ Adopt the **phased hybrid**:
 - `vaultAutofill.ts` + `views/ConnectedAppView.tsx` — `autofillWebview(webview, entry, expectedHost)` with renderer-side origin check + in-page guard; `hostMatches` unit-tested.
 - `tests/e2e/securityQuickWins.spec.ts` — permanent regression guard.
 
-Proven: 66/66 unit + 18/18 e2e, GREEN (`haptyx-tester`). The one un-automated check is the live OAuth round-trip — worth a 60-second manual confirmation against a Google login.
+Proven: 66/66 unit + 18/18 e2e, GREEN (`plexidesk-tester`). The one un-automated check is the live OAuth round-trip — worth a 60-second manual confirmation against a Google login.

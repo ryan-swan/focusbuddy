@@ -326,6 +326,7 @@ export default function NewNodeDialog({
             </label>
             <input
               autoFocus
+              data-testid="newnode-name"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder={
