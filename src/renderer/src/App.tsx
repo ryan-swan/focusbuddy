@@ -47,6 +47,8 @@ import { useWidgetStore } from './stores/widgets'
 import { installLivingPageScheduler } from './lib/livingPageScheduler'
 import { installCapabilityWatcher } from './stores/capabilities'
 import { useViewStore } from './stores/view'
+import { useActionHistory } from './stores/actionHistory'
+import UndoToast from './components/UndoToast'
 import './lib/timeOfDay' // side-effect: pushes --tod-* CSS vars to :root + ticks every 60s
 import './lib/modelPrefs' // side-effect: pushes user's saved model mode to main process
 import './lib/bodyDouble' // side-effect: auto-resumes Body Double mode if user had it enabled
@@ -231,6 +233,32 @@ export default function App(): JSX.Element {
       if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'k') {
         e.preventDefault()
         toggleAiBar()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
+
+  // Global undo/redo for structural workspace actions (create/delete/move/rename
+  // of tasks, folders, widgets). Yields to text fields and the full editors
+  // (docs/sheets/slides/files), which keep their own per-character undo.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent): void {
+      if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== 'z') return
+      const el = document.activeElement as HTMLElement | null
+      const tag = (el?.tagName ?? '').toLowerCase()
+      if (tag === 'input' || tag === 'textarea' || el?.isContentEditable) return
+      const v = useViewStore.getState().view
+      if (v.kind === 'document' || v.kind === 'livedoc' || v.kind === 'files') return
+      const hist = useActionHistory.getState()
+      if (e.shiftKey) {
+        if (hist.future.length === 0) return
+        e.preventDefault()
+        void hist.redo()
+      } else {
+        if (hist.past.length === 0) return
+        e.preventDefault()
+        void hist.undo()
       }
     }
     window.addEventListener('keydown', onKey)
@@ -475,6 +503,7 @@ export default function App(): JSX.Element {
         canSmartStack={canSmartStack}
       />
       <FirstRunOnboarding />
+      <UndoToast />
       <LaunchSignInModal />
       <UpgradePromptModal />
       <MetricsOverlay />
