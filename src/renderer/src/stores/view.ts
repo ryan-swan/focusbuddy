@@ -17,6 +17,7 @@ export type View =
   | { kind: 'mail'; openUid?: number }
   | { kind: 'documents' }
   | { kind: 'document'; documentId: string }
+  | { kind: 'livedoc'; liveDocId: string }
   | { kind: 'files' }
 
 interface ViewStore {
@@ -34,6 +35,7 @@ interface ViewStore {
   goMail: (openUid?: number) => void
   goDocuments: () => void
   goDocument: (documentId: string) => void
+  goLiveDoc: (liveDocId: string) => void
   goFiles: () => void
 }
 
@@ -126,6 +128,11 @@ export const useViewStore = create<ViewStore>((set) => ({
   },
   goDocument: (documentId) => {
     const v: View = { kind: 'document', documentId }
+    persistView(v)
+    set({ view: v })
+  },
+  goLiveDoc: (liveDocId) => {
+    const v: View = { kind: 'livedoc', liveDocId }
     persistView(v)
     set({ view: v })
   },

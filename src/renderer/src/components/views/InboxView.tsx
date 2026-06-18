@@ -1,8 +1,10 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useMessagingStore } from '../../stores/messaging'
 import { useAccountStore } from '../../stores/account'
 import { useViewStore } from '../../stores/view'
 import { useSignInPrompt } from '../../stores/signInPrompt'
+import { useDocCollabStore } from '../../stores/docCollab'
+import type { Takeover } from '../../lib/docCollabClient'
 import Icon from '../Icon'
 
 // PlexiInbox — your internal PlexiDesk notifications, and only those: direct
@@ -42,10 +44,16 @@ export default function InboxView(): JSX.Element {
   const acceptContact = useMessagingStore((s) => s.acceptContactRequest)
   const declineContact = useMessagingStore((s) => s.declineContactRequest)
   const goMessages = useViewStore((s) => s.goMessages)
+  const takeovers = useDocCollabStore((s) => s.takeovers)
+  const refreshTakeovers = useDocCollabStore((s) => s.refreshTakeovers)
+  const respondTakeover = useDocCollabStore((s) => s.respond)
 
   useEffect(() => {
-    if (account) void refreshInbox()
-  }, [account, refreshInbox])
+    if (account) {
+      void refreshInbox()
+      void refreshTakeovers()
+    }
+  }, [account, refreshInbox, refreshTakeovers])
 
   // Internal notifications only: chat (direct + shared-space), shared items, and
   // contact requests. Email is intentionally excluded — it lives in Mail.
@@ -119,6 +127,18 @@ export default function InboxView(): JSX.Element {
             <Icon name="refresh" size={16} />
           </button>
         </header>
+
+        {takeovers.length > 0 && (
+          <div className="mb-4 space-y-2" data-testid="takeover-requests">
+            {takeovers.map((t) => (
+              <TakeoverCard
+                key={t.id}
+                takeover={t}
+                onRespond={(accept, message) => void respondTakeover(t.id, accept, message)}
+              />
+            ))}
+          </div>
+        )}
 
         {rows.length === 0 ? (
           <div className="rounded-xl border border-dashed border-stone-300 dark:border-stone-700 p-10 text-center">
@@ -199,6 +219,74 @@ export default function InboxView(): JSX.Element {
             ))}
           </div>
         )}
+      </div>
+    </div>
+  )
+}
+
+// A pending request from another member to take over editing a live document
+// you currently hold. Accepting transfers the edit lock to them.
+function TakeoverCard({
+  takeover,
+  onRespond
+}: {
+  takeover: Takeover
+  onRespond: (accept: boolean, message: string) => void
+}): JSX.Element {
+  const [rejecting, setRejecting] = useState(false)
+  const [message, setMessage] = useState('')
+  return (
+    <div
+      data-testid="takeover-card"
+      className="rounded-xl border border-amber-200 dark:border-amber-900/50 bg-amber-50 dark:bg-amber-950/30 px-4 py-3"
+    >
+      <div className="flex items-start gap-3">
+        <div className="h-8 w-8 rounded-lg bg-amber-200/60 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 inline-flex items-center justify-center shrink-0">
+          <Icon name="lock_open" size={15} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="text-[13px] font-semibold text-stone-900 dark:text-stone-100">
+            {takeover.requesterHandle ?? 'Someone'} wants to edit “{takeover.docTitle ?? 'a document'}”
+          </div>
+          {takeover.message && (
+            <div className="text-[12px] text-stone-600 dark:text-stone-300 mt-0.5">“{takeover.message}”</div>
+          )}
+          {rejecting ? (
+            <div className="flex items-center gap-2 mt-2">
+              <input
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                placeholder="Reason (optional)"
+                data-testid="takeover-reject-message"
+                className="flex-1 bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-lg px-2.5 py-1 text-[12px] focus:outline-none focus:border-accent"
+              />
+              <button
+                onClick={() => onRespond(false, message)}
+                data-testid="takeover-reject-send"
+                className="text-[11px] px-2.5 py-1 rounded-md border border-stone-300 dark:border-stone-600 text-stone-600 dark:text-stone-300"
+              >
+                Send decline
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 mt-2">
+              <button
+                onClick={() => onRespond(true, '')}
+                data-testid="takeover-accept"
+                className="text-[11px] font-medium px-2.5 py-1 rounded-md bg-emerald-600 text-white hover:brightness-110"
+              >
+                Hand over editing
+              </button>
+              <button
+                onClick={() => setRejecting(true)}
+                data-testid="takeover-reject"
+                className="text-[11px] px-2 py-1 text-stone-500 dark:text-stone-400 hover:text-stone-700 dark:hover:text-stone-200"
+              >
+                Decline
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )
