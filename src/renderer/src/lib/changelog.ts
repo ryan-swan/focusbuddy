@@ -36,6 +36,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.59',
+    date: '2026-06-19T11:30:00Z',
+    title: 'v2.5.59 — Undo on the canvas',
+    tag: 'feature',
+    summary:
+      'Cmd-Z now reverses canvas actions too — adding, moving, resizing, recolouring and deleting widgets.',
+    highlights: [
+      'Undo and redo widget changes with Cmd-Z / Cmd-Shift-Z, including a one-step undo for moving a whole selection.',
+      'Deleting a widget is recoverable now: it comes back with its connector lines intact, and there is an Undo on the toast.'
+    ],
+    links: [{ label: 'Finding your way around', href: `${HELP_BASE}/getting-around` }]
+  },
+  {
     version: '2.5.58',
     date: '2026-06-19T10:30:00Z',
     title: 'v2.5.58 — Undo for tasks and folders',
