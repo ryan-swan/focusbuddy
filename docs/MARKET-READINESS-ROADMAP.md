@@ -24,7 +24,7 @@ You cannot make a product elite before it is safe to trust, and you cannot sell 
 
 ## Wave 0 — Quick wins ✅ (done & proven this session)
 
-Six fixes, implemented and verified GREEN (`haptyx-tester`: 66/66 unit + 18/18 e2e). See [SYSTEM-REVIEW §0](./SYSTEM-REVIEW-2026-06.md#0--what-was-fixed-and-proven-in-this-session).
+Six fixes, implemented and verified GREEN (`plexidesk-tester`: 66/66 unit + 18/18 e2e). See [SYSTEM-REVIEW §0](./SYSTEM-REVIEW-2026-06.md#0--what-was-fixed-and-proven-in-this-session).
 
 1. Clean desktop-Chrome **User-Agent** on webview sessions — the #1 cause of broken logins.
 2. **Origin-gated vault autofill** — closes a confirmed credential-exfiltration hole.

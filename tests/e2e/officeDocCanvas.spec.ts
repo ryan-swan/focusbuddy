@@ -63,27 +63,29 @@ async function openCtxMenuItem(
   await surface.click({ button: 'right', position: { x: 320, y: 280 } })
   await expect(window.locator('[data-canvas-ctx-menu]').first()).toBeVisible({ timeout: 4_000 })
 
+  // Scope to context-menu items (role=menuitem) so labels like "Files" don't
+  // collide with the Files sidebar entry of the same name.
   // Hover "Add object" to open its submenu.
-  await window.getByText('Add object', { exact: true }).hover()
+  await window.getByRole('menuitem', { name: 'Add object', exact: true }).hover()
   await window.waitForTimeout(250)
 
-  // Hover the category (e.g. "Notes", "Tools") to open its sub-submenu.
-  await window.getByText(category, { exact: true }).hover()
+  // Hover the category (e.g. "Files") to open its sub-submenu.
+  await window.getByRole('menuitem', { name: category, exact: true }).hover()
   await window.waitForTimeout(250)
 
   // Click the item (e.g. "Document", "Spreadsheet").
-  await window.getByText(item, { exact: true }).click()
+  await window.getByRole('menuitem', { name: item, exact: true }).click()
 }
 
 // ── ODC-1: Add Dialog from canvas right-click (Document) ─────────────────────
 
-test('ODC-1 — right-click Add object > Notes > Document shows office-add-dialog; Create new places widget', async () => {
+test('ODC-1 — right-click Add object > Files > Document shows office-add-dialog; Create new places widget', async () => {
   const { app: _app, window, dispose } = await launchApp()
   try {
     await waitForReady(window)
     const taskId = await seedTaskAndOpen({ app: _app, window, userDataDir: '', dispose }, 'ODC-1 Task')
 
-    await openCtxMenuItem(window, 'Notes', 'Document')
+    await openCtxMenuItem(window, 'Files', 'Document')
 
     // The add dialog must be visible.
     await expect(window.locator('[data-testid="office-add-dialog"]')).toBeVisible({ timeout: 5_000 })
@@ -128,13 +130,13 @@ test('ODC-1 — right-click Add object > Notes > Document shows office-add-dialo
 
 // ── ODC-2: Add Spreadsheet from canvas → sheet-grid renders ──────────────────
 
-test('ODC-2 — Add object > Tools > Spreadsheet > Create new embeds sheet editor', async () => {
+test('ODC-2 — Add object > Files > Spreadsheet > Create new embeds sheet editor', async () => {
   const { app: _app, window, dispose } = await launchApp()
   try {
     await waitForReady(window)
     const taskId = await seedTaskAndOpen({ app: _app, window, userDataDir: '', dispose }, 'ODC-2 Task')
 
-    await openCtxMenuItem(window, 'Tools', 'Spreadsheet')
+    await openCtxMenuItem(window, 'Files', 'Spreadsheet')
 
     await expect(window.locator('[data-testid="office-add-dialog"]')).toBeVisible({ timeout: 5_000 })
     await window.locator('[data-testid="office-add-new"]').click()
@@ -264,7 +266,7 @@ test('ODC-4 — Add Spreadsheet > Import a file: stub sheet:import; widget embed
     )
 
     // Open the add dialog via the canvas context menu.
-    await openCtxMenuItem(window, 'Tools', 'Spreadsheet')
+    await openCtxMenuItem(window, 'Files', 'Spreadsheet')
     await expect(window.locator('[data-testid="office-add-dialog"]')).toBeVisible({ timeout: 5_000 })
 
     // Click "Import a file".

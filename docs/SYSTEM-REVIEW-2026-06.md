@@ -18,7 +18,7 @@ This document is the honest answer. It is paired with two companions:
 | **Browser deep-dive** | 3 independent Electron-architect agents (auth / native-compositing / extensions lenses) → 1 synthesis | [BROWSER-ADR-001](./BROWSER-ADR-001-in-canvas-browser.md) |
 | **Adversarial verification** | 8 hostile skeptics, each told to *refute* a load-bearing "critical" claim, default-to-REFUTED unless code-proven | Every claim below is marked CONFIRMED / PARTIAL with proof |
 | **Market-readiness critic** | 1 strategist over all findings | Score **38/100**, 13 sequenced priorities |
-| **Fix & prove** | 6 quick-wins implemented, then `haptyx-tester` ran 66 unit + 18 e2e | **GREEN** — see §0 |
+| **Fix & prove** | 6 quick-wins implemented, then `plexidesk-tester` ran 66 unit + 18 e2e | **GREEN** — see §0 |
 
 **Discipline:** no claim of "broken" appears here without a code citation. Where verification downgraded or corrected the survey, the correction is shown — flattery and alarmism are both failures of a "no second chances" review.
 
@@ -28,7 +28,7 @@ A note surfaced during verification, not in the original brief: **the working tr
 
 ## §0 — What was fixed and proven in this session
 
-Six high-leverage, low-risk fixes were implemented and **proven** (`haptyx-tester` → GREEN, 66/66 unit + 18/18 e2e, new permanent guard `tests/e2e/securityQuickWins.spec.ts`). These are shipped in the working tree now:
+Six high-leverage, low-risk fixes were implemented and **proven** (`plexidesk-tester` → GREEN, 66/66 unit + 18/18 e2e, new permanent guard `tests/e2e/securityQuickWins.spec.ts`). These are shipped in the working tree now:
 
 | # | Fix | Files | Closes |
 |---|---|---|---|
