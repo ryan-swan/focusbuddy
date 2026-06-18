@@ -278,8 +278,8 @@ test('Step 8 — no regressions: Home, Calendar, Vault, Inbox still route withou
     await window.waitForTimeout(400)
     await expect(window.getByRole('button', { name: /^Documents$/i })).toBeVisible()
 
-    // Inbox
-    await window.getByRole('button', { name: /^Inbox$/i }).click()
+    // PlexiInbox
+    await window.getByRole('button', { name: /^PlexiInbox$/i }).click()
     await window.waitForTimeout(400)
     await expect(window.getByRole('button', { name: /^Documents$/i })).toBeVisible()
 
