@@ -131,28 +131,32 @@ export default function Toolbar({
         <option value="code">Code</option>
       </select>
 
-      {/* Heading style: when the cursor is in a heading, edit that level's named
-          style so every heading of the level updates at once. */}
-      {currentHeadingLevel && (
-        <div className="relative">
-          <button
-            className={btn(headingStyleOpen)}
-            title={`Edit Heading ${currentHeadingLevel} style (applies to all H${currentHeadingLevel})`}
-            data-testid="doc-heading-style-btn"
-            onClick={() => setHeadingStyleOpen((v) => !v)}
-          >
-            <Icon name="format_size" size={15} />
-          </button>
-          {headingStyleOpen && (
-            <HeadingStylePanel
-              level={currentHeadingLevel}
-              style={headingStyles[currentHeadingLevel] ?? {}}
-              onSet={(patch) => onSetHeadingStyle(currentHeadingLevel, patch)}
-              onClose={() => setHeadingStyleOpen(false)}
-            />
-          )}
-        </div>
-      )}
+      {/* Styles panel: one clear place to apply a heading level and to define
+          what each level looks like. Editing a level updates every heading of
+          that level at once. */}
+      <div className="relative">
+        <button
+          className={btn(headingStyleOpen)}
+          title="Paragraph styles — apply and customise heading levels"
+          data-testid="doc-styles-btn"
+          onClick={() => setHeadingStyleOpen((v) => !v)}
+        >
+          <Icon name="format_size" size={15} />
+          <span className="ml-1 text-[12px]">Styles</span>
+        </button>
+        {headingStyleOpen && (
+          <StylesPanel
+            currentHeadingLevel={currentHeadingLevel}
+            headingStyles={headingStyles}
+            onApplyLevel={(lvl) => {
+              if (lvl === 0) editor.chain().focus().setParagraph().run()
+              else editor.chain().focus().setHeading({ level: lvl as 1 | 2 | 3 | 4 | 5 | 6 }).run()
+            }}
+            onSet={onSetHeadingStyle}
+            onClose={() => setHeadingStyleOpen(false)}
+          />
+        )}
+      </div>
 
       <select
         className={`${sel} w-16`}
@@ -350,16 +354,21 @@ export default function Toolbar({
 }
 
 // Popover to edit one heading level's named style (size, colour, bold). Changes
-// apply to every heading of that level via DocEditor's injected CSS.
-function HeadingStylePanel({
-  level,
-  style,
+// The Styles panel: apply a paragraph style (Normal / Heading 1-3) and define
+// what each heading level looks like. Editing a level's size / colour / bold /
+// italic updates every heading of that level at once (via DocEditor's injected
+// CSS), the Word "named styles" behaviour.
+function StylesPanel({
+  currentHeadingLevel,
+  headingStyles,
+  onApplyLevel,
   onSet,
   onClose
 }: {
-  level: number
-  style: HeadingStyle
-  onSet: (patch: Partial<HeadingStyle>) => void
+  currentHeadingLevel: number | null
+  headingStyles: HeadingStyles
+  onApplyLevel: (level: number) => void
+  onSet: (level: number, patch: Partial<HeadingStyle>) => void
   onClose: () => void
 }): JSX.Element {
   const ref = useRef<HTMLDivElement | null>(null)
@@ -370,57 +379,90 @@ function HeadingStylePanel({
     document.addEventListener('mousedown', onDown)
     return () => document.removeEventListener('mousedown', onDown)
   }, [onClose])
-  const input =
-    'w-full bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded px-2 py-1 text-[12px] focus:outline-none'
-  return (
-    <div
-      ref={ref}
-      data-testid="doc-heading-style-panel"
-      className="absolute z-50 mt-1 left-0 w-56 rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 shadow-xl p-2.5 space-y-2 font-normal"
-    >
-      <div className="text-[11px] uppercase tracking-wide text-stone-400">
-        Heading {level} style — applies to all H{level}
-      </div>
-      <label className="block text-[11px] text-stone-500 dark:text-stone-400">
-        Size (px)
+
+  const tiny =
+    'h-6 w-6 inline-flex items-center justify-center rounded text-[12px]'
+  const numCls =
+    'w-12 bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded px-1 py-0.5 text-[11px] focus:outline-none'
+
+  function row(level: number, label: string, previewSize: number): JSX.Element {
+    const s: HeadingStyle = headingStyles[level] ?? {}
+    const active = currentHeadingLevel === level
+    return (
+      <div
+        key={level}
+        className={`flex items-center gap-1 px-2 py-1.5 rounded ${active ? 'bg-accent/10' : 'hover:bg-stone-100 dark:hover:bg-stone-800'}`}
+        data-testid={`doc-style-row-${level}`}
+      >
+        <button
+          onClick={() => onApplyLevel(level)}
+          className="flex-1 text-left truncate"
+          title={`Apply ${label}`}
+          style={{
+            fontSize: Math.min(previewSize, 20),
+            fontWeight: s.bold ? 700 : 600,
+            fontStyle: s.italic ? 'italic' : undefined,
+            color: s.color
+          }}
+        >
+          {label}
+        </button>
+        <button
+          className={`${tiny} ${s.bold ? 'bg-accent/15 text-accent' : 'text-stone-500 hover:bg-stone-100 dark:hover:bg-stone-800'}`}
+          title="Bold"
+          onClick={() => onSet(level, { bold: !s.bold })}
+        >
+          <Icon name="format_bold" size={13} />
+        </button>
+        <button
+          className={`${tiny} ${s.italic ? 'bg-accent/15 text-accent' : 'text-stone-500 hover:bg-stone-100 dark:hover:bg-stone-800'}`}
+          title="Italic"
+          onClick={() => onSet(level, { italic: !s.italic })}
+        >
+          <Icon name="format_italic" size={13} />
+        </button>
         <input
           type="number"
           min={10}
           max={96}
-          value={style.fontSize ?? ''}
-          placeholder="default"
-          onChange={(e) => onSet({ fontSize: e.target.value === '' ? undefined : Number(e.target.value) })}
-          className={input + ' mt-0.5'}
+          value={s.fontSize ?? ''}
+          placeholder={String(previewSize)}
+          title="Size (px)"
+          onChange={(e) => onSet(level, { fontSize: e.target.value === '' ? undefined : Number(e.target.value) })}
+          className={numCls}
         />
-      </label>
-      <div className="flex items-center gap-2">
-        <label className="flex items-center gap-1.5 text-[11px] text-stone-500 dark:text-stone-400 cursor-pointer">
-          Colour
-          <input
-            type="color"
-            value={style.color ?? '#1c1917'}
-            onChange={(e) => onSet({ color: e.target.value })}
-            className="h-6 w-8 rounded cursor-pointer"
-          />
-        </label>
-        <button
-          onClick={() => onSet({ bold: !style.bold })}
-          className={`h-7 w-7 inline-flex items-center justify-center rounded text-[13px] ${
-            style.bold ? 'bg-accent/15 text-accent' : 'text-stone-600 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800'
-          }`}
-          title="Bold"
-        >
-          <Icon name="format_bold" size={15} />
-        </button>
-        <button
-          onClick={() => onSet({ italic: !style.italic })}
-          className={`h-7 w-7 inline-flex items-center justify-center rounded text-[13px] ${
-            style.italic ? 'bg-accent/15 text-accent' : 'text-stone-600 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800'
-          }`}
-          title="Italic"
-        >
-          <Icon name="format_italic" size={15} />
-        </button>
+        <input
+          type="color"
+          value={s.color ?? '#1c1917'}
+          title="Colour"
+          onChange={(e) => onSet(level, { color: e.target.value })}
+          className="h-6 w-6 rounded cursor-pointer p-0 border border-stone-200 dark:border-stone-700"
+        />
+      </div>
+    )
+  }
+
+  return (
+    <div
+      ref={ref}
+      data-testid="doc-styles-panel"
+      className="absolute z-50 mt-1 left-0 w-[320px] rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 shadow-xl p-2 font-normal"
+    >
+      <div className="text-[11px] uppercase tracking-wide text-stone-400 px-2 pb-1">Paragraph styles</div>
+      <button
+        onClick={() => onApplyLevel(0)}
+        className={`w-full text-left px-2 py-1.5 rounded text-[13px] ${
+          currentHeadingLevel === null ? 'bg-accent/10' : 'hover:bg-stone-100 dark:hover:bg-stone-800'
+        }`}
+        data-testid="doc-style-row-0"
+      >
+        Normal text
+      </button>
+      {row(1, 'Heading 1', 30)}
+      {row(2, 'Heading 2', 24)}
+      {row(3, 'Heading 3', 19)}
+      <div className="text-[10px] text-stone-400 px-2 pt-1.5 border-t border-stone-100 dark:border-stone-800 mt-1">
+        Click a name to apply it. Changing a style updates every heading of that level.
       </div>
     </div>
   )

@@ -53,11 +53,16 @@ export function headingCss(scopeClass: string, styles: HeadingStyles): string {
     const s = styles[lvl]
     if (!s) continue
     const decls: string[] = []
-    if (s.fontSize) decls.push(`font-size:${s.fontSize}px`)
-    if (s.color) decls.push(`color:${s.color}`)
-    if (s.bold !== undefined) decls.push(`font-weight:${s.bold ? 700 : 400}`)
-    if (s.italic !== undefined) decls.push(`font-style:${s.italic ? 'italic' : 'normal'}`)
-    if (decls.length) css += `.${scopeClass} h${lvl}{${decls.join(';')} !important}\n`
+    if (s.fontSize) decls.push(`font-size:${s.fontSize}px !important`)
+    if (s.color) decls.push(`color:${s.color} !important`)
+    if (s.bold !== undefined) decls.push(`font-weight:${s.bold ? 700 : 400} !important`)
+    if (s.italic !== undefined) decls.push(`font-style:${s.italic ? 'italic' : 'normal'} !important`)
+    if (!decls.length) continue
+    // Target the heading AND its inline descendants (spans), so the named style
+    // is authoritative even when individual heading text carries inline marks
+    // from the size / colour controls — otherwise those headings would not
+    // follow the level's style.
+    css += `.${scopeClass} h${lvl}, .${scopeClass} h${lvl} *{${decls.join(';')}}\n`
   }
   return css
 }
