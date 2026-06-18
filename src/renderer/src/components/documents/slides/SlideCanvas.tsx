@@ -21,6 +21,27 @@ interface Props {
   onSetText: (id: string, text: string) => void
 }
 
+// Visible square handles on the selected element's corners and edge midpoints,
+// so resizing is as discoverable for an image as it is for a shape.
+const HANDLE: React.CSSProperties = {
+  width: 14,
+  height: 14,
+  background: '#6d5dfc',
+  border: '2px solid #fff',
+  borderRadius: 3,
+  boxShadow: '0 1px 3px rgba(0,0,0,0.3)'
+}
+const HANDLE_STYLES = {
+  topLeft: { ...HANDLE, left: -7, top: -7 },
+  top: { ...HANDLE, top: -7 },
+  topRight: { ...HANDLE, right: -7, top: -7 },
+  right: { ...HANDLE, right: -7 },
+  bottomRight: { ...HANDLE, right: -7, bottom: -7 },
+  bottom: { ...HANDLE, bottom: -7 },
+  bottomLeft: { ...HANDLE, left: -7, bottom: -7 },
+  left: { ...HANDLE, left: -7 }
+}
+
 export default function SlideCanvas({
   slide,
   theme,
@@ -68,6 +89,8 @@ export default function SlideCanvas({
               position={{ x: el.x, y: el.y }}
               disableDragging={isEditing}
               enableResizing={!isEditing}
+              lockAspectRatio={el.type === 'image' && !!el.lockAspect}
+              resizeHandleStyles={selected && !isEditing ? HANDLE_STYLES : undefined}
               onMouseDown={() => onSelect(el.id)}
               onDragStop={(_e, d) => onUpdateElement(el.id, { x: Math.round(d.x), y: Math.round(d.y) })}
               onResizeStop={(_e, _dir, ref, _delta, pos) =>

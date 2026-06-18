@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import type { DeckTheme, Slide, SlideElement, SlideLayout, SlidesBody, SlideTransition } from '@shared/types'
 import { resolveTheme, layoutElements, applyThemeToDeck } from '@shared/slideThemes'
+import { SLIDE_TEMPLATES } from '@shared/slideTemplates'
 import { migrateSlidesBody } from '@shared/slidesMigrate'
 import SlideFace from './slides/SlideFace'
 import SlideCanvas from './slides/SlideCanvas'
 import ElementInspector from './slides/ElementInspector'
 import SlidesToolbar from './slides/SlidesToolbar'
+import SlideTemplateGallery from './slides/SlideTemplateGallery'
 import PresentOverlay from './slides/PresentOverlay'
 import AiSlidePanel from './slides/AiSlidePanel'
 import {
@@ -39,6 +41,7 @@ export default function SlidesEditor({ body: rawBody, title, onChange }: Props):
   const [selectedElId, setSelectedElId] = useState<string | null>(null)
   const [presenting, setPresenting] = useState(false)
   const [aiOpen, setAiOpen] = useState(false)
+  const [galleryOpen, setGalleryOpen] = useState(false)
   const [status, setStatus] = useState<string | null>(null)
   const [canvasW, setCanvasW] = useState(720)
 
@@ -103,19 +106,25 @@ export default function SlidesEditor({ body: rawBody, title, onChange }: Props):
   }, [body])
 
   // ── Slide rail ops ────────────────────────────────────────────────────────
-  function addSlide(): void {
+  // Insert a new slide built from a starter template, right after the current
+  // one so it lands where the user is working.
+  function addSlideFromTemplate(templateId: string): void {
+    const tpl = SLIDE_TEMPLATES.find((t) => t.id === templateId)
+    const elements = tpl ? tpl.build(theme) : layoutElements('title-content', theme)
     const s: Slide = {
       id: `sl-${Date.now().toString(36)}`,
       notes: '',
-      layout: 'title-content',
-      elements: layoutElements('title-content', theme),
+      layout: templateId === 'blank' ? 'blank' : 'title-content',
+      elements,
       transition: 'none',
       background: { type: 'solid', color: theme.background },
       schemaVersion: 2
     }
-    commit({ ...body, slides: [...slides, s] })
-    setSel(slides.length)
+    const insertAt = slideIdx + 1
+    commit({ ...body, slides: [...slides.slice(0, insertAt), s, ...slides.slice(insertAt)] })
+    setSel(insertAt)
     setSelectedElId(null)
+    setGalleryOpen(false)
   }
   function deleteSlide(i: number): void {
     if (slides.length <= 1) return
@@ -161,11 +170,35 @@ export default function SlidesEditor({ body: rawBody, title, onChange }: Props):
   }
   async function insertImage(): Promise<void> {
     const res = await window.api.office.pickImage()
-    if (res.ok && res.dataUrl) {
-      const el: SlideElement = { id: elementId(), type: 'image', src: res.dataUrl, fit: 'contain', x: 340, y: 180, w: 600, h: 360, z: 10 }
-      mutateSlide((s) => addElement(s, el))
-      setSelectedElId(el.id)
+    if (!res.ok || !res.dataUrl) return
+    const src = res.dataUrl
+    // Measure the image so the frame starts at its true aspect ratio (rather
+    // than a fixed box that distorts it), and so aspect-lock has a ratio to use.
+    const dims = await new Promise<{ w: number; h: number }>((resolve) => {
+      const img = new Image()
+      img.onload = () => resolve({ w: img.naturalWidth || 600, h: img.naturalHeight || 360 })
+      img.onerror = () => resolve({ w: 600, h: 360 })
+      img.src = src
+    })
+    const ratio = Math.min(720 / dims.w, 480 / dims.h, 1)
+    const w = Math.max(80, Math.round(dims.w * ratio))
+    const h = Math.max(60, Math.round(dims.h * ratio))
+    const el: SlideElement = {
+      id: elementId(),
+      type: 'image',
+      src,
+      fit: 'cover',
+      lockAspect: true,
+      naturalW: dims.w,
+      naturalH: dims.h,
+      x: Math.round((1280 - w) / 2),
+      y: Math.round((720 - h) / 2),
+      w,
+      h,
+      z: 10
     }
+    mutateSlide((s) => addElement(s, el))
+    setSelectedElId(el.id)
   }
   function applyLayout(layout: SlideLayout): void {
     mutateSlide((s) => ({ ...s, layout, elements: layoutElements(layout, theme) }))
@@ -230,6 +263,7 @@ export default function SlidesEditor({ body: rawBody, title, onChange }: Props):
         onInsertShape={insertShape}
         onInsertLine={insertLine}
         onApplyLayout={applyLayout}
+        onTemplates={() => setGalleryOpen(true)}
         onPresent={() => setPresenting(true)}
         onAi={() => setAiOpen((v) => !v)}
         onImport={() => void importFile()}
@@ -255,7 +289,7 @@ export default function SlidesEditor({ body: rawBody, title, onChange }: Props):
               </div>
             </div>
           ))}
-          <button onClick={addSlide} className="w-full aspect-video rounded-md border-2 border-dashed border-stone-300 dark:border-stone-600 text-stone-400 hover:text-accent hover:border-accent flex items-center justify-center" data-testid="slides-add">
+          <button onClick={() => setGalleryOpen(true)} className="w-full aspect-video rounded-md border-2 border-dashed border-stone-300 dark:border-stone-600 text-stone-400 hover:text-accent hover:border-accent flex items-center justify-center" data-testid="slides-add">
             <Icon name="add" size={20} />
           </button>
         </div>
@@ -334,6 +368,10 @@ export default function SlidesEditor({ body: rawBody, title, onChange }: Props):
           onApplyTheme={applyTheme}
         />
       </div>
+
+      {galleryOpen && (
+        <SlideTemplateGallery theme={theme} onPick={addSlideFromTemplate} onClose={() => setGalleryOpen(false)} />
+      )}
 
       {presenting && <PresentOverlay slides={slides} theme={theme} startIndex={slideIdx} onClose={() => setPresenting(false)} />}
     </div>

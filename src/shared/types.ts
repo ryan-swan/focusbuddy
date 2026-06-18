@@ -1267,7 +1267,13 @@ export interface SlideTextElement extends SlideElementBase {
 export interface SlideImageElement extends SlideElementBase {
   type: 'image'
   src: string // data: URI or file path
-  fit?: 'contain' | 'cover'
+  fit?: 'contain' | 'cover' | 'fill'
+  // When true, dragging a resize handle preserves the frame's aspect ratio.
+  lockAspect?: boolean
+  // The image's natural width/height, captured on insert, so aspect-lock and
+  // "fit to image" can use the true ratio rather than the current frame.
+  naturalW?: number
+  naturalH?: number
 }
 export interface SlideShapeElement extends SlideElementBase {
   type: 'shape'
