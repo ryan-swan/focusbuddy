@@ -36,6 +36,20 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.62',
+    date: '2026-06-19T16:00:00Z',
+    title: 'v2.5.62 — Collaborate live on a whole desk',
+    tag: 'feature',
+    summary:
+      'Live collaboration now covers entire desks, not just documents. Right-click a desk and choose Collaborate live to share the whole board, and the same check-out model keeps everyone out of each other’s way.',
+    highlights: [
+      'Right-click a desk and choose Collaborate live to share the whole canvas — widgets, their connector links, sections and table data.',
+      'Whoever checks the board out edits it live; everyone else sees it read-only with who is editing, and can request access.',
+      'The takeover handshake hands editing over without losing work, exactly like live documents, and shared canvases appear in the Documents Shared-live list.'
+    ],
+    links: [{ label: 'Finding your way around', href: `${HELP_BASE}/getting-around` }]
+  },
+  {
     version: '2.5.61',
     date: '2026-06-19T14:00:00Z',
     title: 'v2.5.61 — Undo for table rows',
