@@ -686,7 +686,7 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
             />
             <NavRow
               icon="inbox"
-              label="Inbox"
+              label="PlexiInbox"
               active={viewIsActive({ kind: 'inbox' })}
               badge={unreadMessages > 0 ? String(unreadMessages) : undefined}
               onClick={() => {

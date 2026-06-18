@@ -147,8 +147,8 @@ test('step5 - Inbox view renders without crashing when no account is set', async
   const { window } = launched
   await waitForReady(window)
 
-  // Navigate to Inbox.
-  const inboxBtn = window.getByRole('button', { name: /^Inbox$/i })
+  // Navigate to PlexiInbox.
+  const inboxBtn = window.getByRole('button', { name: /^PlexiInbox$/i })
   await expect(inboxBtn).toBeVisible({ timeout: 5_000 })
   await inboxBtn.click()
 
