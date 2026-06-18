@@ -126,12 +126,23 @@ import {
   getFile,
   ingestFromBuffer,
   ingestFromPath,
-  readFileBytes
+  readFileBytes,
+  listEntries as listFileEntries,
+  getEntry as getFileEntry,
+  folderPath as fileFolderPath,
+  createFolder as createFileFolder,
+  renameEntry as renameFileEntry,
+  moveEntry as moveFileEntry,
+  deleteEntry as deleteFileEntry,
+  fileDocument,
+  unfiledDocuments
 } from '../db/files'
 import {
   openExternalUrl,
   openLocalFile,
   pickAndIngestFile,
+  pickFilesIntoFolder,
+  revealFile,
   thumbnailForFile
 } from '../filePreviews'
 import {
@@ -882,12 +893,13 @@ export function registerIpcHandlers(): void {
     'files:ingestBuffer',
     (
       _e,
-      input: { buffer: ArrayBuffer; originalName: string; mimeType: string }
+      input: { buffer: ArrayBuffer; originalName: string; mimeType: string; parentId?: string | null }
     ) =>
       ingestFromBuffer({
         buffer: new Uint8Array(input.buffer),
         originalName: input.originalName,
-        mimeType: input.mimeType
+        mimeType: input.mimeType,
+        parentId: input.parentId ?? null
       })
   )
   ipcMain.handle('files:get', (_e, id: string) => getFile(id))
@@ -1038,6 +1050,26 @@ export function registerIpcHandlers(): void {
   // Open a remote URL in the user's default browser. Allowed only for
   // http: / https: — other protocols return { ok: false, error }.
   ipcMain.handle('files:openExternal', (_e, url: string) => openExternalUrl(url))
+
+  // ── File / folder manager ─────────────────────────────────────────────────
+  // fb_files doubles as a foldered library: folders, imported external files,
+  // and references to internal documents. Handlers are thin wrappers over the
+  // db/files manager functions plus OS-level pick/reveal in filePreviews.
+  ipcMain.handle('fileManager:list', (_e, parentId: string | null) => listFileEntries(parentId))
+  ipcMain.handle('fileManager:get', (_e, id: string) => getFileEntry(id))
+  ipcMain.handle('fileManager:path', (_e, id: string | null) => fileFolderPath(id))
+  ipcMain.handle('fileManager:createFolder', (_e, parentId: string | null, name: string) =>
+    createFileFolder(parentId, name)
+  )
+  ipcMain.handle('fileManager:rename', (_e, id: string, name: string) => renameFileEntry(id, name))
+  ipcMain.handle('fileManager:move', (_e, id: string, newParentId: string | null) => moveFileEntry(id, newParentId))
+  ipcMain.handle('fileManager:delete', (_e, id: string) => deleteFileEntry(id))
+  ipcMain.handle('fileManager:fileDocument', (_e, docId: string, parentId: string | null) =>
+    fileDocument(docId, parentId)
+  )
+  ipcMain.handle('fileManager:unfiledDocuments', () => unfiledDocuments())
+  ipcMain.handle('fileManager:pickFiles', (_e, parentId: string | null) => pickFilesIntoFolder(parentId))
+  ipcMain.handle('fileManager:reveal', (_e, id: string) => revealFile(id))
 
   // ── Voice / video note AI pipeline ────────────────────────────────────────
   // Three independently-invokable stages so the renderer can:
