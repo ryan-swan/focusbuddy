@@ -22,6 +22,7 @@ import CanvasContextMenu, { type CtxMenuItem } from './CanvasContextMenu'
 import { useSharesStore } from '../stores/shares'
 import { useAccountStore } from '../stores/account'
 import { acceptShareIntoWorkspace, type ShareSnap } from '../lib/acceptShare'
+import { promoteToLiveCanvas } from '../lib/liveCanvasMirror'
 import SharedBadge from './SharedBadge'
 import SharedRecipientBadges from './SharedRecipientBadges'
 import Icon from './Icon'
@@ -153,6 +154,7 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
   const unreadMail = useMailStore(selectMailUnread)
   const goProject = useViewStore((s) => s.goProject)
   const goTask = useViewStore((s) => s.goTask)
+  const goLiveCanvas = useViewStore((s) => s.goLiveCanvas)
   const goConnectedApp = useViewStore((s) => s.goConnectedApp)
   const goVault = useViewStore((s) => s.goVault)
 
@@ -310,6 +312,7 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
   const outgoingShares = useSharesStore((s) => s.outgoing)
   const recipientsByEntity = useSharesStore((s) => s.recipientsByEntity)
   const account = useAccountStore((s) => s.account)
+  const sessionToken = useAccountStore((s) => s.sessionToken)
   const [sharedOpen, setSharedOpen] = useState(true)
 
   // Entity ids the owner has shared OUT (active, non-revoked links) — drives a
@@ -1303,6 +1306,31 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
                 })
               }
             },
+            // Live collaboration is a per-desk (task) capability — a whole board
+            // checked out under the same lock/takeover model as live documents.
+            // Folders get their own live-collaboration surface in a later pass.
+            ...(rowCtxMenu.node.kind === 'task'
+              ? [
+                  {
+                    label: 'Collaborate live',
+                    icon: 'group',
+                    onClick: () => {
+                      const node = rowCtxMenu.node
+                      void (async () => {
+                        if (!sessionToken) {
+                          promptUpgrade(
+                            'Sign in to collaborate live on a desk with others.',
+                            'pro'
+                          )
+                          return
+                        }
+                        const liveId = await promoteToLiveCanvas(node, sessionToken)
+                        if (liveId) goLiveCanvas(liveId)
+                      })()
+                    }
+                  }
+                ]
+              : []),
             { separator: true },
             {
               label: 'Rename',

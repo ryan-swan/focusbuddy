@@ -12,6 +12,7 @@ import MailView from './views/MailView'
 import DocumentsView from './views/DocumentsView'
 import DocumentEditorView from './views/DocumentEditorView'
 import LiveDocEditorView from './views/LiveDocEditorView'
+import LiveCanvasView from './views/LiveCanvasView'
 import FilesView from './views/FilesView'
 
 // The MainPane routes the central area between the OS-level views.
@@ -46,6 +47,8 @@ export default function MainPane(): JSX.Element {
       return <DocumentEditorView documentId={view.documentId} />
     case 'livedoc':
       return <LiveDocEditorView liveDocId={view.liveDocId} />
+    case 'livecanvas':
+      return <LiveCanvasView liveCanvasId={view.liveCanvasId} />
     case 'files':
       return <FilesView />
     default:
