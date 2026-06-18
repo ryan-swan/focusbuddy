@@ -32,6 +32,15 @@ function persistPrefs(p: { viewMode: FileViewMode; sortKey: FileSortKey; sortDir
   }
 }
 
+// One reversible action: undo and redo are async because they call the IPC
+// layer. We keep the inverse rather than snapshots so undo stays cheap and the
+// DB remains the source of truth.
+interface UndoItem {
+  label: string
+  undo: () => Promise<void>
+  redo: () => Promise<void>
+}
+
 interface FileManagerStore {
   cwd: string | null
   crumbs: Array<{ id: string; name: string }>
@@ -41,6 +50,8 @@ interface FileManagerStore {
   viewMode: FileViewMode
   sortKey: FileSortKey
   sortDir: SortDir
+  past: UndoItem[]
+  future: UndoItem[]
 
   refresh: () => Promise<void>
   openFolder: (id: string | null) => Promise<void>
@@ -55,6 +66,8 @@ interface FileManagerStore {
   importFiles: () => Promise<void>
   ingestBuffers: (files: Array<{ buffer: ArrayBuffer; originalName: string; mimeType: string }>) => Promise<void>
   fileExistingDocument: (docId: string) => Promise<void>
+  undo: () => Promise<void>
+  redo: () => Promise<void>
 }
 
 const prefs = readPrefs()
@@ -68,6 +81,8 @@ export const useFileManagerStore = create<FileManagerStore>((set, get) => ({
   viewMode: prefs.viewMode,
   sortKey: prefs.sortKey,
   sortDir: prefs.sortDir,
+  past: [],
+  future: [],
 
   refresh: async () => {
     const cwd = get().cwd
@@ -99,38 +114,131 @@ export const useFileManagerStore = create<FileManagerStore>((set, get) => ({
   },
 
   createFolder: async (name) => {
-    await window.api.fileManager.createFolder(get().cwd, name)
+    const folder = await window.api.fileManager.createFolder(get().cwd, name)
+    record(set, get, {
+      label: 'Create folder',
+      // A created folder is removed by trashing it (recoverable), and brought
+      // back by restoring — keeping the same id so later history stays valid.
+      undo: async () => {
+        await window.api.fileManager.delete(folder.id)
+      },
+      redo: async () => {
+        await window.api.fileManager.restore([folder.id])
+      }
+    })
     await get().refresh()
   },
   rename: async (id, name) => {
+    const before = get().entries.find((e) => e.id === id)?.name ?? ''
     await window.api.fileManager.rename(id, name)
+    record(set, get, {
+      label: 'Rename',
+      undo: async () => {
+        await window.api.fileManager.rename(id, before)
+      },
+      redo: async () => {
+        await window.api.fileManager.rename(id, name)
+      }
+    })
     await get().refresh()
   },
   move: async (id, newParentId) => {
+    const before = get().entries.find((e) => e.id === id)?.parentId ?? get().cwd
     const ok = await window.api.fileManager.move(id, newParentId)
-    if (ok) await get().refresh()
+    if (!ok) return
+    record(set, get, {
+      label: 'Move',
+      undo: async () => {
+        await window.api.fileManager.move(id, before)
+      },
+      redo: async () => {
+        await window.api.fileManager.move(id, newParentId)
+      }
+    })
+    await get().refresh()
   },
   remove: async (id) => {
-    await window.api.fileManager.delete(id)
+    const ids = await window.api.fileManager.delete(id)
     set({ selectedId: null })
+    if (ids.length) {
+      record(set, get, {
+        label: 'Delete',
+        undo: async () => {
+          await window.api.fileManager.restore(ids)
+        },
+        redo: async () => {
+          await window.api.fileManager.delete(id)
+        }
+      })
+    }
     await get().refresh()
   },
   importFiles: async () => {
-    await window.api.fileManager.pickFiles(get().cwd)
+    const added = await window.api.fileManager.pickFiles(get().cwd)
+    const ids = added.map((f) => f.id)
+    if (ids.length) {
+      record(set, get, {
+        label: 'Import files',
+        undo: async () => {
+          for (const fid of ids) await window.api.fileManager.delete(fid)
+        },
+        redo: async () => {
+          await window.api.fileManager.restore(ids)
+        }
+      })
+    }
     await get().refresh()
   },
   ingestBuffers: async (files) => {
     const cwd = get().cwd
+    const ids: string[] = []
     for (const f of files) {
-      await window.api.files.ingestBuffer({ ...f, parentId: cwd })
+      const created = await window.api.files.ingestBuffer({ ...f, parentId: cwd })
+      ids.push(created.id)
+    }
+    if (ids.length) {
+      record(set, get, {
+        label: 'Add files',
+        undo: async () => {
+          for (const fid of ids) await window.api.fileManager.delete(fid)
+        },
+        redo: async () => {
+          await window.api.fileManager.restore(ids)
+        }
+      })
     }
     await get().refresh()
   },
   fileExistingDocument: async (docId) => {
     await window.api.fileManager.fileDocument(docId, get().cwd)
     await get().refresh()
+  },
+  undo: async () => {
+    const past = get().past
+    const item = past[past.length - 1]
+    if (!item) return
+    set({ past: past.slice(0, -1), future: [...get().future, item] })
+    await item.undo()
+    await get().refresh()
+  },
+  redo: async () => {
+    const future = get().future
+    const item = future[future.length - 1]
+    if (!item) return
+    set({ future: future.slice(0, -1), past: [...get().past, item] })
+    await item.redo()
+    await get().refresh()
   }
 }))
+
+// Push a reversible action onto the undo stack, clearing the redo branch.
+function record(
+  set: (partial: Partial<FileManagerStore>) => void,
+  get: () => FileManagerStore,
+  item: UndoItem
+): void {
+  set({ past: [...get().past, item].slice(-50), future: [] })
+}
 
 // Sort + always-folders-first comparator used by the view.
 export function sortEntries(entries: FileEntry[], key: FileSortKey, dir: SortDir): FileEntry[] {

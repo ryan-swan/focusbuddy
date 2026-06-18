@@ -107,7 +107,7 @@ export default function FirstRunOnboarding(): JSX.Element | null {
       <div className="w-[560px] max-w-[92vw] rounded-2xl bg-[rgba(16,24,39,0.96)] border border-white/10 shadow-2xl overflow-hidden text-stone-100">
         {/* Progress dots */}
         <div className="flex items-center gap-1.5 px-6 pt-5">
-          {[0, 1, 2].map((i) => (
+          {[0, 1, 2, 3].map((i) => (
             <div
               key={i}
               className={`h-1 rounded-full transition-all ${
@@ -131,7 +131,7 @@ export default function FirstRunOnboarding(): JSX.Element | null {
               side. Describe what you need and the AI builds it onto your desk.
             </p>
             <p className="text-[13px] text-stone-400 leading-relaxed">
-              Two quick steps and you are working. You can skip either.
+              A key, a quick tour, and you are working. You can skip any step.
             </p>
             <div className="flex justify-end mt-6">
               <button onClick={() => setStep(1)} className="btn-primary">
@@ -216,6 +216,43 @@ export default function FirstRunOnboarding(): JSX.Element | null {
         )}
 
         {step === 2 && (
+          <div className="px-6 py-6">
+            <h2 className="text-xl font-semibold mb-2">What is inside</h2>
+            <p className="text-[13px] text-stone-300 leading-relaxed mb-4">
+              Everything lives in the left sidebar. Here is the quick map so you know where to reach
+              for each thing.
+            </p>
+            <div className="grid grid-cols-2 gap-2.5" data-testid="onboarding-tour">
+              {[
+                { icon: 'dashboard', name: 'Home & Tasks', blurb: 'Your desks and to-dos, each with its own glass canvas.' },
+                { icon: 'description', name: 'Documents', blurb: 'Word, Excel and PowerPoint-class docs, sheets and slides.' },
+                { icon: 'folder', name: 'Files', blurb: 'A folder library for any file, with views and sorting.' },
+                { icon: 'calendar_month', name: 'Calendar', blurb: 'Time-block your day and plan focus sessions.' },
+                { icon: 'mail', name: 'Mail', blurb: 'Read and reply to email, and turn any message into a task.' },
+                { icon: 'lock', name: 'Vault', blurb: 'Encrypted passwords and secrets, with auto-fill.' }
+              ].map((s) => (
+                <div key={s.name} className="flex gap-2.5 rounded-lg bg-white/5 border border-white/10 px-3 py-2.5">
+                  <Icon name={s.icon} size={18} className="text-accent shrink-0 mt-0.5" />
+                  <div className="min-w-0">
+                    <div className="text-[13px] font-medium text-stone-100">{s.name}</div>
+                    <div className="text-[11px] text-stone-400 leading-snug">{s.blurb}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="flex items-center justify-between mt-6">
+              <button onClick={() => setStep(3)} className="text-[13px] text-stone-400 hover:text-stone-200">
+                Skip
+              </button>
+              <button onClick={() => setStep(3)} className="btn-primary" data-testid="onboarding-tour-continue">
+                <span>Continue</span>
+                <Icon name="arrow_forward" size={14} />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {step === 3 && (
           <div className="px-6 py-6">
             <h2 className="text-xl font-semibold mb-2">A place to start</h2>
             <p className="text-[13px] text-stone-300 leading-relaxed mb-4">

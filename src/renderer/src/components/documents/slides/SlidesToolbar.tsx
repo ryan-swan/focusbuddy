@@ -12,6 +12,10 @@ interface Props {
   onInsertLine: () => void
   onApplyLayout: (layout: SlideLayout) => void
   onTemplates: () => void
+  onUndo: () => void
+  onRedo: () => void
+  canUndo: boolean
+  canRedo: boolean
   onPresent: () => void
   onAi: () => void
   onImport: () => void
@@ -43,6 +47,9 @@ export default function SlidesToolbar(props: Props): JSX.Element {
 
   return (
     <div ref={ref} className="flex items-center gap-0.5 flex-wrap px-2 py-1.5 border-b border-stone-200 dark:border-stone-700" data-testid="slides-toolbar">
+      <button className={`${btn} disabled:opacity-40`} onClick={props.onUndo} disabled={!props.canUndo} title="Undo" data-testid="slides-undo"><Icon name="undo" size={15} /></button>
+      <button className={`${btn} disabled:opacity-40`} onClick={props.onRedo} disabled={!props.canRedo} title="Redo" data-testid="slides-redo"><Icon name="redo" size={15} /></button>
+      <Divider />
       <button className={btn} onClick={props.onInsertText}><Icon name="title" size={15} /> Text</button>
       <button className={btn} onClick={props.onInsertImage}><Icon name="image" size={15} /> Image</button>
       <div className="relative">

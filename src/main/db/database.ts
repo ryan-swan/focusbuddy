@@ -280,6 +280,9 @@ export function getDb(): Database.Database {
   ensureColumn(db, 'fb_files', 'doc_id', 'TEXT')
   ensureColumn(db, 'fb_files', 'doc_type', 'TEXT')
   ensureColumn(db, 'fb_files', 'sort_order', 'INTEGER')
+  // Soft-delete for the file manager: a trashed entry is hidden from listings
+  // but recoverable (undo / within a grace window), then purged after 7 days.
+  ensureColumn(db, 'fb_files', 'trashed_at', 'INTEGER')
   ensureColumn(db, 'nodes', 'estimate_minutes', 'INTEGER')
   ensureColumn(db, 'nodes', 'extensions_minutes', 'INTEGER NOT NULL DEFAULT 0')
   ensureColumn(db, 'widgets', 'pinned', 'INTEGER NOT NULL DEFAULT 0')
