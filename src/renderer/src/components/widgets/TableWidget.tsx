@@ -18,6 +18,7 @@ import WidgetFrame from './WidgetFrame'
 import TableImportDialog from './TableImportDialog'
 import type { ParsedGrid } from '../../lib/tableImport'
 import { useTablesStore } from '../../stores/tables'
+import { useActionHistory } from '../../stores/actionHistory'
 import { useWidgetStore } from '../../stores/widgets'
 import FieldEditor from '../fields/FieldEditor'
 import RelationConfigEditor from '../fields/RelationConfigEditor'
@@ -445,17 +446,24 @@ export default function TableWidget({ widget, inline = false }: Props): JSX.Elem
       byKey.set(col.id, col)
       byKey.set(col.label.toLowerCase().trim(), col)
     }
-    for (const aiRow of aiStaged) {
-      const cells: Record<string, unknown> = {}
-      for (const [key, raw] of Object.entries(aiRow)) {
-        const col =
-          byKey.get(key) ?? byKey.get(key.toLowerCase().trim()) ?? null
-        if (!col) continue
-        cells[col.id] = coerceCellValue(col.type, raw, col.config)
+    let added = 0
+    useActionHistory.getState().beginBatch()
+    try {
+      for (const aiRow of aiStaged) {
+        const cells: Record<string, unknown> = {}
+        for (const [key, raw] of Object.entries(aiRow)) {
+          const col =
+            byKey.get(key) ?? byKey.get(key.toLowerCase().trim()) ?? null
+          if (!col) continue
+          cells[col.id] = coerceCellValue(col.type, raw, col.config)
+        }
+        if (Object.keys(cells).length > 0) {
+          await addRow(table.id, cells)
+          added++
+        }
       }
-      if (Object.keys(cells).length > 0) {
-        await addRow(table.id, cells)
-      }
+    } finally {
+      useActionHistory.getState().endBatch(`Add ${added} row${added === 1 ? '' : 's'}`)
     }
     setAiStaged(null)
     setAiStagedColumns(null)

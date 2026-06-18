@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import type { TableSchema, FieldType, FieldDefinition } from '@shared/fields'
 import { defaultConfig, FIELD_TYPE_LABELS } from '@shared/fields'
 import { useTablesStore } from '../../stores/tables'
+import { useActionHistory } from '../../stores/actionHistory'
 import Icon from '../Icon'
 import {
   buildImportPlan,
@@ -102,9 +103,15 @@ export default function TableImportDialog({
         )
         await setSchema(tableId, { ...schema, columns: [...schema.columns, ...added] })
       }
-      for (const op of plan.ops) {
-        if (op.op === 'insert') await addRow(tableId, op.cells)
-        else await updateCells(op.rowId, op.cells)
+      // One undo entry for the whole import, not one per row.
+      useActionHistory.getState().beginBatch()
+      try {
+        for (const op of plan.ops) {
+          if (op.op === 'insert') await addRow(tableId, op.cells)
+          else await updateCells(op.rowId, op.cells)
+        }
+      } finally {
+        useActionHistory.getState().endBatch(`Import ${plan.ops.length} row${plan.ops.length === 1 ? '' : 's'}`)
       }
       onApplied({
         inserted: plan.summary.inserted,

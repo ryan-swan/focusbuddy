@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { recordAction, recordActionWithToast } from './actionHistory'
 import type {
   FbRow,
   FbTable,
@@ -67,6 +68,21 @@ export const useTablesStore = create<TablesStore>((set, get) => ({
     const row = await window.api.tables.createRow({ tableId, cells })
     const existing = get().rows[tableId] ?? []
     set({ rows: { ...get().rows, [tableId]: [...existing, row] } })
+    // Undo a row add (covers AI add-table-row applies). Redo re-creates it; the
+    // id changes, so track the live id for a subsequent undo.
+    let rowId = row.id
+    recordAction({
+      label: 'Add row',
+      undo: async () => {
+        await window.api.tables.deleteRow(rowId)
+        set({ rows: { ...get().rows, [tableId]: (get().rows[tableId] ?? []).filter((r) => r.id !== rowId) } })
+      },
+      redo: async () => {
+        const again = await window.api.tables.createRow({ tableId, cells })
+        rowId = again.id
+        set({ rows: { ...get().rows, [tableId]: [...(get().rows[tableId] ?? []), again] } })
+      }
+    })
     return row
   },
   updateCells: async (rowId, cells) => {
@@ -99,12 +115,41 @@ export const useTablesStore = create<TablesStore>((set, get) => ({
     }
   },
   deleteRow: async (rowId) => {
+    // Capture the row + its table so the delete can be undone (re-created with
+    // the same cell values; the new row lands at the end of the table).
+    let capturedTableId: string | null = null
+    let capturedCells: Record<string, unknown> | null = null
+    for (const [tableId, list] of Object.entries(get().rows)) {
+      const r = list.find((x) => x.id === rowId)
+      if (r) {
+        capturedTableId = tableId
+        capturedCells = r.cells
+        break
+      }
+    }
     await window.api.tables.deleteRow(rowId)
     const rowsCopy: Record<string, FbRow[]> = {}
     for (const [tableId, list] of Object.entries(get().rows)) {
       rowsCopy[tableId] = list.filter((r) => r.id !== rowId)
     }
     set({ rows: rowsCopy })
+    if (capturedTableId && capturedCells) {
+      const tableId = capturedTableId
+      const cells = capturedCells
+      let curId = rowId
+      recordActionWithToast({
+        label: 'Delete row',
+        undo: async () => {
+          const again = await window.api.tables.createRow({ tableId, cells })
+          curId = again.id
+          set({ rows: { ...get().rows, [tableId]: [...(get().rows[tableId] ?? []), again] } })
+        },
+        redo: async () => {
+          await window.api.tables.deleteRow(curId)
+          set({ rows: { ...get().rows, [tableId]: (get().rows[tableId] ?? []).filter((r) => r.id !== curId) } })
+        }
+      })
+    }
   },
   reorderRows: async (tableId, ids) => {
     const byId = new Map((get().rows[tableId] ?? []).map((r) => [r.id, r]))
