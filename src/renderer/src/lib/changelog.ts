@@ -36,6 +36,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.50',
+    date: '2026-06-18T23:30:00Z',
+    title: 'v2.5.50 — Spreadsheet formulas the easy way',
+    tag: 'feature',
+    summary:
+      'Typing = in a cell now suggests functions, and you can click cells to build references instead of typing them.',
+    highlights: [
+      'Type = and a function menu appears with SUM, AVERAGE, IF and more, each with a short hint; filter as you type and pick it with a click or the keyboard.',
+      'While writing a formula, click a cell to drop its reference, or drag across a range to insert something like A1:A3, then carry on typing.'
+    ],
+    links: [{ label: 'Finding your way around', href: `${HELP_BASE}/getting-around` }]
+  },
+  {
     version: '2.5.49',
     date: '2026-06-18T22:00:00Z',
     title: 'v2.5.49 — Turn an email into a real task',
