@@ -36,6 +36,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.61',
+    date: '2026-06-19T14:00:00Z',
+    title: 'v2.5.61 — Undo for table rows',
+    tag: 'feature',
+    summary:
+      'Adding, deleting and importing table rows can now be undone with Cmd-Z, and a whole import is a single undo step.',
+    highlights: [
+      'Add or delete a row and Cmd-Z reverses it; deleting a row offers an Undo on the toast.',
+      'Importing a spreadsheet or letting AI fill a table is one undo step, not one per row.'
+    ],
+    links: [{ label: 'Finding your way around', href: `${HELP_BASE}/getting-around` }]
+  },
+  {
     version: '2.5.60',
     date: '2026-06-19T13:00:00Z',
     title: 'v2.5.60 — Undo a whole AI change at once',
