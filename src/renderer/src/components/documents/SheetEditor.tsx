@@ -5,7 +5,8 @@ import {
   withTab,
   activeTab,
   emptyTab,
-  colLabel
+  colLabel,
+  cellFormat
 } from '../../lib/sheetBody'
 import {
   setCell,
@@ -318,6 +319,7 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
   return (
     <div className="flex flex-col h-full">
       <SheetToolbar
+        activeFont={cellFormat(tab, focus.r, focus.c)?.fontFamily}
         onFormat={applyToSelection}
         onNumberFormat={applyNumberFormat}
         onInsertRow={() => mutateTab((t) => insertRowAt(t, selection.r0))}

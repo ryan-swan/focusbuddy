@@ -92,7 +92,17 @@ export default function OfficeDocWidget({ widget, inline = false }: Props): JSX.
     body = <SlidesEditor key={doc.id} body={doc.body as SlidesBody} title={doc.title} onChange={saveBody} />
   }
 
-  const wrapped = <div className="h-full w-full overflow-auto bg-white dark:bg-stone-900">{body}</div>
+  // Stop right-clicks (and the editors' own context menus, e.g. the sheet column
+  // header menu) from bubbling to the canvas, so the canvas add/widget menu does
+  // not hijack them when the document widget is focused.
+  const wrapped = (
+    <div
+      className="h-full w-full overflow-auto bg-white dark:bg-stone-900"
+      onContextMenu={(e) => e.stopPropagation()}
+    >
+      {body}
+    </div>
+  )
   if (inline) return wrapped
   return (
     <WidgetFrame widget={widget} headerLabel={doc?.title || meta.label} headerAccent={meta.accent}>

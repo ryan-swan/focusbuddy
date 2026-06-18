@@ -4,9 +4,11 @@
 // looks identical. Falls back to the legacy title/bullets shape if a slide
 // somehow has no elements.
 
+import { useEffect } from 'react'
 import type { DeckTheme, Slide } from '@shared/types'
 import { SLIDE_W, SLIDE_H } from '@shared/slideThemes'
 import SlideElementView from './SlideElementView'
+import { loadGoogleFont, familyLabel } from '../../../lib/googleFonts'
 
 interface Props {
   slide: Slide
@@ -19,6 +21,13 @@ export default function SlideFace({ slide, theme, width }: Props): JSX.Element {
   const height = width * (SLIDE_H / SLIDE_W)
   const bg = slide.background?.type === 'solid' ? slide.background.color : theme.background
   const elements = (slide.elements ?? []).slice().sort((a, b) => a.z - b.z)
+
+  // Load any Google fonts the slide's text elements (and the theme) use.
+  useEffect(() => {
+    loadGoogleFont(familyLabel(theme.fontHeading))
+    loadGoogleFont(familyLabel(theme.fontBody))
+    for (const el of elements) if (el.type === 'text' && el.fontFamily) loadGoogleFont(familyLabel(el.fontFamily))
+  })
 
   return (
     <div style={{ width, height, position: 'relative', overflow: 'hidden', background: bg }}>

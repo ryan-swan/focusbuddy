@@ -88,3 +88,7 @@ export function styleTextElement(
 export function setParagraphAlign(el: SlideTextElement, align: 'left' | 'center' | 'right'): SlideTextElement {
   return { ...el, paragraphs: el.paragraphs.map((p) => ({ ...p, align })) }
 }
+
+export function setListStyle(el: SlideTextElement, listStyle: 'bullet' | 'number' | 'none'): SlideTextElement {
+  return { ...el, paragraphs: el.paragraphs.map((p) => ({ ...p, listStyle })) }
+}

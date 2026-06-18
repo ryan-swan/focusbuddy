@@ -8,6 +8,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { Editor } from '@tiptap/react'
 import Icon from '../../Icon'
 import LinkPopover from './LinkPopover'
+import FontPicker from './FontPicker'
 import type { HeadingStyle, HeadingStyles } from './headingStyles'
 
 interface Props {
@@ -22,12 +23,6 @@ interface Props {
   onExportPdf: () => void
 }
 
-const FONT_FAMILIES: Array<{ label: string; value: string }> = [
-  { label: 'Default', value: '' },
-  { label: 'Sans', value: 'Inter, system-ui, sans-serif' },
-  { label: 'Serif', value: 'Georgia, "Times New Roman", serif' },
-  { label: 'Mono', value: '"JetBrains Mono", ui-monospace, monospace' }
-]
 const FONT_SIZES = ['12', '14', '16', '18', '20', '24', '30', '36']
 const LINE_HEIGHTS = [
   { label: 'Single', value: '1' },
@@ -81,28 +76,22 @@ export default function Toolbar({
   const currentHeadingLevel =
     [1, 2, 3, 4, 5, 6].find((lvl) => editor.isActive('heading', { level: lvl })) ?? null
 
-  // Current block type for the select.
-  const blockValue = editor.isActive('heading', { level: 1 })
-    ? 'h1'
-    : editor.isActive('heading', { level: 2 })
-      ? 'h2'
-      : editor.isActive('heading', { level: 3 })
-        ? 'h3'
-        : editor.isActive('heading', { level: 4 })
-          ? 'h4'
-          : editor.isActive('codeBlock')
-            ? 'code'
-            : editor.isActive('blockquote')
-              ? 'quote'
-              : 'p'
-
-  function setBlock(v: string): void {
-    const c = editor.chain().focus()
-    if (v === 'p') c.setParagraph().run()
-    else if (v === 'code') c.toggleCodeBlock().run()
-    else if (v === 'quote') c.toggleBlockquote().run()
-    else c.setHeading({ level: Number(v.slice(1)) as 1 | 2 | 3 | 4 | 5 | 6 }).run()
-  }
+  // Friendly label of the current block style, shown on the Styles dropdown.
+  const styleLabel = editor.isActive('bulletList')
+    ? 'Bulleted'
+    : editor.isActive('orderedList')
+      ? 'Numbered'
+      : editor.isActive('taskList')
+        ? 'Checklist'
+        : editor.isActive('codeBlock')
+          ? 'Code'
+          : editor.isActive('blockquote')
+            ? 'Quote'
+            : currentHeadingLevel === 1
+              ? 'Title'
+              : currentHeadingLevel
+                ? `Heading ${currentHeadingLevel - 1}`
+                : 'Normal'
 
   const wordCount = editor.storage.characterCount?.words?.() ?? 0
 
@@ -121,31 +110,24 @@ export default function Toolbar({
       </button>
       <Divider />
 
-      <select className={sel} value={blockValue} onChange={(e) => setBlock(e.target.value)} title="Block type">
-        <option value="p">Text</option>
-        <option value="h1">Heading 1</option>
-        <option value="h2">Heading 2</option>
-        <option value="h3">Heading 3</option>
-        <option value="h4">Heading 4</option>
-        <option value="quote">Quote</option>
-        <option value="code">Code</option>
-      </select>
-
-      {/* Styles panel: one clear place to apply a heading level and to define
-          what each level looks like. Editing a level updates every heading of
-          that level at once. */}
+      {/* One comprehensive Styles dropdown replaces the block-type select: it
+          applies Plain text, Title, Headings 1-6, Quote, Code, bulleted and
+          numbered lists and links, and lets each heading level's named style be
+          customised in place (editing a level updates every heading of it). */}
       <div className="relative">
         <button
-          className={btn(headingStyleOpen)}
-          title="Paragraph styles — apply and customise heading levels"
+          className={btn(headingStyleOpen) + ' px-2'}
+          title="Styles — apply and customise paragraph styles"
           data-testid="doc-styles-btn"
           onClick={() => setHeadingStyleOpen((v) => !v)}
         >
           <Icon name="format_size" size={15} />
-          <span className="ml-1 text-[12px]">Styles</span>
+          <span className="mx-1 text-[12px] w-16 text-left truncate">{styleLabel}</span>
+          <Icon name="expand_more" size={13} />
         </button>
         {headingStyleOpen && (
           <StylesPanel
+            editor={editor}
             currentHeadingLevel={currentHeadingLevel}
             headingStyles={headingStyles}
             onApplyLevel={(lvl) => {
@@ -153,27 +135,22 @@ export default function Toolbar({
               else editor.chain().focus().setHeading({ level: lvl as 1 | 2 | 3 | 4 | 5 | 6 }).run()
             }}
             onSet={onSetHeadingStyle}
+            onOpenLink={() => {
+              setHeadingStyleOpen(false)
+              setLinkOpen(true)
+            }}
             onClose={() => setHeadingStyleOpen(false)}
           />
         )}
       </div>
 
-      <select
-        className={`${sel} w-16`}
-        title="Font"
+      <FontPicker
         value={(editor.getAttributes('textStyle').fontFamily as string) ?? ''}
-        onChange={(e) => {
-          const v = e.target.value
+        onChange={(v) => {
           if (v) editor.chain().focus().setFontFamily(v).run()
           else editor.chain().focus().unsetFontFamily().run()
         }}
-      >
-        {FONT_FAMILIES.map((f) => (
-          <option key={f.label} value={f.value}>
-            {f.label}
-          </option>
-        ))}
-      </select>
+      />
 
       <select
         className={`${sel} w-12`}
@@ -355,20 +332,25 @@ export default function Toolbar({
 
 // Popover to edit one heading level's named style (size, colour, bold). Changes
 // The Styles panel: apply a paragraph style (Normal / Heading 1-3) and define
-// what each heading level looks like. Editing a level's size / colour / bold /
-// italic updates every heading of that level at once (via DocEditor's injected
-// CSS), the Word "named styles" behaviour.
+// The Styles dropdown: one comprehensive list to apply a paragraph style and to
+// customise each heading level. Title maps to H1 and Heading 1-5 to H2-H6.
+// Clicking a name applies it; editing a heading row's size / colour / bold /
+// italic updates every heading of that level at once via DocEditor's CSS.
 function StylesPanel({
+  editor,
   currentHeadingLevel,
   headingStyles,
   onApplyLevel,
   onSet,
+  onOpenLink,
   onClose
 }: {
+  editor: Editor
   currentHeadingLevel: number | null
   headingStyles: HeadingStyles
   onApplyLevel: (level: number) => void
   onSet: (level: number, patch: Partial<HeadingStyle>) => void
+  onOpenLink: () => void
   onClose: () => void
 }): JSX.Element {
   const ref = useRef<HTMLDivElement | null>(null)
@@ -380,64 +362,60 @@ function StylesPanel({
     return () => document.removeEventListener('mousedown', onDown)
   }, [onClose])
 
-  const tiny =
-    'h-6 w-6 inline-flex items-center justify-center rounded text-[12px]'
-  const numCls =
-    'w-12 bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded px-1 py-0.5 text-[11px] focus:outline-none'
+  // Title = H1, Heading 1..5 = H2..H6.
+  const HEADINGS: Array<{ label: string; level: number; preview: number }> = [
+    { label: 'Title', level: 1, preview: 28 },
+    { label: 'Heading 1', level: 2, preview: 24 },
+    { label: 'Heading 2', level: 3, preview: 21 },
+    { label: 'Heading 3', level: 4, preview: 18 },
+    { label: 'Heading 4', level: 5, preview: 16 },
+    { label: 'Heading 5', level: 6, preview: 14 }
+  ]
 
-  function row(level: number, label: string, previewSize: number): JSX.Element {
-    const s: HeadingStyle = headingStyles[level] ?? {}
-    const active = currentHeadingLevel === level
+  const tiny = 'h-6 w-6 inline-flex items-center justify-center rounded text-[12px]'
+  const numCls =
+    'w-11 bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded px-1 py-0.5 text-[11px] focus:outline-none'
+
+  function applyRow(active: boolean, label: string, icon: string, onClick: () => void, testid: string): JSX.Element {
+    return (
+      <button
+        onClick={onClick}
+        data-testid={testid}
+        className={`w-full flex items-center gap-2 px-2 py-1.5 rounded text-[13px] ${
+          active ? 'bg-accent/10 text-accent' : 'hover:bg-stone-100 dark:hover:bg-stone-800'
+        }`}
+      >
+        <Icon name={icon} size={14} className="text-stone-400" />
+        {label}
+      </button>
+    )
+  }
+
+  function headingRow(h: { label: string; level: number; preview: number }): JSX.Element {
+    const s: HeadingStyle = headingStyles[h.level] ?? {}
+    const active = currentHeadingLevel === h.level
     return (
       <div
-        key={level}
-        className={`flex items-center gap-1 px-2 py-1.5 rounded ${active ? 'bg-accent/10' : 'hover:bg-stone-100 dark:hover:bg-stone-800'}`}
-        data-testid={`doc-style-row-${level}`}
+        key={h.level}
+        data-testid={`doc-style-row-${h.level}`}
+        className={`flex items-center gap-1 px-2 py-1 rounded ${active ? 'bg-accent/10' : 'hover:bg-stone-100 dark:hover:bg-stone-800'}`}
       >
         <button
-          onClick={() => onApplyLevel(level)}
+          onClick={() => onApplyLevel(h.level)}
           className="flex-1 text-left truncate"
-          title={`Apply ${label}`}
-          style={{
-            fontSize: Math.min(previewSize, 20),
-            fontWeight: s.bold ? 700 : 600,
-            fontStyle: s.italic ? 'italic' : undefined,
-            color: s.color
-          }}
+          title={`Apply ${h.label}`}
+          style={{ fontSize: Math.min(h.preview, 18), fontWeight: s.bold ?? true ? 700 : 600, fontStyle: s.italic ? 'italic' : undefined, color: s.color }}
         >
-          {label}
+          {h.label}
         </button>
-        <button
-          className={`${tiny} ${s.bold ? 'bg-accent/15 text-accent' : 'text-stone-500 hover:bg-stone-100 dark:hover:bg-stone-800'}`}
-          title="Bold"
-          onClick={() => onSet(level, { bold: !s.bold })}
-        >
+        <button className={`${tiny} ${s.bold ? 'bg-accent/15 text-accent' : 'text-stone-500 hover:bg-stone-100 dark:hover:bg-stone-800'}`} title="Bold" onClick={() => onSet(h.level, { bold: !s.bold })}>
           <Icon name="format_bold" size={13} />
         </button>
-        <button
-          className={`${tiny} ${s.italic ? 'bg-accent/15 text-accent' : 'text-stone-500 hover:bg-stone-100 dark:hover:bg-stone-800'}`}
-          title="Italic"
-          onClick={() => onSet(level, { italic: !s.italic })}
-        >
+        <button className={`${tiny} ${s.italic ? 'bg-accent/15 text-accent' : 'text-stone-500 hover:bg-stone-100 dark:hover:bg-stone-800'}`} title="Italic" onClick={() => onSet(h.level, { italic: !s.italic })}>
           <Icon name="format_italic" size={13} />
         </button>
-        <input
-          type="number"
-          min={10}
-          max={96}
-          value={s.fontSize ?? ''}
-          placeholder={String(previewSize)}
-          title="Size (px)"
-          onChange={(e) => onSet(level, { fontSize: e.target.value === '' ? undefined : Number(e.target.value) })}
-          className={numCls}
-        />
-        <input
-          type="color"
-          value={s.color ?? '#1c1917'}
-          title="Colour"
-          onChange={(e) => onSet(level, { color: e.target.value })}
-          className="h-6 w-6 rounded cursor-pointer p-0 border border-stone-200 dark:border-stone-700"
-        />
+        <input type="number" min={10} max={96} value={s.fontSize ?? ''} placeholder={String(h.preview)} title="Size" onChange={(e) => onSet(h.level, { fontSize: e.target.value === '' ? undefined : Number(e.target.value) })} className={numCls} />
+        <input type="color" value={s.color ?? '#1c1917'} title="Colour" onChange={(e) => onSet(h.level, { color: e.target.value })} className="h-6 w-6 rounded cursor-pointer p-0 border border-stone-200 dark:border-stone-700" />
       </div>
     )
   }
@@ -446,23 +424,20 @@ function StylesPanel({
     <div
       ref={ref}
       data-testid="doc-styles-panel"
-      className="absolute z-50 mt-1 left-0 w-[320px] rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 shadow-xl p-2 font-normal"
+      className="absolute z-50 mt-1 left-0 w-[340px] max-h-[70vh] overflow-auto rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 shadow-xl p-2 font-normal"
     >
-      <div className="text-[11px] uppercase tracking-wide text-stone-400 px-2 pb-1">Paragraph styles</div>
-      <button
-        onClick={() => onApplyLevel(0)}
-        className={`w-full text-left px-2 py-1.5 rounded text-[13px] ${
-          currentHeadingLevel === null ? 'bg-accent/10' : 'hover:bg-stone-100 dark:hover:bg-stone-800'
-        }`}
-        data-testid="doc-style-row-0"
-      >
-        Normal text
-      </button>
-      {row(1, 'Heading 1', 30)}
-      {row(2, 'Heading 2', 24)}
-      {row(3, 'Heading 3', 19)}
+      {applyRow(currentHeadingLevel === null && !editor.isActive('blockquote') && !editor.isActive('codeBlock') && !editor.isActive('bulletList') && !editor.isActive('orderedList'), 'Normal text', 'notes', () => onApplyLevel(0), 'doc-style-row-0')}
+      <div className="my-1 border-t border-stone-100 dark:border-stone-800" />
+      {HEADINGS.map(headingRow)}
+      <div className="my-1 border-t border-stone-100 dark:border-stone-800" />
+      {applyRow(editor.isActive('bulletList'), 'Bulleted list', 'format_list_bulleted', () => editor.chain().focus().toggleBulletList().run(), 'doc-style-bullet')}
+      {applyRow(editor.isActive('orderedList'), 'Numbered list', 'format_list_numbered', () => editor.chain().focus().toggleOrderedList().run(), 'doc-style-ordered')}
+      {applyRow(editor.isActive('taskList'), 'Checklist', 'checklist', () => editor.chain().focus().toggleTaskList().run(), 'doc-style-task')}
+      {applyRow(editor.isActive('blockquote'), 'Quote', 'format_quote', () => editor.chain().focus().toggleBlockquote().run(), 'doc-style-quote')}
+      {applyRow(editor.isActive('codeBlock'), 'Code block', 'code', () => editor.chain().focus().toggleCodeBlock().run(), 'doc-style-code')}
+      {applyRow(editor.isActive('link'), 'Hyperlink', 'link', onOpenLink, 'doc-style-link')}
       <div className="text-[10px] text-stone-400 px-2 pt-1.5 border-t border-stone-100 dark:border-stone-800 mt-1">
-        Click a name to apply it. Changing a style updates every heading of that level.
+        Click a name to apply it. Editing a heading row updates every heading of that level.
       </div>
     </div>
   )

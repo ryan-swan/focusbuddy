@@ -1,3 +1,5 @@
+import typography from '@tailwindcss/typography'
+
 /** @type {import('tailwindcss').Config} */
 export default {
   darkMode: 'class',
@@ -33,5 +35,9 @@ export default {
       }
     }
   },
-  plugins: []
+  // @tailwindcss/typography provides the `prose` classes the document editor and
+  // markdown/page widgets rely on for list markers, heading sizes, blockquotes
+  // and code blocks. Without it Tailwind's preflight strips those, which is why
+  // bullets and numbered lists rendered with no marker or indent.
+  plugins: [typography]
 }

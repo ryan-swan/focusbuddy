@@ -3,7 +3,7 @@
  *
  * DHS-1  The "Styles" button (doc-styles-btn) is always visible in the toolbar
  *        regardless of cursor position. Clicking it opens doc-styles-panel which
- *        contains a "Normal text" row and rows for Heading 1/2/3.
+ *        contains a "Normal text" row, a "Title" row, and heading rows (Heading 1/2/3…).
  *
  * DHS-2  Clicking a heading name in the panel applies that heading level to the
  *        current block. Clicking "Normal text" resets it to a paragraph.
@@ -45,9 +45,44 @@ async function startBlankDoc(window: Page): Promise<void> {
   })
 }
 
-/** Set the current block type via the toolbar select (still present). */
+/**
+ * Set the current block type via the Styles panel.
+ * The Styles panel maps:
+ *   'p'  → doc-style-row-0 (Normal text)
+ *   'h1' → doc-style-row-1 (Title → h1)
+ *   'h2' → doc-style-row-2 (Heading 1 → h2)
+ *   'h3' → doc-style-row-3 (Heading 2 → h3)
+ *   'h4' → doc-style-row-4 (Heading 3 → h4)
+ *   'h5' → doc-style-row-5 (Heading 4 → h5)
+ *   'h6' → doc-style-row-6 (Heading 5 → h6)
+ */
+const BLOCK_TYPE_ROW: Record<string, string> = {
+  p: 'doc-style-row-0',
+  h1: 'doc-style-row-1',
+  h2: 'doc-style-row-2',
+  h3: 'doc-style-row-3',
+  h4: 'doc-style-row-4',
+  h5: 'doc-style-row-5',
+  h6: 'doc-style-row-6'
+}
+
 async function setBlockType(window: Page, value: string): Promise<void> {
-  await window.locator('select[title="Block type"]').selectOption(value)
+  const rowId = BLOCK_TYPE_ROW[value]
+  if (!rowId) throw new Error(`Unknown block type: ${value}`)
+  // Open the Styles panel if not already open.
+  const panel = window.locator('[data-testid="doc-styles-panel"]')
+  const alreadyOpen = await panel.isVisible().catch(() => false)
+  if (!alreadyOpen) {
+    await window.locator('[data-testid="doc-styles-btn"]').click()
+    await expect(panel).toBeVisible({ timeout: 3_000 })
+  }
+  if (value === 'p') {
+    // Normal text row is a button itself.
+    await panel.locator(`[data-testid="${rowId}"]`).click()
+  } else {
+    // Heading rows: the first button inside the row applies the level.
+    await panel.locator(`[data-testid="${rowId}"] button`).first().click()
+  }
   await window.waitForTimeout(200)
 }
 
@@ -72,7 +107,7 @@ async function openStylesPanel(window: Page): Promise<void> {
 
 // ── DHS-1: Styles button is always visible; panel has expected rows ───────────
 
-test('DHS-1 — doc-styles-btn always visible; panel shows Normal/H1/H2/H3 rows', async () => {
+test('DHS-1 — doc-styles-btn always visible; panel shows Normal/Title/Heading-1/Heading-2 rows', async () => {
   const { window, dispose } = await launchApp()
   try {
     await waitForReady(window)
@@ -93,11 +128,13 @@ test('DHS-1 — doc-styles-btn always visible; panel shows Normal/H1/H2/H3 rows'
     await expect(panel.locator('[data-testid="doc-style-row-2"]')).toBeVisible()
     await expect(panel.locator('[data-testid="doc-style-row-3"]')).toBeVisible()
 
-    // Row text labels are present.
+    // Row text labels are present. The panel maps:
+    //   row-0 = Normal text, row-1 = Title (→h1), row-2 = Heading 1 (→h2),
+    //   row-3 = Heading 2 (→h3), row-4 = Heading 3 (→h4) …
     await expect(panel.locator('[data-testid="doc-style-row-0"]')).toContainText('Normal text')
-    await expect(panel.locator('[data-testid="doc-style-row-1"]')).toContainText('Heading 1')
-    await expect(panel.locator('[data-testid="doc-style-row-2"]')).toContainText('Heading 2')
-    await expect(panel.locator('[data-testid="doc-style-row-3"]')).toContainText('Heading 3')
+    await expect(panel.locator('[data-testid="doc-style-row-1"]')).toContainText('Title')
+    await expect(panel.locator('[data-testid="doc-style-row-2"]')).toContainText('Heading 1')
+    await expect(panel.locator('[data-testid="doc-style-row-3"]')).toContainText('Heading 2')
 
     // Heading rows include size (number) and colour inputs.
     const h2Row = panel.locator('[data-testid="doc-style-row-2"]')
@@ -114,6 +151,9 @@ test('DHS-1 — doc-styles-btn always visible; panel shows Normal/H1/H2/H3 rows'
     await surface.click()
     await surface.type('Heading text')
     await setBlockType(window, 'h2')
+    // Dismiss the Styles panel so it doesn't intercept the h2 click.
+    await surface.click({ position: { x: 5, y: 5 } })
+    await expect(panel).not.toBeVisible({ timeout: 2_000 })
     await surface.locator('h2').first().click()
     await window.waitForTimeout(200)
     await expect(window.locator('[data-testid="doc-styles-btn"]')).toBeVisible({ timeout: 2_000 })

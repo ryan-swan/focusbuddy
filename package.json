@@ -90,6 +90,7 @@
     "@electron-toolkit/tsconfig": "^1.0.1",
     "@electron/rebuild": "^3.7.2",
     "@playwright/test": "^1.60.0",
+    "@tailwindcss/typography": "^0.5.20",
     "@types/better-sqlite3": "^7.6.11",
     "@types/node": "^22.9.0",
     "@types/nodemailer": "^6.4.24",

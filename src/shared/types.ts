@@ -1165,6 +1165,7 @@ export interface SheetCellFormat {
   color?: string // text colour, hex
   bg?: string // fill colour, hex
   align?: 'left' | 'center' | 'right'
+  fontFamily?: string // CSS font-family (e.g. a Google font)
   numFmt?: SheetNumberFormat
 }
 
