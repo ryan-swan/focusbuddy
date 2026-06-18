@@ -36,6 +36,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.53',
+    date: '2026-06-19T03:00:00Z',
+    title: 'v2.5.53 — A real file and folder manager',
+    tag: 'feature',
+    summary:
+      'A new Files area to organise everything in folders, with several view modes and proper sorting.',
+    highlights: [
+      'Create and nest folders, drag things between them, and import files of any kind alongside your own documents, sheets and slides.',
+      'Switch between list and three icon views, see thumbnails where the system can make them, and sort by name, type, size or date with a click.'
+    ],
+    links: [{ label: 'Finding your way around', href: `${HELP_BASE}/getting-around` }]
+  },
+  {
     version: '2.5.52',
     date: '2026-06-19T01:30:00Z',
     title: 'v2.5.52 — Apply a style across a whole document',
