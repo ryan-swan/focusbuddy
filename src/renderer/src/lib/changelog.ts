@@ -36,6 +36,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.52',
+    date: '2026-06-19T01:30:00Z',
+    title: 'v2.5.52 — Apply a style across a whole document',
+    tag: 'feature',
+    summary:
+      'Format one piece of text, then push that exact style to the entire document in one step.',
+    highlights: [
+      'Select styled text and use the new paint-roller in the formatting bubble to apply its bold, colour, font, size and more across the whole document.',
+      'A confirmation lists exactly what will change first, and the whole thing undoes in a single step.'
+    ],
+    links: [{ label: 'Finding your way around', href: `${HELP_BASE}/getting-around` }]
+  },
+  {
     version: '2.5.51',
     date: '2026-06-19T00:30:00Z',
     title: 'v2.5.51 — Slide templates and better image handling',
