@@ -36,6 +36,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.49',
+    date: '2026-06-18T22:00:00Z',
+    title: 'v2.5.49 — Turn an email into a real task',
+    tag: 'feature',
+    summary:
+      'Making a task from an email now asks where it should go, when it is due, and how urgent it is, and files it properly.',
+    highlights: [
+      'The Make a task button on an email opens a quick dialog: choose All Tasks, an existing folder or task, or create a new folder on the spot.',
+      'Set a due date and an urgency, and the task is created for real, showing in All Tasks and inside the folder you picked, with the sender and a snippet kept.'
+    ],
+    links: [{ label: 'Finding your way around', href: `${HELP_BASE}/getting-around` }]
+  },
+  {
     version: '2.5.48',
     date: '2026-06-18T20:00:00Z',
     title: 'v2.5.48 — Lists that work, one Styles menu, and Google Fonts',
