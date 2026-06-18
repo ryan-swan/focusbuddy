@@ -54,6 +54,7 @@ import {
   bringToFront,
   createWidget,
   deleteWidget,
+  restoreWidget,
   getWidget,
   listWidgetsByTask,
   updateWidget
@@ -373,6 +374,7 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('widgets:create', (_e, draft: WidgetDraft) => createWidget(draft))
   ipcMain.handle('widgets:update', (_e, id: string, patch: WidgetPatch) => updateWidget(id, patch))
   ipcMain.handle('widgets:delete', (_e, id: string) => deleteWidget(id))
+  ipcMain.handle('widgets:restore', (_e, id: string) => restoreWidget(id))
   ipcMain.handle('widgets:bringToFront', (_e, id: string) => bringToFront(id))
 
   ipcMain.handle('widgetLinks:listByTask', (_e, taskId: string) => listLinksByTask(taskId))

@@ -70,10 +70,20 @@ export function getWidget(id: string): Widget | null {
   return row ? rowToWidget(row) : null
 }
 
+let purgedWidgetTrashThisSession = false
+
 export function listWidgetsByTask(taskId: string): Widget[] {
   const db = getDb()
+  if (!purgedWidgetTrashThisSession) {
+    purgedWidgetTrashThisSession = true
+    try {
+      purgeTrashedWidgets()
+    } catch {
+      /* best-effort */
+    }
+  }
   const rows = db
-    .prepare('SELECT * FROM widgets WHERE task_id = ? ORDER BY z_index ASC, created_at ASC')
+    .prepare('SELECT * FROM widgets WHERE task_id = ? AND trashed_at IS NULL ORDER BY z_index ASC, created_at ASC')
     .all(taskId) as WidgetRow[]
   return rows.map(rowToWidget)
 }
@@ -206,10 +216,26 @@ export function updateWidget(id: string, patch: WidgetPatch): Widget | null {
   return updated
 }
 
+// Soft-delete so the removal is undoable. The widget's connector links are left
+// intact (the link overlay skips trashed endpoints) and come back on restore.
 export function deleteWidget(id: string): boolean {
   const db = getDb()
-  const result = db.prepare('DELETE FROM widgets WHERE id = ?').run(id)
+  const result = db.prepare('UPDATE widgets SET trashed_at = ? WHERE id = ? AND trashed_at IS NULL').run(Date.now(), id)
   return result.changes > 0
+}
+
+export function restoreWidget(id: string): boolean {
+  const db = getDb()
+  const result = db.prepare('UPDATE widgets SET trashed_at = NULL WHERE id = ?').run(id)
+  return result.changes > 0
+}
+
+// Permanently remove widgets trashed longer than maxAgeMs (default 7 days). The
+// hard DELETE cascades their links. Runs once per session.
+export function purgeTrashedWidgets(maxAgeMs = 7 * 24 * 60 * 60 * 1000): void {
+  const db = getDb()
+  const cutoff = Date.now() - maxAgeMs
+  db.prepare('DELETE FROM widgets WHERE trashed_at IS NOT NULL AND trashed_at < ?').run(cutoff)
 }
 
 export function bringToFront(id: string): Widget | null {
