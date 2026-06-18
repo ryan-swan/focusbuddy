@@ -1340,15 +1340,18 @@ export default function Canvas(): JSX.Element {
     const addWidget: CtxMenuItem = {
       label: 'Add object',
       icon: 'add',
-      children: CATEGORIES.map((cat) => ({
-        label: cat,
-        icon: CATEGORY_ICON[cat],
-        children: WIDGET_CATALOG.filter((e) => e.category === cat).map((entry) => ({
-          label: entry.label,
-          icon: entry.icon,
-          onClick: () => void placeWidgetAtCanvas(entry, cx, cy)
-        }))
-      }))
+      children: CATEGORIES.map((cat) => {
+        const entries = WIDGET_CATALOG.filter((e) => e.category === cat && !e.hideFromPicker)
+        return {
+          label: cat,
+          icon: CATEGORY_ICON[cat],
+          children: entries.map((entry) => ({
+            label: entry.label,
+            icon: entry.icon,
+            onClick: () => void placeWidgetAtCanvas(entry, cx, cy)
+          }))
+        }
+      }).filter((group) => group.children.length > 0)
     }
     const arrange: CtxMenuItem = {
       label: 'Auto-arrange',

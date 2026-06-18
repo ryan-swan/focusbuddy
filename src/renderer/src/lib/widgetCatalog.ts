@@ -112,7 +112,7 @@ export const WIDGET_CATALOG: WidgetCatalogEntry[] = [
   },
   {
     kind: 'doc',
-    category: 'Notes',
+    category: 'Files',
     label: 'Document',
     icon: 'article',
     hint: 'A Word-class document. Create new, open a .docx, or place an existing one.',
@@ -123,7 +123,7 @@ export const WIDGET_CATALOG: WidgetCatalogEntry[] = [
   },
   {
     kind: 'sheet',
-    category: 'Tools',
+    category: 'Files',
     label: 'Spreadsheet',
     icon: 'grid_on',
     hint: 'An Excel-class spreadsheet with formulas. Create new, import .xlsx/.csv, or place an existing one.',
@@ -134,7 +134,7 @@ export const WIDGET_CATALOG: WidgetCatalogEntry[] = [
   },
   {
     kind: 'slides',
-    category: 'Tools',
+    category: 'Files',
     label: 'Slides',
     icon: 'slideshow',
     hint: 'A PowerPoint-class deck. Create new, import .pptx, or place an existing one.',
