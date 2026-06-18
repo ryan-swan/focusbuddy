@@ -9,9 +9,31 @@ import type { ChatMessage } from './messagingClient'
 
 type IncomingMessage = { conversationId: string; message: ChatMessage }
 
+// Live-document events ride the same authenticated socket. The doc-collab store
+// registers a handler; null when no live doc work is active.
+export type DocSocketEvent =
+  | { type: 'docLockChanged'; docId: string; holder: { accountId: string; handle: string } | null; expiresAt: number | null }
+  | { type: 'docUpdated'; docId: string; version: number; updatedBy: string }
+  | {
+      type: 'docTakeoverRequest'
+      id: string
+      docId: string
+      docTitle: string
+      requesterAccountId: string
+      requesterHandle: string
+      message: string | null
+    }
+  | { type: 'docTakeoverResponse'; id: string; docId: string; accepted: boolean; message: string | null }
+
 let socket: WebSocket | null = null
 let currentToken: string | null = null
 let onMessageCb: ((m: IncomingMessage) => void) | null = null
+let onDocEventCb: ((e: DocSocketEvent) => void) | null = null
+
+/** Register a handler for live-document socket events. */
+export function setDocSocketHandler(cb: ((e: DocSocketEvent) => void) | null): void {
+  onDocEventCb = cb
+}
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null
 let backoffMs = 1000
 let pingTimer: ReturnType<typeof setInterval> | null = null
@@ -67,6 +89,14 @@ function open(): void {
         conversationId: p.conversationId,
         message: { ...p.message, conversationId: p.conversationId } as ChatMessage
       })
+    } else if (
+      msg.type === 'docLockChanged' ||
+      msg.type === 'docUpdated' ||
+      msg.type === 'docTakeoverRequest' ||
+      msg.type === 'docTakeoverResponse'
+    ) {
+      // Forward live-document events verbatim; the doc-collab store interprets them.
+      onDocEventCb?.({ type: msg.type, ...(msg.payload as object) } as DocSocketEvent)
     }
   }
 

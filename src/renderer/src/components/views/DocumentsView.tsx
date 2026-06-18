@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import type { DocType } from '@shared/types'
 import { useDocumentsStore } from '../../stores/documents'
 import { useViewStore } from '../../stores/view'
+import { useAccountStore } from '../../stores/account'
+import { createLiveDoc, listLiveDocs, type LiveDocListItem } from '../../lib/docCollabClient'
 import Icon from '../Icon'
 
 // Documents hub — the home for office files. The top panel is the AI-first
@@ -38,16 +40,46 @@ export default function DocumentsView(): JSX.Element {
   const createBlank = useDocumentsStore((s) => s.createBlank)
   const remove = useDocumentsStore((s) => s.remove)
   const goDocument = useViewStore((s) => s.goDocument)
+  const goLiveDoc = useViewStore((s) => s.goLiveDoc)
+  const token = useAccountStore((s) => s.sessionToken)
 
   const [docType, setDocType] = useState<DocType>('doc')
   const [prompt, setPrompt] = useState('')
   const [audience, setAudience] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [shared, setShared] = useState<LiveDocListItem[]>([])
 
   useEffect(() => {
     void refresh()
   }, [refresh])
+
+  useEffect(() => {
+    if (token) void listLiveDocs(token).then(setShared)
+    else setShared([])
+  }, [token])
+
+  // Turn a local document into a live, shared one and open it. Its current body
+  // becomes the server-canonical copy; from there it's check-out collaborative.
+  async function collaborate(id: string): Promise<void> {
+    if (!token) {
+      setError('Sign in to collaborate on a document.')
+      return
+    }
+    const full = await window.api.documents.get(id)
+    if (!full) return
+    const created = await createLiveDoc(token, {
+      docType: full.docType,
+      title: full.title,
+      body: JSON.stringify(full.body)
+    })
+    if (created) {
+      void listLiveDocs(token).then(setShared)
+      goLiveDoc(created.id)
+    } else {
+      setError('Could not start collaboration. Check your connection and that you are signed in.')
+    }
+  }
 
   async function create(): Promise<void> {
     if (!prompt.trim()) return
@@ -162,19 +194,61 @@ export default function DocumentsView(): JSX.Element {
                   <div className="text-[13px] font-medium text-stone-900 dark:text-stone-100 truncate">{d.title}</div>
                   <div className="text-[11px] text-stone-400 dark:text-stone-500">Edited {relTime(d.updatedAt)}</div>
                 </div>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    if (confirm(`Delete "${d.title}"? This cannot be undone.`)) void remove(d.id)
-                  }}
-                  className="opacity-0 group-hover:opacity-100 text-stone-400 hover:text-red-500 p-1"
-                  title="Delete"
-                >
-                  <Icon name="delete" size={15} />
-                </button>
+                <div className="opacity-0 group-hover:opacity-100 flex items-center gap-1">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      void collaborate(d.id)
+                    }}
+                    className="text-stone-400 hover:text-accent p-1"
+                    title="Collaborate (share live)"
+                    data-testid="doc-collaborate"
+                  >
+                    <Icon name="group_add" size={15} />
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      if (confirm(`Delete "${d.title}"? This cannot be undone.`)) void remove(d.id)
+                    }}
+                    className="text-stone-400 hover:text-red-500 p-1"
+                    title="Delete"
+                  >
+                    <Icon name="delete" size={15} />
+                  </button>
+                </div>
               </div>
             ))}
           </div>
+        )}
+
+        {/* Shared live — collaborative documents you own or were invited to */}
+        {shared.length > 0 && (
+          <>
+            <h2 className="text-[13px] font-semibold text-stone-700 dark:text-stone-300 mb-2 mt-8 flex items-center gap-1.5">
+              <Icon name="group" size={15} className="text-accent" /> Shared live
+            </h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2" data-testid="shared-live-list">
+              {shared.map((d) => (
+                <div
+                  key={d.id}
+                  onClick={() => goLiveDoc(d.id)}
+                  className="flex items-center gap-3 rounded-xl border border-stone-200 dark:border-stone-700 bg-white/70 dark:bg-stone-900/70 px-3.5 py-3 cursor-pointer hover:border-accent/50 hover:shadow-sm transition"
+                >
+                  <div className="h-9 w-9 rounded-lg bg-accent/10 text-accent inline-flex items-center justify-center shrink-0">
+                    <Icon name={typeIcon(d.docType)} size={17} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[13px] font-medium text-stone-900 dark:text-stone-100 truncate">{d.title}</div>
+                    <div className="text-[11px] text-stone-400 dark:text-stone-500">
+                      {d.lock ? `Being edited by ${d.lock.handle}` : 'Free to edit'}
+                    </div>
+                  </div>
+                  <Icon name="group" size={15} className="text-stone-300 dark:text-stone-600 shrink-0" />
+                </div>
+              ))}
+            </div>
+          </>
         )}
       </div>
     </div>
