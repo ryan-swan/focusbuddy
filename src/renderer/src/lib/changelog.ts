@@ -36,6 +36,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.60',
+    date: '2026-06-19T13:00:00Z',
+    title: 'v2.5.60 — Undo a whole AI change at once',
+    tag: 'feature',
+    summary:
+      'When the AI applies a batch of changes, one Cmd-Z (or one Undo) now reverses the whole batch, and bulk deletes ask first.',
+    highlights: [
+      'Apply all from an AI suggestion is now a single undo step instead of undoing each change one by one.',
+      'If an AI batch would delete things, it asks for confirmation first, and you can still undo afterwards.'
+    ],
+    links: [{ label: 'Finding your way around', href: `${HELP_BASE}/getting-around` }]
+  },
+  {
     version: '2.5.59',
     date: '2026-06-19T11:30:00Z',
     title: 'v2.5.59 — Undo on the canvas',
