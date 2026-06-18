@@ -39,7 +39,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '2.5.54',
     date: '2026-06-19T04:30:00Z',
     title: 'v2.5.54 — A friendlier welcome and more undo',
-    tag: 'improvement',
+    tag: 'polish',
     summary:
       'New users get a quick tour of every area, and undo reaches more places.',
     highlights: [
