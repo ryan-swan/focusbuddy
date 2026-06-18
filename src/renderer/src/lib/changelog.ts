@@ -36,6 +36,21 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.48',
+    date: '2026-06-18T20:00:00Z',
+    title: 'v2.5.48 — Lists that work, one Styles menu, and Google Fonts',
+    tag: 'feature',
+    summary:
+      'Bulleted and numbered lists now render properly in documents, document styles live in one clear menu, and you can choose from the full Google Fonts library across documents, spreadsheets and slides.',
+    highlights: [
+      'Fixed bulleted and numbered lists in documents, which were not showing their markers or indentation. Headings, quotes and code blocks also render correctly now.',
+      'One Styles menu in the document toolbar: apply Normal text, Title, Headings, bulleted / numbered / checklist, quote, code or a hyperlink, and customise each heading level in the same place.',
+      'A searchable Google Fonts picker in documents, spreadsheets (per cell) and slides, with fonts loaded on demand.',
+      'Slides: turn a text box into a bulleted or numbered list. Documents, spreadsheets and slides placed on a canvas now keep their own right-click menus.'
+    ],
+    links: [{ label: 'Finding your way around', href: `${HELP_BASE}/getting-around` }]
+  },
+  {
     version: '2.5.47',
     date: '2026-06-18T18:00:00Z',
     title: 'v2.5.47 — Heading styles you can actually control',
