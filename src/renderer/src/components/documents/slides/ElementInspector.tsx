@@ -174,9 +174,38 @@ export default function ElementInspector(props: Props): JSX.Element {
       )}
 
       {el.type === 'image' && (
-        <button className={btn} onClick={() => props.onUpdateElement(el.id, { fit: el.fit === 'cover' ? 'contain' : 'cover' })}>
-          Fit: {el.fit ?? 'contain'}
-        </button>
+        <div className="space-y-1.5">
+          <div className={labelCls}>Image</div>
+          <select
+            className={inputCls}
+            value={el.fit ?? 'contain'}
+            onChange={(e) => props.onUpdateElement(el.id, { fit: e.target.value as 'contain' | 'cover' | 'fill' })}
+            title="How the image fills its frame"
+          >
+            <option value="contain">Fit (show all)</option>
+            <option value="cover">Fill frame (crop)</option>
+            <option value="fill">Stretch</option>
+          </select>
+          <button
+            className={`${btn} w-full justify-start gap-1.5 ${el.lockAspect ? 'bg-accent/15 text-accent' : ''}`}
+            title="Keep the image's aspect ratio when resizing"
+            onClick={() => props.onUpdateElement(el.id, { lockAspect: !el.lockAspect })}
+          >
+            <Icon name={el.lockAspect ? 'lock' : 'lock_open'} size={14} /> Lock aspect ratio
+          </button>
+          {el.naturalW && el.naturalH && (
+            <button
+              className={btn + ' w-full justify-start gap-1.5'}
+              title="Resize the frame to the image's natural proportions"
+              onClick={() => {
+                const ratio = el.naturalH! / el.naturalW!
+                props.onUpdateElement(el.id, { h: Math.round(el.w * ratio) })
+              }}
+            >
+              <Icon name="aspect_ratio" size={14} /> Reset proportions
+            </button>
+          )}
+        </div>
       )}
 
       <div>

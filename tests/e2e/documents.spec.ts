@@ -180,62 +180,42 @@ test('Step 5 — blank Spreadsheet: SUM formula, multiply, #ERR for broken formu
   }
 })
 
-test('Step 6 — blank Slides: edit title, add slide, Present mode, arrow nav, Esc exits', async () => {
+test('Step 6 — blank Slides: template gallery adds a slide, Present mode arrow nav + Esc exits', async () => {
   const { window, dispose } = await launchApp()
   try {
     await waitForReady(window)
     await openDocumentsHub(window)
     await clickStartBlank(window, 'Slides')
 
-    // "Present" button visible = editor loaded
+    // "Present" button + element toolbar visible = the element-based editor loaded.
     const presentBtn = window.getByRole('button', { name: /Present/i })
     await expect(presentBtn).toBeVisible({ timeout: 5_000 })
+    await expect(window.getByTestId('slides-toolbar')).toBeVisible()
 
-    // Rail shows "Slide 1 of 1"
-    await expect(window.locator('text=Slide 1 of 1')).toBeVisible()
+    // The rail starts with one slide thumbnail (the blank starter slide).
+    const railThumbs = window.locator('.w-40 button.overflow-hidden')
+    await expect(railThumbs).toHaveCount(1, { timeout: 3_000 })
 
-    // Edit the title and verify live preview updates
-    const titleInput = window.locator('input[placeholder="Slide title"]')
-    await titleInput.clear()
-    await titleInput.fill('Test Slide')
-    // The SlideFace preview renders the title in an h2 inside .aspect-video
-    await expect(window.locator('.aspect-video h2').first()).toContainText('Test Slide', { timeout: 3_000 })
+    // Open the starter-template gallery and insert an Agenda slide.
+    await window.getByTestId('slides-add').click()
+    await expect(window.getByTestId('slide-template-gallery')).toBeVisible({ timeout: 3_000 })
+    await window.getByTestId('slide-template-agenda').click()
+    await expect(window.getByTestId('slide-template-gallery')).not.toBeVisible({ timeout: 3_000 })
 
-    // Switch to "bullets" layout so that bullet text appears in the live preview
-    const layoutSelect = window.locator('select')
-    await layoutSelect.selectOption('bullets')
+    // Two slides now in the rail, and the canvas renders elements.
+    await expect(railThumbs).toHaveCount(2, { timeout: 3_000 })
+    await expect(window.getByTestId('slide-element').first()).toBeVisible({ timeout: 3_000 })
 
-    // Add a bullet
-    const bulletsArea = window.locator('textarea[placeholder="One point per line"]')
-    await bulletsArea.click()
-    await bulletsArea.fill('First bullet')
-    // Preview shows bullets in a <ul><li> (only rendered when layout is not 'title'/'section')
-    await expect(window.locator('.aspect-video ul li').first()).toContainText('First bullet', { timeout: 3_000 })
-
-    // Add a second slide via the dashed add button in the rail
-    const addSlideBtn = window.locator('button.border-dashed').first()
-    await addSlideBtn.click()
-    // Counter updates to "Slide 2 of 2"
-    await expect(window.locator('text=Slide 2 of 2')).toBeVisible({ timeout: 3_000 })
-
-    // Select slide 1 before presenting so Present starts at slide 1 of 2.
-    // The rail has two slide thumbnails; click the first one.
-    const railThumbnails = window.locator('[class*="aspect-video"][class*="rounded-md"]')
-    await railThumbnails.first().click()
-    await expect(window.locator('text=Slide 1 of 2')).toBeVisible({ timeout: 3_000 })
-
-    // Enter Present mode
+    // Start at slide 1, present, arrow to slide 2, Esc out.
+    await railThumbs.first().click()
     await presentBtn.click()
-    const overlay = window.locator('.fixed.inset-0.bg-black')
+    const overlay = window.getByTestId('present-overlay')
     await expect(overlay).toBeVisible({ timeout: 3_000 })
-    // Counter shows "1 / 2" (presentIdx=0, starting from slide 1)
-    await expect(window.locator('.fixed.inset-0.bg-black span.tabular-nums')).toContainText('1 / 2')
+    await expect(overlay.locator('span.tabular-nums').first()).toContainText('1 / 2')
 
-    // ArrowRight advances to slide 2
     await window.keyboard.press('ArrowRight')
-    await expect(window.locator('.fixed.inset-0.bg-black span.tabular-nums')).toContainText('2 / 2', { timeout: 3_000 })
+    await expect(overlay.locator('span.tabular-nums').first()).toContainText('2 / 2', { timeout: 3_000 })
 
-    // Escape exits
     await window.keyboard.press('Escape')
     await expect(overlay).not.toBeVisible({ timeout: 3_000 })
 

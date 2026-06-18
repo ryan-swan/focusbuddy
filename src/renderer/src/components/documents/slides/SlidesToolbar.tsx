@@ -11,6 +11,7 @@ interface Props {
   onInsertShape: (shape: 'rect' | 'ellipse' | 'roundRect' | 'triangle') => void
   onInsertLine: () => void
   onApplyLayout: (layout: SlideLayout) => void
+  onTemplates: () => void
   onPresent: () => void
   onAi: () => void
   onImport: () => void
@@ -56,6 +57,7 @@ export default function SlidesToolbar(props: Props): JSX.Element {
         )}
       </div>
       <Divider />
+      <button className={btn} onClick={props.onTemplates} data-testid="slides-templates-btn"><Icon name="dashboard_customize" size={15} /> Templates</button>
       <div className="relative">
         <button className={btn} onClick={() => setMenu(menu === 'layout' ? null : 'layout')}><Icon name="dashboard" size={15} /> Layout</button>
         {menu === 'layout' && (
