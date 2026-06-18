@@ -36,6 +36,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.51',
+    date: '2026-06-19T00:30:00Z',
+    title: 'v2.5.51 — Slide templates and better image handling',
+    tag: 'feature',
+    summary:
+      'Build slides faster with a gallery of starter templates, and place images that keep their shape.',
+    highlights: [
+      'Adding a slide opens a gallery of ready-made templates (cover, agenda, comparison, big number, quote, image and caption, closing and more), each shown as a live preview in your theme.',
+      'Images now arrive at their true proportions, show resize handles like a shape, can keep their aspect ratio while resizing, and offer fit options to show all, crop or stretch.'
+    ],
+    links: [{ label: 'Finding your way around', href: `${HELP_BASE}/getting-around` }]
+  },
+  {
     version: '2.5.50',
     date: '2026-06-18T23:30:00Z',
     title: 'v2.5.50 — Spreadsheet formulas the easy way',
