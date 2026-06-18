@@ -36,6 +36,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.58',
+    date: '2026-06-19T10:30:00Z',
+    title: 'v2.5.58 — Undo for tasks and folders',
+    tag: 'feature',
+    summary:
+      'Press Cmd-Z to undo creating, renaming, moving or deleting a task or folder — and a deleted folder comes back with everything inside it.',
+    highlights: [
+      'Cmd-Z (and Cmd-Shift-Z to redo) now reverse task and folder changes, with an Undo button on the toast after a delete.',
+      'Deleting is now recoverable: a removed folder restores with all its tasks and their contents intact, not gone for good.'
+    ],
+    links: [{ label: 'Finding your way around', href: `${HELP_BASE}/getting-around` }]
+  },
+  {
     version: '2.5.57',
     date: '2026-06-19T09:00:00Z',
     title: 'v2.5.57 — Cleaner document adds on the canvas',
