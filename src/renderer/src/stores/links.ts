@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import type { WidgetLink } from '@shared/types'
+import { recordAction } from './actionHistory'
 
 // Spatial-link store. Mirrors the widgets store's per-task lifecycle:
 // loadForTask wipes + fetches; clear empties on task switch. Optimistic
@@ -48,6 +49,23 @@ export const useLinksStore = create<LinksStore>((set, get) => ({
     // the server is the source of truth for the canonical row.
     if (get().links.some((l) => l.id === created.id)) return created
     set({ links: [...get().links, created] })
+    // Undo a newly-drawn connection (covers AI link-widgets applies too). Redo
+    // re-creates it; the id may change, so track the live id for a later undo.
+    let linkId = created.id
+    recordAction({
+      label: 'Connect widgets',
+      undo: async () => {
+        await window.api.widgetLinks.delete(linkId)
+        set({ links: get().links.filter((l) => l.id !== linkId) })
+      },
+      redo: async () => {
+        const again = await window.api.widgetLinks.create(sourceId, targetId, taskId)
+        if (again) {
+          linkId = again.id
+          if (!get().links.some((l) => l.id === again.id)) set({ links: [...get().links, again] })
+        }
+      }
+    })
     return created
   },
   update: async (id, patch) => {
