@@ -283,6 +283,10 @@ export function getDb(): Database.Database {
   // Soft-delete for the file manager: a trashed entry is hidden from listings
   // but recoverable (undo / within a grace window), then purged after 7 days.
   ensureColumn(db, 'fb_files', 'trashed_at', 'INTEGER')
+  // Soft-delete for undoable task/folder deletion. Deleting a node hard-cascades
+  // its whole subtree + every widget on those tasks, so we trash instead (hide +
+  // recoverable), and purge old trash on launch. trashed_at null = live.
+  ensureColumn(db, 'nodes', 'trashed_at', 'INTEGER')
   ensureColumn(db, 'nodes', 'estimate_minutes', 'INTEGER')
   ensureColumn(db, 'nodes', 'extensions_minutes', 'INTEGER NOT NULL DEFAULT 0')
   ensureColumn(db, 'widgets', 'pinned', 'INTEGER NOT NULL DEFAULT 0')

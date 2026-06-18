@@ -44,6 +44,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import {
   createNode,
   deleteNode,
+  restoreNodes,
   getNode,
   listNodes,
   moveNode,
@@ -361,6 +362,7 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('nodes:create', (_e, draft: NodeDraft) => createNode(draft))
   ipcMain.handle('nodes:update', (_e, id: string, patch: NodePatch) => updateNode(id, patch))
   ipcMain.handle('nodes:delete', (_e, id: string) => deleteNode(id))
+  ipcMain.handle('nodes:restore', (_e, ids: string[]) => restoreNodes(ids))
   ipcMain.handle(
     'nodes:move',
     (_e, id: string, newParentId: string | null, beforeId: string | null) =>

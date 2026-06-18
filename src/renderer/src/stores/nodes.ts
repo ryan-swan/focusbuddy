@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import type { FbNode, NodeDraft, NodePatch } from '@shared/types'
+import { recordAction, recordActionWithToast } from './actionHistory'
 import { recordTrail } from '../lib/trail'
 import { taskComplete } from '../lib/audioBeep'
 import { hapticSuccess } from '../lib/haptics'
@@ -65,6 +66,20 @@ export const useNodeStore = create<NodeStore>((set, get) => ({
     const node = await window.api.nodes.create(draft)
     set({ nodes: [...get().nodes, node] })
     if (draft.parentId) set({ expanded: { ...get().expanded, [draft.parentId]: true } })
+    // Undo a creation by trashing it; redo restores exactly what was trashed
+    // (it may have gained children by the time you undo).
+    let trashed: string[] = [node.id]
+    recordAction({
+      label: `Create ${node.kind}`,
+      undo: async () => {
+        trashed = await window.api.nodes.delete(node.id)
+        await get().refresh()
+      },
+      redo: async () => {
+        await window.api.nodes.restore(trashed)
+        await get().refresh()
+      }
+    })
     return node
   },
   update: async (id, patch) => {
@@ -72,6 +87,34 @@ export const useNodeStore = create<NodeStore>((set, get) => ({
     const updated = await window.api.nodes.update(id, patch)
     if (!updated) return
     set({ nodes: get().nodes.map((n) => (n.id === id ? updated : n)) })
+    // Record an undo only for user-meaningful field edits (not programmatic
+    // patches like resume autosave or timers), restoring the prior values.
+    const UNDOABLE = ['title', 'description', 'status', 'priority', 'interest', 'importance', 'dueDate'] as const
+    const touched = UNDOABLE.filter((k) => k in patch)
+    if (prev && touched.length) {
+      const prevPatch: NodePatch = {}
+      const redoPatch: NodePatch = {}
+      for (const k of touched) {
+        ;(prevPatch as Record<string, unknown>)[k] = (prev as unknown as Record<string, unknown>)[k]
+        ;(redoPatch as Record<string, unknown>)[k] = (patch as unknown as Record<string, unknown>)[k]
+      }
+      const label = touched.includes('title')
+        ? `Rename ${prev.kind}`
+        : touched.includes('status')
+          ? 'Change status'
+          : 'Edit'
+      recordAction({
+        label,
+        undo: async () => {
+          await window.api.nodes.update(id, prevPatch)
+          await get().refresh()
+        },
+        redo: async () => {
+          await window.api.nodes.update(id, redoPatch)
+          await get().refresh()
+        }
+      })
+    }
     // Triumphant chime on task completion — fire only on the open→done transition
     if (
       prev &&
@@ -84,13 +127,35 @@ export const useNodeStore = create<NodeStore>((set, get) => ({
     }
   },
   remove: async (id) => {
-    await window.api.nodes.delete(id)
+    const target = get().nodes.find((n) => n.id === id)
+    const ids = await window.api.nodes.delete(id)
     set({
-      nodes: get().nodes.filter((n) => n.id !== id && !descendantOf(get().nodes, n.id, id)),
-      activeTaskId: get().activeTaskId === id ? null : get().activeTaskId
+      nodes: get().nodes.filter((n) => !ids.includes(n.id)),
+      activeTaskId: ids.includes(get().activeTaskId ?? '') ? null : get().activeTaskId
     })
+    if (ids.length) {
+      recordActionWithToast({
+        label: `Delete ${target?.kind ?? 'item'}${target?.title ? ` “${target.title}”` : ''}`,
+        undo: async () => {
+          await window.api.nodes.restore(ids)
+          await get().refresh()
+        },
+        redo: async () => {
+          await window.api.nodes.delete(id)
+          await get().refresh()
+        }
+      })
+    }
   },
   move: async (id, newParentId, beforeId) => {
+    // Capture the node's current slot so undo can put it back exactly.
+    const before = get().nodes.find((n) => n.id === id)
+    const prevParentId = before?.parentId ?? null
+    const siblings = get()
+      .nodes.filter((n) => n.parentId === prevParentId)
+      .sort((a, b) => a.sortOrder - b.sortOrder)
+    const idx = siblings.findIndex((n) => n.id === id)
+    const prevBeforeId = idx >= 0 ? siblings[idx + 1]?.id ?? null : null
     const updated = await window.api.nodes.move(id, newParentId, beforeId)
     if (!updated) return // rejected (cycle or missing) — leave state untouched
     // Refresh from server so sort_order on every sibling is correct in one fetch
@@ -98,6 +163,19 @@ export const useNodeStore = create<NodeStore>((set, get) => ({
     set({ nodes: fresh })
     // Auto-expand the destination parent so the moved node is visible after drop
     if (newParentId) set({ expanded: { ...get().expanded, [newParentId]: true } })
+    if (prevParentId !== newParentId || prevBeforeId !== beforeId) {
+      recordAction({
+        label: 'Move',
+        undo: async () => {
+          await window.api.nodes.move(id, prevParentId, prevBeforeId)
+          set({ nodes: await window.api.nodes.list() })
+        },
+        redo: async () => {
+          await window.api.nodes.move(id, newParentId, beforeId)
+          set({ nodes: await window.api.nodes.list() })
+        }
+      })
+    }
   },
   setActive: (id) => {
     const prev = get().activeTaskId
@@ -117,15 +195,3 @@ export const useNodeStore = create<NodeStore>((set, get) => ({
     set({ expanded: { ...get().expanded, [id]: !get().expanded[id] } }),
   expand: (id, on) => set({ expanded: { ...get().expanded, [id]: on } })
 }))
-
-function descendantOf(nodes: FbNode[], candidate: string, ancestor: string): boolean {
-  const byId = new Map(nodes.map((n) => [n.id, n]))
-  let cur: string | null = candidate
-  while (cur) {
-    const node = byId.get(cur)
-    if (!node || !node.parentId) return false
-    if (node.parentId === ancestor) return true
-    cur = node.parentId
-  }
-  return false
-}

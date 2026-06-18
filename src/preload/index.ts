@@ -82,7 +82,9 @@ const api = {
     create: (draft: NodeDraft): Promise<FbNode> => ipcRenderer.invoke('nodes:create', draft),
     update: (id: string, patch: NodePatch): Promise<FbNode | null> =>
       ipcRenderer.invoke('nodes:update', id, patch),
-    delete: (id: string): Promise<boolean> => ipcRenderer.invoke('nodes:delete', id),
+    // Soft-delete: returns the trashed ids (the node + its subtree) for undo.
+    delete: (id: string): Promise<string[]> => ipcRenderer.invoke('nodes:delete', id),
+    restore: (ids: string[]): Promise<boolean> => ipcRenderer.invoke('nodes:restore', ids),
     move: (
       id: string,
       newParentId: string | null,

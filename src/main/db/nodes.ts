@@ -52,10 +52,20 @@ function rowToNode(row: NodeRow): FbNode {
   }
 }
 
+let purgedTrashThisSession = false
+
 export function listNodes(): FbNode[] {
   const db = getDb()
+  if (!purgedTrashThisSession) {
+    purgedTrashThisSession = true
+    try {
+      purgeTrashedNodes()
+    } catch {
+      /* best-effort */
+    }
+  }
   const rows = db
-    .prepare('SELECT * FROM nodes ORDER BY sort_order ASC, created_at ASC')
+    .prepare('SELECT * FROM nodes WHERE trashed_at IS NULL ORDER BY sort_order ASC, created_at ASC')
     .all() as NodeRow[]
   return rows.map(rowToNode)
 }
@@ -146,10 +156,55 @@ export function updateNode(id: string, patch: NodePatch): FbNode | null {
   return getNode(id)
 }
 
-export function deleteNode(id: string): boolean {
+// Soft-delete a node and its whole subtree (children would otherwise be
+// hard-cascaded along with all their widgets). Returns the trashed ids so the
+// caller can offer a lossless undo. The rows and widgets are untouched on disk,
+// just hidden, until purgeTrashedNodes removes them.
+export function deleteNode(id: string): string[] {
   const db = getDb()
-  const result = db.prepare('DELETE FROM nodes WHERE id = ?').run(id)
-  return result.changes > 0
+  const exists = db.prepare('SELECT id FROM nodes WHERE id = ? AND trashed_at IS NULL').get(id)
+  if (!exists) return []
+  const ids: string[] = []
+  const collect = (nid: string): void => {
+    ids.push(nid)
+    const kids = db.prepare('SELECT id FROM nodes WHERE parent_id = ? AND trashed_at IS NULL').all(nid) as Array<{
+      id: string
+    }>
+    for (const k of kids) collect(k.id)
+  }
+  collect(id)
+  const now = Date.now()
+  const stmt = db.prepare('UPDATE nodes SET trashed_at = ? WHERE id = ?')
+  db.transaction(() => {
+    for (const i of ids) stmt.run(now, i)
+  })()
+  return ids
+}
+
+// Restore trashed nodes (undo of a delete, or redo of a create-undo).
+export function restoreNodes(ids: string[]): boolean {
+  if (!ids.length) return false
+  const db = getDb()
+  const stmt = db.prepare('UPDATE nodes SET trashed_at = NULL WHERE id = ?')
+  db.transaction(() => {
+    for (const i of ids) stmt.run(i)
+  })()
+  return true
+}
+
+// Permanently remove nodes trashed longer than maxAgeMs (default 7 days). The
+// hard DELETE cascades their descendants + widgets. Runs once per session.
+export function purgeTrashedNodes(maxAgeMs = 7 * 24 * 60 * 60 * 1000): void {
+  const db = getDb()
+  const cutoff = Date.now() - maxAgeMs
+  const rows = db.prepare('SELECT id FROM nodes WHERE trashed_at IS NOT NULL AND trashed_at < ?').all(cutoff) as Array<{
+    id: string
+  }>
+  if (!rows.length) return
+  const del = db.prepare('DELETE FROM nodes WHERE id = ?')
+  db.transaction(() => {
+    for (const r of rows) del.run(r.id)
+  })()
 }
 
 // Returns true if `candidateId` is a descendant of `ancestorId` (or equal). Used to prevent
