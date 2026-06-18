@@ -36,6 +36,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.54',
+    date: '2026-06-19T04:30:00Z',
+    title: 'v2.5.54 — A friendlier welcome and more undo',
+    tag: 'improvement',
+    summary:
+      'New users get a quick tour of every area, and undo reaches more places.',
+    highlights: [
+      'First-run onboarding now shows a short map of the app: Home and tasks, Documents, Files, Calendar, Mail and Vault.',
+      'Slides gain proper redo with toolbar buttons, and the Files area gets full undo and redo — including a recoverable delete, so nothing disappears by accident.'
+    ],
+    links: [{ label: 'Finding your way around', href: `${HELP_BASE}/getting-around` }]
+  },
+  {
     version: '2.5.53',
     date: '2026-06-19T03:00:00Z',
     title: 'v2.5.53 — A real file and folder manager',
