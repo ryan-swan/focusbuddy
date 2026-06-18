@@ -4,6 +4,7 @@ import { useViewStore } from '../../stores/view'
 import type { MailAccountInput } from '@shared/types'
 import Icon from '../Icon'
 import ComposeDialog from '../ComposeDialog'
+import EmailTaskDialog from '../mail/EmailTaskDialog'
 
 // Mail — the IMAP email inbox. The user connects their own mailbox (Gmail,
 // Outlook, iCloud, Fastmail, any IMAP host) and reads it here, inside the
@@ -264,11 +265,13 @@ function ReadingPane(): JSX.Element {
   const suggestReply = useMailStore((s) => s.suggestReply)
   const [taskState, setTaskState] = useState<'idle' | 'making' | 'done'>('idle')
   const [taskError, setTaskError] = useState<string | null>(null)
+  const [taskDialogOpen, setTaskDialogOpen] = useState(false)
   const [draftDismissed, setDraftDismissed] = useState(false)
 
   useEffect(() => {
     setTaskState('idle')
     setTaskError(null)
+    setTaskDialogOpen(false)
     setDraftDismissed(false)
   }, [open?.uid])
 
@@ -297,27 +300,8 @@ function ReadingPane(): JSX.Element {
     )
   }
 
-  async function makeTask(): Promise<void> {
-    if (!open) return
-    setTaskState('making')
-    setTaskError(null)
-    const snippet = open.text.trim().slice(0, 400)
-    try {
-      await window.api.nodes.create({
-        parentId: null,
-        kind: 'task',
-        title: open.subject || '(no subject)',
-        description: `From ${open.fromName} <${open.fromAddress}>\n\n${snippet}`
-      })
-      setTaskState('done')
-    } catch (e) {
-      // Previously this had no catch, so a failed create left the button stuck
-      // on "Adding…" forever and read as broken. Surface the real error and
-      // let the user try again.
-      setTaskState('idle')
-      setTaskError((e as Error)?.message ?? 'Could not create the task.')
-    }
-  }
+  // The "Make a task" button now opens a dialog (choose destination / new
+  // folder, due date, urgency) instead of creating a bare top-level task.
 
   function forwardOpen(): void {
     if (!open) return
@@ -363,12 +347,12 @@ function ReadingPane(): JSX.Element {
             Forward
           </button>
           <button
-            onClick={() => void makeTask()}
-            disabled={taskState !== 'idle'}
-            className="text-[12px] px-2.5 py-1 rounded-lg border border-stone-300 dark:border-stone-600 text-stone-600 dark:text-stone-300 hover:border-accent inline-flex items-center gap-1.5 disabled:opacity-60"
+            onClick={() => setTaskDialogOpen(true)}
+            data-testid="mail-make-task"
+            className="text-[12px] px-2.5 py-1 rounded-lg border border-stone-300 dark:border-stone-600 text-stone-600 dark:text-stone-300 hover:border-accent inline-flex items-center gap-1.5"
           >
             <Icon name={taskState === 'done' ? 'check' : 'add_task'} size={13} />
-            {taskState === 'done' ? 'Added to All Tasks' : taskState === 'making' ? 'Adding…' : 'Make a task'}
+            {taskState === 'done' ? 'Task created' : 'Make a task'}
           </button>
           {open.attachments.length > 0 && (
             <span className="text-[12px] text-stone-500 dark:text-stone-400 inline-flex items-center gap-1">
@@ -490,6 +474,16 @@ function ReadingPane(): JSX.Element {
             </span>
           ))}
         </div>
+      )}
+      {taskDialogOpen && open && (
+        <EmailTaskDialog
+          email={{ subject: open.subject, fromName: open.fromName, fromAddress: open.fromAddress, text: open.text }}
+          onClose={() => setTaskDialogOpen(false)}
+          onCreated={() => {
+            setTaskState('done')
+            setTaskDialogOpen(false)
+          }}
+        />
       )}
     </div>
   )
