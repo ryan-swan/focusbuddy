@@ -46,6 +46,7 @@ export default function SlidesEditor({ body: rawBody, title, onChange }: Props):
   const [canvasW, setCanvasW] = useState(720)
 
   const undo = useRef<SlidesBody[]>([])
+  const redo = useRef<SlidesBody[]>([])
   const canvasWrap = useRef<HTMLDivElement | null>(null)
 
   const theme = resolveTheme(body.theme)
@@ -69,6 +70,7 @@ export default function SlidesEditor({ body: rawBody, title, onChange }: Props):
   function commit(next: SlidesBody): void {
     undo.current.push(body)
     if (undo.current.length > 80) undo.current.shift()
+    redo.current = [] // a fresh edit invalidates the redo branch
     setBody(next)
     onChange(next)
   }
@@ -85,20 +87,29 @@ export default function SlidesEditor({ body: rawBody, title, onChange }: Props):
   function undoLast(): void {
     const prev = undo.current.pop()
     if (!prev) return
+    redo.current.push(body)
     setBody(prev)
     onChange(prev)
   }
+  function redoLast(): void {
+    const next = redo.current.pop()
+    if (!next) return
+    undo.current.push(body)
+    setBody(next)
+    onChange(next)
+  }
 
-  // Deck-level undo on Cmd/Ctrl+Z, except while editing text in an input or
-  // textarea (where the browser's own text undo should win). A document listener
-  // rather than a div handler so it fires regardless of which child has focus.
+  // Deck-level undo/redo on Cmd/Ctrl+Z (and Shift for redo), except while editing
+  // text in an input or textarea (where the browser's own text undo should win).
+  // A document listener rather than a div handler so it fires regardless of which
+  // child has focus.
   useEffect(() => {
     function onKey(e: KeyboardEvent): void {
       if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== 'z') return
       const tag = (document.activeElement?.tagName ?? '').toLowerCase()
       if (tag === 'input' || tag === 'textarea') return
       e.preventDefault()
-      undoLast()
+      e.shiftKey ? redoLast() : undoLast()
     }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
@@ -264,6 +275,10 @@ export default function SlidesEditor({ body: rawBody, title, onChange }: Props):
         onInsertLine={insertLine}
         onApplyLayout={applyLayout}
         onTemplates={() => setGalleryOpen(true)}
+        onUndo={undoLast}
+        onRedo={redoLast}
+        canUndo={undo.current.length > 0}
+        canRedo={redo.current.length > 0}
         onPresent={() => setPresenting(true)}
         onAi={() => setAiOpen((v) => !v)}
         onImport={() => void importFile()}

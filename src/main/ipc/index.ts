@@ -134,6 +134,7 @@ import {
   renameEntry as renameFileEntry,
   moveEntry as moveFileEntry,
   deleteEntry as deleteFileEntry,
+  restoreEntries as restoreFileEntries,
   fileDocument,
   unfiledDocuments
 } from '../db/files'
@@ -1064,6 +1065,7 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('fileManager:rename', (_e, id: string, name: string) => renameFileEntry(id, name))
   ipcMain.handle('fileManager:move', (_e, id: string, newParentId: string | null) => moveFileEntry(id, newParentId))
   ipcMain.handle('fileManager:delete', (_e, id: string) => deleteFileEntry(id))
+  ipcMain.handle('fileManager:restore', (_e, ids: string[]) => restoreFileEntries(ids))
   ipcMain.handle('fileManager:fileDocument', (_e, docId: string, parentId: string | null) =>
     fileDocument(docId, parentId)
   )

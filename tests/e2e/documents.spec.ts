@@ -131,50 +131,30 @@ test('Step 5 — blank Spreadsheet: SUM formula, multiply, #ERR for broken formu
     // Formula bar confirms we're in the sheet editor
     await expect(window.locator('input[placeholder*="Select a cell"]')).toBeVisible({ timeout: 5_000 })
 
-    // Cell accessor: rows are table tbody tr (8 default rows), tds: [0]=row-num, [1]=A, [2]=B, [3]=C, [4]=spacer
-    function cell(r: number, col: 'A' | 'B' | 'C'): import('@playwright/test').Locator {
-      const colIdx = { A: 1, B: 2, C: 3 }[col]
-      return window.locator('table tbody tr').nth(r).locator('td').nth(colIdx).locator('input')
+    // Current sheet model: cells are divs (data-testid cell-<r>-<c>); editing
+    // mounts a floating input inside the cell. A=col0, B=col1, C=col2; rows
+    // 0-indexed (A1 = cell-0-0).
+    async function setCell(r: number, c: number, text: string): Promise<void> {
+      const td = window.getByTestId(`cell-${r}-${c}`)
+      await td.dblclick()
+      const input = td.locator('input')
+      await input.fill(text)
+      await window.keyboard.press('Enter')
+      await window.waitForTimeout(80)
     }
+    const display = (r: number, c: number): Promise<string> =>
+      window.getByTestId(`cell-${r}-${c}`).innerText().then((t) => t.trim())
 
-    // Fill A1 = 10: click, fill value, then click another cell to blur (avoids Tab navigation side-effects)
-    await cell(0, 'A').click()
-    await cell(0, 'A').fill('10')
-    // Click A2 to blur A1 first
-    await cell(1, 'A').click()
-    await window.waitForTimeout(100)
+    await setCell(0, 0, '10') // A1
+    await setCell(1, 0, '20') // A2
+    await setCell(2, 0, '=SUM(A1:A2)') // A3
+    expect(await display(2, 0), 'A3 =SUM(A1:A2)').toBe('30')
 
-    // Fill A2 = 20: already focused, fill then blur to A3
-    await cell(1, 'A').fill('20')
-    await cell(2, 'A').click()
-    await window.waitForTimeout(100)
+    await setCell(0, 1, '=A1*3') // B1
+    expect(await display(0, 1), 'B1 =A1*3').toBe('30')
 
-    // Fill A3 = =SUM(A1:A2) then blur to A1 so displayCell is called
-    await cell(2, 'A').fill('=SUM(A1:A2)')
-    await cell(0, 'A').click() // blur A3 → triggers displayCell → shows 30
-    await window.waitForTimeout(200)
-
-    // A3 when not focused should display evaluated value 30 (10+20=30)
-    const a3Value = await cell(2, 'A').inputValue()
-    expect(a3Value, `A3 =SUM(A1:A2): expected "30", got "${a3Value}"`).toBe('30')
-
-    // B1 = =A1*3 → should display 30
-    await cell(0, 'B').click()
-    await cell(0, 'B').fill('=A1*3')
-    await cell(0, 'A').click() // blur B1
-    await window.waitForTimeout(200)
-
-    const b1Value = await cell(0, 'B').inputValue()
-    expect(b1Value, `B1 =A1*3: expected "30", got "${b1Value}"`).toBe('30')
-
-    // C1 = =2+ (broken) → should display #ERR
-    await cell(0, 'C').click()
-    await cell(0, 'C').fill('=2+')
-    await cell(0, 'A').click() // blur C1
-    await window.waitForTimeout(200)
-
-    const c1Value = await cell(0, 'C').inputValue()
-    expect(c1Value, `C1 =2+ (broken): expected "#ERR", got "${c1Value}"`).toBe('#ERR')
+    await setCell(0, 2, '=1/0') // C1, non-finite → #ERR (avoids the =<op> formula menu)
+    expect(await display(0, 2), 'C1 =1/0 (#ERR)').toBe('#ERR')
   } finally {
     await dispose()
   }
@@ -205,6 +185,12 @@ test('Step 6 — blank Slides: template gallery adds a slide, Present mode arrow
     // Two slides now in the rail, and the canvas renders elements.
     await expect(railThumbs).toHaveCount(2, { timeout: 3_000 })
     await expect(window.getByTestId('slide-element').first()).toBeVisible({ timeout: 3_000 })
+
+    // Undo the insert (toolbar button) → back to one slide; redo → two again.
+    await window.getByTestId('slides-undo').click()
+    await expect(railThumbs).toHaveCount(1, { timeout: 3_000 })
+    await window.getByTestId('slides-redo').click()
+    await expect(railThumbs).toHaveCount(2, { timeout: 3_000 })
 
     // Start at slide 1, present, arrow to slide 2, Esc out.
     await railThumbs.first().click()

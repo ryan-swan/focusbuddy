@@ -182,7 +182,7 @@ interface EntryRow {
 
 function childCount(id: string): number {
   const db = getDb()
-  const r = db.prepare('SELECT COUNT(*) as n FROM fb_files WHERE parent_id = ?').get(id) as { n: number }
+  const r = db.prepare('SELECT COUNT(*) as n FROM fb_files WHERE parent_id = ? AND trashed_at IS NULL').get(id) as { n: number }
   return r.n
 }
 
@@ -228,12 +228,22 @@ function rowToEntry(row: EntryRow): FileEntry | null {
 const ENTRY_COLS =
   'id, parent_id, kind, original_name, display_name, mime_type, size_bytes, ext, doc_id, doc_type, created_at, updated_at'
 
+let purgedThisSession = false
+
 export function listEntries(parentId: string | null): FileEntry[] {
   const db = getDb()
+  if (!purgedThisSession) {
+    purgedThisSession = true
+    try {
+      purgeOldTrash()
+    } catch {
+      // best-effort cleanup
+    }
+  }
   const rows = (
     parentId == null
-      ? db.prepare(`SELECT ${ENTRY_COLS} FROM fb_files WHERE parent_id IS NULL`).all()
-      : db.prepare(`SELECT ${ENTRY_COLS} FROM fb_files WHERE parent_id = ?`).all(parentId)
+      ? db.prepare(`SELECT ${ENTRY_COLS} FROM fb_files WHERE parent_id IS NULL AND trashed_at IS NULL`).all()
+      : db.prepare(`SELECT ${ENTRY_COLS} FROM fb_files WHERE parent_id = ? AND trashed_at IS NULL`).all(parentId)
   ) as EntryRow[]
   const out: FileEntry[] = []
   for (const row of rows) {
@@ -246,7 +256,9 @@ export function listEntries(parentId: string | null): FileEntry[] {
 
 export function getEntry(id: string): FileEntry | null {
   const db = getDb()
-  const row = db.prepare(`SELECT ${ENTRY_COLS} FROM fb_files WHERE id = ?`).get(id) as EntryRow | undefined
+  const row = db.prepare(`SELECT ${ENTRY_COLS} FROM fb_files WHERE id = ? AND trashed_at IS NULL`).get(id) as
+    | EntryRow
+    | undefined
   return row ? rowToEntry(row) : null
 }
 
@@ -310,24 +322,64 @@ export function moveEntry(id: string, newParentId: string | null): boolean {
   return db.prepare('UPDATE fb_files SET parent_id = ?, updated_at = ? WHERE id = ?').run(newParentId, Date.now(), id).changes > 0
 }
 
-export function deleteEntry(id: string): boolean {
+// Soft-delete: mark the entry and its whole subtree as trashed (hidden from
+// listings) and return the affected ids so the caller can offer undo. The blob
+// stays on disk until purgeOldTrash removes it, so a restore is lossless. A doc
+// reference is trashed too, but the underlying document is never touched.
+export function deleteEntry(id: string): string[] {
   const db = getDb()
-  const row = db.prepare('SELECT id, kind, ext FROM fb_files WHERE id = ?').get(id) as
-    | { id: string; kind: string; ext: string }
-    | undefined
-  if (!row) return false
-  if (row.kind === 'folder') {
-    const children = db.prepare('SELECT id FROM fb_files WHERE parent_id = ?').all(id) as Array<{ id: string }>
-    for (const c of children) deleteEntry(c.id)
-  } else if (row.kind === 'file') {
-    // Remove the stored blob; a doc reference never deletes the document.
-    try {
-      unlinkSync(join(filesDir(), `${row.id}${row.ext}`))
-    } catch {
-      // best-effort
+  const exists = db.prepare('SELECT id FROM fb_files WHERE id = ? AND trashed_at IS NULL').get(id)
+  if (!exists) return []
+  const ids: string[] = []
+  const collect = (nid: string): void => {
+    ids.push(nid)
+    const kids = db.prepare('SELECT id FROM fb_files WHERE parent_id = ? AND trashed_at IS NULL').all(nid) as Array<{
+      id: string
+    }>
+    for (const k of kids) collect(k.id)
+  }
+  collect(id)
+  const now = Date.now()
+  const stmt = db.prepare('UPDATE fb_files SET trashed_at = ? WHERE id = ?')
+  db.transaction(() => {
+    for (const i of ids) stmt.run(now, i)
+  })()
+  return ids
+}
+
+// Restore trashed entries (undo of a delete).
+export function restoreEntries(ids: string[]): boolean {
+  if (!ids.length) return false
+  const db = getDb()
+  const stmt = db.prepare('UPDATE fb_files SET trashed_at = NULL WHERE id = ?')
+  db.transaction(() => {
+    for (const i of ids) stmt.run(i)
+  })()
+  return true
+}
+
+// Permanently remove entries trashed longer than maxAgeMs (default 7 days),
+// unlinking their stored blobs. Runs once per session on first listing.
+export function purgeOldTrash(maxAgeMs = 7 * 24 * 60 * 60 * 1000): void {
+  const db = getDb()
+  const cutoff = Date.now() - maxAgeMs
+  const rows = db
+    .prepare('SELECT id, kind, ext FROM fb_files WHERE trashed_at IS NOT NULL AND trashed_at < ?')
+    .all(cutoff) as Array<{ id: string; kind: string; ext: string }>
+  if (!rows.length) return
+  for (const r of rows) {
+    if (r.kind === 'file') {
+      try {
+        unlinkSync(join(filesDir(), `${r.id}${r.ext}`))
+      } catch {
+        // best-effort
+      }
     }
   }
-  return db.prepare('DELETE FROM fb_files WHERE id = ?').run(id).changes > 0
+  const del = db.prepare('DELETE FROM fb_files WHERE id = ?')
+  db.transaction(() => {
+    for (const r of rows) del.run(r.id)
+  })()
 }
 
 // File an internal document into a folder. A document lives in exactly one
@@ -343,7 +395,7 @@ export function fileDocument(docId: string, parentId: string | null): FileEntry 
     | { id: string }
     | undefined
   if (existing) {
-    db.prepare('UPDATE fb_files SET parent_id = ?, updated_at = ? WHERE id = ?').run(parentId, now, existing.id)
+    db.prepare('UPDATE fb_files SET parent_id = ?, updated_at = ?, trashed_at = NULL WHERE id = ?').run(parentId, now, existing.id)
     return getEntry(existing.id)
   }
   const id = randomUUID()

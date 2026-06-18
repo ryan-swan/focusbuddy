@@ -92,6 +92,8 @@ function formatDate(ms: number): string {
 export default function FilesView(): JSX.Element {
   const store = useFileManagerStore()
   const goDocument = useViewStore((s) => s.goDocument)
+  const undo = useFileManagerStore((s) => s.undo)
+  const redo = useFileManagerStore((s) => s.redo)
   const [renaming, setRenaming] = useState<string | null>(null)
   const [ctx, setCtx] = useState<{ x: number; y: number; items: CtxMenuItem[] } | null>(null)
   const [dropActive, setDropActive] = useState(false)
@@ -101,6 +103,21 @@ export default function FilesView(): JSX.Element {
     void store.refresh()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Undo/redo for file operations while the manager is open. Ignored while
+  // typing in an input (rename) so text editing keeps its own undo.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent): void {
+      if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== 'z') return
+      const tag = (document.activeElement?.tagName ?? '').toLowerCase()
+      if (tag === 'input' || tag === 'textarea') return
+      e.preventDefault()
+      if (e.shiftKey) void redo()
+      else void undo()
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [undo, redo])
 
   const sorted = useMemo(
     () => sortEntries(store.entries, store.sortKey, store.sortDir),
@@ -243,7 +260,12 @@ function Toolbar({ onNewFolder, onAddFiles, onAddDoc }: { onNewFolder: () => voi
   const setViewMode = useFileManagerStore((s) => s.setViewMode)
   const sortKey = useFileManagerStore((s) => s.sortKey)
   const setSort = useFileManagerStore((s) => s.setSort)
+  const undo = useFileManagerStore((s) => s.undo)
+  const redo = useFileManagerStore((s) => s.redo)
+  const canUndo = useFileManagerStore((s) => s.past.length > 0)
+  const canRedo = useFileManagerStore((s) => s.future.length > 0)
   const btn = 'h-8 px-2.5 inline-flex items-center gap-1.5 rounded-lg text-[12px] text-stone-600 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800'
+  const iconBtn = 'h-8 w-8 inline-flex items-center justify-center rounded-lg text-stone-500 hover:bg-stone-100 dark:hover:bg-stone-800 disabled:opacity-40'
   const modes: Array<{ id: FileViewMode; icon: string; title: string }> = [
     { id: 'list', icon: 'view_list', title: 'List' },
     { id: 'small', icon: 'grid_view', title: 'Small icons' },
@@ -253,6 +275,9 @@ function Toolbar({ onNewFolder, onAddFiles, onAddDoc }: { onNewFolder: () => voi
   return (
     <div className="flex items-center gap-1 px-4 py-2 border-b border-stone-200 dark:border-stone-800">
       <h1 className="text-[15px] font-semibold text-stone-800 dark:text-stone-100 mr-2">Files</h1>
+      <button className={iconBtn} onClick={() => void undo()} disabled={!canUndo} title="Undo" data-testid="files-undo"><Icon name="undo" size={16} /></button>
+      <button className={iconBtn} onClick={() => void redo()} disabled={!canRedo} title="Redo" data-testid="files-redo"><Icon name="redo" size={16} /></button>
+      <span className="w-px h-5 bg-stone-200 dark:bg-stone-700 mx-1" />
       <button className={btn} onClick={onNewFolder} data-testid="files-new-folder"><Icon name="create_new_folder" size={16} /> New folder</button>
       <button className={btn} onClick={onAddFiles} data-testid="files-add-files"><Icon name="upload_file" size={16} /> Add files</button>
       <button className={btn} onClick={onAddDoc} data-testid="files-add-doc"><Icon name="post_add" size={16} /> Add document</button>

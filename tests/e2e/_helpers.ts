@@ -110,6 +110,8 @@ export async function waitForReady(
   if (await onb.isVisible().catch(() => false)) {
     await window.getByRole('button', { name: 'Get started' }).click().catch(() => {})
     await window.getByRole('button', { name: 'Skip for now' }).click().catch(() => {})
+    // Tour step (surfaces overview) sits between the key step and the starter.
+    await window.locator('[data-testid="onboarding-tour-continue"]').click().catch(() => {})
     await window.locator('[data-testid="onboarding-start-blank"]').click().catch(() => {})
   }
 

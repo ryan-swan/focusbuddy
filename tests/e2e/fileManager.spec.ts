@@ -83,6 +83,29 @@ test('FM-A2: create folder — new entry with kind=folder appears', async () => 
   }
 })
 
+test('FM-A2b: undo/redo — creating a folder can be undone and redone from the toolbar', async () => {
+  const { window, dispose } = await launchApp()
+  try {
+    await waitForReady(window)
+    await goFiles(window)
+
+    const countBefore = await window.locator('[data-kind="folder"]').count()
+    await window.locator('[data-testid="files-new-folder"]').click()
+    await expect(window.locator('[data-kind="folder"]')).toHaveCount(countBefore + 1, { timeout: 5_000 })
+
+    // Undo removes it; redo brings it back.
+    await window.locator('[data-testid="files-undo"]').click()
+    await expect(window.locator('[data-kind="folder"]')).toHaveCount(countBefore, { timeout: 5_000 })
+    await window.locator('[data-testid="files-redo"]').click()
+    await expect(window.locator('[data-kind="folder"]')).toHaveCount(countBefore + 1, { timeout: 5_000 })
+
+    // Clean up the restored folder.
+    await window.locator('[data-testid="files-undo"]').click()
+  } finally {
+    await dispose()
+  }
+})
+
 test('FM-A3: navigate into folder, create subfolder, breadcrumb root returns to root', async () => {
   const { window, dispose } = await launchApp()
   try {
@@ -518,7 +541,7 @@ test('FM-B4: fileDocument — re-filing moves reference; no duplicate; unfiledDo
   }
 })
 
-test('FM-B5: recursive delete — deleting a folder removes it and its child files', async () => {
+test('FM-B5: recursive soft-delete trashes a folder + children and restore brings them back', async () => {
   const { window, dispose } = await launchApp()
   try {
     await waitForReady(window)
@@ -529,36 +552,47 @@ test('FM-B5: recursive delete — deleting a folder removes it and its child fil
     const result = await window.evaluate(async () => {
       const api = (window as unknown as { api: typeof window.api }).api
 
-      // Create a folder at root, ingest a file at root, move it into the folder
-      // (works around the parentId IPC bug so the file is genuinely inside the folder).
       const folder = (await api.fileManager.createFolder(null, 'B5-RecDelete')) as { id: string }
       const buf = new TextEncoder().encode('delete me').buffer
-      const ingested = (await api.files.ingestBuffer({ buffer: buf, originalName: 'child.txt', mimeType: 'text/plain' })) as FbFile
-      await api.fileManager.move(ingested.id, folder.id)
+      const ingested = (await api.files.ingestBuffer({
+        buffer: buf,
+        originalName: 'child.txt',
+        mimeType: 'text/plain',
+        parentId: folder.id
+      })) as FbFile
 
-      // Capture the child ID for getEntry check after delete.
       const children = (await api.fileManager.list(folder.id)) as FileEntry[]
-      const childFile = children.find(e => e.kind === 'file')
-      const childId = childFile?.id ?? null
+      const childId = children.find((e) => e.kind === 'file')?.id ?? null
 
-      // Delete the folder recursively.
-      const deleteResult = await api.fileManager.delete(folder.id)
+      // Soft-delete the folder recursively — returns the trashed ids (for undo).
+      const trashedIds = await api.fileManager.delete(folder.id)
 
-      // Root listing must no longer contain the folder.
+      // Hidden from listings and from getEntry.
       const rootEntries = (await api.fileManager.list(null)) as FileEntry[]
-      const folderGone = !rootEntries.some(e => e.id === folder.id)
+      const folderGone = !rootEntries.some((e) => e.id === folder.id)
+      const childEntryAfterDelete = childId ? await api.fileManager.get(childId) : 'no-child-id'
 
-      // getEntry on the child should return null (deleted by recursive delete).
-      const childEntry = childId ? await api.fileManager.get(childId) : 'no-child-id'
+      // Restore (the undo path) brings the whole subtree back.
+      await api.fileManager.restore(trashedIds)
+      const rootAfterRestore = (await api.fileManager.list(null)) as FileEntry[]
+      const folderBack = rootAfterRestore.some((e) => e.id === folder.id)
+      const childBack = childId ? await api.fileManager.get(childId) : null
 
-      return { deleteResult, folderGone, childEntry, childId }
+      // Clean up.
+      await api.fileManager.delete(folder.id)
+
+      return { trashedIds, folderGone, childEntryAfterDelete, childId, folderBack, childBack }
     })
 
-    expect(result.deleteResult).toBe(true)
+    // delete returns the trashed ids: folder + its child.
+    expect(Array.isArray(result.trashedIds)).toBe(true)
+    expect(result.trashedIds).toContain(result.childId)
     expect(result.folderGone).toBe(true)
-    // childId must have been found (the file was actually in the folder).
     expect(result.childId).toBeTruthy()
-    expect(result.childEntry).toBeNull()
+    expect(result.childEntryAfterDelete).toBeNull()
+    // Restore recovered both the folder and its child file.
+    expect(result.folderBack).toBe(true)
+    expect(result.childBack).toBeTruthy()
   } finally {
     await dispose()
   }
