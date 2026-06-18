@@ -18,10 +18,11 @@ const TYPES: { type: DocType; label: string; icon: string; blurb: string }[] = [
   { type: 'slides', label: 'Slides', icon: 'slideshow', blurb: 'Decks and presentations' }
 ]
 
-function typeIcon(t: DocType | 'canvas'): string {
-  // A live canvas (a shared desk) isn't one of the local document TYPES, so map
-  // it to a board icon; everything else looks itself up with a safe fallback.
+function typeIcon(t: DocType | 'canvas' | 'folder'): string {
+  // Live canvases (shared desks) and live folders aren't local document TYPES,
+  // so map them to their own icons; everything else looks itself up safely.
   if (t === 'canvas') return 'space_dashboard'
+  if (t === 'folder') return 'folder_shared'
   return TYPES.find((x) => x.type === t)?.icon ?? 'description'
 }
 
@@ -45,6 +46,7 @@ export default function DocumentsView(): JSX.Element {
   const goDocument = useViewStore((s) => s.goDocument)
   const goLiveDoc = useViewStore((s) => s.goLiveDoc)
   const goLiveCanvas = useViewStore((s) => s.goLiveCanvas)
+  const goLiveFolder = useViewStore((s) => s.goLiveFolder)
   const token = useAccountStore((s) => s.sessionToken)
 
   const [docType, setDocType] = useState<DocType>('doc')
@@ -236,7 +238,13 @@ export default function DocumentsView(): JSX.Element {
               {shared.map((d) => (
                 <div
                   key={d.id}
-                  onClick={() => (d.docType === 'canvas' ? goLiveCanvas(d.id) : goLiveDoc(d.id))}
+                  onClick={() =>
+                    d.docType === 'canvas'
+                      ? goLiveCanvas(d.id)
+                      : d.docType === 'folder'
+                        ? goLiveFolder(d.id)
+                        : goLiveDoc(d.id)
+                  }
                   className="flex items-center gap-3 rounded-xl border border-stone-200 dark:border-stone-700 bg-white/70 dark:bg-stone-900/70 px-3.5 py-3 cursor-pointer hover:border-accent/50 hover:shadow-sm transition"
                 >
                   <div className="h-9 w-9 rounded-lg bg-accent/10 text-accent inline-flex items-center justify-center shrink-0">
