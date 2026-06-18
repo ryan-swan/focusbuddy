@@ -20,6 +20,41 @@ export interface Grid {
 
 export type CellValue = number | string | boolean
 
+// The functions the engine supports, with a short signature hint. Drives the
+// in-cell "type =" formula menu so users get quick, discoverable access.
+export const SHEET_FUNCTIONS: Array<{ name: string; hint: string }> = [
+  { name: 'SUM', hint: 'SUM(range) — add numbers' },
+  { name: 'AVERAGE', hint: 'AVERAGE(range) — mean of numbers' },
+  { name: 'MIN', hint: 'MIN(range) — smallest number' },
+  { name: 'MAX', hint: 'MAX(range) — largest number' },
+  { name: 'COUNT', hint: 'COUNT(range) — count of numbers' },
+  { name: 'COUNTA', hint: 'COUNTA(range) — count of non-empty cells' },
+  { name: 'PRODUCT', hint: 'PRODUCT(range) — multiply numbers' },
+  { name: 'COUNTIF', hint: 'COUNTIF(range, criteria)' },
+  { name: 'SUMIF', hint: 'SUMIF(range, criteria, [sumRange])' },
+  { name: 'AVERAGEIF', hint: 'AVERAGEIF(range, criteria, [avgRange])' },
+  { name: 'IF', hint: 'IF(test, ifTrue, ifFalse)' },
+  { name: 'AND', hint: 'AND(a, b, …) — all true' },
+  { name: 'OR', hint: 'OR(a, b, …) — any true' },
+  { name: 'NOT', hint: 'NOT(x)' },
+  { name: 'IFERROR', hint: 'IFERROR(value, fallback)' },
+  { name: 'ROUND', hint: 'ROUND(number, decimals)' },
+  { name: 'ROUNDUP', hint: 'ROUNDUP(number, decimals)' },
+  { name: 'ROUNDDOWN', hint: 'ROUNDDOWN(number, decimals)' },
+  { name: 'ABS', hint: 'ABS(number)' },
+  { name: 'SQRT', hint: 'SQRT(number)' },
+  { name: 'POWER', hint: 'POWER(base, exponent)' },
+  { name: 'MOD', hint: 'MOD(number, divisor)' },
+  { name: 'CONCAT', hint: 'CONCAT(a, b, …) — join text' },
+  { name: 'LEN', hint: 'LEN(text)' },
+  { name: 'LEFT', hint: 'LEFT(text, n)' },
+  { name: 'RIGHT', hint: 'RIGHT(text, n)' },
+  { name: 'MID', hint: 'MID(text, start, length)' },
+  { name: 'UPPER', hint: 'UPPER(text)' },
+  { name: 'LOWER', hint: 'LOWER(text)' },
+  { name: 'TRIM', hint: 'TRIM(text)' }
+]
+
 // ── References ────────────────────────────────────────────────────────────────
 
 function colToIndex(letters: string): number {

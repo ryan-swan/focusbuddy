@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { SheetBody, SheetBodyV2, SheetCellFormat, SheetChartSpec, SheetNumberFormat, SheetTab } from '@shared/types'
+import { SHEET_FUNCTIONS } from '../../lib/sheetFormula'
 import {
   normalizeBody,
   withTab,
@@ -49,7 +50,40 @@ interface Cell {
   c: number
 }
 
+interface FuncMenu {
+  items: typeof SHEET_FUNCTIONS
+  tokenStart: number
+  query: string
+}
+
 const DEFAULT_COL_W = 120
+
+// When the in-cell text is a formula, work out whether to show the function
+// menu and which functions match. We assume the caret is at the end of the
+// text (the normal left-to-right typing case), which keeps this free of
+// render-time DOM caret reads. Trailing letters are treated as a function-name
+// prefix; right after =, (, a comma or an operator we show the full list.
+function computeFuncMenu(value: string): FuncMenu | null {
+  if (!value.startsWith('=')) return null
+  const idM = value.match(/([A-Za-z]+)$/)
+  let query = ''
+  let tokenStart = value.length
+  if (idM) {
+    query = idM[1].toUpperCase()
+    tokenStart = value.length - idM[1].length
+  } else if (/[=+\-*/&^<>]$/.test(value)) {
+    // Right after = or a binary operator: offer the whole catalogue. We
+    // deliberately skip ( and , so the menu closes after a function is picked
+    // (where you usually type a reference, not nest another function).
+    query = ''
+    tokenStart = value.length
+  } else {
+    return null
+  }
+  const items = SHEET_FUNCTIONS.filter((f) => f.name.startsWith(query))
+  if (!items.length) return null
+  return { items, tokenStart, query }
+}
 
 export default function SheetEditor({ body: rawBody, title, onChange }: Props): JSX.Element {
   const [body, setBody] = useState<SheetBodyV2>(() => normalizeBody(rawBody))
@@ -61,11 +95,15 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
   const [liveWidth, setLiveWidth] = useState<{ c: number; w: number } | null>(null)
   const [status, setStatus] = useState<string | null>(null)
   const [colMenu, setColMenu] = useState<{ c: number; x: number; y: number } | null>(null)
+  const [funcIndex, setFuncIndex] = useState(0)
+  const [funcDismissed, setFuncDismissed] = useState(false)
 
   const undoStack = useRef<SheetBodyV2[]>([])
   const redoStack = useRef<SheetBodyV2[]>([])
   const dragging = useRef(false)
   const gridWrapRef = useRef<HTMLDivElement | null>(null)
+  const editInputRef = useRef<HTMLInputElement | null>(null)
+  const refDrag = useRef<{ start: Cell; end: Cell } | null>(null)
 
   const idx = body.activeSheet ?? 0
   const tab = activeTab(body)
@@ -111,7 +149,18 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
   function focusGrid(): void {
     gridWrapRef.current?.focus()
   }
+  // True while the cell being edited holds a formula, so a click on another
+  // cell should insert its reference rather than move the selection.
+  const inFormulaEdit = (): boolean => !!editing && editValue.startsWith('=')
+
   function onCellMouseDown(r: number, c: number, shift: boolean): void {
+    if (inFormulaEdit()) {
+      // Clicking the cell we're editing just places the caret in its input.
+      if (editing && r === editing.r && c === editing.c) return
+      refDrag.current = { start: { r, c }, end: { r, c } }
+      dragging.current = true
+      return
+    }
     setEditing(null)
     if (shift) setFocus({ r, c })
     else {
@@ -122,19 +171,115 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
     focusGrid()
   }
   function onCellMouseEnter(r: number, c: number): void {
+    if (refDrag.current) {
+      refDrag.current = { start: refDrag.current.start, end: { r, c } }
+      return
+    }
     if (dragging.current) setFocus({ r, c })
   }
   useEffect(() => {
+    // Reads only refs + colLabel + setEditValue (all stable), so the empty dep
+    // list is safe and the handler never sees stale formula text — it pulls the
+    // live value and caret straight from the input element.
     const up = (): void => {
+      if (refDrag.current) {
+        const { start, end } = refDrag.current
+        refDrag.current = null
+        dragging.current = false
+        const r0 = Math.min(start.r, end.r)
+        const r1 = Math.max(start.r, end.r)
+        const c0 = Math.min(start.c, end.c)
+        const c1 = Math.max(start.c, end.c)
+        const ref =
+          r0 === r1 && c0 === c1
+            ? `${colLabel(c0)}${r0 + 1}`
+            : `${colLabel(c0)}${r0 + 1}:${colLabel(c1)}${r1 + 1}`
+        const input = editInputRef.current
+        if (input) {
+          const s = input.selectionStart ?? input.value.length
+          const e = input.selectionEnd ?? s
+          const next = input.value.slice(0, s) + ref + input.value.slice(e)
+          setEditValue(next)
+          const caret = s + ref.length
+          requestAnimationFrame(() => {
+            input.focus()
+            try {
+              input.setSelectionRange(caret, caret)
+            } catch {
+              /* input may have unmounted */
+            }
+          })
+        }
+        return
+      }
       dragging.current = false
     }
     window.addEventListener('mouseup', up)
     return () => window.removeEventListener('mouseup', up)
   }, [])
 
+  // ── Formula function menu ─────────────────────────────────────────────────
+  const funcMenu = useMemo(
+    () => (editing && !funcDismissed ? computeFuncMenu(editValue) : null),
+    [editing, editValue, funcDismissed]
+  )
+  function handleEditValue(v: string): void {
+    setEditValue(v)
+    setFuncIndex(0)
+    setFuncDismissed(false)
+  }
+  function applyFunc(menu: FuncMenu, index: number): void {
+    const fn = menu.items[index] ?? menu.items[0]
+    if (!fn) return
+    const input = editInputRef.current
+    const caret = input?.selectionStart ?? editValue.length
+    const next = editValue.slice(0, menu.tokenStart) + fn.name + '(' + editValue.slice(caret)
+    setEditValue(next)
+    setFuncIndex(0)
+    const newCaret = menu.tokenStart + fn.name.length + 1
+    requestAnimationFrame(() => {
+      input?.focus()
+      try {
+        input?.setSelectionRange(newCaret, newCaret)
+      } catch {
+        /* noop */
+      }
+    })
+  }
+  // Drive the menu from the edit input's own keystrokes (capture phase, so this
+  // runs before SheetGrid's Enter/Tab/Escape commit handlers and can stop them).
+  useEffect(() => {
+    const input = editInputRef.current
+    if (!input || !funcMenu) return
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault()
+        e.stopPropagation()
+        setFuncIndex((i) => Math.min(funcMenu.items.length - 1, i + 1))
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault()
+        e.stopPropagation()
+        setFuncIndex((i) => Math.max(0, i - 1))
+      } else if (e.key === 'Enter' || e.key === 'Tab') {
+        e.preventDefault()
+        e.stopPropagation()
+        applyFunc(funcMenu, funcIndex)
+      } else if (e.key === 'Escape') {
+        e.preventDefault()
+        e.stopPropagation()
+        setFuncDismissed(true)
+      }
+    }
+    input.addEventListener('keydown', onKey, true)
+    return () => input.removeEventListener('keydown', onKey, true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [funcMenu, funcIndex])
+
   function startEdit(cell: Cell, initial?: string): void {
     setEditing(cell)
     setEditValue(initial ?? tab.rows[cell.r]?.[cell.c] ?? '')
+    setFuncIndex(0)
+    setFuncDismissed(false)
   }
   function commitEdit(move: 'down' | 'right' | 'none'): void {
     if (!editing) return
@@ -383,7 +528,7 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
             editing={editing}
             editValue={editValue}
             colWidthOf={colWidthOf}
-            onEditValue={setEditValue}
+            onEditValue={handleEditValue}
             onCellMouseDown={onCellMouseDown}
             onCellMouseEnter={onCellMouseEnter}
             onCellDoubleClick={(r, c) => startEdit({ r, c })}
@@ -392,7 +537,17 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
             onHeaderRename={(c, name) => mutateTab((t) => setColumnName(t, c, name))}
             onColResizeStart={onColResizeStart}
             onHeaderContextMenu={(c, x, y) => setColMenu({ c, x, y })}
+            editInputRef={editInputRef}
+            formulaRefMode={inFormulaEdit()}
           />
+          {funcMenu && editInputRef.current && (
+            <FormulaMenu
+              rect={editInputRef.current.getBoundingClientRect()}
+              menu={funcMenu}
+              activeIndex={Math.min(funcIndex, funcMenu.items.length - 1)}
+              onPick={(i) => applyFunc(funcMenu, i)}
+            />
+          )}
         </div>
 
         {colMenu && (
@@ -488,6 +643,48 @@ function ColumnHeaderMenu({
       >
         <Icon name="delete" size={13} /> Delete column
       </button>
+    </div>
+  )
+}
+
+// The formula function menu, anchored just under the cell being edited. Buttons
+// use onMouseDown + preventDefault so picking one does not blur the edit input
+// (a blur would commit the half-typed formula).
+function FormulaMenu({
+  rect,
+  menu,
+  activeIndex,
+  onPick
+}: {
+  rect: DOMRect
+  menu: FuncMenu
+  activeIndex: number
+  onPick: (index: number) => void
+}): JSX.Element {
+  const top = Math.min(rect.bottom + 2, window.innerHeight - 240)
+  const left = Math.min(rect.left, window.innerWidth - 280)
+  return (
+    <div
+      data-testid="sheet-formula-menu"
+      className="fixed z-[120] w-[268px] max-h-[230px] overflow-auto rounded-md border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 shadow-xl py-1 text-stone-700 dark:text-stone-200"
+      style={{ top, left }}
+    >
+      {menu.items.map((f, i) => (
+        <button
+          key={f.name}
+          data-testid={`sheet-func-${f.name}`}
+          onMouseDown={(e) => {
+            e.preventDefault()
+            onPick(i)
+          }}
+          className={`w-full text-left px-3 py-1.5 ${
+            i === activeIndex ? 'bg-accent/15' : 'hover:bg-stone-100 dark:hover:bg-stone-800'
+          }`}
+        >
+          <span className="font-mono text-[12px] font-semibold text-accent">{f.name}</span>
+          <span className="block text-[11px] text-stone-500 dark:text-stone-400 truncate">{f.hint}</span>
+        </button>
+      ))}
     </div>
   )
 }
