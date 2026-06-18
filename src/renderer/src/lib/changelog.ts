@@ -36,6 +36,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.57',
+    date: '2026-06-19T09:00:00Z',
+    title: 'v2.5.57 — Cleaner document adds on the canvas',
+    tag: 'fix',
+    summary:
+      'Adding a document, spreadsheet or slides to a workspace now offers the real built-in editors, grouped together.',
+    highlights: [
+      'The right-click Add menu and the + Widget palette now list Document, Spreadsheet and Slides together under Files, using the built-in editors.',
+      'Removed the leftover Google Docs/Sheets/Slides add entries that had been showing by mistake; pasting a Google link still works.'
+    ],
+    links: [{ label: 'Finding your way around', href: `${HELP_BASE}/getting-around` }]
+  },
+  {
     version: '2.5.56',
     date: '2026-06-19T08:00:00Z',
     title: 'v2.5.56 — Work on a document together, safely',
