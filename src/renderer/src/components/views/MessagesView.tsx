@@ -175,16 +175,20 @@ export default function MessagesView(): JSX.Element {
 
       {/* Thread */}
       <div className="flex-1 flex flex-col min-w-0">
-        {!activeConv ? (
+        {!activeId ? (
           <div className="flex-1 flex items-center justify-center text-[13px] text-stone-500 dark:text-stone-400">
             Pick a conversation, or start a new one.
           </div>
         ) : (
+          // Gate on activeId, not activeConv: a conversation opened from
+          // PlexiInbox sets activeId before it has landed in the conversations
+          // list, and the receiver must be able to reply immediately. Title
+          // falls back until the list catches up.
           <>
             <div className="px-4 py-3 border-b border-stone-200 dark:border-stone-800">
               <h2 className="text-sm font-semibold text-stone-900 dark:text-stone-100 inline-flex items-center gap-1.5">
-                <Icon name={activeConv.kind === 'space' ? 'folder_shared' : 'person'} size={14} className="text-accent" />
-                {activeConv.title}
+                <Icon name={activeConv?.kind === 'space' ? 'folder_shared' : 'person'} size={14} className="text-accent" />
+                {activeConv?.title ?? 'Conversation'}
               </h2>
             </div>
             <div ref={threadRef} className="flex-1 overflow-auto px-4 py-3 space-y-2">

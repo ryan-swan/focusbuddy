@@ -69,6 +69,10 @@ export default function App(): JSX.Element {
   const chatRef = useRef<ImperativePanelHandle>(null)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [chatCollapsed, setChatCollapsed] = useState(false)
+  // On macOS the window uses hiddenInset, so the traffic lights sit at the top
+  // left of the header. Reserve room so the header's left controls (the show-
+  // workspace toggle, the trust chip) never sit under them.
+  const isMac = typeof window !== 'undefined' && window.api?.platform === 'darwin'
   const [settingsOpen, setSettingsOpen] = useState<{ x: number; y: number } | null>(null)
   const [smartStackOpen, setSmartStackOpen] = useState(false)
   // First-run "What's new in vX.Y.Z" modal — shown once on the first launch
@@ -296,7 +300,11 @@ export default function App(): JSX.Element {
       {releaseEntry && (
         <ReleaseModal entry={releaseEntry} onClose={() => setReleaseEntry(null)} />
       )}
-      <header className="titlebar-drag fb-glass-chrome h-10 flex items-center justify-between px-3 border-b border-[color:var(--glass-chrome-border)] transition-colors">
+      <header
+        className={`titlebar-drag fb-glass-chrome h-10 flex items-center justify-between pr-3 border-b border-[color:var(--glass-chrome-border)] transition-colors ${
+          isMac ? 'pl-[78px]' : 'pl-3'
+        }`}
+      >
         <div className="titlebar-nodrag flex items-center gap-2">
           {sidebarCollapsed && (
             <Tooltip content="Show the workspace panel — your folders, tasks and projects" placement="bottom">

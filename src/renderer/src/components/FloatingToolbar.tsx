@@ -19,7 +19,7 @@ export default function FloatingToolbar({ actions }: Props): JSX.Element {
 
   return (
     <div
-      className="absolute top-3 left-3 z-20 flex flex-col gap-0.5 bg-white/95 dark:bg-stone-800/95 backdrop-blur rounded-lg shadow-lg border border-stone-200 dark:border-stone-700 p-1 overflow-hidden"
+      className="absolute top-3 left-3 z-40 flex flex-col gap-0.5 bg-white/95 dark:bg-stone-800/95 backdrop-blur rounded-lg shadow-lg border border-stone-200 dark:border-stone-700 p-1 overflow-hidden"
       style={{
         width: expanded ? 174 : 40,
         transition: 'width 200ms ease-out'
