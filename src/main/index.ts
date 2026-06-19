@@ -128,6 +128,10 @@ function createCommandCenter(): BrowserWindow {
     show: false,
     autoHideMenuBar: true,
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
+    // Centre the macOS traffic lights vertically within the 40px (h-10) header
+    // and inset them from the left, so they align with the header controls and
+    // the renderer can reserve a matching left gap (see isMac padding in App).
+    ...(process.platform === 'darwin' ? { trafficLightPosition: { x: 14, y: 13 } } : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false,

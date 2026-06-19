@@ -1,7 +1,10 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useMessagingStore } from '../../stores/messaging'
 import { useAccountStore } from '../../stores/account'
 import { useViewStore } from '../../stores/view'
+import { useNodeStore } from '../../stores/nodes'
+import { useSharesStore } from '../../stores/shares'
+import { acceptShareIntoWorkspace } from '../../lib/acceptShare'
 import { useSignInPrompt } from '../../stores/signInPrompt'
 import { useDocCollabStore } from '../../stores/docCollab'
 import type { Takeover } from '../../lib/docCollabClient'
@@ -44,6 +47,10 @@ export default function InboxView(): JSX.Element {
   const acceptContact = useMessagingStore((s) => s.acceptContactRequest)
   const declineContact = useMessagingStore((s) => s.declineContactRequest)
   const goMessages = useViewStore((s) => s.goMessages)
+  const goTask = useViewStore((s) => s.goTask)
+  const goProject = useViewStore((s) => s.goProject)
+  const setActive = useNodeStore((s) => s.setActive)
+  const acceptByToken = useSharesStore((s) => s.acceptByToken)
   const takeovers = useDocCollabStore((s) => s.takeovers)
   const refreshTakeovers = useDocCollabStore((s) => s.refreshTakeovers)
   const respondTakeover = useDocCollabStore((s) => s.respond)
@@ -54,6 +61,29 @@ export default function InboxView(): JSX.Element {
       void refreshTakeovers()
     }
   }, [account, refreshInbox, refreshTakeovers])
+
+  // Accept a shared folder/task/widget and open it. A share row used to do
+  // nothing on click; now it resolves the share into the workspace (under
+  // "Shared with me") and navigates to it.
+  const openShare = useCallback(
+    async (token: string): Promise<void> => {
+      try {
+        const item = await acceptByToken(token)
+        const res = await acceptShareIntoWorkspace(item.snapshot)
+        if (res.rootKind === 'folder') {
+          goProject(res.rootNodeId)
+        } else {
+          setActive(res.rootNodeId)
+          goTask(res.rootNodeId)
+        }
+      } catch {
+        // Snapshot couldn't be resolved (expired / incompatible). Leave the row;
+        // the sidebar's "Shared with me" surfaces the same item with its own
+        // error handling rather than silently pretending it opened.
+      }
+    },
+    [acceptByToken, goProject, setActive, goTask]
+  )
 
   // Internal notifications only: chat (direct + shared-space), shared items, and
   // contact requests. Email is intentionally excluded — it lives in Mail.
@@ -79,12 +109,14 @@ export default function InboxView(): JSX.Element {
                 void openConversation(it.id)
                 goMessages()
               }
-            : undefined,
+            : it.kind === 'share'
+              ? () => void openShare(it.id)
+              : undefined,
           contactId: isContact ? it.id : undefined
         }
       })
       .sort((a, b) => b.ts - a.ts)
-  }, [items, openConversation, goMessages])
+  }, [items, openConversation, goMessages, openShare])
 
   // PlexiInbox needs a PlexiDesk account (email lives in Mail, separately).
   if (!account) {
