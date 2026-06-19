@@ -6,6 +6,7 @@ import { promptUpgrade } from '../stores/upgradePrompt'
 import { useWidgetStore } from '../stores/widgets'
 import { useTemplateStore } from '../stores/templates'
 import { computeVelocity, predictForEstimate } from '../lib/velocityStats'
+import { STARTER_TEMPLATES } from '../lib/starterTemplates'
 import AxisPicker from './AxisPicker'
 import Icon from './Icon'
 
@@ -515,7 +516,7 @@ export default function NewNodeDialog({
                 </div>
               )}
 
-              {!isEdit && templates.length > 0 && (
+              {!isEdit && (
                 <div>
                   <label className="block text-[11px] uppercase tracking-wider text-stone-500 dark:text-stone-400 font-medium mb-1.5">
                     Start from a template <span className="normal-case text-stone-400">(optional)</span>
@@ -533,23 +534,37 @@ export default function NewNodeDialog({
                       <Icon name="add" size={14} />
                       <span>Empty</span>
                     </button>
-                    {templates.map((t) => (
-                      <button
-                        key={t.id}
-                        type="button"
-                        onClick={() => setSelectedTemplate(t)}
-                        title={`${t.widgets.length} widget(s)`}
-                        className={`chip-btn ${
-                          selectedTemplate?.id === t.id
-                            ? 'border-stone-900 dark:border-stone-200 bg-stone-900 dark:bg-stone-200 text-stone-50 dark:text-stone-900'
-                            : 'chip-active'
-                        }`}
-                      >
-                        <Icon name="layers" size={14} />
-                        <span>{t.name}</span>
-                      </button>
-                    ))}
+                    {/* Built-in starters first (always available), then the
+                        user's own saved templates. Picking one pre-fills the
+                        title if it's still blank. */}
+                    {[...STARTER_TEMPLATES, ...templates].map((t) => {
+                      const isStarter = t.id.startsWith('starter-')
+                      return (
+                        <button
+                          key={t.id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedTemplate(t)
+                            if (!title.trim()) setTitle(t.name)
+                          }}
+                          title={t.description || `${t.widgets.length} widget(s)`}
+                          className={`chip-btn ${
+                            selectedTemplate?.id === t.id
+                              ? 'border-stone-900 dark:border-stone-200 bg-stone-900 dark:bg-stone-200 text-stone-50 dark:text-stone-900'
+                              : 'chip-active'
+                          }`}
+                        >
+                          <Icon name={isStarter ? 'dashboard' : 'layers'} size={14} />
+                          <span>{t.name}</span>
+                        </button>
+                      )
+                    })}
                   </div>
+                  {selectedTemplate && (
+                    <div className="mt-1.5 text-[11px] text-stone-500 dark:text-stone-400">
+                      {selectedTemplate.description || `${selectedTemplate.widgets.length} widgets`}
+                    </div>
+                  )}
                 </div>
               )}
 

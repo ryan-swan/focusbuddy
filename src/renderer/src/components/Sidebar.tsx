@@ -23,6 +23,7 @@ import { useSharesStore } from '../stores/shares'
 import { useAccountStore } from '../stores/account'
 import { acceptShareIntoWorkspace, type ShareSnap } from '../lib/acceptShare'
 import { promoteToLiveCanvas } from '../lib/liveCanvasMirror'
+import { STARTER_TEMPLATES } from '../lib/starterTemplates'
 import SharedBadge from './SharedBadge'
 import SharedRecipientBadges from './SharedRecipientBadges'
 import Icon from './Icon'
@@ -399,7 +400,7 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
       window.alert('Open a task first — templates apply to the active task.')
       return
     }
-    const tpl = templates.find((t) => t.id === templateId)
+    const tpl = templates.find((t) => t.id === templateId) ?? STARTER_TEMPLATES.find((t) => t.id === templateId)
     if (!tpl) return
     // Spawn each widget at its stored position. The template was saved
     // from a real task layout, so the relative coordinates already make
@@ -1148,14 +1149,9 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
         />
         {templatesOpen && (
           <div className="mb-2 px-2">
-            {templates.length === 0 ? (
-              <div className="text-[11px] text-stone-500 dark:text-stone-400 leading-relaxed px-2 py-2">
-                Save a task's layout as a template from its toolbar — it'll
-                appear here, droppable on any new task to skip the setup.
-              </div>
-            ) : (
+            {(
               <div role="list">
-                {templates.map((tpl) => (
+                {[...STARTER_TEMPLATES, ...templates].map((tpl) => (
                   <button
                     key={tpl.id}
                     onClick={() => void applyTemplateToActiveTask(tpl.id)}
