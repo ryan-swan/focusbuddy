@@ -36,6 +36,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.66',
+    date: '2026-06-19T23:00:00Z',
+    title: 'v2.5.66 — Find anything, and start from a template',
+    tag: 'feature',
+    summary:
+      'Press Cmd-K to search the contents of your whole workspace, and start a new desk from a ready-made template instead of a blank canvas.',
+    highlights: [
+      'Cmd-K now searches everything — the words inside your notes, pages, documents, table rows and file names, not just titles — and jumps you straight to the match.',
+      'Creating a task now offers built-in starters (Daily Focus, Project Hub, Research, Writing, Weekly Plan, Brainstorm) that drop in a ready-to-use desk in one click; your own saved templates sit alongside them.'
+    ],
+    links: [{ label: 'Finding your way around', href: `${HELP_BASE}/getting-around` }]
+  },
+  {
     version: '2.5.65',
     date: '2026-06-19T21:30:00Z',
     title: 'v2.5.65 — A home for your Collaborations',
