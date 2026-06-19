@@ -36,6 +36,21 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.64',
+    date: '2026-06-19T20:00:00Z',
+    title: 'v2.5.64 — Two-way chat, openable shared items, and tidier widgets',
+    tag: 'fix',
+    summary:
+      'Replies now work both ways in chat, shared items in PlexiInbox open when you click them, widgets are created at sensible sizes and scroll instead of clipping, and a few overlapping controls were cleaned up.',
+    highlights: [
+      'Chat works both ways now — when you open a conversation from PlexiInbox you can reply straight away.',
+      'Shared folders, tasks and tools in PlexiInbox open when you click them instead of doing nothing.',
+      'New widgets start at a size that suits them (calculator, colour and timer are smaller, notes roomier) and scroll rather than clip when content outgrows them; Tidy now keeps linked tools side by side so connector lines stay short.',
+      'Cleaned up overlapping controls: the widget toolbar and the voice button no longer sit on top of other things, and on Mac the window buttons no longer cover the sidebar toggle.'
+    ],
+    links: [{ label: 'Finding your way around', href: `${HELP_BASE}/getting-around` }]
+  },
+  {
     version: '2.5.63',
     date: '2026-06-19T18:00:00Z',
     title: 'v2.5.63 — Command palette, canvas panning and widget shortcuts',
