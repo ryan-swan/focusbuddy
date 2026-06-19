@@ -36,6 +36,7 @@ import {
   updateDocument,
   deleteDocument
 } from '../db/documents'
+import { searchAll } from '../db/search'
 import { generateDocument } from '../ai/anthropic'
 import type { DocType, DocumentDraft, DocumentPatch, MailSendInput } from '@shared/types'
 import { sendMail } from '../mail/smtp'
@@ -1519,6 +1520,9 @@ export function registerIpcHandlers(): void {
       return { ok: false as const, error: explainSendError(err) }
     }
   })
+
+  // ── Global search ───────────────────────────────────────────────────────
+  ipcMain.handle('search:query', (_e, q: string) => searchAll(typeof q === 'string' ? q : ''))
 
   // ── Office documents (doc / sheet / slides) ─────────────────────────────
   ipcMain.handle('documents:list', () => listDocuments())

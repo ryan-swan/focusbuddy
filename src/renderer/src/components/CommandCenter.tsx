@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { useNodeStore } from '../stores/nodes'
 import { useViewStore } from '../stores/view'
 import { useWidgetStore } from '../stores/widgets'
-import type { WidgetKind } from '@shared/types'
+import type { WidgetKind, SearchHit } from '@shared/types'
 import { WIDGET_CATALOG, WIDGET_SHORTCUTS } from '../lib/widgetCatalog'
 import Icon from './Icon'
 import { useCapabilityEnabled, useCapabilityStore } from '../stores/capabilities'
@@ -62,6 +62,9 @@ export default function CommandCenter({
   const [paletteOpen, setPaletteOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [highlightIdx, setHighlightIdx] = useState(0)
+  // Deep content search results (notes, doc bodies, table cells, files) from the
+  // main process, fetched async + debounced as the query changes.
+  const [deepHits, setDeepHits] = useState<SearchHit[]>([])
   const inputRef = useRef<HTMLInputElement | null>(null)
   const bodyDoubleEnabled = useCapabilityEnabled('body_double')
   const caps = useCapabilityStore((s) => s.capabilities)
@@ -77,6 +80,7 @@ export default function CommandCenter({
   const goFiles = useViewStore((s) => s.goFiles)
   const goMail = useViewStore((s) => s.goMail)
   const goDocuments = useViewStore((s) => s.goDocuments)
+  const goDocument = useViewStore((s) => s.goDocument)
   const goMessages = useViewStore((s) => s.goMessages)
   const goInbox = useViewStore((s) => s.goInbox)
   const view = useViewStore((s) => s.view)
@@ -197,6 +201,27 @@ export default function CommandCenter({
     }
     return undefined
   }, [paletteOpen])
+
+  // Deep content search across the whole workspace — debounced, only while the
+  // palette is open and the query is meaningful. Results merge into the list
+  // below the instant name matches.
+  useEffect(() => {
+    const q = query.trim()
+    if (!paletteOpen || q.length < 2) {
+      setDeepHits([])
+      return undefined
+    }
+    let cancelled = false
+    const t = window.setTimeout(() => {
+      void window.api.search.query(q).then((hits) => {
+        if (!cancelled) setDeepHits(hits)
+      })
+    }, 160)
+    return () => {
+      cancelled = true
+      window.clearTimeout(t)
+    }
+  }, [query, paletteOpen])
 
   const results = useMemo<CommandResult[]>(() => {
     const q = query.trim().toLowerCase()
@@ -352,33 +377,54 @@ export default function CommandCenter({
       }
     }
 
-    // Dynamic — every folder + task. Capped at 60 entries so giant
-    // workspaces don't slow the palette.
-    let added = 0
-    for (const n of nodes) {
-      if (n.archived) continue
-      if (added >= 60) break
-      const isFolder = n.kind === 'folder'
-      const haystack = `${n.title || ''} ${isFolder ? 'folder project' : 'task'}`.toLowerCase()
-      const score = q === '' ? 30 : matchScore(haystack, q)
-      if (score <= 0 && q !== '') continue
-      items.push({
-        id: `node-${n.id}`,
-        label: n.title || (isFolder ? '(untitled folder)' : '(untitled task)'),
-        hint: isFolder ? 'Open folder' : 'Open task',
-        icon: isFolder ? 'folder' : 'task_alt',
-        kind: 'jump',
-        score: score + (n.kind === 'task' && n.status !== 'done' ? 5 : 0),
-        run: () => {
-          if (isFolder) goProject(n.id)
-          else {
-            setActive(n.id)
-            goTask(n.id)
+    // Empty query → list every folder + task for browsing (capped). For a real
+    // query, deep search (below) owns node results too, so they rank correctly
+    // by title/description match rather than appearing twice.
+    if (q === '') {
+      let added = 0
+      for (const n of nodes) {
+        if (n.archived) continue
+        if (added >= 60) break
+        const isFolder = n.kind === 'folder'
+        items.push({
+          id: `node-${n.id}`,
+          label: n.title || (isFolder ? '(untitled folder)' : '(untitled task)'),
+          hint: isFolder ? 'Open folder' : 'Open task',
+          icon: isFolder ? 'folder' : 'task_alt',
+          kind: 'jump',
+          score: 30 + (n.kind === 'task' && n.status !== 'done' ? 5 : 0),
+          run: () => {
+            if (isFolder) goProject(n.id)
+            else {
+              setActive(n.id)
+              goTask(n.id)
+            }
+            closePalette()
           }
+        })
+        added++
+      }
+    }
+
+    // Deep content search — anything the main process found in note/page/doc
+    // bodies, table cells, file names, and node descriptions. Ranked above the
+    // static commands when there's a real query, since this is what the user is
+    // usually after. Each routes to where the match lives.
+    for (const h of deepHits) {
+      items.push({
+        id: `hit-${h.type}-${h.id}`,
+        label: h.title,
+        hint: h.snippet ? `${hitKindLabel(h)} · ${h.snippet}` : hitKindLabel(h),
+        icon: hitIcon(h),
+        kind: 'action',
+        // h.score (0..1000+) scaled so a strong content/title match sits at the
+        // top, a weak body match still above the static nav items.
+        score: 140 + h.score / 8,
+        run: () => {
+          runHit(h, { goProject, goTask, goDocument, goFiles, setActive })
           closePalette()
         }
       })
-      added++
     }
 
     const ranked = items
@@ -406,9 +452,11 @@ export default function CommandCenter({
     goFiles,
     goMail,
     goDocuments,
+    goDocument,
     goMessages,
     goInbox,
     spawnWidget,
+    deepHits,
     setZoom,
     setPan
   ])
@@ -491,7 +539,7 @@ export default function CommandCenter({
                     setHighlightIdx(0)
                   }}
                   onKeyDown={paletteKeyDown}
-                  placeholder="Search tasks, folders, actions…"
+                  placeholder="Search everything — tasks, notes, docs, files, actions…"
                   className="flex-1 bg-transparent text-[13px] text-stone-900 dark:text-stone-100 placeholder:text-stone-400 dark:placeholder:text-stone-500 focus:outline-none"
                 />
                 <kbd className="text-[10px] font-mono text-stone-400 dark:text-stone-500 bg-stone-100 dark:bg-stone-800 px-1.5 py-0.5 rounded">
@@ -599,6 +647,76 @@ function PillButton({
       <span>{label}</span>
     </button>
   )
+}
+
+// ── Deep-search hit helpers ─────────────────────────────────────────────────
+
+function hitIcon(h: SearchHit): string {
+  switch (h.type) {
+    case 'folder':
+      return 'folder'
+    case 'task':
+      return 'task_alt'
+    case 'document':
+      return h.docType === 'sheet' ? 'table_chart' : h.docType === 'slides' ? 'slideshow' : 'description'
+    case 'file':
+      return 'draft'
+    case 'table-row':
+      return 'table_chart'
+    default:
+      return 'widgets' // widget
+  }
+}
+
+function hitKindLabel(h: SearchHit): string {
+  switch (h.type) {
+    case 'folder':
+      return 'Folder'
+    case 'task':
+      return 'Task'
+    case 'document':
+      return h.docType === 'sheet' ? 'Spreadsheet' : h.docType === 'slides' ? 'Slides' : 'Document'
+    case 'file':
+      return 'File'
+    case 'table-row':
+      return 'Table'
+    default:
+      return 'On a desk'
+  }
+}
+
+interface HitNav {
+  goProject: (id: string) => void
+  goTask: (id: string) => void
+  goDocument: (id: string) => void
+  goFiles: () => void
+  setActive: (id: string | null) => void
+}
+
+function runHit(h: SearchHit, nav: HitNav): void {
+  switch (h.type) {
+    case 'folder':
+      nav.goProject(h.id)
+      break
+    case 'task':
+      nav.setActive(h.id)
+      nav.goTask(h.id)
+      break
+    case 'widget':
+    case 'table-row':
+      // Open the canvas the widget / table lives on.
+      if (h.taskId) {
+        nav.setActive(h.taskId)
+        nav.goTask(h.taskId)
+      }
+      break
+    case 'document':
+      nav.goDocument(h.id)
+      break
+    case 'file':
+      nav.goFiles()
+      break
+  }
 }
 
 // Simple substring + word-prefix score. Higher means better match.
