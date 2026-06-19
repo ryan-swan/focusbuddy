@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useNodeStore } from '../stores/nodes'
 import { useViewStore } from '../stores/view'
 import { useWidgetStore } from '../stores/widgets'
 import type { WidgetKind } from '@shared/types'
-import { WIDGET_CATALOG } from '../lib/widgetCatalog'
+import { WIDGET_CATALOG, WIDGET_SHORTCUTS } from '../lib/widgetCatalog'
 import Icon from './Icon'
 import { useCapabilityEnabled, useCapabilityStore } from '../stores/capabilities'
 import { canCreateWidget } from '../lib/gating'
@@ -34,6 +34,9 @@ interface CommandResult {
   kind: 'jump' | 'action'
   // Score for ranking — higher is better.
   score: number
+  // Optional keyboard shortcut to surface in the row (e.g. a widget quick-add
+  // key). Display only — the actual handler lives on the canvas.
+  shortcut?: string
   run: () => void
 }
 
@@ -71,6 +74,11 @@ export default function CommandCenter({
   const goVault = useViewStore((s) => s.goVault)
   const goTask = useViewStore((s) => s.goTask)
   const goProject = useViewStore((s) => s.goProject)
+  const goFiles = useViewStore((s) => s.goFiles)
+  const goMail = useViewStore((s) => s.goMail)
+  const goDocuments = useViewStore((s) => s.goDocuments)
+  const goMessages = useViewStore((s) => s.goMessages)
+  const goInbox = useViewStore((s) => s.goInbox)
   const view = useViewStore((s) => s.view)
   const activeTaskId = useNodeStore((s) => s.activeTaskId)
   const setZoom = useWidgetStore((s) => s.setZoom)
@@ -85,31 +93,35 @@ export default function CommandCenter({
   //   make sense without a canvas — New, Body double, Smart Stack.
   // All actions are also reachable from the palette and chrome, so the
   // pill is a convenience, never the only path.
+  // Spawn a widget on the active task at a sensible position, gated by the
+  // capability matrix. Shared by the pill, the palette's "Add" commands, and
+  // (via the same catalog) the canvas quick-add shortcuts.
+  const spawnWidget = useCallback(
+    (kind: WidgetKind): void => {
+      if (!activeTaskId) return
+      if (!canCreateWidget(caps, kind)) {
+        promptUpgrade(`The ${kind} widget is a Pro feature.`)
+        return
+      }
+      const entry = WIDGET_CATALOG.find((e) => e.kind === kind)
+      void createWidget({
+        taskId: activeTaskId,
+        kind,
+        title: '',
+        content: entry?.defaultContent || '',
+        x: 80 + Math.round(Math.random() * 120),
+        y: 80 + Math.round(Math.random() * 80),
+        width: entry?.defaultWidth ?? 320,
+        height: entry?.defaultHeight ?? 240,
+        color: kind === 'sticky' ? '#fef08a' : null
+      })
+    },
+    [activeTaskId, caps, createWidget]
+  )
+
   const contextActions = useMemo<PillAction[]>(() => {
     if (view.kind === 'task' && activeTaskId) {
-      // Build a quick widget at a sensible position on the active task.
-      function spawn(kind: WidgetKind): () => void {
-        return () => {
-          // Same matrix gate as the widget palette — a Pro-only widget kind
-          // (e.g. table on Free) opens the upgrade prompt instead of creating.
-          if (!canCreateWidget(caps, kind)) {
-            promptUpgrade(`The ${kind} widget is a Pro feature.`)
-            return
-          }
-          const entry = WIDGET_CATALOG.find((e) => e.kind === kind)
-          void createWidget({
-            taskId: activeTaskId!,
-            kind,
-            title: '',
-            content: entry?.defaultContent || '',
-            x: 80 + Math.round(Math.random() * 120),
-            y: 80 + Math.round(Math.random() * 80),
-            width: entry?.defaultWidth ?? 320,
-            height: entry?.defaultHeight ?? 240,
-            color: kind === 'sticky' ? '#fef08a' : null
-          })
-        }
-      }
+      const spawn = (kind: WidgetKind): (() => void) => () => spawnWidget(kind)
       return [
         { id: 'w-note', icon: 'sticky_note_2', label: 'Note', title: 'Add a sticky note', onClick: spawn('sticky') },
         { id: 'w-page', icon: 'description', label: 'Page', title: 'Add a Page widget', onClick: spawn('page') },
@@ -147,7 +159,7 @@ export default function CommandCenter({
         onClick: onOpenSmartStack
       }
     ]
-  }, [view, activeTaskId, createWidget, canSmartStack, onOpenBodyDouble, onOpenSmartStack, bodyDoubleEnabled, caps])
+  }, [view, activeTaskId, spawnWidget, canSmartStack, onOpenBodyDouble, onOpenSmartStack, bodyDoubleEnabled])
 
   function openPalette(): void {
     setPaletteOpen(true)
@@ -243,6 +255,41 @@ export default function CommandCenter({
         closePalette()
       }
     })
+    // Navigation to the other top-level surfaces.
+    const navTargets: Array<{ id: string; label: string; hint: string; icon: string; words: string; go: () => void }> = [
+      { id: 'go-documents', label: 'Documents', hint: 'Docs, sheets, slides', icon: 'article', words: 'documents docs sheets slides', go: goDocuments },
+      { id: 'go-files', label: 'Files', hint: 'File manager', icon: 'folder', words: 'files folders manager', go: goFiles },
+      { id: 'go-mail', label: 'Mail', hint: 'Email inbox', icon: 'mail', words: 'mail email inbox', go: () => goMail() },
+      { id: 'go-inbox', label: 'PlexiInbox', hint: 'Notifications, share invites', icon: 'inbox', words: 'inbox notifications invites plexi', go: goInbox },
+      { id: 'go-messages', label: 'Messages', hint: 'Chats', icon: 'forum', words: 'messages chat dm', go: goMessages }
+    ]
+    for (const t of navTargets) {
+      items.push({
+        id: t.id,
+        label: t.label,
+        hint: t.hint,
+        icon: t.icon,
+        kind: 'action',
+        score: q === '' ? 55 : matchScore(t.words, q),
+        run: () => {
+          setActive(null)
+          t.go()
+          closePalette()
+        }
+      })
+    }
+    items.push({
+      id: 'new-task',
+      label: 'New folder or task',
+      hint: 'Create a desk or task',
+      icon: 'add',
+      kind: 'action',
+      score: q === '' ? 58 : matchScore('new folder task desk create', q),
+      run: () => {
+        window.dispatchEvent(new CustomEvent('fb:command-new-task'))
+        closePalette()
+      }
+    })
     items.push({
       id: 'body-double',
       label: 'Find a body double',
@@ -283,6 +330,26 @@ export default function CommandCenter({
           closePalette()
         }
       })
+      // "Add <widget>" for every picker-visible kind, driven by the catalog so
+      // the palette always matches the picker. The quick-add shortcut (if any)
+      // is shown in the row and works directly on the canvas.
+      for (const entry of WIDGET_CATALOG) {
+        if (entry.hideFromPicker) continue
+        const sc = WIDGET_SHORTCUTS[entry.kind]
+        items.push({
+          id: `add-${entry.kind}`,
+          label: `Add ${entry.label}`,
+          hint: entry.hint,
+          icon: entry.icon,
+          kind: 'action',
+          score: q === '' ? 40 : matchScore(`add ${entry.label} ${entry.kind} widget ${entry.category}`, q),
+          shortcut: sc,
+          run: () => {
+            spawnWidget(entry.kind)
+            closePalette()
+          }
+        })
+      }
     }
 
     // Dynamic — every folder + task. Capped at 60 entries so giant
@@ -332,6 +399,12 @@ export default function CommandCenter({
     goVault,
     goTask,
     goProject,
+    goFiles,
+    goMail,
+    goDocuments,
+    goMessages,
+    goInbox,
+    spawnWidget,
     setZoom,
     setPan
   ])
@@ -464,6 +537,11 @@ export default function CommandCenter({
                             {r.hint}
                           </div>
                         </div>
+                        {r.shortcut && (
+                          <kbd className="text-[9px] font-mono text-stone-500 dark:text-stone-400 bg-stone-100 dark:bg-stone-800 px-1 py-0.5 rounded shrink-0">
+                            {r.shortcut}
+                          </kbd>
+                        )}
                         {i === highlightIdx && (
                           <kbd className="text-[9px] font-mono text-stone-400 dark:text-stone-500 bg-stone-100 dark:bg-stone-800 px-1 py-0.5 rounded shrink-0">
                             ↵
