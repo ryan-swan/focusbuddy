@@ -5,6 +5,7 @@ import { useViewStore } from '../stores/view'
 import { useWidgetStore } from '../stores/widgets'
 import type { WidgetKind, SearchHit } from '@shared/types'
 import { WIDGET_CATALOG, WIDGET_SHORTCUTS } from '../lib/widgetCatalog'
+import { getNavPrefs, setNavPrefs } from '../lib/navPrefs'
 import Icon from './Icon'
 import { useCapabilityEnabled, useCapabilityStore } from '../stores/capabilities'
 import { canCreateWidget } from '../lib/gating'
@@ -352,6 +353,18 @@ export default function CommandCenter({
         run: () => {
           setZoom(1)
           setPan(0, 0)
+          closePalette()
+        }
+      })
+      items.push({
+        id: 'toggle-snap',
+        label: getNavPrefs().snapToGridEnabled ? 'Snap to grid: on (turn off)' : 'Snap to grid: off (turn on)',
+        hint: 'Round dragged widgets to an 8px grid',
+        icon: 'grid_4x4',
+        kind: 'action',
+        score: q === '' ? 48 : matchScore('snap grid align canvas', q),
+        run: () => {
+          setNavPrefs({ snapToGridEnabled: !getNavPrefs().snapToGridEnabled })
           closePalette()
         }
       })
