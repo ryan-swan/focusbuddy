@@ -3,7 +3,7 @@ import type { DocType } from '@shared/types'
 import { useDocumentsStore } from '../../stores/documents'
 import { useViewStore } from '../../stores/view'
 import { useAccountStore } from '../../stores/account'
-import { createLiveDoc, listLiveDocs, type LiveDocListItem } from '../../lib/docCollabClient'
+import { createLiveDoc } from '../../lib/docCollabClient'
 import Icon from '../Icon'
 
 // Documents hub — the home for office files. The top panel is the AI-first
@@ -18,11 +18,7 @@ const TYPES: { type: DocType; label: string; icon: string; blurb: string }[] = [
   { type: 'slides', label: 'Slides', icon: 'slideshow', blurb: 'Decks and presentations' }
 ]
 
-function typeIcon(t: DocType | 'canvas' | 'folder'): string {
-  // Live canvases (shared desks) and live folders aren't local document TYPES,
-  // so map them to their own icons; everything else looks itself up safely.
-  if (t === 'canvas') return 'space_dashboard'
-  if (t === 'folder') return 'folder_shared'
+function typeIcon(t: DocType): string {
   return TYPES.find((x) => x.type === t)?.icon ?? 'description'
 }
 
@@ -45,8 +41,6 @@ export default function DocumentsView(): JSX.Element {
   const remove = useDocumentsStore((s) => s.remove)
   const goDocument = useViewStore((s) => s.goDocument)
   const goLiveDoc = useViewStore((s) => s.goLiveDoc)
-  const goLiveCanvas = useViewStore((s) => s.goLiveCanvas)
-  const goLiveFolder = useViewStore((s) => s.goLiveFolder)
   const token = useAccountStore((s) => s.sessionToken)
 
   const [docType, setDocType] = useState<DocType>('doc')
@@ -54,19 +48,14 @@ export default function DocumentsView(): JSX.Element {
   const [audience, setAudience] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [shared, setShared] = useState<LiveDocListItem[]>([])
 
   useEffect(() => {
     void refresh()
   }, [refresh])
 
-  useEffect(() => {
-    if (token) void listLiveDocs(token).then(setShared)
-    else setShared([])
-  }, [token])
-
   // Turn a local document into a live, shared one and open it. Its current body
   // becomes the server-canonical copy; from there it's check-out collaborative.
+  // Once live, it appears in the dedicated Collaborations section.
   async function collaborate(id: string): Promise<void> {
     if (!token) {
       setError('Sign in to collaborate on a document.')
@@ -80,7 +69,6 @@ export default function DocumentsView(): JSX.Element {
       body: JSON.stringify(full.body)
     })
     if (created) {
-      void listLiveDocs(token).then(setShared)
       goLiveDoc(created.id)
     } else {
       setError('Could not start collaboration. Check your connection and that you are signed in.')
@@ -227,41 +215,7 @@ export default function DocumentsView(): JSX.Element {
             ))}
           </div>
         )}
-
-        {/* Shared live — collaborative documents you own or were invited to */}
-        {shared.length > 0 && (
-          <>
-            <h2 className="text-[13px] font-semibold text-stone-700 dark:text-stone-300 mb-2 mt-8 flex items-center gap-1.5">
-              <Icon name="group" size={15} className="text-accent" /> Shared live
-            </h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2" data-testid="shared-live-list">
-              {shared.map((d) => (
-                <div
-                  key={d.id}
-                  onClick={() =>
-                    d.docType === 'canvas'
-                      ? goLiveCanvas(d.id)
-                      : d.docType === 'folder'
-                        ? goLiveFolder(d.id)
-                        : goLiveDoc(d.id)
-                  }
-                  className="flex items-center gap-3 rounded-xl border border-stone-200 dark:border-stone-700 bg-white/70 dark:bg-stone-900/70 px-3.5 py-3 cursor-pointer hover:border-accent/50 hover:shadow-sm transition"
-                >
-                  <div className="h-9 w-9 rounded-lg bg-accent/10 text-accent inline-flex items-center justify-center shrink-0">
-                    <Icon name={typeIcon(d.docType)} size={17} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-[13px] font-medium text-stone-900 dark:text-stone-100 truncate">{d.title}</div>
-                    <div className="text-[11px] text-stone-400 dark:text-stone-500">
-                      {d.lock ? `Being edited by ${d.lock.handle}` : 'Free to edit'}
-                    </div>
-                  </div>
-                  <Icon name="group" size={15} className="text-stone-300 dark:text-stone-600 shrink-0" />
-                </div>
-              ))}
-            </div>
-          </>
-        )}
+        {/* Live, shared documents now live in their own Collaborations section. */}
       </div>
     </div>
   )

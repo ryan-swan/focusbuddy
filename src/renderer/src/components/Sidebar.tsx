@@ -150,6 +150,7 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
   const goMail = useViewStore((s) => s.goMail)
   const goDocuments = useViewStore((s) => s.goDocuments)
   const goFiles = useViewStore((s) => s.goFiles)
+  const goCollaborations = useViewStore((s) => s.goCollaborations)
   const unreadMessages = useMessagingStore((s) => s.unreadTotal)
   const unreadMail = useMailStore(selectMailUnread)
   const goProject = useViewStore((s) => s.goProject)
@@ -685,6 +686,20 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
               onClick={() => {
                 setActive(null)
                 goFiles()
+              }}
+            />
+            <NavRow
+              icon="group"
+              label="Collaborations"
+              active={
+                viewIsActive({ kind: 'collaborations' }) ||
+                view.kind === 'livecanvas' ||
+                view.kind === 'livefolder' ||
+                view.kind === 'livedoc'
+              }
+              onClick={() => {
+                setActive(null)
+                goCollaborations()
               }}
             />
             <NavRow
