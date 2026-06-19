@@ -66,6 +66,7 @@ import {
   CATEGORIES,
   DRAG_MIME,
   WIDGET_CATALOG,
+  SHORTCUT_TO_KIND,
   catalogFor,
   type WidgetCatalogEntry,
   type WidgetCategory
@@ -874,6 +875,11 @@ export default function Canvas(): JSX.Element {
   } | null>(null)
   const [grabbing, setGrabbing] = useState(false)
   const [panPing, setPanPing] = useState<{ x: number; y: number } | null>(null)
+  // Space-as-pan-modifier (Figma-style): while Space is held over the canvas, a
+  // left-drag pans instead of marquee-selecting. `spaceReady` only drives the
+  // grab cursor; the gesture itself reads the ref so it's always current.
+  const spaceHeldRef = useRef(false)
+  const [spaceReady, setSpaceReady] = useState(false)
   // ── Rubber-band (marquee) selection ────────────────────────────────────────
   // rubberRef holds the canvas-space anchor while a Shift+drag is in flight;
   // rubberRect is the live canvas-space rectangle (rendered as a screen-space
@@ -1016,6 +1022,64 @@ export default function Canvas(): JSX.Element {
     return () => window.removeEventListener('keydown', onKey)
   }, [clearSelection, selectableWidgets, setSelection])
 
+  // Track the Space bar as a transient pan modifier. Engages only when focus is
+  // on the bare canvas / body (never while typing in a field or interacting with
+  // a widget), so it can't swallow a Space the user meant for something else. We
+  // preventDefault while engaged so the page doesn't scroll.
+  useEffect(() => {
+    function isSafeTarget(): boolean {
+      const ae = document.activeElement as HTMLElement | null
+      if (!ae || ae === document.body) return true
+      if (ae.dataset && ae.dataset.bareCanvas !== undefined) return true
+      const tag = ae.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || ae.isContentEditable) return false
+      // Buttons/links/selects/webviews keep their own Space behaviour.
+      return false
+    }
+    function down(e: KeyboardEvent): void {
+      if (e.code !== 'Space' && e.key !== ' ') return
+      if (e.repeat) return
+      if (!isSafeTarget()) return
+      spaceHeldRef.current = true
+      setSpaceReady(true)
+      e.preventDefault()
+    }
+    function up(e: KeyboardEvent): void {
+      if (e.code !== 'Space' && e.key !== ' ') return
+      if (!spaceHeldRef.current) return
+      spaceHeldRef.current = false
+      setSpaceReady(false)
+    }
+    window.addEventListener('keydown', down)
+    window.addEventListener('keyup', up)
+    return () => {
+      window.removeEventListener('keydown', down)
+      window.removeEventListener('keyup', up)
+    }
+  }, [])
+
+  // Single-key widget quick-add (S=sticky, N=note, T=table, …). Fires only on a
+  // task canvas, with no modifier, when not typing. Reuses the exact same spawn
+  // path as the palette/picker via a ref so position + gating stay consistent.
+  const quickAddRef = useRef<(kind: WidgetKind) => void>(() => {})
+  useEffect(() => {
+    function onKey(e: KeyboardEvent): void {
+      if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return
+      if (e.key.length !== 1) return
+      const el = document.activeElement as HTMLElement | null
+      const typing =
+        !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)
+      if (typing) return
+      const kind = SHORTCUT_TO_KIND[e.key.toUpperCase()]
+      if (!kind) return
+      if (!useNodeStore.getState().activeTaskId) return
+      e.preventDefault()
+      quickAddRef.current(kind)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
+
   const panPingTimer = useRef<number | null>(null)
   // Release-inertia state: smoothed velocity (px/frame), last sample, and the
   // running glide animation frame.
@@ -1032,16 +1096,22 @@ export default function Canvas(): JSX.Element {
   useEffect(() => cancelPanInertia, [])
 
   function handleCanvasPointerDown(e: React.PointerEvent<HTMLDivElement>): void {
-    if (e.button !== 0) return // primary button only
     const target = e.target as HTMLElement
     if (target.dataset.bareCanvas === undefined) return // only on bare canvas
+    const middle = e.button === 1
+    if (!middle && e.button !== 0) return // left or middle button only
     cancelPanInertia() // a fresh grab stops any in-flight glide
     panVelocityRef.current = { vx: 0, vy: 0 }
-    // Shift+drag on the bare canvas = rubber-band (marquee) select. This works
-    // even when drag-pan is disabled in settings, and intentionally pre-empts
-    // panning so the user can sweep a selection box. Plain drag falls through
-    // to panning below.
-    if (e.shiftKey) {
+    const spacePan = e.button === 0 && spaceHeldRef.current
+    // Gesture model: a PAN is middle-mouse, Space+left, or a plain left-drag
+    // when drag-pan is enabled in settings (and Shift isn't held). Anything
+    // else on the bare canvas — Shift+left, or a plain left-drag when drag-pan
+    // is off — draws a rubber-band (marquee) selection. So marquee is always
+    // reachable via Shift, and is the default plain-drag when the user hasn't
+    // opted into drag-pan; pan is always reachable via Space or middle-mouse.
+    const panGesture =
+      middle || spacePan || (e.button === 0 && nav.dragPanEnabled && !e.shiftKey)
+    if (!panGesture) {
       const rect = e.currentTarget.getBoundingClientRect()
       const pt = screenToCanvas(e.clientX - rect.left, e.clientY - rect.top)
       rubberRef.current = { startX: pt.x, startY: pt.y, pointerId: e.pointerId }
@@ -1054,7 +1124,7 @@ export default function Canvas(): JSX.Element {
       }
       return
     }
-    if (!nav.dragPanEnabled) return // click-drag panning turned off in settings
+    if (middle || spacePan) e.preventDefault() // pan via middle/space: stop autoscroll + page scroll
     panLastMoveRef.current = { x: e.clientX, y: e.clientY, t: performance.now() }
     panDragRef.current = {
       startX: e.clientX,
@@ -1414,6 +1484,13 @@ export default function Canvas(): JSX.Element {
     // centre-plus-jitter drop that often landed off-screen.
     const { x, y } = spawnPositionFor(entry.defaultWidth, entry.defaultHeight)
     void placeWidget(entry, x, y)
+  }
+
+  // Keep the quick-add keyboard shortcut pointed at the live add handler, so a
+  // single key (S, N, T, …) spawns through the exact same path as the picker.
+  quickAddRef.current = (kind: WidgetKind): void => {
+    const entry = catalogFor(kind)
+    if (entry) handleClickAdd(entry)
   }
 
   async function handleImportFile(): Promise<void> {
@@ -2131,7 +2208,10 @@ export default function Canvas(): JSX.Element {
           onPointerUp={handleCanvasPointerUp}
           onPointerCancel={handleCanvasPointerUp}
           className="flex-1 relative overflow-hidden desk-paper"
-          style={{ overscrollBehavior: 'none', cursor: grabbing ? 'grabbing' : undefined }}
+          style={{
+            overscrollBehavior: 'none',
+            cursor: grabbing ? 'grabbing' : spaceReady ? 'grab' : undefined
+          }}
         >
           {panPing && (
             <div

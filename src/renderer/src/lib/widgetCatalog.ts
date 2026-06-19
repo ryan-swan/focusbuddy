@@ -449,6 +449,33 @@ export function catalogFor(kind: WidgetKind): WidgetCatalogEntry | null {
   return WIDGET_CATALOG.find((e) => e.kind === kind) ?? null
 }
 
+// Single-key quick-add shortcuts (no modifier) for the most common widgets,
+// fired on the canvas when a desk is active and the user is not typing. The
+// command palette shows these next to each "Add" command. Kept to memorable,
+// non-conflicting letters that avoid the canvas's existing keys ([ ] 0 H A);
+// widgets that need a dialog or a drag flow (office docs, file upload,
+// task-link, app launcher, minimap) intentionally have no quick-add key.
+export const WIDGET_SHORTCUTS: Partial<Record<WidgetKind, string>> = {
+  sticky: 'S',
+  note: 'N',
+  page: 'P',
+  markdown: 'M',
+  table: 'T',
+  webview: 'B',
+  calculator: 'C',
+  timer: 'I',
+  color: 'O',
+  section: 'R',
+  shape: 'G',
+  card: 'D'
+}
+
+// Reverse map: pressed key (uppercased) -> the widget kind to spawn. Built from
+// WIDGET_SHORTCUTS so the two never drift.
+export const SHORTCUT_TO_KIND: Record<string, WidgetKind> = Object.fromEntries(
+  Object.entries(WIDGET_SHORTCUTS).map(([kind, key]) => [key, kind as WidgetKind])
+) as Record<string, WidgetKind>
+
 export const CATEGORIES: WidgetCategory[] = ['Notes', 'Web', 'Files', 'Tools', 'Comms', 'Layout']
 
 /**
