@@ -381,10 +381,14 @@ export default function CommandCenter({
       added++
     }
 
-    return items
+    const ranked = items
       .filter((i) => (q === '' ? true : i.score > 0))
       .sort((a, b) => b.score - a.score)
-      .slice(0, 12)
+    // Empty query shows the FULL list so every command — each Add-widget entry,
+    // all navigation, every desk/task — is scrollable and findable by eye, not
+    // just a top slice. A search query is self-limiting, but cap it generously
+    // so a single common letter can't render hundreds of rows at once.
+    return q === '' ? ranked : ranked.slice(0, 50)
   }, [
     query,
     nodes,

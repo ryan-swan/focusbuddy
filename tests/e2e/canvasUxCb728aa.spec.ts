@@ -81,8 +81,8 @@ async function getPaletteText(window: LaunchedApp['window']): Promise<string> {
 // ──────────────────────────────────────────────────────────────────────────────
 
 test('Cmd+K palette surfaces "Add Sticky" when searching "sticky"', async () => {
-  // With an empty query, widget Add entries (score 40) are pushed out of the
-  // top-12 by nav commands. Searching by widget name surfaces them. Test one
+  // Searching by widget name surfaces its Add command (the empty-query palette
+  // now shows the full scrollable list, and a query filters it). Test one
   // representative case: "sticky" → "Add Sticky".
   launched = await launchApp()
   const { window } = launched
