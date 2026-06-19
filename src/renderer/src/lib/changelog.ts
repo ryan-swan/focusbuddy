@@ -36,6 +36,20 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.65',
+    date: '2026-06-19T21:30:00Z',
+    title: 'v2.5.65 — A home for your Collaborations',
+    tag: 'feature',
+    summary:
+      'Everything shared live with you now has its own place in the sidebar, the way PlexiInbox and Documents do.',
+    highlights: [
+      'New Collaborations section in the sidebar lists every desk, folder and document shared live with you, newest first, showing its type and whether someone is editing it right now.',
+      'Click any of them to jump straight into the shared editor; the section stays highlighted while you work inside a live item.',
+      'Live shares no longer also appear inside Documents, so each shared thing has exactly one home.'
+    ],
+    links: [{ label: 'Finding your way around', href: `${HELP_BASE}/getting-around` }]
+  },
+  {
     version: '2.5.64',
     date: '2026-06-19T20:00:00Z',
     title: 'v2.5.64 — Two-way chat, openable shared items, and tidier widgets',
