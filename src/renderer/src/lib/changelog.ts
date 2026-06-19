@@ -36,6 +36,20 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.63',
+    date: '2026-06-19T18:00:00Z',
+    title: 'v2.5.63 — Command palette, canvas panning and widget shortcuts',
+    tag: 'feature',
+    summary:
+      'Press Cmd-K to search and run anything, pan the canvas with the space bar or middle mouse, drag to select, and add common widgets with a single key.',
+    highlights: [
+      'Cmd-K opens a command palette that lists everything — jump to any desk, document or view, and add any widget — with its keyboard shortcut shown; start typing to filter, or scroll the full list.',
+      'Hold the space bar and drag, or drag with the middle mouse button, to pan the canvas; drag on empty space to rubber-band select widgets.',
+      'Add the common widgets with one key on a desk: S sticky, N note, P page, M markdown, T table, B browser, C calculator, I timer, O colour, R section, G shape, D card.'
+    ],
+    links: [{ label: 'Finding your way around', href: `${HELP_BASE}/getting-around` }]
+  },
+  {
     version: '2.5.62',
     date: '2026-06-19T16:00:00Z',
     title: 'v2.5.62 — Collaborate live on desks and folders',
