@@ -1136,6 +1136,20 @@ export type MailSendResult = { ok: true } | { ok: false; error: string }
 
 export type DocType = 'doc' | 'sheet' | 'slides'
 
+// A single global-search result. `type` decides how the renderer routes a click;
+// `taskId` is the canvas to open for widget / table-row hits, `docType` the
+// document kind. `snippet` is a short, match-centred excerpt for display.
+export interface SearchHit {
+  type: 'task' | 'folder' | 'widget' | 'document' | 'file' | 'table-row'
+  id: string
+  title: string
+  snippet: string
+  score: number
+  taskId?: string | null
+  docType?: DocType
+  widgetKind?: string
+}
+
 // ── Spreadsheet body ────────────────────────────────────────────────────────
 // v1 was a single grid of string cells: { columns, rows }. v2 wraps one or more
 // such grids as named tabs and adds per-cell formatting, column widths, a freeze

@@ -55,6 +55,7 @@ import type {
   ShareLink,
   SharedItem,
   ShareScope,
+  SearchHit,
   WidgetLink,
   WidgetPatch,
   WireType
@@ -1133,6 +1134,10 @@ const api = {
   },
   // Office documents — standalone doc / sheet / slides files, created with AI
   // and edited full-screen. CRUD plus the AI "create" generator.
+  search: {
+    // Global "find anything" across the local workspace.
+    query: (q: string): Promise<SearchHit[]> => ipcRenderer.invoke('search:query', q)
+  },
   documents: {
     list: (): Promise<DocumentMeta[]> => ipcRenderer.invoke('documents:list'),
     get: (id: string): Promise<FbDocument | null> => ipcRenderer.invoke('documents:get', id),
