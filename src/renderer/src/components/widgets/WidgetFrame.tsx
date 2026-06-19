@@ -5,6 +5,7 @@ import { type CtxMenuItem } from '../CanvasContextMenu'
 import UnifiedWidgetMenu from '../contextMenu/UnifiedWidgetMenu'
 import WidgetSetupAffordance from './WidgetSetupAffordance'
 import { useAutoGrowHeight, autoGrowsHeight } from '../../lib/useAutoGrowHeight'
+import { getNavPrefs } from '../../lib/navPrefs'
 import { buildContextForWidget, buildContextForMulti } from '../../lib/contextMenu/buildContext'
 import type { FrameCallbacks } from '../../lib/contextMenu/types'
 import { FrameCallbacksProvider } from '../../lib/contextMenu/frameContext'
@@ -471,8 +472,12 @@ export default function WidgetFrame({
     // Canvas-level drop. Push the widget away from every other top-level
     // widget on the canvas — sections + free widgets. This is the
     // reverse-magnetic behaviour: widgets never overlap on the desk.
-    const rawX = Math.round(newX)
-    const rawY = Math.round(newY)
+    // Optional snap-to-grid rounds the drop to an 8px grid first; overlap
+    // avoidance still runs after, so snapped widgets never land on top of one
+    // another.
+    const grid = getNavPrefs().snapToGridEnabled ? 8 : 1
+    const rawX = Math.round(newX / grid) * grid
+    const rawY = Math.round(newY / grid) * grid
     const topLevelSiblings = latestWidgets.filter(
       (w) => w.id !== widget.id && !w.pinned && !w.parentSectionId
     )

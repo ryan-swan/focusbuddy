@@ -71,6 +71,8 @@ import {
   type WidgetCatalogEntry,
   type WidgetCategory
 } from '../lib/widgetCatalog'
+import { useActionHistory } from '../stores/actionHistory'
+import { computeAlign, computeDistribute, type AlignMode, type DistributeAxis } from '../lib/canvasAlign'
 import {
   computeSectionFrame,
   computeLayoutCells,
@@ -998,6 +1000,46 @@ export default function Canvas(): JSX.Element {
     clearSelection()
     await Promise.all(ids.map((id) => removeWidget(id)))
   }, [clearSelection, removeWidget])
+
+  // Selected, free, top-level widgets eligible for align/distribute (excludes
+  // pinned, section children, sections themselves, and the minimap — same set
+  // selectableWidgets uses).
+  const alignableSelection = useCallback(() => {
+    const ids = useWidgetStore.getState().selectedIds
+    return selectableWidgets().filter((w) => ids.includes(w.id))
+  }, [selectableWidgets])
+
+  // Apply a map of id -> position delta in ONE undo step, then let the canvas
+  // re-read positions (same commit shape as Tidy).
+  const applyPositions = useCallback(
+    async (targets: Record<string, { x?: number; y?: number }>, label: string): Promise<void> => {
+      const ids = Object.keys(targets)
+      if (ids.length === 0) return
+      const st = useWidgetStore.getState()
+      const hist = useActionHistory.getState()
+      hist.beginBatch()
+      try {
+        await Promise.all(ids.map((id) => st.update(id, targets[id])))
+      } finally {
+        hist.endBatch(label)
+      }
+      bumpLayoutVersion()
+    },
+    [bumpLayoutVersion]
+  )
+
+  const alignSelection = useCallback(
+    (mode: AlignMode): void => {
+      void applyPositions(computeAlign(alignableSelection(), mode), `Align ${mode}`)
+    },
+    [alignableSelection, applyPositions]
+  )
+  const distributeSelection = useCallback(
+    (axis: DistributeAxis): void => {
+      void applyPositions(computeDistribute(alignableSelection(), axis), `Distribute ${axis}`)
+    },
+    [alignableSelection, applyPositions]
+  )
 
   // Keyboard: Esc clears the selection; Cmd/Ctrl+A selects every selectable
   // widget on the desk (ignored while typing in a field).
@@ -2332,6 +2374,53 @@ export default function Canvas(): JSX.Element {
                 >
                   <Icon name="delete" size={13} />
                 </button>
+                {/* Align + distribute the selection (needs 2+ to align, 3+ to
+                    distribute). Each is a single undo step. */}
+                {selectionBBox.count >= 2 && (
+                  <>
+                    <div className="h-4 w-px bg-white/20" />
+                    {(
+                      [
+                        ['left', 'align_horizontal_left', 'Align left'],
+                        ['center-h', 'align_horizontal_center', 'Align centre (horizontal)'],
+                        ['right', 'align_horizontal_right', 'Align right'],
+                        ['top', 'align_vertical_top', 'Align top'],
+                        ['center-v', 'align_vertical_center', 'Align centre (vertical)'],
+                        ['bottom', 'align_vertical_bottom', 'Align bottom']
+                      ] as Array<[AlignMode, string, string]>
+                    ).map(([mode, icon, label]) => (
+                      <button
+                        key={mode}
+                        onClick={() => alignSelection(mode)}
+                        title={label}
+                        aria-label={label}
+                        className="h-7 w-7 inline-flex items-center justify-center rounded-full hover:bg-white/15"
+                      >
+                        <Icon name={icon} size={13} />
+                      </button>
+                    ))}
+                    {selectionBBox.count >= 3 && (
+                      <>
+                        <button
+                          onClick={() => distributeSelection('horizontal')}
+                          title="Distribute horizontally (equal gaps)"
+                          aria-label="Distribute horizontally"
+                          className="h-7 w-7 inline-flex items-center justify-center rounded-full hover:bg-white/15"
+                        >
+                          <Icon name="horizontal_distribute" size={13} />
+                        </button>
+                        <button
+                          onClick={() => distributeSelection('vertical')}
+                          title="Distribute vertically (equal gaps)"
+                          aria-label="Distribute vertically"
+                          className="h-7 w-7 inline-flex items-center justify-center rounded-full hover:bg-white/15"
+                        >
+                          <Icon name="vertical_distribute" size={13} />
+                        </button>
+                      </>
+                    )}
+                  </>
+                )}
                 <div className="h-4 w-px bg-white/20" />
                 <button
                   onClick={() => clearSelection()}

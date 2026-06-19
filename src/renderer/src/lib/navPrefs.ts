@@ -21,6 +21,8 @@ export interface NavPrefs {
   wheelSensitivity: number // 0.3..2.5 — two-finger / wheel pan speed (1 = 1:1)
   // ── Zoom ──
   zoomSensitivity: number // 0.3..2.5 — ⌘/pinch zoom speed (1 = default)
+  // ── Layout ──
+  snapToGridEnabled: boolean // round a dragged widget's drop position to an 8px grid
 }
 
 export const NAV_DEFAULTS: NavPrefs = {
@@ -33,7 +35,8 @@ export const NAV_DEFAULTS: NavPrefs = {
   edgePanEnabled: true,
   edgePanSpeed: 1,
   wheelSensitivity: 1,
-  zoomSensitivity: 1
+  zoomSensitivity: 1,
+  snapToGridEnabled: false
 }
 
 const KEY = 'fb.nav.prefs'
@@ -61,7 +64,8 @@ function readFromStorage(): NavPrefs {
       edgePanEnabled: bool(p.edgePanEnabled, NAV_DEFAULTS.edgePanEnabled),
       edgePanSpeed: clamp(p.edgePanSpeed, 0.3, 2.5, NAV_DEFAULTS.edgePanSpeed),
       wheelSensitivity: clamp(p.wheelSensitivity, 0.3, 2.5, NAV_DEFAULTS.wheelSensitivity),
-      zoomSensitivity: clamp(p.zoomSensitivity, 0.3, 2.5, NAV_DEFAULTS.zoomSensitivity)
+      zoomSensitivity: clamp(p.zoomSensitivity, 0.3, 2.5, NAV_DEFAULTS.zoomSensitivity),
+      snapToGridEnabled: bool(p.snapToGridEnabled, NAV_DEFAULTS.snapToGridEnabled)
     }
   } catch {
     return { ...NAV_DEFAULTS }
