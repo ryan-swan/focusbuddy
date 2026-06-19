@@ -1978,7 +1978,50 @@ export default function Canvas(): JSX.Element {
     }
     if (items.length === 0) return
 
-    items.sort((a, b) => a.catRank - b.catRank || a.createdAt - b.createdAt)
+    // Baseline ordering: by category, then creation time.
+    const composite = (it: LayoutItem): number => it.catRank * 1e16 + it.createdAt
+
+    // Cluster linked widgets: widgets joined by connector lines should land next
+    // to each other so the wires stay short and local instead of arcing across
+    // the canvas over unrelated widgets. Compute connected components over the
+    // link graph (union-find), then order so each component's members are
+    // contiguous, components ordered by their earliest baseline member.
+    const idIndex = new Map(items.map((it, i) => [it.id, i]))
+    const parent = items.map((_, i) => i)
+    const find = (i: number): number => {
+      while (parent[i] !== i) {
+        parent[i] = parent[parent[i]]
+        i = parent[i]
+      }
+      return i
+    }
+    const union = (a: number, b: number): void => {
+      const ra = find(a)
+      const rb = find(b)
+      if (ra !== rb) parent[ra] = rb
+    }
+    for (const l of useLinksStore.getState().links) {
+      const ai = idIndex.get(l.sourceWidgetId)
+      const bi = idIndex.get(l.targetWidgetId)
+      if (ai !== undefined && bi !== undefined) union(ai, bi)
+    }
+    // Each component's sort key is the smallest composite among its members, so
+    // a cluster sits where its earliest member would have gone.
+    const compKey = new Map<number, number>()
+    items.forEach((it, i) => {
+      const root = find(i)
+      const c = composite(it)
+      const prev = compKey.get(root)
+      if (prev === undefined || c < prev) compKey.set(root, c)
+    })
+    items.sort((a, b) => {
+      const ia = idIndex.get(a.id)!
+      const ib = idIndex.get(b.id)!
+      const ka = compKey.get(find(ia))!
+      const kb = compKey.get(find(ib))!
+      if (ka !== kb) return ka - kb // different cluster → order by cluster
+      return composite(a) - composite(b) // same cluster → baseline order within
+    })
 
     let cursorX = PADDING
     let cursorY = PADDING

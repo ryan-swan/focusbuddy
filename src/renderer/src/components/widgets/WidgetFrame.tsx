@@ -1014,7 +1014,11 @@ export default function WidgetFrame({
         <div
           ref={bodyRef}
           className={`relative flex-1 min-h-0 ${
-            autoGrowsHeight(widget.kind) && !isChildOfSection && !isPinned ? 'overflow-hidden' : ''
+            // Auto-grow widgets size to their content, but cap out (e.g. a very
+            // long sticky) or sit in a fixed slot when pinned / inside a section.
+            // Scroll vertically rather than clipping so the content stays
+            // reachable when the frame can't grow to fit it.
+            autoGrowsHeight(widget.kind) && !isChildOfSection && !isPinned ? 'overflow-y-auto' : ''
           }`}
         >
           <FrameCallbacksProvider value={frameCallbacks}>{children}</FrameCallbacksProvider>

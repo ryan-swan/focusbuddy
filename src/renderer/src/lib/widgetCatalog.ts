@@ -39,8 +39,8 @@ export const WIDGET_CATALOG: WidgetCatalogEntry[] = [
     label: 'Note',
     icon: 'description',
     hint: 'Larger paper for longer writing',
-    defaultWidth: 360,
-    defaultHeight: 280,
+    defaultWidth: 400,
+    defaultHeight: 320,
     defaultContent: '',
     isWebBased: false
   },
@@ -284,8 +284,8 @@ export const WIDGET_CATALOG: WidgetCatalogEntry[] = [
     label: 'Calc',
     icon: 'calculate',
     hint: 'Small inline calculator',
-    defaultWidth: 240,
-    defaultHeight: 320,
+    defaultWidth: 208,
+    defaultHeight: 300,
     defaultContent: '',
     isWebBased: false
   },
@@ -295,8 +295,8 @@ export const WIDGET_CATALOG: WidgetCatalogEntry[] = [
     label: 'Color',
     icon: 'palette',
     hint: 'Color picker + screen eyedropper',
-    defaultWidth: 260,
-    defaultHeight: 220,
+    defaultWidth: 220,
+    defaultHeight: 200,
     defaultContent: '#fbbf24',
     isWebBased: false
   },
@@ -306,8 +306,8 @@ export const WIDGET_CATALOG: WidgetCatalogEntry[] = [
     label: 'Timer',
     icon: 'timer',
     hint: 'Countdown timer with audio cues — beeps as time runs out',
-    defaultWidth: 280,
-    defaultHeight: 280,
+    defaultWidth: 224,
+    defaultHeight: 224,
     defaultContent: JSON.stringify({ targetSec: 600, elapsedSec: 0, state: 'idle', startedAt: null }),
     isWebBased: false
   },
