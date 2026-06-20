@@ -33,3 +33,10 @@ sources/
 # are large (the working webcam placeholder alone is ~190 MB).
 Mock Videos/
 release/
+
+# Marketing assets stay LOCAL — never committed to the app repo. The folder holds
+# the brief, real screenshots, ad copy, finished ad creatives, and the landing
+# page (large binaries + a working copy). The screenshot-capture spec is a
+# marketing-only tool, so it's excluded too.
+marketing/
+tests/e2e/captureMarketingShots.spec.ts
