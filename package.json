@@ -13,6 +13,7 @@
     "typecheck:node": "tsc --noEmit -p tsconfig.node.json --composite false",
     "typecheck:web": "tsc --noEmit -p tsconfig.web.json --composite false",
     "typecheck": "npm run typecheck:node && npm run typecheck:web",
+    "lint:hooks": "node scripts/check-hooks.mjs",
     "rebuild": "electron-builder install-app-deps",
     "dist": "npm run build && electron-builder --mac --publish never",
     "dist:zip": "npm run build && electron-builder --mac zip --publish never",
