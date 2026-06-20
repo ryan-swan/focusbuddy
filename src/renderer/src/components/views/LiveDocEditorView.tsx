@@ -4,9 +4,7 @@ import { useDocCollabStore } from '../../stores/docCollab'
 import { useViewStore } from '../../stores/view'
 import { useAccountStore } from '../../stores/account'
 import { inviteToLiveDoc } from '../../lib/docCollabClient'
-import DocEditor from '../documents/DocEditor'
-import SheetEditor from '../documents/SheetEditor'
-import SlidesEditor from '../documents/SlidesEditor'
+import { DocEditor, SheetEditor, SlidesEditor } from '@office'
 import Icon from '../Icon'
 
 // Editor for a LIVE (collaborative) document. The body lives on the server; this

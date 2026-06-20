@@ -3,9 +3,7 @@ import type { Widget } from '@shared/types'
 import type { DocType, FbDocument } from '@shared/types'
 import WidgetFrame from './WidgetFrame'
 import { useWidgetStore } from '../../stores/widgets'
-import DocEditor from '../documents/DocEditor'
-import SheetEditor from '../documents/SheetEditor'
-import SlidesEditor from '../documents/SlidesEditor'
+import { DocEditor, SheetEditor, SlidesEditor } from '@office'
 import type { SheetBody, SlidesBody } from '@shared/types'
 
 // A document / spreadsheet / slide deck living on the canvas as a native widget.

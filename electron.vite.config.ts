@@ -39,7 +39,11 @@ export default defineConfig({
     resolve: {
       alias: {
         '@renderer': resolve('src/renderer/src'),
-        '@shared': resolve('src/shared')
+        '@shared': resolve('src/shared'),
+        // Lean-split package boundaries (see src/renderer/src/office|runtime).
+        // When these become real packages, only these targets move.
+        '@office': resolve('src/renderer/src/office'),
+        '@runtime': resolve('src/renderer/src/runtime')
       }
     },
     plugins: [react()],
