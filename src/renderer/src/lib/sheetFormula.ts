@@ -63,13 +63,35 @@ function colToIndex(letters: string): number {
   return n - 1
 }
 
-function refToCoord(ref: string): { r: number; c: number } | null {
-  const m = ref.toUpperCase().match(/^([A-Z]+)(\d+)$/)
+function refToCoord(
+  ref: string
+): { r: number; c: number; absR: boolean; absC: boolean } | null {
+  // Optional $ before the column letters and/or the row number (e.g. $A$1, A$1).
+  const m = ref.toUpperCase().match(/^(\$?)([A-Z]+)(\$?)(\d+)$/)
   if (!m) return null
-  const c = colToIndex(m[1])
-  const r = parseInt(m[2], 10) - 1
+  const absC = m[1] === '$'
+  const c = colToIndex(m[2])
+  const absR = m[3] === '$'
+  const r = parseInt(m[4], 10) - 1
   if (r < 0 || c < 0) return null
-  return { r, c }
+  return { r, c, absR, absC }
+}
+
+// Render a column index back to letters (A, B, …, AA). Local copy so the engine
+// stays self-contained (sheetBody.colLabel is the renderer-facing twin).
+function indexToCol(c: number): string {
+  let s = ''
+  let n = c
+  do {
+    s = String.fromCharCode(65 + (n % 26)) + s
+    n = Math.floor(n / 26) - 1
+  } while (n >= 0)
+  return s
+}
+
+// Render a single A1 reference with its absolute markers preserved.
+function refToA1(r: number, c: number, absR: boolean, absC: boolean): string {
+  return `${absC ? '$' : ''}${indexToCol(c)}${absR ? '$' : ''}${r + 1}`
 }
 
 function cellRaw(grid: Grid, r: number, c: number): string {
@@ -115,7 +137,10 @@ function tokenize(s: string): Tok[] {
       i += numMatch[0].length
       continue
     }
-    const idMatch = s.slice(i).match(/^[A-Za-z]+\d*/)
+    // Identifiers double as function names AND cell references. Allow optional
+    // `$` markers so absolute references ($A$1, A$1, $A1) tokenize as one ident;
+    // function names never carry `$`, so this is unambiguous.
+    const idMatch = s.slice(i).match(/^\$?[A-Za-z]+\$?\d*/)
     if (idMatch) {
       toks.push({ t: 'ident', v: idMatch[0] })
       i += idMatch[0].length
@@ -143,12 +168,26 @@ function tokenize(s: string): Tok[] {
 
 // ── AST ───────────────────────────────────────────────────────────────────────
 
+// `absR`/`absC` mark a `$`-anchored row/column (e.g. $A$1). The evaluator ignores
+// them; only the reference-rewriter (autofill / copy) and the serializer read
+// them, so an absolute ref stays put while a relative one shifts by the fill
+// offset, exactly like Excel and Sheets.
 type Node =
   | { k: 'num'; v: number }
   | { k: 'str'; v: string }
   | { k: 'bool'; v: boolean }
-  | { k: 'ref'; r: number; c: number }
-  | { k: 'range'; r1: number; c1: number; r2: number; c2: number }
+  | { k: 'ref'; r: number; c: number; absR?: boolean; absC?: boolean }
+  | {
+      k: 'range'
+      r1: number
+      c1: number
+      r2: number
+      c2: number
+      absR1?: boolean
+      absC1?: boolean
+      absR2?: boolean
+      absC2?: boolean
+    }
   | { k: 'unary'; op: string; x: Node }
   | { k: 'binary'; op: string; a: Node; b: Node }
   | { k: 'call'; name: string; args: Node[] }
@@ -243,7 +282,7 @@ function parse(src: string): Node {
       if (upper === 'FALSE') return { k: 'bool', v: false }
       const coord = refToCoord(name)
       if (!coord) throw new Error(`bad ref ${name}`)
-      return { k: 'ref', r: coord.r, c: coord.c }
+      return { k: 'ref', r: coord.r, c: coord.c, absR: coord.absR, absC: coord.absC }
     }
     throw new Error('parse error')
   }
@@ -258,12 +297,20 @@ function parse(src: string): Node {
         const b = refToCoord(endTok.v)
         if (b) {
           p += 3
+          // Normalize each axis independently, keeping each endpoint's $-flag
+          // attached to whichever side it lands on after min/max.
+          const rowFirst = a.r <= b.r
+          const colFirst = a.c <= b.c
           return {
             k: 'range',
             r1: Math.min(a.r, b.r),
             c1: Math.min(a.c, b.c),
             r2: Math.max(a.r, b.r),
-            c2: Math.max(a.c, b.c)
+            c2: Math.max(a.c, b.c),
+            absR1: rowFirst ? a.absR : b.absR,
+            absC1: colFirst ? a.absC : b.absC,
+            absR2: rowFirst ? b.absR : a.absR,
+            absC2: colFirst ? b.absC : a.absC
           }
         }
       }
@@ -275,6 +322,101 @@ function parse(src: string): Node {
   const node = parseExpr()
   if (p !== toks.length) throw new Error('trailing tokens')
   return node
+}
+
+// ── Serialization & reference rewriting (autofill / copy) ──────────────────────
+
+const PREC: Record<string, number> = {
+  '=': 1, '<>': 1, '<': 1, '>': 1, '<=': 1, '>=': 1,
+  '&': 2,
+  '+': 3, '-': 3,
+  '*': 4, '/': 4,
+  '^': 5
+}
+
+// Turn an AST back into a formula string. Precedence-aware so it adds parentheses
+// only where they're needed to preserve meaning (and round-trips through parse).
+function nodeToString(node: Node): string {
+  switch (node.k) {
+    case 'num':
+      return String(node.v)
+    case 'str':
+      return `"${node.v.replace(/"/g, '""')}"`
+    case 'bool':
+      return node.v ? 'TRUE' : 'FALSE'
+    case 'ref':
+      return refToA1(node.r, node.c, !!node.absR, !!node.absC)
+    case 'range':
+      return (
+        refToA1(node.r1, node.c1, !!node.absR1, !!node.absC1) +
+        ':' +
+        refToA1(node.r2, node.c2, !!node.absR2, !!node.absC2)
+      )
+    case 'unary': {
+      const inner = nodeToString(node.x)
+      return `${node.op}${node.x.k === 'binary' ? `(${inner})` : inner}`
+    }
+    case 'binary': {
+      const p = PREC[node.op] ?? 0
+      const rightAssoc = node.op === '^'
+      const wrap = (child: Node, isRight: boolean): string => {
+        const s = nodeToString(child)
+        if (child.k !== 'binary') return s
+        const cp = PREC[child.op] ?? 0
+        // Lower-precedence children always need parens. Equal precedence needs
+        // parens on the associativity-breaking side (right side for left-assoc
+        // ops, left side for the right-assoc ^).
+        const needs = cp < p || (cp === p && (rightAssoc ? !isRight : isRight))
+        return needs ? `(${s})` : s
+      }
+      return `${wrap(node.a, false)}${node.op}${wrap(node.b, true)}`
+    }
+    case 'call':
+      return `${node.name}(${node.args.map(nodeToString).join(', ')})`
+  }
+}
+
+// Shift every RELATIVE reference in a formula by (dRow, dCol); absolute ($) parts
+// stay pinned. Coordinates clamp at 0 so a fill near the top edge can't go
+// negative. Used when a formula is dragged with the fill handle or pasted to a
+// new origin, so =B2 dragged one row down becomes =B3, exactly like Excel/Sheets.
+// `formula` may include the leading '='. Unparseable input is returned unchanged.
+export function rewriteFormulaRefs(formula: string, dRow: number, dCol: number): string {
+  if (dRow === 0 && dCol === 0) return formula
+  const hadEquals = formula.startsWith('=')
+  const src = hadEquals ? formula.slice(1) : formula
+  if (src.trim() === '') return formula
+  let ast: Node
+  try {
+    ast = parse(src)
+  } catch {
+    return formula
+  }
+  const shift = (coord: number, abs: boolean | undefined, delta: number): number =>
+    abs ? coord : Math.max(0, coord + delta)
+  const rewrite = (n: Node): Node => {
+    switch (n.k) {
+      case 'ref':
+        return { ...n, r: shift(n.r, n.absR, dRow), c: shift(n.c, n.absC, dCol) }
+      case 'range':
+        return {
+          ...n,
+          r1: shift(n.r1, n.absR1, dRow),
+          c1: shift(n.c1, n.absC1, dCol),
+          r2: shift(n.r2, n.absR2, dRow),
+          c2: shift(n.c2, n.absC2, dCol)
+        }
+      case 'unary':
+        return { ...n, x: rewrite(n.x) }
+      case 'binary':
+        return { ...n, a: rewrite(n.a), b: rewrite(n.b) }
+      case 'call':
+        return { ...n, args: n.args.map(rewrite) }
+      default:
+        return n
+    }
+  }
+  return (hadEquals ? '=' : '') + nodeToString(rewrite(ast))
 }
 
 // ── Evaluation ────────────────────────────────────────────────────────────────
@@ -583,6 +725,20 @@ function evalCall(node: Extract<Node, { k: 'call' }>, grid: Grid, seen: Set<stri
 // for unit testing the engine directly.
 export function evaluateFormula(grid: Grid, formula: string, seedKey = '__seed__'): CellValue {
   return evalNode(parse(formula), grid, new Set([seedKey]))
+}
+
+// True if a formula string parses (syntax only — it may still reference empty
+// cells). The AI formula assistant uses this as an honesty gate so a formula the
+// engine cannot even parse is never offered for insertion.
+export function isParseableFormula(formula: string): boolean {
+  const src = formula.startsWith('=') ? formula.slice(1) : formula
+  if (src.trim() === '') return false
+  try {
+    parse(src)
+    return true
+  } catch {
+    return false
+  }
 }
 
 // The value to DISPLAY for a cell: raw text, the evaluated formula, or #ERR.

@@ -36,6 +36,22 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.70',
+    date: '2026-06-20T09:00:00Z',
+    title: 'v2.5.70 — Spreadsheet power editing: fill handle, bulk paste, AI formulas',
+    tag: 'feature',
+    summary:
+      'The spreadsheet now works the way Excel and Google Sheets do: drag the fill handle to extend series and formulas, double-click it to fill to the end of your data, paste across a whole selection, and ask the AI to write a formula for you. Tables gain the same bulk paste across selected cells.',
+    highlights: [
+      'Fill handle: drag the small square at the selection corner to copy a value, continue a series (numbers, dates, months, weekdays, "Item 1, Item 2"), or fill a formula with its references shifting per row. Double-click it to fill down to the end of the neighbouring data.',
+      'Bulk apply: paste one value across a whole highlighted range, or a block that tiles to fit. Ctrl+Enter fills the selection from the active cell; Ctrl+D and Ctrl+R fill down and right. Copied formulas adjust their references; absolute $refs stay pinned.',
+      'After a numeric fill, a Copy/Series toggle lets you switch how it filled, just like Excel.',
+      'AI formulas: click the AI button on the formula bar, describe what you want in plain words, and it writes the formula, explains it, and can add the columns or tabs the calculation needs, all previewed before it touches the sheet. A formula it can’t actually run is never inserted.',
+      'Tables: drag to highlight cells, copy them, and bulk-paste a value or a block across the selection, coerced to each column’s type.'
+    ],
+    links: [{ label: 'Finding your way around', href: `${HELP_BASE}/getting-around` }]
+  },
+  {
     version: '2.5.69',
     date: '2026-06-20T05:00:00Z',
     title: 'v2.5.69 — Build spreadsheets with AI in two steps',

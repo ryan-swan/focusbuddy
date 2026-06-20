@@ -34,6 +34,11 @@ interface Props {
   // a cell click keeps the input focused rather than blurring + committing).
   editInputRef?: React.MutableRefObject<HTMLInputElement | null>
   formulaRefMode?: boolean
+  // The fill handle: a live preview rectangle while dragging it, a start hook
+  // (mousedown on the handle), and a fill-to-end hook (double-click the handle).
+  fillPreview?: CellRange | null
+  onFillStart?: () => void
+  onFillToEnd?: () => void
 }
 
 const ROW_HEADER_W = 44
@@ -103,6 +108,14 @@ export default function SheetGrid(props: Props): JSX.Element {
                 const isActive = active?.r === r && active?.c === c
                 const isEditing = editing?.r === r && editing?.c === c
                 const selected = inRange(selection, r, c)
+                const inFillPreview = inRange(props.fillPreview ?? null, r, c) && !selected
+                // The fill handle sits on the bottom-right cell of the selection.
+                const showHandle =
+                  !isEditing &&
+                  !!selection &&
+                  !!props.onFillStart &&
+                  r === selection.r1 &&
+                  c === selection.c1
                 const fmt = cellFormat(tab, r, c)
                 const computed = displayCell(grid, r, c)
                 const shown = formatValue(computed, fmt?.numFmt)
@@ -131,10 +144,27 @@ export default function SheetGrid(props: Props): JSX.Element {
                     }}
                     onMouseEnter={() => props.onCellMouseEnter(r, c)}
                     onDoubleClick={() => props.onCellDoubleClick(r, c)}
-                    className={`border-b border-r border-stone-200 dark:border-stone-700 p-0 ${
-                      selected ? 'bg-accent/[0.10]' : ''
+                    className={`relative border-b border-r border-stone-200 dark:border-stone-700 p-0 ${
+                      selected ? 'bg-accent/[0.10]' : inFillPreview ? 'bg-accent/[0.06]' : ''
                     } ${isActive ? 'outline outline-2 -outline-offset-1 outline-accent' : ''}`}
                   >
+                    {showHandle && (
+                      <span
+                        data-testid="sheet-fill-handle"
+                        title="Drag to fill. Double-click to fill down to the end of your data."
+                        onMouseDown={(e) => {
+                          e.preventDefault()
+                          e.stopPropagation()
+                          props.onFillStart?.()
+                        }}
+                        onDoubleClick={(e) => {
+                          e.preventDefault()
+                          e.stopPropagation()
+                          props.onFillToEnd?.()
+                        }}
+                        className="absolute -bottom-[3px] -right-[3px] z-10 h-[7px] w-[7px] cursor-crosshair rounded-[1px] bg-accent border border-white dark:border-stone-900"
+                      />
+                    )}
                     {isEditing ? (
                       <input
                         ref={(el) => {

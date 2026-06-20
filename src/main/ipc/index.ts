@@ -277,6 +277,7 @@ import {
   suggestDocContent,
   rewriteSelection,
   suggestSheetColumns,
+  suggestFormula,
   fillSheetRange,
   generateSlideElements
 } from '../ai/anthropic'
@@ -704,6 +705,13 @@ export function registerIpcHandlers(): void {
     recordAiCall()
     return suggestSheetColumns(input)
   })
+  ipcMain.handle(
+    'ai:suggestFormula',
+    (_e, input: { prompt: string; headers: string[]; activeRef: string; sample?: string[][] }) => {
+      recordAiCall()
+      return suggestFormula(input)
+    }
+  )
   ipcMain.handle(
     'ai:fillSheetRange',
     (_e, input: { prompt: string; headers: string[]; rangeRows: number; auto?: boolean }) => {

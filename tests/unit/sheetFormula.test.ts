@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { displayCell, type Grid } from '@renderer/lib/sheetFormula'
+import { displayCell, rewriteFormulaRefs, type Grid } from '@renderer/lib/sheetFormula'
 
 // The sheet's formula engine must compute real values, not plausible ones. A
 // wrong total is worse than a visible #ERR, so these tests pin the arithmetic,
@@ -173,5 +173,39 @@ describe('formula engine — text functions', () => {
     expect(displayCell(grid([['=LOWER(\"ABC\")']]), 0, 0)).toBe('abc')
     expect(displayCell(grid([['=TRIM(\"  hi  \")']]), 0, 0)).toBe('hi')
     expect(displayCell(grid([['=CONCAT(\"a\",\"-\",\"b\")']]), 0, 0)).toBe('a-b')
+  })
+})
+
+describe('rewriteFormulaRefs — relative/absolute reference shifting (autofill)', () => {
+  it('shifts a relative ref down by the row delta', () => {
+    expect(rewriteFormulaRefs('=B1', 1, 0)).toBe('=B2')
+    expect(rewriteFormulaRefs('=B1', 3, 0)).toBe('=B4')
+  })
+  it('shifts a relative ref right by the column delta', () => {
+    expect(rewriteFormulaRefs('=A1', 0, 1)).toBe('=B1')
+  })
+  it('keeps absolute parts pinned', () => {
+    expect(rewriteFormulaRefs('=B1*$F$1', 2, 0)).toBe('=B3*$F$1')
+    expect(rewriteFormulaRefs('=$A1', 1, 1)).toBe('=$A2') // col pinned, row shifts
+    expect(rewriteFormulaRefs('=A$1', 1, 1)).toBe('=B$1') // row pinned, col shifts
+  })
+  it('shifts both endpoints of a range', () => {
+    expect(rewriteFormulaRefs('=SUM(A1:A3)', 1, 0)).toBe('=SUM(A2:A4)')
+  })
+  it('clamps at the top-left edge instead of going negative', () => {
+    expect(rewriteFormulaRefs('=A1', -5, -5)).toBe('=A1')
+  })
+  it('round-trips a complex formula through parse/serialize', () => {
+    const out = rewriteFormulaRefs('=IF(A1>B1, A1*2, (A1+B1)/2)', 1, 0)
+    expect(out).toBe('=IF(A2>B2, A2*2, (A2+B2)/2)')
+    // and it still evaluates
+    const g = grid([['1', '2'], ['10', '4']])
+    expect(evaluateFormula(g, out.slice(1))).toBe(20)
+  })
+  it('leaves an unparseable formula unchanged', () => {
+    expect(rewriteFormulaRefs('=SUM(', 1, 0)).toBe('=SUM(')
+  })
+  it('preserves precedence without over-parenthesizing', () => {
+    expect(rewriteFormulaRefs('=A1+B1*C1', 1, 0)).toBe('=A2+B2*C2')
   })
 })

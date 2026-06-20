@@ -23,6 +23,15 @@ import { useWidgetStore } from '../../stores/widgets'
 import FieldEditor from '../fields/FieldEditor'
 import RelationConfigEditor from '../fields/RelationConfigEditor'
 import { coerceCellValue } from '../../lib/actionExecutor'
+import {
+  normCellRange,
+  inCellRange,
+  cellsToTsv,
+  planTablePaste,
+  type RC,
+  type RCRange
+} from '../../lib/tableSelection'
+import { parseTsv } from '@shared/gridClipboard'
 import Icon from '../Icon'
 import { ListView, CardsView, KanbanView, CalendarView, GanttView } from './TableViews'
 import UnifiedConnectedMenu from '../contextMenu/UnifiedConnectedMenu'
@@ -185,6 +194,20 @@ export default function TableWidget({ widget, inline = false }: Props): JSX.Elem
   // in-flight width here so the render is smooth, then commit to the schema
   // (widthHint) on mouse-up. null when no resize is in progress.
   const [resize, setResize] = useState<{ columnId: string; width: number } | null>(null)
+  // Cell-range selection for copy / bulk-paste (flat table view only). Indices
+  // are into the filtered row list and the schema's columns.
+  const [cellSel, setCellSel] = useState<{ a: RC; f: RC } | null>(null)
+  const [selNote, setSelNote] = useState<string | null>(null)
+  const selDrag = useRef(false)
+  // End a cell-range drag on any mouseup. Declared here (above the early return)
+  // so the hook order is stable whether or not the table has loaded yet.
+  useEffect(() => {
+    const up = (): void => {
+      selDrag.current = false
+    }
+    window.addEventListener('mouseup', up)
+    return () => window.removeEventListener('mouseup', up)
+  }, [])
 
   if (!table) {
     const body = (
@@ -507,6 +530,73 @@ export default function TableWidget({ widget, inline = false }: Props): JSX.Elem
     setViewConfig({ ...viewConfig, group: { ...current, collapsed: Array.from(collapsed) } })
   }
 
+  // ── Cell selection + copy / bulk paste (flat table view only) ─────────────
+  const cols0 = table.schema.columns
+  // Range selection geometry only makes sense in the flat table view; grouping
+  // and the other view modes reorder/transform rows.
+  const cellSelectable = !groups && viewMode === 'table'
+  const selRange: RCRange | null = cellSel ? normCellRange(cellSel.a, cellSel.f) : null
+
+  function onCellSelDown(r: number, c: number, shift: boolean): void {
+    if (!cellSelectable) return
+    if (shift && cellSel) setCellSel({ a: cellSel.a, f: { r, c } })
+    else setCellSel({ a: { r, c }, f: { r, c } })
+    selDrag.current = true
+    setSelNote(null)
+  }
+  function onCellSelEnter(r: number, c: number): void {
+    if (!cellSelectable || !selDrag.current || !cellSel) return
+    // Only treat it as a range drag once the pointer leaves the anchor cell, so a
+    // plain click still focuses the cell input for editing.
+    if (cellSel.a.r === r && cellSel.a.c === c) return
+    ;(document.activeElement as HTMLElement | null)?.blur?.()
+    setCellSel({ a: cellSel.a, f: { r, c } })
+  }
+  async function copySelection(): Promise<void> {
+    if (!selRange) return
+    await navigator.clipboard.writeText(cellsToTsv(filteredRows, cols0, selRange)).catch(() => {})
+  }
+  async function pasteSelection(): Promise<void> {
+    if (!selRange) return
+    const text = await navigator.clipboard.readText().catch(() => '')
+    if (!text) return
+    const { updates, clippedRows } = planTablePaste({
+      rows: filteredRows,
+      columns: cols0,
+      range: selRange,
+      matrix: parseTsv(text)
+    })
+    for (const u of updates) void updateCells(u.rowId, u.cells)
+    setSelNote(
+      clippedRows > 0
+        ? `Pasted into ${updates.length} row${updates.length === 1 ? '' : 's'}; ${clippedRows} more didn't fit. Add rows first to paste the rest.`
+        : null
+    )
+  }
+  function onTableKeyDown(e: React.KeyboardEvent): void {
+    if (!cellSelectable || !selRange) return
+    if (e.key === 'Escape') {
+      setCellSel(null)
+      return
+    }
+    const mod = e.metaKey || e.ctrlKey
+    if (!mod) return
+    const ae = document.activeElement
+    const editingInput =
+      (ae instanceof HTMLInputElement || ae instanceof HTMLTextAreaElement) &&
+      ae.closest('[data-testid^="table-cell-"]') != null
+    const multi = selRange.r0 !== selRange.r1 || selRange.c0 !== selRange.c1
+    // While editing a single cell, let the browser paste/copy into that input.
+    if (editingInput && !multi) return
+    if (e.key.toLowerCase() === 'c') {
+      e.preventDefault()
+      void copySelection()
+    } else if (e.key.toLowerCase() === 'v') {
+      e.preventDefault()
+      void pasteSelection()
+    }
+  }
+
   // One data <tr>. Extracted so the flat list and the grouped list render rows
   // identically. `idx` only drives the zebra stripe.
   function renderDataRow(row: FbRow, idx: number): JSX.Element {
@@ -528,11 +618,16 @@ export default function TableWidget({ widget, inline = false }: Props): JSX.Elem
             <Icon name="delete" size={13} />
           </button>
         </td>
-        {table!.schema.columns.map((col) => (
+        {table!.schema.columns.map((col, ci) => (
           <td
             key={col.id}
-            className="border-r border-stone-200 dark:border-stone-700 align-top"
+            data-testid={`table-cell-${idx}-${ci}`}
+            className={`border-r border-stone-200 dark:border-stone-700 align-top ${
+              cellSelectable && inCellRange(selRange, idx, ci) ? 'bg-accent/[0.12]' : ''
+            }`}
             style={{ minWidth: 140 }}
+            onMouseDown={(e) => onCellSelDown(idx, ci, e.shiftKey)}
+            onMouseEnter={() => onCellSelEnter(idx, ci)}
             onContextMenu={(e) => {
               // Shift bypasses our menu and gives the OS clipboard menu.
               if (e.shiftKey) return
@@ -567,7 +662,23 @@ export default function TableWidget({ widget, inline = false }: Props): JSX.Elem
   }
 
   const body = (
-    <div className="h-full w-full bg-white dark:bg-stone-900 overflow-auto relative">
+    <div
+      className="h-full w-full bg-white dark:bg-stone-900 overflow-auto relative outline-none"
+      data-testid="table-body"
+      tabIndex={0}
+      onKeyDown={onTableKeyDown}
+    >
+      {selNote && (
+        <div
+          className="absolute bottom-2 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 rounded-md border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 px-3 py-1.5 text-[12px] shadow-lg"
+          data-testid="table-paste-note"
+        >
+          <span className="text-stone-600 dark:text-stone-300">{selNote}</span>
+          <button onClick={() => setSelNote(null)} className="text-stone-400 hover:text-stone-600">
+            <Icon name="close" size={12} />
+          </button>
+        </div>
+      )}
       {/* Title row */}
       <div className="sticky top-0 z-10 px-3 py-2 bg-white/95 dark:bg-stone-900/95 border-b border-stone-200 dark:border-stone-700 flex items-center gap-1.5">
         <Icon name={currentViewMeta.icon} size={15} className="text-accent shrink-0" />
