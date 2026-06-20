@@ -17,7 +17,7 @@ export interface LaunchedApp {
   dispose: () => Promise<void>
 }
 
-export async function launchApp(): Promise<LaunchedApp> {
+export async function launchApp(opts?: { env?: Record<string, string> }): Promise<LaunchedApp> {
   const userDataDir = mkdtempSync(join(tmpdir(), 'focusbuddy-e2e-'))
   // ELECTRON_RUN_AS_NODE=1 makes Electron boot as a plain Node process — which
   // is what happens when these tests run from inside another Electron host
@@ -41,7 +41,9 @@ export async function launchApp(): Promise<LaunchedApp> {
     env: {
       ...cleanEnv,
       FB_TEST_USER_DATA: userDataDir,
-      NODE_ENV: 'test'
+      NODE_ENV: 'test',
+      // Per-test overrides (e.g. PLEXI_APP=office to boot the PlexiOffice shell).
+      ...(opts?.env ?? {})
     },
     timeout: 20_000
   })
@@ -53,10 +55,23 @@ export async function launchApp(): Promise<LaunchedApp> {
   await window.waitForLoadState('domcontentloaded')
 
   async function dispose(): Promise<void> {
+    // app.close() on Electron 37 / macOS can hang indefinitely when the
+    // inspector remains attached. Race it against a 5 s timeout and fall back
+    // to SIGKILL so tests don't exhaust the 30 s afterEach budget.
     try {
-      await app.close()
+      await Promise.race([
+        app.close(),
+        new Promise<void>((_, reject) =>
+          setTimeout(() => reject(new Error('app.close() timed out')), 5_000)
+        )
+      ])
     } catch {
-      // App may already be closed
+      // Grace period elapsed or app already gone — force-kill the process.
+      try {
+        app.process().kill()
+      } catch {
+        // Already dead
+      }
     }
     try {
       rmSync(userDataDir, { recursive: true, force: true })

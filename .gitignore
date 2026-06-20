@@ -33,6 +33,7 @@ sources/
 # are large (the working webcam placeholder alone is ~190 MB).
 Mock Videos/
 release/
+release-office/
 
 # Marketing assets stay LOCAL — never committed to the app repo. The folder holds
 # the brief, real screenshots, ad copy, finished ad creatives, and the landing

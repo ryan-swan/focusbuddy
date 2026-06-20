@@ -28,6 +28,7 @@ import {
 import { haptic } from '../lib/haptics'
 import Icon from './Icon'
 import AccountSection from './settings/AccountSection'
+import DocumentsSyncSection from './settings/DocumentsSyncSection'
 import ApiKeysSection from './settings/ApiKeysSection'
 import BackupSection from './settings/BackupSection'
 import NavigationSection from './settings/NavigationSection'
@@ -498,6 +499,8 @@ export default function SettingsPanel({
       </div>
 
       <AccountSection />
+
+      <DocumentsSyncSection />
 
       <ApiKeysSection />
 
