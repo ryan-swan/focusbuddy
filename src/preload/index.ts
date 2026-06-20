@@ -1146,6 +1146,16 @@ const api = {
     update: (id: string, patch: DocumentPatch): Promise<FbDocument | null> =>
       ipcRenderer.invoke('documents:update', id, patch),
     delete: (id: string): Promise<boolean> => ipcRenderer.invoke('documents:delete', id),
+    // Insert-or-replace by explicit id (used by cloud-document sync to land a
+    // server document under its own id).
+    upsert: (input: {
+      id: string
+      docType: DocType
+      title: string
+      body: unknown
+      archived?: boolean
+      updatedAt?: number
+    }): Promise<FbDocument> => ipcRenderer.invoke('documents:upsert', input),
     generate: (input: {
       docType: DocType
       prompt: string

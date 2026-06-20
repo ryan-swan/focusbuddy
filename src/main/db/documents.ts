@@ -140,6 +140,37 @@ export function updateDocument(id: string, patch: DocumentPatch): FbDocument | n
   return getDocument(id)
 }
 
+// Insert-or-replace by an explicit id. Used by cloud-document sync to land a
+// document from the server under its own id (the normal create() mints a fresh
+// id, which would break id alignment across devices/apps). `updatedAt` lets the
+// caller preserve the server's timestamp.
+export function upsertDocument(input: {
+  id: string
+  docType: FbDocument['docType']
+  title: string
+  body: DocBody | SheetBody | SlidesBody
+  archived?: boolean
+  updatedAt?: number
+}): FbDocument {
+  const db = getDb()
+  const existing = getDocument(input.id)
+  const now = input.updatedAt ?? Date.now()
+  const bodyStr = JSON.stringify(input.body)
+  const archived = input.archived ? 1 : 0
+  if (existing) {
+    db.prepare(
+      `UPDATE documents SET doc_type = @docType, title = @title, body = @body,
+         archived = @archived, updated_at = @now WHERE id = @id`
+    ).run({ id: input.id, docType: input.docType, title: input.title, body: bodyStr, archived, now })
+  } else {
+    db.prepare(
+      `INSERT INTO documents (id, doc_type, title, body, archived, created_at, updated_at)
+       VALUES (@id, @docType, @title, @body, @archived, @now, @now)`
+    ).run({ id: input.id, docType: input.docType, title: input.title, body: bodyStr, archived, now })
+  }
+  return getDocument(input.id) as FbDocument
+}
+
 export function deleteDocument(id: string): boolean {
   const db = getDb()
   const info = db.prepare('DELETE FROM documents WHERE id = ?').run(id)

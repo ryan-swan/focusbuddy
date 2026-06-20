@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import type { DocType, DocumentMeta, FbDocument } from '@shared/types'
+import { pullCloudDocs, pushCloudDoc, pushCloudDelete } from '../lib/cloudDocsSync'
 
 // Documents store — the standalone office files (doc / sheet / slides). Holds
 // the list for the hub and the one open document for the editor. Body edits are
@@ -35,6 +36,9 @@ export const useDocumentsStore = create<DocumentsStore>((set, get) => ({
 
   refresh: async () => {
     set({ loadingList: true })
+    // Pull cloud changes first (no-op unless the flag is on + signed in), so the
+    // list reflects edits made in the other app / on another device.
+    await pullCloudDocs().catch(() => {})
     const list = await window.api.documents.list()
     set({ list, loadingList: false })
   },
@@ -58,6 +62,7 @@ export const useDocumentsStore = create<DocumentsStore>((set, get) => ({
   createBlank: async (docType) => {
     const title = docType === 'doc' ? 'Untitled document' : docType === 'sheet' ? 'Untitled sheet' : 'Untitled deck'
     const doc = await window.api.documents.create({ docType, title })
+    void pushCloudDoc(doc).catch(() => {})
     await get().refresh()
     return doc
   },
@@ -70,6 +75,7 @@ export const useDocumentsStore = create<DocumentsStore>((set, get) => ({
       title: r.title || 'Untitled',
       body: r.body as FbDocument['body']
     })
+    void pushCloudDoc(doc).catch(() => {})
     await get().refresh()
     return { ok: true, id: doc.id }
   },
@@ -87,19 +93,26 @@ export const useDocumentsStore = create<DocumentsStore>((set, get) => ({
       if (!cur || cur.id !== a.id) return
       await window.api.documents.update(cur.id, { body: cur.body })
       set({ saving: false })
+      // Mirror to the cloud (no-op when the flag is off). On a rev conflict the
+      // server copy wins and is reflected in the open editor.
+      const { conflictedTo } = await pushCloudDoc(cur).catch(() => ({ conflictedTo: undefined }))
+      if (conflictedTo && get().active?.id === conflictedTo.id) set({ active: conflictedTo })
     }, 600)
   },
 
   rename: async (title) => {
     const a = get().active
     if (!a) return
-    set({ active: { ...a, title } })
+    const next = { ...a, title }
+    set({ active: next })
     await window.api.documents.update(a.id, { title })
+    void pushCloudDoc(next).catch(() => {})
     await get().refresh()
   },
 
   remove: async (id) => {
     await window.api.documents.delete(id)
+    void pushCloudDelete(id).catch(() => {})
     if (get().active?.id === id) set({ active: null })
     await get().refresh()
   }
