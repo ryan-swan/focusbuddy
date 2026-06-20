@@ -36,6 +36,20 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.67',
+    date: '2026-06-20T01:00:00Z',
+    title: 'v2.5.67 — Tidy canvases and focus insights',
+    tag: 'feature',
+    summary:
+      'Line up and space out widgets neatly, optionally snap them to a grid, and see an honest picture of when and where you actually focus.',
+    highlights: [
+      'Select two or more widgets and the toolbar gains Align (left/centre/right/top/middle/bottom); select three or more and you can Distribute them with equal gaps — each in a single undo.',
+      'Optional snap-to-grid rounds a dragged widget to a neat 8px grid; toggle it from Cmd-K → “Snap to grid”.',
+      'A new Insights view in the sidebar shows your real focus sessions — focused time, your best hours of the day, where your focus went, and what to work on now based on your energy. Nothing is made up; it fills in as you use focus sessions.'
+    ],
+    links: [{ label: 'Finding your way around', href: `${HELP_BASE}/getting-around` }]
+  },
+  {
     version: '2.5.66',
     date: '2026-06-19T23:00:00Z',
     title: 'v2.5.66 — Find anything, and start from a template',
