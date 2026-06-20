@@ -121,15 +121,28 @@ to embed docs on the canvas; the desk's DB / file manager / collaboration stay p
 - Verified: typecheck + hooks + build (both entries) green; PlexiDesk documents e2e
   green (no regression). Commits `3226b57` (boundaries), `cea65ba` (app shell).
 
+**Round 4 (2026-06-21) — standalone app proven + packaged; sync toggle shipped.**
+- e2e `plexiOffice.spec.ts`: boots the build with `PLEXI_APP=office`, asserts the
+  PlexiOffice shell renders (not the desk — no canvas), and creates/opens a sheet
+  via the shared editor. `launchApp` gained an optional `env` override. Both green.
+- Packaged the second product: `dist:office:zip` →
+  `release-office/PlexiOffice-2.5.70-mac-arm64.zip` (ad-hoc signed). Output dir
+  gitignored.
+- Settings: a "Documents sync (beta)" toggle (`DocumentsSyncSection`) flips the
+  cloud-docs flag. Commit `08ee833`.
+
 **Still open (next rounds):**
-- Package the office binary (`dist:office:zip`) and smoke-test that it launches into
-  the office UI; then its own release channel (separate repo or electron-updater
-  channel) so its update manifests don't collide with PlexiDesk's.
-- Auth handoff: one sign-in across both apps (two apps can't both own `haptyx://`).
-- Turn the cloud-docs flag on via a Settings toggle + a two-client round-trip proof.
-- Optional: promote the in-repo `@office`/`@runtime` aliases to real workspace
-  packages (`packages/office`, `packages/runtime`) — now mechanical thanks to the
-  boundary.
+- PlexiOffice's own release channel (separate repo or electron-updater channel) so
+  its `latest-mac.yml` / `latest.yml` don't collide with PlexiDesk's; then a real
+  published office release.
+- Auth handoff: one sign-in across both apps (two apps can't both own `haptyx://` —
+  add a `plexioffice://` handback or a shared-token mechanism).
+- Two-client cloud-docs round-trip proof with the flag on and a real signed-in
+  account on two machines.
+- A PlexiOffice app icon (the packaged build currently uses the default Electron
+  icon).
+- Optional: promote the `@office`/`@runtime` aliases to real workspace packages —
+  mechanical now thanks to the boundary.
 
 **Earlier next-round note (superseded by Round 3 above):** turn the flag on end-to-end, then start the lean extraction.
 1. Add a Settings toggle for the cloud-docs flag; sign in on two clients and prove a
