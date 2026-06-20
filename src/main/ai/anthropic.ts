@@ -2817,16 +2817,22 @@ export async function fillSheetRange(input: {
   prompt: string
   headers: string[]
   rangeRows: number
+  // When true (or when rangeRows is 0/absent), the AI decides how many rows the
+  // task genuinely requires — every task in a plan, every item in a list — and
+  // is told NOT to stop at a few sample rows. When false, exactly rangeRows are
+  // produced. Auto is the default for "solve this", exact for "give me N rows".
+  auto?: boolean
 }): Promise<SheetFillResult> {
   const c = getClient()
   if (!c) return { ok: false, needsApiKey: true, error: 'No Anthropic API key set. Open Settings → AI · API keys to paste one.' }
   const prompt = input.prompt?.trim()
   if (!prompt) return { ok: false, error: 'Describe the data to generate.' }
   const cols = input.headers.length || 1
-  // No upper cap on the requested row count. Large counts are produced in
-  // batches below so a single response can never truncate, which is what used
-  // to surface as an error. Only a sane lower bound and integer coercion.
-  const total = Math.max(1, Math.floor(input.rangeRows || 10))
+  // Auto mode: the model decides the row count from what the task needs. Exact
+  // mode: a specific number of rows, produced in batches (no upper cap) so a
+  // large count never truncates a single response.
+  const auto = input.auto === true || !input.rangeRows
+  const total = auto ? 0 : Math.max(1, Math.floor(input.rangeRows))
 
   const headerLine = `Columns (in order): ${input.headers.join(', ') || 'A'}`
   const baseSystem =
@@ -2836,6 +2842,11 @@ export async function fillSheetRange(input: {
     ' string cells, one per column, in the column order given. Produce realistic, useful values ' +
     '(never "example 1"). For a computed column such as a total, rate or growth, put a real spreadsheet ' +
     'formula starting with = that references A1-style cells, for example "=B2/B1-1". ' +
+    (auto
+      ? 'You are solving the user\'s problem, not illustrating it. Produce EVERY row the task genuinely ' +
+        'requires to be complete and usable — for a project plan, every phase and task with no gaps; for a ' +
+        'list, every real item. Do NOT stop at a few sample or explanatory rows, and do NOT pad with filler. '
+      : '') +
     'No markdown, no code fences, no prose outside the JSON.'
   // Fallback system used only if a batch does not parse and was not truncated.
   // Some replies wrap the matrix in prose or pick a different shape; this is
@@ -2883,31 +2894,43 @@ export async function fillSheetRange(input: {
   // forever. This is not a row cap a normal user hits — it is a backstop.
   const maxBatches = 400
 
+  // Build the per-batch user message for either mode. In auto mode we never name
+  // a target total — we ask for the complete result, capped per response so it
+  // can't truncate, and let the model signal completion by returning fewer than
+  // the cap (or an empty array, which parses as "nothing more").
+  const batchUser = (done: number, want: number): string => {
+    if (auto) {
+      return (
+        `${headerLine}\n` +
+        (done > 0
+          ? `You have produced ${done} rows so far. Continue ONLY with rows that genuinely belong to a complete result; do not repeat earlier rows and do not pad. Return up to ${want} more rows, or an empty rows array if the result is already complete.\n`
+          : `Produce the complete set of rows that fully solves this — every row the task needs, not a sample. Return up to ${want} rows in this response; if more are needed you will be asked to continue.\n`) +
+        `Request: ${prompt}`
+      )
+    }
+    return (
+      `${headerLine}\n` +
+      (done > 0
+        ? `You have already produced ${done} of ${total} rows. Generate the NEXT ${want} rows that continue the same dataset. Do not repeat earlier rows.\n`
+        : `Generate ${want} rows${total > want ? ` (the first of ${total} total)` : ''}.\n`) +
+      `Request: ${prompt}`
+    )
+  }
+
   try {
     const acc: string[][] = []
     let batches = 0
-    while (acc.length < total && batches < maxBatches) {
-      const want = Math.min(batchSize, total - acc.length)
-      const user =
-        `${headerLine}\n` +
-        (acc.length > 0
-          ? `You have already produced ${acc.length} of ${total} rows. Generate the NEXT ${want} rows that continue the same dataset. Do not repeat earlier rows.\n`
-          : `Generate ${want} rows${total > want ? ` (the first of ${total} total)` : ''}.\n`) +
-        `Request: ${prompt}`
+    while (batches < maxBatches) {
+      if (!auto && acc.length >= total) break
+      const want = auto ? batchSize : Math.min(batchSize, total - acc.length)
 
-      let r = await attempt(baseSystem, user)
-      if (r.kind === 'unparsed') r = await attempt(strictSystem, user)
+      let r = await attempt(baseSystem, batchUser(acc.length, want))
+      if (r.kind === 'unparsed') r = await attempt(strictSystem, batchUser(acc.length, want))
       if (r.kind === 'truncated' && want > 10) {
         // The batch was too tall for one response — retry this batch smaller.
         const half = Math.max(10, Math.floor(want / 2))
-        const smaller =
-          `${headerLine}\n` +
-          (acc.length > 0
-            ? `You have already produced ${acc.length} rows. Generate the NEXT ${half} rows; do not repeat earlier rows.\n`
-            : `Generate ${half} rows.\n`) +
-          `Request: ${prompt}`
-        r = await attempt(baseSystem, smaller)
-        if (r.kind === 'unparsed') r = await attempt(strictSystem, smaller)
+        r = await attempt(baseSystem, batchUser(acc.length, half))
+        if (r.kind === 'unparsed') r = await attempt(strictSystem, batchUser(acc.length, half))
       }
 
       batches++
@@ -2915,10 +2938,13 @@ export async function fillSheetRange(input: {
       if (r.kind === 'rows') {
         if (!r.rows.length) break // model has nothing more to add
         acc.push(...r.rows)
+        // Auto: a short batch means the model has given the complete result.
+        if (auto && r.rows.length < want) break
         continue
       }
       // A failure on the FIRST batch is fatal; once we have some rows, keep them
-      // and stop rather than throwing away good work.
+      // and stop rather than throwing away good work. (In auto mode an empty
+      // continuation parses as 'unparsed' and lands here, ending the loop.)
       if (acc.length > 0) break
       if (r.kind === 'refusal')
         return { ok: false, error: 'Claude declined this request. Try rephrasing it.' }

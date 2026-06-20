@@ -1284,6 +1284,7 @@ const api = {
       prompt: string
       headers: string[]
       rangeRows: number
+      auto?: boolean
     }): Promise<{ ok: boolean; rows?: string[][]; error?: string; needsApiKey?: boolean }> =>
       ipcRenderer.invoke('ai:fillSheetRange', input)
   },

@@ -704,10 +704,13 @@ export function registerIpcHandlers(): void {
     recordAiCall()
     return suggestSheetColumns(input)
   })
-  ipcMain.handle('ai:fillSheetRange', (_e, input: { prompt: string; headers: string[]; rangeRows: number }) => {
-    recordAiCall()
-    return fillSheetRange(input)
-  })
+  ipcMain.handle(
+    'ai:fillSheetRange',
+    (_e, input: { prompt: string; headers: string[]; rangeRows: number; auto?: boolean }) => {
+      recordAiCall()
+      return fillSheetRange(input)
+    }
+  )
 
   // ── Slides interop + AI ───────────────────────────────────────────────────
   ipcMain.handle('slides:export', (_e, input: Parameters<typeof exportSlides>[0]) => exportSlides(input))
