@@ -89,17 +89,31 @@ the tight integration.
   (list / sync / get / put-with-conflict / delete). Not yet wired into the
   document store — that's next.
 
-**Next round — finish Phase 0, then Phase 1.**
-1. Deploy the signal server (additive; gated `npm run deploy:signal`) and smoke-test
-   the live endpoints.
-2. Wire the renderer document store to the cloud client behind a feature flag
-   (default off): pull-sync on init/login, push on save, apply tombstones, resolve
-   `rev` conflicts (last-write-wins + a "newer copy on the server" notice). The
-   local SQLite stays the offline fallback and the source of truth until sync runs.
-3. Reconcile ids: local `FbDocument.id`s become the cloud ids so a doc created
-   offline upserts cleanly.
-4. Then Phase 1 (monorepo skeleton) — but that and Phase 2 need the coordination
-   freeze noted below before they start.
+**Round 2 (2026-06-21) — direction confirmed (LEAN split), Phase 0 complete.**
+Decision refined: do the **lean** split — extract only what the standalone app needs
+(`@plexi/office` editors + a minimal `@plexi/runtime`: auth/AI/theme/signal) and use
+the cloud-documents API as the integration contract, rather than a big-bang
+`@plexi/core` extraction of the whole platform. PlexiDesk keeps bundling the editors
+to embed docs on the canvas; the desk's DB / file manager / collaboration stay put.
+- Signal server **deployed** (additive); live endpoints verified (401 = auth-gated).
+- `upsertDocument` (insert-or-replace by explicit id) + `documents:upsert` IPC +
+  preload, so cloud docs land locally under their own id (id alignment).
+- `lib/cloudDocsSync.ts`: pull on refresh, push on save/create/rename, delete
+  propagation, server-wins on rev conflict — all behind a **default-off** feature
+  flag (`fb.clouddocs.enabled`), so today's behaviour is unchanged. Local SQLite is
+  the offline source of truth.
+- Wired into `stores/documents.ts`. Pure merge seam unit-tested
+  (`cloudDocsSync.test.ts`); documents e2e green (no regression).
+
+**Next round — turn the flag on end-to-end, then start the lean extraction.**
+1. Add a Settings toggle for the cloud-docs flag; sign in on two clients and prove a
+   doc round-trips (create/edit/delete) between them against the live endpoints.
+2. Begin the **lean** package extraction (this is the step that needs the freeze):
+   carve `@plexi/office` (editors + office IO + office AI + cloud-docs client) and a
+   minimal `@plexi/runtime` (auth, AI client, theme, signalConfig). Define the
+   boundary barrels, then move files.
+3. Stand up `apps/plexioffice` on those packages + cloud documents; new identity +
+   updater. Do NOT move the desk DB / file manager / collaboration.
 
 ## Execution plan (chosen direction: real split + cloud documents)
 

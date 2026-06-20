@@ -34,11 +34,12 @@ import {
   getDocument,
   createDocument,
   updateDocument,
+  upsertDocument,
   deleteDocument
 } from '../db/documents'
 import { searchAll } from '../db/search'
 import { generateDocument } from '../ai/anthropic'
-import type { DocType, DocumentDraft, DocumentPatch, MailSendInput } from '@shared/types'
+import type { DocType, DocumentDraft, DocumentPatch, FbDocument, MailSendInput } from '@shared/types'
 import { sendMail } from '../mail/smtp'
 import { suggestReply, resetToneCache } from '../mail/aiReply'
 import Anthropic from '@anthropic-ai/sdk'
@@ -1548,6 +1549,20 @@ export function registerIpcHandlers(): void {
     updateDocument(id, patch)
   )
   ipcMain.handle('documents:delete', (_e, id: string) => deleteDocument(id))
+  ipcMain.handle(
+    'documents:upsert',
+    (
+      _e,
+      input: {
+        id: string
+        docType: FbDocument['docType']
+        title: string
+        body: FbDocument['body']
+        archived?: boolean
+        updatedAt?: number
+      }
+    ) => upsertDocument(input)
+  )
   ipcMain.handle(
     'documents:generate',
     (_e, input: { docType: DocType; prompt: string; audience?: string }) =>
