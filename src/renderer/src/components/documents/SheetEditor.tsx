@@ -20,6 +20,9 @@ import {
   deleteColAt,
   applyFormat,
   writeMatrix,
+  fillSelection,
+  tileMatrix,
+  dataExtentBelow,
   sortByColumn,
   setColWidth,
   parseTsv,
@@ -27,11 +30,15 @@ import {
   normalizeRange,
   type CellRange
 } from './sheet/sheetOps'
+import { extendSeries, canToggleSeries, numericFill } from '../../lib/sheetFill'
+import { rewriteFormulaRefs } from '../../lib/sheetFormula'
+import { isSingleCell } from '@shared/gridClipboard'
 import SheetGrid from './sheet/SheetGrid'
 import SheetToolbar from './sheet/SheetToolbar'
 import SheetTabStrip from './sheet/SheetTabStrip'
 import SheetChart from './sheet/SheetChart'
 import SheetAiFill from './sheet/SheetAiFill'
+import SheetFormulaAssist, { type FormulaPlan } from './sheet/SheetFormulaAssist'
 import Icon from '../Icon'
 
 // Excel-class spreadsheet editor. The body is held locally as v2 (legacy v1
@@ -93,11 +100,21 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
   const [editing, setEditing] = useState<Cell | null>(null)
   const [editValue, setEditValue] = useState('')
   const [aiOpen, setAiOpen] = useState(false)
+  const [formulaAiOpen, setFormulaAiOpen] = useState(false)
   const [liveWidth, setLiveWidth] = useState<{ c: number; w: number } | null>(null)
   const [status, setStatus] = useState<string | null>(null)
   const [colMenu, setColMenu] = useState<{ c: number; x: number; y: number } | null>(null)
   const [funcIndex, setFuncIndex] = useState(0)
   const [funcDismissed, setFuncDismissed] = useState(false)
+  // Live preview rectangle while dragging the fill handle (cells about to be
+  // filled), and the just-completed fill so we can offer an Excel-style
+  // Copy/Series toggle for numeric fills.
+  const [fillPreview, setFillPreview] = useState<CellRange | null>(null)
+  const [lastFill, setLastFill] = useState<{
+    source: CellRange
+    target: CellRange
+    mode: 'series' | 'copy'
+  } | null>(null)
 
   const undoStack = useRef<SheetBodyV2[]>([])
   const redoStack = useRef<SheetBodyV2[]>([])
@@ -105,6 +122,18 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
   const gridWrapRef = useRef<HTMLDivElement | null>(null)
   const editInputRef = useRef<HTMLInputElement | null>(null)
   const refDrag = useRef<{ start: Cell; end: Cell } | null>(null)
+  // Source selection captured when a fill-handle drag begins, the live preview
+  // rectangle (mirrored as a ref so the global mouseup can read it), and a ref to
+  // the latest fill executor (kept fresh each render so the mouseup closure isn't
+  // stale).
+  const fillDrag = useRef<CellRange | null>(null)
+  const fillPreviewRef = useRef<CellRange | null>(null)
+  const doFillRef = useRef<(source: CellRange, target: CellRange) => void>(() => {})
+  // Remember the origin of the last in-app copy so a paste elsewhere can shift
+  // formula references relative to the move (matching Excel/Sheets). Only applied
+  // when the clipboard text still matches what we copied — an external copy is
+  // pasted literally, since we can't know its origin.
+  const clipboardCopy = useRef<{ text: string; r: number; c: number } | null>(null)
 
   const idx = body.activeSheet ?? 0
   const tab = activeTab(body)
@@ -172,6 +201,10 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
     focusGrid()
   }
   function onCellMouseEnter(r: number, c: number): void {
+    if (fillDrag.current) {
+      onFillEnter(r, c)
+      return
+    }
     if (refDrag.current) {
       refDrag.current = { start: refDrag.current.start, end: { r, c } }
       return
@@ -183,6 +216,16 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
     // list is safe and the handler never sees stale formula text — it pulls the
     // live value and caret straight from the input element.
     const up = (): void => {
+      if (fillDrag.current) {
+        const source = fillDrag.current
+        const target = fillPreviewRef.current
+        fillDrag.current = null
+        fillPreviewRef.current = null
+        dragging.current = false
+        setFillPreview(null)
+        if (target) doFillRef.current(source, target)
+        return
+      }
       if (refDrag.current) {
         const { start, end } = refDrag.current
         refDrag.current = null
@@ -311,12 +354,16 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
     }
     if (mod && e.key.toLowerCase() === 'c') {
       e.preventDefault()
-      await navigator.clipboard.writeText(rangeToTsv(tab, selection)).catch(() => {})
+      const text = rangeToTsv(tab, selection)
+      await navigator.clipboard.writeText(text).catch(() => {})
+      clipboardCopy.current = { text, r: selection.r0, c: selection.c0 }
       return
     }
     if (mod && e.key.toLowerCase() === 'x') {
       e.preventDefault()
-      await navigator.clipboard.writeText(rangeToTsv(tab, selection)).catch(() => {})
+      const text = rangeToTsv(tab, selection)
+      await navigator.clipboard.writeText(text).catch(() => {})
+      clipboardCopy.current = { text, r: selection.r0, c: selection.c0 }
       mutateTab((t) => {
         let next = t
         for (let rr = selection.r0; rr <= selection.r1; rr++)
@@ -325,10 +372,80 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
       })
       return
     }
+    if (mod && e.key === 'Enter') {
+      // Ctrl/Cmd+Enter fills the whole selection with the active cell's content,
+      // shifting a formula's references per target cell.
+      e.preventDefault()
+      const v = tab.rows[focus.r]?.[focus.c] ?? ''
+      mutateTab((t) =>
+        fillSelection(t, selection, v, (val, rr, cc) =>
+          val.trim().startsWith('=') ? rewriteFormulaRefs(val, rr - focus.r, cc - focus.c) : val
+        )
+      )
+      return
+    }
+    if (mod && e.key.toLowerCase() === 'd') {
+      // Fill down: copy the selection's top row into the rest, relative-shifting
+      // formulas (Excel/Sheets Ctrl+D).
+      e.preventDefault()
+      mutateTab((t) => {
+        const rows = t.rows.map((r) => [...r])
+        for (let c = selection.c0; c <= selection.c1; c++) {
+          const src = rows[selection.r0]?.[c] ?? ''
+          for (let r = selection.r0 + 1; r <= selection.r1; r++)
+            rows[r][c] = src.trim().startsWith('=') ? rewriteFormulaRefs(src, r - selection.r0, 0) : src
+        }
+        return { ...t, rows }
+      })
+      return
+    }
+    if (mod && e.key.toLowerCase() === 'r') {
+      // Fill right (Ctrl+R).
+      e.preventDefault()
+      mutateTab((t) => {
+        const rows = t.rows.map((r) => [...r])
+        for (let r = selection.r0; r <= selection.r1; r++) {
+          const src = rows[r]?.[selection.c0] ?? ''
+          for (let c = selection.c0 + 1; c <= selection.c1; c++)
+            rows[r][c] = src.trim().startsWith('=') ? rewriteFormulaRefs(src, 0, c - selection.c0) : src
+        }
+        return { ...t, rows }
+      })
+      return
+    }
     if (mod && e.key.toLowerCase() === 'v') {
       e.preventDefault()
       const text = await navigator.clipboard.readText().catch(() => '')
-      if (text) mutateTab((t) => writeMatrix(t, focus.r, focus.c, parseTsv(text)))
+      if (!text) return
+      const matrix = parseTsv(text)
+      // Only shift formulas when the clipboard is still our own copy (we know its
+      // origin); an external paste is written literally.
+      const origin = clipboardCopy.current && clipboardCopy.current.text === text ? clipboardCopy.current : null
+      const isF = (s: string): boolean => s.trim().startsWith('=')
+      const multiCell = selection.r0 !== selection.r1 || selection.c0 !== selection.c1
+      if (isSingleCell(matrix) && multiCell) {
+        const v = matrix[0][0]
+        mutateTab((t) =>
+          fillSelection(t, selection, v, (val, rr, cc) =>
+            origin && isF(val) ? rewriteFormulaRefs(val, rr - origin.r, cc - origin.c) : val
+          )
+        )
+      } else if (multiCell) {
+        mutateTab((t) =>
+          tileMatrix(t, selection, matrix, (val, destR, destC, si, sj) =>
+            origin && isF(val) ? rewriteFormulaRefs(val, destR - origin.r - si, destC - origin.c - sj) : val
+          )
+        )
+      } else {
+        const shifted = origin
+          ? matrix.map((row) =>
+              row.map((val) =>
+                isF(val) ? rewriteFormulaRefs(val, focus.r - origin.r, focus.c - origin.c) : val
+              )
+            )
+          : matrix
+        mutateTab((t) => writeMatrix(t, focus.r, focus.c, shifted))
+      }
       return
     }
     if (mod && e.key.toLowerCase() === 'a') {
@@ -366,6 +483,134 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
   function move(r: number, c: number, extend: boolean): void {
     setFocus({ r, c })
     if (!extend) setAnchor({ r, c })
+  }
+
+  // ── Autofill (fill handle, double-click, Ctrl+D/R) ────────────────────────
+  // Compute the new tab after extending `source` into `target`. Direction is
+  // inferred from how target grows past source; numeric sources can be forced to
+  // 'copy' or 'series' (the post-fill toggle). Formulas shift their relative
+  // references along the fill axis via the engine.
+  function computeFilledTab(
+    t: SheetTab,
+    source: CellRange,
+    target: CellRange,
+    modeOverride?: 'copy' | 'series'
+  ): SheetTab {
+    let axis: 'down' | 'up' | 'right' | 'left' | null = null
+    if (target.r1 > source.r1) axis = 'down'
+    else if (target.r0 < source.r0) axis = 'up'
+    else if (target.c1 > source.c1) axis = 'right'
+    else if (target.c0 < source.c0) axis = 'left'
+    if (!axis) return t
+
+    const rows = t.rows.map((r) => [...r])
+    let columns = t.columns
+    while (columns.length <= target.c1) columns = [...columns, colLabel(columns.length)]
+    while (rows.length <= target.r1) rows.push(new Array(columns.length).fill(''))
+    rows.forEach((r) => {
+      while (r.length < columns.length) r.push('')
+    })
+
+    const forced = (strip: string[]): boolean => !!modeOverride && canToggleSeries(strip)
+    if (axis === 'down' || axis === 'up') {
+      for (let c = source.c0; c <= source.c1; c++) {
+        const strip: string[] = []
+        for (let r = source.r0; r <= source.r1; r++) strip.push(rows[r]?.[c] ?? '')
+        if (axis === 'down') {
+          const count = target.r1 - source.r1
+          const vals = forced(strip)
+            ? numericFill(strip, count, modeOverride!)
+            : extendSeries(strip, count, (v, step) => rewriteFormulaRefs(v, step, 0))
+          for (let k = 0; k < count; k++) rows[source.r1 + 1 + k][c] = vals[k]
+        } else {
+          const count = source.r0 - target.r0
+          const rev = [...strip].reverse()
+          const vals = forced(rev)
+            ? numericFill(rev, count, modeOverride!)
+            : extendSeries(rev, count, (v, step) => rewriteFormulaRefs(v, -step, 0))
+          for (let k = 0; k < count; k++) rows[source.r0 - 1 - k][c] = vals[k]
+        }
+      }
+    } else {
+      for (let r = source.r0; r <= source.r1; r++) {
+        const strip: string[] = []
+        for (let c = source.c0; c <= source.c1; c++) strip.push(rows[r]?.[c] ?? '')
+        if (axis === 'right') {
+          const count = target.c1 - source.c1
+          const vals = forced(strip)
+            ? numericFill(strip, count, modeOverride!)
+            : extendSeries(strip, count, (v, step) => rewriteFormulaRefs(v, 0, step))
+          for (let k = 0; k < count; k++) rows[r][source.c1 + 1 + k] = vals[k]
+        } else {
+          const count = source.c0 - target.c0
+          const rev = [...strip].reverse()
+          const vals = forced(rev)
+            ? numericFill(rev, count, modeOverride!)
+            : extendSeries(rev, count, (v, step) => rewriteFormulaRefs(v, 0, -step))
+          for (let k = 0; k < count; k++) rows[r][source.c0 - 1 - k] = vals[k]
+        }
+      }
+    }
+    return { ...t, columns, rows }
+  }
+
+  function runFill(source: CellRange, target: CellRange): void {
+    if (target.r0 === source.r0 && target.r1 === source.r1 && target.c0 === source.c0 && target.c1 === source.c1)
+      return
+    mutateTab((t) => computeFilledTab(t, source, target))
+    setFocus({ r: target.r1, c: target.c1 })
+    setAnchor({ r: target.r0, c: target.c0 })
+    // Offer the Copy/Series toggle only when the source is numeric, where the
+    // distinction is meaningful (Excel's auto-fill options button).
+    const flat: string[] = []
+    for (let r = source.r0; r <= source.r1; r++)
+      for (let c = source.c0; c <= source.c1; c++) flat.push(tab.rows[r]?.[c] ?? '')
+    setLastFill(canToggleSeries(flat) ? { source, target, mode: 'series' } : null)
+  }
+  // Keep the mouseup-time executor fresh (it reads the current tab via mutateTab).
+  doFillRef.current = runFill
+
+  // Flip a completed numeric fill between Copy and Series (re-applies over the
+  // same target).
+  function toggleFillMode(): void {
+    if (!lastFill) return
+    const nextMode = lastFill.mode === 'series' ? 'copy' : 'series'
+    mutateTab((t) => computeFilledTab(t, lastFill.source, lastFill.target, nextMode))
+    setLastFill({ ...lastFill, mode: nextMode })
+  }
+
+  // The preview rectangle while dragging the handle: extend along whichever axis
+  // the pointer moved furthest, in the pointer's direction.
+  function fillPreviewFor(source: CellRange, r: number, c: number): CellRange {
+    const dRow = r > source.r1 ? r - source.r1 : r < source.r0 ? r - source.r0 : 0
+    const dCol = c > source.c1 ? c - source.c1 : c < source.c0 ? c - source.c0 : 0
+    if (Math.abs(dRow) >= Math.abs(dCol) && dRow !== 0) {
+      return dRow > 0
+        ? { r0: source.r0, c0: source.c0, r1: r, c1: source.c1 }
+        : { r0: r, c0: source.c0, r1: source.r1, c1: source.c1 }
+    }
+    if (dCol !== 0) {
+      return dCol > 0
+        ? { r0: source.r0, c0: source.c0, r1: source.r1, c1: c }
+        : { r0: source.r0, c0: c, r1: source.r1, c1: source.c1 }
+    }
+    return source
+  }
+
+  function onFillStart(): void {
+    fillDrag.current = selection
+    setLastFill(null)
+  }
+  function onFillEnter(r: number, c: number): void {
+    if (!fillDrag.current) return
+    const range = fillPreviewFor(fillDrag.current, r, c)
+    fillPreviewRef.current = range
+    setFillPreview(range)
+  }
+  // Double-click the handle: fill down to the extent of the neighbouring data.
+  function onFillToEnd(): void {
+    const extent = dataExtentBelow(tab, selection)
+    if (extent > selection.r1) runFill(selection, { ...selection, r1: extent })
   }
 
   // ── Formatting + structural ops ───────────────────────────────────────────
@@ -475,7 +720,30 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
     setAiOpen(false)
   }
 
+  // Apply an AI formula plan in a single undo step: create any proposed columns
+  // (appended to the active tab), write the formula to the active cell, and add
+  // any proposed tabs.
+  function applyFormulaPlan(plan: FormulaPlan): void {
+    const ai = body.activeSheet ?? 0
+    let nextBody: SheetBodyV2 = body
+    if (plan.columnsToAdd?.length) {
+      let t = activeTab(nextBody)
+      for (const name of plan.columnsToAdd) {
+        t = addColumn(t)
+        t = setColumnName(t, t.columns.length - 1, name)
+      }
+      nextBody = withTab(nextBody, ai, t)
+    }
+    nextBody = withTab(nextBody, ai, setCell(activeTab(nextBody), focus.r, focus.c, plan.formula))
+    if (plan.tabsToAdd?.length) {
+      nextBody = { ...nextBody, sheets: [...nextBody.sheets, ...plan.tabsToAdd.map((tb) => emptyTab(tb.name))] }
+    }
+    commit(nextBody)
+    setFormulaAiOpen(false)
+  }
+
   const activeRaw = tab.rows[focus.r]?.[focus.c] ?? ''
+  const activeRef = `${colLabel(focus.c)}${focus.r + 1}`
 
   return (
     <div className="flex flex-col h-full">
@@ -511,12 +779,49 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
             placeholder="Select a cell. Start with = for a formula, e.g. =SUM(A2:A9)"
             className="flex-1 bg-white dark:bg-stone-800 border border-stone-300 dark:border-stone-600 rounded-lg px-3 py-1.5 text-[13px] font-mono focus:outline-none focus:border-accent"
           />
+          <button
+            onClick={() => setFormulaAiOpen((v) => !v)}
+            data-testid="sheet-formula-ai-btn"
+            title="Ask AI to write a formula"
+            className="shrink-0 inline-flex items-center gap-1 rounded-lg border border-accent/40 bg-accent/[0.06] text-accent px-2.5 py-1.5 text-[12px] hover:bg-accent/[0.12]"
+          >
+            <Icon name="function" size={13} />
+            AI
+          </button>
         </div>
+
+        {formulaAiOpen && (
+          <SheetFormulaAssist
+            headers={tab.columns}
+            activeRef={activeRef}
+            sample={tab.rows.slice(0, 5)}
+            onApply={applyFormulaPlan}
+            onClose={() => setFormulaAiOpen(false)}
+          />
+        )}
 
         {status && (
           <div className="mb-2 text-[12px] text-stone-500 dark:text-stone-400 flex items-center gap-1.5" data-testid="sheet-status">
             <span>{status}</span>
             <button onClick={() => setStatus(null)} className="text-stone-400 hover:text-stone-600">
+              <Icon name="close" size={12} />
+            </button>
+          </div>
+        )}
+
+        {/* Excel-style auto-fill options: after a numeric fill, flip between
+            copying the value and continuing the series. */}
+        {lastFill && (
+          <div
+            className="mb-2 inline-flex items-center gap-2 rounded-md border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 px-2 py-1 text-[12px]"
+            data-testid="sheet-fill-options"
+          >
+            <Icon name="auto_fix_high" size={13} className="text-accent" />
+            <span className="text-stone-500 dark:text-stone-400">Filled as {lastFill.mode === 'series' ? 'series' : 'copy'}.</span>
+            <button onClick={toggleFillMode} className="text-accent hover:underline">
+              Switch to {lastFill.mode === 'series' ? 'copy' : 'series'}
+            </button>
+            <button onClick={() => setLastFill(null)} className="text-stone-400 hover:text-stone-600">
               <Icon name="close" size={12} />
             </button>
           </div>
@@ -556,6 +861,9 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
             onHeaderContextMenu={(c, x, y) => setColMenu({ c, x, y })}
             editInputRef={editInputRef}
             formulaRefMode={inFormulaEdit()}
+            fillPreview={fillPreview}
+            onFillStart={onFillStart}
+            onFillToEnd={onFillToEnd}
           />
           {funcMenu && editInputRef.current && (
             <FormulaMenu

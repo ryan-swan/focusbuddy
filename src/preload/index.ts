@@ -1280,6 +1280,20 @@ const api = {
       existing?: string[]
     }): Promise<{ ok: boolean; columns?: string[]; error?: string; needsApiKey?: boolean }> =>
       ipcRenderer.invoke('ai:suggestSheetColumns', input),
+    aiFormula: (input: {
+      prompt: string
+      headers: string[]
+      activeRef: string
+      sample?: string[][]
+    }): Promise<{
+      ok: boolean
+      formula?: string
+      explanation?: string
+      columnsToAdd?: string[]
+      tabsToAdd?: { name: string; purpose: string }[]
+      error?: string
+      needsApiKey?: boolean
+    }> => ipcRenderer.invoke('ai:suggestFormula', input),
     aiFill: (input: {
       prompt: string
       headers: string[]

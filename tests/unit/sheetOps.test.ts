@@ -7,6 +7,9 @@ import {
   applyFormat,
   writeMatrix,
   fillDown,
+  fillSelection,
+  tileMatrix,
+  dataExtentBelow,
   sortByColumn,
   parseTsv,
   rangeToTsv,
@@ -51,6 +54,65 @@ describe('row/column structural ops shift formats', () => {
     expect(t.columns).toHaveLength(2)
     expect(t.rows[0]).toEqual(['1', '3'])
     expect(t.formats?.['2,1']).toBeUndefined() // the bold cell was in deleted col
+  })
+})
+
+describe('fillSelection — Ctrl+Enter / single-cell over a range', () => {
+  it('writes one value into every cell of the range', () => {
+    const t = fillSelection(tab(), { r0: 0, c0: 0, r1: 1, c1: 1 }, 'x')
+    expect(t.rows[0].slice(0, 2)).toEqual(['x', 'x'])
+    expect(t.rows[1].slice(0, 2)).toEqual(['x', 'x'])
+    expect(t.rows[2]).toEqual(['7', '8', '9']) // untouched
+  })
+  it('grows the tab when the range is past the current extent', () => {
+    const t = fillSelection(tab(), { r0: 4, c0: 4, r1: 4, c1: 4 }, 'z')
+    expect(t.rows.length).toBeGreaterThanOrEqual(5)
+    expect(t.rows[4][4]).toBe('z')
+  })
+  it('applies a per-cell transform (formula relative rewrite)', () => {
+    const t = fillSelection(tab(), { r0: 0, c0: 0, r1: 2, c1: 0 }, '=B1', (v, r, _c, ar) =>
+      r === ar ? v : `=B${r + 1}`
+    )
+    expect(t.rows[0][0]).toBe('=B1')
+    expect(t.rows[1][0]).toBe('=B2')
+    expect(t.rows[2][0]).toBe('=B3')
+  })
+})
+
+describe('tileMatrix — paste a block tiled to fill a multiple-sized selection', () => {
+  it('tiles a 1x2 block across a 2x2 selection', () => {
+    const t = tileMatrix(tab(), { r0: 0, c0: 0, r1: 1, c1: 1 }, [['p', 'q']])
+    expect(t.rows[0].slice(0, 2)).toEqual(['p', 'q'])
+    expect(t.rows[1].slice(0, 2)).toEqual(['p', 'q'])
+  })
+  it('writes once at the corner when the selection is not a clean multiple', () => {
+    const t = tileMatrix(tab(), { r0: 0, c0: 0, r1: 2, c1: 0 }, [['p', 'q']])
+    // 1x2 block into a 3x1 selection is not a multiple -> placed once, grows cols
+    expect(t.rows[0].slice(0, 2)).toEqual(['p', 'q'])
+    expect(t.rows[1][0]).toBe('4') // unchanged
+  })
+})
+
+describe('dataExtentBelow — double-click fill-to-end uses the neighbour column', () => {
+  it('extends to the last filled row of the left neighbour', () => {
+    const t: SheetTab = {
+      id: 't',
+      name: 'S',
+      columns: ['A', 'B'],
+      rows: [
+        ['x', '=A1'],
+        ['y', ''],
+        ['z', ''],
+        ['', '']
+      ]
+    }
+    // Source is B1 (col 1, the formula); left neighbour A (col 0) has data to row 2,
+    // so a double-click fill should extend to row 2.
+    expect(dataExtentBelow(t, { r0: 0, c0: 1, r1: 0, c1: 1 })).toBe(2)
+  })
+  it('returns the source bottom when no neighbour data follows', () => {
+    const t: SheetTab = { id: 't', name: 'S', columns: ['A', 'B'], rows: [['1', '2']] }
+    expect(dataExtentBelow(t, { r0: 0, c0: 0, r1: 0, c1: 0 })).toBe(0)
   })
 })
 

@@ -140,6 +140,16 @@ async function stubAiColumns(app: LaunchedApp['app'], columns: string[]): Promis
   }, columns)
 }
 
+async function stubAiFormula(
+  app: LaunchedApp['app'],
+  result: { ok: boolean; formula?: string; explanation?: string; columnsToAdd?: string[] }
+): Promise<void> {
+  await app.evaluate(({ ipcMain }, r) => {
+    ipcMain.removeHandler('ai:suggestFormula')
+    ipcMain.handle('ai:suggestFormula', async () => r)
+  }, result)
+}
+
 // ── SE-1: Basic layout ────────────────────────────────────────────────────────
 
 test('SE-1 — blank spreadsheet opens with toolbar, grid and tab strip', async () => {
@@ -819,6 +829,158 @@ test('SE-13 — backward compat: legacy v1 sheet body normalizes and renders', a
     await expect(
       window.locator('[data-testid="sheet-tab-strip"]').locator('text=Sheet 1')
     ).toBeVisible()
+  } finally {
+    await dispose()
+  }
+})
+
+// ── SE-14: Ctrl+D fills down with relative formula references ──────────────────
+
+test('SE-14 — Ctrl+D copies the top cell down, shifting relative references', async () => {
+  const { window, dispose } = await launchApp()
+  try {
+    await waitForReady(window)
+    await openDocumentsHub(window)
+    await startBlankSpreadsheet(window)
+
+    await setViaFormulaBar(window, 0, 1, '10') // B1
+    await setViaFormulaBar(window, 1, 1, '20') // B2
+    await setViaFormulaBar(window, 0, 2, '=B1*2') // C1 -> 20
+
+    // Select C1:C2 then Ctrl+D.
+    await clickCell(window, 0, 2)
+    await window.locator('[data-testid="cell-1-2"]').click({ modifiers: ['Shift'] })
+    await window.keyboard.press('Control+d')
+    await window.waitForTimeout(150)
+
+    // C2 should be =B2*2 -> 40 (relative shift), not a copy of 20.
+    expect(await cellText(window, 1, 2), 'C2 = =B2*2 = 40').toBe('40')
+  } finally {
+    await dispose()
+  }
+})
+
+// ── SE-15: Ctrl+Enter fills the selection with the active cell's content ───────
+
+test('SE-15 — Ctrl+Enter fills the whole selection from the active cell', async () => {
+  const { window, dispose } = await launchApp()
+  try {
+    await waitForReady(window)
+    await openDocumentsHub(window)
+    await startBlankSpreadsheet(window)
+
+    await setViaFormulaBar(window, 0, 0, 'hi') // A1
+    // Anchor at A3, extend focus up to A1 so the ACTIVE cell (focus) is A1 = "hi".
+    await clickCell(window, 2, 0)
+    await window.locator('[data-testid="cell-0-0"]').click({ modifiers: ['Shift'] })
+    await window.keyboard.press('Control+Enter')
+    await window.waitForTimeout(150)
+
+    expect(await cellText(window, 1, 0), 'A2 filled').toBe('hi')
+    expect(await cellText(window, 2, 0), 'A3 filled').toBe('hi')
+  } finally {
+    await dispose()
+  }
+})
+
+// ── SE-16: double-click the fill handle fills to the end of the neighbour data ─
+
+test('SE-16 — double-click fill handle extends a formula to the neighbour data extent', async () => {
+  const { window, dispose } = await launchApp()
+  try {
+    await waitForReady(window)
+    await openDocumentsHub(window)
+    await startBlankSpreadsheet(window)
+
+    await setViaFormulaBar(window, 0, 0, 'x') // A1
+    await setViaFormulaBar(window, 1, 0, 'y') // A2
+    await setViaFormulaBar(window, 2, 0, 'z') // A3
+    await setViaFormulaBar(window, 0, 1, '=A1') // B1 -> x
+
+    await clickCell(window, 0, 1) // select B1; fill handle appears on it
+    await window.locator('[data-testid="sheet-fill-handle"]').dblclick()
+    await window.waitForTimeout(150)
+
+    expect(await cellText(window, 1, 1), 'B2 = =A2 = y').toBe('y')
+    expect(await cellText(window, 2, 1), 'B3 = =A3 = z').toBe('z')
+  } finally {
+    await dispose()
+  }
+})
+
+// ── SE-17: drag the fill handle to extrapolate a numeric series ────────────────
+
+test('SE-17 — dragging the fill handle extends a numeric series; toggle to copy', async () => {
+  const { window, dispose } = await launchApp()
+  try {
+    await waitForReady(window)
+    await openDocumentsHub(window)
+    await startBlankSpreadsheet(window)
+
+    await setViaFormulaBar(window, 0, 0, '1') // A1
+    await setViaFormulaBar(window, 1, 0, '2') // A2
+    await clickCell(window, 0, 0)
+    await window.locator('[data-testid="cell-1-0"]').click({ modifiers: ['Shift'] }) // select A1:A2
+
+    const handle = window.locator('[data-testid="sheet-fill-handle"]')
+    const hb = await handle.boundingBox()
+    const target = window.locator('[data-testid="cell-3-0"]')
+    const tb = await target.boundingBox()
+    if (!hb || !tb) throw new Error('missing bounding boxes')
+    await window.mouse.move(hb.x + hb.width / 2, hb.y + hb.height / 2)
+    await window.mouse.down()
+    await window.mouse.move(tb.x + tb.width / 2, tb.y + tb.height / 2, { steps: 6 })
+    await window.mouse.up()
+    await window.waitForTimeout(150)
+
+    expect(await cellText(window, 2, 0), 'A3 = 3 (series)').toBe('3')
+    expect(await cellText(window, 3, 0), 'A4 = 4 (series)').toBe('4')
+
+    // Auto-fill options offer a switch to copy.
+    await expect(window.locator('[data-testid="sheet-fill-options"]')).toBeVisible()
+    await window.locator('[data-testid="sheet-fill-options"]').getByText(/Switch to copy/i).click()
+    await window.waitForTimeout(150)
+    expect(await cellText(window, 2, 0), 'A3 = 2 (copy of last)').toBe('2')
+    expect(await cellText(window, 3, 0), 'A4 = 2 (copy of last)').toBe('2')
+  } finally {
+    await dispose()
+  }
+})
+
+// ── SE-18: AI formula assistant (stubbed) writes a formula + adds a column ─────
+
+test('SE-18 — formula assistant: stub suggestFormula; preview, Apply writes formula and adds column', async () => {
+  const { app, window, dispose } = await launchApp()
+  try {
+    await waitForReady(window)
+    await openDocumentsHub(window)
+    await startBlankSpreadsheet(window)
+
+    await stubAiFormula(app, {
+      ok: true,
+      formula: '=B1+C1',
+      explanation: 'Adds B1 and C1.',
+      columnsToAdd: ['Total']
+    })
+
+    // Active cell defaults to A1. Open the assistant from the formula bar.
+    await window.locator('[data-testid="sheet-formula-ai-btn"]').click()
+    await expect(window.locator('[data-testid="sheet-formula-assist"]')).toBeVisible({ timeout: 3_000 })
+
+    const panel = window.locator('[data-testid="sheet-formula-assist"]')
+    await panel.locator('textarea').fill('add the two numbers')
+    await panel.getByRole('button', { name: /Suggest formula/i }).click()
+    await expect(window.locator('[data-testid="sheet-formula-preview"]')).toContainText('=B1+C1', {
+      timeout: 5_000
+    })
+
+    await window.locator('[data-testid="sheet-formula-apply"]').click()
+    await window.waitForTimeout(200)
+
+    // A1 holds =B1+C1; B1 and C1 are empty so it computes to 0.
+    expect(await cellText(window, 0, 0), 'A1 computed').toBe('0')
+    // A new "Total" column was created (columns were A,B,C -> index 3 is Total).
+    expect(await columnName(window, 3), 'new Total column').toBe('Total')
   } finally {
     await dispose()
   }

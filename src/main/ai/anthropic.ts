@@ -2739,6 +2739,16 @@ export interface SheetFillResult {
   needsApiKey?: boolean
 }
 
+export interface SheetFormulaResult {
+  ok: boolean
+  formula?: string
+  explanation?: string
+  columnsToAdd?: string[]
+  tabsToAdd?: { name: string; purpose: string }[]
+  error?: string
+  needsApiKey?: boolean
+}
+
 export interface SheetColumnsResult {
   ok: boolean
   columns?: string[]
@@ -2808,6 +2818,109 @@ export async function suggestSheetColumns(input: {
     if (result.kind === 'unparsed')
       return { ok: false, error: 'The AI did not return a usable list of columns. Try a simpler description.' }
     return { ok: true, columns: result.columns }
+  } catch (e) {
+    return { ok: false, error: (e as Error).message }
+  }
+}
+
+// The natural-language formula assistant. The user says what they want ("total
+// of revenue minus cost for each row"); given the sheet's headers, the active
+// cell, and a sample of the data, the model returns the best A1-style formula
+// plus a plain explanation, and may propose the extra columns or tabs the
+// calculation needs. The renderer validates the formula through the real engine
+// before offering Apply, so a formula that won't compute is never written.
+export async function suggestFormula(input: {
+  prompt: string
+  headers: string[]
+  activeRef: string
+  sample?: string[][]
+}): Promise<SheetFormulaResult> {
+  const c = getClient()
+  if (!c) return { ok: false, needsApiKey: true, error: 'No Anthropic API key set. Open Settings → AI · API keys to paste one.' }
+  const prompt = input.prompt?.trim()
+  if (!prompt) return { ok: false, error: 'Describe what you want to calculate.' }
+
+  const headerLine = input.headers.length
+    ? input.headers.map((h, i) => `${String.fromCharCode(65 + (i % 26))}=${h || '(unnamed)'}`).join(', ')
+    : '(no headers yet)'
+  const sampleLines = (input.sample ?? [])
+    .slice(0, 5)
+    .map((row, i) => `row ${i + 1}: ${row.join(' | ')}`)
+    .join('\n')
+
+  const system =
+    'You are a spreadsheet formula assistant. Given a request, the columns, the active cell, and a data sample, ' +
+    'reply with ONLY a JSON object: {"formula": string, "explanation": string, "columnsToAdd"?: string[], "tabsToAdd"?: [{"name": string, "purpose": string}]}.\n' +
+    '- "formula" MUST start with = and use A1-style references (e.g. =B2-C2, =SUM(B2:B10)). It is written for the active cell.\n' +
+    '- Reference real columns by their letter as given. Do NOT use cross-sheet references like Sheet2!A1 — they are not supported.\n' +
+    '- "explanation" is one short, plain sentence a non-expert understands.\n' +
+    '- Propose "columnsToAdd" ONLY if the calculation genuinely needs a new column to hold its result or an intermediate; give clear header names.\n' +
+    '- Propose "tabsToAdd" ONLY if the task truly needs a separate sheet (e.g. a summary tab); keep it rare.\n' +
+    '- No markdown, no code fences, no prose outside the JSON.'
+  const user =
+    `Columns: ${headerLine}\n` +
+    `Active cell: ${input.activeRef}\n` +
+    (sampleLines ? `Data sample:\n${sampleLines}\n` : '') +
+    `Request: ${prompt}`
+
+  const attempt = async (sys: string): Promise<SheetFormulaResult | null> => {
+    const resp = await c.messages.create({
+      model: resolveModel('document'),
+      max_tokens: 2000,
+      system: sys,
+      messages: [{ role: 'user', content: user }]
+    })
+    if ((resp.stop_reason as string) === 'refusal')
+      return { ok: false, error: 'Claude declined this request. Try rephrasing it.' }
+    if (resp.stop_reason === 'max_tokens')
+      return { ok: false, error: 'That was too complex to answer in one go. Try a narrower request.' }
+    const text = resp.content
+      .filter((b) => b.type === 'text')
+      .map((b) => ('text' in b ? b.text : ''))
+      .join('')
+    let obj: unknown
+    try {
+      obj = extractJsonObject(text)
+    } catch {
+      return null
+    }
+    const o = obj as {
+      formula?: unknown
+      explanation?: unknown
+      columnsToAdd?: unknown
+      tabsToAdd?: unknown
+    }
+    const formula = typeof o.formula === 'string' ? o.formula.trim() : ''
+    if (!formula) return null
+    const columnsToAdd = Array.isArray(o.columnsToAdd)
+      ? o.columnsToAdd.map((x) => String(x ?? '').trim()).filter(Boolean)
+      : undefined
+    const tabsToAdd = Array.isArray(o.tabsToAdd)
+      ? o.tabsToAdd
+          .map((t) => {
+            const tt = t as { name?: unknown; purpose?: unknown }
+            return { name: String(tt.name ?? '').trim(), purpose: String(tt.purpose ?? '').trim() }
+          })
+          .filter((t) => t.name)
+      : undefined
+    return {
+      ok: true,
+      formula: formula.startsWith('=') ? formula : `=${formula}`,
+      explanation: typeof o.explanation === 'string' ? o.explanation.trim() : undefined,
+      columnsToAdd: columnsToAdd?.length ? columnsToAdd : undefined,
+      tabsToAdd: tabsToAdd?.length ? tabsToAdd : undefined
+    }
+  }
+
+  try {
+    let result = await attempt(system)
+    if (result === null)
+      result = await attempt(
+        system + '\nReturn STRICTLY the JSON object, starting with { and ending with }. Nothing else.'
+      )
+    if (result === null)
+      return { ok: false, error: 'The AI did not return a usable formula. Try describing the calculation differently.' }
+    return result
   } catch (e) {
     return { ok: false, error: (e as Error).message }
   }
