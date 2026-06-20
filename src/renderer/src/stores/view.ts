@@ -21,6 +21,7 @@ export type View =
   | { kind: 'livecanvas'; liveCanvasId: string }
   | { kind: 'livefolder'; liveFolderId: string }
   | { kind: 'collaborations' }
+  | { kind: 'insights' }
   | { kind: 'files' }
 
 interface ViewStore {
@@ -42,6 +43,7 @@ interface ViewStore {
   goLiveCanvas: (liveCanvasId: string) => void
   goLiveFolder: (liveFolderId: string) => void
   goCollaborations: () => void
+  goInsights: () => void
   goFiles: () => void
 }
 
@@ -154,6 +156,11 @@ export const useViewStore = create<ViewStore>((set) => ({
   },
   goCollaborations: () => {
     const v: View = { kind: 'collaborations' }
+    persistView(v)
+    set({ view: v })
+  },
+  goInsights: () => {
+    const v: View = { kind: 'insights' }
     persistView(v)
     set({ view: v })
   },
