@@ -50,6 +50,9 @@ export default function SheetAiFill({
   const [cols, setCols] = useState<string[] | null>(null)
   // Step two state: the headers locked in, and the previewed row matrix.
   const [activeHeaders, setActiveHeaders] = useState<string[]>([])
+  // 'auto' = let the AI generate as many rows as the task actually needs (a full
+  // project plan, not a 5-row sample). 'exact' = a specific number.
+  const [rowMode, setRowMode] = useState<'auto' | 'exact'>('auto')
   const [rowCount, setRowCount] = useState(Math.max(1, rangeRows))
   const [rows, setRows] = useState<string[][] | null>(null)
 
@@ -96,7 +99,8 @@ export default function SheetAiFill({
       const res = await window.api.sheet.aiFill({
         prompt,
         headers: activeHeaders,
-        rangeRows: rowCount
+        rangeRows: rowMode === 'exact' ? rowCount : 0,
+        auto: rowMode === 'auto'
       })
       if (!res.ok || !res.rows) {
         setError(res.error || (res.needsApiKey ? 'No Anthropic API key set.' : 'The AI returned nothing.'))
@@ -240,15 +244,35 @@ export default function SheetAiFill({
             </button>
           </div>
 
-          <div className="mt-2 flex items-center gap-2">
+          <div className="mt-2 flex items-center gap-2" data-testid="sheet-ai-row-mode">
             <label className="text-[12px] text-stone-500 dark:text-stone-400">Rows</label>
-            <input
-              type="number"
-              min={1}
-              value={rowCount}
-              onChange={(e) => setRowCount(Math.max(1, Math.floor(Number(e.target.value) || 1)))}
-              className="w-20 bg-white dark:bg-stone-800 border border-stone-300 dark:border-stone-600 rounded px-2 py-1 text-[12px] focus:outline-none focus:border-accent"
-            />
+            <div className="inline-flex rounded-md border border-stone-300 dark:border-stone-600 overflow-hidden text-[12px]">
+              <button
+                onClick={() => setRowMode('auto')}
+                data-testid="sheet-ai-rowmode-auto"
+                className={`px-2.5 py-1 ${rowMode === 'auto' ? 'bg-accent text-white' : 'hover:bg-stone-100 dark:hover:bg-stone-800'}`}
+              >
+                As many as needed
+              </button>
+              <button
+                onClick={() => setRowMode('exact')}
+                className={`px-2.5 py-1 border-l border-stone-300 dark:border-stone-600 ${rowMode === 'exact' ? 'bg-accent text-white' : 'hover:bg-stone-100 dark:hover:bg-stone-800'}`}
+              >
+                Exact
+              </button>
+            </div>
+            {rowMode === 'exact' && (
+              <input
+                type="number"
+                min={1}
+                value={rowCount}
+                onChange={(e) => setRowCount(Math.max(1, Math.floor(Number(e.target.value) || 1)))}
+                className="w-20 bg-white dark:bg-stone-800 border border-stone-300 dark:border-stone-600 rounded px-2 py-1 text-[12px] focus:outline-none focus:border-accent"
+              />
+            )}
+            {rowMode === 'auto' && (
+              <span className="text-[11px] text-stone-400">The AI decides how many rows the task needs.</span>
+            )}
           </div>
 
           {rows && (

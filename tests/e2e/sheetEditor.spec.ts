@@ -743,8 +743,11 @@ test('SE-12 — AI two-step: suggest columns → create them → generate rows �
     expect(await columnName(window, 1), 'col B name').toBe('ARR')
     expect(await columnName(window, 2), 'col C name').toBe('Commission')
 
-    // Step 2: the active headers are shown; generate rows.
+    // Step 2: the active headers are shown; the row mode defaults to "as many
+    // as needed" (auto), so no fixed-count input is shown by default.
     await expect(window.locator('[data-testid="sheet-ai-active-headers"]')).toContainText('Company')
+    await expect(window.locator('[data-testid="sheet-ai-row-mode"]')).toBeVisible()
+    await expect(aiPanel.locator('input[type="number"]')).toHaveCount(0)
     await aiPanel.getByRole('button', { name: /Generate rows/i }).click()
 
     const previewTable = aiPanel.locator('table')
