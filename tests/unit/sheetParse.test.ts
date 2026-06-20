@@ -3,7 +3,7 @@
 // object-only extractor rejected with "No JSON object in response".
 
 import { describe, it, expect } from 'vitest'
-import { parseSheetRows } from '../../src/main/ai/sheetParse'
+import { parseSheetRows, parseSheetColumns } from '../../src/main/ai/sheetParse'
 
 describe('parseSheetRows', () => {
   it('parses the requested {"rows": [[...]]} object form', () => {
@@ -49,5 +49,40 @@ describe('parseSheetRows', () => {
     // No closing brace, but a complete inner array is recoverable.
     const r = parseSheetRows('{"rows": [["a","b"]] ')
     expect(r).toEqual([['a', 'b']])
+  })
+})
+
+describe('parseSheetColumns', () => {
+  it('parses the requested {"columns": [...]} object form', () => {
+    expect(parseSheetColumns('{"columns": ["Task","Owner","Status"]}')).toEqual([
+      'Task',
+      'Owner',
+      'Status'
+    ])
+  })
+
+  it('parses a bare top-level array of names', () => {
+    expect(parseSheetColumns('["Name","ARR","Growth %"]')).toEqual(['Name', 'ARR', 'Growth %'])
+  })
+
+  it('tolerates a ```json fence and surrounding prose', () => {
+    expect(parseSheetColumns('Sure:\n```json\n{"columns":["A","B"]}\n```')).toEqual(['A', 'B'])
+  })
+
+  it('trims, drops blanks, and de-duplicates case-insensitively', () => {
+    expect(parseSheetColumns('[" Task ", "task", "", "Owner"]')).toEqual(['Task', 'Owner'])
+  })
+
+  it('returns null for prose with no list', () => {
+    expect(parseSheetColumns('I cannot do that.')).toBeNull()
+  })
+
+  it('returns null for an empty list', () => {
+    expect(parseSheetColumns('{"columns": []}')).toBeNull()
+    expect(parseSheetColumns('[]')).toBeNull()
+  })
+
+  it('returns null for truncated/invalid JSON rather than throwing', () => {
+    expect(parseSheetColumns('{"columns": ["Task","Own')).toBeNull()
   })
 })

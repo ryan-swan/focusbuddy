@@ -42,3 +42,51 @@ export function parseSheetRows(text: string): string[][] | null {
   }
   return null
 }
+
+// Parse the column-header list out of a Sheets AI "suggest columns" reply. Like
+// parseSheetRows it tolerates BOTH {"columns": ["a","b"]} and a bare array
+// ["a","b"], plus a ```json fence, and never throws. Blank/duplicate names are
+// dropped so the header row is always clean. Returns null when there is no
+// usable list of names.
+export function parseSheetColumns(text: string): string[] | null {
+  let s = (text ?? '').trim()
+  const fence = s.match(/```(?:json)?\s*([\s\S]*?)```/i)
+  if (fence) s = fence[1].trim()
+  const objStart = s.indexOf('{')
+  const arrStart = s.indexOf('[')
+  const candidates: string[] = []
+  if (objStart !== -1) {
+    const end = s.lastIndexOf('}')
+    if (end > objStart) candidates.push(s.slice(objStart, end + 1))
+  }
+  if (arrStart !== -1) {
+    const end = s.lastIndexOf(']')
+    if (end > arrStart) candidates.push(s.slice(arrStart, end + 1))
+  }
+  for (const cand of candidates) {
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(cand)
+    } catch {
+      continue
+    }
+    const list = Array.isArray(parsed)
+      ? parsed
+      : parsed && typeof parsed === 'object'
+        ? (parsed as { columns?: unknown }).columns
+        : null
+    if (Array.isArray(list)) {
+      const seen = new Set<string>()
+      const names: string[] = []
+      for (const c of list) {
+        const name = String(c ?? '').trim()
+        const key = name.toLowerCase()
+        if (!name || seen.has(key)) continue
+        seen.add(key)
+        names.push(name)
+      }
+      if (names.length) return names
+    }
+  }
+  return null
+}

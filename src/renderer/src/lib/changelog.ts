@@ -36,6 +36,20 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.69',
+    date: '2026-06-20T05:00:00Z',
+    title: 'v2.5.69 — Build spreadsheets with AI in two steps',
+    tag: 'feature',
+    summary:
+      'Spreadsheet AI now works like the tables assistant: it designs your columns first, then fills the rows to fit them. There is no longer a cap on how many columns or rows it can add, so big sheets just work.',
+    highlights: [
+      'Two-step AI build: describe your data, the AI proposes columns you can rename, add, or remove, then it generates rows that match those exact columns.',
+      'No row or column limit. Large sheets are generated in batches behind the scenes, so a big request no longer fails partway with an error.',
+      'Already have headers? Use them and skip straight to row generation. Every result is previewed before it writes, and formulas still compute for real.'
+    ],
+    links: [{ label: 'Finding your way around', href: `${HELP_BASE}/getting-around` }]
+  },
+  {
     version: '2.5.68',
     date: '2026-06-20T03:00:00Z',
     title: 'v2.5.68 — Spreadsheet AI fill fix',
