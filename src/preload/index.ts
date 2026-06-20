@@ -1275,6 +1275,11 @@ const api = {
       format: 'xlsx' | 'csv'
       name: string
     }): Promise<{ ok: boolean; path?: string; error?: string }> => ipcRenderer.invoke('sheet:export', input),
+    aiColumns: (input: {
+      prompt: string
+      existing?: string[]
+    }): Promise<{ ok: boolean; columns?: string[]; error?: string; needsApiKey?: boolean }> =>
+      ipcRenderer.invoke('ai:suggestSheetColumns', input),
     aiFill: (input: {
       prompt: string
       headers: string[]

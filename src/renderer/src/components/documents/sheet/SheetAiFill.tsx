@@ -1,6 +1,8 @@
-// AI fill panel. The user describes the data they want; the model returns a
-// matrix of cell values (possibly including formulas) sized to the current
-// selection, which is previewed before it is written. Any formula it returns is
+// AI fill panel — a two-step flow that mirrors the Tables assistant: first
+// design the COLUMNS, then generate ROWS that fit them. Step one proposes a
+// clean set of header names from the user's description (editable before they
+// commit); step two fills rows against those exact headers. Everything is
+// previewed before it touches the sheet, and any formula the model returns is
 // run through the real engine on apply, so the AI cannot smuggle in a fake
 // number — a bad formula shows #ERR like any other.
 
@@ -10,28 +12,97 @@ import Icon from '../../Icon'
 interface Props {
   headers: string[]
   rangeRows: number
+  // Writes the chosen header names into the sheet (step one). Returns the names
+  // actually applied so step two can generate rows against them.
+  onApplyColumns: (columns: string[]) => void
+  // Writes the generated row matrix into the sheet (step two).
   onApply: (matrix: string[][]) => void
   onClose: () => void
 }
 
-export default function SheetAiFill({ headers, rangeRows, onApply, onClose }: Props): JSX.Element {
+// A header is "real" (user-named) rather than a default A/B/C grid label.
+function hasNamedColumns(headers: string[]): boolean {
+  return headers.some((h, i) => h.trim() && h.trim() !== defaultLabel(i))
+}
+function defaultLabel(i: number): string {
+  let s = ''
+  let n = i
+  do {
+    s = String.fromCharCode(65 + (n % 26)) + s
+    n = Math.floor(n / 26) - 1
+  } while (n >= 0)
+  return s
+}
+
+export default function SheetAiFill({
+  headers,
+  rangeRows,
+  onApplyColumns,
+  onApply,
+  onClose
+}: Props): JSX.Element {
+  const [step, setStep] = useState<'columns' | 'rows'>('columns')
   const [prompt, setPrompt] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [preview, setPreview] = useState<string[][] | null>(null)
 
-  async function run(): Promise<void> {
+  // Step one state: the editable list of proposed columns.
+  const [cols, setCols] = useState<string[] | null>(null)
+  // Step two state: the headers locked in, and the previewed row matrix.
+  const [activeHeaders, setActiveHeaders] = useState<string[]>([])
+  const [rowCount, setRowCount] = useState(Math.max(1, rangeRows))
+  const [rows, setRows] = useState<string[][] | null>(null)
+
+  async function suggestColumns(): Promise<void> {
     if (!prompt.trim()) return
     setBusy(true)
     setError(null)
-    setPreview(null)
+    setCols(null)
     try {
-      const res = await window.api.sheet.aiFill({ prompt, headers, rangeRows })
+      const existing = headers.filter((h, i) => h.trim() && h.trim() !== defaultLabel(i))
+      const res = await window.api.sheet.aiColumns({ prompt, existing })
+      if (!res.ok || !res.columns) {
+        setError(res.error || (res.needsApiKey ? 'No Anthropic API key set.' : 'The AI returned nothing.'))
+        return
+      }
+      setCols(res.columns)
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  // Lock the columns in (write them to the sheet) and move to the rows step.
+  function commitColumns(list: string[]): void {
+    const clean = list.map((c) => c.trim()).filter(Boolean)
+    if (!clean.length) {
+      setError('Add at least one column first.')
+      return
+    }
+    onApplyColumns(clean)
+    setActiveHeaders(clean)
+    setError(null)
+    setRows(null)
+    setStep('rows')
+  }
+
+  async function generateRows(): Promise<void> {
+    if (!prompt.trim()) return
+    setBusy(true)
+    setError(null)
+    setRows(null)
+    try {
+      const res = await window.api.sheet.aiFill({
+        prompt,
+        headers: activeHeaders,
+        rangeRows: rowCount
+      })
       if (!res.ok || !res.rows) {
         setError(res.error || (res.needsApiKey ? 'No Anthropic API key set.' : 'The AI returned nothing.'))
         return
       }
-      setPreview(res.rows)
+      setRows(res.rows)
     } catch (e) {
       setError((e as Error).message)
     } finally {
@@ -44,60 +115,206 @@ export default function SheetAiFill({ headers, rangeRows, onApply, onClose }: Pr
       <div className="flex items-center gap-1.5 mb-2">
         <Icon name="auto_awesome" size={13} className="text-accent" />
         <span className="text-[11px] uppercase tracking-wider font-semibold text-accent">
-          AI fill ({headers.length} cols x {rangeRows} rows)
+          {step === 'columns' ? 'AI · Step 1 of 2 · Columns' : 'AI · Step 2 of 2 · Rows'}
         </span>
         <button onClick={onClose} className="ml-auto icon-btn" aria-label="Close">
           <Icon name="close" size={13} />
         </button>
       </div>
+
       <textarea
         value={prompt}
         onChange={(e) => setPrompt(e.target.value)}
         onKeyDown={(e) => {
-          if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) void run()
+          if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+            if (step === 'columns') void suggestColumns()
+            else void generateRows()
+          }
         }}
-        placeholder={`Describe the data for columns: ${headers.join(', ') || 'A, B, C'}. e.g. "10 SaaS companies with name, ARR, and a growth % formula"`}
+        placeholder={'Describe the data. e.g. "A project plan for a Loop ERP marketing launch with tasks, owners, start and end dates, and status"'}
         rows={2}
         autoFocus
         className="w-full bg-white dark:bg-stone-800 border border-stone-300 dark:border-stone-600 rounded-lg px-3 py-2 text-[13px] focus:outline-none focus:border-accent resize-none"
       />
       {error && <div className="text-[12px] text-red-600 dark:text-red-400 mt-1">{error}</div>}
 
-      {preview && (
-        <div className="mt-2 max-h-48 overflow-auto rounded-lg border border-stone-200 dark:border-stone-700">
-          <table className="w-full text-[11px]">
-            <tbody>
-              {preview.slice(0, 30).map((row, i) => (
-                <tr key={i} className="border-b border-stone-100 dark:border-stone-800">
-                  {row.map((cell, j) => (
-                    <td key={j} className="px-2 py-1 border-r border-stone-100 dark:border-stone-800 truncate max-w-[160px]">
-                      {cell}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      {/* ── Step 1: columns ───────────────────────────────────────────────── */}
+      {step === 'columns' && (
+        <>
+          {cols && (
+            <div className="mt-2" data-testid="sheet-ai-columns">
+              <div className="text-[11px] text-stone-500 dark:text-stone-400 mb-1">
+                Proposed columns — edit, add, or remove, then create them.
+              </div>
+              <div className="space-y-1.5 max-h-48 overflow-auto">
+                {cols.map((col, i) => (
+                  <div key={i} className="flex items-center gap-1.5">
+                    <span className="text-[11px] font-mono text-stone-400 w-5 text-right shrink-0">{i + 1}</span>
+                    <input
+                      value={col}
+                      onChange={(e) =>
+                        setCols((cur) => (cur ? cur.map((c, j) => (j === i ? e.target.value : c)) : cur))
+                      }
+                      className="flex-1 bg-white dark:bg-stone-800 border border-stone-300 dark:border-stone-600 rounded px-2 py-1 text-[12px] focus:outline-none focus:border-accent"
+                    />
+                    <button
+                      onClick={() => setCols((cur) => (cur ? cur.filter((_, j) => j !== i) : cur))}
+                      className="icon-btn"
+                      aria-label="Remove column"
+                    >
+                      <Icon name="close" size={12} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <button
+                onClick={() => setCols((cur) => [...(cur ?? []), ''])}
+                className="mt-1.5 text-[12px] text-accent hover:underline flex items-center gap-1"
+              >
+                <Icon name="add" size={12} /> Add column
+              </button>
+            </div>
+          )}
+
+          <div className="flex flex-wrap items-center gap-2 mt-2">
+            {cols == null ? (
+              <button
+                onClick={() => void suggestColumns()}
+                disabled={busy || !prompt.trim()}
+                className="btn-primary text-[12px] px-3 py-1.5"
+              >
+                {busy ? 'Thinking…' : 'Suggest columns'}
+              </button>
+            ) : (
+              <>
+                <button
+                  onClick={() => commitColumns(cols)}
+                  data-testid="sheet-ai-create-columns"
+                  className="btn-primary text-[12px] px-3 py-1.5"
+                >
+                  Create {cols.filter((c) => c.trim()).length} columns
+                </button>
+                <button
+                  onClick={() => void suggestColumns()}
+                  disabled={busy}
+                  className="text-[12px] px-3 py-1.5 rounded border border-stone-300 dark:border-stone-600 hover:bg-stone-100 dark:hover:bg-stone-800"
+                >
+                  Re-suggest
+                </button>
+              </>
+            )}
+            {hasNamedColumns(headers) && (
+              <button
+                onClick={() => commitColumns(headers.filter((h, i) => h.trim() && h.trim() !== defaultLabel(i)))}
+                className="text-[12px] px-3 py-1.5 rounded border border-stone-300 dark:border-stone-600 hover:bg-stone-100 dark:hover:bg-stone-800"
+              >
+                Use existing columns
+              </button>
+            )}
+            <span className="text-[11px] text-stone-400">Cmd+Enter</span>
+          </div>
+        </>
       )}
 
-      <div className="flex items-center gap-2 mt-2">
-        {preview == null ? (
-          <button onClick={() => void run()} disabled={busy || !prompt.trim()} className="btn-primary text-[12px] px-3 py-1.5">
-            {busy ? 'Generating…' : 'Generate'}
-          </button>
-        ) : (
-          <>
-            <button onClick={() => onApply(preview)} data-testid="sheet-ai-apply" className="btn-primary text-[12px] px-3 py-1.5">
-              Insert {preview.length} rows
+      {/* ── Step 2: rows ──────────────────────────────────────────────────── */}
+      {step === 'rows' && (
+        <>
+          <div className="mt-2 flex flex-wrap items-center gap-1.5" data-testid="sheet-ai-active-headers">
+            {activeHeaders.map((h, i) => (
+              <span
+                key={i}
+                className="text-[11px] px-2 py-0.5 rounded-full bg-stone-200/70 dark:bg-stone-700/70 text-stone-600 dark:text-stone-300"
+              >
+                {h}
+              </span>
+            ))}
+            <button
+              onClick={() => {
+                setStep('columns')
+                setRows(null)
+                setError(null)
+              }}
+              className="text-[11px] text-accent hover:underline ml-1"
+            >
+              Edit columns
             </button>
-            <button onClick={() => void run()} disabled={busy} className="text-[12px] px-3 py-1.5 rounded border border-stone-300 dark:border-stone-600 hover:bg-stone-100 dark:hover:bg-stone-800">
-              Regenerate
-            </button>
-          </>
-        )}
-        <span className="text-[11px] text-stone-400">Previewed before it writes. Cmd+Enter</span>
-      </div>
+          </div>
+
+          <div className="mt-2 flex items-center gap-2">
+            <label className="text-[12px] text-stone-500 dark:text-stone-400">Rows</label>
+            <input
+              type="number"
+              min={1}
+              value={rowCount}
+              onChange={(e) => setRowCount(Math.max(1, Math.floor(Number(e.target.value) || 1)))}
+              className="w-20 bg-white dark:bg-stone-800 border border-stone-300 dark:border-stone-600 rounded px-2 py-1 text-[12px] focus:outline-none focus:border-accent"
+            />
+          </div>
+
+          {rows && (
+            <div className="mt-2 max-h-48 overflow-auto rounded-lg border border-stone-200 dark:border-stone-700">
+              <table className="w-full text-[11px]">
+                <thead>
+                  <tr className="border-b border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800/60">
+                    {activeHeaders.map((h, j) => (
+                      <th
+                        key={j}
+                        className="px-2 py-1 border-r border-stone-100 dark:border-stone-800 text-left font-semibold truncate max-w-[160px]"
+                      >
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.slice(0, 30).map((row, i) => (
+                    <tr key={i} className="border-b border-stone-100 dark:border-stone-800">
+                      {row.map((cell, j) => (
+                        <td
+                          key={j}
+                          className="px-2 py-1 border-r border-stone-100 dark:border-stone-800 truncate max-w-[160px]"
+                        >
+                          {cell}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          <div className="flex items-center gap-2 mt-2">
+            {rows == null ? (
+              <button
+                onClick={() => void generateRows()}
+                disabled={busy || !prompt.trim()}
+                className="btn-primary text-[12px] px-3 py-1.5"
+              >
+                {busy ? 'Generating…' : 'Generate rows'}
+              </button>
+            ) : (
+              <>
+                <button
+                  onClick={() => onApply(rows)}
+                  data-testid="sheet-ai-apply"
+                  className="btn-primary text-[12px] px-3 py-1.5"
+                >
+                  Insert {rows.length} rows
+                </button>
+                <button
+                  onClick={() => void generateRows()}
+                  disabled={busy}
+                  className="text-[12px] px-3 py-1.5 rounded border border-stone-300 dark:border-stone-600 hover:bg-stone-100 dark:hover:bg-stone-800"
+                >
+                  Regenerate
+                </button>
+              </>
+            )}
+            <span className="text-[11px] text-stone-400">Previewed before it writes. Cmd+Enter</span>
+          </div>
+        </>
+      )}
     </div>
   )
 }

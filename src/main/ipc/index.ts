@@ -276,6 +276,7 @@ import {
   summarizeRecentTrail,
   suggestDocContent,
   rewriteSelection,
+  suggestSheetColumns,
   fillSheetRange,
   generateSlideElements
 } from '../ai/anthropic'
@@ -699,6 +700,10 @@ export function registerIpcHandlers(): void {
   // ── Spreadsheet interop + AI fill ─────────────────────────────────────────
   ipcMain.handle('sheet:import', () => importSheet())
   ipcMain.handle('sheet:export', (_e, input: Parameters<typeof exportSheet>[0]) => exportSheet(input))
+  ipcMain.handle('ai:suggestSheetColumns', (_e, input: { prompt: string; existing?: string[] }) => {
+    recordAiCall()
+    return suggestSheetColumns(input)
+  })
   ipcMain.handle('ai:fillSheetRange', (_e, input: { prompt: string; headers: string[]; rangeRows: number }) => {
     recordAiCall()
     return fillSheetRange(input)

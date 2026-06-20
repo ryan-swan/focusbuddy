@@ -98,6 +98,11 @@ async function cellText(window: Page, r: number, c: number): Promise<string> {
   return (await div.textContent()) ?? ''
 }
 
+// Read a column's header name (the editable input inside its col-header cell).
+async function columnName(window: Page, c: number): Promise<string> {
+  return window.locator(`[data-testid="col-header-${c}"] input`).inputValue()
+}
+
 // ── IPC stubs (main process) ──────────────────────────────────────────────────
 
 async function stubSheetImport(
@@ -126,6 +131,13 @@ async function stubAiFill(app: LaunchedApp['app'], rows: string[][]): Promise<vo
     ipcMain.removeHandler('ai:fillSheetRange')
     ipcMain.handle('ai:fillSheetRange', async () => ({ ok: true, rows: r }))
   }, rows)
+}
+
+async function stubAiColumns(app: LaunchedApp['app'], columns: string[]): Promise<void> {
+  await app.evaluate(({ ipcMain }, c: string[]) => {
+    ipcMain.removeHandler('ai:suggestSheetColumns')
+    ipcMain.handle('ai:suggestSheetColumns', async () => ({ ok: true, columns: c }))
+  }, columns)
 }
 
 // ── SE-1: Basic layout ────────────────────────────────────────────────────────
@@ -690,41 +702,51 @@ test('SE-11 — sheet:import stub loads a SheetBodyV2; export stub shows path in
 
 // ── SE-12: AI fill (stubbed) ──────────────────────────────────────────────────
 
-test('SE-12 — AI fill: stub ai:fillSheetRange; open panel, generate, preview shows, Apply writes matrix', async () => {
+test('SE-12 — AI two-step: suggest columns → create them → generate rows → Apply writes matrix', async () => {
   const { app, window, dispose } = await launchApp()
   try {
     await waitForReady(window)
     await openDocumentsHub(window)
     await startBlankSpreadsheet(window)
 
-    // Stub ai:fillSheetRange before opening the panel
+    // Stub BOTH steps before opening the panel: step 1 columns, step 2 rows.
+    const fakeColumns = ['Company', 'ARR', 'Commission']
     const fakeMatrix = [
       ['Acme Corp', '500000', '=B1*0.1'],
       ['Beta LLC', '250000', '=B2*0.1'],
       ['Gamma Inc', '750000', '=B3*0.1']
     ]
+    await stubAiColumns(app, fakeColumns)
     await stubAiFill(app, fakeMatrix)
 
-    // Select a range: A1:C1 (click A1, shift-click C1)
+    // Anchor the selection at A1.
     await clickCell(window, 0, 0)
-    await window.locator('[data-testid="cell-0-2"]').click({ modifiers: ['Shift'] })
     await window.waitForTimeout(100)
 
-    // Open AI fill panel via toolbar button (the "AI fill" button)
+    // Open AI panel via toolbar button (the "AI fill" button)
     const toolbar = window.locator('[data-testid="sheet-toolbar"]')
     const aiFillBtn = toolbar.locator('button', { hasText: /AI fill/i })
     await aiFillBtn.click()
     await expect(window.locator('[data-testid="sheet-ai-fill"]')).toBeVisible({ timeout: 3_000 })
 
-    // Fill in the prompt textarea
     const aiPanel = window.locator('[data-testid="sheet-ai-fill"]')
     await aiPanel.locator('textarea').fill('SaaS companies with ARR and 10% commission')
 
-    // Click Generate
-    await aiPanel.getByRole('button', { name: /^Generate$/i }).click()
-    await window.waitForTimeout(500)
+    // Step 1: suggest columns, then create them.
+    await aiPanel.getByRole('button', { name: /Suggest columns/i }).click()
+    await expect(window.locator('[data-testid="sheet-ai-columns"]')).toBeVisible({ timeout: 5_000 })
+    await window.locator('[data-testid="sheet-ai-create-columns"]').click()
+    await window.waitForTimeout(200)
 
-    // Preview table should appear inside the AI panel
+    // Columns are written into the header row.
+    expect(await columnName(window, 0), 'col A name').toBe('Company')
+    expect(await columnName(window, 1), 'col B name').toBe('ARR')
+    expect(await columnName(window, 2), 'col C name').toBe('Commission')
+
+    // Step 2: the active headers are shown; generate rows.
+    await expect(window.locator('[data-testid="sheet-ai-active-headers"]')).toContainText('Company')
+    await aiPanel.getByRole('button', { name: /Generate rows/i }).click()
+
     const previewTable = aiPanel.locator('table')
     await expect(previewTable).toBeVisible({ timeout: 5_000 })
     await expect(previewTable).toContainText('Acme Corp')
@@ -737,15 +759,9 @@ test('SE-12 — AI fill: stub ai:fillSheetRange; open panel, generate, preview s
     await expect(window.locator('[data-testid="sheet-ai-fill"]')).not.toBeVisible({ timeout: 3_000 })
 
     // The matrix should be written starting at the selection anchor (row 0, col 0)
-    const a1 = await cellText(window, 0, 0)
-    expect(a1, 'A1 = Acme Corp').toBe('Acme Corp')
-
-    const b1 = await cellText(window, 0, 1)
-    expect(b1, 'B1 = 500000').toBe('500000')
-
-    // Row 1 (second data row)
-    const a2 = await cellText(window, 1, 0)
-    expect(a2, 'A2 = Beta LLC').toBe('Beta LLC')
+    expect(await cellText(window, 0, 0), 'A1 = Acme Corp').toBe('Acme Corp')
+    expect(await cellText(window, 0, 1), 'B1 = 500000').toBe('500000')
+    expect(await cellText(window, 1, 0), 'A2 = Beta LLC').toBe('Beta LLC')
   } finally {
     await dispose()
   }

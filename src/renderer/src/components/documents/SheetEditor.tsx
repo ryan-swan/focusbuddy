@@ -12,6 +12,7 @@ import {
 import {
   setCell,
   setColumnName,
+  addColumn,
   addRow,
   insertRowAt,
   deleteRowAt,
@@ -454,6 +455,21 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
   }
 
   // ── AI fill ───────────────────────────────────────────────────────────────
+  // Step one: name the columns starting at the selection's left edge, growing
+  // the grid as needed. The panel stays open and advances to the rows step.
+  function applyAiColumns(columns: string[]): void {
+    mutateTab((t) => {
+      let next = t
+      const need = selection.c0 + columns.length
+      while (next.columns.length < need) next = addColumn(next)
+      columns.forEach((name, i) => {
+        next = setColumnName(next, selection.c0 + i, name)
+      })
+      return next
+    })
+  }
+  // Step two: write the generated rows just below the header, anchored to the
+  // selection's top-left so they land under the columns we just created.
   function applyAiMatrix(matrix: string[][]): void {
     mutateTab((t) => writeMatrix(t, selection.r0, selection.c0, matrix))
     setAiOpen(false)
@@ -510,6 +526,7 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
           <SheetAiFill
             headers={Array.from({ length: selection.c1 - selection.c0 + 1 }, (_, i) => tab.columns[selection.c0 + i] ?? colLabel(selection.c0 + i))}
             rangeRows={Math.max(1, selection.r1 - selection.r0 + 1)}
+            onApplyColumns={applyAiColumns}
             onApply={applyAiMatrix}
             onClose={() => setAiOpen(false)}
           />

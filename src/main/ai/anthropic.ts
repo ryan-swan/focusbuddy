@@ -9,7 +9,7 @@ import { getRecentActivity } from '../db/activity'
 import { markdownToTiptap } from './markdownToTiptap'
 import { extractJson, salvageEnvelope } from './chatJson'
 import { resolveModel } from './modelRouting'
-import { parseSheetRows } from './sheetParse'
+import { parseSheetRows, parseSheetColumns } from './sheetParse'
 import { migrateSlidesBody } from '@shared/slidesMigrate'
 import { resolveTheme, applyThemeToDeck, BUILTIN_THEMES } from '@shared/slideThemes'
 import type { SlidesBody } from '@shared/types'
@@ -2739,6 +2739,80 @@ export interface SheetFillResult {
   needsApiKey?: boolean
 }
 
+export interface SheetColumnsResult {
+  ok: boolean
+  columns?: string[]
+  error?: string
+  needsApiKey?: boolean
+}
+
+// Step one of the two-step Sheets AI flow (mirrors the Tables assistant, which
+// proposes typed columns before generating rows). Given a description of the
+// data, return a clean list of column headers. The renderer previews them, the
+// user accepts, and the headers become the contract for the row-generation step
+// (fillSheetRange below). Existing headers in the selection are passed so the
+// model extends rather than restating them.
+export async function suggestSheetColumns(input: {
+  prompt: string
+  existing?: string[]
+}): Promise<SheetColumnsResult> {
+  const c = getClient()
+  if (!c) return { ok: false, needsApiKey: true, error: 'No Anthropic API key set. Open Settings → AI · API keys to paste one.' }
+  const prompt = input.prompt?.trim()
+  if (!prompt) return { ok: false, error: 'Describe the data you want.' }
+  const existing = (input.existing ?? []).map((s) => s.trim()).filter(Boolean)
+
+  const baseSystem =
+    'You design the columns of a spreadsheet. Reply with ONLY a JSON object of the form ' +
+    '{"columns": string[]} — an ordered list of clear column header names for the data described. ' +
+    'Include as many columns as the data genuinely needs; do not pad with filler. ' +
+    'Use concise human labels (e.g. "Owner", "Start date", "Growth %"), not letters. ' +
+    'Do not include data rows. No markdown, no code fences, no prose outside the JSON.'
+  const strictSystem =
+    'Output ONLY a JSON array of column header name strings and nothing else. ' +
+    'The value must start with [ and end with ]. No object wrapper, no markdown, no commentary.'
+  const user =
+    (existing.length ? `Columns that already exist (keep and extend, do not restate): ${existing.join(', ')}\n` : '') +
+    `Describe the dataset: ${prompt}`
+
+  type Attempt =
+    | { kind: 'cols'; columns: string[] }
+    | { kind: 'refusal' }
+    | { kind: 'truncated' }
+    | { kind: 'unparsed' }
+  const attempt = async (system: string): Promise<Attempt> => {
+    const resp = await c.messages.create({
+      model: resolveModel('document'),
+      // Ample room for a long header list so even a wide schema never truncates.
+      max_tokens: 4000,
+      system,
+      messages: [{ role: 'user', content: user }]
+    })
+    if ((resp.stop_reason as string) === 'refusal') return { kind: 'refusal' }
+    if (resp.stop_reason === 'max_tokens') return { kind: 'truncated' }
+    const text = resp.content
+      .filter((b) => b.type === 'text')
+      .map((b) => ('text' in b ? b.text : ''))
+      .join('')
+    const cols = parseSheetColumns(text)
+    return cols ? { kind: 'cols', columns: cols } : { kind: 'unparsed' }
+  }
+
+  try {
+    let result = await attempt(baseSystem)
+    if (result.kind === 'unparsed') result = await attempt(strictSystem)
+    if (result.kind === 'refusal')
+      return { ok: false, error: 'Claude declined this request. Try rephrasing it.' }
+    if (result.kind === 'truncated')
+      return { ok: false, error: 'That was too many columns to propose at once. Try a narrower request.' }
+    if (result.kind === 'unparsed')
+      return { ok: false, error: 'The AI did not return a usable list of columns. Try a simpler description.' }
+    return { ok: true, columns: result.columns }
+  } catch (e) {
+    return { ok: false, error: (e as Error).message }
+  }
+}
+
 export async function fillSheetRange(input: {
   prompt: string
   headers: string[]
@@ -2749,9 +2823,13 @@ export async function fillSheetRange(input: {
   const prompt = input.prompt?.trim()
   if (!prompt) return { ok: false, error: 'Describe the data to generate.' }
   const cols = input.headers.length || 1
-  const rows = Math.max(1, Math.min(200, input.rangeRows || 10))
+  // No upper cap on the requested row count. Large counts are produced in
+  // batches below so a single response can never truncate, which is what used
+  // to surface as an error. Only a sane lower bound and integer coercion.
+  const total = Math.max(1, Math.floor(input.rangeRows || 10))
 
-  const system =
+  const headerLine = `Columns (in order): ${input.headers.join(', ') || 'A'}`
+  const baseSystem =
     'You generate spreadsheet data as JSON. Reply with ONLY a JSON object of the form ' +
     '{"rows": string[][]}. Each row must be an array of exactly ' +
     cols +
@@ -2759,38 +2837,107 @@ export async function fillSheetRange(input: {
     '(never "example 1"). For a computed column such as a total, rate or growth, put a real spreadsheet ' +
     'formula starting with = that references A1-style cells, for example "=B2/B1-1". ' +
     'No markdown, no code fences, no prose outside the JSON.'
-  const user =
-    `Columns (in order): ${input.headers.join(', ') || 'A'}\n` +
-    `Generate ${rows} rows.\n` +
-    `Request: ${prompt}`
-  try {
+  // Fallback system used only if a batch does not parse and was not truncated.
+  // Some replies wrap the matrix in prose or pick a different shape; this is
+  // maximally explicit and accepts a bare array, which parseSheetRows handles.
+  const strictSystem =
+    'Output ONLY a JSON array of rows and nothing else. The value must start with [ and end with ]. ' +
+    'Each row is an array of exactly ' +
+    cols +
+    ' string cells in the given column order. No object wrapper, no markdown, no code fences, no commentary. ' +
+    'Use real spreadsheet formulas starting with = for computed columns.'
+
+  // One attempt against a given system prompt + user message. Returns the parsed
+  // matrix, or a discriminated failure so the caller can decide whether a retry
+  // is worthwhile (a declined reply will not improve on retry; an unparseable
+  // one might; a truncated one means the batch was too tall and should shrink).
+  type Attempt =
+    | { kind: 'rows'; rows: string[][] }
+    | { kind: 'refusal' }
+    | { kind: 'truncated' }
+    | { kind: 'unparsed' }
+  const attempt = async (system: string, user: string): Promise<Attempt> => {
     const resp = await c.messages.create({
       model: resolveModel('document'),
-      // Headroom so a wide/tall fill isn't truncated mid-JSON (which previously
-      // surfaced as the opaque "No JSON object in response").
-      max_tokens: 8000,
+      // Generous headroom per batch. 16000 is within the max-output limit of
+      // every model the router can select (Sonnet/Haiku 64K, Opus 128K), and a
+      // batch is sized well under it so it does not truncate.
+      max_tokens: 16000,
       system,
       messages: [{ role: 'user', content: user }]
     })
-    if ((resp.stop_reason as string) === 'refusal')
-      return { ok: false, error: 'Claude declined this request. Try rephrasing it.' }
-    if (resp.stop_reason === 'max_tokens')
-      return {
-        ok: false,
-        error: 'That range was too large to fill in one go. Try fewer rows or a narrower request.'
-      }
+    if ((resp.stop_reason as string) === 'refusal') return { kind: 'refusal' }
+    if (resp.stop_reason === 'max_tokens') return { kind: 'truncated' }
     const text = resp.content
       .filter((b) => b.type === 'text')
       .map((b) => ('text' in b ? b.text : ''))
       .join('')
-    const rows = parseSheetRows(text)
-    if (!rows) return { ok: false, error: 'The AI did not return a usable table. Try rephrasing the request.' }
-    const out = rows.map((r) => {
+    const parsed = parseSheetRows(text)
+    return parsed ? { kind: 'rows', rows: parsed } : { kind: 'unparsed' }
+  }
+
+  // Rows per request. Kept well below the token budget so even wide sheets do
+  // not truncate; large totals simply loop. Narrower for very wide sheets.
+  const batchSize = Math.max(10, Math.min(60, Math.floor(2400 / Math.max(1, cols))))
+  // Safety bound on the number of API calls so a runaway request can't loop
+  // forever. This is not a row cap a normal user hits — it is a backstop.
+  const maxBatches = 400
+
+  try {
+    const acc: string[][] = []
+    let batches = 0
+    while (acc.length < total && batches < maxBatches) {
+      const want = Math.min(batchSize, total - acc.length)
+      const user =
+        `${headerLine}\n` +
+        (acc.length > 0
+          ? `You have already produced ${acc.length} of ${total} rows. Generate the NEXT ${want} rows that continue the same dataset. Do not repeat earlier rows.\n`
+          : `Generate ${want} rows${total > want ? ` (the first of ${total} total)` : ''}.\n`) +
+        `Request: ${prompt}`
+
+      let r = await attempt(baseSystem, user)
+      if (r.kind === 'unparsed') r = await attempt(strictSystem, user)
+      if (r.kind === 'truncated' && want > 10) {
+        // The batch was too tall for one response — retry this batch smaller.
+        const half = Math.max(10, Math.floor(want / 2))
+        const smaller =
+          `${headerLine}\n` +
+          (acc.length > 0
+            ? `You have already produced ${acc.length} rows. Generate the NEXT ${half} rows; do not repeat earlier rows.\n`
+            : `Generate ${half} rows.\n`) +
+          `Request: ${prompt}`
+        r = await attempt(baseSystem, smaller)
+        if (r.kind === 'unparsed') r = await attempt(strictSystem, smaller)
+      }
+
+      batches++
+
+      if (r.kind === 'rows') {
+        if (!r.rows.length) break // model has nothing more to add
+        acc.push(...r.rows)
+        continue
+      }
+      // A failure on the FIRST batch is fatal; once we have some rows, keep them
+      // and stop rather than throwing away good work.
+      if (acc.length > 0) break
+      if (r.kind === 'refusal')
+        return { ok: false, error: 'Claude declined this request. Try rephrasing it.' }
+      if (r.kind === 'truncated')
+        return { ok: false, error: 'The AI could not return even a small batch. Try a narrower request.' }
+      return {
+        ok: false,
+        error: 'The AI did not return a usable table. Try a simpler request, or add the column headers you want first.'
+      }
+    }
+
+    if (!acc.length) return { ok: false, error: 'The AI returned no rows.' }
+    // Pad/truncate each row to the column count. We keep every row produced
+    // (a batch may return a few more than asked) rather than discarding work.
+    const out = acc.map((r) => {
       const row = [...r]
       while (row.length < cols) row.push('')
       return row.slice(0, cols)
     })
-    if (!out.length) return { ok: false, error: 'The AI returned no rows.' }
     return { ok: true, rows: out }
   } catch (e) {
     return { ok: false, error: (e as Error).message }
