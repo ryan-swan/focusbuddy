@@ -36,6 +36,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.68',
+    date: '2026-06-20T03:00:00Z',
+    title: 'v2.5.68 — Spreadsheet AI fill fix',
+    tag: 'fix',
+    summary:
+      'Filling a spreadsheet range with AI no longer fails with a “no JSON object” error, and large fills give a clear message instead of breaking.',
+    highlights: [
+      'AI spreadsheet fill now reads the result reliably however the model returns it, fixing the “AI generation error: No JSON object in response”.',
+      'If a requested range is too large to fill in one go, you get a plain “try fewer rows” message instead of an error.'
+    ],
+    links: [{ label: 'Finding your way around', href: `${HELP_BASE}/getting-around` }]
+  },
+  {
     version: '2.5.67',
     date: '2026-06-20T01:00:00Z',
     title: 'v2.5.67 — Tidy canvases and focus insights',
