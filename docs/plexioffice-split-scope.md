@@ -131,14 +131,36 @@ to embed docs on the canvas; the desk's DB / file manager / collaboration stay p
 - Settings: a "Documents sync (beta)" toggle (`DocumentsSyncSection`) flips the
   cloud-docs flag. Commit `08ee833`.
 
+**Round 5 (2026-06-21) — PlexiOffice can sign in and sync; release channel wired.**
+The standalone app was a viewer of the local DB only; this round closes the
+integration loop so it is genuinely the same account's documents as PlexiDesk.
+- Sign-in surface: `OfficeAccountBar` (in `components/officeApp/`) is a minimal,
+  self-contained email/password sign-in + create-account control that talks to the
+  runtime account store directly (it does not reuse the desk's sign-in modal, which
+  pulls in desk-only infrastructure). Signed in, it shows the account and a sign-out.
+- `PlexiOfficeApp` now boots the account session (`useAccountStore.init()`) and turns
+  cloud-docs sync ON by default on mount (PlexiOffice is cloud-first), and re-pulls
+  whenever the signed-in account changes. So signing in on PlexiOffice surfaces that
+  account's PlexiDesk documents, and edits push back.
+- Release channel: `electron-builder.plexioffice.yml` gained a `publish` block on the
+  same `saasmouth/focusbuddy` repo but `channel: office`, so electron-builder writes
+  `office-mac.yml` / `office.yml` (never colliding with PlexiDesk's `latest-*`). The
+  per-product `app-update.yml` electron-builder bakes in carries that channel, so the
+  packaged office app's updater reads its own manifests with no code change.
+- Verified: typecheck + hooks (406 files) + build (both entries) green; office e2e now
+  3 specs (boot, create-sheet, and PO-3 asserting the sign-in surface) all green.
+
 **Still open (next rounds):**
-- PlexiOffice's own release channel (separate repo or electron-updater channel) so
-  its `latest-mac.yml` / `latest.yml` don't collide with PlexiDesk's; then a real
-  published office release.
-- Auth handoff: one sign-in across both apps (two apps can't both own `haptyx://` —
-  add a `plexioffice://` handback or a shared-token mechanism).
-- Two-client cloud-docs round-trip proof with the flag on and a real signed-in
-  account on two machines.
+- A real *published* office release: build with `--config electron-builder.plexioffice.yml`
+  and publish to the `office` channel, then a `release:verify`-style gate proving
+  `office-mac.yml` / `office.yml` and every asset are reachable with matching sha512.
+  (The channel is now wired; what remains is actually cutting and verifying a release.)
+- Auth handoff convenience: a deep-link/shared-token so signing in on one app carries
+  to the other without re-entering credentials (two apps can't both own `haptyx://` —
+  add a `plexioffice://` handback). Today each app signs in to the same account
+  independently, which already shares documents — this is a convenience, not a blocker.
+- Two-machine cloud-docs round-trip proof with a real signed-in account (genuinely
+  external; cannot be self-verified in this environment — must be done on two devices).
 - A PlexiOffice app icon (the packaged build currently uses the default Electron
   icon).
 - Optional: promote the `@office`/`@runtime` aliases to real workspace packages —

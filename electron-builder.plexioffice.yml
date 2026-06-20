@@ -10,14 +10,24 @@
 #  - productName PlexiOffice → app.getName() returns this, which is how the main
 #    process knows to boot the office renderer.
 #
-# NOTE (next round): the auto-update release channel is intentionally NOT wired yet.
-# PlexiOffice needs its own release stream (separate repo or electron-updater
-# channel) so its latest-mac.yml / latest.yml don't collide with PlexiDesk's. Until
-# that's decided, build locally with --publish never (see dist:office:zip).
 appId: app.plexioffice.desktop
 productName: PlexiOffice
 copyright: Copyright © 2026 PlexiOffice
 artifactName: PlexiOffice-${version}-${os}-${arch}.${ext}
+
+# PlexiOffice can ship from the SAME GitHub repo as PlexiDesk because two things
+# keep the two products from stepping on each other: the artifactName above is
+# PlexiOffice-prefixed (PlexiDesk's is Haptyx-prefixed), and the channel below is
+# 'office', so electron-builder writes office-mac.yml / office.yml instead of the
+# latest-mac.yml / latest.yml PlexiDesk owns. The PlexiOffice app's autoUpdater
+# must request the 'office' channel to read these. Until a published office release
+# exists, dist:office:zip builds locally with --publish never.
+publish:
+  provider: github
+  owner: saasmouth
+  repo: focusbuddy
+  releaseType: release
+  channel: office
 
 directories:
   output: release-office
