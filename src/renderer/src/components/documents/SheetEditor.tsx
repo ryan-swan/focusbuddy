@@ -31,7 +31,7 @@ import {
   type CellRange
 } from './sheet/sheetOps'
 import { extendSeries, canToggleSeries, numericFill } from '../../lib/sheetFill'
-import { rewriteFormulaRefs } from '../../lib/sheetFormula'
+import { rewriteFormulaRefs, displayCell } from '../../lib/sheetFormula'
 import { isSingleCell } from '@shared/gridClipboard'
 import SheetGrid from './sheet/SheetGrid'
 import SheetToolbar from './sheet/SheetToolbar'
@@ -671,6 +671,19 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
     document.addEventListener('mouseup', onUp)
   }
 
+  // Double-click the column boundary to auto-fit width to content (Excel). Sizes
+  // to the widest displayed value in the column, clamped to a sane range.
+  function onColAutoFit(c: number): void {
+    const grid = { columns: tab.columns, rows: tab.rows }
+    let maxLen = (tab.columns[c] ?? '').length
+    for (let r = 0; r < tab.rows.length; r++) {
+      const v = displayCell(grid, r, c)
+      if (v.length > maxLen) maxLen = v.length
+    }
+    const w = Math.max(64, Math.min(480, Math.round(maxLen * 7.3) + 28))
+    mutateTab((t) => setColWidth(t, c, w))
+  }
+
   // ── Office import / export ────────────────────────────────────────────────
   async function importFile(): Promise<void> {
     setStatus('Importing…')
@@ -766,9 +779,9 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
         canRedo={redoStack.current.length > 0}
       />
 
-      <div className="flex-1 overflow-auto min-h-0 px-3 py-2">
+      <div className="flex-1 flex flex-col min-h-0 px-3 py-2">
         {/* Formula bar */}
-        <div className="flex items-center gap-2 mb-2">
+        <div className="flex items-center gap-2 mb-2 shrink-0">
           <span className="text-[11px] font-mono text-stone-400 w-12 text-center shrink-0">
             {colLabel(focus.c)}
             {focus.r + 1}
@@ -841,7 +854,7 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
           ref={gridWrapRef}
           tabIndex={0}
           onKeyDown={(e) => void onGridKeyDown(e)}
-          className="outline-none"
+          className="outline-none flex-1 min-h-0"
         >
           <SheetGrid
             tab={tab}
@@ -858,6 +871,7 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
             onCancelEdit={() => setEditing(null)}
             onHeaderRename={(c, name) => mutateTab((t) => setColumnName(t, c, name))}
             onColResizeStart={onColResizeStart}
+            onColAutoFit={onColAutoFit}
             onHeaderContextMenu={(c, x, y) => setColMenu({ c, x, y })}
             editInputRef={editInputRef}
             formulaRefMode={inFormulaEdit()}
