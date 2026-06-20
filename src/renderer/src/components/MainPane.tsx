@@ -15,6 +15,7 @@ import LiveDocEditorView from './views/LiveDocEditorView'
 import LiveCanvasView from './views/LiveCanvasView'
 import LiveFolderView from './views/LiveFolderView'
 import CollaborationsView from './views/CollaborationsView'
+import InsightsView from './views/InsightsView'
 import FilesView from './views/FilesView'
 
 // The MainPane routes the central area between the OS-level views.
@@ -55,6 +56,8 @@ export default function MainPane(): JSX.Element {
       return <LiveFolderView liveFolderId={view.liveFolderId} />
     case 'collaborations':
       return <CollaborationsView />
+    case 'insights':
+      return <InsightsView />
     case 'files':
       return <FilesView />
     default:
