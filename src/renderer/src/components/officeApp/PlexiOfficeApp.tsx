@@ -11,9 +11,18 @@
 // become real packages — call sites here won't change when they do.
 
 import { useEffect, useState } from 'react'
-import { DocEditor, SheetEditor, SlidesEditor, type DocType, type SheetBody, type SlidesBody } from '@office'
-import { useTheme } from '@runtime'
+import {
+  DocEditor,
+  SheetEditor,
+  SlidesEditor,
+  setCloudDocsEnabled,
+  type DocType,
+  type SheetBody,
+  type SlidesBody
+} from '@office'
+import { useTheme, useAccountStore } from '@runtime'
 import { useDocumentsStore } from '../../stores/documents'
+import OfficeAccountBar from './OfficeAccountBar'
 import Icon from '../Icon'
 
 const NEW_KINDS: { type: DocType; label: string; icon: string }[] = [
@@ -28,10 +37,18 @@ export default function PlexiOfficeApp(): JSX.Element {
   useTheme()
   const { list, active, refresh, open, createBlank, saveBody, rename, close } = useDocumentsStore()
   const [renaming, setRenaming] = useState(false)
-
+  // PlexiOffice is cloud-first: sign in once and your documents are the same as in
+  // PlexiDesk. Enable sync and boot the account session on mount.
+  const token = useAccountStore((s) => s.sessionToken)
+  useEffect(() => {
+    setCloudDocsEnabled(true)
+    void useAccountStore.getState().init()
+  }, [])
+  // Refresh on mount and whenever the signed-in account changes — a fresh sign-in
+  // pulls that account's documents from the cloud.
   useEffect(() => {
     void refresh()
-  }, [refresh])
+  }, [refresh, token])
 
   async function newDoc(type: DocType): Promise<void> {
     const doc = await createBlank(type)
@@ -86,6 +103,8 @@ export default function PlexiOfficeApp(): JSX.Element {
             ))
           )}
         </div>
+
+        <OfficeAccountBar />
       </aside>
 
       {/* Editor pane */}

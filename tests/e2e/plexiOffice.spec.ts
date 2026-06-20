@@ -56,3 +56,19 @@ test('PO-2 — create a spreadsheet: the shared SheetEditor opens and the doc is
     window.locator('aside').getByText('Untitled sheet', { exact: true })
   ).toBeVisible({ timeout: 5_000 })
 })
+
+test('PO-3 — the sidebar offers a sign-in surface so documents can sync with PlexiDesk', async () => {
+  launched = await launchApp({ env: { PLEXI_APP: 'office' } })
+  const { window } = launched
+
+  // Signed out (no real account in the test env), the account bar invites sign-in.
+  // This is the integration contract of the split: one account, shared documents.
+  const signIn = window.locator('[data-testid="office-signin"]')
+  await expect(signIn).toBeVisible({ timeout: 10_000 })
+
+  // Opening it reveals the inline email/password form with a submit control.
+  await signIn.click()
+  await expect(window.getByPlaceholder('Email')).toBeVisible()
+  await expect(window.getByPlaceholder('Password')).toBeVisible()
+  await expect(window.locator('[data-testid="office-signin-submit"]')).toBeVisible()
+})
