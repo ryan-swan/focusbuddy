@@ -9,6 +9,7 @@ import { getRecentActivity } from '../db/activity'
 import { markdownToTiptap } from './markdownToTiptap'
 import { extractJson, salvageEnvelope } from './chatJson'
 import { resolveModel } from './modelRouting'
+import { parseSheetRows } from './sheetParse'
 import { migrateSlidesBody } from '@shared/slidesMigrate'
 import { resolveTheme, applyThemeToDeck, BUILTIN_THEMES } from '@shared/slideThemes'
 import type { SlidesBody } from '@shared/types'
@@ -2765,20 +2766,27 @@ export async function fillSheetRange(input: {
   try {
     const resp = await c.messages.create({
       model: resolveModel('document'),
-      max_tokens: 3000,
+      // Headroom so a wide/tall fill isn't truncated mid-JSON (which previously
+      // surfaced as the opaque "No JSON object in response").
+      max_tokens: 8000,
       system,
       messages: [{ role: 'user', content: user }]
     })
     if ((resp.stop_reason as string) === 'refusal')
       return { ok: false, error: 'Claude declined this request. Try rephrasing it.' }
+    if (resp.stop_reason === 'max_tokens')
+      return {
+        ok: false,
+        error: 'That range was too large to fill in one go. Try fewer rows or a narrower request.'
+      }
     const text = resp.content
       .filter((b) => b.type === 'text')
       .map((b) => ('text' in b ? b.text : ''))
       .join('')
-    const parsed = extractJsonObject(text) as { rows?: unknown }
-    if (!Array.isArray(parsed.rows)) return { ok: false, error: 'The AI did not return rows.' }
-    const out = parsed.rows.map((r) => {
-      const row = Array.isArray(r) ? r.map((cell) => String(cell ?? '')) : []
+    const rows = parseSheetRows(text)
+    if (!rows) return { ok: false, error: 'The AI did not return a usable table. Try rephrasing the request.' }
+    const out = rows.map((r) => {
+      const row = [...r]
       while (row.length < cols) row.push('')
       return row.slice(0, cols)
     })
