@@ -2,9 +2,7 @@ import { useEffect } from 'react'
 import type { SheetBody, SlidesBody } from '@shared/types'
 import { useDocumentsStore } from '../../stores/documents'
 import { useViewStore } from '../../stores/view'
-import DocEditor from '../documents/DocEditor'
-import SheetEditor from '../documents/SheetEditor'
-import SlidesEditor from '../documents/SlidesEditor'
+import { DocEditor, SheetEditor, SlidesEditor } from '@office'
 import Icon from '../Icon'
 
 // Document editor — loads the active document and hands its body to the right

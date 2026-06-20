@@ -14,7 +14,9 @@
     "moduleResolution": "bundler",
     "paths": {
       "@renderer/*": ["./src/renderer/src/*"],
-      "@shared/*": ["./src/shared/*"]
+      "@shared/*": ["./src/shared/*"],
+      "@office": ["./src/renderer/src/office/index.ts"],
+      "@runtime": ["./src/renderer/src/runtime/index.ts"]
     }
   }
 }

@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { DocBody, DocType, DocumentMeta } from '@shared/types'
 import Icon from '../Icon'
-import { htmlToDoc } from '../../lib/docHtml'
-import { wrapDocBody } from '../documents/editor/headingStyles'
+import { htmlToDoc, wrapDocBody } from '@office'
 
 // Shown when the user adds a Document / Spreadsheet / Slides to the canvas. It
 // offers three honest paths: create a new blank one, import a real Office file
