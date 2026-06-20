@@ -105,7 +105,33 @@ to embed docs on the canvas; the desk's DB / file manager / collaboration stay p
 - Wired into `stores/documents.ts`. Pure merge seam unit-tested
   (`cloudDocsSync.test.ts`); documents e2e green (no regression).
 
-**Next round — turn the flag on end-to-end, then start the lean extraction.**
+**Round 3 (2026-06-21) — freeze used; boundaries + standalone app shell.**
+- `@office` / `@runtime` boundaries established in place (barrels + vite/tsconfig
+  aliases); every cross-boundary consumer (canvas embed, add dialog, doc + live-doc
+  views) rerouted through `@office`. The desk now touches Office only through this
+  surface, so the physical package extraction is just moving the alias targets.
+- Standalone **PlexiOffice app shell**: a second renderer entry (`plexioffice.html`
+  + `officeApp.tsx` + `PlexiOfficeApp`) — a focused Documents experience reusing the
+  same editors (`@office`) + theme (`@runtime`) + documents store. Multi-entry build
+  emits both `index.html` and `plexioffice.html`; the main process loads the office
+  entry when `app.getName()` is PlexiOffice (or `PLEXI_APP=office` in dev).
+- Second product identity: `electron-builder.plexioffice.yml` (appId
+  `app.plexioffice.desktop`, productName PlexiOffice, own artifact/output) +
+  `dev:office` / `dist:office:zip` scripts.
+- Verified: typecheck + hooks + build (both entries) green; PlexiDesk documents e2e
+  green (no regression). Commits `3226b57` (boundaries), `cea65ba` (app shell).
+
+**Still open (next rounds):**
+- Package the office binary (`dist:office:zip`) and smoke-test that it launches into
+  the office UI; then its own release channel (separate repo or electron-updater
+  channel) so its update manifests don't collide with PlexiDesk's.
+- Auth handoff: one sign-in across both apps (two apps can't both own `haptyx://`).
+- Turn the cloud-docs flag on via a Settings toggle + a two-client round-trip proof.
+- Optional: promote the in-repo `@office`/`@runtime` aliases to real workspace
+  packages (`packages/office`, `packages/runtime`) — now mechanical thanks to the
+  boundary.
+
+**Earlier next-round note (superseded by Round 3 above):** turn the flag on end-to-end, then start the lean extraction.
 1. Add a Settings toggle for the cloud-docs flag; sign in on two clients and prove a
    doc round-trips (create/edit/delete) between them against the live endpoints.
 2. Begin the **lean** package extraction (this is the step that needs the freeze):
