@@ -627,6 +627,22 @@ export function GanttView({
   const { start: startCol, end: endCol } = pickStartEndDateColumns(schema, viewConfig)
   const titleCol = pickTitleColumn(schema, viewConfig)
 
+  // Compute the timeline window from all row start/end dates, with a 5% pad on
+  // each side. This hook MUST run before any early return below so the hook order
+  // stays stable when the date columns appear/disappear (otherwise React throws
+  // "rendered more hooks than during the previous render" and the view crashes).
+  const dated = useMemo(() => {
+    if (!startCol || !endCol) return []
+    const out: Array<{ row: FbRow; start: number; end: number }> = []
+    for (const row of rows) {
+      const sN = getCellNumber(row, startCol) ?? Date.parse(getCellString(row, startCol))
+      const eN = getCellNumber(row, endCol) ?? Date.parse(getCellString(row, endCol))
+      if (!Number.isFinite(sN) || !Number.isFinite(eN)) continue
+      out.push({ row, start: Math.min(sN, eN), end: Math.max(sN, eN) })
+    }
+    return out
+  }, [rows, startCol, endCol])
+
   if (!startCol || !endCol) {
     return (
       <ConfigureHint
@@ -637,19 +653,6 @@ export function GanttView({
       />
     )
   }
-
-  // Compute the timeline window from all row start/end dates, with a
-  // 5% pad on each side.
-  const dated = useMemo(() => {
-    const out: Array<{ row: FbRow; start: number; end: number }> = []
-    for (const row of rows) {
-      const sN = getCellNumber(row, startCol) ?? Date.parse(getCellString(row, startCol))
-      const eN = getCellNumber(row, endCol) ?? Date.parse(getCellString(row, endCol))
-      if (!Number.isFinite(sN) || !Number.isFinite(eN)) continue
-      out.push({ row, start: Math.min(sN, eN), end: Math.max(sN, eN) })
-    }
-    return out
-  }, [rows, startCol, endCol])
 
   if (dated.length === 0) {
     return (
