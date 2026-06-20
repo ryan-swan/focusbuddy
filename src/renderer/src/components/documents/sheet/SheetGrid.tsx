@@ -27,6 +27,7 @@ interface Props {
   onCancelEdit: () => void
   onHeaderRename: (c: number, name: string) => void
   onColResizeStart: (c: number, e: React.MouseEvent) => void
+  onColAutoFit?: (c: number) => void
   onHeaderContextMenu: (c: number, x: number, y: number) => void
   // When editing a formula, clicking another cell inserts its reference instead
   // of moving the selection. The parent exposes the edit input (so it can read
@@ -60,7 +61,7 @@ export default function SheetGrid(props: Props): JSX.Element {
   const freezeHeader = (tab.freeze?.rows ?? 1) >= 1
 
   return (
-    <div className="overflow-auto border border-stone-200 dark:border-stone-700 rounded-lg max-h-[70vh]" data-testid="sheet-grid">
+    <div className="h-full overflow-auto border border-stone-200 dark:border-stone-700 rounded-lg" data-testid="sheet-grid">
       <table className="border-collapse text-[13px]" style={{ tableLayout: 'fixed' }}>
         <colgroup>
           <col style={{ width: ROW_HEADER_W }} />
@@ -89,10 +90,17 @@ export default function SheetGrid(props: Props): JSX.Element {
                     className="w-full bg-transparent px-1 py-1.5 text-[12px] font-semibold text-stone-700 dark:text-stone-200 focus:outline-none min-w-0"
                   />
                 </div>
-                {/* Column resize handle */}
+                {/* Column resize handle. Drag to set the width (which drives the
+                    sheet's total width); double-click to auto-fit to content. */}
                 <span
                   onMouseDown={(e) => props.onColResizeStart(c, e)}
-                  className="absolute top-0 right-0 h-full w-[5px] cursor-col-resize hover:bg-accent/40"
+                  onDoubleClick={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    props.onColAutoFit?.(c)
+                  }}
+                  title="Drag to resize · double-click to fit"
+                  className="absolute top-0 right-0 h-full w-[8px] translate-x-1/2 z-20 cursor-col-resize hover:bg-accent/40"
                 />
               </th>
             ))}
@@ -144,7 +152,7 @@ export default function SheetGrid(props: Props): JSX.Element {
                     }}
                     onMouseEnter={() => props.onCellMouseEnter(r, c)}
                     onDoubleClick={() => props.onCellDoubleClick(r, c)}
-                    className={`relative border-b border-r border-stone-200 dark:border-stone-700 p-0 ${
+                    className={`relative border-b border-r border-stone-200 dark:border-stone-700 p-0 align-top ${
                       selected ? 'bg-accent/[0.10]' : inFillPreview ? 'bg-accent/[0.06]' : ''
                     } ${isActive ? 'outline outline-2 -outline-offset-1 outline-accent' : ''}`}
                   >
@@ -191,7 +199,7 @@ export default function SheetGrid(props: Props): JSX.Element {
                     ) : (
                       <div
                         style={style}
-                        className="px-2 py-1.5 truncate select-none text-stone-800 dark:text-stone-100"
+                        className="px-2 py-1.5 whitespace-pre-wrap break-words select-none text-stone-800 dark:text-stone-100"
                         title={shown}
                       >
                         {shown}
