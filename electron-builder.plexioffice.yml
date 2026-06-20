@@ -1,0 +1,75 @@
+# Electron-builder config for the standalone PlexiOffice app — the second product
+# of the lean split. It packages the SAME built bundle (out/**) as PlexiDesk; the
+# main process branches on app.getName() ('PlexiOffice') to load plexioffice.html
+# instead of index.html.
+#
+# Distinct identity from PlexiDesk:
+#  - appId app.plexioffice.desktop → its OWN LaunchServices identity + userData
+#    dir, so it installs alongside PlexiDesk rather than upgrading it. Documents
+#    are shared via the cloud-documents API, not a shared local DB.
+#  - productName PlexiOffice → app.getName() returns this, which is how the main
+#    process knows to boot the office renderer.
+#
+# NOTE (next round): the auto-update release channel is intentionally NOT wired yet.
+# PlexiOffice needs its own release stream (separate repo or electron-updater
+# channel) so its latest-mac.yml / latest.yml don't collide with PlexiDesk's. Until
+# that's decided, build locally with --publish never (see dist:office:zip).
+appId: app.plexioffice.desktop
+productName: PlexiOffice
+copyright: Copyright © 2026 PlexiOffice
+artifactName: PlexiOffice-${version}-${os}-${arch}.${ext}
+
+directories:
+  output: release-office
+  buildResources: build
+
+files:
+  - out/**/*
+  - package.json
+  - "!**/node_modules/*/{CHANGELOG.md,README.md,readme.md}"
+  - "!**/*.{ts,tsx,map}"
+
+asarUnpack:
+  - node_modules/better-sqlite3/**/*
+  - node_modules/node-mac-haptics/**/*
+
+protocols:
+  - name: PlexiOffice Protocol
+    schemes:
+      - plexioffice
+    role: Viewer
+
+mac:
+  category: public.app-category.productivity
+  target:
+    - target: zip
+      arch:
+        - arm64
+  hardenedRuntime: false
+  gatekeeperAssess: false
+  identity: null
+  extendInfo:
+    NSMicrophoneUsageDescription: >-
+      PlexiOffice records voice notes you choose to capture. Audio is processed
+      locally or via your configured transcription provider.
+    NSCameraUsageDescription: >-
+      PlexiOffice records video notes when you choose to capture them, stored
+      locally and transcribed only via your configured provider.
+
+afterPack: build/adhoc-sign.cjs
+
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: PlexiOffice
+
+npmRebuild: false

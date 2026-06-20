@@ -51,7 +51,10 @@ export default defineConfig({
     build: {
       rollupOptions: {
         input: {
-          index: resolve('src/renderer/index.html')
+          index: resolve('src/renderer/index.html'),
+          // Second product entry — the standalone PlexiOffice app. Same built
+          // bundle; the main process loads this HTML when running as PlexiOffice.
+          plexioffice: resolve('src/renderer/plexioffice.html')
         }
       }
     }

@@ -17,6 +17,8 @@
     "rebuild": "electron-builder install-app-deps",
     "dist": "npm run build && electron-builder --mac --publish never",
     "dist:zip": "npm run build && electron-builder --mac zip --publish never",
+    "dev:office": "PLEXI_APP=office node scripts/dev.cjs dev",
+    "dist:office:zip": "npm run build && electron-builder --mac zip --publish never --config electron-builder.plexioffice.yml",
     "dist:release": "npm run build && electron-builder --mac zip --publish always",
     "rebuild:win": "electron-rebuild -f -w better-sqlite3",
     "dist:win": "npm run build && electron-builder --win --publish never",

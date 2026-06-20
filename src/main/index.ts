@@ -166,8 +166,15 @@ function createCommandCenter(): BrowserWindow {
     }
   })
 
+  // Which product is this build? The PlexiOffice electron-builder config sets
+  // productName 'PlexiOffice' (→ app.getName()); PLEXI_APP=office forces it in dev.
+  // PlexiOffice loads its own renderer entry; everything else is PlexiDesk.
+  const officeMode =
+    process.env['PLEXI_APP'] === 'office' || app.getName().toLowerCase().includes('office')
+  const rendererHtml = officeMode ? 'plexioffice.html' : 'index.html'
+
   if (isDev && process.env['ELECTRON_RENDERER_URL']) {
-    win.loadURL(process.env['ELECTRON_RENDERER_URL'])
+    win.loadURL(`${process.env['ELECTRON_RENDERER_URL']}/${officeMode ? 'plexioffice.html' : ''}`)
     win.webContents.once('did-finish-load', () => {
       win.webContents.openDevTools({ mode: 'detach' })
     })
@@ -181,7 +188,7 @@ function createCommandCenter(): BrowserWindow {
       }
     })
   } else {
-    win.loadFile(join(__dirname, '../renderer/index.html'))
+    win.loadFile(join(__dirname, `../renderer/${rendererHtml}`))
   }
 
   return win
