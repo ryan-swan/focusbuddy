@@ -6,7 +6,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import type { SheetTab } from '@shared/types'
-import { displayCell, type Grid } from '../../../lib/sheetFormula'
+import { displayCell, type Grid, type Workbook } from '../../../lib/sheetFormula'
 import { formatValue } from '../../../lib/sheetFormat'
 import { cellFormat, colLabel } from '../../../lib/sheetBody'
 import { applyCondFormat, validationForCell, valueIsValid } from '../../../lib/sheetCond'
@@ -43,6 +43,8 @@ interface Props {
   onFillToEnd?: () => void
   // Directly set a cell value (used by the data-validation in-cell dropdown).
   onSetCell?: (r: number, c: number, value: string) => void
+  // The whole workbook, so cross-sheet references (Sheet2!A1) resolve at render.
+  workbook?: Workbook
 }
 
 const ROW_HEADER_W = 44
@@ -129,7 +131,7 @@ export default function SheetGrid(props: Props): JSX.Element {
                   !!props.onFillStart &&
                   r === selection.r1 &&
                   c === selection.c1
-                const computed = displayCell(grid, r, c)
+                const computed = displayCell(grid, r, c, props.workbook)
                 // Base cell format, then overlay any matching conditional-format
                 // rule (paint only — the true value is unchanged).
                 const fmt = applyCondFormat(cellFormat(tab, r, c), tab.condRules, r, c, computed)

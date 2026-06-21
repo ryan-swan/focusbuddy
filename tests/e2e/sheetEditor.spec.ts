@@ -1059,3 +1059,32 @@ test('SE-20 — data validation list dropdown sets a value and strict mode rejec
     await dispose()
   }
 })
+
+// ── SE-21: Cross-sheet references resolve in the live editor ──────────────────
+
+test('SE-21 — a formula on Sheet 1 reads a value from Sheet 2', async () => {
+  const { window, dispose } = await launchApp()
+  try {
+    await waitForReady(window)
+    await openDocumentsHub(window)
+    await startBlankSpreadsheet(window)
+
+    const tabStrip = window.locator('[data-testid="sheet-tab-strip"]')
+    await tabStrip.getByTitle('Add sheet').click()
+    await expect(tabStrip.locator('text=Sheet 2')).toBeVisible({ timeout: 3_000 })
+
+    // Put 100 in Sheet 2 A1.
+    await tabStrip.locator('text=Sheet 2').click()
+    await window.waitForTimeout(150)
+    await setViaFormulaBar(window, 0, 0, '100', [1, 0])
+
+    // Back on Sheet 1, reference it (the tab name has a space, so it is quoted).
+    await tabStrip.locator('text=Sheet 1').click()
+    await window.waitForTimeout(150)
+    await setViaFormulaBar(window, 0, 0, "='Sheet 2'!A1+5", [1, 0])
+
+    expect(await cellText(window, 0, 0), "Sheet1 A1 = 'Sheet 2'!A1 + 5 = 105").toBe('105')
+  } finally {
+    await dispose()
+  }
+})
