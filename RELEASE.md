@@ -64,7 +64,34 @@ gh release upload vX.Y.Z /tmp/win/Haptyx-X.Y.Z-win-x64.exe /tmp/win/latest.yml -
 
 # 6. FINAL GATE — the release is not done until this is green:
 npm run release:verify
+
+# 7. PlexiOffice ships from this same repo on a separate update channel
+#    ('office'), so it MUST get its assets on the SAME (now latest) release tag,
+#    or its updater 404s — electron-updater reads the channel manifest from the
+#    newest release, and a PlexiDesk-only release leaves office-mac.yml behind on
+#    the previous tag. Build the office app (mac arm64) and attach its set:
+npm run dist:office:zip   # produces release-office/PlexiOffice-X.Y.Z-mac-arm64.zip + .blockmap + office-mac.yml
+gh release upload vX.Y.Z \
+  release-office/PlexiOffice-X.Y.Z-mac-arm64.zip \
+  release-office/PlexiOffice-X.Y.Z-mac-arm64.zip.blockmap \
+  release-office/office-mac.yml --clobber
+
+# 8. OFFICE GATE — the office channel is not done until this is green:
+npm run release:verify:office
 ```
+
+## The office channel (do not forget it)
+
+PlexiOffice is the standalone second app. It is built from this same codebase and
+published to the **same GitHub releases**, but on the `office` channel: its bundled
+`app-update.yml` carries `channel: office`, so electron-updater reads
+`office-mac.yml` (not `latest-mac.yml`). The recurring trap: cutting a PlexiDesk
+release creates a new *latest* release, and electron-updater always reads the
+channel manifest from the latest release. If that release has no `office-mac.yml`,
+every PlexiOffice client's update check 404s — the exact same silent-break the main
+gate prevents for mac/win. So every release that bumps the version MUST also attach
+the office set to the same tag and pass `npm run release:verify:office`. Office is
+mac arm64 only today (no Windows office build in CI yet).
 
 `npm run release:mac` uploads `Haptyx-X.Y.Z-mac-arm64.zip`, its `.blockmap`, and
 `latest-mac.yml` (with `--clobber`, so re-running is safe), then runs the gate.
