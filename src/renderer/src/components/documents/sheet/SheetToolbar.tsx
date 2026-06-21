@@ -18,6 +18,7 @@ interface Props {
   onDeleteCol: () => void
   onSort: (dir: 'asc' | 'desc') => void
   onConditionalFormat: () => void
+  onDataValidation: () => void
   onInsertChart: (type: 'bar' | 'line' | 'pie') => void
   onImport: () => void
   onExport: (format: 'xlsx' | 'csv') => void
@@ -139,6 +140,14 @@ export default function SheetToolbar(props: Props): JSX.Element {
         onClick={props.onConditionalFormat}
       >
         <Icon name="palette" size={15} />
+      </button>
+      <button
+        className={btn}
+        title="Data validation for the selection"
+        data-testid="sheet-validation-btn"
+        onClick={props.onDataValidation}
+      >
+        <Icon name="rule" size={15} />
       </button>
       <Divider />
 
