@@ -21,8 +21,11 @@ test('PO-1 — boots into the PlexiOffice shell with new-document actions', asyn
   const { window } = launched
 
   // The office shell, not the desk: its sidebar shows the PlexiOffice brand and
-  // the three new-document actions.
-  await expect(window.getByText('PlexiOffice', { exact: true })).toBeVisible({ timeout: 10_000 })
+  // the new-document actions. (Scope to the sidebar — the footer also says
+  // "PlexiOffice".)
+  await expect(
+    window.locator('aside').getByText('PlexiOffice', { exact: true })
+  ).toBeVisible({ timeout: 10_000 })
   await expect(window.locator('[data-testid="office-new-doc"]')).toBeVisible()
   await expect(window.locator('[data-testid="office-new-sheet"]')).toBeVisible()
   await expect(window.locator('[data-testid="office-new-slides"]')).toBeVisible()
@@ -105,4 +108,32 @@ test('PO-5 — the shell shows a version pill and updater affordance like PlexiD
   const pill = window.locator('[data-testid="office-version"]')
   await expect(pill).toBeVisible({ timeout: 10_000 })
   await expect(pill).toContainText('v')
+})
+
+test('PO-6 — Drive: create a folder, open it, make a doc inside, breadcrumb back', async () => {
+  launched = await launchApp({ env: { PLEXI_APP: 'office' } })
+  const { window } = launched
+
+  // Create a folder; it appears in the Drive list (created as "New folder").
+  await window.locator('[data-testid="office-new-folder"]').click()
+  const folder = window.locator('[data-testid="office-folder-New folder"]')
+  await expect(folder).toBeVisible({ timeout: 10_000 })
+
+  // Open it — the breadcrumb now shows the folder, and it starts empty.
+  await folder.locator('button').first().click()
+  await expect(window.locator('aside').getByText('New folder', { exact: true })).toBeVisible()
+  await expect(window.locator('aside').getByText('This folder is empty.')).toBeVisible({ timeout: 5_000 })
+
+  // Create a document inside the folder; it lands here, not at the root.
+  await window.locator('[data-testid="office-new-doc"]').click()
+  await expect(window.locator('input').first()).toBeVisible({ timeout: 10_000 }) // editor mounted
+  await window.getByRole('button', { name: /Back to list/i }).click()
+  await expect(window.locator('aside').getByText('Untitled document', { exact: true })).toBeVisible({
+    timeout: 5_000
+  })
+
+  // Breadcrumb home: the folder is listed at root, and the in-folder doc is not.
+  await window.locator('[data-testid="office-crumb-home"]').click()
+  await expect(window.locator('[data-testid="office-folder-New folder"]')).toBeVisible()
+  await expect(window.locator('aside').getByText('Untitled document', { exact: true })).toHaveCount(0)
 })
