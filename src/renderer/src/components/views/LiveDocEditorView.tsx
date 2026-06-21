@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
-import type { SheetBody, SlidesBody } from '@shared/types'
+import type { SheetBody, SlidesBody, MapBody } from '@shared/types'
 import { useDocCollabStore } from '../../stores/docCollab'
 import { useViewStore } from '../../stores/view'
 import { useAccountStore } from '../../stores/account'
 import { inviteToLiveDoc } from '../../lib/docCollabClient'
-import { DocEditor, SheetEditor, SlidesEditor } from '@office'
+import { DocEditor, SheetEditor, SlidesEditor, MapEditor } from '@office'
 import Icon from '../Icon'
 
 // Editor for a LIVE (collaborative) document. The body lives on the server; this
@@ -15,9 +15,12 @@ import Icon from '../Icon'
 
 interface Props {
   liveDocId: string
+  // Where "back" goes. Defaults to the desk's Documents view; PlexiOffice passes
+  // its own handler since it has no desk routing.
+  onBack?: () => void
 }
 
-export default function LiveDocEditorView({ liveDocId }: Props): JSX.Element {
+export default function LiveDocEditorView({ liveDocId, onBack }: Props): JSX.Element {
   const meta = useDocCollabStore((s) => s.meta)
   const bodyObj = useDocCollabStore((s) => s.bodyObj)
   const lock = useDocCollabStore((s) => s.lock)
@@ -30,6 +33,7 @@ export default function LiveDocEditorView({ liveDocId }: Props): JSX.Element {
   const acquire = useDocCollabStore((s) => s.acquire)
   const requestTakeoverForOpen = useDocCollabStore((s) => s.requestTakeoverForOpen)
   const goDocuments = useViewStore((s) => s.goDocuments)
+  const back = onBack ?? goDocuments
   const myId = useAccountStore((s) => s.account?.id)
   const token = useAccountStore((s) => s.sessionToken)
 
@@ -62,8 +66,22 @@ export default function LiveDocEditorView({ liveDocId }: Props): JSX.Element {
     )
   }
 
-  const typeLabel = meta.docType === 'doc' ? 'Document' : meta.docType === 'sheet' ? 'Spreadsheet' : 'Slides'
-  const typeIcon = meta.docType === 'doc' ? 'description' : meta.docType === 'sheet' ? 'table_chart' : 'slideshow'
+  const typeLabel =
+    meta.docType === 'doc'
+      ? 'Document'
+      : meta.docType === 'sheet'
+        ? 'Spreadsheet'
+        : meta.docType === 'slides'
+          ? 'Slides'
+          : 'Map'
+  const typeIcon =
+    meta.docType === 'doc'
+      ? 'description'
+      : meta.docType === 'sheet'
+        ? 'table_chart'
+        : meta.docType === 'slides'
+          ? 'slideshow'
+          : 'account_tree'
   const isOwner = meta.ownerAccountId === myId
   const holderHandle = lock?.holder?.handle ?? null
   const lockedByOther = !!lock?.holder && lock.holder.accountId !== myId
@@ -93,7 +111,7 @@ export default function LiveDocEditorView({ liveDocId }: Props): JSX.Element {
     <div className="h-full flex flex-col desk-paper no-tod">
       {/* Header */}
       <div className="shrink-0 px-4 py-2.5 border-b border-stone-200 dark:border-stone-800 flex items-center gap-3">
-        <button onClick={() => goDocuments()} className="icon-btn" title="Back to Documents">
+        <button onClick={() => back()} className="icon-btn" title="Back">
           <Icon name="arrow_back" size={17} />
         </button>
         <Icon name={typeIcon} size={16} className="text-accent shrink-0" />
@@ -203,6 +221,9 @@ export default function LiveDocEditorView({ liveDocId }: Props): JSX.Element {
         )}
         {meta.docType === 'slides' && (
           <SlidesEditor key={editorKey} body={bodyObj as SlidesBody} title={meta.title} onChange={(b) => saveBody(b)} />
+        )}
+        {meta.docType === 'map' && (
+          <MapEditor key={editorKey} body={bodyObj as MapBody} title={meta.title} onChange={(b) => saveBody(b)} />
         )}
       </div>
     </div>

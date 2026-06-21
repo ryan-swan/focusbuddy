@@ -183,3 +183,18 @@ test('PO-9 — Drive exposes an "open a shared link" import affordance', async (
   await expect(window.locator('[data-testid="office-import-url"]')).toBeVisible({ timeout: 5_000 })
   await expect(window.locator('[data-testid="office-import-go"]')).toBeVisible()
 })
+
+test('PO-10 — Collaborate offers live editing; prompts sign-in when signed out', async () => {
+  launched = await launchApp({ env: { PLEXI_APP: 'office' } })
+  const { window } = launched
+
+  await window.locator('[data-testid="office-new-doc"]').click()
+  // The Collaborate action is present in the document header.
+  const collab = window.locator('[data-testid="office-collaborate-btn"]')
+  await expect(collab).toBeVisible({ timeout: 10_000 })
+
+  // Signed out (no account in the test env), it asks the user to sign in rather
+  // than failing silently.
+  await collab.click()
+  await expect(window.getByText(/Sign in.*collaborate/i)).toBeVisible({ timeout: 5_000 })
+})

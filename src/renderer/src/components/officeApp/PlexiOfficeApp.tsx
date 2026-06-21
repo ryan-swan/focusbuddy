@@ -27,6 +27,9 @@ import { useFileManagerStore } from '../../stores/fileManager'
 import OfficeAccountBar from './OfficeAccountBar'
 import OfficeDrive from './OfficeDrive'
 import OfficeShareDialog, { type ShareTarget } from './OfficeShareDialog'
+import OfficeCollaborations from './OfficeCollaborations'
+import LiveDocEditorView from '../views/LiveDocEditorView'
+import { createLiveDoc } from '../../lib/docCollabClient'
 import UpdaterBanner from '../UpdaterBanner'
 import Icon from '../Icon'
 
@@ -38,6 +41,32 @@ export default function PlexiOfficeApp(): JSX.Element {
   const refreshDrive = useFileManagerStore((s) => s.refresh)
   const [renaming, setRenaming] = useState(false)
   const [shareTarget, setShareTarget] = useState<ShareTarget | null>(null)
+  const [liveDocId, setLiveDocId] = useState<string | null>(null)
+  const [collabError, setCollabError] = useState<string | null>(null)
+  const [collabNonce, setCollabNonce] = useState(0)
+
+  // Turn the open document into a live (collaborative) document and open it in the
+  // check-out editor. Reuses the same live-docs system as PlexiDesk.
+  async function collaborate(): Promise<void> {
+    if (!active) return
+    const tok = useAccountStore.getState().sessionToken
+    if (!tok) {
+      setCollabError('Sign in (bottom of the sidebar) to collaborate.')
+      return
+    }
+    setCollabError(null)
+    const created = await createLiveDoc(tok, {
+      docType: active.docType,
+      title: active.title,
+      body: JSON.stringify(active.body)
+    }).catch(() => null)
+    if (created) {
+      setLiveDocId(created.id)
+      setCollabNonce((n) => n + 1)
+    } else {
+      setCollabError('Could not start collaboration. Check your connection and sign-in.')
+    }
+  }
   // PlexiOffice is cloud-first: sign in once and your documents are the same as in
   // PlexiDesk. Enable sync and boot the account session on mount.
   const token = useAccountStore((s) => s.sessionToken)
@@ -69,12 +98,30 @@ export default function PlexiOfficeApp(): JSX.Element {
         {/* Drive — folders + documents, reusing the shared file-manager store. */}
         <OfficeDrive onShareFolder={(folderId, name) => setShareTarget({ kind: 'docfolder', folderId, name })} />
 
+        {/* Live collaborations you own or were invited to. */}
+        <OfficeCollaborations
+          refreshKey={collabNonce}
+          activeId={liveDocId}
+          onOpen={(id) => setLiveDocId(id)}
+        />
+
         <OfficeAccountBar />
       </aside>
 
       {/* Editor pane */}
       <main className="flex-1 min-w-0 flex flex-col">
-        {!active ? (
+        {collabError && (
+          <div className="shrink-0 px-4 py-1.5 text-[12px] bg-amber-50 dark:bg-amber-950/30 text-amber-800 dark:text-amber-200 flex items-center gap-2">
+            <Icon name="info" size={13} />
+            <span>{collabError}</span>
+            <button onClick={() => setCollabError(null)} className="ml-auto icon-btn" aria-label="Dismiss">
+              <Icon name="close" size={12} />
+            </button>
+          </div>
+        )}
+        {liveDocId ? (
+          <LiveDocEditorView liveDocId={liveDocId} onBack={() => setLiveDocId(null)} />
+        ) : !active ? (
           <div className="flex-1 flex flex-col items-center justify-center text-center text-stone-400">
             <Icon name="draft" size={40} className="mb-3 text-stone-300 dark:text-stone-600" />
             <div className="text-[14px]">Pick a document, or create a new one.</div>
@@ -109,9 +156,18 @@ export default function PlexiOfficeApp(): JSX.Element {
                 </button>
               )}
               <button
+                onClick={() => void collaborate()}
+                data-testid="office-collaborate-btn"
+                className="ml-auto inline-flex items-center gap-1.5 rounded-lg border border-stone-200 dark:border-stone-700 px-2.5 py-1 text-[12px] hover:border-accent hover:text-accent"
+                title="Collaborate live on this document"
+              >
+                <Icon name="group" size={14} />
+                Collaborate
+              </button>
+              <button
                 onClick={() => setShareTarget({ kind: 'document', doc: active })}
                 data-testid="office-share-btn"
-                className="ml-auto inline-flex items-center gap-1.5 rounded-lg border border-stone-200 dark:border-stone-700 px-2.5 py-1 text-[12px] hover:border-accent hover:text-accent"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-stone-200 dark:border-stone-700 px-2.5 py-1 text-[12px] hover:border-accent hover:text-accent"
                 title="Share this document"
               >
                 <Icon name="share" size={14} />
