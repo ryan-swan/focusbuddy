@@ -150,11 +150,23 @@ integration loop so it is genuinely the same account's documents as PlexiDesk.
 - Verified: typecheck + hooks (406 files) + build (both entries) green; office e2e now
   3 specs (boot, create-sheet, and PO-3 asserting the sign-in surface) all green.
 
+**Round 6 (2026-06-21) — first published office release, mac arm64.**
+- Built on the office channel (`dist:office:zip`) and uploaded the three office
+  assets (`PlexiOffice-2.5.70-mac-arm64.zip` + `.blockmap` + `office-mac.yml`) to the
+  existing `v2.5.70` GitHub release. PlexiDesk's `latest-mac.yml` / `latest.yml` were
+  left untouched; the office assets coexist by distinct names + channel.
+- New repeatable gate `scripts/verify-office-release.sh` (+ `release:verify:office`):
+  asserts every office asset is reachable (200) and the served `office-mac.yml`
+  sha512 matches the served binary. Ran GREEN against the live release. Added
+  `dist:office:release` (build + `--publish always` on the office config) for future
+  cuts.
+- Also installed the local build to `/Applications/PlexiOffice.app` for this machine.
+
 **Still open (next rounds):**
-- A real *published* office release: build with `--config electron-builder.plexioffice.yml`
-  and publish to the `office` channel, then a `release:verify`-style gate proving
-  `office-mac.yml` / `office.yml` and every asset are reachable with matching sha512.
-  (The channel is now wired; what remains is actually cutting and verifying a release.)
+- Windows office build: there is no `.exe` / `office.yml` yet (mac arm64 only). Needs a
+  Windows CI build (pinned to windows-2022 per the node-gyp/Electron-37 constraint),
+  then extend `verify-office-release.sh` REQUIRED with the win assets.
+- Intel mac build (the published zip is arm64 only).
 - Auth handoff convenience: a deep-link/shared-token so signing in on one app carries
   to the other without re-entering credentials (two apps can't both own `haptyx://` —
   add a `plexioffice://` handback). Today each app signs in to the same account
