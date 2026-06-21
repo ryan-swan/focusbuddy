@@ -20,6 +20,47 @@ export interface Grid {
 
 export type CellValue = number | string | boolean
 
+// ── Cross-sheet workbook context ────────────────────────────────────────────
+// A formula may reference another tab: =Sheet2!A1 or =SUM('My Tab'!A1:A9). The
+// evaluator resolves the named tab's grid from this context, which is set for the
+// duration of one top-level evaluation. Sheet names match case-insensitively.
+export interface Workbook {
+  byName: Map<string, Grid>
+}
+let WB: Workbook | null = null
+
+// The grid a ref/range should read from: its own sheet's grid when it carries a
+// sheet qualifier we can resolve, otherwise the formula's own (default) grid.
+function pickGrid(def: Grid, sheet?: string): Grid {
+  if (sheet && WB) {
+    const g = WB.byName.get(sheet.toLowerCase())
+    if (g) return g
+  }
+  return def
+}
+
+// Stable per-grid id so the cycle-detection key is sheet-aware (A1 on two
+// different tabs must not be treated as the same cell).
+let gridSeq = 0
+const gridIds = new WeakMap<Grid, number>()
+function gridId(grid: Grid): number {
+  let id = gridIds.get(grid)
+  if (id === undefined) {
+    id = ++gridSeq
+    gridIds.set(grid, id)
+  }
+  return id
+}
+
+// Build a Workbook from named tabs (the renderer passes its sheet list).
+export function makeWorkbook(
+  sheets: Array<{ name: string; columns: string[]; rows: string[][] }>
+): Workbook {
+  const byName = new Map<string, Grid>()
+  for (const s of sheets) byName.set(s.name.toLowerCase(), { columns: s.columns, rows: s.rows })
+  return { byName }
+}
+
 // The functions the engine supports, with a short signature hint. Drives the
 // in-cell "type =" formula menu so users get quick, discoverable access.
 export const SHEET_FUNCTIONS: Array<{ name: string; hint: string }> = [
@@ -132,7 +173,7 @@ function cellRaw(grid: Grid, r: number, c: number): string {
 type Tok =
   | { t: 'num'; v: number }
   | { t: 'str'; v: string }
-  | { t: 'ident'; v: string }
+  | { t: 'ident'; v: string; sheet?: string }
   | { t: 'op'; v: string }
   | { t: 'lp' }
   | { t: 'rp' }
@@ -158,6 +199,17 @@ function tokenize(s: string): Tok[] {
       if (s[i] !== '"') throw new Error('unterminated string')
       i++
       toks.push({ t: 'str', v: str })
+      continue
+    }
+    // Sheet-qualified reference: Sheet1!A1 or 'My Sheet'!A1. The qualifier binds
+    // to the cell ref that follows; for a range (Sheet1!A1:B2) the colon + second
+    // ref are tokenized normally and the parser carries the sheet onto the range.
+    const sheetMatch = s
+      .slice(i)
+      .match(/^(?:'([^']+)'|([A-Za-z_][A-Za-z0-9_.]*))!(\$?[A-Za-z]+\$?\d+)/)
+    if (sheetMatch) {
+      toks.push({ t: 'ident', v: sheetMatch[3], sheet: sheetMatch[1] ?? sheetMatch[2] })
+      i += sheetMatch[0].length
       continue
     }
     const numMatch = s.slice(i).match(/^\d+(\.\d+)?/)
@@ -205,7 +257,7 @@ type Node =
   | { k: 'num'; v: number }
   | { k: 'str'; v: string }
   | { k: 'bool'; v: boolean }
-  | { k: 'ref'; r: number; c: number; absR?: boolean; absC?: boolean }
+  | { k: 'ref'; r: number; c: number; absR?: boolean; absC?: boolean; sheet?: string }
   | {
       k: 'range'
       r1: number
@@ -216,6 +268,7 @@ type Node =
       absC1?: boolean
       absR2?: boolean
       absC2?: boolean
+      sheet?: string
     }
   | { k: 'unary'; op: string; x: Node }
   | { k: 'binary'; op: string; a: Node; b: Node }
@@ -311,7 +364,14 @@ function parse(src: string): Node {
       if (upper === 'FALSE') return { k: 'bool', v: false }
       const coord = refToCoord(name)
       if (!coord) throw new Error(`bad ref ${name}`)
-      return { k: 'ref', r: coord.r, c: coord.c, absR: coord.absR, absC: coord.absC }
+      return {
+        k: 'ref',
+        r: coord.r,
+        c: coord.c,
+        absR: coord.absR,
+        absC: coord.absC,
+        ...(tok.sheet ? { sheet: tok.sheet } : {})
+      }
     }
     throw new Error('parse error')
   }
@@ -339,7 +399,10 @@ function parse(src: string): Node {
             absR1: rowFirst ? a.absR : b.absR,
             absC1: colFirst ? a.absC : b.absC,
             absR2: rowFirst ? b.absR : a.absR,
-            absC2: colFirst ? b.absC : a.absC
+            absC2: colFirst ? b.absC : a.absC,
+            // The sheet qualifier (if any) rides on the first ref and covers the
+            // whole range, e.g. Sheet2!A1:B10.
+            ...(tok.sheet ? { sheet: tok.sheet } : {})
           }
         }
       }
@@ -365,6 +428,13 @@ const PREC: Record<string, number> = {
 
 // Turn an AST back into a formula string. Precedence-aware so it adds parentheses
 // only where they're needed to preserve meaning (and round-trips through parse).
+// Render a sheet qualifier for serialization: bare when it is a simple name,
+// single-quoted when it contains spaces or punctuation (e.g. 'Q1 Plan'!A1).
+function sheetPrefix(sheet?: string): string {
+  if (!sheet) return ''
+  return /^[A-Za-z_][A-Za-z0-9_.]*$/.test(sheet) ? `${sheet}!` : `'${sheet}'!`
+}
+
 function nodeToString(node: Node): string {
   switch (node.k) {
     case 'num':
@@ -374,9 +444,10 @@ function nodeToString(node: Node): string {
     case 'bool':
       return node.v ? 'TRUE' : 'FALSE'
     case 'ref':
-      return refToA1(node.r, node.c, !!node.absR, !!node.absC)
+      return sheetPrefix(node.sheet) + refToA1(node.r, node.c, !!node.absR, !!node.absC)
     case 'range':
       return (
+        sheetPrefix(node.sheet) +
         refToA1(node.r1, node.c1, !!node.absR1, !!node.absC1) +
         ':' +
         refToA1(node.r2, node.c2, !!node.absR2, !!node.absC2)
@@ -481,7 +552,7 @@ function parseDate(s: string): Date | null {
 
 // The evaluated value of a cell (following a formula), or its raw text/number.
 function cellValue(grid: Grid, r: number, c: number, seen: Set<string>): CellValue {
-  const key = `${r},${c}`
+  const key = `${gridId(grid)}:${r},${c}`
   if (seen.has(key)) throw new Error('cycle')
   const raw = cellRaw(grid, r, c).trim()
   if (raw.startsWith('=')) {
@@ -555,7 +626,7 @@ function evalNode(node: Node, grid: Grid, seen: Set<string>): CellValue {
     case 'bool':
       return node.v
     case 'ref':
-      return cellValue(grid, node.r, node.c, seen)
+      return cellValue(pickGrid(grid, node.sheet), node.r, node.c, seen)
     case 'range':
       throw new Error('range not allowed here')
     case 'unary': {
@@ -592,8 +663,9 @@ function collectNumbers(args: Node[], grid: Grid, seen: Set<string>): number[] {
   const out: number[] = []
   for (const arg of args) {
     if (arg.k === 'range') {
+      const g = pickGrid(grid, arg.sheet)
       for (const { r, c } of rangeCoords(arg)) {
-        const n = cellNumeric(grid, r, c, seen)
+        const n = cellNumeric(g, r, c, seen)
         if (n !== null) out.push(n)
       }
     } else {
@@ -607,6 +679,10 @@ function evalCall(node: Extract<Node, { k: 'call' }>, grid: Grid, seen: Set<stri
   const name = node.name
   const args = node.args
   const arg = (i: number): CellValue => evalNode(args[i], grid, seen)
+  // The grid a range argument reads from — its own sheet's grid when qualified
+  // (e.g. SUM(Sheet2!A1:A9)), otherwise this formula's grid.
+  const gridOf = (n: Node | undefined): Grid =>
+    pickGrid(grid, n && (n.k === 'range' || n.k === 'ref') ? n.sheet : undefined)
 
   switch (name) {
     // Aggregates
@@ -632,7 +708,8 @@ function evalCall(node: Extract<Node, { k: 'call' }>, grid: Grid, seen: Set<stri
       let n = 0
       for (const a of args) {
         if (a.k === 'range') {
-          for (const { r, c } of rangeCoords(a)) if (cellNumeric(grid, r, c, seen) !== null) n++
+          const g = gridOf(a)
+          for (const { r, c } of rangeCoords(a)) if (cellNumeric(g, r, c, seen) !== null) n++
         } else if (typeof evalNode(a, grid, seen) === 'number') n++
       }
       return n
@@ -641,7 +718,8 @@ function evalCall(node: Extract<Node, { k: 'call' }>, grid: Grid, seen: Set<stri
       let n = 0
       for (const a of args) {
         if (a.k === 'range') {
-          for (const { r, c } of rangeCoords(a)) if (cellRaw(grid, r, c).trim() !== '') n++
+          const g = gridOf(a)
+          for (const { r, c } of rangeCoords(a)) if (cellRaw(g, r, c).trim() !== '') n++
         } else {
           const v = evalNode(a, grid, seen)
           if (!(typeof v === 'string' && v === '')) n++
@@ -652,8 +730,9 @@ function evalCall(node: Extract<Node, { k: 'call' }>, grid: Grid, seen: Set<stri
     case 'COUNTIF': {
       if (args[0]?.k !== 'range') throw new Error('COUNTIF needs a range')
       const crit = arg(1)
+      const g = gridOf(args[0])
       let n = 0
-      for (const { r, c } of rangeCoords(args[0])) if (matchCriteria(cellValue(grid, r, c, seen), crit)) n++
+      for (const { r, c } of rangeCoords(args[0])) if (matchCriteria(cellValue(g, r, c, seen), crit)) n++
       return n
     }
     case 'SUMIF':
@@ -661,14 +740,16 @@ function evalCall(node: Extract<Node, { k: 'call' }>, grid: Grid, seen: Set<stri
       if (args[0]?.k !== 'range') throw new Error(`${name} needs a range`)
       const crit = arg(1)
       const sumRange = args[2]?.k === 'range' ? args[2] : args[0]
+      const critGrid = gridOf(args[0])
+      const sumGrid = gridOf(sumRange)
       const cells = rangeCoords(args[0])
       const sumCells = rangeCoords(sumRange)
       let sum = 0
       let count = 0
       for (let i = 0; i < cells.length; i++) {
-        if (matchCriteria(cellValue(grid, cells[i].r, cells[i].c, seen), crit)) {
+        if (matchCriteria(cellValue(critGrid, cells[i].r, cells[i].c, seen), crit)) {
           const sc = sumCells[i] ?? cells[i]
-          const n = cellNumeric(grid, sc.r, sc.c, seen)
+          const n = cellNumeric(sumGrid, sc.r, sc.c, seen)
           if (n !== null) { sum += n; count++ }
         }
       }
@@ -729,7 +810,8 @@ function evalCall(node: Extract<Node, { k: 'call' }>, grid: Grid, seen: Set<stri
       let out = ''
       for (const a of args) {
         if (a.k === 'range') {
-          for (const { r, c } of rangeCoords(a)) out += toStr(cellValue(grid, r, c, seen))
+          const g = gridOf(a)
+          for (const { r, c } of rangeCoords(a)) out += toStr(cellValue(g, r, c, seen))
         } else out += toStr(evalNode(a, grid, seen))
       }
       return out
@@ -816,8 +898,9 @@ function evalCall(node: Extract<Node, { k: 'call' }>, grid: Grid, seen: Set<stri
       for (let i = 2; i < args.length; i++) {
         const a = args[i]
         if (a.k === 'range') {
+          const g = gridOf(a)
           for (const { r, c } of rangeCoords(a)) {
-            const v = toStr(cellValue(grid, r, c, seen))
+            const v = toStr(cellValue(g, r, c, seen))
             if (!ignoreEmpty || v !== '') parts.push(v)
           }
         } else {
@@ -850,7 +933,8 @@ function evalCall(node: Extract<Node, { k: 'call' }>, grid: Grid, seen: Set<stri
       let n = 0
       for (const a of args) {
         if (a.k === 'range') {
-          for (const { r, c } of rangeCoords(a)) if (cellRaw(grid, r, c).trim() === '') n++
+          const g = gridOf(a)
+          for (const { r, c } of rangeCoords(a)) if (cellRaw(g, r, c).trim() === '') n++
         } else {
           const v = evalNode(a, grid, seen)
           if (typeof v === 'string' && v.trim() === '') n++
@@ -874,19 +958,21 @@ function evalCall(node: Extract<Node, { k: 'call' }>, grid: Grid, seen: Set<stri
       }
       if (!pairs.length) throw new Error(`${name} needs a range/criteria pair`)
       const coordsList = pairs.map((p) => rangeCoords(p.range))
+      const pairGrids = pairs.map((p) => gridOf(p.range))
       const len = coordsList[0].length
       const sumCells = sumRange ? rangeCoords(sumRange) : null
+      const sumGrid = sumRange ? gridOf(sumRange) : grid
       let sum = 0
       let count = 0
       for (let i = 0; i < len; i++) {
         const ok = pairs.every((p, pi) =>
-          matchCriteria(cellValue(grid, coordsList[pi][i].r, coordsList[pi][i].c, seen), p.crit)
+          matchCriteria(cellValue(pairGrids[pi], coordsList[pi][i].r, coordsList[pi][i].c, seen), p.crit)
         )
         if (!ok) continue
         count++
         if (sumCells) {
           const sc = sumCells[i]
-          const v = cellNumeric(grid, sc.r, sc.c, seen)
+          const v = cellNumeric(sumGrid, sc.r, sc.c, seen)
           if (v !== null) sum += v
         }
       }
@@ -901,13 +987,14 @@ function evalCall(node: Extract<Node, { k: 'call' }>, grid: Grid, seen: Set<stri
       const ranges = args.filter((a) => a.k === 'range') as Array<Extract<Node, { k: 'range' }>>
       if (!ranges.length) throw new Error('SUMPRODUCT needs ranges')
       const coordsList = ranges.map(rangeCoords)
+      const rangeGrids = ranges.map((rg) => gridOf(rg))
       const len = coordsList[0].length
       let total = 0
       for (let i = 0; i < len; i++) {
         let prod = 1
         for (let ri = 0; ri < ranges.length; ri++) {
           const { r, c } = coordsList[ri][i]
-          prod *= cellNumeric(grid, r, c, seen) ?? 0
+          prod *= cellNumeric(rangeGrids[ri], r, c, seen) ?? 0
         }
         total += prod
       }
@@ -971,16 +1058,17 @@ function evalCall(node: Extract<Node, { k: 'call' }>, grid: Grid, seen: Set<stri
     case 'MATCH': {
       const key = arg(0)
       if (args[1]?.k !== 'range') throw new Error('MATCH needs a range')
+      const g = gridOf(args[1])
       const coords = rangeCoords(args[1])
       const type = args.length > 2 ? toNum(arg(2)) : 1
       if (type === 0) {
         for (let i = 0; i < coords.length; i++)
-          if (compare('=', cellValue(grid, coords[i].r, coords[i].c, seen), key)) return i + 1
+          if (compare('=', cellValue(g, coords[i].r, coords[i].c, seen), key)) return i + 1
         throw new Error('MATCH: not found')
       }
       let best = -1
       for (let i = 0; i < coords.length; i++) {
-        const v = cellValue(grid, coords[i].r, coords[i].c, seen)
+        const v = cellValue(g, coords[i].r, coords[i].c, seen)
         if (type === 1 ? compare('<=', v, key) : compare('>=', v, key)) best = i
       }
       if (best < 0) throw new Error('MATCH: not found')
@@ -989,6 +1077,7 @@ function evalCall(node: Extract<Node, { k: 'call' }>, grid: Grid, seen: Set<stri
     case 'INDEX': {
       if (args[0]?.k !== 'range') throw new Error('INDEX needs a range')
       const rg = args[0]
+      const g = gridOf(rg)
       const rows = rg.r2 - rg.r1 + 1
       const cols = rg.c2 - rg.c1 + 1
       const a1 = toNum(arg(1))
@@ -1005,21 +1094,22 @@ function evalCall(node: Extract<Node, { k: 'call' }>, grid: Grid, seen: Set<stri
         cc = rg.c1 + ((args.length > 2 ? toNum(arg(2)) : 1) - 1)
       }
       if (rr < rg.r1 || rr > rg.r2 || cc < rg.c1 || cc > rg.c2) throw new Error('INDEX out of range')
-      return cellValue(grid, rr, cc, seen)
+      return cellValue(g, rr, cc, seen)
     }
     case 'VLOOKUP':
     case 'HLOOKUP': {
       const key = arg(0)
       if (args[1]?.k !== 'range') throw new Error(`${name} needs a table range`)
       const rg = args[1]
+      const g = gridOf(rg)
       const idx = toNum(arg(2))
       const exact = args.length > 3 ? !toBool(arg(3)) : true
       const horizontal = name === 'HLOOKUP'
       if (idx < 1) throw new Error(`${name}: bad index`)
       const lineVal = (i: number): CellValue =>
-        horizontal ? cellValue(grid, rg.r1, i, seen) : cellValue(grid, i, rg.c1, seen)
+        horizontal ? cellValue(g, rg.r1, i, seen) : cellValue(g, i, rg.c1, seen)
       const resultVal = (i: number): CellValue =>
-        horizontal ? cellValue(grid, rg.r1 + idx - 1, i, seen) : cellValue(grid, i, rg.c1 + idx - 1, seen)
+        horizontal ? cellValue(g, rg.r1 + idx - 1, i, seen) : cellValue(g, i, rg.c1 + idx - 1, seen)
       const lo = horizontal ? rg.c1 : rg.r1
       const hi = horizontal ? rg.c2 : rg.r2
       const lim = horizontal ? rg.r1 + idx - 1 : rg.c1 + idx - 1
@@ -1038,9 +1128,20 @@ function evalCall(node: Extract<Node, { k: 'call' }>, grid: Grid, seen: Set<stri
 }
 
 // Evaluate a formula string (without the leading '=') against the grid. Exposed
-// for unit testing the engine directly.
-export function evaluateFormula(grid: Grid, formula: string, seedKey = '__seed__'): CellValue {
-  return evalNode(parse(formula), grid, new Set([seedKey]))
+// for unit testing the engine directly. Pass a Workbook to resolve cross-sheet
+// references (Sheet2!A1).
+export function evaluateFormula(
+  grid: Grid,
+  formula: string,
+  seedKey = '__seed__',
+  wb?: Workbook
+): CellValue {
+  WB = wb ?? null
+  try {
+    return evalNode(parse(formula), grid, new Set([`${gridId(grid)}:${seedKey}`]))
+  } finally {
+    WB = null
+  }
 }
 
 // True if a formula string parses (syntax only — it may still reference empty
@@ -1059,11 +1160,12 @@ export function isParseableFormula(formula: string): boolean {
 
 // The value to DISPLAY for a cell: raw text, the evaluated formula, or #ERR.
 // Never a silent wrong number.
-export function displayCell(grid: Grid, r: number, c: number): string {
+export function displayCell(grid: Grid, r: number, c: number, wb?: Workbook): string {
   const raw = cellRaw(grid, r, c)
   if (!raw.startsWith('=')) return raw
+  WB = wb ?? null
   try {
-    const v = evalNode(parse(raw.slice(1)), grid, new Set([`${r},${c}`]))
+    const v = evalNode(parse(raw.slice(1)), grid, new Set([`${gridId(grid)}:${r},${c}`]))
     if (typeof v === 'boolean') return v ? 'TRUE' : 'FALSE'
     if (typeof v === 'number') {
       if (!Number.isFinite(v)) return '#ERR'
@@ -1072,5 +1174,7 @@ export function displayCell(grid: Grid, r: number, c: number): string {
     return v
   } catch {
     return '#ERR'
+  } finally {
+    WB = null
   }
 }

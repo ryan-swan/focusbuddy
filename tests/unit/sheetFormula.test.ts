@@ -288,3 +288,47 @@ describe('formula engine — text + math + date', () => {
     expect(evaluateFormula(g, 'DAY(A1)')).toBe(15)
   })
 })
+
+// ── Cross-sheet references (Sheet2!A1) ────────────────────────────────────────
+
+import { makeWorkbook } from '@renderer/lib/sheetFormula'
+
+describe('formula engine — cross-sheet references', () => {
+  const main = grid([['5']])
+  const wb = makeWorkbook([
+    { name: 'Data', columns: ['A', 'B'], rows: [['x', '10'], ['y', '20'], ['z', '30']] },
+    { name: 'My Tab', columns: ['A'], rows: [['7']] }
+  ])
+
+  it('resolves a single cross-sheet cell ref', () => {
+    expect(evaluateFormula(main, 'Data!B1', '__seed__', wb)).toBe(10)
+  })
+  it('aggregates a cross-sheet range', () => {
+    expect(evaluateFormula(main, 'SUM(Data!B1:B3)', '__seed__', wb)).toBe(60)
+  })
+  it('mixes a local ref with a cross-sheet ref', () => {
+    expect(evaluateFormula(main, 'A1 + Data!B1', '__seed__', wb)).toBe(15)
+  })
+  it('VLOOKUP against another sheet', () => {
+    expect(evaluateFormula(main, 'VLOOKUP("y", Data!A1:B3, 2, FALSE)', '__seed__', wb)).toBe(20)
+  })
+  it('quoted sheet names with spaces', () => {
+    expect(evaluateFormula(main, "'My Tab'!A1", '__seed__', wb)).toBe(7)
+  })
+  it('an unknown sheet evaluates as empty (0 in arithmetic), never a fake value', () => {
+    // Unresolved sheet falls back to the current grid; out-of-range reads as ''.
+    expect(evaluateFormula(main, 'Ghost!Z99 + 0', '__seed__', wb)).toBe(0)
+  })
+})
+
+describe('rewriteFormulaRefs — cross-sheet round-trips', () => {
+  it('shifts the cell but preserves the sheet qualifier', () => {
+    expect(rewriteFormulaRefs('=Data!B1*2', 1, 0)).toBe('=Data!B2*2')
+  })
+  it('preserves a quoted sheet name', () => {
+    expect(rewriteFormulaRefs("='My Tab'!A1", 2, 0)).toBe("='My Tab'!A3")
+  })
+  it('shifts a cross-sheet range', () => {
+    expect(rewriteFormulaRefs('=SUM(Data!A1:A3)', 1, 0)).toBe('=SUM(Data!A2:A4)')
+  })
+})

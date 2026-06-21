@@ -31,7 +31,7 @@ import {
   type CellRange
 } from './sheet/sheetOps'
 import { extendSeries, canToggleSeries, numericFill } from '../../lib/sheetFill'
-import { rewriteFormulaRefs, displayCell } from '../../lib/sheetFormula'
+import { rewriteFormulaRefs, displayCell, makeWorkbook } from '../../lib/sheetFormula'
 import { isSingleCell } from '@shared/gridClipboard'
 import SheetGrid from './sheet/SheetGrid'
 import SheetToolbar from './sheet/SheetToolbar'
@@ -144,6 +144,9 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
   const idx = body.activeSheet ?? 0
   const tab = activeTab(body)
   const selection: CellRange = normalizeRange(anchor, focus)
+  // Workbook view for cross-sheet references (Sheet2!A1). Rebuilt when any tab's
+  // name or data changes so a formula reading another tab stays current.
+  const workbook = useMemo(() => makeWorkbook(body.sheets), [body.sheets])
 
   // ── Commit helpers ────────────────────────────────────────────────────────
   const commit = useCallback(
@@ -693,7 +696,7 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
     const grid = { columns: tab.columns, rows: tab.rows }
     let maxLen = (tab.columns[c] ?? '').length
     for (let r = 0; r < tab.rows.length; r++) {
-      const v = displayCell(grid, r, c)
+      const v = displayCell(grid, r, c, workbook)
       if (v.length > maxLen) maxLen = v.length
     }
     const w = Math.max(64, Math.min(480, Math.round(maxLen * 7.3) + 28))
@@ -925,6 +928,7 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
             onFillStart={onFillStart}
             onFillToEnd={onFillToEnd}
             onSetCell={(r, c, v) => mutateTab((t) => setCell(t, r, c, v))}
+            workbook={workbook}
           />
           {funcMenu && editInputRef.current && (
             <FormulaMenu
