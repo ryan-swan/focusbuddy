@@ -17,6 +17,7 @@ interface Props {
   onInsertCol: () => void
   onDeleteCol: () => void
   onSort: (dir: 'asc' | 'desc') => void
+  onConditionalFormat: () => void
   onInsertChart: (type: 'bar' | 'line' | 'pie') => void
   onImport: () => void
   onExport: (format: 'xlsx' | 'csv') => void
@@ -130,6 +131,14 @@ export default function SheetToolbar(props: Props): JSX.Element {
       </button>
       <button className={btn} title="Sort descending" onClick={() => props.onSort('desc')}>
         <Icon name="arrow_downward" size={15} />
+      </button>
+      <button
+        className={btn}
+        title="Conditional formatting for the selection"
+        data-testid="sheet-condformat-btn"
+        onClick={props.onConditionalFormat}
+      >
+        <Icon name="palette" size={15} />
       </button>
       <Divider />
 

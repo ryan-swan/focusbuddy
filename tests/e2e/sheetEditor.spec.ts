@@ -985,3 +985,41 @@ test('SE-18 — formula assistant: stub suggestFormula; preview, Apply writes fo
     await dispose()
   }
 })
+
+// ── SE-19: Conditional formatting paints a matching cell ──────────────────────
+
+test('SE-19 — conditional formatting "greater than 100" paints A1 but not A2', async () => {
+  const { window, dispose } = await launchApp()
+  try {
+    await waitForReady(window)
+    await openDocumentsHub(window)
+    await startBlankSpreadsheet(window)
+
+    // A1 = 150 (matches "> 100"); A2 = 50 (does not).
+    await setViaFormulaBar(window, 0, 0, '150')
+    await setViaFormulaBar(window, 1, 0, '50')
+
+    // Select A1 so the rule's range is A1:A1, then open the dialog.
+    await clickCell(window, 0, 0)
+    await window.locator('[data-testid="sheet-condformat-btn"]').click()
+    await expect(window.locator('[data-testid="sheet-condformat-dialog"]')).toBeVisible({ timeout: 3_000 })
+
+    // Default op is "Greater than"; set the value and add the rule (default fill swatch).
+    await window.locator('[data-testid="condformat-value"]').fill('100')
+    await window.locator('[data-testid="condformat-add"]').click()
+    await window.waitForTimeout(200)
+
+    // The rule paints A1 with the default swatch (#fee2e2 = rgb(254,226,226)) and
+    // leaves A2 unpainted. Computed style is readable beneath the open dialog.
+    const bgA1 = await window
+      .locator('[data-testid="cell-0-0"] div.whitespace-pre-wrap')
+      .evaluate((el) => getComputedStyle(el).backgroundColor)
+    expect(bgA1).toBe('rgb(254, 226, 226)')
+    const bgA2 = await window
+      .locator('[data-testid="cell-1-0"] div.whitespace-pre-wrap')
+      .evaluate((el) => getComputedStyle(el).backgroundColor)
+    expect(bgA2).toBe('rgba(0, 0, 0, 0)')
+  } finally {
+    await dispose()
+  }
+})

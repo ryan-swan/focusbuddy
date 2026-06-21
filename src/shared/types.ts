@@ -1195,6 +1195,48 @@ export interface SheetChartSpec {
   headerCol?: boolean // first column holds category labels
 }
 
+// Conditional formatting — a rule paints cells in its A1 range whose computed
+// value satisfies the condition. Rules apply in order; later matching rules
+// override earlier ones for the same property. The cell's true value is never
+// changed, only how it is shown (mirrors the honesty rule for number formats).
+export type SheetCondOp =
+  | 'gt'
+  | 'lt'
+  | 'ge'
+  | 'le'
+  | 'eq'
+  | 'ne'
+  | 'between'
+  | 'contains'
+  | 'notEmpty'
+  | 'empty'
+
+export interface SheetCondRule {
+  id: string
+  range: string // A1 range on the owning tab, e.g. 'B2:B20'
+  op: SheetCondOp
+  value?: string // comparison operand (number or text depending on op)
+  value2?: string // upper bound for 'between'
+  bg?: string // fill colour to apply when matched
+  color?: string // text colour to apply when matched
+  bold?: boolean
+}
+
+// Data validation — constrains what a cell in its range may contain. 'list'
+// renders an in-cell dropdown; numeric/text rules flag invalid entries. The
+// value is never silently changed; invalid input is marked, not faked.
+export type SheetValidationRule =
+  | { kind: 'list'; values: string[] }
+  | { kind: 'number'; op: 'gt' | 'lt' | 'ge' | 'le' | 'eq' | 'between'; value: number; value2?: number }
+  | { kind: 'textNotEmpty' }
+
+export interface SheetValidation {
+  id: string
+  range: string // A1 range on the owning tab
+  rule: SheetValidationRule
+  strict?: boolean // when true, invalid entries are rejected on commit
+}
+
 export interface SheetTab {
   id: string
   name: string
@@ -1205,6 +1247,8 @@ export interface SheetTab {
   colWidths?: Record<number, number> // px; absent = default
   freeze?: { rows: number; cols: number }
   charts?: SheetChartSpec[]
+  condRules?: SheetCondRule[]
+  validations?: SheetValidation[]
 }
 
 export interface SheetBodyV2 {
