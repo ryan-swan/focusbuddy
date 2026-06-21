@@ -1,26 +1,35 @@
 import { useState } from 'react'
 import type { FbDocument } from '@office'
+import type { ShareScope } from '@shared/types'
 import { useSharesStore } from '../../stores/shares'
 import { generateAnonymousHandle } from '../../lib/shareSnapshot'
-import { buildDocumentSnapshot } from '../../lib/officeShareSnapshot'
+import { buildDocumentSnapshot, buildFolderShareSnapshot } from '../../lib/officeShareSnapshot'
 import { viewerUrlFor } from '../../lib/shareTokens'
 import Icon from '../Icon'
 
-// Share an office document, view-only, by link (and optional email invite). Mints
-// a 'document' snapshot (rendered to HTML on the desktop) through the same share
-// system PlexiDesk uses, so the link opens read-only in the browser viewer. Live
-// collaboration and folder sharing are later phases of the sharing epic.
+// Share an office document or a Drive folder by link (and optional email invite),
+// through the same share system PlexiDesk uses, so the link opens read-only in the
+// browser viewer. A folder can be shared 'view' (read-only) or 'copy' (recipient
+// imports it into their own Drive). Live collaboration is a later phase.
+
+export type ShareTarget =
+  | { kind: 'document'; doc: FbDocument }
+  | { kind: 'docfolder'; folderId: string; name: string }
 
 export default function OfficeShareDialog({
-  doc,
+  target,
   onClose
 }: {
-  doc: FbDocument
+  target: ShareTarget
   onClose: () => void
 }): JSX.Element {
   const createFor = useSharesStore((s) => s.createFor)
   const invite = useSharesStore((s) => s.invite)
 
+  const isFolder = target.kind === 'docfolder'
+  const label = isFolder ? target.name || 'Folder' : target.doc.title || 'Untitled'
+
+  const [scope, setScope] = useState<ShareScope>('view')
   const [link, setLink] = useState<string | null>(null)
   const [token, setToken] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -36,12 +45,14 @@ export default function OfficeShareDialog({
     setError(null)
     try {
       const handle = generateAnonymousHandle()
-      const snapshot = buildDocumentSnapshot(doc, handle)
+      const snapshot = isFolder
+        ? await buildFolderShareSnapshot(target.folderId, target.name, handle)
+        : buildDocumentSnapshot(target.doc, handle)
       const created = await createFor({
-        kind: 'document',
-        entityId: doc.id,
-        label: doc.title || 'Untitled',
-        scope: 'view',
+        kind: target.kind,
+        entityId: isFolder ? target.folderId : target.doc.id,
+        label,
+        scope: isFolder ? scope : 'view',
         snapshot,
         fromHandle: handle
       })
@@ -80,17 +91,28 @@ export default function OfficeShareDialog({
         onMouseDown={(e) => e.stopPropagation()}
       >
         <div className="flex items-center gap-2">
-          <Icon name="share" size={16} className="text-accent" />
-          <span className="text-[14px] font-semibold text-stone-800 dark:text-stone-100">
-            Share “{doc.title || 'Untitled'}”
+          <Icon name={isFolder ? 'folder_shared' : 'share'} size={16} className="text-accent" />
+          <span className="text-[14px] font-semibold text-stone-800 dark:text-stone-100 truncate">
+            Share “{label}”
           </span>
           <button onClick={onClose} className="ml-auto icon-btn" aria-label="Close">
             <Icon name="close" size={15} />
           </button>
         </div>
 
+        {isFolder && !link && (
+          <div className="flex gap-2">
+            <ScopeChip active={scope === 'view'} onClick={() => setScope('view')} title="View only" desc="Read-only in the browser" />
+            <ScopeChip active={scope === 'copy'} onClick={() => setScope('copy')} title="Can copy" desc="Import into their Drive" />
+          </div>
+        )}
+
         <p className="text-[12px] text-stone-500 dark:text-stone-400">
-          Anyone with the link can view this document read-only in their browser. No sign-up needed.
+          {isFolder
+            ? scope === 'copy'
+              ? 'Anyone with the link can view this folder and import a copy of its documents into their own Drive.'
+              : 'Anyone with the link can view this folder and its documents read-only in their browser.'
+            : 'Anyone with the link can view this document read-only in their browser. No sign-up needed.'}
         </p>
 
         {error && <div className="text-[12px] text-red-600 dark:text-red-400">{error}</div>}
@@ -148,5 +170,29 @@ export default function OfficeShareDialog({
         )}
       </div>
     </div>
+  )
+}
+
+function ScopeChip({
+  active,
+  onClick,
+  title,
+  desc
+}: {
+  active: boolean
+  onClick: () => void
+  title: string
+  desc: string
+}): JSX.Element {
+  return (
+    <button
+      onClick={onClick}
+      className={`flex-1 rounded-lg border px-2.5 py-1.5 text-left ${
+        active ? 'border-accent bg-accent/[0.06]' : 'border-stone-200 dark:border-stone-700'
+      }`}
+    >
+      <div className="text-[12px] font-medium text-stone-800 dark:text-stone-100">{title}</div>
+      <div className="text-[10px] text-stone-500">{desc}</div>
+    </button>
   )
 }

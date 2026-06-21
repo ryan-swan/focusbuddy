@@ -53,7 +53,30 @@ export interface DocumentSnapshot extends ShareSnapshotBase {
   html: string
 }
 
-export type ShareSnapshot = FolderSnapshot | TaskSnapshot | WidgetSnapshot | DocumentSnapshot
+// One node of a shared Drive folder tree: a nested folder, or a document
+// carrying both its rendered `html` (for the browser viewer) and its raw `body`
+// (so a copy-scope recipient can import a real, editable copy).
+export interface DocFolderEntry {
+  type: 'folder' | 'document'
+  name: string
+  docType?: 'doc' | 'sheet' | 'slides' | 'map'
+  html?: string
+  body?: unknown
+  items?: DocFolderEntry[]
+}
+
+export interface DocFolderSnapshot extends ShareSnapshotBase {
+  kind: 'docfolder'
+  name: string
+  items: DocFolderEntry[]
+}
+
+export type ShareSnapshot =
+  | FolderSnapshot
+  | TaskSnapshot
+  | WidgetSnapshot
+  | DocumentSnapshot
+  | DocFolderSnapshot
 
 // Trim-down of FbNode — the snapshot only keeps display-relevant fields.
 // Internal tracking (sortOrder, axis values, resume markdown if empty,

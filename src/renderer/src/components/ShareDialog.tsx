@@ -187,7 +187,8 @@ export default function ShareDialog({
     folder: 'folder',
     task: 'task',
     widget: 'desk item',
-    document: 'document'
+    document: 'document',
+    docfolder: 'folder'
   }
 
   return createPortal(

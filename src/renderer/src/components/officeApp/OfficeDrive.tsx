@@ -3,7 +3,16 @@ import type { DocType } from '@office'
 import type { FileEntry } from '@shared/fields'
 import { useFileManagerStore, sortEntries } from '../../stores/fileManager'
 import { useDocumentsStore } from '../../stores/documents'
+import { useSharesStore } from '../../stores/shares'
+import { materializeDocFolder } from '../../lib/officeShareImport'
+import type { DocFolderSnapshot } from '../../lib/shareSnapshot'
 import Icon from '../Icon'
+
+// Pull the share token out of a pasted viewer URL (…/share/<token>) or a bare token.
+function extractToken(input: string): string {
+  const m = input.trim().match(/\/share\/([a-z0-9]+)/i)
+  return m ? m[1] : input.trim()
+}
 
 // PlexiOffice Drive — the folder tree for the standalone app, reusing PlexiDesk's
 // file-manager store + IPC verbatim (window.api.fileManager). Folders organise
@@ -22,7 +31,11 @@ function docIcon(t: string | undefined): string {
   return t === 'sheet' ? 'table' : t === 'slides' ? 'slideshow' : t === 'map' ? 'account_tree' : 'description'
 }
 
-export default function OfficeDrive(): JSX.Element {
+export default function OfficeDrive({
+  onShareFolder
+}: {
+  onShareFolder?: (folderId: string, name: string) => void
+}): JSX.Element {
   const cwd = useFileManagerStore((s) => s.cwd)
   const crumbs = useFileManagerStore((s) => s.crumbs)
   const entries = useFileManagerStore((s) => s.entries)
@@ -36,9 +49,15 @@ export default function OfficeDrive(): JSX.Element {
   const createBlank = useDocumentsStore((s) => s.createBlank)
   const active = useDocumentsStore((s) => s.active)
 
+  const acceptByToken = useSharesStore((s) => s.acceptByToken)
+
   const [unfiled, setUnfiled] = useState<Array<{ id: string; title: string; docType: string }>>([])
   const [dragId, setDragId] = useState<string | null>(null)
   const [dropTarget, setDropTarget] = useState<string | null>(null)
+  const [importOpen, setImportOpen] = useState(false)
+  const [importUrl, setImportUrl] = useState('')
+  const [importBusy, setImportBusy] = useState(false)
+  const [importMsg, setImportMsg] = useState<string | null>(null)
 
   useEffect(() => {
     void refresh()
@@ -67,6 +86,35 @@ export default function OfficeDrive(): JSX.Element {
 
   async function newFolder(): Promise<void> {
     await createFolder('New folder')
+  }
+
+  // Open a shared link: fetch the snapshot and, for a copy-scope folder, import a
+  // real editable copy into the current folder. View-only shares open in a browser.
+  async function importLink(): Promise<void> {
+    const token = extractToken(importUrl)
+    if (!token || importBusy) return
+    setImportBusy(true)
+    setImportMsg(null)
+    try {
+      const item = await acceptByToken(token)
+      const snap = item.snapshot as { kind?: string } | undefined
+      if (snap?.kind === 'docfolder') {
+        if (item.scope !== 'copy') {
+          setImportMsg('This folder was shared view-only. Open the link in a browser to view it.')
+        } else {
+          await materializeDocFolder(item.snapshot as DocFolderSnapshot, cwd)
+          await refresh()
+          setImportMsg('Imported into this folder.')
+          setImportUrl('')
+        }
+      } else {
+        setImportMsg('That link is not an importable folder. View-only links open in a browser.')
+      }
+    } catch (e) {
+      setImportMsg((e as Error).message || 'Could not open that link.')
+    } finally {
+      setImportBusy(false)
+    }
   }
 
   async function onDropOnFolder(folderId: string | null): Promise<void> {
@@ -109,6 +157,39 @@ export default function OfficeDrive(): JSX.Element {
           <Icon name="create_new_folder" size={14} />
           New folder
         </button>
+        <button
+          onClick={() => setImportOpen((v) => !v)}
+          data-testid="office-import-link"
+          className="flex items-center gap-1.5 rounded-lg px-2 py-1 text-[11px] text-stone-500 dark:text-stone-400 hover:text-accent"
+        >
+          <Icon name="link" size={13} />
+          Open a shared link
+        </button>
+        {importOpen && (
+          <div className="space-y-1">
+            <div className="flex items-center gap-1.5">
+              <input
+                value={importUrl}
+                onChange={(e) => setImportUrl(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') void importLink()
+                }}
+                placeholder="Paste a share link"
+                data-testid="office-import-url"
+                className="flex-1 min-w-0 bg-stone-50 dark:bg-stone-800 border border-stone-300 dark:border-stone-600 rounded px-2 py-1 text-[11.5px] focus:outline-none focus:border-accent"
+              />
+              <button
+                onClick={() => void importLink()}
+                disabled={importBusy || !importUrl.trim()}
+                data-testid="office-import-go"
+                className="btn-primary text-[11px] px-2 py-1 disabled:opacity-50"
+              >
+                {importBusy ? '…' : 'Open'}
+              </button>
+            </div>
+            {importMsg && <div className="text-[10.5px] text-stone-500">{importMsg}</div>}
+          </div>
+        )}
       </div>
 
       {/* Breadcrumbs */}
@@ -156,6 +237,9 @@ export default function OfficeDrive(): JSX.Element {
                   else if (e.kind === 'doc' && e.docId) void open(e.docId)
                   else void window.api.files.open(e.id)
                 }}
+                onShare={
+                  e.kind === 'folder' && onShareFolder ? () => onShareFolder(e.id, e.name) : undefined
+                }
                 onDelete={() => void remove(e.id)}
                 draggable
                 onDragStart={() => setDragId(e.id)}
@@ -205,6 +289,7 @@ function DriveRow({
   active,
   isDropTarget,
   onOpen,
+  onShare,
   onDelete,
   draggable,
   onDragStart,
@@ -216,6 +301,7 @@ function DriveRow({
   active: boolean
   isDropTarget: boolean
   onOpen: () => void
+  onShare?: () => void
   onDelete: () => void
   draggable: boolean
   onDragStart: () => void
@@ -241,6 +327,16 @@ function DriveRow({
         <Icon name={icon} size={14} className={`shrink-0 ${isFolder ? 'text-accent' : 'text-stone-400'}`} />
         <span className="truncate">{entry.name || 'Untitled'}</span>
       </button>
+      {onShare && (
+        <button
+          onClick={onShare}
+          data-testid={`office-folder-share-${entry.name}`}
+          className="opacity-0 group-hover:opacity-100 text-stone-400 hover:text-accent shrink-0"
+          title="Share folder"
+        >
+          <Icon name="share" size={13} />
+        </button>
+      )}
       <button
         onClick={onDelete}
         className="opacity-0 group-hover:opacity-100 text-stone-400 hover:text-rose-500 shrink-0"
