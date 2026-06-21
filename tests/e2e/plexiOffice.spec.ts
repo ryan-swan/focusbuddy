@@ -153,3 +153,33 @@ test('PO-7 — Share a document: create a view-only link', async () => {
   await expect(link).toBeVisible({ timeout: 5_000 })
   await expect(link).toHaveValue(/\/share\/[a-z0-9]+/)
 })
+
+test('PO-8 — Share a Drive folder: copy-scope view-only link', async () => {
+  launched = await launchApp({ env: { PLEXI_APP: 'office' } })
+  const { window } = launched
+
+  await window.locator('[data-testid="office-new-folder"]').click()
+  const folder = window.locator('[data-testid="office-folder-New folder"]')
+  await expect(folder).toBeVisible({ timeout: 10_000 })
+
+  // Hover reveals the folder share button; click it.
+  await folder.hover()
+  await window.locator('[data-testid="office-folder-share-New folder"]').click()
+  await expect(window.locator('[data-testid="office-share-dialog"]')).toBeVisible({ timeout: 5_000 })
+
+  // A folder share offers view/copy scope; pick copy, then mint the link.
+  await window.getByText('Can copy', { exact: true }).click()
+  await window.locator('[data-testid="office-share-create"]').click()
+  const link = window.locator('[data-testid="office-share-link"]')
+  await expect(link).toBeVisible({ timeout: 5_000 })
+  await expect(link).toHaveValue(/\/share\/[a-z0-9]+/)
+})
+
+test('PO-9 — Drive exposes an "open a shared link" import affordance', async () => {
+  launched = await launchApp({ env: { PLEXI_APP: 'office' } })
+  const { window } = launched
+
+  await window.locator('[data-testid="office-import-link"]').click()
+  await expect(window.locator('[data-testid="office-import-url"]')).toBeVisible({ timeout: 5_000 })
+  await expect(window.locator('[data-testid="office-import-go"]')).toBeVisible()
+})

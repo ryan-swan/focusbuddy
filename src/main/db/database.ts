@@ -199,7 +199,9 @@ CREATE INDEX IF NOT EXISTS idx_canvas_snapshots_task ON canvas_snapshots(task_id
 CREATE TABLE IF NOT EXISTS share_links (
   id TEXT PRIMARY KEY,
   token TEXT NOT NULL UNIQUE,
-  kind TEXT NOT NULL CHECK (kind IN ('folder', 'task', 'widget', 'document')),
+  -- No kind CHECK: the ShareableKind TS union is the guard, so new share kinds
+  -- (document, docfolder, …) never need a DB migration.
+  kind TEXT NOT NULL,
   entity_id TEXT NOT NULL,
   label TEXT NOT NULL DEFAULT '',
   scope TEXT NOT NULL DEFAULT 'view' CHECK (scope IN ('view', 'copy')),
@@ -218,7 +220,7 @@ CREATE INDEX IF NOT EXISTS idx_share_links_created ON share_links(created_at DES
 CREATE TABLE IF NOT EXISTS shared_with_me (
   id TEXT PRIMARY KEY,
   token TEXT NOT NULL UNIQUE,
-  kind TEXT NOT NULL CHECK (kind IN ('folder', 'task', 'widget', 'document')),
+  kind TEXT NOT NULL,
   snapshot_json TEXT NOT NULL DEFAULT '{}',
   from_handle TEXT NOT NULL DEFAULT '',
   accepted_at INTEGER NOT NULL,
@@ -475,25 +477,26 @@ function migrateDocumentsDocTypeCheck(d: Database.Database): void {
   `)
 }
 
-// The share tables shipped with a CHECK listing only folder/task/widget. Office
-// document sharing adds the 'document' kind, so existing databases reject it.
-// Rebuild each share table (copying rows) when its live CHECK predates 'document'.
-// Idempotent; a no-op once migrated or on a fresh DB.
+// The share tables shipped with a CHECK on `kind` (folder/task/widget). Office
+// sharing keeps adding kinds (document, docfolder, …), so rather than migrate the
+// CHECK each time, this drops the kind CHECK entirely — the ShareableKind TS union
+// is the guard. Rebuilds a share table (copying rows) only while its live schema
+// still carries a `kind` CHECK. Idempotent; a no-op once migrated or on a fresh DB.
 function migrateShareKindChecks(d: Database.Database): void {
-  const needs = (name: string): boolean => {
+  const hasKindCheck = (name: string): boolean => {
     const row = d
       .prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name=?")
       .get(name) as { sql?: string } | undefined
-    return !!row?.sql && row.sql.includes('CHECK') && !row.sql.includes("'document'")
+    return !!row?.sql && /CHECK\s*\(\s*kind\s+IN/i.test(row.sql)
   }
-  if (needs('share_links')) {
+  if (hasKindCheck('share_links')) {
     d.exec(`
       PRAGMA foreign_keys=off;
       BEGIN;
       CREATE TABLE share_links_new (
         id TEXT PRIMARY KEY,
         token TEXT NOT NULL UNIQUE,
-        kind TEXT NOT NULL CHECK (kind IN ('folder', 'task', 'widget', 'document')),
+        kind TEXT NOT NULL,
         entity_id TEXT NOT NULL,
         label TEXT NOT NULL DEFAULT '',
         scope TEXT NOT NULL DEFAULT 'view' CHECK (scope IN ('view', 'copy')),
@@ -511,14 +514,14 @@ function migrateShareKindChecks(d: Database.Database): void {
       PRAGMA foreign_keys=on;
     `)
   }
-  if (needs('shared_with_me')) {
+  if (hasKindCheck('shared_with_me')) {
     d.exec(`
       PRAGMA foreign_keys=off;
       BEGIN;
       CREATE TABLE shared_with_me_new (
         id TEXT PRIMARY KEY,
         token TEXT NOT NULL UNIQUE,
-        kind TEXT NOT NULL CHECK (kind IN ('folder', 'task', 'widget', 'document')),
+        kind TEXT NOT NULL,
         snapshot_json TEXT NOT NULL DEFAULT '{}',
         from_handle TEXT NOT NULL DEFAULT '',
         accepted_at INTEGER NOT NULL,

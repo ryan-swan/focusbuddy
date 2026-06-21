@@ -1,5 +1,5 @@
-import type { FbDocument, SheetBody, SlidesBody, MapBody } from '@shared/types'
-import type { DocumentSnapshot } from './shareSnapshot'
+import type { FbDocument, SheetBody, SlidesBody, MapBody, DocType } from '@shared/types'
+import type { DocumentSnapshot, DocFolderSnapshot, DocFolderEntry } from './shareSnapshot'
 import { SHARE_SNAPSHOT_VERSION } from './shareSnapshot'
 import { docToHtml } from './docHtml'
 import { normalizeBody, activeTab, colLabel } from './sheetBody'
@@ -71,16 +71,20 @@ function mapHtml(body: MapBody): string {
   return `<div class="office-map"><h4>Nodes</h4><ul>${nodes || '<li>(none)</li>'}</ul><h4>Connections</h4><ul>${edges || '<li>(none)</li>'}</ul></div>`
 }
 
-export function buildDocumentSnapshot(doc: FbDocument, fromHandle: string): DocumentSnapshot {
-  let html = ''
+// Render a document's body to read-only HTML for the viewer. Per-type, honest:
+// computed sheet cells show their real value or #ERR, never a fabricated one.
+export function documentHtml(docType: DocType, body: unknown): string {
   try {
-    if (doc.docType === 'doc') html = docToHtml(doc.body as Parameters<typeof docToHtml>[0])
-    else if (doc.docType === 'sheet') html = sheetHtml(doc.body as SheetBody)
-    else if (doc.docType === 'slides') html = slidesHtml(doc.body as SlidesBody)
-    else html = mapHtml(doc.body as MapBody)
+    if (docType === 'doc') return docToHtml(body as Parameters<typeof docToHtml>[0])
+    if (docType === 'sheet') return sheetHtml(body as SheetBody)
+    if (docType === 'slides') return slidesHtml(body as SlidesBody)
+    return mapHtml(body as MapBody)
   } catch {
-    html = '<p>(preview unavailable)</p>'
+    return '<p>(preview unavailable)</p>'
   }
+}
+
+export function buildDocumentSnapshot(doc: FbDocument, fromHandle: string): DocumentSnapshot {
   return {
     _version: SHARE_SNAPSHOT_VERSION,
     kind: 'document',
@@ -88,6 +92,49 @@ export function buildDocumentSnapshot(doc: FbDocument, fromHandle: string): Docu
     capturedAt: Date.now(),
     title: doc.title || 'Untitled',
     docType: doc.docType,
-    html
+    html: documentHtml(doc.docType, doc.body)
   }
 }
+
+// Walk a Drive folder (fb_files) into a shareable tree. Each document carries
+// both its rendered html (browser view) and its raw body (copy-import). Files
+// that aren't documents are skipped — they have no body to render or import.
+async function buildEntries(parentId: string | null): Promise<DocFolderEntry[]> {
+  const entries = await window.api.fileManager.list(parentId)
+  const out: DocFolderEntry[] = []
+  for (const e of entries) {
+    if (e.kind === 'folder') {
+      out.push({ type: 'folder', name: e.name, items: await buildEntries(e.id) })
+    } else if (e.kind === 'doc' && e.docId) {
+      const doc = await window.api.documents.get(e.docId)
+      if (doc) {
+        out.push({
+          type: 'document',
+          name: doc.title || 'Untitled',
+          docType: doc.docType,
+          html: documentHtml(doc.docType, doc.body),
+          body: doc.body
+        })
+      }
+    }
+  }
+  return out
+}
+
+export async function buildFolderShareSnapshot(
+  folderId: string,
+  name: string,
+  fromHandle: string
+): Promise<DocFolderSnapshot> {
+  return {
+    _version: SHARE_SNAPSHOT_VERSION,
+    kind: 'docfolder',
+    fromHandle,
+    capturedAt: Date.now(),
+    name: name || 'Folder',
+    items: await buildEntries(folderId)
+  }
+}
+
+// Import-side helpers (materialize, countDocs) live in officeShareImport.ts so
+// they stay free of the editor/HTML imports this module pulls in.
