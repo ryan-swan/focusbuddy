@@ -36,6 +36,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.72',
+    date: '2026-06-21T16:00:00Z',
+    title: 'v2.5.72 — Spreadsheet filters, and PlexiOffice updates itself',
+    tag: 'feature',
+    summary:
+      'Spreadsheets gain column filters, and the standalone PlexiOffice app now shows its version and updates itself the same way PlexiDesk does.',
+    highlights: [
+      'Column filters: turn on the filter from the toolbar to put funnels on your headers, then tick or untick values to hide and show rows. Hidden rows are only hidden from view; your data and every formula are untouched.',
+      'PlexiOffice now has a version pill and update banner in its footer, so it checks for and installs updates just like PlexiDesk. Clicking the version checks for an update on demand.'
+    ],
+    links: [{ label: 'Finding your way around', href: `${HELP_BASE}/getting-around` }]
+  },
+  {
     version: '2.5.71',
     date: '2026-06-21T09:00:00Z',
     title: 'v2.5.71 — PlexiMaps diagrams + big spreadsheet upgrades',
