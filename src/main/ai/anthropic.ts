@@ -12,6 +12,8 @@ import { resolveModel } from './modelRouting'
 import { parseSheetRows, parseSheetColumns } from './sheetParse'
 import { migrateSlidesBody } from '@shared/slidesMigrate'
 import { resolveTheme, applyThemeToDeck, BUILTIN_THEMES } from '@shared/slideThemes'
+import { normalizeMapBody, autoLayout } from '@shared/mapGraph'
+import type { MapShape } from '@shared/types'
 import type { SlidesBody } from '@shared/types'
 import { resolveAnthropicKey } from '../settingsStore'
 import { shouldUseCredits, getCreditClient, invalidateCreditClient } from './creditMode'
@@ -1534,7 +1536,7 @@ function extractJsonObject(text: string): unknown {
 }
 
 export async function generateDocument(input: {
-  docType: 'doc' | 'sheet' | 'slides'
+  docType: 'doc' | 'sheet' | 'slides' | 'map'
   prompt: string
   audience?: string
 }): Promise<DocumentGenResult> {
@@ -1621,6 +1623,43 @@ export async function generateDocument(input: {
         title: parsed.title || topic.slice(0, 80),
         body: { columns, rows }
       }
+    }
+
+    if (input.docType === 'map') {
+      const system =
+        'You design a clear node-and-edge diagram or workflow map.' +
+        audienceLine +
+        ' Reply with ONLY a JSON object of the form {"title": string, "nodes": [{"id": string, "label": string, "shape": "process"|"decision"|"terminator"|"data"|"database"|"circle"|"note"}], "edges": [{"source": string, "target": string, "label"?: string}]}. Use short stable ids like "n1","n2". Use "terminator" for start/end, "decision" for yes/no branches and give those outgoing edges a "Yes"/"No" label, "process" for steps, "data" for inputs or outputs, "database" for stored data. Produce 5 to 14 nodes that form one connected flow. Do NOT include x or y coordinates. No markdown, no code fences, no prose outside the JSON.' +
+        style
+      const resp = await c.messages.create({
+        model: resolveModel('document'),
+        max_tokens: 2000,
+        system,
+        messages: [{ role: 'user', content: topic }]
+      })
+      if ((resp.stop_reason as string) === 'refusal')
+        return { ok: false, error: 'Claude declined this request. Try rephrasing it.' }
+      const text = resp.content
+        .filter((b) => b.type === 'text')
+        .map((b) => ('text' in b ? b.text : ''))
+        .join('\n')
+      const parsed = extractJsonObject(text) as { title?: string; nodes?: unknown; edges?: unknown }
+      const norm = normalizeMapBody({ version: 1, nodes: parsed.nodes, edges: parsed.edges })
+      if (!norm.nodes.length)
+        return { ok: false, error: 'The map came back empty. Try a more specific prompt.' }
+      // Colour by shape for readability, then lay out (the model gives no coords).
+      const SHAPE_COLOR: Record<MapShape, string> = {
+        process: '#2563eb',
+        decision: '#d97706',
+        terminator: '#2563eb',
+        data: '#0891b2',
+        database: '#16a34a',
+        circle: '#7c3aed',
+        note: '#475569'
+      }
+      const coloured = norm.nodes.map((n) => ({ ...n, color: SHAPE_COLOR[n.shape] || n.color }))
+      const body = { ...norm, nodes: autoLayout(coloured, norm.edges) }
+      return { ok: true, title: parsed.title || topic.slice(0, 80), body }
     }
 
     // slides

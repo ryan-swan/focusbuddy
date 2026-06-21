@@ -18,7 +18,9 @@ interface Props {
 const META: Record<DocType, { label: string; importLabel: string }> = {
   doc: { label: 'Document', importLabel: 'Import a Word .docx' },
   sheet: { label: 'Spreadsheet', importLabel: 'Import an Excel .xlsx / .csv' },
-  slides: { label: 'Slides', importLabel: 'Import a PowerPoint .pptx' }
+  slides: { label: 'Slides', importLabel: 'Import a PowerPoint .pptx' },
+  // Maps have no external import format yet — the create-new path is the only one.
+  map: { label: 'Map', importLabel: '' }
 }
 
 export default function OfficeDocAddDialog({ docType, onPicked, onClose }: Props): JSX.Element {
@@ -101,7 +103,7 @@ export default function OfficeDocAddDialog({ docType, onPicked, onClose }: Props
 
         {error && <div className="mb-2 text-[12px] text-red-600 dark:text-red-400">{error}</div>}
 
-        <div className="grid grid-cols-2 gap-2">
+        <div className={`grid ${meta.importLabel ? 'grid-cols-2' : 'grid-cols-1'} gap-2`}>
           <button
             onClick={() => void createNew()}
             disabled={!!busy}
@@ -112,6 +114,7 @@ export default function OfficeDocAddDialog({ docType, onPicked, onClose }: Props
             <span className="text-[13px] font-medium text-stone-800 dark:text-stone-100">Create new</span>
             <span className="text-[11px] text-stone-500 dark:text-stone-400">Start blank with our editor</span>
           </button>
+          {meta.importLabel && (
           <button
             onClick={() => void importFile()}
             disabled={!!busy}
@@ -122,6 +125,7 @@ export default function OfficeDocAddDialog({ docType, onPicked, onClose }: Props
             <span className="text-[13px] font-medium text-stone-800 dark:text-stone-100">Import a file</span>
             <span className="text-[11px] text-stone-500 dark:text-stone-400">{meta.importLabel}, formatting kept</span>
           </button>
+          )}
         </div>
 
         <div className="mt-3">

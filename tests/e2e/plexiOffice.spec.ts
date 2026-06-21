@@ -57,6 +57,28 @@ test('PO-2 — create a spreadsheet: the shared SheetEditor opens and the doc is
   ).toBeVisible({ timeout: 5_000 })
 })
 
+test('PO-4 — create a PlexiMap: the diagram editor opens with a starter node and accepts a shape', async () => {
+  launched = await launchApp({ env: { PLEXI_APP: 'office' } })
+  const { window } = launched
+
+  await window.locator('[data-testid="office-new-map"]').click()
+
+  // The MapEditor toolbar mounts (its shape buttons are the definitive signal).
+  await expect(window.locator('[data-testid="map-add-process"]')).toBeVisible({ timeout: 10_000 })
+  // A fresh map seeds a single Start node (starterMapBody) — React Flow renders it.
+  await expect(window.locator('.react-flow__node')).toHaveCount(1, { timeout: 5_000 })
+
+  // Adding a process shape puts a second node on the canvas.
+  await window.locator('[data-testid="map-add-process"]').click()
+  await expect(window.locator('.react-flow__node')).toHaveCount(2, { timeout: 5_000 })
+
+  // Back in the list, the new map is present (createBlank titles it "Untitled map").
+  await window.getByRole('button', { name: /Back to list/i }).click()
+  await expect(window.locator('aside').getByText('Untitled map', { exact: true })).toBeVisible({
+    timeout: 5_000
+  })
+})
+
 test('PO-3 — the sidebar offers a sign-in surface so documents can sync with PlexiDesk', async () => {
   launched = await launchApp({ env: { PLEXI_APP: 'office' } })
   const { window } = launched

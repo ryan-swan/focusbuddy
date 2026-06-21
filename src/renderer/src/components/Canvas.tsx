@@ -161,6 +161,7 @@ function renderWidget(w: Widget): JSX.Element | null {
     case 'doc':
     case 'sheet':
     case 'slides':
+    case 'map':
       return <OfficeDocWidget widget={w} />
     case 'calculator':
       return <CalculatorWidget widget={w} />

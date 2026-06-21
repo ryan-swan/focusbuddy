@@ -144,6 +144,17 @@ export const WIDGET_CATALOG: WidgetCatalogEntry[] = [
     isWebBased: false
   },
   {
+    kind: 'map',
+    category: 'Files',
+    label: 'Map',
+    icon: 'account_tree',
+    hint: 'A PlexiMaps diagram and workflow map — flowcharts, process maps, org charts, mind maps. Build by hand or generate with AI.',
+    defaultWidth: 720,
+    defaultHeight: 520,
+    defaultContent: '',
+    isWebBased: false
+  },
+  {
     kind: 'streamdeck',
     category: 'Tools',
     label: 'SpeedDeck',

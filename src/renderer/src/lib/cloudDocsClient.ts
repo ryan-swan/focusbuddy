@@ -10,7 +10,7 @@
 
 import { signalConfig } from './signalConfig'
 
-export type CloudDocType = 'doc' | 'sheet' | 'slides'
+export type CloudDocType = 'doc' | 'sheet' | 'slides' | 'map'
 
 export interface CloudDocument {
   id: string

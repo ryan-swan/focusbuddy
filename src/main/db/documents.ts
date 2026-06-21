@@ -6,10 +6,12 @@ import type {
   DocumentMeta,
   DocumentPatch,
   FbDocument,
+  MapBody,
   SheetBody,
   SlidesBody
 } from '@shared/types'
 import { migrateSlidesBody } from '@shared/slidesMigrate'
+import { normalizeMapBody, starterMapBody } from '@shared/mapGraph'
 
 // Office documents store — CRUD for standalone doc / sheet / slides files. The
 // body is persisted as a JSON string; the shape depends on doc_type and is
@@ -29,12 +31,14 @@ interface DocumentRow {
 function parseBody(
   type: FbDocument['docType'],
   raw: string
-): DocBody | SheetBody | SlidesBody {
+): DocBody | SheetBody | SlidesBody | MapBody {
   try {
     const parsed = JSON.parse(raw)
     // Slides bodies are migrated to the v2 element model on read, so a legacy
     // deck always opens as editable elements without rewriting the file at rest.
     if (type === 'slides') return migrateSlidesBody(parsed as SlidesBody)
+    // Maps are normalised on read so a malformed graph still opens cleanly.
+    if (type === 'map') return normalizeMapBody(parsed)
     return parsed
   } catch {
     // Corrupt or empty — hand back a valid empty body for the type so the
@@ -43,7 +47,7 @@ function parseBody(
   }
 }
 
-export function emptyBody(type: FbDocument['docType']): DocBody | SheetBody | SlidesBody {
+export function emptyBody(type: FbDocument['docType']): DocBody | SheetBody | SlidesBody | MapBody {
   if (type === 'sheet') {
     return { columns: ['A', 'B', 'C'], rows: Array.from({ length: 8 }, () => ['', '', '']) }
   }
@@ -52,6 +56,10 @@ export function emptyBody(type: FbDocument['docType']): DocBody | SheetBody | Sl
     return migrateSlidesBody({
       slides: [{ id: randomUUID(), title: 'Title slide', bullets: [], notes: '', layout: 'title' }]
     })
+  }
+  if (type === 'map') {
+    // A fresh map opens with a single Start node to build out from.
+    return starterMapBody()
   }
   return { type: 'doc', content: [{ type: 'paragraph' }] }
 }
@@ -148,7 +156,7 @@ export function upsertDocument(input: {
   id: string
   docType: FbDocument['docType']
   title: string
-  body: DocBody | SheetBody | SlidesBody
+  body: DocBody | SheetBody | SlidesBody | MapBody
   archived?: boolean
   updatedAt?: number
 }): FbDocument {

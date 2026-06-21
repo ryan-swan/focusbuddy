@@ -15,10 +15,12 @@ import {
   DocEditor,
   SheetEditor,
   SlidesEditor,
+  MapEditor,
   setCloudDocsEnabled,
   type DocType,
   type SheetBody,
-  type SlidesBody
+  type SlidesBody,
+  type MapBody
 } from '@office'
 import { useTheme, useAccountStore } from '@runtime'
 import { useDocumentsStore } from '../../stores/documents'
@@ -28,7 +30,8 @@ import Icon from '../Icon'
 const NEW_KINDS: { type: DocType; label: string; icon: string }[] = [
   { type: 'doc', label: 'Document', icon: 'description' },
   { type: 'sheet', label: 'Spreadsheet', icon: 'table' },
-  { type: 'slides', label: 'Slides', icon: 'slideshow' }
+  { type: 'slides', label: 'Slides', icon: 'slideshow' },
+  { type: 'map', label: 'Map', icon: 'account_tree' }
 ]
 
 export default function PlexiOfficeApp(): JSX.Element {
@@ -94,7 +97,15 @@ export default function PlexiOfficeApp(): JSX.Element {
                 }`}
               >
                 <Icon
-                  name={d.docType === 'sheet' ? 'table' : d.docType === 'slides' ? 'slideshow' : 'description'}
+                  name={
+                    d.docType === 'sheet'
+                      ? 'table'
+                      : d.docType === 'slides'
+                        ? 'slideshow'
+                        : d.docType === 'map'
+                          ? 'account_tree'
+                          : 'description'
+                  }
                   size={14}
                   className="shrink-0 text-stone-400"
                 />
@@ -154,10 +165,17 @@ export default function PlexiOfficeApp(): JSX.Element {
                   title={active.title}
                   onChange={(b) => saveBody(b)}
                 />
-              ) : (
+              ) : active.docType === 'slides' ? (
                 <SlidesEditor
                   key={active.id}
                   body={active.body as SlidesBody}
+                  title={active.title}
+                  onChange={(b) => saveBody(b)}
+                />
+              ) : (
+                <MapEditor
+                  key={active.id}
+                  body={active.body as MapBody}
                   title={active.title}
                   onChange={(b) => saveBody(b)}
                 />

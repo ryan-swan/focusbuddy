@@ -429,7 +429,7 @@ export function getDb(): Database.Database {
     -- sharing and AI-create flow uniform.
     CREATE TABLE IF NOT EXISTS documents (
       id TEXT PRIMARY KEY,
-      doc_type TEXT NOT NULL CHECK (doc_type IN ('doc', 'sheet', 'slides')),
+      doc_type TEXT NOT NULL CHECK (doc_type IN ('doc', 'sheet', 'slides', 'map')),
       title TEXT NOT NULL DEFAULT '',
       body TEXT NOT NULL DEFAULT '{}',
       archived INTEGER NOT NULL DEFAULT 0,
@@ -438,7 +438,40 @@ export function getDb(): Database.Database {
     );
     CREATE INDEX IF NOT EXISTS idx_documents_updated ON documents (updated_at DESC);
   `)
+  migrateDocumentsDocTypeCheck(db)
   return db
+}
+
+// The documents table shipped with a CHECK constraint listing only the original
+// doc types. SQLite can't ALTER a CHECK in place, so when PlexiMaps added the
+// 'map' type, existing databases reject `INSERT ... doc_type='map'`. This rebuilds
+// the table (copying every row) whenever the live CHECK predates 'map'. Idempotent
+// and a no-op once migrated or on a fresh DB created with the updated schema above.
+function migrateDocumentsDocTypeCheck(d: Database.Database): void {
+  const row = d
+    .prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='documents'")
+    .get() as { sql?: string } | undefined
+  if (!row?.sql || !row.sql.includes('CHECK') || row.sql.includes("'map'")) return
+  d.exec(`
+    PRAGMA foreign_keys=off;
+    BEGIN;
+    CREATE TABLE documents_new (
+      id TEXT PRIMARY KEY,
+      doc_type TEXT NOT NULL CHECK (doc_type IN ('doc', 'sheet', 'slides', 'map')),
+      title TEXT NOT NULL DEFAULT '',
+      body TEXT NOT NULL DEFAULT '{}',
+      archived INTEGER NOT NULL DEFAULT 0,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+    INSERT INTO documents_new (id, doc_type, title, body, archived, created_at, updated_at)
+      SELECT id, doc_type, title, body, archived, created_at, updated_at FROM documents;
+    DROP TABLE documents;
+    ALTER TABLE documents_new RENAME TO documents;
+    CREATE INDEX IF NOT EXISTS idx_documents_updated ON documents (updated_at DESC);
+    COMMIT;
+    PRAGMA foreign_keys=on;
+  `)
 }
 
 export function closeDb(): void {
