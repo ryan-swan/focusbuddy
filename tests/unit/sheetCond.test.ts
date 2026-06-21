@@ -121,3 +121,26 @@ describe('sheetCond — validation', () => {
     expect(valueIsValid('abc', vNum.rule)).toBe(false)
   })
 })
+
+import { isRowHidden, distinctValues } from '../../src/renderer/src/lib/sheetCond'
+
+describe('sheetCond — column filters', () => {
+  it('isRowHidden hides a row whose value is in a column hide-set', () => {
+    const filters = { 1: ['Done'] }
+    expect(isRowHidden({ 1: 'Done' }, filters)).toBe(true)
+    expect(isRowHidden({ 1: 'Open' }, filters)).toBe(false)
+  })
+  it('no filters or empty hide-set hides nothing', () => {
+    expect(isRowHidden({ 0: 'x' }, undefined)).toBe(false)
+    expect(isRowHidden({ 0: 'x' }, { 0: [] })).toBe(false)
+  })
+  it('multiple columns: any matching hide-set hides the row', () => {
+    const filters = { 0: ['EU'], 2: ['Lost'] }
+    expect(isRowHidden({ 0: 'US', 2: 'Lost' }, filters)).toBe(true)
+    expect(isRowHidden({ 0: 'US', 2: 'Won' }, filters)).toBe(false)
+  })
+  it('distinctValues dedupes and sorts numerically then lexically', () => {
+    expect(distinctValues(['2', '10', '1', '2'])).toEqual(['1', '2', '10'])
+    expect(distinctValues(['b', 'a', 'b', ''])).toEqual(['', 'a', 'b'])
+  })
+})

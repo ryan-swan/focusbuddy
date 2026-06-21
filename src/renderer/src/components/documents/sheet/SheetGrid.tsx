@@ -9,7 +9,13 @@ import type { SheetTab } from '@shared/types'
 import { displayCell, type Grid, type Workbook } from '../../../lib/sheetFormula'
 import { formatValue } from '../../../lib/sheetFormat'
 import { cellFormat, colLabel } from '../../../lib/sheetBody'
-import { applyCondFormat, validationForCell, valueIsValid } from '../../../lib/sheetCond'
+import {
+  applyCondFormat,
+  validationForCell,
+  valueIsValid,
+  distinctValues
+} from '../../../lib/sheetCond'
+import Icon from '../../Icon'
 import { loadGoogleFont, familyLabel } from '../../../lib/googleFonts'
 import type { CellRange } from './sheetOps'
 
@@ -45,6 +51,12 @@ interface Props {
   onSetCell?: (r: number, c: number, value: string) => void
   // The whole workbook, so cross-sheet references (Sheet2!A1) resolve at render.
   workbook?: Workbook
+  // Column filters: rows to hide, whether funnels show, the current per-column
+  // hide-sets, and a setter. SheetGrid owns the funnel dropdown UI.
+  hiddenRows?: Set<number> | null
+  filterActive?: boolean
+  filters?: Record<number, string[]>
+  onSetColumnFilter?: (c: number, hidden: string[]) => void
 }
 
 const ROW_HEADER_W = 44
@@ -60,6 +72,8 @@ export default function SheetGrid(props: Props): JSX.Element {
   const editRef = useRef<HTMLInputElement | null>(null)
   // Which cell's data-validation list dropdown is open (null = none).
   const [openList, setOpenList] = useState<{ r: number; c: number } | null>(null)
+  // Which column header's filter funnel dropdown is open (null = none).
+  const [openFilter, setOpenFilter] = useState<number | null>(null)
 
   useEffect(() => {
     if (editing) editRef.current?.focus()
@@ -109,12 +123,48 @@ export default function SheetGrid(props: Props): JSX.Element {
                   title="Drag to resize · double-click to fit"
                   className="absolute top-0 right-0 h-full w-[8px] translate-x-1/2 z-20 cursor-col-resize hover:bg-accent/40"
                 />
+                {/* Filter funnel (Data > Create a filter). Highlighted when this
+                    column has an active filter. */}
+                {props.filterActive && (
+                  <button
+                    data-testid={`col-filter-${c}`}
+                    title="Filter this column"
+                    onMouseDown={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      setOpenFilter(openFilter === c ? null : c)
+                    }}
+                    className={`absolute right-1.5 top-1/2 -translate-y-1/2 z-10 ${
+                      props.filters?.[c]?.length
+                        ? 'text-accent'
+                        : 'text-stone-400 hover:text-stone-600'
+                    }`}
+                  >
+                    <Icon name="filter_alt" size={13} />
+                  </button>
+                )}
+                {props.filterActive && openFilter === c && (
+                  <FilterDropdown
+                    values={distinctValues(
+                      tab.rows.map((_, r) => displayCell(grid, r, c, props.workbook))
+                    )}
+                    hidden={props.filters?.[c] ?? []}
+                    onApply={(hidden) => {
+                      props.onSetColumnFilter?.(c, hidden)
+                    }}
+                    onClose={() => setOpenFilter(null)}
+                  />
+                )}
               </th>
             ))}
           </tr>
         </thead>
         <tbody>
-          {tab.rows.map((_row, r) => (
+          {tab.rows.map((_row, r) => {
+            // Filtered-out rows are not rendered, but r stays the true data index
+            // so selection, fill, and every formula reference are unaffected.
+            if (props.hiddenRows?.has(r)) return null
+            return (
             <tr key={r}>
               <td className="sticky left-0 z-10 bg-stone-100 dark:bg-stone-800 text-center text-[11px] text-stone-400 border-b border-r border-stone-200 dark:border-stone-700 select-none">
                 {r + 1}
@@ -270,9 +320,65 @@ export default function SheetGrid(props: Props): JSX.Element {
                 )
               })}
             </tr>
-          ))}
+            )
+          })}
         </tbody>
       </table>
     </div>
+  )
+}
+
+// The filter funnel dropdown: a checkbox list of the column's distinct values.
+// Checked = visible; unchecking adds the value to the column's hide-set.
+function FilterDropdown({
+  values,
+  hidden,
+  onApply,
+  onClose
+}: {
+  values: string[]
+  hidden: string[]
+  onApply: (hidden: string[]) => void
+  onClose: () => void
+}): JSX.Element {
+  const hide = new Set(hidden)
+  const toggle = (v: string): void => {
+    const next = new Set(hide)
+    if (next.has(v)) next.delete(v)
+    else next.add(v)
+    onApply([...next])
+  }
+  return (
+    <>
+      <div className="fixed inset-0 z-30" onMouseDown={onClose} />
+      <div
+        data-testid="sheet-filter-dropdown"
+        className="absolute left-0 top-full z-40 mt-0.5 w-48 rounded-md border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 shadow-lg"
+        onMouseDown={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-2 py-1 border-b border-stone-100 dark:border-stone-700 text-[11px]">
+          <button className="text-accent hover:underline" onMouseDown={() => onApply([])}>
+            Select all
+          </button>
+          <button
+            className="text-stone-500 hover:underline"
+            onMouseDown={() => onApply(values.slice())}
+          >
+            Clear
+          </button>
+        </div>
+        <div className="max-h-52 overflow-auto py-1">
+          {values.map((v) => (
+            <label
+              key={v}
+              className="flex items-center gap-2 px-2 py-1 text-[12px] hover:bg-stone-100 dark:hover:bg-stone-700 cursor-pointer"
+            >
+              <input type="checkbox" checked={!hide.has(v)} onChange={() => toggle(v)} />
+              <span className="truncate">{v === '' ? '(blanks)' : v}</span>
+            </label>
+          ))}
+        </div>
+      </div>
+    </>
   )
 }

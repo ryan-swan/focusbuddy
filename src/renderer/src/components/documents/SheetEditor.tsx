@@ -41,7 +41,7 @@ import SheetAiFill from './sheet/SheetAiFill'
 import SheetFormulaAssist, { type FormulaPlan } from './sheet/SheetFormulaAssist'
 import CondFormatDialog from './sheet/CondFormatDialog'
 import ValidationDialog from './sheet/ValidationDialog'
-import { validationForCell, valueIsValid } from '../../lib/sheetCond'
+import { validationForCell, valueIsValid, isRowHidden } from '../../lib/sheetCond'
 import type { SheetCondRule, SheetValidation } from '@shared/types'
 import Icon from '../Icon'
 
@@ -147,6 +147,24 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
   // Workbook view for cross-sheet references (Sheet2!A1). Rebuilt when any tab's
   // name or data changes so a formula reading another tab stays current.
   const workbook = useMemo(() => makeWorkbook(body.sheets), [body.sheets])
+  // Rows hidden by the active column filters (by displayed value). null when no
+  // filter is set, so the common path does no work. r stays the true data index.
+  const hiddenRows = useMemo(() => {
+    const filters = tab.filters
+    if (!filters) return null
+    const cols = Object.keys(filters)
+      .map(Number)
+      .filter((c) => filters[c]?.length)
+    if (!cols.length) return null
+    const grid = { columns: tab.columns, rows: tab.rows }
+    const set = new Set<number>()
+    for (let r = 0; r < tab.rows.length; r++) {
+      const rowValues: Record<number, string> = {}
+      for (const c of cols) rowValues[c] = displayCell(grid, r, c, workbook)
+      if (isRowHidden(rowValues, filters)) set.add(r)
+    }
+    return set
+  }, [tab, workbook])
 
   // ── Commit helpers ────────────────────────────────────────────────────────
   const commit = useCallback(
@@ -790,6 +808,15 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
         onSort={(dir) => mutateTab((t) => sortByColumn(t, selection.c0, dir))}
         onConditionalFormat={() => setCondOpen(true)}
         onDataValidation={() => setValidationOpen(true)}
+        filterActive={!!tab.filterActive}
+        onToggleFilter={() =>
+          mutateTab((t) => ({
+            ...t,
+            filterActive: !t.filterActive,
+            // Turning the filter off clears any per-column hide-sets.
+            ...(t.filterActive ? { filters: {} } : {})
+          }))
+        }
         onInsertChart={insertChart}
         onImport={() => void importFile()}
         onExport={(f) => void exportFile(f)}
@@ -929,6 +956,17 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
             onFillToEnd={onFillToEnd}
             onSetCell={(r, c, v) => mutateTab((t) => setCell(t, r, c, v))}
             workbook={workbook}
+            hiddenRows={hiddenRows}
+            filterActive={tab.filterActive}
+            filters={tab.filters}
+            onSetColumnFilter={(c, hidden) =>
+              mutateTab((t) => {
+                const filters = { ...(t.filters ?? {}) }
+                if (hidden.length) filters[c] = hidden
+                else delete filters[c]
+                return { ...t, filters }
+              })
+            }
           />
           {funcMenu && editInputRef.current && (
             <FormulaMenu
