@@ -1249,6 +1249,11 @@ export interface SheetTab {
   charts?: SheetChartSpec[]
   condRules?: SheetCondRule[]
   validations?: SheetValidation[]
+  // Column filters: per-column-index the set of displayed values to HIDE. A row
+  // is hidden when any filtered column's displayed value is in its hide-set. The
+  // data is untouched; only which rows render changes.
+  filters?: Record<number, string[]>
+  filterActive?: boolean // funnels shown on the headers (Data > Create a filter)
 }
 
 export interface SheetBodyV2 {

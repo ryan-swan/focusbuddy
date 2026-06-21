@@ -1088,3 +1088,38 @@ test('SE-21 — a formula on Sheet 1 reads a value from Sheet 2', async () => {
     await dispose()
   }
 })
+
+// ── SE-22: Column filter hides rows by value ──────────────────────────────────
+
+test('SE-22 — create a filter, uncheck a value, matching rows are hidden', async () => {
+  const { window, dispose } = await launchApp()
+  try {
+    await waitForReady(window)
+    await openDocumentsHub(window)
+    await startBlankSpreadsheet(window)
+
+    await setViaFormulaBar(window, 0, 0, 'apple')
+    await setViaFormulaBar(window, 1, 0, 'banana')
+    await setViaFormulaBar(window, 2, 0, 'apple', [3, 0])
+
+    // Turn on filtering; funnels appear on headers.
+    await window.locator('[data-testid="sheet-filter-btn"]').click()
+    await expect(window.locator('[data-testid="col-filter-0"]')).toBeVisible({ timeout: 3_000 })
+
+    // Open column A's funnel and uncheck "apple".
+    await window.locator('[data-testid="col-filter-0"]').click()
+    await expect(window.locator('[data-testid="sheet-filter-dropdown"]')).toBeVisible({ timeout: 3_000 })
+    await window
+      .locator('[data-testid="sheet-filter-dropdown"] label', { hasText: 'apple' })
+      .locator('input')
+      .click()
+    await window.waitForTimeout(200)
+
+    // The two "apple" rows (0 and 2) are no longer rendered; "banana" (row 1) stays.
+    await expect(window.locator('[data-testid="cell-0-0"]')).toHaveCount(0)
+    await expect(window.locator('[data-testid="cell-2-0"]')).toHaveCount(0)
+    await expect(window.locator('[data-testid="cell-1-0"]')).toBeVisible()
+  } finally {
+    await dispose()
+  }
+})

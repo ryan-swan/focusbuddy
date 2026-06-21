@@ -129,6 +129,36 @@ export function applyCondFormat(
   return out
 }
 
+// ── Column filters ──────────────────────────────────────────────────────────
+
+// Is a row hidden, given its displayed value for each filtered column? A column's
+// filter is the set of values to HIDE; a row is hidden when any filtered column's
+// value is in that set. Pure so the hide logic is unit-tested directly.
+export function isRowHidden(
+  rowValues: Record<number, string>,
+  filters?: Record<number, string[]>
+): boolean {
+  if (!filters) return false
+  for (const key of Object.keys(filters)) {
+    const c = Number(key)
+    const hide = filters[c]
+    if (hide && hide.length && hide.includes(rowValues[c] ?? '')) return true
+  }
+  return false
+}
+
+// The distinct, sorted set of displayed values in a column (for the filter
+// dropdown's checkbox list). Empty cells collapse to one '' entry.
+export function distinctValues(values: string[]): string[] {
+  const seen = new Set(values.map((v) => v ?? ''))
+  return [...seen].sort((a, b) => {
+    const na = Number(a)
+    const nb = Number(b)
+    if (Number.isFinite(na) && Number.isFinite(nb) && a !== '' && b !== '') return na - nb
+    return a.localeCompare(b)
+  })
+}
+
 // ── Data validation ─────────────────────────────────────────────────────────
 
 export function validationForCell(

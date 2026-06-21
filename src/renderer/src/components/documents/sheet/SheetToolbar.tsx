@@ -19,6 +19,8 @@ interface Props {
   onSort: (dir: 'asc' | 'desc') => void
   onConditionalFormat: () => void
   onDataValidation: () => void
+  filterActive: boolean
+  onToggleFilter: () => void
   onInsertChart: (type: 'bar' | 'line' | 'pie') => void
   onImport: () => void
   onExport: (format: 'xlsx' | 'csv') => void
@@ -148,6 +150,14 @@ export default function SheetToolbar(props: Props): JSX.Element {
         onClick={props.onDataValidation}
       >
         <Icon name="rule" size={15} />
+      </button>
+      <button
+        className={`${btn} ${props.filterActive ? 'bg-accent/[0.12] text-accent' : ''}`}
+        title="Create a filter (funnels on the headers)"
+        data-testid="sheet-filter-btn"
+        onClick={props.onToggleFilter}
+      >
+        <Icon name="filter_alt" size={15} />
       </button>
       <Divider />
 
