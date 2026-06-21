@@ -198,3 +198,13 @@ test('PO-10 — Collaborate offers live editing; prompts sign-in when signed out
   await collab.click()
   await expect(window.getByText(/Sign in.*collaborate/i)).toBeVisible({ timeout: 5_000 })
 })
+
+test('PO-11 — Teams dialog opens from the sidebar', async () => {
+  launched = await launchApp({ env: { PLEXI_APP: 'office' } })
+  const { window } = launched
+
+  await window.locator('[data-testid="office-teams-btn"]').click()
+  await expect(window.locator('[data-testid="office-teams-dialog"]')).toBeVisible({ timeout: 10_000 })
+  // Signed out in the test env, it tells the user to sign in rather than erroring.
+  await expect(window.getByText(/Sign in to create and manage teams/i)).toBeVisible({ timeout: 5_000 })
+})
