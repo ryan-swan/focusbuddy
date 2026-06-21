@@ -209,3 +209,82 @@ describe('rewriteFormulaRefs — relative/absolute reference shifting (autofill)
     expect(rewriteFormulaRefs('=A1+B1*C1', 1, 0)).toBe('=A2+B2*C2')
   })
 })
+
+// ── Extended function library (Round 4 parity): lookups, multi-criteria, stats,
+//    text, math, date. Pinned because a wrong lookup is worse than a visible #ERR.
+
+describe('formula engine — lookup functions', () => {
+  // A small table: name, dept, salary
+  const g = grid([
+    ['Alice', 'Eng', '100'],
+    ['Bob', 'Sales', '90'],
+    ['Cara', 'Eng', '120']
+  ])
+  it('VLOOKUP exact match returns the requested column', () => {
+    expect(evaluateFormula(g, 'VLOOKUP("Bob", A1:C3, 3, FALSE)')).toBe(90)
+    expect(evaluateFormula(g, 'VLOOKUP("Cara", A1:C3, 2, FALSE)')).toBe('Eng')
+  })
+  it('VLOOKUP not found is #ERR (never a fake value)', () => {
+    expect(() => evaluateFormula(g, 'VLOOKUP("Zed", A1:C3, 2, FALSE)')).toThrow()
+  })
+  it('HLOOKUP looks across a row', () => {
+    const h = grid([['Q1', 'Q2', 'Q3'], ['10', '20', '30']])
+    expect(evaluateFormula(h, 'HLOOKUP("Q2", A1:C2, 2, FALSE)')).toBe(20)
+  })
+  it('INDEX + MATCH compose', () => {
+    expect(evaluateFormula(g, 'MATCH("Cara", A1:A3, 0)')).toBe(3)
+    expect(evaluateFormula(g, 'INDEX(C1:C3, 3)')).toBe(120)
+    expect(evaluateFormula(g, 'INDEX(A1:C3, 2, 2)')).toBe('Sales')
+  })
+})
+
+describe('formula engine — multi-criteria + stats', () => {
+  const g = grid([
+    ['Eng', '100'],
+    ['Sales', '90'],
+    ['Eng', '120'],
+    ['Sales', '80']
+  ])
+  it('SUMIFS / COUNTIFS / AVERAGEIFS', () => {
+    expect(evaluateFormula(g, 'SUMIFS(B1:B4, A1:A4, "Eng")')).toBe(220)
+    expect(evaluateFormula(g, 'COUNTIFS(A1:A4, "Sales")')).toBe(2)
+    expect(evaluateFormula(g, 'AVERAGEIFS(B1:B4, A1:A4, "Sales")')).toBe(85)
+  })
+  it('SUMPRODUCT multiplies pairwise then sums', () => {
+    const h = grid([['2', '3'], ['4', '5']])
+    expect(evaluateFormula(h, 'SUMPRODUCT(A1:A2, B1:B2)')).toBe(2 * 3 + 4 * 5)
+  })
+  it('MEDIAN / STDEV / COUNTBLANK', () => {
+    const h = grid([['1'], ['2'], ['3'], ['']])
+    expect(evaluateFormula(h, 'MEDIAN(A1:A3)')).toBe(2)
+    expect(evaluateFormula(h, 'COUNTBLANK(A1:A4)')).toBe(1)
+    expect(Number(evaluateFormula(h, 'STDEV(A1:A3)')).toFixed(4)).toBe('1.0000')
+  })
+})
+
+describe('formula engine — text + math + date', () => {
+  it('text functions', () => {
+    const g = grid([['hello world']])
+    expect(evaluateFormula(g, 'FIND("world", A1)')).toBe(7)
+    expect(evaluateFormula(g, 'SEARCH("WORLD", A1)')).toBe(7)
+    expect(evaluateFormula(g, 'SUBSTITUTE(A1, "o", "0")')).toBe('hell0 w0rld')
+    expect(evaluateFormula(g, 'SUBSTITUTE(A1, "o", "0", 2)')).toBe('hello w0rld')
+    expect(evaluateFormula(g, 'REPLACE(A1, 1, 5, "HELLO")')).toBe('HELLO world')
+    expect(evaluateFormula(g, 'PROPER(A1)')).toBe('Hello World')
+    expect(evaluateFormula(g, 'TEXTJOIN("-", TRUE, "a", "", "b")')).toBe('a-b')
+  })
+  it('math extras', () => {
+    const g = grid([['']])
+    expect(evaluateFormula(g, 'INT(3.9)')).toBe(3)
+    expect(evaluateFormula(g, 'TRUNC(3.567, 1)')).toBe(3.5)
+    expect(evaluateFormula(g, 'CEILING(7, 5)')).toBe(10)
+    expect(evaluateFormula(g, 'FLOOR(7, 5)')).toBe(5)
+    expect(evaluateFormula(g, 'SIGN(-4)')).toBe(-1)
+  })
+  it('date functions parse an ISO date deterministically', () => {
+    const g = grid([['2024-03-15']])
+    expect(evaluateFormula(g, 'YEAR(A1)')).toBe(2024)
+    expect(evaluateFormula(g, 'MONTH(A1)')).toBe(3)
+    expect(evaluateFormula(g, 'DAY(A1)')).toBe(15)
+  })
+})
