@@ -36,6 +36,18 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.73',
+    date: '2026-06-21T16:40:00Z',
+    title: 'v2.5.73 — Readability fix in voice command proposals',
+    tag: 'fix',
+    summary:
+      'The before/after diff on a voice command proposal now uses plain words instead of cryptic symbols, so an empty value reads as "(empty)" rather than a special character that could look broken.',
+    highlights: [
+      'Voice command proposal diffs show "(empty)" for an empty value, "x" between width and height, and "..." for trimmed text, instead of symbols that could render as a broken character or garble when copied.'
+    ],
+    links: [{ label: 'Finding your way around', href: `${HELP_BASE}/getting-around` }]
+  },
+  {
     version: '2.5.72',
     date: '2026-06-21T16:00:00Z',
     title: 'v2.5.72 — Spreadsheet filters, and PlexiOffice updates itself',
