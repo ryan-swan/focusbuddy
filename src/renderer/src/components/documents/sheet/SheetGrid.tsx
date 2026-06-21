@@ -4,12 +4,12 @@
 // SheetEditor through props. Formatting (bold/colour/align/number format) is
 // applied per cell from the tab's sparse format map.
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { SheetTab } from '@shared/types'
 import { displayCell, type Grid } from '../../../lib/sheetFormula'
 import { formatValue } from '../../../lib/sheetFormat'
 import { cellFormat, colLabel } from '../../../lib/sheetBody'
-import { applyCondFormat } from '../../../lib/sheetCond'
+import { applyCondFormat, validationForCell, valueIsValid } from '../../../lib/sheetCond'
 import { loadGoogleFont, familyLabel } from '../../../lib/googleFonts'
 import type { CellRange } from './sheetOps'
 
@@ -41,6 +41,8 @@ interface Props {
   fillPreview?: CellRange | null
   onFillStart?: () => void
   onFillToEnd?: () => void
+  // Directly set a cell value (used by the data-validation in-cell dropdown).
+  onSetCell?: (r: number, c: number, value: string) => void
 }
 
 const ROW_HEADER_W = 44
@@ -54,6 +56,8 @@ export default function SheetGrid(props: Props): JSX.Element {
   const { tab, selection, active, editing } = props
   const grid: Grid = { columns: tab.columns, rows: tab.rows }
   const editRef = useRef<HTMLInputElement | null>(null)
+  // Which cell's data-validation list dropdown is open (null = none).
+  const [openList, setOpenList] = useState<{ r: number; c: number } | null>(null)
 
   useEffect(() => {
     if (editing) editRef.current?.focus()
@@ -130,6 +134,13 @@ export default function SheetGrid(props: Props): JSX.Element {
                 // rule (paint only — the true value is unchanged).
                 const fmt = applyCondFormat(cellFormat(tab, r, c), tab.condRules, r, c, computed)
                 const shown = formatValue(computed, fmt?.numFmt)
+                // Data validation: a list rule shows an in-cell dropdown; any rule
+                // flags an invalid current value (the value is never auto-changed).
+                const validation = validationForCell(tab.validations, r, c)
+                const invalid = validation ? !valueIsValid(computed, validation.rule) : false
+                const listValues =
+                  validation && validation.rule.kind === 'list' ? validation.rule.values : null
+                const listOpen = !!openList && openList.r === r && openList.c === c
                 const isErr = computed === '#ERR'
                 if (fmt?.fontFamily) loadGoogleFont(familyLabel(fmt.fontFamily))
                 const style: React.CSSProperties = {
@@ -176,6 +187,51 @@ export default function SheetGrid(props: Props): JSX.Element {
                         className="absolute -bottom-[3px] -right-[3px] z-10 h-[7px] w-[7px] cursor-crosshair rounded-[1px] bg-accent border border-white dark:border-stone-900"
                       />
                     )}
+                    {/* Data validation: invalid-value marker (a small red corner). */}
+                    {invalid && !isEditing && (
+                      <span
+                        data-testid={`cell-invalid-${r}-${c}`}
+                        title="Value does not match this cell's data validation"
+                        className="absolute top-0 right-0 z-10 h-0 w-0 border-t-[6px] border-l-[6px] border-t-red-500 border-l-transparent"
+                      />
+                    )}
+                    {/* Data validation: in-cell dropdown for a list rule. */}
+                    {listValues && !isEditing && (
+                      <button
+                        data-testid={`cell-list-${r}-${c}`}
+                        title="Choose a value"
+                        onMouseDown={(e) => {
+                          e.preventDefault()
+                          e.stopPropagation()
+                          setOpenList(listOpen ? null : { r, c })
+                        }}
+                        className="absolute bottom-0 right-0 z-10 flex h-4 w-4 items-center justify-center text-stone-400 hover:text-stone-600"
+                      >
+                        <span className="text-[9px] leading-none">▾</span>
+                      </button>
+                    )}
+                    {listValues && listOpen && (
+                      <>
+                        <div className="fixed inset-0 z-20" onMouseDown={() => setOpenList(null)} />
+                        <div className="absolute left-0 top-full z-30 min-w-full max-h-40 overflow-auto rounded-md border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 shadow-lg py-1">
+                          {listValues.map((v) => (
+                            <button
+                              key={v}
+                              data-testid={`cell-list-opt-${r}-${c}-${v}`}
+                              onMouseDown={(e) => {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                props.onSetCell?.(r, c, v)
+                                setOpenList(null)
+                              }}
+                              className="block w-full text-left px-3 py-1 text-[12px] hover:bg-stone-100 dark:hover:bg-stone-700 whitespace-nowrap"
+                            >
+                              {v}
+                            </button>
+                          ))}
+                        </div>
+                      </>
+                    )}
                     {isEditing ? (
                       <input
                         ref={(el) => {
@@ -202,7 +258,7 @@ export default function SheetGrid(props: Props): JSX.Element {
                     ) : (
                       <div
                         style={style}
-                        className="px-2 py-1.5 whitespace-pre-wrap break-words select-none text-stone-800 dark:text-stone-100"
+                        className={`px-2 py-1.5 whitespace-pre-wrap break-words select-none text-stone-800 dark:text-stone-100 ${listValues ? 'pr-4' : ''}`}
                         title={shown}
                       >
                         {shown}

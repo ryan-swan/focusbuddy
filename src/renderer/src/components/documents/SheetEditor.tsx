@@ -40,7 +40,9 @@ import SheetChart from './sheet/SheetChart'
 import SheetAiFill from './sheet/SheetAiFill'
 import SheetFormulaAssist, { type FormulaPlan } from './sheet/SheetFormulaAssist'
 import CondFormatDialog from './sheet/CondFormatDialog'
-import type { SheetCondRule } from '@shared/types'
+import ValidationDialog from './sheet/ValidationDialog'
+import { validationForCell, valueIsValid } from '../../lib/sheetCond'
+import type { SheetCondRule, SheetValidation } from '@shared/types'
 import Icon from '../Icon'
 
 // Excel-class spreadsheet editor. The body is held locally as v2 (legacy v1
@@ -104,6 +106,7 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
   const [aiOpen, setAiOpen] = useState(false)
   const [formulaAiOpen, setFormulaAiOpen] = useState(false)
   const [condOpen, setCondOpen] = useState(false)
+  const [validationOpen, setValidationOpen] = useState(false)
   const [liveWidth, setLiveWidth] = useState<{ c: number; w: number } | null>(null)
   const [status, setStatus] = useState<string | null>(null)
   const [colMenu, setColMenu] = useState<{ c: number; x: number; y: number } | null>(null)
@@ -331,6 +334,16 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
   function commitEdit(move: 'down' | 'right' | 'none'): void {
     if (!editing) return
     const { r, c } = editing
+    // Strict data validation rejects an invalid entry rather than writing a value
+    // the rule forbids. The cell keeps its previous content; we never silently
+    // coerce it into something valid.
+    const dv = validationForCell(tab.validations, r, c)
+    if (dv?.strict && editValue.trim() !== '' && !valueIsValid(editValue, dv.rule)) {
+      setStatus(`"${editValue}" is not allowed in ${colLabel(c)}${r + 1} by its data validation.`)
+      setEditing(null)
+      focusGrid()
+      return
+    }
     mutateTab((t) => setCell(t, r, c, editValue))
     setEditing(null)
     if (move === 'down') selectCell(Math.min(tab.rows.length - 1, r + 1), c)
@@ -773,6 +786,7 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
         onDeleteCol={() => mutateTab((t) => deleteColAt(t, selection.c0))}
         onSort={(dir) => mutateTab((t) => sortByColumn(t, selection.c0, dir))}
         onConditionalFormat={() => setCondOpen(true)}
+        onDataValidation={() => setValidationOpen(true)}
         onInsertChart={insertChart}
         onImport={() => void importFile()}
         onExport={(f) => void exportFile(f)}
@@ -828,6 +842,20 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
               mutateTab((t) => ({ ...t, condRules: (t.condRules ?? []).filter((x) => x.id !== id) }))
             }
             onClose={() => setCondOpen(false)}
+          />
+        )}
+
+        {validationOpen && (
+          <ValidationDialog
+            range={`${colLabel(selection.c0)}${selection.r0 + 1}:${colLabel(selection.c1)}${selection.r1 + 1}`}
+            validations={tab.validations ?? []}
+            onAdd={(v: SheetValidation) =>
+              mutateTab((t) => ({ ...t, validations: [...(t.validations ?? []), v] }))
+            }
+            onRemove={(id: string) =>
+              mutateTab((t) => ({ ...t, validations: (t.validations ?? []).filter((x) => x.id !== id) }))
+            }
+            onClose={() => setValidationOpen(false)}
           />
         )}
 
@@ -896,6 +924,7 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
             fillPreview={fillPreview}
             onFillStart={onFillStart}
             onFillToEnd={onFillToEnd}
+            onSetCell={(r, c, v) => mutateTab((t) => setCell(t, r, c, v))}
           />
           {funcMenu && editInputRef.current && (
             <FormulaMenu

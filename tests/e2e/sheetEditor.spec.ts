@@ -1023,3 +1023,39 @@ test('SE-19 — conditional formatting "greater than 100" paints A1 but not A2',
     await dispose()
   }
 })
+
+// ── SE-20: Data validation — list dropdown sets a value; strict rejects invalid ─
+
+test('SE-20 — data validation list dropdown sets a value and strict mode rejects invalid input', async () => {
+  const { window, dispose } = await launchApp()
+  try {
+    await waitForReady(window)
+    await openDocumentsHub(window)
+    await startBlankSpreadsheet(window)
+
+    // Define a strict list validation on B1 (Open / Done).
+    await clickCell(window, 0, 1)
+    await window.locator('[data-testid="sheet-validation-btn"]').click()
+    await expect(window.locator('[data-testid="sheet-validation-dialog"]')).toBeVisible({ timeout: 3_000 })
+    await window.locator('[data-testid="validation-list"]').fill('Open, Done')
+    await window.locator('[data-testid="validation-add"]').click()
+    await window.locator('[data-testid="sheet-validation-dialog"] button[aria-label="Close"]').click()
+    await window.locator('[data-testid="sheet-validation-dialog"]').waitFor({ state: 'detached', timeout: 2_000 })
+
+    // The in-cell dropdown appears on B1; pick "Open".
+    await window.locator('[data-testid="cell-list-0-1"]').click()
+    await window.locator('[data-testid="cell-list-opt-0-1-Open"]').click()
+    await window.waitForTimeout(150)
+    expect(await cellText(window, 0, 1), 'B1 set via dropdown').toBe('Open')
+
+    // Strict mode: typing an invalid value inline is rejected; B1 keeps "Open".
+    await window.locator('[data-testid="cell-0-1"]').dblclick()
+    await window.keyboard.type('Nope')
+    await window.keyboard.press('Enter')
+    await window.waitForTimeout(150)
+    await expect(window.locator('[data-testid="sheet-status"]')).toContainText('not allowed', { timeout: 3_000 })
+    expect(await cellText(window, 0, 1), 'B1 unchanged after rejected entry').toBe('Open')
+  } finally {
+    await dispose()
+  }
+})
