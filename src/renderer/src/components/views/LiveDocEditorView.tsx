@@ -4,6 +4,7 @@ import { useDocCollabStore } from '../../stores/docCollab'
 import { useViewStore } from '../../stores/view'
 import { useAccountStore } from '../../stores/account'
 import { inviteToLiveDoc } from '../../lib/docCollabClient'
+import { listTeams, inviteTeamToDoc, type Team } from '../../lib/teamsClient'
 import { DocEditor, SheetEditor, SlidesEditor, MapEditor } from '@office'
 import Icon from '../Icon'
 
@@ -43,6 +44,7 @@ export default function LiveDocEditorView({ liveDocId, onBack }: Props): JSX.Ele
   const [inviting, setInviting] = useState(false)
   const [inviteHandle, setInviteHandle] = useState('')
   const [inviteNote, setInviteNote] = useState<string | null>(null)
+  const [teams, setTeams] = useState<Team[]>([])
   const surfaceRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
@@ -57,6 +59,12 @@ export default function LiveDocEditorView({ liveDocId, onBack }: Props): JSX.Ele
     const el = surfaceRef.current
     if (el) (el as unknown as { inert: boolean }).inert = !isHolder
   }, [isHolder, meta, bodyObj])
+
+  // Load the owner's teams when the invite panel opens, so they can invite a whole
+  // team at once. Above the early return to keep hook order stable.
+  useEffect(() => {
+    if (inviting && token) void listTeams(token).then(setTeams).catch(() => setTeams([]))
+  }, [inviting, token])
 
   if (loading || !meta || meta.id !== liveDocId) {
     return (
@@ -94,6 +102,13 @@ export default function LiveDocEditorView({ liveDocId, onBack }: Props): JSX.Ele
       setInviteHandle('')
       setInviting(false)
     }
+  }
+
+  async function inviteTeam(teamId: string): Promise<void> {
+    if (!token) return
+    const res = await inviteTeamToDoc(token, liveDocId, teamId)
+    setInviteNote(res.ok ? `Invited the team (${res.invited ?? 0} members)` : res.error ?? 'Could not invite that team.')
+    if (res.ok) setInviting(false)
   }
 
   async function sendRequest(): Promise<void> {
@@ -208,6 +223,22 @@ export default function LiveDocEditorView({ liveDocId, onBack }: Props): JSX.Ele
             Invite
           </button>
           {inviteNote && <span className="text-[11px] text-stone-500 dark:text-stone-400">{inviteNote}</span>}
+          {teams.length > 0 && (
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-[11px] text-stone-400">or a team:</span>
+              {teams.map((t) => (
+                <button
+                  key={t.id}
+                  onClick={() => void inviteTeam(t.id)}
+                  data-testid={`livedoc-invite-team-${t.id}`}
+                  className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md border border-stone-200 dark:border-stone-700 hover:border-accent hover:text-accent"
+                >
+                  <Icon name="group" size={12} />
+                  {t.name}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

@@ -28,6 +28,7 @@ import OfficeAccountBar from './OfficeAccountBar'
 import OfficeDrive from './OfficeDrive'
 import OfficeShareDialog, { type ShareTarget } from './OfficeShareDialog'
 import OfficeCollaborations from './OfficeCollaborations'
+import OfficeTeamsDialog from './OfficeTeamsDialog'
 import LiveDocEditorView from '../views/LiveDocEditorView'
 import { createLiveDoc } from '../../lib/docCollabClient'
 import UpdaterBanner from '../UpdaterBanner'
@@ -44,6 +45,7 @@ export default function PlexiOfficeApp(): JSX.Element {
   const [liveDocId, setLiveDocId] = useState<string | null>(null)
   const [collabError, setCollabError] = useState<string | null>(null)
   const [collabNonce, setCollabNonce] = useState(0)
+  const [teamsOpen, setTeamsOpen] = useState(false)
 
   // Turn the open document into a live (collaborative) document and open it in the
   // check-out editor. Reuses the same live-docs system as PlexiDesk.
@@ -93,6 +95,14 @@ export default function PlexiOfficeApp(): JSX.Element {
         <div className="px-4 py-3 flex items-center gap-2 border-b border-stone-200 dark:border-stone-800">
           <Icon name="auto_awesome" size={16} className="text-accent" />
           <span className="font-semibold text-[14px]">PlexiOffice</span>
+          <button
+            onClick={() => setTeamsOpen(true)}
+            data-testid="office-teams-btn"
+            className="ml-auto icon-btn text-stone-400 hover:text-accent"
+            title="Teams"
+          >
+            <Icon name="groups" size={16} />
+          </button>
         </div>
 
         {/* Drive — folders + documents, reusing the shared file-manager store. */}
@@ -206,6 +216,7 @@ export default function PlexiOfficeApp(): JSX.Element {
       </div>
 
       {shareTarget && <OfficeShareDialog target={shareTarget} onClose={() => setShareTarget(null)} />}
+      {teamsOpen && <OfficeTeamsDialog onClose={() => setTeamsOpen(false)} />}
 
       {/* Footer — version pill (click to check for updates) + the shared updater
           banner, mirroring PlexiDesk so updates are visible here too. */}
