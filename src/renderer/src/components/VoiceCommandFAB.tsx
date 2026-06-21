@@ -828,7 +828,7 @@ interface UpdateDiffProps {
 function UpdateDiff({ before, proposal }: UpdateDiffProps): JSX.Element {
   const rows: Array<{ field: string; from: string; to: string }> = []
   if (proposal.title !== undefined) {
-    rows.push({ field: 'Title', from: before.title || '∅', to: proposal.title || '∅' })
+    rows.push({ field: 'Title', from: before.title || '(empty)', to: proposal.title || '(empty)' })
   }
   if (proposal.content !== undefined) {
     const op = proposal.operation ?? 'replace'
@@ -836,13 +836,13 @@ function UpdateDiff({ before, proposal }: UpdateDiffProps): JSX.Element {
       rows.push({
         field: 'Append',
         from: clip(before.content || '', 36),
-        to: `… + ${clip(proposal.content, 36)}`
+        to: `... + ${clip(proposal.content, 36)}`
       })
     } else if (op === 'prepend') {
       rows.push({
         field: 'Prepend',
         from: clip(before.content || '', 36),
-        to: `${clip(proposal.content, 36)} + …`
+        to: `${clip(proposal.content, 36)} + ...`
       })
     } else {
       rows.push({
@@ -862,8 +862,8 @@ function UpdateDiff({ before, proposal }: UpdateDiffProps): JSX.Element {
   if (proposal.width !== undefined || proposal.height !== undefined) {
     rows.push({
       field: 'Size',
-      from: `${Math.round(before.width)} × ${Math.round(before.height)}`,
-      to: `${Math.round(proposal.width ?? before.width)} × ${Math.round(proposal.height ?? before.height)}`
+      from: `${Math.round(before.width)} x ${Math.round(before.height)}`,
+      to: `${Math.round(proposal.width ?? before.width)} x ${Math.round(proposal.height ?? before.height)}`
     })
   }
   if (rows.length === 0) return <></>
@@ -890,8 +890,8 @@ function UpdateDiff({ before, proposal }: UpdateDiffProps): JSX.Element {
 
 function clip(s: string, n: number): string {
   const flat = s.replace(/\s+/g, ' ').trim()
-  if (flat.length <= n) return flat || '∅'
-  return flat.slice(0, n) + '…'
+  if (flat.length <= n) return flat || '(empty)'
+  return flat.slice(0, n) + '...'
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
