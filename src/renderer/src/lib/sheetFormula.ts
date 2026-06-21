@@ -52,7 +52,36 @@ export const SHEET_FUNCTIONS: Array<{ name: string; hint: string }> = [
   { name: 'MID', hint: 'MID(text, start, length)' },
   { name: 'UPPER', hint: 'UPPER(text)' },
   { name: 'LOWER', hint: 'LOWER(text)' },
-  { name: 'TRIM', hint: 'TRIM(text)' }
+  { name: 'TRIM', hint: 'TRIM(text)' },
+  { name: 'VLOOKUP', hint: 'VLOOKUP(key, table, colIndex, [FALSE]) — look up a row' },
+  { name: 'HLOOKUP', hint: 'HLOOKUP(key, table, rowIndex, [FALSE]) — look up a column' },
+  { name: 'INDEX', hint: 'INDEX(range, row, [col]) — value at a position' },
+  { name: 'MATCH', hint: 'MATCH(key, range, [type]) — position of a value' },
+  { name: 'SUMIFS', hint: 'SUMIFS(sumRange, range1, crit1, …)' },
+  { name: 'COUNTIFS', hint: 'COUNTIFS(range1, crit1, …)' },
+  { name: 'AVERAGEIFS', hint: 'AVERAGEIFS(avgRange, range1, crit1, …)' },
+  { name: 'SUMPRODUCT', hint: 'SUMPRODUCT(rangeA, rangeB, …)' },
+  { name: 'MEDIAN', hint: 'MEDIAN(range) — middle value' },
+  { name: 'STDEV', hint: 'STDEV(range) — sample standard deviation' },
+  { name: 'VAR', hint: 'VAR(range) — sample variance' },
+  { name: 'COUNTBLANK', hint: 'COUNTBLANK(range) — count of empty cells' },
+  { name: 'INT', hint: 'INT(number) — round down to integer' },
+  { name: 'TRUNC', hint: 'TRUNC(number, [decimals]) — drop decimals' },
+  { name: 'CEILING', hint: 'CEILING(number, [significance])' },
+  { name: 'FLOOR', hint: 'FLOOR(number, [significance])' },
+  { name: 'FIND', hint: 'FIND(needle, text, [start]) — case-sensitive position' },
+  { name: 'SEARCH', hint: 'SEARCH(needle, text, [start]) — case-insensitive position' },
+  { name: 'SUBSTITUTE', hint: 'SUBSTITUTE(text, old, new, [nth])' },
+  { name: 'REPLACE', hint: 'REPLACE(text, start, length, new)' },
+  { name: 'TEXTJOIN', hint: 'TEXTJOIN(delim, ignoreEmpty, …)' },
+  { name: 'PROPER', hint: 'PROPER(text) — Title Case' },
+  { name: 'VALUE', hint: 'VALUE(text) — text to number' },
+  { name: 'YEAR', hint: 'YEAR(date)' },
+  { name: 'MONTH', hint: 'MONTH(date)' },
+  { name: 'DAY', hint: 'DAY(date)' },
+  { name: 'WEEKDAY', hint: 'WEEKDAY(date) — 1=Sunday' },
+  { name: 'TODAY', hint: 'TODAY() — current date' },
+  { name: 'NOW', hint: 'NOW() — current date and time' }
 ]
 
 // ── References ────────────────────────────────────────────────────────────────
@@ -441,6 +470,14 @@ function toBool(v: CellValue): boolean {
   if (t === 'false' || t === '') return false
   return true
 }
+// Parse a date cell for the date functions: an epoch-ms integer or any string
+// Date can read (ISO dates parse as UTC). null when it is not a date.
+function parseDate(s: string): Date | null {
+  const t = s.trim()
+  if (t === '') return null
+  const d = /^\d+$/.test(t) ? new Date(Number(t)) : new Date(t)
+  return Number.isNaN(d.getTime()) ? null : d
+}
 
 // The evaluated value of a cell (following a formula), or its raw text/number.
 function cellValue(grid: Grid, r: number, c: number, seen: Set<string>): CellValue {
@@ -716,6 +753,285 @@ function evalCall(node: Extract<Node, { k: 'call' }>, grid: Grid, seen: Set<stri
       return toStr(arg(0)).toLowerCase()
     case 'TRIM':
       return toStr(arg(0)).trim()
+    case 'FIND':
+    case 'SEARCH': {
+      const needle = toStr(arg(0))
+      const hay = toStr(arg(1))
+      const start = args.length > 2 ? Math.max(1, toNum(arg(2))) : 1
+      const idx =
+        name === 'SEARCH'
+          ? hay.toLowerCase().indexOf(needle.toLowerCase(), start - 1)
+          : hay.indexOf(needle, start - 1)
+      if (idx < 0) throw new Error(`${name}: not found`)
+      return idx + 1
+    }
+    case 'SUBSTITUTE': {
+      const s = toStr(arg(0))
+      const oldT = toStr(arg(1))
+      const newT = toStr(arg(2))
+      if (oldT === '') return s
+      if (args.length > 3) {
+        const nth = toNum(arg(3))
+        let count = 0
+        let i = 0
+        let out = ''
+        while (i < s.length) {
+          if (s.startsWith(oldT, i)) {
+            count++
+            if (count === nth) return out + newT + s.slice(i + oldT.length)
+            out += oldT
+            i += oldT.length
+          } else {
+            out += s[i]
+            i++
+          }
+        }
+        return out
+      }
+      return s.split(oldT).join(newT)
+    }
+    case 'REPLACE': {
+      const s = toStr(arg(0))
+      const start = Math.max(1, toNum(arg(1)))
+      const len = toNum(arg(2))
+      return s.slice(0, start - 1) + toStr(arg(3)) + s.slice(start - 1 + len)
+    }
+    case 'REPT':
+      return toStr(arg(0)).repeat(Math.max(0, toNum(arg(1))))
+    case 'PROPER':
+      return toStr(arg(0))
+        .toLowerCase()
+        .replace(/\b\w/g, (ch) => ch.toUpperCase())
+    case 'EXACT':
+      return toStr(arg(0)) === toStr(arg(1))
+    case 'VALUE': {
+      const n = Number(toStr(arg(0)).replace(/[\s,$%]/g, ''))
+      if (!Number.isFinite(n)) throw new Error('VALUE: not a number')
+      return n
+    }
+    case 'TEXTJOIN': {
+      const delim = toStr(arg(0))
+      const ignoreEmpty = toBool(arg(1))
+      const parts: string[] = []
+      for (let i = 2; i < args.length; i++) {
+        const a = args[i]
+        if (a.k === 'range') {
+          for (const { r, c } of rangeCoords(a)) {
+            const v = toStr(cellValue(grid, r, c, seen))
+            if (!ignoreEmpty || v !== '') parts.push(v)
+          }
+        } else {
+          const v = toStr(evalNode(a, grid, seen))
+          if (!ignoreEmpty || v !== '') parts.push(v)
+        }
+      }
+      return parts.join(delim)
+    }
+    // Statistical
+    case 'MEDIAN': {
+      const ns = collectNumbers(args, grid, seen).sort((a, b) => a - b)
+      if (!ns.length) throw new Error('MEDIAN of nothing')
+      const mid = Math.floor(ns.length / 2)
+      return ns.length % 2 ? ns[mid] : (ns[mid - 1] + ns[mid]) / 2
+    }
+    case 'STDEV':
+    case 'STDEVP':
+    case 'VAR':
+    case 'VARP': {
+      const ns = collectNumbers(args, grid, seen)
+      const pop = name.endsWith('P')
+      if (ns.length < (pop ? 1 : 2)) throw new Error(`${name} needs more numbers`)
+      const mean = ns.reduce((a, b) => a + b, 0) / ns.length
+      const ss = ns.reduce((a, b) => a + (b - mean) ** 2, 0)
+      const variance = ss / (pop ? ns.length : ns.length - 1)
+      return name.startsWith('VAR') ? variance : Math.sqrt(variance)
+    }
+    case 'COUNTBLANK': {
+      let n = 0
+      for (const a of args) {
+        if (a.k === 'range') {
+          for (const { r, c } of rangeCoords(a)) if (cellRaw(grid, r, c).trim() === '') n++
+        } else {
+          const v = evalNode(a, grid, seen)
+          if (typeof v === 'string' && v.trim() === '') n++
+        }
+      }
+      return n
+    }
+    // Multi-criteria
+    case 'SUMIFS':
+    case 'AVERAGEIFS':
+    case 'COUNTIFS': {
+      const isCount = name === 'COUNTIFS'
+      const sumRange = isCount ? null : args[0]?.k === 'range' ? args[0] : null
+      if (!isCount && !sumRange) throw new Error(`${name} needs a sum range`)
+      const pairStart = isCount ? 0 : 1
+      const pairs: Array<{ range: Extract<Node, { k: 'range' }>; crit: CellValue }> = []
+      for (let i = pairStart; i + 1 < args.length; i += 2) {
+        const rangeNode = args[i]
+        if (rangeNode.k !== 'range') throw new Error(`${name}: criteria range expected`)
+        pairs.push({ range: rangeNode, crit: evalNode(args[i + 1], grid, seen) })
+      }
+      if (!pairs.length) throw new Error(`${name} needs a range/criteria pair`)
+      const coordsList = pairs.map((p) => rangeCoords(p.range))
+      const len = coordsList[0].length
+      const sumCells = sumRange ? rangeCoords(sumRange) : null
+      let sum = 0
+      let count = 0
+      for (let i = 0; i < len; i++) {
+        const ok = pairs.every((p, pi) =>
+          matchCriteria(cellValue(grid, coordsList[pi][i].r, coordsList[pi][i].c, seen), p.crit)
+        )
+        if (!ok) continue
+        count++
+        if (sumCells) {
+          const sc = sumCells[i]
+          const v = cellNumeric(grid, sc.r, sc.c, seen)
+          if (v !== null) sum += v
+        }
+      }
+      if (isCount) return count
+      if (name === 'AVERAGEIFS') {
+        if (!count) throw new Error('AVERAGEIFS of nothing')
+        return sum / count
+      }
+      return sum
+    }
+    case 'SUMPRODUCT': {
+      const ranges = args.filter((a) => a.k === 'range') as Array<Extract<Node, { k: 'range' }>>
+      if (!ranges.length) throw new Error('SUMPRODUCT needs ranges')
+      const coordsList = ranges.map(rangeCoords)
+      const len = coordsList[0].length
+      let total = 0
+      for (let i = 0; i < len; i++) {
+        let prod = 1
+        for (let ri = 0; ri < ranges.length; ri++) {
+          const { r, c } = coordsList[ri][i]
+          prod *= cellNumeric(grid, r, c, seen) ?? 0
+        }
+        total += prod
+      }
+      return total
+    }
+    // Math (extra)
+    case 'INT':
+      return Math.floor(toNum(arg(0)))
+    case 'TRUNC': {
+      const d = args.length > 1 ? toNum(arg(1)) : 0
+      const f = Math.pow(10, d)
+      return Math.trunc(toNum(arg(0)) * f) / f
+    }
+    case 'CEILING': {
+      const sig = args.length > 1 ? toNum(arg(1)) : 1
+      return sig === 0 ? 0 : Math.ceil(toNum(arg(0)) / sig) * sig
+    }
+    case 'FLOOR': {
+      const sig = args.length > 1 ? toNum(arg(1)) : 1
+      return sig === 0 ? 0 : Math.floor(toNum(arg(0)) / sig) * sig
+    }
+    case 'SIGN':
+      return Math.sign(toNum(arg(0)))
+    case 'EXP':
+      return Math.exp(toNum(arg(0)))
+    case 'LN': {
+      const x = toNum(arg(0))
+      if (x <= 0) throw new Error('LN domain')
+      return Math.log(x)
+    }
+    case 'LOG10': {
+      const x = toNum(arg(0))
+      if (x <= 0) throw new Error('LOG10 domain')
+      return Math.log10(x)
+    }
+    case 'LOG': {
+      const x = toNum(arg(0))
+      const base = args.length > 1 ? toNum(arg(1)) : 10
+      if (x <= 0) throw new Error('LOG domain')
+      return Math.log(x) / Math.log(base)
+    }
+    // Date
+    case 'YEAR':
+    case 'MONTH':
+    case 'DAY':
+    case 'WEEKDAY': {
+      const d = parseDate(toStr(arg(0)))
+      if (!d) throw new Error(`${name}: bad date`)
+      if (name === 'YEAR') return d.getUTCFullYear()
+      if (name === 'MONTH') return d.getUTCMonth() + 1
+      if (name === 'DAY') return d.getUTCDate()
+      return d.getUTCDay() + 1 // WEEKDAY: Sunday = 1
+    }
+    case 'TODAY': {
+      const d = new Date()
+      return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`
+    }
+    case 'NOW':
+      return new Date().toISOString()
+    // Lookup
+    case 'MATCH': {
+      const key = arg(0)
+      if (args[1]?.k !== 'range') throw new Error('MATCH needs a range')
+      const coords = rangeCoords(args[1])
+      const type = args.length > 2 ? toNum(arg(2)) : 1
+      if (type === 0) {
+        for (let i = 0; i < coords.length; i++)
+          if (compare('=', cellValue(grid, coords[i].r, coords[i].c, seen), key)) return i + 1
+        throw new Error('MATCH: not found')
+      }
+      let best = -1
+      for (let i = 0; i < coords.length; i++) {
+        const v = cellValue(grid, coords[i].r, coords[i].c, seen)
+        if (type === 1 ? compare('<=', v, key) : compare('>=', v, key)) best = i
+      }
+      if (best < 0) throw new Error('MATCH: not found')
+      return best + 1
+    }
+    case 'INDEX': {
+      if (args[0]?.k !== 'range') throw new Error('INDEX needs a range')
+      const rg = args[0]
+      const rows = rg.r2 - rg.r1 + 1
+      const cols = rg.c2 - rg.c1 + 1
+      const a1 = toNum(arg(1))
+      let rr: number
+      let cc: number
+      if (args.length <= 2 && rows === 1) {
+        rr = rg.r1
+        cc = rg.c1 + (a1 - 1)
+      } else if (args.length <= 2 && cols === 1) {
+        rr = rg.r1 + (a1 - 1)
+        cc = rg.c1
+      } else {
+        rr = rg.r1 + (a1 - 1)
+        cc = rg.c1 + ((args.length > 2 ? toNum(arg(2)) : 1) - 1)
+      }
+      if (rr < rg.r1 || rr > rg.r2 || cc < rg.c1 || cc > rg.c2) throw new Error('INDEX out of range')
+      return cellValue(grid, rr, cc, seen)
+    }
+    case 'VLOOKUP':
+    case 'HLOOKUP': {
+      const key = arg(0)
+      if (args[1]?.k !== 'range') throw new Error(`${name} needs a table range`)
+      const rg = args[1]
+      const idx = toNum(arg(2))
+      const exact = args.length > 3 ? !toBool(arg(3)) : true
+      const horizontal = name === 'HLOOKUP'
+      if (idx < 1) throw new Error(`${name}: bad index`)
+      const lineVal = (i: number): CellValue =>
+        horizontal ? cellValue(grid, rg.r1, i, seen) : cellValue(grid, i, rg.c1, seen)
+      const resultVal = (i: number): CellValue =>
+        horizontal ? cellValue(grid, rg.r1 + idx - 1, i, seen) : cellValue(grid, i, rg.c1 + idx - 1, seen)
+      const lo = horizontal ? rg.c1 : rg.r1
+      const hi = horizontal ? rg.c2 : rg.r2
+      const lim = horizontal ? rg.r1 + idx - 1 : rg.c1 + idx - 1
+      if (lim > (horizontal ? rg.r2 : rg.c2)) throw new Error(`${name}: index out of range`)
+      for (let i = lo; i <= hi; i++) if (compare('=', lineVal(i), key)) return resultVal(i)
+      if (!exact) {
+        let best = -1
+        for (let i = lo; i <= hi; i++) if (compare('<=', lineVal(i), key)) best = i
+        if (best >= 0) return resultVal(best)
+      }
+      throw new Error(`${name}: not found`)
+    }
     default:
       throw new Error(`unknown function ${name}`)
   }
