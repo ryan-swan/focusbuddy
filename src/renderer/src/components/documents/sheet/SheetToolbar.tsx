@@ -21,6 +21,7 @@ interface Props {
   onDataValidation: () => void
   filterActive: boolean
   onToggleFilter: () => void
+  onInsertPivot: () => void
   onInsertChart: (type: 'bar' | 'line' | 'pie') => void
   onImport: () => void
   onExport: (format: 'xlsx' | 'csv') => void
@@ -158,6 +159,14 @@ export default function SheetToolbar(props: Props): JSX.Element {
         onClick={props.onToggleFilter}
       >
         <Icon name="filter_alt" size={15} />
+      </button>
+      <button
+        className={btn}
+        title="Pivot table from the selection"
+        data-testid="sheet-pivot-btn"
+        onClick={props.onInsertPivot}
+      >
+        <Icon name="pivot_table_chart" size={15} />
       </button>
       <Divider />
 

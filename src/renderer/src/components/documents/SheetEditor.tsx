@@ -37,6 +37,9 @@ import SheetGrid from './sheet/SheetGrid'
 import SheetToolbar from './sheet/SheetToolbar'
 import SheetTabStrip from './sheet/SheetTabStrip'
 import SheetChart from './sheet/SheetChart'
+import SheetPivot from './sheet/SheetPivot'
+import PivotDialog from './sheet/PivotDialog'
+import type { SheetPivotSpec } from '@shared/types'
 import SheetAiFill from './sheet/SheetAiFill'
 import SheetFormulaAssist, { type FormulaPlan } from './sheet/SheetFormulaAssist'
 import CondFormatDialog from './sheet/CondFormatDialog'
@@ -107,6 +110,7 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
   const [formulaAiOpen, setFormulaAiOpen] = useState(false)
   const [condOpen, setCondOpen] = useState(false)
   const [validationOpen, setValidationOpen] = useState(false)
+  const [pivotOpen, setPivotOpen] = useState(false)
   const [liveWidth, setLiveWidth] = useState<{ c: number; w: number } | null>(null)
   const [status, setStatus] = useState<string | null>(null)
   const [colMenu, setColMenu] = useState<{ c: number; x: number; y: number } | null>(null)
@@ -670,6 +674,12 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
   function removeChart(id: string): void {
     mutateTab((t) => ({ ...t, charts: (t.charts ?? []).filter((ch) => ch.id !== id) }))
   }
+  function insertPivot(spec: SheetPivotSpec): void {
+    mutateTab((t) => ({ ...t, pivots: [...(t.pivots ?? []), spec] }))
+  }
+  function removePivot(id: string): void {
+    mutateTab((t) => ({ ...t, pivots: (t.pivots ?? []).filter((p) => p.id !== id) }))
+  }
 
   // ── Tabs ──────────────────────────────────────────────────────────────────
   function switchTab(i: number): void {
@@ -808,6 +818,7 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
         onSort={(dir) => mutateTab((t) => sortByColumn(t, selection.c0, dir))}
         onConditionalFormat={() => setCondOpen(true)}
         onDataValidation={() => setValidationOpen(true)}
+        onInsertPivot={() => setPivotOpen(true)}
         filterActive={!!tab.filterActive}
         onToggleFilter={() =>
           mutateTab((t) => ({
@@ -1004,6 +1015,27 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
               <SheetChart key={spec.id} spec={spec} tab={tab} onRemove={() => removeChart(spec.id)} />
             ))}
           </div>
+        )}
+
+        {/* Pivots */}
+        {(tab.pivots ?? []).length > 0 && (
+          <div className="mt-4 grid grid-cols-1 lg:grid-cols-2 gap-3">
+            {tab.pivots!.map((spec) => (
+              <SheetPivot key={spec.id} spec={spec} tab={tab} onRemove={() => removePivot(spec.id)} />
+            ))}
+          </div>
+        )}
+
+        {pivotOpen && (
+          <PivotDialog
+            range={`${colLabel(selection.c0)}${selection.r0 + 1}:${colLabel(selection.c1)}${selection.r1 + 1}`}
+            columns={Array.from({ length: selection.c1 - selection.c0 + 1 }, (_, i) => ({
+              rel: i,
+              label: tab.columns[selection.c0 + i] || colLabel(selection.c0 + i)
+            }))}
+            onCreate={insertPivot}
+            onClose={() => setPivotOpen(false)}
+          />
         )}
       </div>
 
