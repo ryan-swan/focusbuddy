@@ -1240,6 +1240,20 @@ export interface SheetValidation {
   strict?: boolean // when true, invalid entries are rejected on commit
 }
 
+// A pivot summary over a source range: group rows by one field, optionally
+// across a second field, aggregating a value field. Computed read-only from the
+// live data (honest: aggregates the real values, never fabricated ones).
+export type SheetPivotAgg = 'sum' | 'count' | 'avg' | 'min' | 'max'
+export interface SheetPivotSpec {
+  id: string
+  range: string // A1 source range INCLUDING the header row
+  rowField: number // 0-based column index within the range to group rows by
+  colField?: number // optional second field to pivot across columns
+  valueField: number // column index whose values are aggregated
+  agg: SheetPivotAgg
+  title?: string
+}
+
 export interface SheetTab {
   id: string
   name: string
@@ -1250,6 +1264,7 @@ export interface SheetTab {
   colWidths?: Record<number, number> // px; absent = default
   freeze?: { rows: number; cols: number }
   charts?: SheetChartSpec[]
+  pivots?: SheetPivotSpec[]
   condRules?: SheetCondRule[]
   validations?: SheetValidation[]
   // Column filters: per-column-index the set of displayed values to HIDE. A row

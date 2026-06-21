@@ -1123,3 +1123,40 @@ test('SE-22 — create a filter, uncheck a value, matching rows are hidden', asy
     await dispose()
   }
 })
+
+// ── SE-23: Pivot table summarises the selection ──────────────────────────────
+
+test('SE-23 — pivot: sum a value column grouped by a row column', async () => {
+  const { window, dispose } = await launchApp()
+  try {
+    await waitForReady(window)
+    await openDocumentsHub(window)
+    await startBlankSpreadsheet(window)
+
+    // A: Dept, B: Amount.  Eng/100, Sales/90, Eng/50.
+    await setViaFormulaBar(window, 0, 0, 'Dept')
+    await setViaFormulaBar(window, 0, 1, 'Amount')
+    await setViaFormulaBar(window, 1, 0, 'Eng')
+    await setViaFormulaBar(window, 1, 1, '100')
+    await setViaFormulaBar(window, 2, 0, 'Sales')
+    await setViaFormulaBar(window, 2, 1, '90')
+    await setViaFormulaBar(window, 3, 0, 'Eng')
+    await setViaFormulaBar(window, 3, 1, '50', [0, 0])
+
+    // Select A1:B4, open the pivot dialog (defaults: rows=A, values=B, sum).
+    await clickCell(window, 0, 0)
+    await window.locator('[data-testid="cell-3-1"]').click({ modifiers: ['Shift'] })
+    await window.locator('[data-testid="sheet-pivot-btn"]').click()
+    await expect(window.locator('[data-testid="sheet-pivot-dialog"]')).toBeVisible({ timeout: 3_000 })
+    await window.locator('[data-testid="pivot-create"]').click()
+
+    // The pivot renders: Eng = 150, grand total 240.
+    const pivot = window.locator('[data-testid="sheet-pivot"]')
+    await expect(pivot).toBeVisible({ timeout: 5_000 })
+    await expect(pivot).toContainText('Eng')
+    await expect(pivot).toContainText('150')
+    await expect(pivot).toContainText('240')
+  } finally {
+    await dispose()
+  }
+})
