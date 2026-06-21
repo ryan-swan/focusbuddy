@@ -1,9 +1,9 @@
 // PlexiOffice — the standalone app shell. A focused Word/Excel/PowerPoint-style
-// experience that reuses the very same editors PlexiDesk embeds (via @office) and
-// the same documents store, so the two apps stay in lockstep. It deliberately does
-// NOT pull in the desk canvas, file manager, or collaboration — documents reach it
-// through the cloud-documents API (@office sync), which is the integration contract
-// of the lean split.
+// experience that reuses the very same editors PlexiDesk embeds (via @office), the
+// same documents store, and the same file-manager store (OfficeDrive), so the two
+// apps stay in lockstep. It deliberately does NOT pull in the desk canvas or
+// collaboration — documents reach it through the cloud-documents API (@office
+// sync), and the Drive organises them via the shared fb_files file manager.
 //
 // This is the second product's renderer root. It builds as its own HTML entry
 // (plexioffice.html); the main process loads it when the app is the PlexiOffice
@@ -17,29 +17,24 @@ import {
   SlidesEditor,
   MapEditor,
   setCloudDocsEnabled,
-  type DocType,
   type SheetBody,
   type SlidesBody,
   type MapBody
 } from '@office'
 import { useTheme, useAccountStore } from '@runtime'
 import { useDocumentsStore } from '../../stores/documents'
+import { useFileManagerStore } from '../../stores/fileManager'
 import OfficeAccountBar from './OfficeAccountBar'
+import OfficeDrive from './OfficeDrive'
 import UpdaterBanner from '../UpdaterBanner'
 import Icon from '../Icon'
-
-const NEW_KINDS: { type: DocType; label: string; icon: string }[] = [
-  { type: 'doc', label: 'Document', icon: 'description' },
-  { type: 'sheet', label: 'Spreadsheet', icon: 'table' },
-  { type: 'slides', label: 'Slides', icon: 'slideshow' },
-  { type: 'map', label: 'Map', icon: 'account_tree' }
-]
 
 export default function PlexiOfficeApp(): JSX.Element {
   // Applying the shared theme is the whole reason useTheme lives in @runtime —
   // PlexiOffice looks like PlexiDesk without copying the theme system.
   useTheme()
-  const { list, active, refresh, open, createBlank, saveBody, rename, close } = useDocumentsStore()
+  const { active, refresh, saveBody, rename, close } = useDocumentsStore()
+  const refreshDrive = useFileManagerStore((s) => s.refresh)
   const [renaming, setRenaming] = useState(false)
   // PlexiOffice is cloud-first: sign in once and your documents are the same as in
   // PlexiDesk. Enable sync and boot the account session on mount.
@@ -49,15 +44,11 @@ export default function PlexiOfficeApp(): JSX.Element {
     void useAccountStore.getState().init()
   }, [])
   // Refresh on mount and whenever the signed-in account changes — a fresh sign-in
-  // pulls that account's documents from the cloud.
+  // pulls that account's documents from the cloud, and the Drive reflects them.
   useEffect(() => {
     void refresh()
-  }, [refresh, token])
-
-  async function newDoc(type: DocType): Promise<void> {
-    const doc = await createBlank(type)
-    await open(doc.id)
-  }
+    void refreshDrive()
+  }, [refresh, refreshDrive, token])
 
   // Build-time version, injected by electron-vite from package.json (same global
   // the desk footer uses). Drives the footer version pill + manual update check.
@@ -73,53 +64,8 @@ export default function PlexiOfficeApp(): JSX.Element {
           <span className="font-semibold text-[14px]">PlexiOffice</span>
         </div>
 
-        <div className="p-3 flex flex-col gap-1.5">
-          {NEW_KINDS.map((k) => (
-            <button
-              key={k.type}
-              onClick={() => void newDoc(k.type)}
-              data-testid={`office-new-${k.type}`}
-              className="flex items-center gap-2 rounded-lg border border-stone-200 dark:border-stone-700 px-2.5 py-1.5 text-[12.5px] hover:border-accent hover:bg-accent/[0.05]"
-            >
-              <Icon name={k.icon} size={15} className="text-accent" />
-              New {k.label.toLowerCase()}
-            </button>
-          ))}
-        </div>
-
-        <div className="px-3 pb-1 text-[10px] uppercase tracking-wider text-stone-400">Documents</div>
-        <div className="flex-1 overflow-auto px-2 pb-3">
-          {list.length === 0 ? (
-            <div className="px-2 py-3 text-[12px] text-stone-400">No documents yet.</div>
-          ) : (
-            list.map((d) => (
-              <button
-                key={d.id}
-                onClick={() => void open(d.id)}
-                className={`w-full flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-[12.5px] truncate ${
-                  active?.id === d.id
-                    ? 'bg-accent/[0.12] text-accent'
-                    : 'hover:bg-stone-100 dark:hover:bg-stone-800'
-                }`}
-              >
-                <Icon
-                  name={
-                    d.docType === 'sheet'
-                      ? 'table'
-                      : d.docType === 'slides'
-                        ? 'slideshow'
-                        : d.docType === 'map'
-                          ? 'account_tree'
-                          : 'description'
-                  }
-                  size={14}
-                  className="shrink-0 text-stone-400"
-                />
-                <span className="truncate">{d.title || 'Untitled'}</span>
-              </button>
-            ))
-          )}
-        </div>
+        {/* Drive — folders + documents, reusing the shared file-manager store. */}
+        <OfficeDrive />
 
         <OfficeAccountBar />
       </aside>
