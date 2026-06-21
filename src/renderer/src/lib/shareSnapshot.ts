@@ -43,7 +43,17 @@ export interface WidgetSnapshot extends ShareSnapshotBase {
   widget: SerializedWidget
 }
 
-export type ShareSnapshot = FolderSnapshot | TaskSnapshot | WidgetSnapshot
+// An office document (doc / sheet / slides / map) shared read-only. The body is
+// pre-rendered to safe, structural HTML on the desktop (where the editors live)
+// so the public viewer can display it without bundling the editors.
+export interface DocumentSnapshot extends ShareSnapshotBase {
+  kind: 'document'
+  title: string
+  docType: 'doc' | 'sheet' | 'slides' | 'map'
+  html: string
+}
+
+export type ShareSnapshot = FolderSnapshot | TaskSnapshot | WidgetSnapshot | DocumentSnapshot
 
 // Trim-down of FbNode — the snapshot only keeps display-relevant fields.
 // Internal tracking (sortOrder, axis values, resume markdown if empty,

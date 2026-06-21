@@ -137,3 +137,19 @@ test('PO-6 — Drive: create a folder, open it, make a doc inside, breadcrumb ba
   await expect(window.locator('[data-testid="office-folder-New folder"]')).toBeVisible()
   await expect(window.locator('aside').getByText('Untitled document', { exact: true })).toHaveCount(0)
 })
+
+test('PO-7 — Share a document: create a view-only link', async () => {
+  launched = await launchApp({ env: { PLEXI_APP: 'office' } })
+  const { window } = launched
+
+  // Open a new document, then share it.
+  await window.locator('[data-testid="office-new-doc"]').click()
+  await window.locator('[data-testid="office-share-btn"]').click()
+  await expect(window.locator('[data-testid="office-share-dialog"]')).toBeVisible({ timeout: 10_000 })
+
+  // Minting produces a viewer link (works offline — local token mint).
+  await window.locator('[data-testid="office-share-create"]').click()
+  const link = window.locator('[data-testid="office-share-link"]')
+  await expect(link).toBeVisible({ timeout: 5_000 })
+  await expect(link).toHaveValue(/\/share\/[a-z0-9]+/)
+})

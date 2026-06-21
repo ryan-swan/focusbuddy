@@ -199,7 +199,7 @@ CREATE INDEX IF NOT EXISTS idx_canvas_snapshots_task ON canvas_snapshots(task_id
 CREATE TABLE IF NOT EXISTS share_links (
   id TEXT PRIMARY KEY,
   token TEXT NOT NULL UNIQUE,
-  kind TEXT NOT NULL CHECK (kind IN ('folder', 'task', 'widget')),
+  kind TEXT NOT NULL CHECK (kind IN ('folder', 'task', 'widget', 'document')),
   entity_id TEXT NOT NULL,
   label TEXT NOT NULL DEFAULT '',
   scope TEXT NOT NULL DEFAULT 'view' CHECK (scope IN ('view', 'copy')),
@@ -218,7 +218,7 @@ CREATE INDEX IF NOT EXISTS idx_share_links_created ON share_links(created_at DES
 CREATE TABLE IF NOT EXISTS shared_with_me (
   id TEXT PRIMARY KEY,
   token TEXT NOT NULL UNIQUE,
-  kind TEXT NOT NULL CHECK (kind IN ('folder', 'task', 'widget')),
+  kind TEXT NOT NULL CHECK (kind IN ('folder', 'task', 'widget', 'document')),
   snapshot_json TEXT NOT NULL DEFAULT '{}',
   from_handle TEXT NOT NULL DEFAULT '',
   accepted_at INTEGER NOT NULL,
@@ -439,6 +439,7 @@ export function getDb(): Database.Database {
     CREATE INDEX IF NOT EXISTS idx_documents_updated ON documents (updated_at DESC);
   `)
   migrateDocumentsDocTypeCheck(db)
+  migrateShareKindChecks(db)
   return db
 }
 
@@ -472,6 +473,65 @@ function migrateDocumentsDocTypeCheck(d: Database.Database): void {
     COMMIT;
     PRAGMA foreign_keys=on;
   `)
+}
+
+// The share tables shipped with a CHECK listing only folder/task/widget. Office
+// document sharing adds the 'document' kind, so existing databases reject it.
+// Rebuild each share table (copying rows) when its live CHECK predates 'document'.
+// Idempotent; a no-op once migrated or on a fresh DB.
+function migrateShareKindChecks(d: Database.Database): void {
+  const needs = (name: string): boolean => {
+    const row = d
+      .prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name=?")
+      .get(name) as { sql?: string } | undefined
+    return !!row?.sql && row.sql.includes('CHECK') && !row.sql.includes("'document'")
+  }
+  if (needs('share_links')) {
+    d.exec(`
+      PRAGMA foreign_keys=off;
+      BEGIN;
+      CREATE TABLE share_links_new (
+        id TEXT PRIMARY KEY,
+        token TEXT NOT NULL UNIQUE,
+        kind TEXT NOT NULL CHECK (kind IN ('folder', 'task', 'widget', 'document')),
+        entity_id TEXT NOT NULL,
+        label TEXT NOT NULL DEFAULT '',
+        scope TEXT NOT NULL DEFAULT 'view' CHECK (scope IN ('view', 'copy')),
+        created_at INTEGER NOT NULL,
+        expires_at INTEGER,
+        view_count INTEGER NOT NULL DEFAULT 0,
+        revoked INTEGER NOT NULL DEFAULT 0
+      );
+      INSERT INTO share_links_new SELECT id, token, kind, entity_id, label, scope, created_at, expires_at, view_count, revoked FROM share_links;
+      DROP TABLE share_links;
+      ALTER TABLE share_links_new RENAME TO share_links;
+      CREATE INDEX IF NOT EXISTS idx_share_links_entity ON share_links(kind, entity_id);
+      CREATE INDEX IF NOT EXISTS idx_share_links_created ON share_links(created_at DESC);
+      COMMIT;
+      PRAGMA foreign_keys=on;
+    `)
+  }
+  if (needs('shared_with_me')) {
+    d.exec(`
+      PRAGMA foreign_keys=off;
+      BEGIN;
+      CREATE TABLE shared_with_me_new (
+        id TEXT PRIMARY KEY,
+        token TEXT NOT NULL UNIQUE,
+        kind TEXT NOT NULL CHECK (kind IN ('folder', 'task', 'widget', 'document')),
+        snapshot_json TEXT NOT NULL DEFAULT '{}',
+        from_handle TEXT NOT NULL DEFAULT '',
+        accepted_at INTEGER NOT NULL,
+        scope TEXT NOT NULL DEFAULT 'view' CHECK (scope IN ('view', 'copy'))
+      );
+      INSERT INTO shared_with_me_new SELECT id, token, kind, snapshot_json, from_handle, accepted_at, scope FROM shared_with_me;
+      DROP TABLE shared_with_me;
+      ALTER TABLE shared_with_me_new RENAME TO shared_with_me;
+      CREATE INDEX IF NOT EXISTS idx_shared_with_me_accepted ON shared_with_me(accepted_at DESC);
+      COMMIT;
+      PRAGMA foreign_keys=on;
+    `)
+  }
 }
 
 export function closeDb(): void {
