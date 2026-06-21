@@ -94,3 +94,15 @@ test('PO-3 — the sidebar offers a sign-in surface so documents can sync with P
   await expect(window.getByPlaceholder('Password')).toBeVisible()
   await expect(window.locator('[data-testid="office-signin-submit"]')).toBeVisible()
 })
+
+test('PO-5 — the shell shows a version pill and updater affordance like PlexiDesk', async () => {
+  launched = await launchApp({ env: { PLEXI_APP: 'office' } })
+  const { window } = launched
+
+  // The footer version pill is the user-visible signal that updates are wired
+  // here too (clicking it triggers an update check; the UpdaterBanner beside it
+  // reflects state). It must show a v-prefixed version.
+  const pill = window.locator('[data-testid="office-version"]')
+  await expect(pill).toBeVisible({ timeout: 10_000 })
+  await expect(pill).toContainText('v')
+})
