@@ -36,6 +36,22 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.74',
+    date: '2026-06-21T18:30:00Z',
+    title: 'v2.5.74 — PlexiOffice gets a Drive, sharing, and live collaboration',
+    tag: 'feature',
+    summary:
+      'PlexiOffice now organises your work in folders and lets you share and collaborate: share a document or a whole folder by link, view shared work in a browser, import a shared folder, edit together live with check-out, and group people into teams.',
+    highlights: [
+      'Drive: PlexiOffice now has folders. Organise your documents, spreadsheets, slides, and maps into folders with breadcrumbs, and drag items to move them.',
+      'Share by link: share a single document, or a whole folder, with a link (and an optional email invite). Anyone with the link can view it read-only in their browser, no sign-up needed.',
+      'Import a shared folder: when a folder is shared so you can copy it, paste the link in your Drive to import an editable copy of the folder and its documents.',
+      'Live collaboration: turn a document into a shared one and edit together. One person checks it out to edit while others see it live and read-only, with a one-click request to take over.',
+      'Teams: create a team, add people by handle, and invite a whole team to a document at once.'
+    ],
+    links: [{ label: 'Finding your way around', href: `${HELP_BASE}/getting-around` }]
+  },
+  {
     version: '2.5.73',
     date: '2026-06-21T16:40:00Z',
     title: 'v2.5.73 — Readability fix in voice command proposals',
