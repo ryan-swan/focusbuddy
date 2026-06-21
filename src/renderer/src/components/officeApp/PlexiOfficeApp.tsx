@@ -25,6 +25,7 @@ import {
 import { useTheme, useAccountStore } from '@runtime'
 import { useDocumentsStore } from '../../stores/documents'
 import OfficeAccountBar from './OfficeAccountBar'
+import UpdaterBanner from '../UpdaterBanner'
 import Icon from '../Icon'
 
 const NEW_KINDS: { type: DocType; label: string; icon: string }[] = [
@@ -58,8 +59,13 @@ export default function PlexiOfficeApp(): JSX.Element {
     await open(doc.id)
   }
 
+  // Build-time version, injected by electron-vite from package.json (same global
+  // the desk footer uses). Drives the footer version pill + manual update check.
+  const appVersion = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : 'dev'
+
   return (
-    <div className="h-screen w-screen flex bg-desk-50 dark:bg-stone-950 text-stone-900 dark:text-stone-100">
+    <div className="h-screen w-screen flex flex-col bg-desk-50 dark:bg-stone-950 text-stone-900 dark:text-stone-100">
+      <div className="flex-1 min-h-0 flex">
       {/* Sidebar — branding, new-document actions, the document list */}
       <aside className="w-64 shrink-0 flex flex-col border-r border-stone-200 dark:border-stone-800 bg-white/70 dark:bg-stone-900/60">
         <div className="px-4 py-3 flex items-center gap-2 border-b border-stone-200 dark:border-stone-800">
@@ -184,6 +190,24 @@ export default function PlexiOfficeApp(): JSX.Element {
           </>
         )}
       </main>
+      </div>
+
+      {/* Footer — version pill (click to check for updates) + the shared updater
+          banner, mirroring PlexiDesk so updates are visible here too. */}
+      <footer className="h-7 shrink-0 px-3 flex items-center gap-2 text-[11px] text-stone-500 dark:text-stone-400 border-t border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-900 select-none">
+        <span>PlexiOffice</span>
+        <span className="text-stone-300 dark:text-stone-700">·</span>
+        <button
+          type="button"
+          onClick={() => void window.api.update.check()}
+          title="Click to check for updates"
+          data-testid="office-version"
+          className="font-mono hover:text-stone-700 dark:hover:text-stone-200 transition-colors"
+        >
+          v{appVersion}
+        </button>
+        <UpdaterBanner />
+      </footer>
     </div>
   )
 }
