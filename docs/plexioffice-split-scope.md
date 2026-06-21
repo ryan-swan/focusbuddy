@@ -162,6 +162,33 @@ integration loop so it is genuinely the same account's documents as PlexiDesk.
   cuts.
 - Also installed the local build to `/Applications/PlexiOffice.app` for this machine.
 
+**Round 7 (2026-06-21) — fixed: PlexiOffice quit on launch (shared lock).**
+The first published build crashed within ~0.5s of opening. Root cause: the packaged
+bundle embeds package.json `name: "focusbuddy"` with no `productName`, so
+`app.getName()` returned "focusbuddy" for the office build too. PlexiOffice therefore
+defaulted to PlexiDesk's userData directory and shared its single-instance lock, so
+launching it while PlexiDesk was open made `requestSingleInstanceLock()` fail and the
+app `app.quit()` immediately. The same root cause meant the renderer-selection check
+(`app.getName().includes('office')`) was also broken.
+- Fix in `src/main/index.ts` + new pure helper `src/main/appMode.ts`
+  (`detectOfficeBuild`): identify the office build from `PLEXI_APP` (dev) or the
+  executable path (packaged bundle is PlexiOffice.app / .exe), not `app.getName()`.
+  For the office build, call `app.setName('PlexiOffice')` and pin userData to its own
+  `…/Application Support/PlexiOffice` directory BEFORE the single-instance lock.
+- `src/main/authProtocol.ts`: `registerHaptyxAuthProtocol({ claimProtocol })` so
+  PlexiOffice no longer hijacks the `haptyx://` scheme from PlexiDesk (it still takes
+  its own single-instance lock, now on its own userData).
+- Verified by running the built main under the dev Electron with the live PlexiDesk
+  open: the office process stayed alive (gotLock=true, userData=…/PlexiOffice) instead
+  of quitting. New unit test `tests/unit/appMode.test.ts` (6 cases) guards the
+  detection; office e2e still green. Rebuilt, reinstalled to /Applications, and the
+  fixed assets re-published + `release:verify:office` GREEN.
+- Consequence of the separate userData: PlexiOffice starts with an empty LOCAL cache
+  and shows your documents only after you sign in AND cloud sync is on in both apps.
+  PlexiOffice turns sync on by default; in PlexiDesk enable Settings → "Documents sync
+  (beta)". This is by design — the apps share documents via the cloud, not a shared
+  local DB.
+
 **Still open (next rounds):**
 - Windows office build: there is no `.exe` / `office.yml` yet (mac arm64 only). Needs a
   Windows CI build (pinned to windows-2022 per the node-gyp/Electron-37 constraint),

@@ -89,15 +89,20 @@ export function consumePendingAuthHandoff(): AuthHandoff | null {
   return p
 }
 
-export function registerHaptyxAuthProtocol() {
+export function registerHaptyxAuthProtocol(opts: { claimProtocol?: boolean } = {}) {
+  const { claimProtocol = true } = opts
   // Ask macOS / Windows to route haptyx:// URLs to this binary.
   // In dev (electron-vite) the running binary is `node_modules/electron/.../Electron`
   // which doesn't survive a restart — the brochure flow only works end-to-end
   // from a packaged build. The registration is still safe to call in dev.
-  if (process.defaultApp && process.argv.length >= 2) {
-    app.setAsDefaultProtocolClient(SCHEME, process.execPath, [process.argv[1]])
-  } else {
-    app.setAsDefaultProtocolClient(SCHEME)
+  // Skipped for PlexiOffice (claimProtocol=false): two apps can't both own the
+  // scheme, and it belongs to PlexiDesk's auth handoff.
+  if (claimProtocol) {
+    if (process.defaultApp && process.argv.length >= 2) {
+      app.setAsDefaultProtocolClient(SCHEME, process.execPath, [process.argv[1]])
+    } else {
+      app.setAsDefaultProtocolClient(SCHEME)
+    }
   }
 
   // macOS — the canonical event for deep links once the app is running.

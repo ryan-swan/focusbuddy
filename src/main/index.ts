@@ -13,6 +13,7 @@ import { installFocusTracker } from './streamdeckActions'
 import { installActivityTracker } from './activityTracker'
 import { registerHaptyxAuthProtocol } from './authProtocol'
 import { installAutoUpdater } from './autoUpdate'
+import { detectOfficeBuild } from './appMode'
 
 loadEnv({ path: join(app.getAppPath(), '.env') })
 loadEnv({ path: join(app.getAppPath(), '..', '.env') })
@@ -21,8 +22,25 @@ loadEnv({ path: join(app.getAppPath(), '..', '.env') })
 // userData (separate DB, separate cookies) so tests don't touch the developer's
 // real FocusBuddy data. Must be set BEFORE app.whenReady() so getPath('userData')
 // picks up the override on first access.
+// Which product is this binary? See detectOfficeBuild for why app.getName() alone
+// is not enough. Set the app name early so getName(), the menu, the renderer
+// selection, and the default paths are all office-correct from here on.
+const isOfficeBuild = detectOfficeBuild({
+  plexiAppEnv: process.env['PLEXI_APP'],
+  execPath: process.execPath,
+  appName: app.getName()
+})
+if (isOfficeBuild) app.setName('PlexiOffice')
+
 if (process.env.FB_TEST_USER_DATA) {
   app.setPath('userData', process.env.FB_TEST_USER_DATA)
+} else if (isOfficeBuild) {
+  // PlexiOffice gets its OWN userData directory. Without this it inherits
+  // PlexiDesk's directory and therefore PlexiDesk's single-instance lock, so
+  // launching it while PlexiDesk is open makes it quit immediately (~0.5s). The
+  // two apps share documents through the cloud-documents API, not a shared local
+  // database, so a separate local cache is exactly right.
+  app.setPath('userData', join(app.getPath('appData'), 'PlexiOffice'))
 } else if (app.isPackaged) {
   // Data-safe rename: the app was renamed Haptyx → PlexiDesk, which would
   // otherwise move userData from "…/Application Support/Haptyx" to "…/PlexiDesk"
@@ -109,7 +127,10 @@ function applyPermissionPolicy(ses: Electron.Session): void {
 // Register haptyx:// before whenReady so the OS knows we own the
 // protocol scheme. Also handles second-instance / open-url events for
 // the web→desktop auth handoff. See authProtocol.ts.
-registerHaptyxAuthProtocol()
+// PlexiOffice must not claim the haptyx:// scheme — only one app can own it, and
+// it belongs to PlexiDesk's web→desktop auth handoff. PlexiOffice still takes its
+// own single-instance lock (on its own userData) inside this call.
+registerHaptyxAuthProtocol({ claimProtocol: !isOfficeBuild })
 
 function createCommandCenter(): BrowserWindow {
   // The window stays opaque. Live-mirror widgets render desktopCapturer
