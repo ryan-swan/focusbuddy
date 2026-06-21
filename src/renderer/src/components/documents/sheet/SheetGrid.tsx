@@ -9,6 +9,7 @@ import type { SheetTab } from '@shared/types'
 import { displayCell, type Grid } from '../../../lib/sheetFormula'
 import { formatValue } from '../../../lib/sheetFormat'
 import { cellFormat, colLabel } from '../../../lib/sheetBody'
+import { applyCondFormat } from '../../../lib/sheetCond'
 import { loadGoogleFont, familyLabel } from '../../../lib/googleFonts'
 import type { CellRange } from './sheetOps'
 
@@ -124,8 +125,10 @@ export default function SheetGrid(props: Props): JSX.Element {
                   !!props.onFillStart &&
                   r === selection.r1 &&
                   c === selection.c1
-                const fmt = cellFormat(tab, r, c)
                 const computed = displayCell(grid, r, c)
+                // Base cell format, then overlay any matching conditional-format
+                // rule (paint only — the true value is unchanged).
+                const fmt = applyCondFormat(cellFormat(tab, r, c), tab.condRules, r, c, computed)
                 const shown = formatValue(computed, fmt?.numFmt)
                 const isErr = computed === '#ERR'
                 if (fmt?.fontFamily) loadGoogleFont(familyLabel(fmt.fontFamily))

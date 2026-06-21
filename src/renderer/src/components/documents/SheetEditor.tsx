@@ -39,6 +39,8 @@ import SheetTabStrip from './sheet/SheetTabStrip'
 import SheetChart from './sheet/SheetChart'
 import SheetAiFill from './sheet/SheetAiFill'
 import SheetFormulaAssist, { type FormulaPlan } from './sheet/SheetFormulaAssist'
+import CondFormatDialog from './sheet/CondFormatDialog'
+import type { SheetCondRule } from '@shared/types'
 import Icon from '../Icon'
 
 // Excel-class spreadsheet editor. The body is held locally as v2 (legacy v1
@@ -101,6 +103,7 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
   const [editValue, setEditValue] = useState('')
   const [aiOpen, setAiOpen] = useState(false)
   const [formulaAiOpen, setFormulaAiOpen] = useState(false)
+  const [condOpen, setCondOpen] = useState(false)
   const [liveWidth, setLiveWidth] = useState<{ c: number; w: number } | null>(null)
   const [status, setStatus] = useState<string | null>(null)
   const [colMenu, setColMenu] = useState<{ c: number; x: number; y: number } | null>(null)
@@ -769,6 +772,7 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
         onInsertCol={() => mutateTab((t) => insertColAt(t, selection.c0))}
         onDeleteCol={() => mutateTab((t) => deleteColAt(t, selection.c0))}
         onSort={(dir) => mutateTab((t) => sortByColumn(t, selection.c0, dir))}
+        onConditionalFormat={() => setCondOpen(true)}
         onInsertChart={insertChart}
         onImport={() => void importFile()}
         onExport={(f) => void exportFile(f)}
@@ -810,6 +814,20 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
             sample={tab.rows.slice(0, 5)}
             onApply={applyFormulaPlan}
             onClose={() => setFormulaAiOpen(false)}
+          />
+        )}
+
+        {condOpen && (
+          <CondFormatDialog
+            range={`${colLabel(selection.c0)}${selection.r0 + 1}:${colLabel(selection.c1)}${selection.r1 + 1}`}
+            rules={tab.condRules ?? []}
+            onAdd={(rule: SheetCondRule) =>
+              mutateTab((t) => ({ ...t, condRules: [...(t.condRules ?? []), rule] }))
+            }
+            onRemove={(id: string) =>
+              mutateTab((t) => ({ ...t, condRules: (t.condRules ?? []).filter((x) => x.id !== id) }))
+            }
+            onClose={() => setCondOpen(false)}
           />
         )}
 
