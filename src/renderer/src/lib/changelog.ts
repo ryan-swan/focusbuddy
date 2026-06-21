@@ -36,6 +36,22 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.71',
+    date: '2026-06-21T09:00:00Z',
+    title: 'v2.5.71 — PlexiMaps diagrams + big spreadsheet upgrades',
+    tag: 'feature',
+    summary:
+      'A new diagram and workflow tool called PlexiMaps joins your documents, sheets, and slides, and the spreadsheet takes a big step toward Google Sheets: conditional formatting, data validation with dropdowns, dozens of new functions including VLOOKUP, and references across tabs.',
+    highlights: [
+      'PlexiMaps: a Draw.io-style diagram and workflow editor. Build flowcharts, org charts, and mind maps with seven shapes, connectors you drag from any side, labels, colours, a minimap, and starter templates. Or describe a process in plain words and the AI lays out the whole diagram for you. It opens on its own, embeds on a desk, and syncs like any other document.',
+      'Conditional formatting: paint cells by their value (greater than, between, contains, and more) over any range, with the true value left untouched.',
+      'Data validation: restrict a range to a list (with an in-cell dropdown), a number rule, or non-empty text, and optionally reject invalid entries on the spot.',
+      'About 35 new spreadsheet functions: VLOOKUP, HLOOKUP, INDEX, MATCH, SUMIFS, COUNTIFS, AVERAGEIFS, SUMPRODUCT, MEDIAN, STDEV, FIND, SUBSTITUTE, TEXTJOIN, YEAR/MONTH/DAY, and more. A lookup that misses shows #ERR, never a made-up value.',
+      'Cross-sheet references: a formula can read another tab, e.g. =’Sheet 2’!A1 or =SUM(Data!B1:B20), and autofill keeps the tab name as it shifts the cells.'
+    ],
+    links: [{ label: 'Finding your way around', href: `${HELP_BASE}/getting-around` }]
+  },
+  {
     version: '2.5.70',
     date: '2026-06-20T09:00:00Z',
     title: 'v2.5.70 — Spreadsheet power editing: fill handle, bulk paste, AI formulas',
