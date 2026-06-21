@@ -26,6 +26,7 @@ import { useDocumentsStore } from '../../stores/documents'
 import { useFileManagerStore } from '../../stores/fileManager'
 import OfficeAccountBar from './OfficeAccountBar'
 import OfficeDrive from './OfficeDrive'
+import OfficeShareDialog from './OfficeShareDialog'
 import UpdaterBanner from '../UpdaterBanner'
 import Icon from '../Icon'
 
@@ -36,6 +37,7 @@ export default function PlexiOfficeApp(): JSX.Element {
   const { active, refresh, saveBody, rename, close } = useDocumentsStore()
   const refreshDrive = useFileManagerStore((s) => s.refresh)
   const [renaming, setRenaming] = useState(false)
+  const [sharing, setSharing] = useState(false)
   // PlexiOffice is cloud-first: sign in once and your documents are the same as in
   // PlexiDesk. Enable sync and boot the account session on mount.
   const token = useAccountStore((s) => s.sessionToken)
@@ -106,6 +108,15 @@ export default function PlexiOfficeApp(): JSX.Element {
                   {active.title || 'Untitled'}
                 </button>
               )}
+              <button
+                onClick={() => setSharing(true)}
+                data-testid="office-share-btn"
+                className="ml-auto inline-flex items-center gap-1.5 rounded-lg border border-stone-200 dark:border-stone-700 px-2.5 py-1 text-[12px] hover:border-accent hover:text-accent"
+                title="Share this document"
+              >
+                <Icon name="share" size={14} />
+                Share
+              </button>
             </header>
             <div className="flex-1 min-h-0">
               {active.docType === 'doc' ? (
@@ -137,6 +148,8 @@ export default function PlexiOfficeApp(): JSX.Element {
         )}
       </main>
       </div>
+
+      {sharing && active && <OfficeShareDialog doc={active} onClose={() => setSharing(false)} />}
 
       {/* Footer — version pill (click to check for updates) + the shared updater
           banner, mirroring PlexiDesk so updates are visible here too. */}

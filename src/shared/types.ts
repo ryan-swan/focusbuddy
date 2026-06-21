@@ -687,7 +687,9 @@ export interface BodyDoubleChatMessage {
 // up so the URL resolves to a hosted viewer; the renderer code path stays
 // identical.
 
-export type ShareableKind = 'folder' | 'task' | 'widget'
+// 'document' is the office kind: a doc / sheet / slides / map shared as a
+// read-only, browser-renderable snapshot (see DocumentSnapshot).
+export type ShareableKind = 'folder' | 'task' | 'widget' | 'document'
 
 // Permission level granted by the share. Two levels in v1 — keeping it
 // simple. "view" = read-only render. "copy" = recipient can sign up and

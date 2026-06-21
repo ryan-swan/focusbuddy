@@ -186,7 +186,8 @@ export default function ShareDialog({
   const KIND_LABEL: Record<ShareableKind, string> = {
     folder: 'folder',
     task: 'task',
-    widget: 'desk item'
+    widget: 'desk item',
+    document: 'document'
   }
 
   return createPortal(
