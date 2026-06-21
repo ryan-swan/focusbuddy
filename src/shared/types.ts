@@ -38,6 +38,9 @@ export type WidgetKind =
   | 'doc'
   | 'sheet'
   | 'slides'
+  // PlexiMaps — a node/edge diagram & workflow map document, embeddable on the
+  // canvas like the other office docs (backed by an fb_documents row of type 'map').
+  | 'map'
   // Stream Deck — Elgato-style 10×3 button grid with folder navigation,
   // macros, app launching, media keys, and volume control. Configuration
   // (buttons, folders, action payloads) lives in widget.content as JSON.
@@ -1134,7 +1137,7 @@ export type MailSendResult = { ok: true } | { ok: false; error: string }
 // Standalone files created and edited as first-class artifacts. One table, one
 // list, one AI-create flow; the body shape switches on docType.
 
-export type DocType = 'doc' | 'sheet' | 'slides'
+export type DocType = 'doc' | 'sheet' | 'slides' | 'map'
 
 // A single global-search result. `type` decides how the renderer routes a click;
 // `taskId` is the canvas to open for widget / table-row hits, `docType` the
@@ -1347,12 +1350,56 @@ export interface SlidesBody {
 // it is opaque to everything except the editor, so it is typed loosely here.
 export type DocBody = { type: 'doc'; content?: unknown[] } | Record<string, unknown>
 
+// ── PlexiMaps (the 'map' document type) ─────────────────────────────────────
+// A node-and-edge diagram / workflow map (flowcharts, process maps, org charts,
+// mind maps). The body is a clean, tool-agnostic graph: nodes carry their own
+// position + shape + colour, edges carry an optional label and line style. The
+// editor (MapEditor) renders this on React Flow; the shape stays independent of
+// React Flow so it can sync to the cloud and later export cleanly.
+export type MapShape =
+  | 'process' // rectangle — a step / action
+  | 'decision' // diamond — a branch / yes-no
+  | 'terminator' // pill — start / end
+  | 'data' // parallelogram — input / output
+  | 'database' // cylinder — a store
+  | 'circle' // connector / state
+  | 'note' // free text label
+
+export interface MapNode {
+  id: string
+  x: number
+  y: number
+  label: string
+  shape: MapShape
+  color: string
+  width?: number
+  height?: number
+}
+
+export interface MapEdge {
+  id: string
+  source: string
+  target: string
+  label?: string
+  sourceHandle?: string | null
+  targetHandle?: string | null
+  style?: 'solid' | 'dashed'
+  animated?: boolean
+}
+
+export interface MapBody {
+  version: 1
+  nodes: MapNode[]
+  edges: MapEdge[]
+  viewport?: { x: number; y: number; zoom: number }
+}
+
 // The full document, body included.
 export interface FbDocument {
   id: string
   docType: DocType
   title: string
-  body: DocBody | SheetBody | SlidesBody
+  body: DocBody | SheetBody | SlidesBody | MapBody
   archived: boolean
   createdAt: number
   updatedAt: number
@@ -1371,11 +1418,11 @@ export interface DocumentMeta {
 export interface DocumentDraft {
   docType: DocType
   title: string
-  body?: DocBody | SheetBody | SlidesBody
+  body?: DocBody | SheetBody | SlidesBody | MapBody
 }
 
 export interface DocumentPatch {
   title?: string
-  body?: DocBody | SheetBody | SlidesBody
+  body?: DocBody | SheetBody | SlidesBody | MapBody
   archived?: boolean
 }

@@ -3,8 +3,8 @@ import type { Widget } from '@shared/types'
 import type { DocType, FbDocument } from '@shared/types'
 import WidgetFrame from './WidgetFrame'
 import { useWidgetStore } from '../../stores/widgets'
-import { DocEditor, SheetEditor, SlidesEditor } from '@office'
-import type { SheetBody, SlidesBody } from '@shared/types'
+import { DocEditor, SheetEditor, SlidesEditor, MapEditor } from '@office'
+import type { MapBody, SheetBody, SlidesBody } from '@shared/types'
 
 // A document / spreadsheet / slide deck living on the canvas as a native widget.
 // widget.content holds the backing fb_documents id (the same store the full
@@ -17,11 +17,17 @@ interface Props {
   inline?: boolean
 }
 
-const KIND_TO_DOCTYPE: Record<string, DocType> = { doc: 'doc', sheet: 'sheet', slides: 'slides' }
+const KIND_TO_DOCTYPE: Record<string, DocType> = {
+  doc: 'doc',
+  sheet: 'sheet',
+  slides: 'slides',
+  map: 'map'
+}
 const TYPE_META: Record<DocType, { label: string; accent: string }> = {
   doc: { label: 'Document', accent: 'bg-sky-300/60' },
   sheet: { label: 'Spreadsheet', accent: 'bg-emerald-300/60' },
-  slides: { label: 'Slides', accent: 'bg-orange-300/60' }
+  slides: { label: 'Slides', accent: 'bg-orange-300/60' },
+  map: { label: 'Map', accent: 'bg-violet-300/60' }
 }
 
 export default function OfficeDocWidget({ widget, inline = false }: Props): JSX.Element {
@@ -86,8 +92,10 @@ export default function OfficeDocWidget({ widget, inline = false }: Props): JSX.
     body = <DocEditor key={doc.id} content={doc.body} title={doc.title} onChange={saveBody} />
   } else if (docType === 'sheet') {
     body = <SheetEditor key={doc.id} body={doc.body as SheetBody} title={doc.title} onChange={saveBody} />
-  } else {
+  } else if (docType === 'slides') {
     body = <SlidesEditor key={doc.id} body={doc.body as SlidesBody} title={doc.title} onChange={saveBody} />
+  } else {
+    body = <MapEditor key={doc.id} body={doc.body as MapBody} title={doc.title} onChange={saveBody} />
   }
 
   // Stop right-clicks (and the editors' own context menus, e.g. the sheet column

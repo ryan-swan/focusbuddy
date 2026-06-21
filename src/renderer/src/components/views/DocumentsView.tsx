@@ -15,7 +15,8 @@ import Icon from '../Icon'
 const TYPES: { type: DocType; label: string; icon: string; blurb: string }[] = [
   { type: 'doc', label: 'Document', icon: 'description', blurb: 'Writeups, briefs, proposals' },
   { type: 'sheet', label: 'Spreadsheet', icon: 'table_chart', blurb: 'Plans, budgets, trackers' },
-  { type: 'slides', label: 'Slides', icon: 'slideshow', blurb: 'Decks and presentations' }
+  { type: 'slides', label: 'Slides', icon: 'slideshow', blurb: 'Decks and presentations' },
+  { type: 'map', label: 'Map', icon: 'account_tree', blurb: 'Flowcharts and workflow maps' }
 ]
 
 function typeIcon(t: DocType): string {
