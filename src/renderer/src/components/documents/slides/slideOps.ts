@@ -92,3 +92,124 @@ export function setParagraphAlign(el: SlideTextElement, align: 'left' | 'center'
 export function setListStyle(el: SlideTextElement, listStyle: 'bullet' | 'number' | 'none'): SlideTextElement {
   return { ...el, paragraphs: el.paragraphs.map((p) => ({ ...p, listStyle })) }
 }
+
+// ── Multi-element operations: selection, alignment, distribution, grouping ────
+
+export type AlignEdge = 'left' | 'centerX' | 'right' | 'top' | 'middleY' | 'bottom'
+
+function pick(slide: Slide, ids: string[]): SlideElement[] {
+  const set = new Set(ids)
+  return (slide.elements ?? []).filter((e) => set.has(e.id))
+}
+
+// Expand a selection to include every element sharing a groupId with any member,
+// so clicking one element of a group acts on the whole group.
+export function withGroupMembers(slide: Slide, ids: string[]): string[] {
+  const els = slide.elements ?? []
+  const idSet = new Set(ids)
+  const groups = new Set<string>()
+  for (const e of els) if (idSet.has(e.id) && e.groupId) groups.add(e.groupId)
+  if (!groups.size) return ids
+  const out = new Set(ids)
+  for (const e of els) if (e.groupId && groups.has(e.groupId)) out.add(e.id)
+  return [...out]
+}
+
+// Shift every listed element by (dx, dy) — the commit of a group drag or nudge.
+export function moveElementsBy(slide: Slide, ids: string[], dx: number, dy: number): Slide {
+  const set = new Set(ids)
+  return {
+    ...slide,
+    elements: (slide.elements ?? []).map((e) =>
+      set.has(e.id) ? ({ ...e, x: Math.round(e.x + dx), y: Math.round(e.y + dy) } as SlideElement) : e
+    )
+  }
+}
+
+// Align the selected elements to a shared edge of their combined bounding box.
+export function alignElements(slide: Slide, ids: string[], edge: AlignEdge): Slide {
+  const els = pick(slide, ids)
+  if (els.length < 2) return slide
+  const minX = Math.min(...els.map((e) => e.x))
+  const maxR = Math.max(...els.map((e) => e.x + e.w))
+  const minY = Math.min(...els.map((e) => e.y))
+  const maxB = Math.max(...els.map((e) => e.y + e.h))
+  const cx = (minX + maxR) / 2
+  const cy = (minY + maxB) / 2
+  const set = new Set(ids)
+  return {
+    ...slide,
+    elements: (slide.elements ?? []).map((e) => {
+      if (!set.has(e.id)) return e
+      switch (edge) {
+        case 'left': return { ...e, x: Math.round(minX) }
+        case 'right': return { ...e, x: Math.round(maxR - e.w) }
+        case 'centerX': return { ...e, x: Math.round(cx - e.w / 2) }
+        case 'top': return { ...e, y: Math.round(minY) }
+        case 'bottom': return { ...e, y: Math.round(maxB - e.h) }
+        case 'middleY': return { ...e, y: Math.round(cy - e.h / 2) }
+        default: return e
+      }
+    })
+  }
+}
+
+// Distribute the selected elements so the gaps between them are equal along the
+// chosen axis. Needs 3+; the outermost two hold and the rest space between them.
+export function distributeElements(slide: Slide, ids: string[], axis: 'h' | 'v'): Slide {
+  const els = pick(slide, ids)
+  if (els.length < 3) return slide
+  const horiz = axis === 'h'
+  const sizeOf = (e: SlideElement): number => (horiz ? e.w : e.h)
+  const posOf = (e: SlideElement): number => (horiz ? e.x : e.y)
+  const sorted = [...els].sort((a, b) => posOf(a) - posOf(b))
+  const first = sorted[0]
+  const last = sorted[sorted.length - 1]
+  const extent = posOf(last) + sizeOf(last) - posOf(first)
+  const totalSize = sorted.reduce((s, e) => s + sizeOf(e), 0)
+  const gap = (extent - totalSize) / (sorted.length - 1)
+  const newPos = new Map<string, number>()
+  let cursor = posOf(first)
+  for (const e of sorted) {
+    newPos.set(e.id, cursor)
+    cursor += sizeOf(e) + gap
+  }
+  return {
+    ...slide,
+    elements: (slide.elements ?? []).map((e) => {
+      if (!newPos.has(e.id)) return e
+      const p = Math.round(newPos.get(e.id) as number)
+      return horiz ? ({ ...e, x: p } as SlideElement) : ({ ...e, y: p } as SlideElement)
+    })
+  }
+}
+
+let groupSeq = 0
+// Tie the selected elements together under a fresh groupId.
+export function groupElements(slide: Slide, ids: string[]): Slide {
+  if (ids.length < 2) return slide
+  groupSeq += 1
+  const gid = `grp-${Date.now().toString(36)}-${groupSeq}`
+  const set = new Set(ids)
+  return { ...slide, elements: (slide.elements ?? []).map((e) => (set.has(e.id) ? { ...e, groupId: gid } : e)) }
+}
+
+// Dissolve the group of every element sharing a group with any selected one.
+export function ungroupElements(slide: Slide, ids: string[]): Slide {
+  const els = slide.elements ?? []
+  const idSet = new Set(ids)
+  const groups = new Set<string>()
+  for (const e of els) if (idSet.has(e.id) && e.groupId) groups.add(e.groupId)
+  if (!groups.size) return slide
+  return {
+    ...slide,
+    elements: els.map((e) => {
+      if (e.groupId && groups.has(e.groupId)) {
+        const next = { ...e }
+        delete (next as { groupId?: string }).groupId
+        return next as SlideElement
+      }
+      return e
+    })
+  }
+}

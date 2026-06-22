@@ -98,6 +98,31 @@ export const SHEET_FUNCTIONS: Array<{ name: string; hint: string }> = [
   { name: 'HLOOKUP', hint: 'HLOOKUP(key, table, rowIndex, [FALSE]) — look up a column' },
   { name: 'INDEX', hint: 'INDEX(range, row, [col]) — value at a position' },
   { name: 'MATCH', hint: 'MATCH(key, range, [type]) — position of a value' },
+  { name: 'XLOOKUP', hint: 'XLOOKUP(key, lookupRange, returnRange, [ifMissing], [mode]) — modern lookup' },
+  { name: 'XMATCH', hint: 'XMATCH(key, range, [mode]) — position, exact or nearest' },
+  { name: 'INDIRECT', hint: 'INDIRECT(refText) — a reference held as text, e.g. "A1"' },
+  { name: 'IFS', hint: 'IFS(cond1, val1, cond2, val2, …) — first true wins' },
+  { name: 'SWITCH', hint: 'SWITCH(value, case1, result1, …, [default])' },
+  { name: 'REGEXMATCH', hint: 'REGEXMATCH(text, pattern) — TRUE if the pattern matches' },
+  { name: 'REGEXEXTRACT', hint: 'REGEXEXTRACT(text, pattern) — first match (or group 1)' },
+  { name: 'REGEXREPLACE', hint: 'REGEXREPLACE(text, pattern, replacement) — replace all matches' },
+  { name: 'LARGE', hint: 'LARGE(range, k) — kth largest value' },
+  { name: 'SMALL', hint: 'SMALL(range, k) — kth smallest value' },
+  { name: 'COUNTUNIQUE', hint: 'COUNTUNIQUE(range) — count of distinct non-empty values' },
+  { name: 'SUMSQ', hint: 'SUMSQ(range) — sum of squares' },
+  { name: 'SIGN', hint: 'SIGN(number) — -1, 0 or 1' },
+  { name: 'EXP', hint: 'EXP(number) — e to the power' },
+  { name: 'LN', hint: 'LN(number) — natural log' },
+  { name: 'LOG', hint: 'LOG(number, [base]) — log, base 10 by default' },
+  { name: 'LOG10', hint: 'LOG10(number) — base-10 log' },
+  { name: 'CHAR', hint: 'CHAR(code) — character for a code point' },
+  { name: 'CODE', hint: 'CODE(text) — code point of the first character' },
+  { name: 'CLEAN', hint: 'CLEAN(text) — remove non-printable characters' },
+  { name: 'DATE', hint: 'DATE(year, month, day) — build a date' },
+  { name: 'DAYS', hint: 'DAYS(end, start) — days between two dates' },
+  { name: 'EDATE', hint: 'EDATE(date, months) — shift by whole months' },
+  { name: 'EOMONTH', hint: 'EOMONTH(date, months) — last day of the shifted month' },
+  { name: 'DATEDIF', hint: 'DATEDIF(start, end, "D"|"M"|"Y") — difference in units' },
   { name: 'SUMIFS', hint: 'SUMIFS(sumRange, range1, crit1, …)' },
   { name: 'COUNTIFS', hint: 'COUNTIFS(range1, crit1, …)' },
   { name: 'AVERAGEIFS', hint: 'AVERAGEIFS(avgRange, range1, crit1, …)' },
@@ -1122,9 +1147,207 @@ function evalCall(node: Extract<Node, { k: 'call' }>, grid: Grid, seen: Set<stri
       }
       throw new Error(`${name}: not found`)
     }
+    // ── Lookup (modern) ─────────────────────────────────────────────────────
+    case 'XLOOKUP': {
+      const key = arg(0)
+      if (args[1]?.k !== 'range' || args[2]?.k !== 'range') throw new Error('XLOOKUP needs a lookup range and a return range')
+      const lg = gridOf(args[1])
+      const rgGrid = gridOf(args[2])
+      const lcoords = rangeCoords(args[1])
+      const rcoords = rangeCoords(args[2])
+      const mode = args.length > 4 ? toNum(arg(4)) : 0
+      const lvals = lcoords.map(({ r, c }) => cellValue(lg, r, c, seen))
+      let found = lvals.findIndex((v) => compare('=', v, key))
+      if (found < 0 && mode !== 0) found = nearestIndex(lvals, key, mode === 1 ? 'up' : 'down')
+      if (found < 0) {
+        if (args.length > 3) return arg(3)
+        throw new Error('XLOOKUP: not found')
+      }
+      const rc = rcoords[found]
+      if (!rc) throw new Error('XLOOKUP: return range shorter than lookup range')
+      return cellValue(rgGrid, rc.r, rc.c, seen)
+    }
+    case 'XMATCH': {
+      const key = arg(0)
+      if (args[1]?.k !== 'range') throw new Error('XMATCH needs a range')
+      const g = gridOf(args[1])
+      const coords = rangeCoords(args[1])
+      const mode = args.length > 2 ? toNum(arg(2)) : 0
+      const vals = coords.map(({ r, c }) => cellValue(g, r, c, seen))
+      let found = vals.findIndex((v) => compare('=', v, key))
+      if (found < 0 && mode !== 0) found = nearestIndex(vals, key, mode === 1 ? 'up' : 'down')
+      if (found < 0) throw new Error('XMATCH: not found')
+      return found + 1
+    }
+    // ── Logical (multi-branch) ──────────────────────────────────────────────
+    case 'IFS': {
+      for (let i = 0; i + 1 < args.length; i += 2) if (toBool(arg(i))) return arg(i + 1)
+      throw new Error('IFS: no condition matched')
+    }
+    case 'SWITCH': {
+      const subject = arg(0)
+      let i = 1
+      for (; i + 1 < args.length; i += 2) if (compare('=', subject, arg(i))) return arg(i + 1)
+      if (i < args.length) return arg(i) // trailing default
+      throw new Error('SWITCH: no case matched')
+    }
+    case 'INDIRECT':
+      // Resolve a reference held as text, e.g. INDIRECT("A1") or INDIRECT("S2!B3").
+      // Reusing the parser keeps A1 / sheet-qualified semantics identical to a
+      // literal reference. A range string yields #ERR (no spill), which is honest.
+      return evalNode(parse(toStr(arg(0)).trim()), grid, seen)
+    // ── Regex (text) ────────────────────────────────────────────────────────
+    case 'REGEXMATCH': {
+      const re = compileRegex(toStr(arg(1)))
+      return re.test(toStr(arg(0)))
+    }
+    case 'REGEXEXTRACT': {
+      const re = compileRegex(toStr(arg(1)))
+      const m = toStr(arg(0)).match(re)
+      if (!m) throw new Error('REGEXEXTRACT: no match')
+      return m[1] ?? m[0]
+    }
+    case 'REGEXREPLACE': {
+      const re = compileRegex(toStr(arg(1)), 'g')
+      return toStr(arg(0)).replace(re, toStr(arg(2)))
+    }
+    case 'CHAR':
+      return String.fromCharCode(Math.trunc(toNum(arg(0))))
+    case 'CODE': {
+      const s = toStr(arg(0))
+      if (!s) throw new Error('CODE of empty text')
+      return s.charCodeAt(0)
+    }
+    case 'CLEAN':
+      // Strip non-printable control characters.
+      // eslint-disable-next-line no-control-regex
+      return toStr(arg(0)).replace(/[\x00-\x1F\x7F]/g, '')
+    // ── Stats / math ────────────────────────────────────────────────────────
+    case 'LARGE':
+    case 'SMALL': {
+      const ns = collectNumbers([args[0]], grid, seen).slice().sort((a, b) => (name === 'LARGE' ? b - a : a - b))
+      const k = Math.trunc(toNum(arg(1)))
+      if (k < 1 || k > ns.length) throw new Error(`${name}: k out of range`)
+      return ns[k - 1]
+    }
+    case 'COUNTUNIQUE': {
+      const set = new Set<string>()
+      for (const a of args) {
+        if (a.k === 'range') {
+          const g = gridOf(a)
+          for (const { r, c } of rangeCoords(a)) {
+            const raw = cellRaw(g, r, c).trim()
+            if (raw !== '') set.add(raw)
+          }
+        } else {
+          const v = toStr(evalNode(a, grid, seen))
+          if (v.trim() !== '') set.add(v)
+        }
+      }
+      return set.size
+    }
+    case 'SUMSQ':
+      return collectNumbers(args, grid, seen).reduce((a, b) => a + b * b, 0)
+    case 'SIGN':
+      return Math.sign(toNum(arg(0)))
+    case 'EXP':
+      return Math.exp(toNum(arg(0)))
+    case 'LN': {
+      const x = toNum(arg(0))
+      if (x <= 0) throw new Error('LN needs a positive number')
+      return Math.log(x)
+    }
+    case 'LOG': {
+      const x = toNum(arg(0))
+      const base = args.length > 1 ? toNum(arg(1)) : 10
+      if (x <= 0 || base <= 0 || base === 1) throw new Error('LOG: bad argument')
+      return Math.log(x) / Math.log(base)
+    }
+    case 'LOG10': {
+      const x = toNum(arg(0))
+      if (x <= 0) throw new Error('LOG10 needs a positive number')
+      return Math.log10(x)
+    }
+    // ── Dates ───────────────────────────────────────────────────────────────
+    case 'DATE': {
+      const dt = new Date(Date.UTC(toNum(arg(0)), toNum(arg(1)) - 1, toNum(arg(2))))
+      if (Number.isNaN(dt.getTime())) throw new Error('DATE: invalid')
+      return isoDate(dt)
+    }
+    case 'DAYS': {
+      const e = parseDate(toStr(arg(0)))
+      const s = parseDate(toStr(arg(1)))
+      if (!e || !s) throw new Error('DAYS: bad date')
+      return Math.round((e.getTime() - s.getTime()) / 86400000)
+    }
+    case 'EDATE': {
+      const d = parseDate(toStr(arg(0)))
+      if (!d) throw new Error('EDATE: bad date')
+      return isoDate(new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + toNum(arg(1)), d.getUTCDate())))
+    }
+    case 'EOMONTH': {
+      const d = parseDate(toStr(arg(0)))
+      if (!d) throw new Error('EOMONTH: bad date')
+      return isoDate(new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + toNum(arg(1)) + 1, 0)))
+    }
+    case 'DATEDIF': {
+      const s = parseDate(toStr(arg(0)))
+      const e = parseDate(toStr(arg(1)))
+      if (!s || !e) throw new Error('DATEDIF: bad date')
+      const unit = toStr(arg(2)).toUpperCase()
+      if (unit === 'D') return Math.round((e.getTime() - s.getTime()) / 86400000)
+      if (unit === 'Y') {
+        let y = e.getUTCFullYear() - s.getUTCFullYear()
+        if (e.getUTCMonth() < s.getUTCMonth() || (e.getUTCMonth() === s.getUTCMonth() && e.getUTCDate() < s.getUTCDate())) y--
+        return y
+      }
+      if (unit === 'M') {
+        let m = (e.getUTCFullYear() - s.getUTCFullYear()) * 12 + (e.getUTCMonth() - s.getUTCMonth())
+        if (e.getUTCDate() < s.getUTCDate()) m--
+        return m
+      }
+      throw new Error('DATEDIF: unit must be D, M or Y')
+    }
     default:
       throw new Error(`unknown function ${name}`)
   }
+}
+
+// Format a date as the engine's canonical YYYY-MM-DD string (matching TODAY).
+function isoDate(d: Date): string {
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`
+}
+
+// Compile a user regex, surfacing a clean error rather than throwing a raw
+// SyntaxError that would read as an engine crash.
+function compileRegex(pattern: string, flags = ''): RegExp {
+  try {
+    return new RegExp(pattern, flags)
+  } catch {
+    throw new Error('bad regular expression')
+  }
+}
+
+// Nearest match for XLOOKUP/XMATCH approximate modes: the largest value <= key
+// ('down') or the smallest value >= key ('up'). Returns -1 when none qualify.
+function nearestIndex(vals: CellValue[], key: CellValue, dir: 'up' | 'down'): number {
+  let best = -1
+  let bestVal: CellValue | null = null
+  for (let i = 0; i < vals.length; i++) {
+    const v = vals[i]
+    if (dir === 'down' && compare('<=', v, key)) {
+      if (bestVal === null || compare('>=', v, bestVal)) {
+        best = i
+        bestVal = v
+      }
+    } else if (dir === 'up' && compare('>=', v, key)) {
+      if (bestVal === null || compare('<=', v, bestVal)) {
+        best = i
+        bestVal = v
+      }
+    }
+  }
+  return best
 }
 
 // Evaluate a formula string (without the leading '=') against the grid. Exposed

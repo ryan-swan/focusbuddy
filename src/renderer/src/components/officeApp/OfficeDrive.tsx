@@ -44,6 +44,15 @@ export default function OfficeDrive({
   const createFolder = useFileManagerStore((s) => s.createFolder)
   const move = useFileManagerStore((s) => s.move)
   const remove = useFileManagerStore((s) => s.remove)
+  const search = useFileManagerStore((s) => s.search)
+  const searchResults = useFileManagerStore((s) => s.searchResults)
+  const searching = useFileManagerStore((s) => s.searching)
+  const runSearch = useFileManagerStore((s) => s.runSearch)
+  const clearSearch = useFileManagerStore((s) => s.clearSearch)
+  const trashed = useFileManagerStore((s) => s.trashed)
+  const loadTrash = useFileManagerStore((s) => s.loadTrash)
+  const restoreFromTrash = useFileManagerStore((s) => s.restoreFromTrash)
+  const purge = useFileManagerStore((s) => s.purge)
 
   const open = useDocumentsStore((s) => s.open)
   const createBlank = useDocumentsStore((s) => s.createBlank)
@@ -58,6 +67,15 @@ export default function OfficeDrive({
   const [importUrl, setImportUrl] = useState('')
   const [importBusy, setImportBusy] = useState(false)
   const [importMsg, setImportMsg] = useState<string | null>(null)
+  const [trashOpen, setTrashOpen] = useState(false)
+
+  function toggleTrash(): void {
+    setTrashOpen((v) => {
+      const next = !v
+      if (next) void loadTrash()
+      return next
+    })
+  }
 
   useEffect(() => {
     void refresh()
@@ -135,6 +153,27 @@ export default function OfficeDrive({
     <div className="flex-1 min-h-0 flex flex-col">
       {/* New-document + new-folder actions (file into the current folder). */}
       <div className="p-3 flex flex-col gap-1.5">
+        {/* Drive-wide search */}
+        <div className="relative">
+          <Icon name="search" size={13} className="absolute left-2 top-1/2 -translate-y-1/2 text-stone-400 pointer-events-none" />
+          <input
+            value={search}
+            onChange={(e) => void runSearch(e.target.value)}
+            placeholder="Search Drive"
+            data-testid="office-search"
+            className="w-full bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-lg pl-7 pr-7 py-1.5 text-[12px] focus:outline-none focus:border-accent"
+          />
+          {search && (
+            <button
+              onClick={clearSearch}
+              data-testid="office-search-clear"
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-stone-400 hover:text-accent"
+              title="Clear search"
+            >
+              <Icon name="close" size={13} />
+            </button>
+          )}
+        </div>
         <div className="grid grid-cols-2 gap-1.5">
           {NEW_KINDS.map((k) => (
             <button
@@ -164,6 +203,16 @@ export default function OfficeDrive({
         >
           <Icon name="link" size={13} />
           Open a shared link
+        </button>
+        <button
+          onClick={toggleTrash}
+          data-testid="office-trash-toggle"
+          className={`flex items-center gap-1.5 rounded-lg px-2 py-1 text-[11px] ${
+            trashOpen ? 'text-accent' : 'text-stone-500 dark:text-stone-400 hover:text-accent'
+          }`}
+        >
+          <Icon name={trashOpen ? 'arrow_back' : 'delete'} size={13} />
+          {trashOpen ? 'Back to Drive' : 'Trash'}
         </button>
         {importOpen && (
           <div className="space-y-1">
@@ -220,7 +269,57 @@ export default function OfficeDrive({
 
       {/* Entry list */}
       <div className="flex-1 overflow-auto px-2 pb-3">
-        {sorted.length === 0 && unfiled.length === 0 ? (
+        {trashOpen ? (
+          trashed.length === 0 ? (
+            <div className="px-2 py-3 text-[12px] text-stone-400" data-testid="office-trash-empty">
+              Trash is empty.
+            </div>
+          ) : (
+            <div data-testid="office-trash-list">
+              <div className="px-2 pt-1 pb-1.5 text-[10px] uppercase tracking-wider text-stone-400">
+                Trash — deleted items, recoverable for 7 days
+              </div>
+              {trashed.map((e) => (
+                <TrashRow
+                  key={e.id}
+                  entry={e}
+                  onRestore={() => void restoreFromTrash(e.id)}
+                  onPurge={() => void purge(e.id)}
+                />
+              ))}
+            </div>
+          )
+        ) : search.trim() ? (
+          searchResults.length === 0 ? (
+            <div className="px-2 py-3 text-[12px] text-stone-400" data-testid="office-search-empty">
+              {searching ? 'Searching…' : `No matches for “${search.trim()}”.`}
+            </div>
+          ) : (
+            <div data-testid="office-search-results">
+              {searchResults.map((e) => (
+                <DriveRow
+                  key={e.id}
+                  entry={e}
+                  active={!!e.docId && active?.id === e.docId}
+                  isDropTarget={false}
+                  onOpen={() => {
+                    if (e.kind === 'folder') {
+                      clearSearch()
+                      void openFolder(e.id)
+                    } else if (e.kind === 'doc' && e.docId) void open(e.docId)
+                    else void window.api.files.open(e.id)
+                  }}
+                  onDelete={() => {
+                    void remove(e.id)
+                    void runSearch(search)
+                  }}
+                  draggable={false}
+                  onDragStart={() => {}}
+                />
+              ))}
+            </div>
+          )
+        ) : sorted.length === 0 && unfiled.length === 0 ? (
           <div className="px-2 py-3 text-[12px] text-stone-400">
             {cwd === null ? 'No documents yet.' : 'This folder is empty.'}
           </div>
@@ -343,6 +442,47 @@ function DriveRow({
         title={isFolder ? 'Delete folder' : 'Remove'}
       >
         <Icon name="delete" size={13} />
+      </button>
+    </div>
+  )
+}
+
+// A row in the Trash view: the deleted item with restore and delete-forever.
+function TrashRow({
+  entry,
+  onRestore,
+  onPurge
+}: {
+  entry: FileEntry
+  onRestore: () => void
+  onPurge: () => void
+}): JSX.Element {
+  const isFolder = entry.kind === 'folder'
+  const icon = isFolder ? 'folder' : entry.kind === 'doc' ? docIcon(entry.docType) : 'draft'
+  return (
+    <div
+      className="group w-full flex items-center gap-2 rounded-md px-2 py-1.5 text-[12.5px] hover:bg-stone-100 dark:hover:bg-stone-800"
+      data-testid={`office-trash-row-${entry.name}`}
+    >
+      <Icon name={icon} size={14} className="shrink-0 text-stone-400" />
+      <span className="truncate flex-1 text-stone-500 dark:text-stone-400 line-through decoration-stone-300 dark:decoration-stone-600">
+        {entry.name || 'Untitled'}
+      </span>
+      <button
+        onClick={onRestore}
+        data-testid={`office-trash-restore-${entry.name}`}
+        className="opacity-0 group-hover:opacity-100 text-stone-400 hover:text-accent shrink-0"
+        title="Restore"
+      >
+        <Icon name="restore_from_trash" size={14} />
+      </button>
+      <button
+        onClick={onPurge}
+        data-testid={`office-trash-purge-${entry.name}`}
+        className="opacity-0 group-hover:opacity-100 text-stone-400 hover:text-rose-500 shrink-0"
+        title="Delete forever"
+      >
+        <Icon name="delete_forever" size={14} />
       </button>
     </div>
   )

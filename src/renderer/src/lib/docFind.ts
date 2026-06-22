@@ -10,6 +10,10 @@
 export interface FindOptions {
   caseSensitive?: boolean
   wholeWord?: boolean
+  // Treat the query as a JavaScript regular expression. This is the thing Google
+  // Docs still cannot do. When on, wholeWord is ignored (use \b in the pattern)
+  // and an invalid pattern matches nothing rather than throwing.
+  regex?: boolean
 }
 
 export interface FindMatch {
@@ -23,10 +27,48 @@ function isWordChar(ch: string | undefined): boolean {
   return ch !== undefined && /[A-Za-z0-9_]/.test(ch)
 }
 
+// Validate a regular-expression query without throwing. The UI uses this to show
+// a "bad pattern" hint instead of silently finding nothing for a typo.
+export function isValidRegex(query: string, caseSensitive = false): boolean {
+  if (!query) return false
+  try {
+    new RegExp(query, caseSensitive ? 'g' : 'gi')
+    return true
+  } catch {
+    return false
+  }
+}
+
+// Regex matches of `query` in `text`, left to right, skipping zero-width matches
+// so an empty-matching pattern (e.g. "a*") can never loop forever. An invalid
+// pattern yields no matches.
+function regexMatches(text: string, query: string, opts: FindOptions): FindMatch[] {
+  let re: RegExp
+  try {
+    re = new RegExp(query, opts.caseSensitive ? 'g' : 'gi')
+  } catch {
+    return []
+  }
+  const out: FindMatch[] = []
+  let m: RegExpExecArray | null
+  let guard = 0
+  while ((m = re.exec(text)) !== null) {
+    if (m[0].length === 0) {
+      re.lastIndex++
+      if (++guard > 200000) break
+      continue
+    }
+    out.push({ start: m.index, end: m.index + m[0].length })
+    if (++guard > 200000) break
+  }
+  return out
+}
+
 // All non-overlapping matches of `query` in `text`, left to right. An empty
 // query yields no matches (rather than a match at every position).
 export function findMatches(text: string, query: string, opts: FindOptions = {}): FindMatch[] {
   if (!query) return []
+  if (opts.regex) return regexMatches(text, query, opts)
   const hay = opts.caseSensitive ? text : text.toLowerCase()
   const needle = opts.caseSensitive ? query : query.toLowerCase()
   const out: FindMatch[] = []

@@ -1339,6 +1339,9 @@ interface SlideElementBase {
   rotation?: number
   // Marks elements that a theme is allowed to restyle (title/body/accent).
   styleRole?: 'title' | 'body' | 'accent'
+  // Elements sharing a groupId select and move together as one group. Optional,
+  // so legacy decks (no groups) are unaffected and need no migration.
+  groupId?: string
 }
 export interface SlideTextElement extends SlideElementBase {
   type: 'text'

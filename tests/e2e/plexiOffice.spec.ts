@@ -208,3 +208,37 @@ test('PO-11 — Teams dialog opens from the sidebar', async () => {
   // Signed out in the test env, it tells the user to sign in rather than erroring.
   await expect(window.getByText(/Sign in to create and manage teams/i)).toBeVisible({ timeout: 5_000 })
 })
+
+test('PO-12 — Drive: search finds an item, and delete → Trash → restore round-trips', async () => {
+  launched = await launchApp({ env: { PLEXI_APP: 'office' } })
+  const { window } = launched
+
+  // A named entry to act on.
+  await window.locator('[data-testid="office-new-folder"]').click()
+  const folder = window.locator('[data-testid="office-folder-New folder"]')
+  await expect(folder).toBeVisible({ timeout: 10_000 })
+
+  // Drive-wide search surfaces it; clearing search returns to the listing.
+  await window.locator('[data-testid="office-search"]').fill('New folder')
+  const results = window.locator('[data-testid="office-search-results"]')
+  await expect(results).toBeVisible({ timeout: 5_000 })
+  await expect(results.locator('[data-testid="office-folder-New folder"]')).toBeVisible()
+  await window.locator('[data-testid="office-search-clear"]').click()
+  await expect(window.locator('[data-testid="office-search-results"]')).toHaveCount(0)
+
+  // Delete it — it leaves the Drive listing (soft-deleted).
+  await folder.hover()
+  await folder.getByTitle('Delete folder').click()
+  await expect(window.locator('[data-testid="office-folder-New folder"]')).toHaveCount(0, { timeout: 5_000 })
+
+  // It now lives in Trash, recoverable.
+  await window.locator('[data-testid="office-trash-toggle"]').click()
+  const trashRow = window.locator('[data-testid="office-trash-row-New folder"]')
+  await expect(trashRow).toBeVisible({ timeout: 5_000 })
+
+  // Restore it and confirm it is back in the Drive listing.
+  await trashRow.hover()
+  await window.locator('[data-testid="office-trash-restore-New folder"]').click()
+  await window.locator('[data-testid="office-trash-toggle"]').click()
+  await expect(window.locator('[data-testid="office-folder-New folder"]')).toBeVisible({ timeout: 5_000 })
+})

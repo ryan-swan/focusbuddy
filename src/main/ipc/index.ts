@@ -139,6 +139,10 @@ import {
   moveEntry as moveFileEntry,
   deleteEntry as deleteFileEntry,
   restoreEntries as restoreFileEntries,
+  listTrashedEntries as listTrashedFileEntries,
+  restoreEntryDeep as restoreFileEntryDeep,
+  purgeEntry as purgeFileEntry,
+  searchEntries as searchFileEntries,
   fileDocument,
   unfiledDocuments
 } from '../db/files'
@@ -1088,6 +1092,10 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('fileManager:move', (_e, id: string, newParentId: string | null) => moveFileEntry(id, newParentId))
   ipcMain.handle('fileManager:delete', (_e, id: string) => deleteFileEntry(id))
   ipcMain.handle('fileManager:restore', (_e, ids: string[]) => restoreFileEntries(ids))
+  ipcMain.handle('fileManager:listTrashed', () => listTrashedFileEntries())
+  ipcMain.handle('fileManager:restoreDeep', (_e, id: string) => restoreFileEntryDeep(id))
+  ipcMain.handle('fileManager:purge', (_e, id: string) => purgeFileEntry(id))
+  ipcMain.handle('fileManager:search', (_e, query: string) => searchFileEntries(query))
   ipcMain.handle('fileManager:fileDocument', (_e, docId: string, parentId: string | null) =>
     fileDocument(docId, parentId)
   )

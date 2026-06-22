@@ -332,3 +332,71 @@ describe('rewriteFormulaRefs — cross-sheet round-trips', () => {
     expect(rewriteFormulaRefs('=SUM(Data!A1:A3)', 1, 0)).toBe('=SUM(Data!A2:A4)')
   })
 })
+
+describe('displayCell — modern lookup, logical, regex, stats and dates', () => {
+  const lk = grid([
+    ['x', '1', '=XLOOKUP("y",A1:A3,B1:B3)'],
+    ['y', '2', '=XLOOKUP("q",A1:A3,B1:B3,"none")'],
+    ['z', '3', '=XMATCH("z",A1:A3)']
+  ])
+  it('XLOOKUP exact match', () => expect(displayCell(lk, 0, 2)).toBe('2'))
+  it('XLOOKUP fallback when missing', () => expect(displayCell(lk, 1, 2)).toBe('none'))
+  it('XMATCH returns a 1-based position', () => expect(displayCell(lk, 2, 2)).toBe('3'))
+
+  it('XLOOKUP approximate (next smaller)', () => {
+    const g = grid([['10', 'a'], ['20', 'b'], ['30', 'c'], ['=XLOOKUP(25,A1:A3,B1:B3,"x",-1)', '']])
+    expect(displayCell(g, 3, 0)).toBe('b')
+  })
+
+  it('IFS picks the first true branch', () => {
+    expect(displayCell(grid([['=IFS(1>2,"a",3>2,"b")']]), 0, 0)).toBe('b')
+  })
+  it('SWITCH matches a case and falls back to a default', () => {
+    expect(displayCell(grid([['=SWITCH(2,1,"one",2,"two","def")']]), 0, 0)).toBe('two')
+    expect(displayCell(grid([['=SWITCH(9,1,"one","def")']]), 0, 0)).toBe('def')
+  })
+  it('INDIRECT resolves a textual reference', () => {
+    expect(displayCell(grid([['10', '=INDIRECT("A1")']]), 0, 1)).toBe('10')
+  })
+
+  it('REGEXMATCH / REGEXEXTRACT / REGEXREPLACE', () => {
+    expect(displayCell(grid([['=REGEXMATCH("abc123","\\d+")']]), 0, 0)).toBe('TRUE')
+    expect(displayCell(grid([['=REGEXEXTRACT("order-42","(\\d+)")']]), 0, 0)).toBe('42')
+    expect(displayCell(grid([['=REGEXREPLACE("a1b2","\\d","#")']]), 0, 0)).toBe('a#b#')
+  })
+
+  it('LARGE / SMALL / COUNTUNIQUE / SUMSQ', () => {
+    const g = grid([['10'], ['20'], ['30'], ['=LARGE(A1:A3,1)'], ['=SMALL(A1:A3,1)'], ['=LARGE(A1:A3,2)']])
+    expect(displayCell(g, 3, 0)).toBe('30')
+    expect(displayCell(g, 4, 0)).toBe('10')
+    expect(displayCell(g, 5, 0)).toBe('20')
+    const u = grid([['a'], ['a'], ['b'], ['=COUNTUNIQUE(A1:A3)'], ['=SUMSQ(1,2,3)']])
+    expect(displayCell(u, 3, 0)).toBe('2')
+    expect(displayCell(u, 4, 0)).toBe('14')
+  })
+
+  it('SIGN / EXP / LN / LOG / LOG10', () => {
+    expect(displayCell(grid([['=SIGN(-5)']]), 0, 0)).toBe('-1')
+    expect(displayCell(grid([['=EXP(0)']]), 0, 0)).toBe('1')
+    expect(displayCell(grid([['=LN(1)']]), 0, 0)).toBe('0')
+    expect(displayCell(grid([['=LOG(100)']]), 0, 0)).toBe('2')
+    expect(displayCell(grid([['=LOG(8,2)']]), 0, 0)).toBe('3')
+    expect(displayCell(grid([['=LOG10(1000)']]), 0, 0)).toBe('3')
+  })
+
+  it('CHAR / CODE / CLEAN', () => {
+    expect(displayCell(grid([['=CHAR(65)']]), 0, 0)).toBe('A')
+    expect(displayCell(grid([['=CODE("A")']]), 0, 0)).toBe('65')
+    const g = grid([['a' + String.fromCharCode(7) + 'b', '=CLEAN(A1)']])
+    expect(displayCell(g, 0, 1)).toBe('ab')
+  })
+
+  it('DATE / DAYS / EDATE / EOMONTH / DATEDIF', () => {
+    expect(displayCell(grid([['=DATE(2026,6,21)']]), 0, 0)).toBe('2026-06-21')
+    expect(displayCell(grid([['=DAYS("2026-06-21","2026-06-20")']]), 0, 0)).toBe('1')
+    expect(displayCell(grid([['=EDATE("2026-01-15",2)']]), 0, 0)).toBe('2026-03-15')
+    expect(displayCell(grid([['=EOMONTH("2026-02-10",0)']]), 0, 0)).toBe('2026-02-28')
+    expect(displayCell(grid([['=DATEDIF("2026-01-01","2026-03-01","M")']]), 0, 0)).toBe('2')
+    expect(displayCell(grid([['=DATEDIF("2026-01-01","2026-01-11","D")']]), 0, 0)).toBe('10')
+  })
+})

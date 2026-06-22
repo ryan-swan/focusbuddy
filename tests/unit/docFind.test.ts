@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { findMatches, replaceAll, stepMatch } from '@renderer/lib/docFind'
+import { findMatches, replaceAll, stepMatch, isValidRegex } from '@renderer/lib/docFind'
 
 // Find & replace matching is pure string work; pin the case/whole-word options,
 // non-overlap, replacement integrity, and the wrap-around stepping.
@@ -59,6 +59,80 @@ describe('replaceAll', () => {
       text: 'dog category',
       count: 1
     })
+  })
+})
+
+// ── Regex find ────────────────────────────────────────────────────────────────
+
+describe('isValidRegex', () => {
+  it('returns false for an unclosed character class', () => {
+    expect(isValidRegex('[')).toBe(false)
+  })
+
+  it('returns false for an unclosed group', () => {
+    expect(isValidRegex('(abc')).toBe(false)
+  })
+
+  it('returns true for a valid digit pattern', () => {
+    expect(isValidRegex('\\d+')).toBe(true)
+  })
+
+  it('returns true for a word-boundary anchored pattern', () => {
+    expect(isValidRegex('\\bfoo\\b')).toBe(true)
+  })
+
+  it('returns false for an empty string', () => {
+    expect(isValidRegex('')).toBe(false)
+  })
+})
+
+describe('findMatches — regex mode', () => {
+  it('finds all \\d+ matches in mixed text', () => {
+    const matches = findMatches('a12 b34', '\\d+', { regex: true })
+    expect(matches).toEqual([
+      { start: 1, end: 3 },
+      { start: 5, end: 7 }
+    ])
+  })
+
+  it('is case-insensitive by default in regex mode', () => {
+    const matches = findMatches('Foo foo FOO', 'foo', { regex: true })
+    expect(matches).toHaveLength(3)
+  })
+
+  it('respects caseSensitive:true in regex mode', () => {
+    const matches = findMatches('Foo foo FOO', 'foo', { regex: true, caseSensitive: true })
+    expect(matches).toHaveLength(1)
+    expect(matches[0]).toEqual({ start: 4, end: 7 })
+  })
+
+  it('returns nothing for an invalid pattern instead of throwing', () => {
+    // "[" is an unclosed character class — would throw without the guard
+    const matches = findMatches('anything', '[', { regex: true })
+    expect(matches).toEqual([])
+  })
+
+  it('terminates and returns only non-empty matches for a zero-width pattern like "a*"', () => {
+    // "a*" matches a zero-width position everywhere, which would infinite-loop
+    // without the zero-width guard.
+    const matches = findMatches('bab', 'a*', { regex: true })
+    // Only the real 'a' at position 1 is non-empty; all the zero-width hits get skipped.
+    expect(matches.length).toBeGreaterThan(0)
+    // Every returned match must span at least one character.
+    for (const m of matches) {
+      expect(m.end).toBeGreaterThan(m.start)
+    }
+  })
+
+  it('finds capturing-group patterns correctly', () => {
+    const matches = findMatches('2024-01-15 and 2025-06-22', '\\d{4}-\\d{2}-\\d{2}', { regex: true })
+    expect(matches).toHaveLength(2)
+    expect(matches[0]).toEqual({ start: 0, end: 10 })
+    expect(matches[1]).toEqual({ start: 15, end: 25 })
+  })
+
+  it('returns nothing for an empty query even in regex mode', () => {
+    expect(findMatches('anything', '', { regex: true })).toEqual([])
   })
 })
 

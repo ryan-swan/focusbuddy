@@ -358,6 +358,101 @@ export function restoreEntries(ids: string[]): boolean {
   return true
 }
 
+// The roots of trashed subtrees, newest-deleted first, for the Drive's Trash
+// view. A child of a trashed folder is omitted so the list shows what the user
+// actually deleted rather than every descendant of it.
+export function listTrashedEntries(): FileEntry[] {
+  const db = getDb()
+  const rows = db
+    .prepare(
+      `SELECT ${ENTRY_COLS} FROM fb_files
+       WHERE trashed_at IS NOT NULL
+         AND (parent_id IS NULL OR parent_id NOT IN (SELECT id FROM fb_files WHERE trashed_at IS NOT NULL))
+       ORDER BY trashed_at DESC`
+    )
+    .all() as EntryRow[]
+  const out: FileEntry[] = []
+  for (const row of rows) {
+    const entry = rowToEntry(row)
+    if (entry) out.push(entry)
+  }
+  return out
+}
+
+// A trashed entry plus its still-trashed descendants, so restoring or purging a
+// folder takes its whole subtree with it.
+function trashedSubtree(id: string): string[] {
+  const db = getDb()
+  const ids: string[] = []
+  const collect = (nid: string): void => {
+    ids.push(nid)
+    const kids = db.prepare('SELECT id FROM fb_files WHERE parent_id = ? AND trashed_at IS NOT NULL').all(nid) as Array<{
+      id: string
+    }>
+    for (const k of kids) collect(k.id)
+  }
+  collect(id)
+  return ids
+}
+
+// Restore a trashed entry and everything trashed beneath it.
+export function restoreEntryDeep(id: string): boolean {
+  return restoreEntries(trashedSubtree(id))
+}
+
+// Permanently delete a trashed entry and its trashed descendants now, unlinking
+// any stored blobs. This is the Trash view's "Delete forever".
+export function purgeEntry(id: string): boolean {
+  const db = getDb()
+  const ids = trashedSubtree(id)
+  if (!ids.length) return false
+  const placeholders = ids.map(() => '?').join(',')
+  const rows = db
+    .prepare(`SELECT id, kind, ext FROM fb_files WHERE id IN (${placeholders})`)
+    .all(...ids) as Array<{ id: string; kind: string; ext: string }>
+  for (const r of rows) {
+    if (r.kind === 'file') {
+      try {
+        unlinkSync(join(filesDir(), `${r.id}${r.ext}`))
+      } catch {
+        // best-effort
+      }
+    }
+  }
+  const del = db.prepare('DELETE FROM fb_files WHERE id = ?')
+  db.transaction(() => {
+    for (const i of ids) del.run(i)
+  })()
+  return true
+}
+
+// Drive-wide search: folders and files by name, plus filed documents by title.
+// Case-insensitive substring, newest-edited first. LIKE wildcards in the query
+// are escaped so a literal % or _ is matched, not treated as a pattern.
+export function searchEntries(query: string): FileEntry[] {
+  const q = query.trim()
+  if (!q) return []
+  const db = getDb()
+  const like = `%${q.replace(/[\\%_]/g, (m) => `\\${m}`)}%`
+  const rows = db
+    .prepare(
+      `SELECT ${ENTRY_COLS} FROM fb_files
+       WHERE trashed_at IS NULL
+         AND (
+           COALESCE(display_name, original_name) LIKE @like ESCAPE '\\'
+           OR doc_id IN (SELECT id FROM documents WHERE archived = 0 AND title LIKE @like ESCAPE '\\')
+         )
+       ORDER BY updated_at DESC LIMIT 200`
+    )
+    .all({ like }) as EntryRow[]
+  const out: FileEntry[] = []
+  for (const row of rows) {
+    const entry = rowToEntry(row)
+    if (entry) out.push(entry)
+  }
+  return out
+}
+
 // Permanently remove entries trashed longer than maxAgeMs (default 7 days),
 // unlinking their stored blobs. Runs once per session on first listing.
 export function purgeOldTrash(maxAgeMs = 7 * 24 * 60 * 60 * 1000): void {
