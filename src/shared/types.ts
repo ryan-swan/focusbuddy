@@ -537,6 +537,7 @@ export type AIPurpose =
   | 'doc_rewrite'
   | 'tone_profile'
   | 'email_reply_draft'
+  | 'file_tag'
 
 // Result of asking AI to draft a reply to an open email in the user's voice.
 // `skip` is the expected, non-error outcome for newsletters / no-reply senders /

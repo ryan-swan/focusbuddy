@@ -662,7 +662,16 @@ const api = {
     openExternal: (
       url: string
     ): Promise<{ ok: true } | { ok: false; error: string }> =>
-      ipcRenderer.invoke('files:openExternal', url)
+      ipcRenderer.invoke('files:openExternal', url),
+    // Auto-filing: ask the AI which tags an item should carry. Suggest-only.
+    suggestTags: (
+      fileId: string
+    ): Promise<{
+      ok: boolean
+      tags?: Array<{ name: string; isNew: boolean; reason: string }>
+      needsApiKey?: boolean
+      error?: string
+    }> => ipcRenderer.invoke('files:suggestTags', fileId)
   },
   // The file/folder manager: a foldered library over fb_files (folders,
   // imported files, and references to internal documents).

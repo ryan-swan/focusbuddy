@@ -47,7 +47,11 @@ const AUTO_ROUTING: Record<AIPurpose, string> = {
   // Drafting an email reply in the user's voice has to hold two constraints at
   // once: match the voice faithfully AND never fabricate facts, dates or
   // commitments. That instruction-following discipline wants Sonnet.
-  email_reply_draft: SONNET
+  email_reply_draft: SONNET,
+  // Auto-filing tag suggestions: a cheap, frequent classification returning a
+  // small JSON list of tags. Haiku is fast and plenty, and this can fire as
+  // files arrive, so cheap matters.
+  file_tag: HAIKU
 }
 
 let currentMode: ModelMode = 'auto'
