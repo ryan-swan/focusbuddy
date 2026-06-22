@@ -36,6 +36,22 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.75',
+    date: '2026-06-22T12:00:00Z',
+    title: 'v2.5.75 — A big editor upgrade across Docs, Slides, Sheets and Drive',
+    tag: 'feature',
+    summary:
+      'A broad step toward an enterprise-grade office suite: the command palette now drives the editors, Docs gains a page view and a focus mode, Slides becomes Figma-grade with snapping, grouping, framing and cropping, spreadsheets gain dynamic array formulas and named ranges, Drive gets a Trash and search, and shared documents show who is collaborating.',
+    highlights: [
+      'Command palette everywhere: press Cmd+K inside a document or slide deck to run any formatting, layout or AI action by name. Docs also gain a focus mode that dims everything but the line you are writing, a live outline, a reading-time meter, regular-expression find and replace, and a page view with portrait and landscape.',
+      'Slides, Figma-grade: drag elements and they snap to smart alignment guides; select several with a marquee, then group, align and distribute them; give shapes and images rounded corners, shadows and borders; crop an image with a real drag-handle editor; and let the AI redesign a slide in your theme with one click.',
+      'Spreadsheets keep closing the gap with Google Sheets: 24 more functions including XLOOKUP, IFS, SWITCH, INDIRECT and regex; dynamic array formulas that spill across cells (UNIQUE, SORT, FILTER, SEQUENCE, TRANSPOSE); and named ranges, so a formula can read =SUM(Revenue) instead of a cell range.',
+      'Drive gets safer and faster: deleting now moves items to a Trash you can restore from, and a search box finds files, folders and documents across every folder.',
+      'See who you are working with: a shared document now shows a row of collaborator avatars in its header, with the person currently editing highlighted.'
+    ],
+    links: [{ label: 'Finding your way around', href: `${HELP_BASE}/getting-around` }]
+  },
+  {
     version: '2.5.74',
     date: '2026-06-21T18:30:00Z',
     title: 'v2.5.74 — PlexiOffice gets a Drive, sharing, and live collaboration',
