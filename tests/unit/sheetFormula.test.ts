@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { displayCell, buildSpillMap, rewriteFormulaRefs, type Grid } from '@renderer/lib/sheetFormula'
+import { displayCell, buildSpillMap, makeNames, rewriteFormulaRefs, type Grid } from '@renderer/lib/sheetFormula'
 
 // The sheet's formula engine must compute real values, not plausible ones. A
 // wrong total is worse than a visible #ERR, so these tests pin the arithmetic,
@@ -469,5 +469,30 @@ describe('array formulas — spill map', () => {
     expect(displayCell(g, 0, 0, undefined, m)).toBe('1')
     expect(displayCell(g, 1, 0, undefined, m)).toBe('2')
     expect(displayCell(g, 2, 0, undefined, m)).toBe('3')
+  })
+})
+
+describe('named ranges', () => {
+  const names = makeNames([
+    { name: 'Tax', ref: 'A1' },
+    { name: 'Data', ref: 'A1:A3' }
+  ])
+  const g = grid([['10'], ['20'], ['30']])
+
+  it('resolves a single-cell name in a scalar formula', () => {
+    expect(evaluateFormula(g, 'Tax*2', '__seed__', undefined, names)).toBe(20)
+  })
+  it('resolves a range name as a function argument', () => {
+    expect(evaluateFormula(g, 'SUM(Data)', '__seed__', undefined, names)).toBe(60)
+  })
+  it('matches names case-insensitively', () => {
+    expect(evaluateFormula(g, 'tax+5', '__seed__', undefined, names)).toBe(15)
+  })
+  it('a cell reference is never shadowed by a name', () => {
+    const shadow = makeNames([{ name: 'A1', ref: 'A3' }])
+    expect(evaluateFormula(g, 'A1', '__seed__', undefined, shadow)).toBe(10)
+  })
+  it('an undefined name (no names map) is an error', () => {
+    expect(() => evaluateFormula(g, 'Tax*2')).toThrow()
   })
 })

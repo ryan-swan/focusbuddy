@@ -31,7 +31,7 @@ import {
   type CellRange
 } from './sheet/sheetOps'
 import { extendSeries, canToggleSeries, numericFill } from '../../lib/sheetFill'
-import { rewriteFormulaRefs, displayCell, makeWorkbook } from '../../lib/sheetFormula'
+import { rewriteFormulaRefs, displayCell, makeWorkbook, makeNames } from '../../lib/sheetFormula'
 import { isSingleCell } from '@shared/gridClipboard'
 import SheetGrid from './sheet/SheetGrid'
 import SheetToolbar from './sheet/SheetToolbar'
@@ -116,6 +116,9 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
   const [colMenu, setColMenu] = useState<{ c: number; x: number; y: number } | null>(null)
   const [funcIndex, setFuncIndex] = useState(0)
   const [funcDismissed, setFuncDismissed] = useState(false)
+  const [namesOpen, setNamesOpen] = useState(false)
+  const [newName, setNewName] = useState('')
+  const [newRef, setNewRef] = useState('')
   // Live preview rectangle while dragging the fill handle (cells about to be
   // filled), and the just-completed fill so we can offer an Excel-style
   // Copy/Series toggle for numeric fills.
@@ -151,6 +154,9 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
   // Workbook view for cross-sheet references (Sheet2!A1). Rebuilt when any tab's
   // name or data changes so a formula reading another tab stays current.
   const workbook = useMemo(() => makeWorkbook(body.sheets), [body.sheets])
+  // Named ranges the formula engine resolves (e.g. =SUM(Revenue)). Workbook-level,
+  // rebuilt only when the definitions change.
+  const names = useMemo(() => makeNames(body.names), [body.names])
   // Rows hidden by the active column filters (by displayed value). null when no
   // filter is set, so the common path does no work. r stays the true data index.
   const hiddenRows = useMemo(() => {
@@ -805,6 +811,24 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
   const activeRaw = tab.rows[focus.r]?.[focus.c] ?? ''
   const activeRef = `${colLabel(focus.c)}${focus.r + 1}`
 
+  function addNamedRange(): void {
+    const n = newName.trim()
+    const ref = newRef.trim()
+    if (!n || !ref) return
+    const rest = (body.names ?? []).filter((x) => x.name.toLowerCase() !== n.toLowerCase())
+    commit({ ...body, names: [...rest, { name: n, ref }] })
+    setNewName('')
+    setNewRef('')
+  }
+  function removeNamedRange(name: string): void {
+    commit({ ...body, names: (body.names ?? []).filter((x) => x.name !== name) })
+  }
+  // Pre-fill the reference with the current selection, the common case.
+  function openNames(): void {
+    setNewRef(`${colLabel(selection.c0)}${selection.r0 + 1}:${colLabel(selection.c1)}${selection.r1 + 1}`)
+    setNamesOpen((v) => !v)
+  }
+
   return (
     <div className="flex flex-col h-full">
       <SheetToolbar
@@ -860,7 +884,75 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
             <Icon name="function" size={13} />
             AI
           </button>
+          <button
+            onClick={openNames}
+            data-testid="sheet-names-toggle"
+            title="Named ranges — give a cell or range a name to use in formulas"
+            className={`shrink-0 inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-[12px] ${
+              namesOpen
+                ? 'border-accent bg-accent/[0.12] text-accent'
+                : 'border-stone-300 dark:border-stone-600 text-stone-600 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800'
+            }`}
+          >
+            <Icon name="label" size={13} />
+            Names
+          </button>
         </div>
+
+        {namesOpen && (
+          <div
+            className="mb-2 rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 p-2 space-y-1.5"
+            data-testid="sheet-names-panel"
+          >
+            <div className="text-[11px] uppercase tracking-wide text-stone-400">Named ranges</div>
+            {(body.names ?? []).length === 0 ? (
+              <div className="text-[12px] text-stone-400">No names yet. Name the selection below, then use it in any formula.</div>
+            ) : (
+              (body.names ?? []).map((nm) => (
+                <div key={nm.name} className="flex items-center gap-2 text-[12px]" data-testid={`sheet-name-row-${nm.name}`}>
+                  <span className="font-mono font-medium text-stone-700 dark:text-stone-200">{nm.name}</span>
+                  <span className="text-stone-400">→</span>
+                  <span className="font-mono text-stone-500 dark:text-stone-400 truncate flex-1">{nm.ref}</span>
+                  <button
+                    onClick={() => removeNamedRange(nm.name)}
+                    data-testid={`sheet-name-del-${nm.name}`}
+                    className="text-stone-400 hover:text-rose-500 shrink-0"
+                    title="Delete name"
+                  >
+                    <Icon name="delete" size={13} />
+                  </button>
+                </div>
+              ))
+            )}
+            <div className="flex items-center gap-1.5 pt-1">
+              <input
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                placeholder="Name"
+                data-testid="sheet-name-input"
+                className="w-28 bg-stone-50 dark:bg-stone-900 border border-stone-300 dark:border-stone-600 rounded px-2 py-1 text-[12px] font-mono focus:outline-none focus:border-accent"
+              />
+              <input
+                value={newRef}
+                onChange={(e) => setNewRef(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') addNamedRange()
+                }}
+                placeholder="A1:B10"
+                data-testid="sheet-ref-input"
+                className="flex-1 bg-stone-50 dark:bg-stone-900 border border-stone-300 dark:border-stone-600 rounded px-2 py-1 text-[12px] font-mono focus:outline-none focus:border-accent"
+              />
+              <button
+                onClick={addNamedRange}
+                disabled={!newName.trim() || !newRef.trim()}
+                data-testid="sheet-name-add"
+                className="btn-primary text-[12px] px-2.5 py-1 disabled:opacity-50"
+              >
+                Add
+              </button>
+            </div>
+          </div>
+        )}
 
         {formulaAiOpen && (
           <SheetFormulaAssist
@@ -967,6 +1059,7 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
             onFillToEnd={onFillToEnd}
             onSetCell={(r, c, v) => mutateTab((t) => setCell(t, r, c, v))}
             workbook={workbook}
+            names={names}
             hiddenRows={hiddenRows}
             filterActive={tab.filterActive}
             filters={tab.filters}

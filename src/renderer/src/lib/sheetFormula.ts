@@ -29,6 +29,22 @@ export interface Workbook {
 }
 let WB: Workbook | null = null
 
+// Named ranges: a workbook-level map from a name (lower-cased) to an A1 reference
+// string such as "A1", "A1:B10" or "Sheet2!A1:C3". Set for the duration of one
+// top-level evaluation, like WB. Null means no names are defined, in which case
+// the parser behaves exactly as before (a bare name that isn't a cell ref errors).
+let NAMES: Map<string, string> | null = null
+
+// Build the names map the evaluator consults, from the sheet body's definitions.
+export function makeNames(defs: Array<{ name: string; ref: string }> | undefined): Map<string, string> {
+  const m = new Map<string, string>()
+  for (const d of defs ?? []) {
+    const name = d.name.trim()
+    if (name) m.set(name.toLowerCase(), d.ref.trim())
+  }
+  return m
+}
+
 // The grid a ref/range should read from: its own sheet's grid when it carries a
 // sheet qualifier we can resolve, otherwise the formula's own (default) grid.
 function pickGrid(def: Grid, sheet?: string): Grid {
@@ -304,6 +320,38 @@ type Node =
   | { k: 'binary'; op: string; a: Node; b: Node }
   | { k: 'call'; name: string; args: Node[] }
 
+// Resolve a named range's A1 reference string into an AST node, handling an
+// optional sheet qualifier and a single cell or a range. Returns null if it does
+// not parse, so a malformed name definition simply fails to resolve.
+function refToNode(refStr: string): Node | null {
+  let body = refStr.trim()
+  let sheet: string | undefined
+  const bang = body.indexOf('!')
+  if (bang >= 0) {
+    let q = body.slice(0, bang).trim()
+    if (q.startsWith("'") && q.endsWith("'")) q = q.slice(1, -1)
+    sheet = q
+    body = body.slice(bang + 1).trim()
+  }
+  const colon = body.indexOf(':')
+  if (colon >= 0) {
+    const a = refToCoord(body.slice(0, colon).trim())
+    const b = refToCoord(body.slice(colon + 1).trim())
+    if (!a || !b) return null
+    return {
+      k: 'range',
+      r1: Math.min(a.r, b.r),
+      c1: Math.min(a.c, b.c),
+      r2: Math.max(a.r, b.r),
+      c2: Math.max(a.c, b.c),
+      ...(sheet ? { sheet } : {})
+    }
+  }
+  const a = refToCoord(body)
+  if (!a) return null
+  return { k: 'ref', r: a.r, c: a.c, absR: a.absR, absC: a.absC, ...(sheet ? { sheet } : {}) }
+}
+
 function parse(src: string): Node {
   const toks = tokenize(src)
   let p = 0
@@ -393,15 +441,25 @@ function parse(src: string): Node {
       if (upper === 'TRUE') return { k: 'bool', v: true }
       if (upper === 'FALSE') return { k: 'bool', v: false }
       const coord = refToCoord(name)
-      if (!coord) throw new Error(`bad ref ${name}`)
-      return {
-        k: 'ref',
-        r: coord.r,
-        c: coord.c,
-        absR: coord.absR,
-        absC: coord.absC,
-        ...(tok.sheet ? { sheet: tok.sheet } : {})
+      if (coord) {
+        return {
+          k: 'ref',
+          r: coord.r,
+          c: coord.c,
+          absR: coord.absR,
+          absC: coord.absC,
+          ...(tok.sheet ? { sheet: tok.sheet } : {})
+        }
       }
+      // Not a cell reference — try a defined named range, which resolves to the
+      // ref or range it points at. Cell-ref syntax always wins, so a name can
+      // never shadow A1 (and Sheets forbids naming a range like a cell anyway).
+      if (NAMES) {
+        const ref = NAMES.get(name.toLowerCase())
+        const node = ref ? refToNode(ref) : null
+        if (node) return node
+      }
+      throw new Error(`bad ref ${name}`)
     }
     throw new Error('parse error')
   }
@@ -1362,27 +1420,33 @@ export function evaluateFormula(
   grid: Grid,
   formula: string,
   seedKey = '__seed__',
-  wb?: Workbook
+  wb?: Workbook,
+  names?: Map<string, string>
 ): CellValue {
   WB = wb ?? null
+  NAMES = names ?? null
   try {
     return evalNode(parse(formula), grid, new Set([`${gridId(grid)}:${seedKey}`]))
   } finally {
     WB = null
+    NAMES = null
   }
 }
 
 // True if a formula string parses (syntax only — it may still reference empty
 // cells). The AI formula assistant uses this as an honesty gate so a formula the
 // engine cannot even parse is never offered for insertion.
-export function isParseableFormula(formula: string): boolean {
+export function isParseableFormula(formula: string, names?: Map<string, string>): boolean {
   const src = formula.startsWith('=') ? formula.slice(1) : formula
   if (src.trim() === '') return false
+  NAMES = names ?? null
   try {
     parse(src)
     return true
   } catch {
     return false
+  } finally {
+    NAMES = null
   }
 }
 
@@ -1393,7 +1457,8 @@ export function displayCell(
   r: number,
   c: number,
   wb?: Workbook,
-  spill?: Map<string, string>
+  spill?: Map<string, string>,
+  names?: Map<string, string>
 ): string {
   // A spill map (built once per grid by buildSpillMap) overrides both the anchor
   // of an array formula and the empty cells it spills into, so an array formula
@@ -1405,6 +1470,7 @@ export function displayCell(
   const raw = cellRaw(grid, r, c)
   if (!raw.startsWith('=')) return raw
   WB = wb ?? null
+  NAMES = names ?? null
   try {
     const v = evalNode(parse(raw.slice(1)), grid, new Set([`${gridId(grid)}:${r},${c}`]))
     if (typeof v === 'boolean') return v ? 'TRUE' : 'FALSE'
@@ -1417,6 +1483,7 @@ export function displayCell(
     return '#ERR'
   } finally {
     WB = null
+    NAMES = null
   }
 }
 
@@ -1546,8 +1613,13 @@ function evalMatrix(grid: Grid, formula: string, seen: Set<string>): Matrix {
 // and the cells it spills into. Keyed "r,c". An anchor whose spill is blocked by
 // existing content resolves to '#SPILL!' and writes no targets. Cells not touched
 // by any spill are absent, so displayCell falls back to its normal evaluation.
-export function buildSpillMap(grid: Grid, wb?: Workbook): Map<string, string> {
+export function buildSpillMap(
+  grid: Grid,
+  wb?: Workbook,
+  names?: Map<string, string>
+): Map<string, string> {
   WB = wb ?? null
+  NAMES = names ?? null
   const map = new Map<string, string>()
   const occupied = (r: number, c: number): boolean => cellRaw(grid, r, c).trim() !== ''
   try {
@@ -1589,6 +1661,7 @@ export function buildSpillMap(grid: Grid, wb?: Workbook): Map<string, string> {
     }
   } finally {
     WB = null
+    NAMES = null
   }
   return map
 }
