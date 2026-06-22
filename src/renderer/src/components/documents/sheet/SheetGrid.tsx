@@ -4,9 +4,9 @@
 // SheetEditor through props. Formatting (bold/colour/align/number format) is
 // applied per cell from the tab's sparse format map.
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { SheetTab } from '@shared/types'
-import { displayCell, type Grid, type Workbook } from '../../../lib/sheetFormula'
+import { displayCell, buildSpillMap, type Grid, type Workbook } from '../../../lib/sheetFormula'
 import { formatValue } from '../../../lib/sheetFormat'
 import { cellFormat, colLabel } from '../../../lib/sheetBody'
 import {
@@ -69,6 +69,13 @@ function inRange(range: CellRange | null, r: number, c: number): boolean {
 export default function SheetGrid(props: Props): JSX.Element {
   const { tab, selection, active, editing } = props
   const grid: Grid = { columns: tab.columns, rows: tab.rows }
+  // Spill map for array formulas (SEQUENCE/UNIQUE/SORT/FILTER/TRANSPOSE), built
+  // once per data change rather than per cell. Drives both the anchor's value and
+  // the cells the result spills into.
+  const spill = useMemo(
+    () => buildSpillMap({ columns: tab.columns, rows: tab.rows }, props.workbook),
+    [tab.columns, tab.rows, props.workbook]
+  )
   const editRef = useRef<HTMLInputElement | null>(null)
   // Which cell's data-validation list dropdown is open (null = none).
   const [openList, setOpenList] = useState<{ r: number; c: number } | null>(null)
@@ -146,7 +153,7 @@ export default function SheetGrid(props: Props): JSX.Element {
                 {props.filterActive && openFilter === c && (
                   <FilterDropdown
                     values={distinctValues(
-                      tab.rows.map((_, r) => displayCell(grid, r, c, props.workbook))
+                      tab.rows.map((_, r) => displayCell(grid, r, c, props.workbook, spill))
                     )}
                     hidden={props.filters?.[c] ?? []}
                     onApply={(hidden) => {
@@ -181,7 +188,11 @@ export default function SheetGrid(props: Props): JSX.Element {
                   !!props.onFillStart &&
                   r === selection.r1 &&
                   c === selection.c1
-                const computed = displayCell(grid, r, c, props.workbook)
+                const computed = displayCell(grid, r, c, props.workbook, spill)
+                // A spilled cell shows a value an array formula produced in a
+                // neighbour, while its own raw is empty — rendered muted so it
+                // reads as computed, not typed.
+                const isSpilled = (tab.rows[r]?.[c] ?? '').trim() === '' && spill.has(`${r},${c}`)
                 // Base cell format, then overlay any matching conditional-format
                 // rule (paint only — the true value is unchanged).
                 const fmt = applyCondFormat(cellFormat(tab, r, c), tab.condRules, r, c, computed)
@@ -199,7 +210,7 @@ export default function SheetGrid(props: Props): JSX.Element {
                   fontWeight: fmt?.bold ? 700 : undefined,
                   fontStyle: fmt?.italic ? 'italic' : undefined,
                   textDecoration: fmt?.underline ? 'underline' : undefined,
-                  color: isErr ? '#ef4444' : fmt?.color,
+                  color: isErr ? '#ef4444' : isSpilled ? '#7c6cf0' : fmt?.color,
                   backgroundColor: fmt?.bg,
                   fontFamily: fmt?.fontFamily || undefined,
                   textAlign: fmt?.align ?? (computed !== '' && Number.isFinite(Number(computed)) ? 'right' : 'left')
@@ -208,6 +219,7 @@ export default function SheetGrid(props: Props): JSX.Element {
                   <td
                     key={c}
                     data-testid={`cell-${r}-${c}`}
+                    data-spill={isSpilled ? '1' : undefined}
                     onMouseDown={(e) => {
                       // In formula reference mode, prevent the default focus
                       // shift so the edit input keeps focus (no blur -> no
