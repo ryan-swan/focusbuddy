@@ -36,6 +36,22 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.76',
+    date: '2026-06-23T12:00:00Z',
+    title: 'v2.5.76 — A Drive that files itself',
+    tag: 'feature',
+    summary:
+      'The Drive stops being a filing cabinet. Tag anything, or let the AI read a file and suggest where it belongs, and a file can live in every place it relates to at once. Smart folders gather the right files automatically, and dragging a file onto a tag or a folder files it.',
+    highlights: [
+      'Tags that span the Drive: give a document or file a tag and it appears in that tag’s view alongside everything else that shares it, wherever each one physically sits. A file can carry several tags, because a thing relates to several things, so you stop having to pick one folder.',
+      'AI auto-filing: open an item’s tags and the assistant reads it and proposes where it belongs, often several tags at once, each with a reason. It is suggest-only, so nothing is applied until you accept, and it proposes nothing rather than guessing when it cannot tell. Needs an Anthropic key in Settings.',
+      'Smart folders: save a combination of tags as a folder that always shows every file carrying all of them, with nothing to refile.',
+      'Drag to file: drop a file on a folder to move it, or on a tag or a smart folder to file it by meaning. The thing you drop onto decides what happens.',
+      'The Drive notices unfiled items: when something is not filed yet, the Drive offers to suggest where it belongs, so the help comes to you. And dragging a file into a folder, which had stopped working, works again.'
+    ],
+    links: [{ label: 'Finding your way around', href: `${HELP_BASE}/getting-around` }]
+  },
+  {
     version: '2.5.75',
     date: '2026-06-22T12:00:00Z',
     title: 'v2.5.75 — A big editor upgrade across Docs, Slides, Sheets and Drive',
