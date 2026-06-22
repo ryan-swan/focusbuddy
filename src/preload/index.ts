@@ -707,6 +707,7 @@ const api = {
     allTags: (): Promise<Array<{ tag: string; count: number }>> => ipcRenderer.invoke('fileManager:allTags'),
     entriesByTag: (tag: string): Promise<FileEntry[]> => ipcRenderer.invoke('fileManager:entriesByTag', tag),
     entriesByTags: (tags: string[]): Promise<FileEntry[]> => ipcRenderer.invoke('fileManager:entriesByTags', tags),
+    untaggedEntries: (): Promise<FileEntry[]> => ipcRenderer.invoke('fileManager:untaggedEntries'),
     listSmartFolders: (): Promise<Array<{ id: string; name: string; tags: string[] }>> =>
       ipcRenderer.invoke('fileManager:listSmartFolders'),
     createSmartFolder: (

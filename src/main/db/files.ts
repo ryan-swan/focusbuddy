@@ -553,6 +553,27 @@ export function entriesByTag(tag: string): FileEntry[] {
   return out
 }
 
+// Files and filed documents that carry no tags yet — the "not filed" set the
+// Drive surfaces so the AI can proactively suggest where they belong. Folders are
+// excluded (they aren't filed by content), as are trashed items.
+export function untaggedEntries(): FileEntry[] {
+  const db = getDb()
+  const rows = db
+    .prepare(
+      `SELECT ${ENTRY_COLS} FROM fb_files f
+       WHERE f.trashed_at IS NULL AND f.kind != 'folder'
+         AND NOT EXISTS (SELECT 1 FROM fb_file_tags t WHERE t.file_id = f.id)
+       ORDER BY f.updated_at DESC`
+    )
+    .all() as EntryRow[]
+  const out: FileEntry[] = []
+  for (const row of rows) {
+    const entry = rowToEntry(row)
+    if (entry) out.push(entry)
+  }
+  return out
+}
+
 // ── Smart folders ────────────────────────────────────────────────────────────
 // A smart folder is a saved query: a set of tags AND-ed together. Opening it runs
 // the query live, so it always shows the right files without anyone refiling.

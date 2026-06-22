@@ -149,6 +149,7 @@ import {
   allTags as allFileTags,
   entriesByTag as fileEntriesByTag,
   entriesByTags as fileEntriesByTags,
+  untaggedEntries as untaggedFileEntries,
   listSmartFolders as listFileSmartFolders,
   createSmartFolder as createFileSmartFolder,
   deleteSmartFolder as deleteFileSmartFolder,
@@ -1114,6 +1115,7 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('fileManager:allTags', () => allFileTags())
   ipcMain.handle('fileManager:entriesByTag', (_e, tag: string) => fileEntriesByTag(tag))
   ipcMain.handle('fileManager:entriesByTags', (_e, tags: string[]) => fileEntriesByTags(tags))
+  ipcMain.handle('fileManager:untaggedEntries', () => untaggedFileEntries())
   ipcMain.handle('fileManager:listSmartFolders', () => listFileSmartFolders())
   ipcMain.handle('fileManager:createSmartFolder', (_e, name: string, tags: string[]) =>
     createFileSmartFolder(name, tags)

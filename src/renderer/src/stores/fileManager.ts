@@ -68,6 +68,9 @@ interface FileManagerStore {
   smartFolders: Array<{ id: string; name: string; tags: string[] }>
   activeSmart: { id: string; name: string; tags: string[] } | null
   smartEntries: FileEntry[]
+  // Items (files + filed docs) that carry no tags yet — the Drive offers to
+  // auto-file these proactively.
+  untagged: FileEntry[]
 
   refresh: () => Promise<void>
   runSearch: (q: string) => Promise<void>
@@ -76,6 +79,7 @@ interface FileManagerStore {
   restoreFromTrash: (id: string) => Promise<void>
   purge: (id: string) => Promise<void>
   loadTags: () => Promise<void>
+  loadUntagged: () => Promise<void>
   addTags: (fileId: string, tags: string[]) => Promise<void>
   removeTag: (fileId: string, tag: string) => Promise<void>
   openTag: (tag: string) => Promise<void>
@@ -124,6 +128,7 @@ export const useFileManagerStore = create<FileManagerStore>((set, get) => ({
   smartFolders: [],
   activeSmart: null,
   smartEntries: [],
+  untagged: [],
 
   refresh: async () => {
     const cwd = get().cwd
@@ -166,9 +171,13 @@ export const useFileManagerStore = create<FileManagerStore>((set, get) => ({
   loadTags: async () => {
     set({ tags: await window.api.fileManager.allTags() })
   },
+  loadUntagged: async () => {
+    set({ untagged: await window.api.fileManager.untaggedEntries() })
+  },
   addTags: async (fileId, tags) => {
     await window.api.fileManager.addTags(fileId, tags)
     await get().loadTags()
+    await get().loadUntagged()
     // If a tag view is open, refresh it so a newly-tagged file appears.
     const active = get().activeTag
     if (active) set({ tagEntries: await window.api.fileManager.entriesByTag(active) })
@@ -176,6 +185,7 @@ export const useFileManagerStore = create<FileManagerStore>((set, get) => ({
   removeTag: async (fileId, tag) => {
     await window.api.fileManager.removeTag(fileId, tag)
     await get().loadTags()
+    await get().loadUntagged()
     const active = get().activeTag
     if (active) set({ tagEntries: await window.api.fileManager.entriesByTag(active) })
   },
