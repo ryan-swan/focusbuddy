@@ -59,6 +59,11 @@ interface FileManagerStore {
   searching: boolean
   // Trash: the roots of trashed subtrees, loaded on demand for the Trash view.
   trashed: FileEntry[]
+  // Facets: the tag vocabulary, and the active tag view (every file carrying it,
+  // wherever it physically sits). A tag is a folder that spans the whole Drive.
+  tags: Array<{ tag: string; count: number }>
+  activeTag: string | null
+  tagEntries: FileEntry[]
 
   refresh: () => Promise<void>
   runSearch: (q: string) => Promise<void>
@@ -66,6 +71,11 @@ interface FileManagerStore {
   loadTrash: () => Promise<void>
   restoreFromTrash: (id: string) => Promise<void>
   purge: (id: string) => Promise<void>
+  loadTags: () => Promise<void>
+  addTags: (fileId: string, tags: string[]) => Promise<void>
+  removeTag: (fileId: string, tag: string) => Promise<void>
+  openTag: (tag: string) => Promise<void>
+  clearTag: () => void
   openFolder: (id: string | null) => Promise<void>
   select: (id: string | null) => void
   setViewMode: (m: FileViewMode) => void
@@ -99,6 +109,9 @@ export const useFileManagerStore = create<FileManagerStore>((set, get) => ({
   searchResults: [],
   searching: false,
   trashed: [],
+  tags: [],
+  activeTag: null,
+  tagEntries: [],
 
   refresh: async () => {
     const cwd = get().cwd
@@ -137,6 +150,27 @@ export const useFileManagerStore = create<FileManagerStore>((set, get) => ({
     await window.api.fileManager.purge(id)
     await get().loadTrash()
   },
+
+  loadTags: async () => {
+    set({ tags: await window.api.fileManager.allTags() })
+  },
+  addTags: async (fileId, tags) => {
+    await window.api.fileManager.addTags(fileId, tags)
+    await get().loadTags()
+    // If a tag view is open, refresh it so a newly-tagged file appears.
+    const active = get().activeTag
+    if (active) set({ tagEntries: await window.api.fileManager.entriesByTag(active) })
+  },
+  removeTag: async (fileId, tag) => {
+    await window.api.fileManager.removeTag(fileId, tag)
+    await get().loadTags()
+    const active = get().activeTag
+    if (active) set({ tagEntries: await window.api.fileManager.entriesByTag(active) })
+  },
+  openTag: async (tag) => {
+    set({ activeTag: tag, tagEntries: await window.api.fileManager.entriesByTag(tag) })
+  },
+  clearTag: () => set({ activeTag: null, tagEntries: [] }),
 
   openFolder: async (id) => {
     set({ cwd: id, selectedId: null })

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import type { DocType } from '@office'
 import type { FileEntry } from '@shared/fields'
 import { useFileManagerStore, sortEntries } from '../../stores/fileManager'
@@ -58,6 +58,14 @@ export default function OfficeDrive({
   const loadTrash = useFileManagerStore((s) => s.loadTrash)
   const restoreFromTrash = useFileManagerStore((s) => s.restoreFromTrash)
   const purge = useFileManagerStore((s) => s.purge)
+  const tags = useFileManagerStore((s) => s.tags)
+  const activeTag = useFileManagerStore((s) => s.activeTag)
+  const tagEntries = useFileManagerStore((s) => s.tagEntries)
+  const loadTags = useFileManagerStore((s) => s.loadTags)
+  const addTags = useFileManagerStore((s) => s.addTags)
+  const removeTag = useFileManagerStore((s) => s.removeTag)
+  const openTag = useFileManagerStore((s) => s.openTag)
+  const clearTag = useFileManagerStore((s) => s.clearTag)
 
   const open = useDocumentsStore((s) => s.open)
   const createBlank = useDocumentsStore((s) => s.createBlank)
@@ -72,6 +80,12 @@ export default function OfficeDrive({
   const [importBusy, setImportBusy] = useState(false)
   const [importMsg, setImportMsg] = useState<string | null>(null)
   const [trashOpen, setTrashOpen] = useState(false)
+  const [tagEditId, setTagEditId] = useState<string | null>(null)
+
+  // Keep the tag vocabulary fresh as the Drive changes.
+  useEffect(() => {
+    void loadTags()
+  }, [loadTags, entries])
 
   function toggleTrash(): void {
     setTrashOpen((v) => {
@@ -271,6 +285,37 @@ export default function OfficeDrive({
         ))}
       </div>
 
+      {/* Facets: tags behave like folders that span the whole Drive. Click one to
+          see every file that carries it, wherever it physically lives. */}
+      {tags.length > 0 && (
+        <div className="px-3 pb-1.5 flex items-center gap-1 flex-wrap" data-testid="office-tags-strip">
+          <Icon name="sell" size={12} className="text-stone-400 shrink-0" />
+          {tags.slice(0, 24).map((t) => (
+            <button
+              key={t.tag}
+              onClick={() => (activeTag === t.tag ? clearTag() : void openTag(t.tag))}
+              data-testid={`office-tag-${t.tag}`}
+              className={`text-[11px] px-2 py-0.5 rounded-full border ${
+                activeTag === t.tag
+                  ? 'border-accent bg-accent/10 text-accent'
+                  : 'border-stone-200 dark:border-stone-700 text-stone-600 dark:text-stone-300 hover:border-accent'
+              }`}
+            >
+              {t.tag} <span className="text-stone-400">{t.count}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {tagEditId && (
+        <TagEditor
+          fileId={tagEditId}
+          onAdd={(tag) => void addTags(tagEditId, [tag])}
+          onRemove={(tag) => void removeTag(tagEditId, tag)}
+          onClose={() => setTagEditId(null)}
+        />
+      )}
+
       {/* Entry list */}
       <div className="flex-1 overflow-auto px-2 pb-3">
         {trashOpen ? (
@@ -293,6 +338,39 @@ export default function OfficeDrive({
               ))}
             </div>
           )
+        ) : activeTag ? (
+          <div data-testid="office-tag-view">
+            <div className="px-2 pt-1 pb-1.5 text-[10px] uppercase tracking-wider text-stone-400 flex items-center gap-1">
+              <Icon name="sell" size={11} />
+              <span>Tag: {activeTag}</span>
+              <button onClick={clearTag} className="text-stone-400 hover:text-accent" data-testid="office-tag-clear" title="Clear tag">
+                <Icon name="close" size={11} />
+              </button>
+            </div>
+            {tagEntries.length === 0 ? (
+              <div className="px-2 py-3 text-[12px] text-stone-400">Nothing tagged “{activeTag}” yet.</div>
+            ) : (
+              tagEntries.map((e) => (
+                <DriveRow
+                  key={e.id}
+                  entry={e}
+                  active={!!e.docId && active?.id === e.docId}
+                  isDropTarget={false}
+                  onOpen={() => {
+                    if (e.kind === 'folder') {
+                      clearTag()
+                      void openFolder(e.id)
+                    } else if (e.kind === 'doc' && e.docId) void open(e.docId)
+                    else void window.api.files.open(e.id)
+                  }}
+                  onDelete={() => void remove(e.id)}
+                  onTag={() => setTagEditId(e.id)}
+                  draggable={false}
+                  onDragStart={() => {}}
+                />
+              ))
+            )}
+          </div>
         ) : search.trim() ? (
           searchResults.length === 0 ? (
             <div className="px-2 py-3 text-[12px] text-stone-400" data-testid="office-search-empty">
@@ -344,6 +422,7 @@ export default function OfficeDrive({
                   e.kind === 'folder' && onShareFolder ? () => onShareFolder(e.id, e.name) : undefined
                 }
                 onDelete={() => void remove(e.id)}
+                onTag={() => setTagEditId(e.id)}
                 draggable
                 onDragStart={(ev) => ev.dataTransfer.setData(ENTRY_MIME, e.id)}
                 onDragOver={
@@ -400,6 +479,7 @@ function DriveRow({
   onOpen,
   onShare,
   onDelete,
+  onTag,
   draggable,
   onDragStart,
   onDragOver,
@@ -412,6 +492,7 @@ function DriveRow({
   onOpen: () => void
   onShare?: () => void
   onDelete: () => void
+  onTag?: () => void
   draggable: boolean
   onDragStart: (e: React.DragEvent) => void
   onDragOver?: (e: React.DragEvent) => void
@@ -447,6 +528,16 @@ function DriveRow({
           <Icon name="share" size={13} />
         </button>
       )}
+      {onTag && (
+        <button
+          onClick={onTag}
+          data-testid={`office-tagbtn-${entry.name}`}
+          className="opacity-0 group-hover:opacity-100 text-stone-400 hover:text-accent shrink-0"
+          title="Tags"
+        >
+          <Icon name="sell" size={13} />
+        </button>
+      )}
       <button
         onClick={onDelete}
         className="opacity-0 group-hover:opacity-100 text-stone-400 hover:text-rose-500 shrink-0"
@@ -454,6 +545,93 @@ function DriveRow({
       >
         <Icon name="delete" size={13} />
       </button>
+    </div>
+  )
+}
+
+// A small panel to view and edit one item's tags. Loads the item's current tags,
+// shows them as removable chips, and adds a typed tag on Enter. The facet store
+// is the single source of truth; this just calls into it and re-reads.
+function TagEditor({
+  fileId,
+  onAdd,
+  onRemove,
+  onClose
+}: {
+  fileId: string
+  onAdd: (tag: string) => void
+  onRemove: (tag: string) => void
+  onClose: () => void
+}): JSX.Element {
+  const [current, setCurrent] = useState<Array<{ tag: string; source: 'user' | 'ai' }>>([])
+  const [value, setValue] = useState('')
+
+  const reload = useCallback((): void => {
+    void window.api.fileManager.tagsFor(fileId).then(setCurrent).catch(() => setCurrent([]))
+  }, [fileId])
+  useEffect(reload, [reload])
+
+  function add(): void {
+    const t = value.trim()
+    if (!t) return
+    onAdd(t)
+    setValue('')
+    // Optimistic, then re-read so the chip reflects the stored state.
+    setCurrent((c) => (c.some((x) => x.tag === t) ? c : [...c, { tag: t, source: 'user' }]))
+    setTimeout(reload, 150)
+  }
+
+  return (
+    <div className="mx-3 mb-2 rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 p-2 space-y-1.5" data-testid="office-tag-editor">
+      <div className="flex items-center gap-1.5">
+        <Icon name="sell" size={12} className="text-accent" />
+        <span className="text-[11px] uppercase tracking-wide text-stone-400 flex-1">Tags</span>
+        <button onClick={onClose} className="text-stone-400 hover:text-stone-600" data-testid="office-tag-editor-close">
+          <Icon name="close" size={13} />
+        </button>
+      </div>
+      {current.length > 0 && (
+        <div className="flex items-center gap-1 flex-wrap">
+          {current.map((t) => (
+            <span
+              key={t.tag}
+              data-testid={`office-tag-chip-${t.tag}`}
+              className={`inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full border ${
+                t.source === 'ai'
+                  ? 'border-accent/40 bg-accent/[0.06] text-accent'
+                  : 'border-stone-300 dark:border-stone-600 text-stone-600 dark:text-stone-300'
+              }`}
+              title={t.source === 'ai' ? 'Suggested by AI' : 'Your tag'}
+            >
+              {t.tag}
+              <button
+                onClick={() => {
+                  onRemove(t.tag)
+                  setCurrent((c) => c.filter((x) => x.tag !== t.tag))
+                }}
+                className="text-stone-400 hover:text-rose-500"
+              >
+                <Icon name="close" size={11} />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+      <div className="flex items-center gap-1.5">
+        <input
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') add()
+          }}
+          placeholder="Add a tag, e.g. Acme, Invoices, Q2"
+          data-testid="office-tag-add-input"
+          className="flex-1 bg-stone-50 dark:bg-stone-900 border border-stone-300 dark:border-stone-600 rounded px-2 py-1 text-[12px] focus:outline-none focus:border-accent"
+        />
+        <button onClick={add} disabled={!value.trim()} data-testid="office-tag-add" className="btn-primary text-[12px] px-2.5 py-1 disabled:opacity-50">
+          Add
+        </button>
+      </div>
     </div>
   )
 }

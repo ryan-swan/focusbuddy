@@ -143,6 +143,11 @@ import {
   restoreEntryDeep as restoreFileEntryDeep,
   purgeEntry as purgeFileEntry,
   searchEntries as searchFileEntries,
+  tagsFor as fileTagsFor,
+  addTags as addFileTags,
+  removeTag as removeFileTag,
+  allTags as allFileTags,
+  entriesByTag as fileEntriesByTag,
   fileDocument,
   unfiledDocuments
 } from '../db/files'
@@ -1096,6 +1101,13 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('fileManager:restoreDeep', (_e, id: string) => restoreFileEntryDeep(id))
   ipcMain.handle('fileManager:purge', (_e, id: string) => purgeFileEntry(id))
   ipcMain.handle('fileManager:search', (_e, query: string) => searchFileEntries(query))
+  ipcMain.handle('fileManager:tagsFor', (_e, fileId: string) => fileTagsFor(fileId))
+  ipcMain.handle('fileManager:addTags', (_e, fileId: string, tags: string[], source?: 'user' | 'ai') =>
+    addFileTags(fileId, tags, source)
+  )
+  ipcMain.handle('fileManager:removeTag', (_e, fileId: string, tag: string) => removeFileTag(fileId, tag))
+  ipcMain.handle('fileManager:allTags', () => allFileTags())
+  ipcMain.handle('fileManager:entriesByTag', (_e, tag: string) => fileEntriesByTag(tag))
   ipcMain.handle('fileManager:fileDocument', (_e, docId: string, parentId: string | null) =>
     fileDocument(docId, parentId)
   )

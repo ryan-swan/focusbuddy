@@ -439,6 +439,20 @@ export function getDb(): Database.Database {
       updated_at INTEGER NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_documents_updated ON documents (updated_at DESC);
+
+    -- Facets: a file/doc can carry many tags, so it lives in every matching view
+    -- at once instead of one folder. The folder hierarchy (fb_files.parent_id) is
+    -- untouched and still works; tags are an additive layer. The source column
+    -- records whether a tag was applied by a person or proposed by the AI.
+    CREATE TABLE IF NOT EXISTS fb_file_tags (
+      file_id TEXT NOT NULL,
+      tag TEXT NOT NULL,
+      source TEXT NOT NULL DEFAULT 'user',
+      created_at INTEGER NOT NULL,
+      PRIMARY KEY (file_id, tag)
+    );
+    CREATE INDEX IF NOT EXISTS idx_file_tags_tag ON fb_file_tags (tag);
+    CREATE INDEX IF NOT EXISTS idx_file_tags_file ON fb_file_tags (file_id);
   `)
   migrateDocumentsDocTypeCheck(db)
   migrateShareKindChecks(db)
