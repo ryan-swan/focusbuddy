@@ -274,3 +274,33 @@ test('PO-13 — Drive: drag a document onto a folder moves it in (dataTransfer p
   await window.locator('[data-testid="office-folder-New folder"]').locator('button').first().click()
   await expect(window.locator('[data-testid="office-doc-Untitled document"]')).toBeVisible({ timeout: 5_000 })
 })
+
+test('PO-14 — Drive facets: tag a document, then browse by tag across folders', async () => {
+  launched = await launchApp({ env: { PLEXI_APP: 'office' } })
+  const { window } = launched
+
+  // A document at the root.
+  await window.locator('[data-testid="office-new-doc"]').click()
+  await expect(window.locator('input').first()).toBeVisible({ timeout: 10_000 })
+  await window.getByRole('button', { name: /Back to list/i }).click()
+  const doc = window.locator('[data-testid="office-doc-Untitled document"]')
+  await expect(doc).toBeVisible({ timeout: 5_000 })
+
+  // Open its tag editor and tag it "Acme".
+  await doc.hover()
+  await window.locator('[data-testid="office-tagbtn-Untitled document"]').click({ force: true })
+  await expect(window.locator('[data-testid="office-tag-editor"]')).toBeVisible({ timeout: 4_000 })
+  await window.locator('[data-testid="office-tag-add-input"]').fill('Acme')
+  await window.locator('[data-testid="office-tag-add"]').click()
+  await expect(window.locator('[data-testid="office-tag-chip-Acme"]')).toBeVisible({ timeout: 4_000 })
+  await window.locator('[data-testid="office-tag-editor-close"]').click()
+
+  // The tag now appears in the facet strip; clicking it shows the tagged doc.
+  const chip = window.locator('[data-testid="office-tag-Acme"]')
+  await expect(chip).toBeVisible({ timeout: 5_000 })
+  await chip.click()
+  await expect(window.locator('[data-testid="office-tag-view"]')).toBeVisible({ timeout: 4_000 })
+  await expect(window.locator('[data-testid="office-tag-view"] [data-testid="office-doc-Untitled document"]')).toBeVisible({
+    timeout: 4_000
+  })
+})

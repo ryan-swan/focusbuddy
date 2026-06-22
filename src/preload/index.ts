@@ -685,6 +685,18 @@ const api = {
     restoreDeep: (id: string): Promise<boolean> => ipcRenderer.invoke('fileManager:restoreDeep', id),
     purge: (id: string): Promise<boolean> => ipcRenderer.invoke('fileManager:purge', id),
     search: (query: string): Promise<FileEntry[]> => ipcRenderer.invoke('fileManager:search', query),
+    tagsFor: (fileId: string): Promise<Array<{ tag: string; source: 'user' | 'ai' }>> =>
+      ipcRenderer.invoke('fileManager:tagsFor', fileId),
+    addTags: (
+      fileId: string,
+      tags: string[],
+      source?: 'user' | 'ai'
+    ): Promise<Array<{ tag: string; source: 'user' | 'ai' }>> =>
+      ipcRenderer.invoke('fileManager:addTags', fileId, tags, source),
+    removeTag: (fileId: string, tag: string): Promise<boolean> =>
+      ipcRenderer.invoke('fileManager:removeTag', fileId, tag),
+    allTags: (): Promise<Array<{ tag: string; count: number }>> => ipcRenderer.invoke('fileManager:allTags'),
+    entriesByTag: (tag: string): Promise<FileEntry[]> => ipcRenderer.invoke('fileManager:entriesByTag', tag),
     fileDocument: (docId: string, parentId: string | null): Promise<FileEntry | null> =>
       ipcRenderer.invoke('fileManager:fileDocument', docId, parentId),
     unfiledDocuments: (): Promise<Array<{ id: string; title: string; docType: string }>> =>

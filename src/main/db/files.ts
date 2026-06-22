@@ -477,6 +477,82 @@ export function purgeOldTrash(maxAgeMs = 7 * 24 * 60 * 60 * 1000): void {
   })()
 }
 
+// ── Tags (facets) ────────────────────────────────────────────────────────────
+// A file or filed document can carry many tags, so it appears in every matching
+// tag view at once without being copied. Folders (parent_id) still work; tags are
+// an additive layer. `source` distinguishes a person's tag from one the AI
+// proposed, so the UI can show unconfirmed AI suggestions differently.
+
+export interface FileTag {
+  tag: string
+  source: 'user' | 'ai'
+}
+
+export function tagsFor(fileId: string): FileTag[] {
+  const db = getDb()
+  const rows = db
+    .prepare('SELECT tag, source FROM fb_file_tags WHERE file_id = ? ORDER BY tag')
+    .all(fileId) as Array<{ tag: string; source: string }>
+  return rows.map((r) => ({ tag: r.tag, source: r.source === 'ai' ? 'ai' : 'user' }))
+}
+
+// Add tags to a file. A person's tag wins over an AI one on conflict (so
+// confirming an AI suggestion promotes it). Returns the file's full tag list.
+export function addTags(fileId: string, tags: string[], source: 'user' | 'ai' = 'user'): FileTag[] {
+  const db = getDb()
+  const now = Date.now()
+  const stmt = db.prepare(
+    `INSERT INTO fb_file_tags (file_id, tag, source, created_at) VALUES (?, ?, ?, ?)
+     ON CONFLICT(file_id, tag) DO UPDATE SET
+       source = CASE WHEN excluded.source = 'user' THEN 'user' ELSE fb_file_tags.source END`
+  )
+  db.transaction(() => {
+    for (const raw of tags) {
+      const tag = raw.trim()
+      if (tag) stmt.run(fileId, tag, source, now)
+    }
+  })()
+  return tagsFor(fileId)
+}
+
+export function removeTag(fileId: string, tag: string): boolean {
+  const db = getDb()
+  return db.prepare('DELETE FROM fb_file_tags WHERE file_id = ? AND tag = ?').run(fileId, tag).changes > 0
+}
+
+// The whole tag vocabulary with how many live files carry each, so the UI offers
+// existing tags and the auto-filing AI reuses them instead of inventing synonyms.
+export function allTags(): Array<{ tag: string; count: number }> {
+  const db = getDb()
+  return db
+    .prepare(
+      `SELECT t.tag AS tag, COUNT(*) AS count
+       FROM fb_file_tags t JOIN fb_files f ON f.id = t.file_id
+       WHERE f.trashed_at IS NULL
+       GROUP BY t.tag ORDER BY count DESC, t.tag ASC`
+    )
+    .all() as Array<{ tag: string; count: number }>
+}
+
+// Every live entry carrying a tag, newest-edited first. A tag view is a folder
+// that spans the entire Drive, which is the whole point of facets over folders.
+export function entriesByTag(tag: string): FileEntry[] {
+  const db = getDb()
+  const rows = db
+    .prepare(
+      `SELECT ${ENTRY_COLS} FROM fb_files
+       WHERE trashed_at IS NULL AND id IN (SELECT file_id FROM fb_file_tags WHERE tag = ?)
+       ORDER BY updated_at DESC`
+    )
+    .all(tag) as EntryRow[]
+  const out: FileEntry[] = []
+  for (const row of rows) {
+    const entry = rowToEntry(row)
+    if (entry) out.push(entry)
+  }
+  return out
+}
+
 // File an internal document into a folder. A document lives in exactly one
 // place, so re-filing moves its reference rather than duplicating it.
 export function fileDocument(docId: string, parentId: string | null): FileEntry | null {
