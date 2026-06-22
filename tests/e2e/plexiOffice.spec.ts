@@ -242,3 +242,35 @@ test('PO-12 — Drive: search finds an item, and delete → Trash → restore ro
   await window.locator('[data-testid="office-trash-toggle"]').click()
   await expect(window.locator('[data-testid="office-folder-New folder"]')).toBeVisible({ timeout: 5_000 })
 })
+
+test('PO-13 — Drive: drag a document onto a folder moves it in (dataTransfer payload)', async () => {
+  launched = await launchApp({ env: { PLEXI_APP: 'office' } })
+  const { window } = launched
+
+  // A target folder and a document at the root.
+  await window.locator('[data-testid="office-new-folder"]').click()
+  await expect(window.locator('[data-testid="office-folder-New folder"]')).toBeVisible({ timeout: 10_000 })
+  await window.locator('[data-testid="office-new-doc"]').click()
+  await expect(window.locator('input').first()).toBeVisible({ timeout: 10_000 })
+  await window.getByRole('button', { name: /Back to list/i }).click()
+  const doc = window.locator('[data-testid="office-doc-Untitled document"]')
+  await expect(doc).toBeVisible({ timeout: 5_000 })
+
+  // Drive the HTML5 drag with a shared DataTransfer (the way Playwright can
+  // exercise drag-and-drop deterministically): dragstart writes the entry id,
+  // drop reads it. If the payload is missing (the old bug), the move never fires.
+  await window.evaluate(() => {
+    const src = document.querySelector('[data-testid="office-doc-Untitled document"]')
+    const tgt = document.querySelector('[data-testid="office-folder-New folder"]')
+    if (!src || !tgt) throw new Error('drag source/target missing')
+    const dt = new DataTransfer()
+    src.dispatchEvent(new DragEvent('dragstart', { bubbles: true, cancelable: true, dataTransfer: dt }))
+    tgt.dispatchEvent(new DragEvent('dragover', { bubbles: true, cancelable: true, dataTransfer: dt }))
+    tgt.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: dt }))
+  })
+
+  // The document leaves the root listing, then shows up inside the folder.
+  await expect(doc).toHaveCount(0, { timeout: 5_000 })
+  await window.locator('[data-testid="office-folder-New folder"]').locator('button').first().click()
+  await expect(window.locator('[data-testid="office-doc-Untitled document"]')).toBeVisible({ timeout: 5_000 })
+})
