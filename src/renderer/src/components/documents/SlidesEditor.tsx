@@ -67,6 +67,13 @@ export default function SlidesEditor({ body: rawBody, title, onChange }: Props):
   // and the multi-select align toolbar takes over.
   const selectedElId = selectedIds.length === 1 ? selectedIds[0] : null
   const selectedEl = (slide?.elements ?? []).find((e) => e.id === selectedElId) ?? null
+  // The current slide's text, fed to the AI "make this slide beautiful" action.
+  const slideSummary = (slide?.elements ?? [])
+    .flatMap((e) =>
+      e.type === 'text' ? [e.paragraphs.map((p) => p.runs.map((r) => r.text).join('')).join(' ').trim()] : []
+    )
+    .filter(Boolean)
+    .join('\n')
 
   // Select an element. additive (Shift/Cmd-click) toggles it in the selection;
   // a plain click replaces. Either way the selection expands to whole groups so
@@ -507,7 +514,7 @@ export default function SlidesEditor({ body: rawBody, title, onChange }: Props):
               <button onClick={() => setStatus(null)} className="text-stone-400 hover:text-stone-600"><Icon name="close" size={12} /></button>
             </div>
           )}
-          {aiOpen && <AiSlidePanel theme={theme} onApply={applyAi} onClose={() => setAiOpen(false)} />}
+          {aiOpen && <AiSlidePanel theme={theme} slideSummary={slideSummary} onApply={applyAi} onClose={() => setAiOpen(false)} />}
           {selectedIds.length >= 2 && (
             <div className="mb-2 flex justify-center">
               <div

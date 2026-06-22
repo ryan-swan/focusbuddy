@@ -12,24 +12,29 @@ type Mode = 'deck' | 'append' | 'redesign'
 
 interface Props {
   theme: DeckTheme
+  // The current slide's text, so "Make this slide beautiful" can redesign the
+  // real content rather than ask the user to retype it. Empty when the slide has
+  // no text.
+  slideSummary?: string
   onApply: (mode: Mode, body: SlidesBody) => void
   onClose: () => void
 }
 
-export default function AiSlidePanel({ theme, onApply, onClose }: Props): JSX.Element {
+export default function AiSlidePanel({ theme, slideSummary, onApply, onClose }: Props): JSX.Element {
   const [mode, setMode] = useState<Mode>('deck')
   const [prompt, setPrompt] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [preview, setPreview] = useState<SlidesBody | null>(null)
 
-  async function run(): Promise<void> {
-    if (!prompt.trim()) return
+  async function run(override?: string): Promise<void> {
+    const text = (override ?? prompt).trim()
+    if (!text) return
     setBusy(true)
     setError(null)
     setPreview(null)
     try {
-      const res = await window.api.documents.generateSlides({ mode, prompt })
+      const res = await window.api.documents.generateSlides({ mode, prompt: text })
       if (!res.ok || !res.body) {
         setError(res.error || (res.needsApiKey ? 'No Anthropic API key set.' : 'The AI returned nothing.'))
         return
@@ -81,6 +86,21 @@ export default function AiSlidePanel({ theme, onApply, onClose }: Props): JSX.El
         }
         className="w-full bg-white dark:bg-stone-800 border border-stone-300 dark:border-stone-600 rounded-lg px-3 py-2 text-[13px] focus:outline-none focus:border-accent resize-none"
       />
+      {mode === 'redesign' && (slideSummary?.trim().length ?? 0) > 0 && (
+        <button
+          data-testid="slides-ai-beautify"
+          onClick={() => {
+            const p = `Redesign this slide with a polished, modern, well-spaced layout that fits the deck's theme. Keep the meaning of the content but improve the visual hierarchy. Content on the slide now:\n${slideSummary}`
+            setPrompt(p)
+            void run(p)
+          }}
+          disabled={busy}
+          className="mt-2 inline-flex items-center gap-1 text-[12px] px-2.5 py-1.5 rounded-full border border-accent/40 bg-accent/[0.06] text-accent hover:bg-accent/[0.12] disabled:opacity-50"
+        >
+          <Icon name="auto_fix_high" size={13} />
+          Make this slide beautiful in the theme
+        </button>
+      )}
       {error && <div className="text-[12px] text-red-600 dark:text-red-400 mt-1">{error}</div>}
 
       {preview && (
