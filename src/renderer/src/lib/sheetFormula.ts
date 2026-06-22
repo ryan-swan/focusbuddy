@@ -101,6 +101,11 @@ export const SHEET_FUNCTIONS: Array<{ name: string; hint: string }> = [
   { name: 'XLOOKUP', hint: 'XLOOKUP(key, lookupRange, returnRange, [ifMissing], [mode]) — modern lookup' },
   { name: 'XMATCH', hint: 'XMATCH(key, range, [mode]) — position, exact or nearest' },
   { name: 'INDIRECT', hint: 'INDIRECT(refText) — a reference held as text, e.g. "A1"' },
+  { name: 'SEQUENCE', hint: 'SEQUENCE(rows, [cols], [start], [step]) — spills a grid of numbers' },
+  { name: 'TRANSPOSE', hint: 'TRANSPOSE(range) — flips rows and columns (spills)' },
+  { name: 'UNIQUE', hint: 'UNIQUE(range) — distinct rows (spills)' },
+  { name: 'SORT', hint: 'SORT(range, [column], [ascending]) — sorted rows (spills)' },
+  { name: 'FILTER', hint: 'FILTER(range, conditionColumn) — rows where the condition is true (spills)' },
   { name: 'IFS', hint: 'IFS(cond1, val1, cond2, val2, …) — first true wins' },
   { name: 'SWITCH', hint: 'SWITCH(value, case1, result1, …, [default])' },
   { name: 'REGEXMATCH', hint: 'REGEXMATCH(text, pattern) — TRUE if the pattern matches' },
@@ -1383,7 +1388,20 @@ export function isParseableFormula(formula: string): boolean {
 
 // The value to DISPLAY for a cell: raw text, the evaluated formula, or #ERR.
 // Never a silent wrong number.
-export function displayCell(grid: Grid, r: number, c: number, wb?: Workbook): string {
+export function displayCell(
+  grid: Grid,
+  r: number,
+  c: number,
+  wb?: Workbook,
+  spill?: Map<string, string>
+): string {
+  // A spill map (built once per grid by buildSpillMap) overrides both the anchor
+  // of an array formula and the empty cells it spills into, so an array formula
+  // renders as a real block instead of #ERR on the anchor and blanks beside it.
+  if (spill) {
+    const s = spill.get(`${r},${c}`)
+    if (s !== undefined) return s
+  }
   const raw = cellRaw(grid, r, c)
   if (!raw.startsWith('=')) return raw
   WB = wb ?? null
@@ -1400,4 +1418,177 @@ export function displayCell(grid: Grid, r: number, c: number, wb?: Workbook): st
   } finally {
     WB = null
   }
+}
+
+// ── Array formulas + spill ──────────────────────────────────────────────────
+// A few functions return a 2D block rather than one scalar: SEQUENCE, TRANSPOSE,
+// UNIQUE, SORT and FILTER. The anchor cell holds the formula and shows the
+// top-left value; the rest spill into the cells below and right when those are
+// empty, exactly like modern Excel and Google Sheets. If a spill target already
+// holds content the anchor shows #SPILL! and nothing spills.
+
+type Matrix = CellValue[][]
+
+export const SPILL_FUNCTIONS = new Set(['SEQUENCE', 'TRANSPOSE', 'UNIQUE', 'SORT', 'FILTER'])
+
+function readRange(grid: Grid, node: Extract<Node, { k: 'range' }>, seen: Set<string>): Matrix {
+  const g = pickGrid(grid, node.sheet)
+  const out: Matrix = []
+  for (let r = node.r1; r <= node.r2; r++) {
+    const row: CellValue[] = []
+    for (let c = node.c1; c <= node.c2; c++) row.push(cellValue(g, r, c, seen))
+    out.push(row)
+  }
+  return out
+}
+
+function fmtCell(v: CellValue): string {
+  if (typeof v === 'boolean') return v ? 'TRUE' : 'FALSE'
+  if (typeof v === 'number') return Number.isFinite(v) ? String(Math.round(v * 1e6) / 1e6) : '#ERR'
+  return v
+}
+
+// Evaluate an array-function call to a matrix, or null if it isn't one (or its
+// arguments are the wrong shape, in which case the scalar path reports the error).
+function evalArrayCall(node: Extract<Node, { k: 'call' }>, grid: Grid, seen: Set<string>): Matrix | null {
+  const args = node.args
+  const asRange = (n: Node | undefined): Extract<Node, { k: 'range' }> | null => (n && n.k === 'range' ? n : null)
+  switch (node.name) {
+    case 'SEQUENCE': {
+      const rows = Math.max(0, Math.trunc(toNum(evalNode(args[0], grid, seen))))
+      const cols = args.length > 1 ? Math.max(1, Math.trunc(toNum(evalNode(args[1], grid, seen)))) : 1
+      const start = args.length > 2 ? toNum(evalNode(args[2], grid, seen)) : 1
+      const step = args.length > 3 ? toNum(evalNode(args[3], grid, seen)) : 1
+      const out: Matrix = []
+      let v = start
+      for (let r = 0; r < rows; r++) {
+        const row: CellValue[] = []
+        for (let c = 0; c < cols; c++) {
+          row.push(v)
+          v += step
+        }
+        out.push(row)
+      }
+      return out
+    }
+    case 'TRANSPOSE': {
+      const rg = asRange(args[0])
+      if (!rg) return null
+      const m = readRange(grid, rg, seen)
+      const rows = m.length
+      const cols = m[0]?.length ?? 0
+      const out: Matrix = []
+      for (let c = 0; c < cols; c++) {
+        const row: CellValue[] = []
+        for (let r = 0; r < rows; r++) row.push(m[r][c])
+        out.push(row)
+      }
+      return out
+    }
+    case 'UNIQUE': {
+      const rg = asRange(args[0])
+      if (!rg) return null
+      const seenRows = new Set<string>()
+      const out: Matrix = []
+      for (const row of readRange(grid, rg, seen)) {
+        const key = row.map(fmtCell).join(' ')
+        if (!seenRows.has(key)) {
+          seenRows.add(key)
+          out.push(row)
+        }
+      }
+      return out
+    }
+    case 'SORT': {
+      const rg = asRange(args[0])
+      if (!rg) return null
+      const m = readRange(grid, rg, seen).map((row) => row.slice())
+      const col = (args.length > 1 ? Math.max(1, Math.trunc(toNum(evalNode(args[1], grid, seen)))) : 1) - 1
+      const asc = args.length > 2 ? toBool(evalNode(args[2], grid, seen)) : true
+      m.sort((a, b) => {
+        const av = a[col] ?? ''
+        const bv = b[col] ?? ''
+        const r = compare('<', av, bv) ? -1 : compare('>', av, bv) ? 1 : 0
+        return asc ? r : -r
+      })
+      return m
+    }
+    case 'FILTER': {
+      const rg = asRange(args[0])
+      const cond = asRange(args[1])
+      if (!rg || !cond) return null
+      const m = readRange(grid, rg, seen)
+      const cm = readRange(grid, cond, seen)
+      const out: Matrix = []
+      for (let i = 0; i < m.length; i++) {
+        const c = cm[i]?.[0]
+        if (c !== undefined && toBool(c)) out.push(m[i])
+      }
+      return out
+    }
+    default:
+      return null
+  }
+}
+
+// Evaluate a formula (without '=') to a matrix: an array function yields its
+// block, anything else a 1x1 of its scalar value.
+function evalMatrix(grid: Grid, formula: string, seen: Set<string>): Matrix {
+  const node = parse(formula)
+  if (node.k === 'call') {
+    const m = evalArrayCall(node, grid, seen)
+    if (m) return m
+  }
+  return [[evalNode(node, grid, seen)]]
+}
+
+// Build the display value for every cell that an array formula owns: the anchor
+// and the cells it spills into. Keyed "r,c". An anchor whose spill is blocked by
+// existing content resolves to '#SPILL!' and writes no targets. Cells not touched
+// by any spill are absent, so displayCell falls back to its normal evaluation.
+export function buildSpillMap(grid: Grid, wb?: Workbook): Map<string, string> {
+  WB = wb ?? null
+  const map = new Map<string, string>()
+  const occupied = (r: number, c: number): boolean => cellRaw(grid, r, c).trim() !== ''
+  try {
+    for (let r = 0; r < grid.rows.length; r++) {
+      const row = grid.rows[r] ?? []
+      for (let c = 0; c < row.length; c++) {
+        const raw = (row[c] ?? '').trim()
+        if (!raw.startsWith('=')) continue
+        let node: Node
+        try {
+          node = parse(raw.slice(1))
+        } catch {
+          continue
+        }
+        if (node.k !== 'call' || !SPILL_FUNCTIONS.has(node.name)) continue
+        let m: Matrix
+        try {
+          m = evalMatrix(grid, raw.slice(1), new Set([`${gridId(grid)}:${r},${c}`]))
+        } catch {
+          continue
+        }
+        // A 1x1 result doesn't spill — leave it to the normal scalar render.
+        if (m.length <= 1 && (m[0]?.length ?? 0) <= 1) continue
+        let blocked = false
+        for (let i = 0; i < m.length && !blocked; i++) {
+          for (let j = 0; j < m[i].length && !blocked; j++) {
+            if (i === 0 && j === 0) continue
+            if (occupied(r + i, c + j)) blocked = true
+          }
+        }
+        if (blocked) {
+          map.set(`${r},${c}`, '#SPILL!')
+          continue
+        }
+        for (let i = 0; i < m.length; i++) {
+          for (let j = 0; j < m[i].length; j++) map.set(`${r + i},${c + j}`, fmtCell(m[i][j]))
+        }
+      }
+    }
+  } finally {
+    WB = null
+  }
+  return map
 }

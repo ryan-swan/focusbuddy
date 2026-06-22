@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { displayCell, rewriteFormulaRefs, type Grid } from '@renderer/lib/sheetFormula'
+import { displayCell, buildSpillMap, rewriteFormulaRefs, type Grid } from '@renderer/lib/sheetFormula'
 
 // The sheet's formula engine must compute real values, not plausible ones. A
 // wrong total is worse than a visible #ERR, so these tests pin the arithmetic,
@@ -398,5 +398,76 @@ describe('displayCell — modern lookup, logical, regex, stats and dates', () =>
     expect(displayCell(grid([['=EOMONTH("2026-02-10",0)']]), 0, 0)).toBe('2026-02-28')
     expect(displayCell(grid([['=DATEDIF("2026-01-01","2026-03-01","M")']]), 0, 0)).toBe('2')
     expect(displayCell(grid([['=DATEDIF("2026-01-01","2026-01-11","D")']]), 0, 0)).toBe('10')
+  })
+})
+
+describe('array formulas — spill map', () => {
+  it('SEQUENCE spills a column of numbers from the anchor', () => {
+    const g = grid([['=SEQUENCE(3,1)']])
+    const m = buildSpillMap(g)
+    expect(m.get('0,0')).toBe('1')
+    expect(m.get('1,0')).toBe('2')
+    expect(m.get('2,0')).toBe('3')
+  })
+
+  it('UNIQUE spills distinct rows', () => {
+    const g = grid([
+      ['a', '', '=UNIQUE(A1:A3)'],
+      ['a', '', ''],
+      ['b', '', '']
+    ])
+    const m = buildSpillMap(g)
+    expect(m.get('0,2')).toBe('a')
+    expect(m.get('1,2')).toBe('b')
+    expect(m.has('2,2')).toBe(false)
+  })
+
+  it('SORT orders the values', () => {
+    const g = grid([
+      ['3', '', '=SORT(A1:A3)'],
+      ['1', '', ''],
+      ['2', '', '']
+    ])
+    const m = buildSpillMap(g)
+    expect(m.get('0,2')).toBe('1')
+    expect(m.get('1,2')).toBe('2')
+    expect(m.get('2,2')).toBe('3')
+  })
+
+  it('FILTER keeps rows where the condition column is truthy', () => {
+    const g = grid([
+      ['x', '1', '=FILTER(A1:A3,B1:B3)'],
+      ['y', '0', ''],
+      ['z', '1', '']
+    ])
+    const m = buildSpillMap(g)
+    expect(m.get('0,2')).toBe('x')
+    expect(m.get('1,2')).toBe('z')
+    expect(m.has('2,2')).toBe(false)
+  })
+
+  it('TRANSPOSE flips a row into a column', () => {
+    const g = grid([
+      ['p', 'q', '=TRANSPOSE(A1:B1)'],
+      ['', '', '']
+    ])
+    const m = buildSpillMap(g)
+    expect(m.get('0,2')).toBe('p')
+    expect(m.get('1,2')).toBe('q')
+  })
+
+  it('a blocked spill reports #SPILL! and writes no targets', () => {
+    const g = grid([['=SEQUENCE(3,1)'], ['blocker'], ['']])
+    const m = buildSpillMap(g)
+    expect(m.get('0,0')).toBe('#SPILL!')
+    expect(m.has('1,0')).toBe(false)
+  })
+
+  it('displayCell renders spilled values from the map', () => {
+    const g = grid([['=SEQUENCE(3,1)']])
+    const m = buildSpillMap(g)
+    expect(displayCell(g, 0, 0, undefined, m)).toBe('1')
+    expect(displayCell(g, 1, 0, undefined, m)).toBe('2')
+    expect(displayCell(g, 2, 0, undefined, m)).toBe('3')
   })
 })

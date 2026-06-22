@@ -1160,3 +1160,24 @@ test('SE-23 — pivot: sum a value column grouped by a row column', async () => 
     await dispose()
   }
 })
+
+test('SE-19 — array formula spills: =SEQUENCE(3,1) fills the cells below', async () => {
+  const { window, dispose } = await launchApp()
+  try {
+    await waitForReady(window)
+    await openDocumentsHub(window)
+    await startBlankSpreadsheet(window)
+
+    // Anchor A1; blur to a real, non-target empty cell so the spill stays clear.
+    await setViaFormulaBar(window, 0, 0, '=SEQUENCE(3,1)', [7, 2])
+
+    expect(await cellText(window, 0, 0)).toBe('1')
+    expect(await cellText(window, 1, 0)).toBe('2')
+    expect(await cellText(window, 2, 0)).toBe('3')
+
+    await expect(window.locator('[data-testid="cell-1-0"]')).toHaveAttribute('data-spill', '1')
+    await expect(window.locator('[data-testid="cell-2-0"]')).toHaveAttribute('data-spill', '1')
+  } finally {
+    await dispose()
+  }
+})
