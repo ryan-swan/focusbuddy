@@ -36,6 +36,18 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.77',
+    date: '2026-06-23T18:00:00Z',
+    title: 'v2.5.77 — Smart folders can search too',
+    tag: 'feature',
+    summary:
+      'A smart folder can now combine tags with a search term, so a folder like "Acme invoices from Q2" filters by both the tags and the words at once.',
+    highlights: [
+      'Smart folders take an optional search term alongside their tags. A folder shows files that carry all of its tags and whose name or title matches the search, so you can pin a precise view like Acme invoices that mention a quarter. Either part can stand alone, a pure tag combination or a pure search.'
+    ],
+    links: [{ label: 'Finding your way around', href: `${HELP_BASE}/getting-around` }]
+  },
+  {
     version: '2.5.76',
     date: '2026-06-23T12:00:00Z',
     title: 'v2.5.76 — A Drive that files itself',
