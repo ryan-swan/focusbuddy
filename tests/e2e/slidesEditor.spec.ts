@@ -1282,3 +1282,60 @@ test('SL-19b — image crop: insert an image, crop it with the drag-handle dialo
     await dispose()
   }
 })
+
+test('SL-20 — AI: "Make this slide beautiful" redesigns the current slide via the stub', async () => {
+  const { app, window, dispose } = await launchApp()
+  try {
+    await waitForReady(window)
+    await openDocumentsHub(window)
+    await startBlankSlides(window)
+    await window.waitForTimeout(400)
+
+    // Stub the generate IPC to return a redesigned slide we can recognise.
+    const redesigned = {
+      schemaVersion: 2,
+      theme: 'plexi',
+      slides: [
+        {
+          id: 'rd-1',
+          schemaVersion: 2,
+          layout: 'title-content',
+          notes: '',
+          transition: 'none',
+          background: { type: 'solid', color: '#101014' },
+          elements: [
+            {
+              id: 'rd-el-1',
+              type: 'text',
+              x: 80,
+              y: 300,
+              w: 1120,
+              h: 120,
+              z: 1,
+              styleRole: 'title',
+              vAlign: 'middle',
+              paragraphs: [{ runs: [{ text: 'BEAUTIFIED', bold: true, fontSize: 60 }], align: 'center' }]
+            }
+          ]
+        }
+      ]
+    }
+    await stubGenerateSlides(app, redesigned)
+
+    // Open the AI panel, switch to redesign, click the one-click beautify.
+    const toolbar = window.locator('[data-testid="slides-toolbar"]')
+    await toolbar.locator('button', { hasText: 'AI' }).first().click()
+    await expect(window.locator('[data-testid="slides-ai-panel"]')).toBeVisible({ timeout: 4_000 })
+    await window.locator('[data-testid="slides-ai-panel"]').locator('button', { hasText: 'redesign' }).first().click()
+
+    await window.locator('[data-testid="slides-ai-beautify"]').click()
+    // Preview renders, then apply the redesign.
+    await expect(window.locator('[data-testid="slides-ai-apply"]')).toBeVisible({ timeout: 5_000 })
+    await window.locator('[data-testid="slides-ai-apply"]').click()
+
+    // The current slide now shows the redesigned content.
+    await expect(window.locator('[data-testid="slide-canvas"]').getByText('BEAUTIFIED')).toBeVisible({ timeout: 4_000 })
+  } finally {
+    await dispose()
+  }
+})
