@@ -20,6 +20,11 @@ function extractToken(input: string): string {
 // documents surface at the root so nothing a user already made is hidden. Drag a
 // row onto a folder (or a breadcrumb) to move it.
 
+// The drag payload type for an entry id, shared with the PlexiDesk file view so a
+// drag started in one Drive can be dropped in the other. Carrying the id on the
+// browser's dataTransfer (rather than React state) is what makes drops land.
+const ENTRY_MIME = 'application/fb-entry-id'
+
 const NEW_KINDS: { type: DocType; label: string; icon: string }[] = [
   { type: 'doc', label: 'Document', icon: 'description' },
   { type: 'sheet', label: 'Spreadsheet', icon: 'table' },
@@ -61,7 +66,6 @@ export default function OfficeDrive({
   const acceptByToken = useSharesStore((s) => s.acceptByToken)
 
   const [unfiled, setUnfiled] = useState<Array<{ id: string; title: string; docType: string }>>([])
-  const [dragId, setDragId] = useState<string | null>(null)
   const [dropTarget, setDropTarget] = useState<string | null>(null)
   const [importOpen, setImportOpen] = useState(false)
   const [importUrl, setImportUrl] = useState('')
@@ -135,12 +139,10 @@ export default function OfficeDrive({
     }
   }
 
-  async function onDropOnFolder(folderId: string | null): Promise<void> {
-    const id = dragId
-    setDragId(null)
+  async function onDropOnFolder(folderId: string | null, draggedId: string): Promise<void> {
     setDropTarget(null)
-    if (!id || id === folderId) return
-    await move(id, folderId)
+    if (!draggedId || draggedId === folderId) return
+    await move(draggedId, folderId)
     // A doc dragged out of "unfiled" needs the unfiled list refreshed too.
     if (cwd === null) {
       window.api.fileManager.unfiledDocuments().then(setUnfiled).catch(() => {})
@@ -246,11 +248,13 @@ export default function OfficeDrive({
         <button
           onClick={() => void openFolder(null)}
           onDragOver={(e) => {
-            e.preventDefault()
-            setDropTarget('root')
+            if (e.dataTransfer.types.includes(ENTRY_MIME)) {
+              e.preventDefault()
+              setDropTarget('root')
+            }
           }}
           onDragLeave={() => setDropTarget((t) => (t === 'root' ? null : t))}
-          onDrop={() => void onDropOnFolder(null)}
+          onDrop={(e) => void onDropOnFolder(null, e.dataTransfer.getData(ENTRY_MIME))}
           className={`inline-flex items-center gap-1 rounded px-1 hover:text-accent ${dropTarget === 'root' ? 'bg-accent/[0.12] text-accent' : ''}`}
           data-testid="office-crumb-home"
         >
@@ -341,17 +345,23 @@ export default function OfficeDrive({
                 }
                 onDelete={() => void remove(e.id)}
                 draggable
-                onDragStart={() => setDragId(e.id)}
+                onDragStart={(ev) => ev.dataTransfer.setData(ENTRY_MIME, e.id)}
                 onDragOver={
                   e.kind === 'folder'
                     ? (ev) => {
-                        ev.preventDefault()
-                        setDropTarget(e.id)
+                        if (ev.dataTransfer.types.includes(ENTRY_MIME)) {
+                          ev.preventDefault()
+                          setDropTarget(e.id)
+                        }
                       }
                     : undefined
                 }
                 onDragLeave={() => setDropTarget((t) => (t === e.id ? null : t))}
-                onDrop={e.kind === 'folder' ? () => void onDropOnFolder(e.id) : undefined}
+                onDrop={
+                  e.kind === 'folder'
+                    ? (ev) => void onDropOnFolder(e.id, ev.dataTransfer.getData(ENTRY_MIME))
+                    : undefined
+                }
               />
             ))}
 
@@ -364,7 +374,7 @@ export default function OfficeDrive({
                   <button
                     key={d.id}
                     draggable
-                    onDragStart={() => setDragId(d.id)}
+                    onDragStart={(ev) => ev.dataTransfer.setData(ENTRY_MIME, d.id)}
                     onClick={() => void open(d.id)}
                     className={`w-full flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-[12.5px] truncate ${
                       active?.id === d.id ? 'bg-accent/[0.12] text-accent' : 'hover:bg-stone-100 dark:hover:bg-stone-800'
@@ -403,10 +413,10 @@ function DriveRow({
   onShare?: () => void
   onDelete: () => void
   draggable: boolean
-  onDragStart: () => void
+  onDragStart: (e: React.DragEvent) => void
   onDragOver?: (e: React.DragEvent) => void
   onDragLeave?: () => void
-  onDrop?: () => void
+  onDrop?: (e: React.DragEvent) => void
 }): JSX.Element {
   const isFolder = entry.kind === 'folder'
   const icon = isFolder ? 'folder' : entry.kind === 'doc' ? docIcon(entry.docType) : 'draft'
@@ -417,7 +427,8 @@ function DriveRow({
       onDragOver={onDragOver}
       onDragLeave={onDragLeave}
       onDrop={onDrop}
-      data-testid={isFolder ? `office-folder-${entry.name}` : undefined}
+      data-testid={isFolder ? `office-folder-${entry.name}` : `office-${entry.kind}-${entry.name}`}
+      data-entry-id={entry.id}
       className={`group w-full flex items-center gap-2 rounded-md px-2 py-1.5 text-[12.5px] ${
         active ? 'bg-accent/[0.12] text-accent' : 'hover:bg-stone-100 dark:hover:bg-stone-800'
       } ${isDropTarget ? 'ring-1 ring-accent bg-accent/[0.08]' : ''}`}
