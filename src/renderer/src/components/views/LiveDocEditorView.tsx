@@ -7,6 +7,8 @@ import { inviteToLiveDoc } from '../../lib/docCollabClient'
 import { listTeams, inviteTeamToDoc, type Team } from '../../lib/teamsClient'
 import { DocEditor, SheetEditor, SlidesEditor, MapEditor } from '@office'
 import Icon from '../Icon'
+import CollaboratorBar from './CollaboratorBar'
+import { collaborators } from '../../lib/presence'
 
 // Editor for a LIVE (collaborative) document. The body lives on the server; this
 // view checks the doc out (acquires the edit lock) and, while it holds the lock,
@@ -93,6 +95,8 @@ export default function LiveDocEditorView({ liveDocId, onBack }: Props): JSX.Ele
   const isOwner = meta.ownerAccountId === myId
   const holderHandle = lock?.holder?.handle ?? null
   const lockedByOther = !!lock?.holder && lock.holder.accountId !== myId
+  // Awareness: who has access, with the live editor (lock holder) highlighted.
+  const people = collaborators(meta.members ?? [], lock, myId ?? null)
 
   async function sendInvite(): Promise<void> {
     if (!token) return
@@ -133,7 +137,7 @@ export default function LiveDocEditorView({ liveDocId, onBack }: Props): JSX.Ele
         <span className="flex-1 min-w-0 text-[14px] font-semibold text-stone-900 dark:text-stone-100 truncate">
           {meta.title}
         </span>
-        <Icon name="group" size={14} className="text-stone-400 shrink-0" />
+        <CollaboratorBar people={people} />
         {isHolder && (
           <span className="text-[11px] text-stone-400 dark:text-stone-500 inline-flex items-center gap-1 shrink-0">
             <Icon name={saving ? 'sync' : 'cloud_done'} size={13} className={saving ? 'animate-spin' : 'text-emerald-500'} />
