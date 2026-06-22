@@ -430,3 +430,30 @@ test('PO-17 — drag-anywhere: drop a file on a tag chip to tag it', async () =>
   await expect(view).toBeVisible({ timeout: 4_000 })
   await expect(view.locator('[data-testid="office-folder-New folder"]')).toBeVisible({ timeout: 4_000 })
 })
+
+test('PO-18 — proactive auto-filing: unfiled banner; Review opens with AI suggestions ready', async () => {
+  launched = await launchApp({ env: { PLEXI_APP: 'office' } })
+  const { app, window } = launched
+
+  await app.evaluate(({ ipcMain }) => {
+    ipcMain.removeHandler('files:suggestTags')
+    ipcMain.handle('files:suggestTags', async () => ({
+      ok: true,
+      tags: [{ name: 'Acme', isNew: true, reason: 'mentions Acme' }]
+    }))
+  })
+
+  // A fresh document arrives unfiled.
+  await window.locator('[data-testid="office-new-doc"]').click()
+  await expect(window.locator('input').first()).toBeVisible({ timeout: 10_000 })
+  await window.getByRole('button', { name: /Back to list/i }).click()
+  await expect(window.locator('[data-testid="office-doc-Untitled document"]')).toBeVisible({ timeout: 5_000 })
+
+  // The Drive proactively flags it, and Review opens its tags with the AI
+  // suggestion already run — no extra click.
+  await expect(window.locator('[data-testid="office-unfiled-banner"]')).toBeVisible({ timeout: 5_000 })
+  await window.locator('[data-testid="office-unfiled-review"]').click()
+  await expect(window.locator('[data-testid="office-tag-editor"]')).toBeVisible({ timeout: 4_000 })
+  await expect(window.locator('[data-testid="office-tag-suggestions"]')).toBeVisible({ timeout: 5_000 })
+  await expect(window.locator('[data-testid="office-tag-suggestion-Acme"]')).toBeVisible()
+})

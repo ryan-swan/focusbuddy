@@ -74,6 +74,8 @@ export default function OfficeDrive({
   const deleteSmart = useFileManagerStore((s) => s.deleteSmart)
   const openSmart = useFileManagerStore((s) => s.openSmart)
   const clearSmart = useFileManagerStore((s) => s.clearSmart)
+  const untagged = useFileManagerStore((s) => s.untagged)
+  const loadUntagged = useFileManagerStore((s) => s.loadUntagged)
 
   const open = useDocumentsStore((s) => s.open)
   const createBlank = useDocumentsStore((s) => s.createBlank)
@@ -89,13 +91,22 @@ export default function OfficeDrive({
   const [importMsg, setImportMsg] = useState<string | null>(null)
   const [trashOpen, setTrashOpen] = useState(false)
   const [tagEditId, setTagEditId] = useState<string | null>(null)
+  const [tagEditAuto, setTagEditAuto] = useState(false)
   const [smartCreatorOpen, setSmartCreatorOpen] = useState(false)
+  const [bannerDismissed, setBannerDismissed] = useState(false)
 
-  // Keep the tag vocabulary and smart folders fresh as the Drive changes.
+  // Keep the tag vocabulary, smart folders and the not-filed set fresh.
   useEffect(() => {
     void loadTags()
     void loadSmartFolders()
-  }, [loadTags, loadSmartFolders, entries])
+    void loadUntagged()
+  }, [loadTags, loadSmartFolders, loadUntagged, entries])
+
+  // Open an item's tags. `auto` runs the AI suggestion immediately (review flow).
+  function openTags(id: string, auto = false): void {
+    setTagEditAuto(auto)
+    setTagEditId(id)
+  }
 
   function toggleTrash(): void {
     setTrashOpen((v) => {
@@ -400,10 +411,44 @@ export default function OfficeDrive({
       {tagEditId && (
         <TagEditor
           fileId={tagEditId}
+          auto={tagEditAuto}
           onAdd={(tag) => void addTags(tagEditId, [tag])}
           onRemove={(tag) => void removeTag(tagEditId, tag)}
-          onClose={() => setTagEditId(null)}
+          onClose={() => {
+            setTagEditId(null)
+            setTagEditAuto(false)
+          }}
         />
+      )}
+
+      {/* Proactive auto-filing: the AI offers to place items that aren't filed
+          yet. Suggest-only — Review opens each with suggestions ready. */}
+      {untagged.length > 0 && !bannerDismissed && !trashOpen && !activeTag && !activeSmart && !search.trim() && (
+        <div
+          className="mx-3 mb-2 rounded-lg border border-accent/30 bg-accent/[0.05] px-3 py-2 flex items-center gap-2 text-[12px]"
+          data-testid="office-unfiled-banner"
+        >
+          <Icon name="auto_awesome" size={14} className="text-accent shrink-0" />
+          <span className="flex-1 text-stone-600 dark:text-stone-300">
+            {untagged.length} item{untagged.length === 1 ? '' : 's'} {untagged.length === 1 ? "isn't" : "aren't"} filed yet.
+            Let AI suggest where {untagged.length === 1 ? 'it belongs' : 'they belong'}.
+          </span>
+          <button
+            onClick={() => openTags(untagged[0].id, true)}
+            data-testid="office-unfiled-review"
+            className="btn-primary text-[12px] px-2.5 py-1 shrink-0"
+          >
+            Review
+          </button>
+          <button
+            onClick={() => setBannerDismissed(true)}
+            data-testid="office-unfiled-dismiss"
+            className="text-stone-400 hover:text-stone-600 shrink-0"
+            title="Dismiss"
+          >
+            <Icon name="close" size={13} />
+          </button>
+        </div>
       )}
 
       {/* Entry list */}
@@ -458,7 +503,7 @@ export default function OfficeDrive({
                     else void window.api.files.open(e.id)
                   }}
                   onDelete={() => void remove(e.id)}
-                  onTag={() => setTagEditId(e.id)}
+                  onTag={() => openTags(e.id)}
                   draggable={false}
                   onDragStart={() => {}}
                 />
@@ -491,7 +536,7 @@ export default function OfficeDrive({
                     else void window.api.files.open(e.id)
                   }}
                   onDelete={() => void remove(e.id)}
-                  onTag={() => setTagEditId(e.id)}
+                  onTag={() => openTags(e.id)}
                   draggable={false}
                   onDragStart={() => {}}
                 />
@@ -549,7 +594,7 @@ export default function OfficeDrive({
                   e.kind === 'folder' && onShareFolder ? () => onShareFolder(e.id, e.name) : undefined
                 }
                 onDelete={() => void remove(e.id)}
-                onTag={() => setTagEditId(e.id)}
+                onTag={() => openTags(e.id)}
                 draggable
                 onDragStart={(ev) => ev.dataTransfer.setData(ENTRY_MIME, e.id)}
                 onDragOver={
@@ -681,11 +726,13 @@ function DriveRow({
 // is the single source of truth; this just calls into it and re-reads.
 function TagEditor({
   fileId,
+  auto,
   onAdd,
   onRemove,
   onClose
 }: {
   fileId: string
+  auto?: boolean
   onAdd: (tag: string) => void
   onRemove: (tag: string) => void
   onClose: () => void
@@ -733,6 +780,12 @@ function TagEditor({
     void window.api.fileManager.tagsFor(fileId).then(setCurrent).catch(() => setCurrent([]))
   }, [fileId])
   useEffect(reload, [reload])
+
+  // Review flow: run the AI suggestion as soon as the editor opens.
+  useEffect(() => {
+    if (auto) void runSuggest()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [auto, fileId])
 
   function add(): void {
     const t = value.trim()
