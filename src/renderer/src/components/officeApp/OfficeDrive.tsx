@@ -304,11 +304,26 @@ export default function OfficeDrive({
             <button
               key={t.tag}
               onClick={() => (activeTag === t.tag ? clearTag() : void openTag(t.tag))}
+              onDragOver={(e) => {
+                if (e.dataTransfer.types.includes(ENTRY_MIME)) {
+                  e.preventDefault()
+                  setDropTarget(`tag:${t.tag}`)
+                }
+              }}
+              onDragLeave={() => setDropTarget((d) => (d === `tag:${t.tag}` ? null : d))}
+              onDrop={(e) => {
+                const id = e.dataTransfer.getData(ENTRY_MIME)
+                setDropTarget(null)
+                if (id) void addTags(id, [t.tag])
+              }}
               data-testid={`office-tag-${t.tag}`}
+              title={`Drop a file here to tag it "${t.tag}"`}
               className={`text-[11px] px-2 py-0.5 rounded-full border ${
-                activeTag === t.tag
-                  ? 'border-accent bg-accent/10 text-accent'
-                  : 'border-stone-200 dark:border-stone-700 text-stone-600 dark:text-stone-300 hover:border-accent'
+                dropTarget === `tag:${t.tag}`
+                  ? 'border-accent ring-2 ring-accent/40 bg-accent/10 text-accent'
+                  : activeTag === t.tag
+                    ? 'border-accent bg-accent/10 text-accent'
+                    : 'border-stone-200 dark:border-stone-700 text-stone-600 dark:text-stone-300 hover:border-accent'
               }`}
             >
               {t.tag} <span className="text-stone-400">{t.count}</span>
@@ -325,12 +340,26 @@ export default function OfficeDrive({
             <span key={sf.id} className="group inline-flex items-center">
               <button
                 onClick={() => (activeSmart?.id === sf.id ? clearSmart() : void openSmart(sf))}
+                onDragOver={(e) => {
+                  if (e.dataTransfer.types.includes(ENTRY_MIME)) {
+                    e.preventDefault()
+                    setDropTarget(`smart:${sf.id}`)
+                  }
+                }}
+                onDragLeave={() => setDropTarget((d) => (d === `smart:${sf.id}` ? null : d))}
+                onDrop={(e) => {
+                  const id = e.dataTransfer.getData(ENTRY_MIME)
+                  setDropTarget(null)
+                  if (id && sf.tags.length) void addTags(id, sf.tags)
+                }}
                 data-testid={`office-smart-${sf.name}`}
-                title={sf.tags.join(' + ')}
+                title={`Drop a file here to tag it: ${sf.tags.join(' + ')}`}
                 className={`text-[11px] px-2 py-0.5 rounded-full border ${
-                  activeSmart?.id === sf.id
-                    ? 'border-accent bg-accent/10 text-accent'
-                    : 'border-stone-200 dark:border-stone-700 text-stone-600 dark:text-stone-300 hover:border-accent'
+                  dropTarget === `smart:${sf.id}`
+                    ? 'border-accent ring-2 ring-accent/40 bg-accent/10 text-accent'
+                    : activeSmart?.id === sf.id
+                      ? 'border-accent bg-accent/10 text-accent'
+                      : 'border-stone-200 dark:border-stone-700 text-stone-600 dark:text-stone-300 hover:border-accent'
                 }`}
               >
                 {sf.name}

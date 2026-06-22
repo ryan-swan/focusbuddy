@@ -391,3 +391,42 @@ test('PO-16 — smart folders: a saved tag-AND query shows only files with all t
   await expect(view.locator('[data-testid="office-doc-Untitled document"]')).toBeVisible({ timeout: 4_000 })
   await expect(view.locator('[data-testid="office-folder-New folder"]')).toHaveCount(0)
 })
+
+test('PO-17 — drag-anywhere: drop a file on a tag chip to tag it', async () => {
+  launched = await launchApp({ env: { PLEXI_APP: 'office' } })
+  const { window } = launched
+
+  // A document tagged "Acme" (so the Acme chip exists), and a folder to drag.
+  await window.locator('[data-testid="office-new-doc"]').click()
+  await expect(window.locator('input').first()).toBeVisible({ timeout: 10_000 })
+  await window.getByRole('button', { name: /Back to list/i }).click()
+  const doc = window.locator('[data-testid="office-doc-Untitled document"]')
+  await expect(doc).toBeVisible({ timeout: 5_000 })
+  await doc.hover()
+  await window.locator('[data-testid="office-tagbtn-Untitled document"]').click({ force: true })
+  await window.locator('[data-testid="office-tag-add-input"]').fill('Acme')
+  await window.locator('[data-testid="office-tag-add"]').click()
+  await expect(window.locator('[data-testid="office-tag-chip-Acme"]')).toBeVisible({ timeout: 4_000 })
+  await window.locator('[data-testid="office-tag-editor-close"]').click()
+
+  await window.locator('[data-testid="office-new-folder"]').click()
+  await expect(window.locator('[data-testid="office-folder-New folder"]')).toBeVisible({ timeout: 5_000 })
+  await expect(window.locator('[data-testid="office-tag-Acme"]')).toBeVisible({ timeout: 4_000 })
+
+  // Drop the folder onto the Acme tag chip — the target decides the verb: tag it.
+  await window.evaluate(() => {
+    const src = document.querySelector('[data-testid="office-folder-New folder"]')
+    const tgt = document.querySelector('[data-testid="office-tag-Acme"]')
+    if (!src || !tgt) throw new Error('drag source/target missing')
+    const dt = new DataTransfer()
+    src.dispatchEvent(new DragEvent('dragstart', { bubbles: true, cancelable: true, dataTransfer: dt }))
+    tgt.dispatchEvent(new DragEvent('dragover', { bubbles: true, cancelable: true, dataTransfer: dt }))
+    tgt.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: dt }))
+  })
+
+  // Open the Acme view; the folder is now tagged and shows up there.
+  await window.locator('[data-testid="office-tag-Acme"]').click()
+  const view = window.locator('[data-testid="office-tag-view"]')
+  await expect(view).toBeVisible({ timeout: 4_000 })
+  await expect(view.locator('[data-testid="office-folder-New folder"]')).toBeVisible({ timeout: 4_000 })
+})
