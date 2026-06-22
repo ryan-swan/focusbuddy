@@ -342,3 +342,52 @@ test('PO-15 — AI auto-filing: suggest tags for a document, accept one (suggest
   await window.locator('[data-testid="office-tag-editor-close"]').click()
   await expect(window.locator('[data-testid="office-tag-Acme"]')).toBeVisible({ timeout: 5_000 })
 })
+
+test('PO-16 — smart folders: a saved tag-AND query shows only files with all the tags', async () => {
+  launched = await launchApp({ env: { PLEXI_APP: 'office' } })
+  const { window } = launched
+
+  // A folder and a document at the root.
+  await window.locator('[data-testid="office-new-folder"]').click()
+  await expect(window.locator('[data-testid="office-folder-New folder"]')).toBeVisible({ timeout: 10_000 })
+  await window.locator('[data-testid="office-new-doc"]').click()
+  await expect(window.locator('input').first()).toBeVisible({ timeout: 10_000 })
+  await window.getByRole('button', { name: /Back to list/i }).click()
+  const doc = window.locator('[data-testid="office-doc-Untitled document"]')
+  await expect(doc).toBeVisible({ timeout: 5_000 })
+
+  // Tag the document with BOTH Acme and Invoices.
+  await doc.hover()
+  await window.locator('[data-testid="office-tagbtn-Untitled document"]').click({ force: true })
+  await window.locator('[data-testid="office-tag-add-input"]').fill('Acme')
+  await window.locator('[data-testid="office-tag-add"]').click()
+  await expect(window.locator('[data-testid="office-tag-chip-Acme"]')).toBeVisible({ timeout: 4_000 })
+  await window.locator('[data-testid="office-tag-add-input"]').fill('Invoices')
+  await window.locator('[data-testid="office-tag-add"]').click()
+  await expect(window.locator('[data-testid="office-tag-chip-Invoices"]')).toBeVisible({ timeout: 4_000 })
+  await window.locator('[data-testid="office-tag-editor-close"]').click()
+
+  // Tag the folder with ONLY Acme.
+  const folder = window.locator('[data-testid="office-folder-New folder"]')
+  await folder.hover()
+  await window.locator('[data-testid="office-tagbtn-New folder"]').click({ force: true })
+  await window.locator('[data-testid="office-tag-add-input"]').fill('Acme')
+  await window.locator('[data-testid="office-tag-add"]').click()
+  await expect(window.locator('[data-testid="office-tag-chip-Acme"]')).toBeVisible({ timeout: 4_000 })
+  await window.locator('[data-testid="office-tag-editor-close"]').click()
+
+  // Build a smart folder requiring BOTH Acme and Invoices.
+  await window.locator('[data-testid="office-smart-new"]').click()
+  await expect(window.locator('[data-testid="office-smart-creator"]')).toBeVisible({ timeout: 4_000 })
+  await window.locator('[data-testid="office-smart-name"]').fill('Acme Invoices')
+  await window.locator('[data-testid="office-smart-pick-Acme"]').click()
+  await window.locator('[data-testid="office-smart-pick-Invoices"]').click()
+  await window.locator('[data-testid="office-smart-save"]').click()
+
+  // Open it: the document (both tags) is in; the folder (only Acme) is NOT.
+  await window.locator('[data-testid="office-smart-Acme Invoices"]').click()
+  const view = window.locator('[data-testid="office-smart-view"]')
+  await expect(view).toBeVisible({ timeout: 4_000 })
+  await expect(view.locator('[data-testid="office-doc-Untitled document"]')).toBeVisible({ timeout: 4_000 })
+  await expect(view.locator('[data-testid="office-folder-New folder"]')).toHaveCount(0)
+})

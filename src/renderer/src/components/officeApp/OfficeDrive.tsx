@@ -66,6 +66,14 @@ export default function OfficeDrive({
   const removeTag = useFileManagerStore((s) => s.removeTag)
   const openTag = useFileManagerStore((s) => s.openTag)
   const clearTag = useFileManagerStore((s) => s.clearTag)
+  const smartFolders = useFileManagerStore((s) => s.smartFolders)
+  const activeSmart = useFileManagerStore((s) => s.activeSmart)
+  const smartEntries = useFileManagerStore((s) => s.smartEntries)
+  const loadSmartFolders = useFileManagerStore((s) => s.loadSmartFolders)
+  const createSmart = useFileManagerStore((s) => s.createSmart)
+  const deleteSmart = useFileManagerStore((s) => s.deleteSmart)
+  const openSmart = useFileManagerStore((s) => s.openSmart)
+  const clearSmart = useFileManagerStore((s) => s.clearSmart)
 
   const open = useDocumentsStore((s) => s.open)
   const createBlank = useDocumentsStore((s) => s.createBlank)
@@ -81,11 +89,13 @@ export default function OfficeDrive({
   const [importMsg, setImportMsg] = useState<string | null>(null)
   const [trashOpen, setTrashOpen] = useState(false)
   const [tagEditId, setTagEditId] = useState<string | null>(null)
+  const [smartCreatorOpen, setSmartCreatorOpen] = useState(false)
 
-  // Keep the tag vocabulary fresh as the Drive changes.
+  // Keep the tag vocabulary and smart folders fresh as the Drive changes.
   useEffect(() => {
     void loadTags()
-  }, [loadTags, entries])
+    void loadSmartFolders()
+  }, [loadTags, loadSmartFolders, entries])
 
   function toggleTrash(): void {
     setTrashOpen((v) => {
@@ -307,6 +317,57 @@ export default function OfficeDrive({
         </div>
       )}
 
+      {/* Smart folders: saved tag queries that always show the matching files. */}
+      {(smartFolders.length > 0 || tags.length > 0) && (
+        <div className="px-3 pb-1.5 flex items-center gap-1 flex-wrap" data-testid="office-smart-strip">
+          <Icon name="folder_special" size={12} className="text-stone-400 shrink-0" />
+          {smartFolders.map((sf) => (
+            <span key={sf.id} className="group inline-flex items-center">
+              <button
+                onClick={() => (activeSmart?.id === sf.id ? clearSmart() : void openSmart(sf))}
+                data-testid={`office-smart-${sf.name}`}
+                title={sf.tags.join(' + ')}
+                className={`text-[11px] px-2 py-0.5 rounded-full border ${
+                  activeSmart?.id === sf.id
+                    ? 'border-accent bg-accent/10 text-accent'
+                    : 'border-stone-200 dark:border-stone-700 text-stone-600 dark:text-stone-300 hover:border-accent'
+                }`}
+              >
+                {sf.name}
+              </button>
+              <button
+                onClick={() => void deleteSmart(sf.id)}
+                data-testid={`office-smart-del-${sf.name}`}
+                className="opacity-0 group-hover:opacity-100 text-stone-400 hover:text-rose-500 ml-0.5"
+                title="Delete smart folder"
+              >
+                <Icon name="close" size={11} />
+              </button>
+            </span>
+          ))}
+          {tags.length > 0 && (
+            <button
+              onClick={() => setSmartCreatorOpen((v) => !v)}
+              data-testid="office-smart-new"
+              className="text-[11px] px-2 py-0.5 rounded-full border border-dashed border-stone-300 dark:border-stone-600 text-stone-500 hover:border-accent hover:text-accent"
+            >
+              + Smart folder
+            </button>
+          )}
+        </div>
+      )}
+
+      {smartCreatorOpen && (
+        <SmartFolderCreator
+          tags={tags}
+          onCreate={(name, sel) => {
+            void createSmart(name, sel)
+            setSmartCreatorOpen(false)
+          }}
+          onClose={() => setSmartCreatorOpen(false)}
+        />
+      )}
+
       {tagEditId && (
         <TagEditor
           fileId={tagEditId}
@@ -338,6 +399,43 @@ export default function OfficeDrive({
               ))}
             </div>
           )
+        ) : activeSmart ? (
+          <div data-testid="office-smart-view">
+            <div className="px-2 pt-1 pb-1.5 text-[10px] uppercase tracking-wider text-stone-400 flex items-center gap-1">
+              <Icon name="folder_special" size={11} />
+              <span className="truncate">
+                {activeSmart.name} — {activeSmart.tags.join(' + ')}
+              </span>
+              <button onClick={clearSmart} className="text-stone-400 hover:text-accent shrink-0" data-testid="office-smart-clear" title="Close">
+                <Icon name="close" size={11} />
+              </button>
+            </div>
+            {smartEntries.length === 0 ? (
+              <div className="px-2 py-3 text-[12px] text-stone-400">
+                Nothing matches all of: {activeSmart.tags.join(', ')}.
+              </div>
+            ) : (
+              smartEntries.map((e) => (
+                <DriveRow
+                  key={e.id}
+                  entry={e}
+                  active={!!e.docId && active?.id === e.docId}
+                  isDropTarget={false}
+                  onOpen={() => {
+                    if (e.kind === 'folder') {
+                      clearSmart()
+                      void openFolder(e.id)
+                    } else if (e.kind === 'doc' && e.docId) void open(e.docId)
+                    else void window.api.files.open(e.id)
+                  }}
+                  onDelete={() => void remove(e.id)}
+                  onTag={() => setTagEditId(e.id)}
+                  draggable={false}
+                  onDragStart={() => {}}
+                />
+              ))
+            )}
+          </div>
         ) : activeTag ? (
           <div data-testid="office-tag-view">
             <div className="px-2 pt-1 pb-1.5 text-[10px] uppercase tracking-wider text-stone-400 flex items-center gap-1">
@@ -739,6 +837,66 @@ function TrashRow({
       >
         <Icon name="delete_forever" size={14} />
       </button>
+    </div>
+  )
+}
+
+// Create a smart folder: a name and a set of tags. Files carrying ALL the chosen
+// tags will always appear in it, wherever they physically live.
+function SmartFolderCreator({
+  tags,
+  onCreate,
+  onClose
+}: {
+  tags: Array<{ tag: string; count: number }>
+  onCreate: (name: string, tags: string[]) => void
+  onClose: () => void
+}): JSX.Element {
+  const [name, setName] = useState('')
+  const [selected, setSelected] = useState<string[]>([])
+  const toggle = (t: string): void => setSelected((s) => (s.includes(t) ? s.filter((x) => x !== t) : [...s, t]))
+  function save(): void {
+    if (!selected.length) return
+    onCreate(name.trim() || selected.join(' + '), selected)
+  }
+  return (
+    <div className="mx-3 mb-2 rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 p-2 space-y-1.5" data-testid="office-smart-creator">
+      <div className="flex items-center gap-1.5">
+        <Icon name="folder_special" size={12} className="text-accent" />
+        <span className="text-[11px] uppercase tracking-wide text-stone-400 flex-1">New smart folder</span>
+        <button onClick={onClose} className="text-stone-400 hover:text-stone-600">
+          <Icon name="close" size={13} />
+        </button>
+      </div>
+      <input
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        placeholder="Name (optional)"
+        data-testid="office-smart-name"
+        className="w-full bg-stone-50 dark:bg-stone-900 border border-stone-300 dark:border-stone-600 rounded px-2 py-1 text-[12px] focus:outline-none focus:border-accent"
+      />
+      <div className="text-[10px] text-stone-400">Files matching ALL chosen tags appear here.</div>
+      <div className="flex items-center gap-1 flex-wrap">
+        {tags.map((t) => (
+          <button
+            key={t.tag}
+            onClick={() => toggle(t.tag)}
+            data-testid={`office-smart-pick-${t.tag}`}
+            className={`text-[11px] px-2 py-0.5 rounded-full border ${
+              selected.includes(t.tag)
+                ? 'border-accent bg-accent/10 text-accent'
+                : 'border-stone-200 dark:border-stone-700 text-stone-600 dark:text-stone-300'
+            }`}
+          >
+            {t.tag}
+          </button>
+        ))}
+      </div>
+      <div className="flex justify-end">
+        <button onClick={save} disabled={!selected.length} data-testid="office-smart-save" className="btn-primary text-[12px] px-2.5 py-1 disabled:opacity-50">
+          Create
+        </button>
+      </div>
     </div>
   )
 }
