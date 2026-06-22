@@ -400,8 +400,8 @@ export default function OfficeDrive({
       {smartCreatorOpen && (
         <SmartFolderCreator
           tags={tags}
-          onCreate={(name, sel) => {
-            void createSmart(name, sel)
+          onCreate={(name, sel, search) => {
+            void createSmart(name, sel, search)
             setSmartCreatorOpen(false)
           }}
           onClose={() => setSmartCreatorOpen(false)}
@@ -478,7 +478,10 @@ export default function OfficeDrive({
             <div className="px-2 pt-1 pb-1.5 text-[10px] uppercase tracking-wider text-stone-400 flex items-center gap-1">
               <Icon name="folder_special" size={11} />
               <span className="truncate">
-                {activeSmart.name} — {activeSmart.tags.join(' + ')}
+                {activeSmart.name} —{' '}
+                {[...activeSmart.tags, activeSmart.search ? `“${activeSmart.search}”` : '']
+                  .filter(Boolean)
+                  .join(' + ')}
               </span>
               <button onClick={clearSmart} className="text-stone-400 hover:text-accent shrink-0" data-testid="office-smart-clear" title="Close">
                 <Icon name="close" size={11} />
@@ -931,15 +934,16 @@ function SmartFolderCreator({
   onClose
 }: {
   tags: Array<{ tag: string; count: number }>
-  onCreate: (name: string, tags: string[]) => void
+  onCreate: (name: string, tags: string[], search: string) => void
   onClose: () => void
 }): JSX.Element {
   const [name, setName] = useState('')
   const [selected, setSelected] = useState<string[]>([])
+  const [searchTerm, setSearchTerm] = useState('')
   const toggle = (t: string): void => setSelected((s) => (s.includes(t) ? s.filter((x) => x !== t) : [...s, t]))
   function save(): void {
-    if (!selected.length) return
-    onCreate(name.trim() || selected.join(' + '), selected)
+    if (!selected.length && !searchTerm.trim()) return
+    onCreate(name.trim() || selected.join(' + ') || searchTerm.trim(), selected, searchTerm.trim())
   }
   return (
     <div className="mx-3 mb-2 rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 p-2 space-y-1.5" data-testid="office-smart-creator">
@@ -957,7 +961,14 @@ function SmartFolderCreator({
         data-testid="office-smart-name"
         className="w-full bg-stone-50 dark:bg-stone-900 border border-stone-300 dark:border-stone-600 rounded px-2 py-1 text-[12px] focus:outline-none focus:border-accent"
       />
-      <div className="text-[10px] text-stone-400">Files matching ALL chosen tags appear here.</div>
+      <input
+        value={searchTerm}
+        onChange={(e) => setSearchTerm(e.target.value)}
+        placeholder="And/or a search term (optional)"
+        data-testid="office-smart-search"
+        className="w-full bg-stone-50 dark:bg-stone-900 border border-stone-300 dark:border-stone-600 rounded px-2 py-1 text-[12px] focus:outline-none focus:border-accent"
+      />
+      <div className="text-[10px] text-stone-400">Shows files matching ALL chosen tags and the search term.</div>
       <div className="flex items-center gap-1 flex-wrap">
         {tags.map((t) => (
           <button
@@ -975,7 +986,7 @@ function SmartFolderCreator({
         ))}
       </div>
       <div className="flex justify-end">
-        <button onClick={save} disabled={!selected.length} data-testid="office-smart-save" className="btn-primary text-[12px] px-2.5 py-1 disabled:opacity-50">
+        <button onClick={save} disabled={!selected.length && !searchTerm.trim()} data-testid="office-smart-save" className="btn-primary text-[12px] px-2.5 py-1 disabled:opacity-50">
           Create
         </button>
       </div>

@@ -457,3 +457,45 @@ test('PO-18 — proactive auto-filing: unfiled banner; Review opens with AI sugg
   await expect(window.locator('[data-testid="office-tag-suggestions"]')).toBeVisible({ timeout: 5_000 })
   await expect(window.locator('[data-testid="office-tag-suggestion-Acme"]')).toBeVisible()
 })
+
+test('PO-19 — smart folders with a search term: tag AND name must both match', async () => {
+  launched = await launchApp({ env: { PLEXI_APP: 'office' } })
+  const { window } = launched
+
+  // A folder and a document, both tagged "Acme".
+  await window.locator('[data-testid="office-new-folder"]').click()
+  const folder = window.locator('[data-testid="office-folder-New folder"]')
+  await expect(folder).toBeVisible({ timeout: 10_000 })
+  await folder.hover()
+  await window.locator('[data-testid="office-tagbtn-New folder"]').click({ force: true })
+  await window.locator('[data-testid="office-tag-add-input"]').fill('Acme')
+  await window.locator('[data-testid="office-tag-add"]').click()
+  await expect(window.locator('[data-testid="office-tag-chip-Acme"]')).toBeVisible({ timeout: 4_000 })
+  await window.locator('[data-testid="office-tag-editor-close"]').click()
+
+  await window.locator('[data-testid="office-new-doc"]').click()
+  await expect(window.locator('input').first()).toBeVisible({ timeout: 10_000 })
+  await window.getByRole('button', { name: /Back to list/i }).click()
+  const doc = window.locator('[data-testid="office-doc-Untitled document"]')
+  await expect(doc).toBeVisible({ timeout: 5_000 })
+  await doc.hover()
+  await window.locator('[data-testid="office-tagbtn-Untitled document"]').click({ force: true })
+  await window.locator('[data-testid="office-tag-add-input"]').fill('Acme')
+  await window.locator('[data-testid="office-tag-add"]').click()
+  await expect(window.locator('[data-testid="office-tag-chip-Acme"]')).toBeVisible({ timeout: 4_000 })
+  await window.locator('[data-testid="office-tag-editor-close"]').click()
+
+  // Smart folder: tag Acme AND name contains "folder".
+  await window.locator('[data-testid="office-smart-new"]').click()
+  await window.locator('[data-testid="office-smart-name"]').fill('Acme Folders')
+  await window.locator('[data-testid="office-smart-pick-Acme"]').click()
+  await window.locator('[data-testid="office-smart-search"]').fill('folder')
+  await window.locator('[data-testid="office-smart-save"]').click()
+
+  // Only the folder qualifies (Acme + name "New folder"); the doc does not.
+  await window.locator('[data-testid="office-smart-Acme Folders"]').click()
+  const view = window.locator('[data-testid="office-smart-view"]')
+  await expect(view).toBeVisible({ timeout: 4_000 })
+  await expect(view.locator('[data-testid="office-folder-New folder"]')).toBeVisible({ timeout: 4_000 })
+  await expect(view.locator('[data-testid="office-doc-Untitled document"]')).toHaveCount(0)
+})
