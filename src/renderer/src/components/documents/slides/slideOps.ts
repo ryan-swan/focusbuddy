@@ -93,6 +93,21 @@ export function setListStyle(el: SlideTextElement, listStyle: 'bullet' | 'number
   return { ...el, paragraphs: el.paragraphs.map((p) => ({ ...p, listStyle })) }
 }
 
+// CSS background size + position that shows just the cropped window of an image,
+// scaled to fill the element frame. Crop is inset fractions (0..1) from each
+// edge; the visible window is (1-l-r) wide and (1-t-b) tall.
+export function cropStyle(crop: { l: number; t: number; r: number; b: number }): {
+  size: string
+  position: string
+} {
+  const round = (n: number): number => Math.round(n * 100) / 100
+  const vw = Math.max(0.01, 1 - crop.l - crop.r)
+  const vh = Math.max(0.01, 1 - crop.t - crop.b)
+  const px = crop.l + crop.r > 0 ? (crop.l / (crop.l + crop.r)) * 100 : 0
+  const py = crop.t + crop.b > 0 ? (crop.t / (crop.t + crop.b)) * 100 : 0
+  return { size: `${round(100 / vw)}% ${round(100 / vh)}%`, position: `${round(px)}% ${round(py)}%` }
+}
+
 // ── Multi-element operations: selection, alignment, distribution, grouping ────
 
 export type AlignEdge = 'left' | 'centerX' | 'right' | 'top' | 'middleY' | 'bottom'

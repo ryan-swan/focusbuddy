@@ -4,6 +4,7 @@
 // editor, present and export sizes.
 
 import type { SlideElement, SlideTextElement } from '@shared/types'
+import { cropStyle } from './slideOps'
 
 // Drop-shadow presets, soft enough to read as depth rather than a hard edge.
 const SHADOW: Record<NonNullable<SlideElement['shadow']>, string> = {
@@ -90,6 +91,26 @@ export default function SlideElementView({ el }: { el: SlideElement }): JSX.Elem
     )
   }
   if (el.type === 'image') {
+    const c = el.crop
+    // A cropped image is drawn as a background so the chosen window fills the
+    // frame; an uncropped one keeps the plain <img> with its object-fit.
+    if (c && (c.l > 0 || c.t > 0 || c.r > 0 || c.b > 0)) {
+      const cs = cropStyle(c)
+      return (
+        <div
+          data-cropped="1"
+          style={{
+            ...base,
+            ...frame(el),
+            border: borderCss(el.border),
+            backgroundImage: `url(${el.src})`,
+            backgroundRepeat: 'no-repeat',
+            backgroundSize: cs.size,
+            backgroundPosition: cs.position
+          }}
+        />
+      )
+    }
     return (
       <div style={{ ...base, ...frame(el), border: borderCss(el.border) }}>
         <img src={el.src} alt="" style={{ width: '100%', height: '100%', objectFit: el.fit ?? 'contain' }} />

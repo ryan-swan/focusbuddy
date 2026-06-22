@@ -1240,3 +1240,45 @@ test('SL-18 — element framing: drop shadow and corner radius render on a shape
     await dispose()
   }
 })
+
+test('SL-19b — image crop: insert an image, crop it with the drag-handle dialog', async () => {
+  const { app, window, dispose } = await launchApp()
+  try {
+    await waitForReady(window)
+    await openDocumentsHub(window)
+    await startBlankSlides(window)
+
+    // Stub the native image picker to return a tiny 1x1 PNG so insert is headless.
+    await app.evaluate(({ ipcMain }) => {
+      const png =
+        'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=='
+      ipcMain.removeHandler('office:pickImage')
+      ipcMain.handle('office:pickImage', async () => ({ ok: true, dataUrl: png }))
+    })
+
+    // Insert the image via the toolbar; it auto-selects, so the inspector shows.
+    await window.locator('[data-testid="slides-toolbar"]').locator('button', { hasText: 'Image' }).first().click()
+    await expect(window.locator('[data-testid="slide-element"][data-eltype="image"]')).toBeVisible({ timeout: 8_000 })
+
+    // Open the crop editor from the inspector.
+    await window.locator('[data-testid="inspector-crop"]').click()
+    await expect(window.locator('[data-testid="slides-crop-dialog"]')).toBeVisible({ timeout: 4_000 })
+
+    // Drag the bottom-right handle inward to shrink the kept window.
+    const handle = window.locator('[data-testid="slides-crop-handle-se"]')
+    const hb = (await handle.boundingBox())!
+    await window.mouse.move(hb.x + hb.width / 2, hb.y + hb.height / 2)
+    await window.mouse.down()
+    await window.mouse.move(hb.x - 120, hb.y - 120, { steps: 8 })
+    await window.mouse.up()
+
+    await window.locator('[data-testid="slides-crop-apply"]').click()
+
+    // The image on the canvas now renders through the cropped (background-image) path.
+    await expect(window.locator('[data-testid="slide-canvas"] [data-cropped="1"]')).toHaveCount(1, {
+      timeout: 4_000
+    })
+  } finally {
+    await dispose()
+  }
+})

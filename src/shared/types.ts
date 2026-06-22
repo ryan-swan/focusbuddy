@@ -1371,6 +1371,9 @@ export interface SlideImageElement extends SlideElementBase {
   // "fit to image" can use the true ratio rather than the current frame.
   naturalW?: number
   naturalH?: number
+  // Crop as inset fractions (0..1) from each edge of the source image. The
+  // remaining window fills the element frame. Absent = the whole image.
+  crop?: { l: number; t: number; r: number; b: number }
 }
 export interface SlideShapeElement extends SlideElementBase {
   type: 'shape'

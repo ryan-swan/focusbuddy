@@ -22,6 +22,7 @@ interface Props {
   onSetTransition: (t: SlideTransition) => void
   onSetBackground: (color: string) => void
   onApplyTheme: (theme: DeckTheme) => void
+  onCrop: (id: string) => void
 }
 
 const labelCls = 'text-[10px] uppercase tracking-wide text-stone-400'
@@ -193,6 +194,23 @@ export default function ElementInspector(props: Props): JSX.Element {
           >
             <Icon name={el.lockAspect ? 'lock' : 'lock_open'} size={14} /> Lock aspect ratio
           </button>
+          <button
+            className={`${btn} w-full justify-start gap-1.5 ${el.crop ? 'text-accent' : ''}`}
+            title="Crop the image"
+            data-testid="inspector-crop"
+            onClick={() => props.onCrop(el.id)}
+          >
+            <Icon name="crop" size={14} /> {el.crop ? 'Edit crop' : 'Crop'}
+          </button>
+          {el.crop && (
+            <button
+              className={btn + ' w-full justify-start gap-1.5'}
+              title="Remove the crop"
+              onClick={() => props.onUpdateElement(el.id, { crop: undefined })}
+            >
+              <Icon name="crop_free" size={14} /> Remove crop
+            </button>
+          )}
           {el.naturalW && el.naturalH && (
             <button
               className={btn + ' w-full justify-start gap-1.5'}

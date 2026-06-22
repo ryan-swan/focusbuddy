@@ -10,6 +10,7 @@ import SlidesToolbar from './slides/SlidesToolbar'
 import SlideTemplateGallery from './slides/SlideTemplateGallery'
 import PresentOverlay from './slides/PresentOverlay'
 import AiSlidePanel from './slides/AiSlidePanel'
+import CropDialog from './slides/CropDialog'
 import {
   addElement,
   updateElement,
@@ -48,6 +49,7 @@ export default function SlidesEditor({ body: rawBody, title, onChange }: Props):
   const [sel, setSel] = useState(0)
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [presenting, setPresenting] = useState(false)
+  const [cropId, setCropId] = useState<string | null>(null)
   const [aiOpen, setAiOpen] = useState(false)
   const [galleryOpen, setGalleryOpen] = useState(false)
   const [status, setStatus] = useState<string | null>(null)
@@ -598,6 +600,7 @@ export default function SlidesEditor({ body: rawBody, title, onChange }: Props):
           onSetTransition={(t: SlideTransition) => mutateSlide((s) => ({ ...s, transition: t }))}
           onSetBackground={(color) => mutateSlide((s) => ({ ...s, background: { type: 'solid', color } }))}
           onApplyTheme={applyTheme}
+          onCrop={(id) => setCropId(id)}
         />
       </div>
 
@@ -606,6 +609,22 @@ export default function SlidesEditor({ body: rawBody, title, onChange }: Props):
       )}
 
       {presenting && <PresentOverlay slides={slides} theme={theme} startIndex={slideIdx} onClose={() => setPresenting(false)} />}
+
+      {cropId &&
+        (() => {
+          const target = (slide.elements ?? []).find((e) => e.id === cropId)
+          if (!target || target.type !== 'image') return null
+          return (
+            <CropDialog
+              el={target}
+              onApply={(crop) => {
+                updateEl(cropId, { crop })
+                setCropId(null)
+              }}
+              onClose={() => setCropId(null)}
+            />
+          )
+        })()}
     </div>
   )
 }
