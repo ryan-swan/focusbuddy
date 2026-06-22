@@ -30,6 +30,7 @@ import { createLowlight, common } from 'lowlight'
 import { ResizableImage } from './ResizableImage'
 import { SlashCommand } from './SlashMenu'
 import { SearchHighlight } from './searchHighlight'
+import { FocusBlock } from './focusBlock'
 
 const lowlight = createLowlight(common)
 
@@ -86,7 +87,8 @@ export function buildDocExtensions(opts: BuildOptions = {}): AnyExt[] {
       }),
       CharacterCount as AnyExt,
       SlashCommand as AnyExt,
-      SearchHighlight as AnyExt
+      SearchHighlight as AnyExt,
+      FocusBlock as AnyExt
     )
   } else {
     // Headless: a plain image node with the identical schema (no NodeView) plus

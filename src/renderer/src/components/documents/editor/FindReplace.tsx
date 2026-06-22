@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react'
 import type { Editor } from '@tiptap/react'
 import Icon from '../../Icon'
 import { getSearchState } from './searchHighlight'
+import { isValidRegex } from '../../../lib/docFind'
 
 interface Props {
   editor: Editor
@@ -17,14 +18,20 @@ export default function FindReplace({ editor, onClose }: Props): JSX.Element {
   const [replacement, setReplacement] = useState('')
   const [caseSensitive, setCaseSensitive] = useState(false)
   const [wholeWord, setWholeWord] = useState(false)
+  const [regex, setRegex] = useState(false)
   const [showReplace, setShowReplace] = useState(false)
   const [status, setStatus] = useState({ count: 0, index: 0 })
 
-  // Push the query into the plugin whenever it or the options change.
+  // A regex query that doesn't compile: we keep the panel usable and just flag it
+  // rather than matching nothing with no explanation.
+  const regexBad = regex && query.length > 0 && !isValidRegex(query, caseSensitive)
+
+  // Push the query into the plugin whenever it or the options change. In regex
+  // mode wholeWord is meaningless, so it is not sent.
   useEffect(() => {
-    editor.commands.setSearch(query, { caseSensitive, wholeWord })
+    editor.commands.setSearch(query, regex ? { caseSensitive, regex: true } : { caseSensitive, wholeWord })
     setStatus(getSearchState(editor))
-  }, [editor, query, caseSensitive, wholeWord])
+  }, [editor, query, caseSensitive, wholeWord, regex])
 
   // Keep the count/index in sync as the selection or document moves.
   useEffect(() => {
@@ -76,12 +83,16 @@ export default function FindReplace({ editor, onClose }: Props): JSX.Element {
             if (e.key === 'Enter') (e.shiftKey ? prev() : next())
             if (e.key === 'Escape') onClose()
           }}
-          placeholder="Find"
+          placeholder={regex ? 'Find (regex)' : 'Find'}
           data-testid="doc-find-input"
-          className="flex-1 bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded px-2 py-1 text-[12px] focus:outline-none focus:border-accent"
+          className={`flex-1 bg-stone-50 dark:bg-stone-800 border rounded px-2 py-1 text-[12px] focus:outline-none ${
+            regexBad
+              ? 'border-red-400 focus:border-red-500'
+              : 'border-stone-200 dark:border-stone-700 focus:border-accent'
+          }`}
         />
         <span className="text-[11px] text-stone-400 tabular-nums w-14 text-center" data-testid="doc-find-count">
-          {status.count ? `${status.index}/${status.count}` : '0/0'}
+          {regexBad ? 'regex!' : status.count ? `${status.index}/${status.count}` : '0/0'}
         </span>
         <button onClick={prev} title="Previous (Shift+Enter)" className="icon-btn">
           <Icon name="keyboard_arrow_up" size={16} />
@@ -105,9 +116,13 @@ export default function FindReplace({ editor, onClose }: Props): JSX.Element {
           <input type="checkbox" checked={caseSensitive} onChange={(e) => setCaseSensitive(e.target.checked)} className="accent-accent" />
           Case
         </label>
-        <label className="inline-flex items-center gap-1 cursor-pointer">
-          <input type="checkbox" checked={wholeWord} onChange={(e) => setWholeWord(e.target.checked)} className="accent-accent" />
+        <label className={`inline-flex items-center gap-1 ${regex ? 'opacity-40' : 'cursor-pointer'}`} title={regex ? 'Not used in regex mode' : 'Match whole words only'}>
+          <input type="checkbox" checked={wholeWord} disabled={regex} onChange={(e) => setWholeWord(e.target.checked)} className="accent-accent" />
           Whole word
+        </label>
+        <label className="inline-flex items-center gap-1 cursor-pointer" title="Regular expression — the thing Google Docs can't do">
+          <input type="checkbox" checked={regex} onChange={(e) => setRegex(e.target.checked)} className="accent-accent" data-testid="doc-find-regex" />
+          <span className="font-mono">.*</span> Regex
         </label>
       </div>
 

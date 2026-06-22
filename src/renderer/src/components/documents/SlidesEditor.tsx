@@ -20,8 +20,16 @@ import {
   styleTextElement,
   setParagraphAlign,
   setListStyle,
-  elementId
+  elementId,
+  alignElements,
+  distributeElements,
+  groupElements,
+  ungroupElements,
+  moveElementsBy,
+  withGroupMembers,
+  type AlignEdge
 } from './slides/slideOps'
+import { useRegisterEditorCommands, type EditorCommand } from '../../stores/editorCommands'
 import Icon from '../Icon'
 
 // PowerPoint-class slides editor. The deck is held as v2 (element-based) in local
@@ -38,7 +46,7 @@ interface Props {
 export default function SlidesEditor({ body: rawBody, title, onChange }: Props): JSX.Element {
   const [body, setBody] = useState<SlidesBody>(() => migrateSlidesBody(rawBody))
   const [sel, setSel] = useState(0)
-  const [selectedElId, setSelectedElId] = useState<string | null>(null)
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [presenting, setPresenting] = useState(false)
   const [aiOpen, setAiOpen] = useState(false)
   const [galleryOpen, setGalleryOpen] = useState(false)
@@ -53,7 +61,31 @@ export default function SlidesEditor({ body: rawBody, title, onChange }: Props):
   const slides = body.slides
   const slideIdx = Math.min(sel, slides.length - 1)
   const slide = slides[slideIdx]
+  // The inspector edits a single element; with 0 or 2+ selected it shows nothing
+  // and the multi-select align toolbar takes over.
+  const selectedElId = selectedIds.length === 1 ? selectedIds[0] : null
   const selectedEl = (slide?.elements ?? []).find((e) => e.id === selectedElId) ?? null
+
+  // Select an element. additive (Shift/Cmd-click) toggles it in the selection;
+  // a plain click replaces. Either way the selection expands to whole groups so
+  // a grouped element never selects alone.
+  function selectElement(id: string | null, additive: boolean): void {
+    if (id === null) {
+      setSelectedIds([])
+      return
+    }
+    setSelectedIds((prev) => {
+      if (!additive) return withGroupMembers(slide, [id])
+      if (prev.includes(id)) {
+        const groupOfId = new Set(withGroupMembers(slide, [id]))
+        return prev.filter((x) => !groupOfId.has(x))
+      }
+      return withGroupMembers(slide, [...prev, id])
+    })
+  }
+  function selectMany(ids: string[]): void {
+    setSelectedIds(ids.length ? withGroupMembers(slide, ids) : [])
+  }
 
   // Measure the canvas column so the slide scales to fit.
   useEffect(() => {
@@ -134,14 +166,14 @@ export default function SlidesEditor({ body: rawBody, title, onChange }: Props):
     const insertAt = slideIdx + 1
     commit({ ...body, slides: [...slides.slice(0, insertAt), s, ...slides.slice(insertAt)] })
     setSel(insertAt)
-    setSelectedElId(null)
+    setSelectedIds([])
     setGalleryOpen(false)
   }
   function deleteSlide(i: number): void {
     if (slides.length <= 1) return
     setSlides(slides.filter((_, si) => si !== i))
     setSel(Math.max(0, i - 1))
-    setSelectedElId(null)
+    setSelectedIds([])
   }
   function moveSlide(i: number, dir: -1 | 1): void {
     const j = i + dir
@@ -167,17 +199,17 @@ export default function SlidesEditor({ body: rawBody, title, onChange }: Props):
       paragraphs: [{ runs: [{ text: 'Text', fontSize: theme.bodyStyle.fontSize, color: theme.textColor }], align: 'left' }]
     }
     mutateSlide((s) => addElement(s, el))
-    setSelectedElId(el.id)
+    setSelectedIds([el.id])
   }
   function insertShape(shape: 'rect' | 'ellipse' | 'roundRect' | 'triangle'): void {
     const el: SlideElement = { id: elementId(), type: 'shape', shape, x: 440, y: 240, w: 400, h: 240, z: 10, fill: { type: 'solid', color: theme.accent } }
     mutateSlide((s) => addElement(s, el))
-    setSelectedElId(el.id)
+    setSelectedIds([el.id])
   }
   function insertLine(): void {
     const el: SlideElement = { id: elementId(), type: 'line', x: 300, y: 320, w: 680, h: 0, z: 10, x2: 980, y2: 320, stroke: theme.accent, strokeWidth: 4, arrowEnd: true }
     mutateSlide((s) => addElement(s, el))
-    setSelectedElId(el.id)
+    setSelectedIds([el.id])
   }
   async function insertImage(): Promise<void> {
     const res = await window.api.office.pickImage()
@@ -209,11 +241,11 @@ export default function SlidesEditor({ body: rawBody, title, onChange }: Props):
       z: 10
     }
     mutateSlide((s) => addElement(s, el))
-    setSelectedElId(el.id)
+    setSelectedIds([el.id])
   }
   function applyLayout(layout: SlideLayout): void {
     mutateSlide((s) => ({ ...s, layout, elements: layoutElements(layout, theme) }))
-    setSelectedElId(null)
+    setSelectedIds([])
   }
   function applyTheme(t: DeckTheme): void {
     commit(applyThemeToDeck(body, t))
@@ -233,7 +265,7 @@ export default function SlidesEditor({ body: rawBody, title, onChange }: Props):
       if (redesigned) mutateSlide((s) => ({ ...s, elements: redesigned.elements, background: redesigned.background ?? s.background }))
     }
     setAiOpen(false)
-    setSelectedElId(null)
+    setSelectedIds([])
   }
 
   // ── Import / export ───────────────────────────────────────────────────────
@@ -264,6 +296,162 @@ export default function SlidesEditor({ body: rawBody, title, onChange }: Props):
     }
   }
 
+  // ── Selection operations (work on one element or many) ───────────────────
+  // Centre the whole selection's bounding box on the slide.
+  function centreSelection(axis: 'h' | 'v'): void {
+    const els = (slide.elements ?? []).filter((e) => selectedIds.includes(e.id))
+    if (!els.length) return
+    if (axis === 'h') {
+      const minX = Math.min(...els.map((e) => e.x))
+      const maxR = Math.max(...els.map((e) => e.x + e.w))
+      mutateSlide((s) => moveElementsBy(s, selectedIds, (1280 - (maxR - minX)) / 2 - minX, 0))
+    } else {
+      const minY = Math.min(...els.map((e) => e.y))
+      const maxB = Math.max(...els.map((e) => e.y + e.h))
+      mutateSlide((s) => moveElementsBy(s, selectedIds, 0, (720 - (maxB - minY)) / 2 - minY))
+    }
+  }
+  function doAlign(edge: AlignEdge): void {
+    mutateSlide((s) => alignElements(s, selectedIds, edge))
+  }
+  function doDistribute(axis: 'h' | 'v'): void {
+    mutateSlide((s) => distributeElements(s, selectedIds, axis))
+  }
+  function doGroup(): void {
+    if (selectedIds.length >= 2) mutateSlide((s) => groupElements(s, selectedIds))
+  }
+  function doUngroup(): void {
+    mutateSlide((s) => ungroupElements(s, selectedIds))
+  }
+  function reorderSelection(dir: 'front' | 'back' | 'forward' | 'backmost'): void {
+    mutateSlide((s) => selectedIds.reduce((acc, id) => reorderZ(acc, id, dir), s))
+  }
+  function duplicateSelection(): void {
+    if (!selectedIds.length) return
+    let s = slide
+    const newIds: string[] = []
+    for (const id of selectedIds) {
+      const r = duplicateElement(s, id)
+      s = r.slide
+      newIds.push(r.newId)
+    }
+    mutateSlide(() => s)
+    setSelectedIds(newIds)
+  }
+  function deleteSelection(): void {
+    if (!selectedIds.length) return
+    mutateSlide((s) => selectedIds.reduce((acc, id) => deleteElement(acc, id), s))
+    setSelectedIds([])
+  }
+  const anyGrouped = (slide.elements ?? []).some((e) => selectedIds.includes(e.id) && e.groupId)
+
+  // Keyboard-direct manipulation of the selection: arrow keys nudge the whole
+  // selection by 1 (10 with Shift), Cmd/Ctrl+D duplicates, Delete/Backspace
+  // removes, Cmd/Ctrl+G groups and Shift+Cmd/Ctrl+G ungroups — never while a text
+  // field is focused, so typing and the notes box are unaffected.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent): void {
+      if (!selectedIds.length) return
+      const tag = (document.activeElement?.tagName ?? '').toLowerCase()
+      if (tag === 'input' || tag === 'textarea') return
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        setSelectedIds([])
+        return
+      }
+      const mod = e.metaKey || e.ctrlKey
+      if (mod && e.key.toLowerCase() === 'g') {
+        e.preventDefault()
+        if (e.shiftKey) doUngroup()
+        else doGroup()
+        return
+      }
+      if (mod && e.key.toLowerCase() === 'd') {
+        e.preventDefault()
+        duplicateSelection()
+        return
+      }
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        e.preventDefault()
+        deleteSelection()
+        return
+      }
+      const step = e.shiftKey ? 10 : 1
+      let dx = 0
+      let dy = 0
+      if (e.key === 'ArrowLeft') dx = -step
+      else if (e.key === 'ArrowRight') dx = step
+      else if (e.key === 'ArrowUp') dy = -step
+      else if (e.key === 'ArrowDown') dy = step
+      else return
+      e.preventDefault()
+      mutateSlide((s) => moveElementsBy(s, selectedIds, dx, dy))
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedIds, slideIdx, body])
+
+  // Publish the deck's commands to the Cmd+K palette under the 'Slides' scope.
+  // Selection-only actions appear with a selection; align/distribute/group only
+  // when several elements are selected.
+  useRegisterEditorCommands(
+    'Slides',
+    () => {
+      const n = selectedIds.length
+      const multi = n >= 2
+      const cmds: EditorCommand[] = [
+        { id: 'sl-text', label: 'Insert text box', icon: 'title', group: 'Insert', run: insertText },
+        { id: 'sl-shape', label: 'Insert shape', icon: 'crop_square', group: 'Insert', keywords: 'rectangle box', run: () => insertShape('rect') },
+        { id: 'sl-ellipse', label: 'Insert ellipse', icon: 'circle', group: 'Insert', keywords: 'oval circle', run: () => insertShape('ellipse') },
+        { id: 'sl-image', label: 'Insert image', icon: 'image', group: 'Insert', keywords: 'picture photo', run: () => void insertImage() },
+        { id: 'sl-line', label: 'Insert line', icon: 'horizontal_rule', group: 'Insert', keywords: 'arrow connector', run: insertLine },
+        { id: 'sl-new', label: 'New slide', icon: 'add_to_photos', group: 'Slide', keywords: 'add template', run: () => setGalleryOpen(true) },
+        { id: 'sl-present', label: 'Present deck', icon: 'play_arrow', group: 'Slide', keywords: 'slideshow play', run: () => setPresenting(true) },
+        { id: 'sl-ai', label: 'AI: generate or redesign slides', icon: 'auto_awesome', group: 'AI', keywords: 'design make beautiful', run: () => setAiOpen(true) },
+        { id: 'sl-undo', label: 'Undo', icon: 'undo', shortcut: '⌘Z', group: 'Edit', run: undoLast },
+        { id: 'sl-redo', label: 'Redo', icon: 'redo', shortcut: '⇧⌘Z', group: 'Edit', run: redoLast },
+        { id: 'sl-import', label: 'Import PowerPoint (.pptx)', icon: 'upload_file', group: 'File', keywords: 'open pptx', run: () => void importFile() },
+        { id: 'sl-export-pptx', label: 'Export PowerPoint (.pptx)', icon: 'slideshow', group: 'File', keywords: 'save pptx', run: () => void exportFile('pptx') },
+        { id: 'sl-export-pdf', label: 'Export PDF', icon: 'picture_as_pdf', group: 'File', keywords: 'save pdf', run: () => void exportFile('pdf') }
+      ]
+      if (n >= 1) {
+        cmds.push(
+          { id: 'sl-dup', label: multi ? `Duplicate ${n} elements` : 'Duplicate element', icon: 'content_copy', shortcut: '⌘D', group: 'Arrange', run: duplicateSelection },
+          { id: 'sl-del', label: multi ? `Delete ${n} elements` : 'Delete element', icon: 'delete', group: 'Arrange', keywords: 'remove', run: deleteSelection },
+          { id: 'sl-ch', label: 'Centre on slide horizontally', icon: 'align_horizontal_center', group: 'Arrange', keywords: 'align center middle slide', run: () => centreSelection('h') },
+          { id: 'sl-cv', label: 'Centre on slide vertically', icon: 'align_vertical_center', group: 'Arrange', keywords: 'align center middle slide', run: () => centreSelection('v') },
+          { id: 'sl-front', label: 'Bring to front', icon: 'flip_to_front', group: 'Arrange', keywords: 'z order top', run: () => reorderSelection('front') },
+          { id: 'sl-forward', label: 'Bring forward', icon: 'arrow_upward', group: 'Arrange', keywords: 'z order', run: () => reorderSelection('forward') },
+          { id: 'sl-backward', label: 'Send backward', icon: 'arrow_downward', group: 'Arrange', keywords: 'z order', run: () => reorderSelection('back') },
+          { id: 'sl-back', label: 'Send to back', icon: 'flip_to_back', group: 'Arrange', keywords: 'z order bottom', run: () => reorderSelection('backmost') }
+        )
+      }
+      if (multi) {
+        cmds.push(
+          { id: 'sl-al', label: 'Align left edges', icon: 'align_horizontal_left', group: 'Align', keywords: 'left', run: () => doAlign('left') },
+          { id: 'sl-acx', label: 'Align horizontal centres', icon: 'align_horizontal_center', group: 'Align', keywords: 'center middle', run: () => doAlign('centerX') },
+          { id: 'sl-ar', label: 'Align right edges', icon: 'align_horizontal_right', group: 'Align', keywords: 'right', run: () => doAlign('right') },
+          { id: 'sl-at', label: 'Align top edges', icon: 'align_vertical_top', group: 'Align', keywords: 'top', run: () => doAlign('top') },
+          { id: 'sl-amy', label: 'Align vertical centres', icon: 'align_vertical_center', group: 'Align', keywords: 'middle center', run: () => doAlign('middleY') },
+          { id: 'sl-ab', label: 'Align bottom edges', icon: 'align_vertical_bottom', group: 'Align', keywords: 'bottom', run: () => doAlign('bottom') },
+          { id: 'sl-group', label: `Group ${n} elements`, icon: 'group_work', shortcut: '⌘G', group: 'Arrange', keywords: 'combine link', run: doGroup }
+        )
+        if (n >= 3) {
+          cmds.push(
+            { id: 'sl-dh', label: 'Distribute horizontally', icon: 'horizontal_distribute', group: 'Align', keywords: 'space even', run: () => doDistribute('h') },
+            { id: 'sl-dv', label: 'Distribute vertically', icon: 'vertical_distribute', group: 'Align', keywords: 'space even', run: () => doDistribute('v') }
+          )
+        }
+      }
+      if (anyGrouped) {
+        cmds.push({ id: 'sl-ungroup', label: 'Ungroup', icon: 'category', shortcut: '⇧⌘G', group: 'Arrange', keywords: 'split separate', run: doUngroup })
+      }
+      return cmds
+    },
+    [selectedIds, slideIdx, body, anyGrouped]
+  )
+
   if (!slide) return <div className="p-6 text-stone-400">Empty deck.</div>
 
   return (
@@ -291,7 +479,7 @@ export default function SlidesEditor({ body: rawBody, title, onChange }: Props):
           {slides.map((s, i) => (
             <div key={s.id} className="group relative">
               <button
-                onClick={() => { setSel(i); setSelectedElId(null) }}
+                onClick={() => { setSel(i); setSelectedIds([]) }}
                 className={`block w-full rounded-md overflow-hidden border-2 ${i === slideIdx ? 'border-accent' : 'border-stone-200 dark:border-stone-700'}`}
               >
                 <SlideFace slide={s} theme={theme} width={140} />
@@ -318,14 +506,43 @@ export default function SlidesEditor({ body: rawBody, title, onChange }: Props):
             </div>
           )}
           {aiOpen && <AiSlidePanel theme={theme} onApply={applyAi} onClose={() => setAiOpen(false)} />}
+          {selectedIds.length >= 2 && (
+            <div className="mb-2 flex justify-center">
+              <div
+                className="inline-flex items-center gap-0.5 fb-glass-panel rounded-full border border-[color:var(--glass-panel-border)] px-1.5 py-1 shadow-sm"
+                data-testid="slides-align-bar"
+              >
+                <span className="text-[10px] text-stone-500 dark:text-stone-400 px-1.5">{selectedIds.length} selected</span>
+                <AlignBtn icon="align_horizontal_left" title="Align left edges" onClick={() => doAlign('left')} />
+                <AlignBtn icon="align_horizontal_center" title="Align horizontal centres" onClick={() => doAlign('centerX')} />
+                <AlignBtn icon="align_horizontal_right" title="Align right edges" onClick={() => doAlign('right')} />
+                <span className="w-px h-4 bg-stone-300/50 dark:bg-stone-600/50 mx-0.5" />
+                <AlignBtn icon="align_vertical_top" title="Align top edges" onClick={() => doAlign('top')} />
+                <AlignBtn icon="align_vertical_center" title="Align vertical centres" onClick={() => doAlign('middleY')} />
+                <AlignBtn icon="align_vertical_bottom" title="Align bottom edges" onClick={() => doAlign('bottom')} />
+                {selectedIds.length >= 3 && (
+                  <>
+                    <span className="w-px h-4 bg-stone-300/50 dark:bg-stone-600/50 mx-0.5" />
+                    <AlignBtn icon="horizontal_distribute" title="Distribute horizontally" onClick={() => doDistribute('h')} />
+                    <AlignBtn icon="vertical_distribute" title="Distribute vertically" onClick={() => doDistribute('v')} />
+                  </>
+                )}
+                <span className="w-px h-4 bg-stone-300/50 dark:bg-stone-600/50 mx-0.5" />
+                <AlignBtn icon="group_work" title="Group (⌘G)" onClick={doGroup} testid="slides-group" />
+                {anyGrouped && <AlignBtn icon="category" title="Ungroup (⇧⌘G)" onClick={doUngroup} testid="slides-ungroup" />}
+              </div>
+            </div>
+          )}
           <div className="flex justify-center">
             <SlideCanvas
               slide={slide}
               theme={theme}
               width={canvasW}
-              selectedId={selectedElId}
-              onSelect={setSelectedElId}
+              selectedIds={selectedIds}
+              onSelect={selectElement}
+              onSelectMany={selectMany}
               onUpdateElement={updateEl}
+              onMoveMany={(ids, dx, dy) => mutateSlide((s) => moveElementsBy(s, ids, dx, dy))}
               onSetText={(id, text) =>
                 mutateSlide((s) => updateElement(s, id, (() => {
                   const e = (s.elements ?? []).find((x) => x.id === id)
@@ -371,11 +588,11 @@ export default function SlidesEditor({ body: rawBody, title, onChange }: Props):
               return e && e.type === 'text' ? setListStyle(e, style) : {}
             })()))
           }
-          onDelete={(id) => { mutateSlide((s) => deleteElement(s, id)); setSelectedElId(null) }}
+          onDelete={(id) => { mutateSlide((s) => deleteElement(s, id)); setSelectedIds([]) }}
           onDuplicate={(id) => {
             const { slide: ns, newId } = duplicateElement(slide, id)
             mutateSlide(() => ns)
-            setSelectedElId(newId)
+            setSelectedIds([newId])
           }}
           onReorderZ={(id, dir) => mutateSlide((s) => reorderZ(s, id, dir))}
           onSetTransition={(t: SlideTransition) => mutateSlide((s) => ({ ...s, transition: t }))}
@@ -390,5 +607,29 @@ export default function SlidesEditor({ body: rawBody, title, onChange }: Props):
 
       {presenting && <PresentOverlay slides={slides} theme={theme} startIndex={slideIdx} onClose={() => setPresenting(false)} />}
     </div>
+  )
+}
+
+// A compact icon button for the multi-select align/distribute toolbar.
+function AlignBtn({
+  icon,
+  title,
+  onClick,
+  testid
+}: {
+  icon: string
+  title: string
+  onClick: () => void
+  testid?: string
+}): JSX.Element {
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      data-testid={testid}
+      className="h-6 w-6 inline-flex items-center justify-center rounded-full text-stone-600 dark:text-stone-300 hover:bg-accent/10 hover:text-accent fb-spring-soft"
+    >
+      <Icon name={icon} size={14} />
+    </button>
   )
 }

@@ -10,6 +10,7 @@ import Icon from './Icon'
 import { useCapabilityEnabled, useCapabilityStore } from '../stores/capabilities'
 import { canCreateWidget } from '../lib/gating'
 import { promptUpgrade } from '../stores/upgradePrompt'
+import { useEditorCommandStore } from '../stores/editorCommands'
 
 interface Props {
   onOpenBodyDouble: () => void
@@ -89,6 +90,10 @@ export default function CommandCenter({
   const setZoom = useWidgetStore((s) => s.setZoom)
   const setPan = useWidgetStore((s) => s.setPan)
   const createWidget = useWidgetStore((s) => s.create)
+  // Commands the active rich editor (Document, Slides) has published. Empty
+  // unless the user is inside one. These drive the editor straight from Cmd+K.
+  const editorCommands = useEditorCommandStore((s) => s.commands)
+  const editorScope = useEditorCommandStore((s) => s.scope)
 
   // The pill's middle buttons swap based on what the user is doing.
   // - On the canvas (kind === 'task'): widget-creation shortcuts that
@@ -227,6 +232,31 @@ export default function CommandCenter({
   const results = useMemo<CommandResult[]>(() => {
     const q = query.trim().toLowerCase()
     const items: CommandResult[] = []
+
+    // Active-editor commands first. When the user is inside a document or slide
+    // deck and opens the palette, formatting / view / insert actions are almost
+    // always what they want, so these outrank navigation. On an empty query they
+    // lead the list in their declared order; on a real query they only appear
+    // when they actually match, but then they rank above general results.
+    for (let idx = 0; idx < editorCommands.length; idx++) {
+      const c = editorCommands[idx]
+      const hay = `${c.label} ${c.keywords ?? ''} ${c.group ?? ''}`
+      const m = matchScore(hay, q)
+      const score = q === '' ? 300 - idx : m > 0 ? m + 150 : 0
+      items.push({
+        id: `ec-${c.id}`,
+        label: c.label,
+        hint: c.group ? `${editorScope ?? 'Editor'} · ${c.group}` : editorScope ?? 'Editor',
+        icon: c.icon ?? 'bolt',
+        kind: 'action',
+        score,
+        shortcut: c.shortcut,
+        run: () => {
+          c.run()
+          if (!c.keepOpen) closePalette()
+        }
+      })
+    }
 
     // Static actions
     items.push({
@@ -471,7 +501,9 @@ export default function CommandCenter({
     spawnWidget,
     deepHits,
     setZoom,
-    setPan
+    setPan,
+    editorCommands,
+    editorScope
   ])
 
   // Clamp highlight within results length whenever the list changes.
@@ -544,6 +576,15 @@ export default function CommandCenter({
             >
               <div className="flex items-center gap-2 px-3 py-2.5 border-b border-stone-200 dark:border-stone-700">
                 <Icon name="search" size={14} className="text-stone-500 dark:text-stone-400 shrink-0" />
+                {editorScope && editorCommands.length > 0 && (
+                  <span
+                    className="shrink-0 inline-flex items-center gap-1 text-[11px] font-medium text-accent bg-accent/10 border border-accent/20 rounded-md px-1.5 py-0.5"
+                    title={`Commands here drive the active ${editorScope.toLowerCase()}`}
+                  >
+                    <Icon name="bolt" size={11} />
+                    {editorScope}
+                  </span>
+                )}
                 <input
                   ref={inputRef}
                   value={query}
@@ -552,7 +593,11 @@ export default function CommandCenter({
                     setHighlightIdx(0)
                   }}
                   onKeyDown={paletteKeyDown}
-                  placeholder="Search everything — tasks, notes, docs, files, actions…"
+                  placeholder={
+                    editorScope && editorCommands.length > 0
+                      ? `Command the ${editorScope.toLowerCase()}, or search everything…`
+                      : 'Search everything — tasks, notes, docs, files, actions…'
+                  }
                   className="flex-1 bg-transparent text-[13px] text-stone-900 dark:text-stone-100 placeholder:text-stone-400 dark:placeholder:text-stone-500 focus:outline-none"
                 />
                 <kbd className="text-[10px] font-mono text-stone-400 dark:text-stone-500 bg-stone-100 dark:bg-stone-800 px-1.5 py-0.5 rounded">

@@ -681,6 +681,10 @@ const api = {
     // Soft-delete: returns the ids trashed (entry + subtree) so the caller can undo.
     delete: (id: string): Promise<string[]> => ipcRenderer.invoke('fileManager:delete', id),
     restore: (ids: string[]): Promise<boolean> => ipcRenderer.invoke('fileManager:restore', ids),
+    listTrashed: (): Promise<FileEntry[]> => ipcRenderer.invoke('fileManager:listTrashed'),
+    restoreDeep: (id: string): Promise<boolean> => ipcRenderer.invoke('fileManager:restoreDeep', id),
+    purge: (id: string): Promise<boolean> => ipcRenderer.invoke('fileManager:purge', id),
+    search: (query: string): Promise<FileEntry[]> => ipcRenderer.invoke('fileManager:search', query),
     fileDocument: (docId: string, parentId: string | null): Promise<FileEntry | null> =>
       ipcRenderer.invoke('fileManager:fileDocument', docId, parentId),
     unfiledDocuments: (): Promise<Array<{ id: string; title: string; docType: string }>> =>

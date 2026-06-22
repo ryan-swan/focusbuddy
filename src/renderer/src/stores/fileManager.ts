@@ -52,8 +52,20 @@ interface FileManagerStore {
   sortDir: SortDir
   past: UndoItem[]
   future: UndoItem[]
+  // Drive-wide search: when `search` is non-empty the view shows searchResults
+  // (matches across every folder) instead of the current folder's entries.
+  search: string
+  searchResults: FileEntry[]
+  searching: boolean
+  // Trash: the roots of trashed subtrees, loaded on demand for the Trash view.
+  trashed: FileEntry[]
 
   refresh: () => Promise<void>
+  runSearch: (q: string) => Promise<void>
+  clearSearch: () => void
+  loadTrash: () => Promise<void>
+  restoreFromTrash: (id: string) => Promise<void>
+  purge: (id: string) => Promise<void>
   openFolder: (id: string | null) => Promise<void>
   select: (id: string | null) => void
   setViewMode: (m: FileViewMode) => void
@@ -83,6 +95,10 @@ export const useFileManagerStore = create<FileManagerStore>((set, get) => ({
   sortDir: prefs.sortDir,
   past: [],
   future: [],
+  search: '',
+  searchResults: [],
+  searching: false,
+  trashed: [],
 
   refresh: async () => {
     const cwd = get().cwd
@@ -92,6 +108,34 @@ export const useFileManagerStore = create<FileManagerStore>((set, get) => ({
       window.api.fileManager.path(cwd)
     ])
     set({ entries, crumbs, loading: false })
+  },
+
+  runSearch: async (q) => {
+    set({ search: q })
+    const query = q.trim()
+    if (!query) {
+      set({ searchResults: [], searching: false })
+      return
+    }
+    set({ searching: true })
+    const results = await window.api.fileManager.search(query)
+    // Ignore a stale response if the query moved on while this one was in flight.
+    if (get().search.trim() === query) set({ searchResults: results, searching: false })
+  },
+  clearSearch: () => set({ search: '', searchResults: [], searching: false }),
+
+  loadTrash: async () => {
+    const trashed = await window.api.fileManager.listTrashed()
+    set({ trashed })
+  },
+  restoreFromTrash: async (id) => {
+    await window.api.fileManager.restoreDeep(id)
+    await get().loadTrash()
+    await get().refresh()
+  },
+  purge: async (id) => {
+    await window.api.fileManager.purge(id)
+    await get().loadTrash()
   },
 
   openFolder: async (id) => {
