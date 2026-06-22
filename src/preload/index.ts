@@ -706,6 +706,15 @@ const api = {
       ipcRenderer.invoke('fileManager:removeTag', fileId, tag),
     allTags: (): Promise<Array<{ tag: string; count: number }>> => ipcRenderer.invoke('fileManager:allTags'),
     entriesByTag: (tag: string): Promise<FileEntry[]> => ipcRenderer.invoke('fileManager:entriesByTag', tag),
+    entriesByTags: (tags: string[]): Promise<FileEntry[]> => ipcRenderer.invoke('fileManager:entriesByTags', tags),
+    listSmartFolders: (): Promise<Array<{ id: string; name: string; tags: string[] }>> =>
+      ipcRenderer.invoke('fileManager:listSmartFolders'),
+    createSmartFolder: (
+      name: string,
+      tags: string[]
+    ): Promise<{ id: string; name: string; tags: string[] }> =>
+      ipcRenderer.invoke('fileManager:createSmartFolder', name, tags),
+    deleteSmartFolder: (id: string): Promise<boolean> => ipcRenderer.invoke('fileManager:deleteSmartFolder', id),
     fileDocument: (docId: string, parentId: string | null): Promise<FileEntry | null> =>
       ipcRenderer.invoke('fileManager:fileDocument', docId, parentId),
     unfiledDocuments: (): Promise<Array<{ id: string; title: string; docType: string }>> =>

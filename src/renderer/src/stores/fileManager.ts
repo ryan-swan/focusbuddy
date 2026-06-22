@@ -64,6 +64,10 @@ interface FileManagerStore {
   tags: Array<{ tag: string; count: number }>
   activeTag: string | null
   tagEntries: FileEntry[]
+  // Smart folders: saved tag queries (AND) that always show the matching files.
+  smartFolders: Array<{ id: string; name: string; tags: string[] }>
+  activeSmart: { id: string; name: string; tags: string[] } | null
+  smartEntries: FileEntry[]
 
   refresh: () => Promise<void>
   runSearch: (q: string) => Promise<void>
@@ -76,6 +80,11 @@ interface FileManagerStore {
   removeTag: (fileId: string, tag: string) => Promise<void>
   openTag: (tag: string) => Promise<void>
   clearTag: () => void
+  loadSmartFolders: () => Promise<void>
+  createSmart: (name: string, tags: string[]) => Promise<void>
+  deleteSmart: (id: string) => Promise<void>
+  openSmart: (sf: { id: string; name: string; tags: string[] }) => Promise<void>
+  clearSmart: () => void
   openFolder: (id: string | null) => Promise<void>
   select: (id: string | null) => void
   setViewMode: (m: FileViewMode) => void
@@ -112,6 +121,9 @@ export const useFileManagerStore = create<FileManagerStore>((set, get) => ({
   tags: [],
   activeTag: null,
   tagEntries: [],
+  smartFolders: [],
+  activeSmart: null,
+  smartEntries: [],
 
   refresh: async () => {
     const cwd = get().cwd
@@ -168,9 +180,26 @@ export const useFileManagerStore = create<FileManagerStore>((set, get) => ({
     if (active) set({ tagEntries: await window.api.fileManager.entriesByTag(active) })
   },
   openTag: async (tag) => {
-    set({ activeTag: tag, tagEntries: await window.api.fileManager.entriesByTag(tag) })
+    set({ activeTag: tag, tagEntries: await window.api.fileManager.entriesByTag(tag), activeSmart: null })
   },
   clearTag: () => set({ activeTag: null, tagEntries: [] }),
+
+  loadSmartFolders: async () => {
+    set({ smartFolders: await window.api.fileManager.listSmartFolders() })
+  },
+  createSmart: async (name, tags) => {
+    await window.api.fileManager.createSmartFolder(name, tags)
+    await get().loadSmartFolders()
+  },
+  deleteSmart: async (id) => {
+    await window.api.fileManager.deleteSmartFolder(id)
+    if (get().activeSmart?.id === id) set({ activeSmart: null, smartEntries: [] })
+    await get().loadSmartFolders()
+  },
+  openSmart: async (sf) => {
+    set({ activeSmart: sf, smartEntries: await window.api.fileManager.entriesByTags(sf.tags), activeTag: null })
+  },
+  clearSmart: () => set({ activeSmart: null, smartEntries: [] }),
 
   openFolder: async (id) => {
     set({ cwd: id, selectedId: null })

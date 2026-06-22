@@ -553,6 +553,77 @@ export function entriesByTag(tag: string): FileEntry[] {
   return out
 }
 
+// ── Smart folders ────────────────────────────────────────────────────────────
+// A smart folder is a saved query: a set of tags AND-ed together. Opening it runs
+// the query live, so it always shows the right files without anyone refiling.
+
+export interface SmartFolder {
+  id: string
+  name: string
+  tags: string[]
+}
+
+function safeTags(json: string): string[] {
+  try {
+    const a = JSON.parse(json)
+    return Array.isArray(a) ? a.filter((x): x is string => typeof x === 'string') : []
+  } catch {
+    return []
+  }
+}
+
+// Every live entry carrying ALL of the given tags (an AND query), newest first.
+// The engine behind a smart folder. An empty tag list matches nothing.
+export function entriesByTags(tags: string[]): FileEntry[] {
+  const clean = tags.map((t) => t.trim()).filter(Boolean)
+  if (!clean.length) return []
+  const db = getDb()
+  const placeholders = clean.map(() => '?').join(',')
+  const rows = db
+    .prepare(
+      `SELECT ${ENTRY_COLS} FROM fb_files
+       WHERE trashed_at IS NULL AND id IN (
+         SELECT file_id FROM fb_file_tags WHERE tag IN (${placeholders})
+         GROUP BY file_id HAVING COUNT(DISTINCT tag) = ?
+       )
+       ORDER BY updated_at DESC`
+    )
+    .all(...clean, clean.length) as EntryRow[]
+  const out: FileEntry[] = []
+  for (const row of rows) {
+    const entry = rowToEntry(row)
+    if (entry) out.push(entry)
+  }
+  return out
+}
+
+export function listSmartFolders(): SmartFolder[] {
+  const db = getDb()
+  const rows = db
+    .prepare('SELECT id, name, tags_json FROM fb_smart_folders ORDER BY name')
+    .all() as Array<{ id: string; name: string; tags_json: string }>
+  return rows.map((r) => ({ id: r.id, name: r.name, tags: safeTags(r.tags_json) }))
+}
+
+export function createSmartFolder(name: string, tags: string[]): SmartFolder {
+  const db = getDb()
+  const id = randomUUID()
+  const clean = tags.map((t) => t.trim()).filter(Boolean)
+  const finalName = name.trim() || 'Smart folder'
+  db.prepare('INSERT INTO fb_smart_folders (id, name, tags_json, created_at) VALUES (?, ?, ?, ?)').run(
+    id,
+    finalName,
+    JSON.stringify(clean),
+    Date.now()
+  )
+  return { id, name: finalName, tags: clean }
+}
+
+export function deleteSmartFolder(id: string): boolean {
+  const db = getDb()
+  return db.prepare('DELETE FROM fb_smart_folders WHERE id = ?').run(id).changes > 0
+}
+
 // File an internal document into a folder. A document lives in exactly one
 // place, so re-filing moves its reference rather than duplicating it.
 export function fileDocument(docId: string, parentId: string | null): FileEntry | null {

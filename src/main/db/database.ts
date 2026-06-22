@@ -453,6 +453,16 @@ export function getDb(): Database.Database {
     );
     CREATE INDEX IF NOT EXISTS idx_file_tags_tag ON fb_file_tags (tag);
     CREATE INDEX IF NOT EXISTS idx_file_tags_file ON fb_file_tags (file_id);
+
+    -- Smart folders: a saved query (a set of tags AND-ed together) that always
+    -- shows the matching files live, wherever they sit. A folder you never have
+    -- to refile, the payoff of facets over folders.
+    CREATE TABLE IF NOT EXISTS fb_smart_folders (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      tags_json TEXT NOT NULL DEFAULT '[]',
+      created_at INTEGER NOT NULL
+    );
   `)
   migrateDocumentsDocTypeCheck(db)
   migrateShareKindChecks(db)
