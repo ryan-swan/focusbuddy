@@ -5,6 +5,25 @@
 
 import type { SlideElement, SlideTextElement } from '@shared/types'
 
+// Drop-shadow presets, soft enough to read as depth rather than a hard edge.
+const SHADOW: Record<NonNullable<SlideElement['shadow']>, string> = {
+  sm: '0 1px 3px rgba(0,0,0,0.18)',
+  md: '0 6px 16px rgba(0,0,0,0.22)',
+  lg: '0 14px 38px rgba(0,0,0,0.28)'
+}
+
+// The shared frame (rounded corners + drop shadow) any element can carry.
+function frame(el: SlideElement): React.CSSProperties {
+  return {
+    borderRadius: el.cornerRadius ? el.cornerRadius : undefined,
+    boxShadow: el.shadow ? SHADOW[el.shadow] : undefined
+  }
+}
+
+function borderCss(b?: { width: number; style?: string; color: string }): string | undefined {
+  return b ? `${b.width}px ${b.style ?? 'solid'} ${b.color}` : undefined
+}
+
 function TextContent({ el }: { el: SlideTextElement }): JSX.Element {
   const justify = el.vAlign === 'middle' ? 'center' : el.vAlign === 'bottom' ? 'flex-end' : 'flex-start'
   return (
@@ -58,23 +77,31 @@ export default function SlideElementView({ el }: { el: SlideElement }): JSX.Elem
 
   if (el.type === 'text') {
     return (
-      <div style={{ ...base }}>
+      <div
+        style={{
+          ...base,
+          ...frame(el),
+          backgroundColor: el.fill?.type === 'solid' ? el.fill.color : undefined,
+          border: borderCss(el.border)
+        }}
+      >
         <TextContent el={el} />
       </div>
     )
   }
   if (el.type === 'image') {
     return (
-      <div style={base}>
+      <div style={{ ...base, ...frame(el), border: borderCss(el.border) }}>
         <img src={el.src} alt="" style={{ width: '100%', height: '100%', objectFit: el.fit ?? 'contain' }} />
       </div>
     )
   }
   if (el.type === 'shape') {
-    const radius = el.shape === 'ellipse' ? '50%' : el.shape === 'roundRect' ? 16 : 0
+    // An explicit cornerRadius overrides the shape's default rounding.
+    const radius = el.shape === 'ellipse' ? '50%' : el.cornerRadius ?? (el.shape === 'roundRect' ? 16 : 0)
     if (el.shape === 'triangle') {
       return (
-        <div style={base}>
+        <div style={{ ...base, filter: el.shadow ? `drop-shadow(${SHADOW[el.shadow]})` : undefined }}>
           <div
             style={{
               width: '100%',
@@ -92,7 +119,8 @@ export default function SlideElementView({ el }: { el: SlideElement }): JSX.Elem
           ...base,
           backgroundColor: el.fill?.type === 'solid' ? el.fill.color : 'transparent',
           borderRadius: radius,
-          border: el.border ? `${el.border.width}px ${el.border.style ?? 'solid'} ${el.border.color}` : undefined
+          boxShadow: el.shadow ? SHADOW[el.shadow] : undefined,
+          border: borderCss(el.border)
         }}
       />
     )

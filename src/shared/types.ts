@@ -1342,6 +1342,10 @@ interface SlideElementBase {
   // Elements sharing a groupId select and move together as one group. Optional,
   // so legacy decks (no groups) are unaffected and need no migration.
   groupId?: string
+  // Framing, shared by every element type: rounded corners (logical px) and a
+  // drop-shadow preset. Absent means square corners and no shadow.
+  cornerRadius?: number
+  shadow?: 'sm' | 'md' | 'lg'
 }
 export interface SlideTextElement extends SlideElementBase {
   type: 'text'
@@ -1355,6 +1359,9 @@ export interface SlideImageElement extends SlideElementBase {
   type: 'image'
   src: string // data: URI or file path
   fit?: 'contain' | 'cover' | 'fill'
+  // Optional frame around the image (in addition to the shared cornerRadius +
+  // shadow on the base).
+  border?: SlideBorder
   // When true, dragging a resize handle preserves the frame's aspect ratio.
   lockAspect?: boolean
   // The image's natural width/height, captured on insert, so aspect-lock and

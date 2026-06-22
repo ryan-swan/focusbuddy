@@ -208,6 +208,40 @@ export default function ElementInspector(props: Props): JSX.Element {
         </div>
       )}
 
+      {el.type !== 'line' && (
+        <div className="space-y-1.5" data-testid="inspector-frame">
+          <div className={labelCls}>Frame</div>
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] text-stone-500 dark:text-stone-400">Radius</span>
+            {num(el.cornerRadius ?? 0, (n) => ({ cornerRadius: Math.max(0, n) }))}
+          </div>
+          <select
+            className={inputCls}
+            title="Drop shadow"
+            data-testid="inspector-shadow"
+            value={el.shadow ?? 'none'}
+            onChange={(e) =>
+              props.onUpdateElement(el.id, { shadow: e.target.value === 'none' ? undefined : (e.target.value as 'sm' | 'md' | 'lg') })
+            }
+          >
+            <option value="none">No shadow</option>
+            <option value="sm">Shadow: subtle</option>
+            <option value="md">Shadow: medium</option>
+            <option value="lg">Shadow: large</option>
+          </select>
+          {el.type === 'image' && (
+            <label className={btn + ' relative cursor-pointer w-full justify-start gap-1.5'} title="Image border colour">
+              <Icon name="border_color" size={14} /> Border
+              <input
+                type="color"
+                className="absolute inset-0 opacity-0 cursor-pointer"
+                onChange={(e) => props.onUpdateElement(el.id, { border: { color: e.target.value, width: 2 } })}
+              />
+            </label>
+          )}
+        </div>
+      )}
+
       <div>
         <div className={labelCls}>Arrange</div>
         <div className="flex items-center gap-1 mt-1 flex-wrap">
