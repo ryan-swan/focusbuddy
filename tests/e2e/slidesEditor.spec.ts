@@ -1199,3 +1199,44 @@ test('SL-17 — multi-select via marquee, align left, and group round-trip', asy
     await dispose()
   }
 })
+
+test('SL-18 — element framing: drop shadow and corner radius render on a shape', async () => {
+  const { window, dispose } = await launchApp()
+  try {
+    await waitForReady(window)
+    await openDocumentsHub(window)
+    await startBlankSlides(window)
+    const toolbar = window.locator('[data-testid="slides-toolbar"]')
+    await toolbar.locator('button', { hasText: 'Layout' }).first().click()
+    await expect(window.locator('text=Blank')).toBeVisible({ timeout: 3_000 })
+    await window.locator('text=Blank').click()
+    await window.waitForTimeout(200)
+    await toolbar.locator('button', { hasText: 'Shape' }).first().click()
+    await window.locator('text=Rectangle').click()
+    await window.waitForTimeout(300)
+
+    const el = window.locator('[data-testid="slide-element"]').first()
+    const anyShadow = (): Promise<boolean> =>
+      el.evaluate((node) =>
+        [node, ...Array.from(node.querySelectorAll('*'))].some(
+          (n) => getComputedStyle(n as Element).boxShadow !== 'none'
+        )
+      )
+    expect(await anyShadow(), 'no shadow before').toBe(false)
+
+    await window.locator('[data-testid="inspector-shadow"]').selectOption('lg')
+    await window.waitForTimeout(250)
+    expect(await anyShadow(), 'shadow renders after selecting lg').toBe(true)
+
+    await window.locator('[data-testid="inspector-frame"] input[type="number"]').fill('40')
+    await window.waitForTimeout(250)
+    const hasRadius = await el.evaluate((node) =>
+      [node, ...Array.from(node.querySelectorAll('*'))].some(
+        (n) => parseFloat(getComputedStyle(n as Element).borderTopLeftRadius) >= 30
+      )
+    )
+    expect(hasRadius, 'corner radius renders').toBe(true)
+  } finally {
+    await dispose()
+  }
+})
