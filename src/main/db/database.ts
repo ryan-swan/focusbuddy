@@ -461,9 +461,13 @@ export function getDb(): Database.Database {
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
       tags_json TEXT NOT NULL DEFAULT '[]',
+      search TEXT NOT NULL DEFAULT '',
       created_at INTEGER NOT NULL
     );
   `)
+  // A smart folder can also carry a free-text search alongside its tags. Added
+  // after the table shipped tags-only, so back-fill the column on existing DBs.
+  ensureColumn(db, 'fb_smart_folders', 'search', "TEXT NOT NULL DEFAULT ''")
   migrateDocumentsDocTypeCheck(db)
   migrateShareKindChecks(db)
   return db

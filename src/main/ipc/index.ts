@@ -153,6 +153,7 @@ import {
   listSmartFolders as listFileSmartFolders,
   createSmartFolder as createFileSmartFolder,
   deleteSmartFolder as deleteFileSmartFolder,
+  smartFolderEntries as fileSmartFolderEntries,
   fileDocument,
   unfiledDocuments
 } from '../db/files'
@@ -1117,10 +1118,13 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('fileManager:entriesByTags', (_e, tags: string[]) => fileEntriesByTags(tags))
   ipcMain.handle('fileManager:untaggedEntries', () => untaggedFileEntries())
   ipcMain.handle('fileManager:listSmartFolders', () => listFileSmartFolders())
-  ipcMain.handle('fileManager:createSmartFolder', (_e, name: string, tags: string[]) =>
-    createFileSmartFolder(name, tags)
+  ipcMain.handle('fileManager:createSmartFolder', (_e, name: string, tags: string[], search?: string) =>
+    createFileSmartFolder(name, tags, search)
   )
   ipcMain.handle('fileManager:deleteSmartFolder', (_e, id: string) => deleteFileSmartFolder(id))
+  ipcMain.handle('fileManager:smartFolderEntries', (_e, tags: string[], search?: string) =>
+    fileSmartFolderEntries(tags, search)
+  )
   // Auto-filing: read the item's text + the existing tag vocabulary and let the
   // AI propose tags. Suggest-only; the renderer decides what to accept.
   ipcMain.handle('files:suggestTags', async (_e, fileId: string) => {

@@ -708,14 +708,17 @@ const api = {
     entriesByTag: (tag: string): Promise<FileEntry[]> => ipcRenderer.invoke('fileManager:entriesByTag', tag),
     entriesByTags: (tags: string[]): Promise<FileEntry[]> => ipcRenderer.invoke('fileManager:entriesByTags', tags),
     untaggedEntries: (): Promise<FileEntry[]> => ipcRenderer.invoke('fileManager:untaggedEntries'),
-    listSmartFolders: (): Promise<Array<{ id: string; name: string; tags: string[] }>> =>
+    listSmartFolders: (): Promise<Array<{ id: string; name: string; tags: string[]; search: string }>> =>
       ipcRenderer.invoke('fileManager:listSmartFolders'),
     createSmartFolder: (
       name: string,
-      tags: string[]
-    ): Promise<{ id: string; name: string; tags: string[] }> =>
-      ipcRenderer.invoke('fileManager:createSmartFolder', name, tags),
+      tags: string[],
+      search?: string
+    ): Promise<{ id: string; name: string; tags: string[]; search: string }> =>
+      ipcRenderer.invoke('fileManager:createSmartFolder', name, tags, search),
     deleteSmartFolder: (id: string): Promise<boolean> => ipcRenderer.invoke('fileManager:deleteSmartFolder', id),
+    smartFolderEntries: (tags: string[], search?: string): Promise<FileEntry[]> =>
+      ipcRenderer.invoke('fileManager:smartFolderEntries', tags, search),
     fileDocument: (docId: string, parentId: string | null): Promise<FileEntry | null> =>
       ipcRenderer.invoke('fileManager:fileDocument', docId, parentId),
     unfiledDocuments: (): Promise<Array<{ id: string; title: string; docType: string }>> =>

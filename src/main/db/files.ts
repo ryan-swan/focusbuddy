@@ -582,6 +582,7 @@ export interface SmartFolder {
   id: string
   name: string
   tags: string[]
+  search: string
 }
 
 function safeTags(json: string): string[] {
@@ -621,23 +622,60 @@ export function entriesByTags(tags: string[]): FileEntry[] {
 export function listSmartFolders(): SmartFolder[] {
   const db = getDb()
   const rows = db
-    .prepare('SELECT id, name, tags_json FROM fb_smart_folders ORDER BY name')
-    .all() as Array<{ id: string; name: string; tags_json: string }>
-  return rows.map((r) => ({ id: r.id, name: r.name, tags: safeTags(r.tags_json) }))
+    .prepare('SELECT id, name, tags_json, search FROM fb_smart_folders ORDER BY name')
+    .all() as Array<{ id: string; name: string; tags_json: string; search: string }>
+  return rows.map((r) => ({ id: r.id, name: r.name, tags: safeTags(r.tags_json), search: r.search ?? '' }))
 }
 
-export function createSmartFolder(name: string, tags: string[]): SmartFolder {
+export function createSmartFolder(name: string, tags: string[], search = ''): SmartFolder {
   const db = getDb()
   const id = randomUUID()
   const clean = tags.map((t) => t.trim()).filter(Boolean)
-  const finalName = name.trim() || 'Smart folder'
-  db.prepare('INSERT INTO fb_smart_folders (id, name, tags_json, created_at) VALUES (?, ?, ?, ?)').run(
+  const s = search.trim()
+  const finalName = name.trim() || (clean.length ? clean.join(' + ') : s) || 'Smart folder'
+  db.prepare('INSERT INTO fb_smart_folders (id, name, tags_json, search, created_at) VALUES (?, ?, ?, ?, ?)').run(
     id,
     finalName,
     JSON.stringify(clean),
+    s,
     Date.now()
   )
-  return { id, name: finalName, tags: clean }
+  return { id, name: finalName, tags: clean, search: s }
+}
+
+// Resolve a smart folder live: files carrying ALL the tags AND whose name or
+// document title matches the search. Either part may be empty; both empty
+// matches nothing.
+export function smartFolderEntries(tags: string[], search = ''): FileEntry[] {
+  const cleanTags = tags.map((t) => t.trim()).filter(Boolean)
+  const q = (search ?? '').trim()
+  if (!cleanTags.length && !q) return []
+  const db = getDb()
+  const where: string[] = ['f.trashed_at IS NULL']
+  const params: unknown[] = []
+  if (cleanTags.length) {
+    const ph = cleanTags.map(() => '?').join(',')
+    where.push(
+      `f.id IN (SELECT file_id FROM fb_file_tags WHERE tag IN (${ph}) GROUP BY file_id HAVING COUNT(DISTINCT tag) = ?)`
+    )
+    params.push(...cleanTags, cleanTags.length)
+  }
+  if (q) {
+    const like = `%${q.replace(/[\\%_]/g, (m) => `\\${m}`)}%`
+    where.push(
+      `(COALESCE(f.display_name, f.original_name) LIKE ? ESCAPE '\\' OR f.doc_id IN (SELECT id FROM documents WHERE archived = 0 AND title LIKE ? ESCAPE '\\'))`
+    )
+    params.push(like, like)
+  }
+  const rows = db
+    .prepare(`SELECT ${ENTRY_COLS} FROM fb_files f WHERE ${where.join(' AND ')} ORDER BY f.updated_at DESC`)
+    .all(...params) as EntryRow[]
+  const out: FileEntry[] = []
+  for (const row of rows) {
+    const entry = rowToEntry(row)
+    if (entry) out.push(entry)
+  }
+  return out
 }
 
 export function deleteSmartFolder(id: string): boolean {
