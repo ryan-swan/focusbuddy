@@ -1278,6 +1278,9 @@ export interface SheetBodyV2 {
   version: 2
   sheets: SheetTab[]
   activeSheet?: number
+  // Workbook-level named ranges: a name maps to an A1 reference string such as
+  // "A1", "A1:B10" or "Sheet2!A1:C3". Usable in any formula on any sheet.
+  names?: Array<{ name: string; ref: string }>
 }
 
 export type SheetBody = SheetBodyV1 | SheetBodyV2

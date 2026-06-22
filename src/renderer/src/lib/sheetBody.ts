@@ -30,7 +30,12 @@ export function normalizeBody(body: SheetBody): SheetBodyV2 {
     const sheets = body.sheets.length
       ? body.sheets.map((s) => ({ ...s, columns: [...s.columns], rows: s.rows.map((r) => [...r]) }))
       : [emptyTab('Sheet 1')]
-    return { version: 2, sheets, activeSheet: clampIndex(body.activeSheet ?? 0, sheets.length) }
+    return {
+      version: 2,
+      sheets,
+      activeSheet: clampIndex(body.activeSheet ?? 0, sheets.length),
+      ...(body.names ? { names: body.names } : {})
+    }
   }
   const v1 = body as { columns?: string[]; rows?: string[][] }
   const columns = Array.isArray(v1.columns) && v1.columns.length ? [...v1.columns] : ['A', 'B', 'C']

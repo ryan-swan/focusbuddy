@@ -1181,3 +1181,29 @@ test('SE-19 — array formula spills: =SEQUENCE(3,1) fills the cells below', asy
     await dispose()
   }
 })
+
+test('SE-20 — named ranges: define a name and use it in a formula', async () => {
+  const { window, dispose } = await launchApp()
+  try {
+    await waitForReady(window)
+    await openDocumentsHub(window)
+    await startBlankSpreadsheet(window)
+
+    // A1 = 10.
+    await setViaFormulaBar(window, 0, 0, '10', [7, 2])
+
+    // Open the Names panel and define Tax -> A1.
+    await window.locator('[data-testid="sheet-names-toggle"]').click()
+    await expect(window.locator('[data-testid="sheet-names-panel"]')).toBeVisible({ timeout: 3_000 })
+    await window.locator('[data-testid="sheet-name-input"]').fill('Tax')
+    await window.locator('[data-testid="sheet-ref-input"]').fill('A1')
+    await window.locator('[data-testid="sheet-name-add"]').click()
+    await expect(window.locator('[data-testid="sheet-name-row-Tax"]')).toBeVisible({ timeout: 3_000 })
+
+    // B1 = =Tax*2 resolves through the named range to 20.
+    await setViaFormulaBar(window, 0, 1, '=Tax*2', [7, 2])
+    expect(await cellText(window, 0, 1)).toBe('20')
+  } finally {
+    await dispose()
+  }
+})

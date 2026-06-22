@@ -51,6 +51,8 @@ interface Props {
   onSetCell?: (r: number, c: number, value: string) => void
   // The whole workbook, so cross-sheet references (Sheet2!A1) resolve at render.
   workbook?: Workbook
+  // Named ranges the formula engine resolves (e.g. =SUM(Revenue)).
+  names?: Map<string, string>
   // Column filters: rows to hide, whether funnels show, the current per-column
   // hide-sets, and a setter. SheetGrid owns the funnel dropdown UI.
   hiddenRows?: Set<number> | null
@@ -73,8 +75,8 @@ export default function SheetGrid(props: Props): JSX.Element {
   // once per data change rather than per cell. Drives both the anchor's value and
   // the cells the result spills into.
   const spill = useMemo(
-    () => buildSpillMap({ columns: tab.columns, rows: tab.rows }, props.workbook),
-    [tab.columns, tab.rows, props.workbook]
+    () => buildSpillMap({ columns: tab.columns, rows: tab.rows }, props.workbook, props.names),
+    [tab.columns, tab.rows, props.workbook, props.names]
   )
   const editRef = useRef<HTMLInputElement | null>(null)
   // Which cell's data-validation list dropdown is open (null = none).
@@ -153,7 +155,7 @@ export default function SheetGrid(props: Props): JSX.Element {
                 {props.filterActive && openFilter === c && (
                   <FilterDropdown
                     values={distinctValues(
-                      tab.rows.map((_, r) => displayCell(grid, r, c, props.workbook, spill))
+                      tab.rows.map((_, r) => displayCell(grid, r, c, props.workbook, spill, props.names))
                     )}
                     hidden={props.filters?.[c] ?? []}
                     onApply={(hidden) => {
@@ -188,7 +190,7 @@ export default function SheetGrid(props: Props): JSX.Element {
                   !!props.onFillStart &&
                   r === selection.r1 &&
                   c === selection.c1
-                const computed = displayCell(grid, r, c, props.workbook, spill)
+                const computed = displayCell(grid, r, c, props.workbook, spill, props.names)
                 // A spilled cell shows a value an array formula produced in a
                 // neighbour, while its own raw is empty — rendered muted so it
                 // reads as computed, not typed.
