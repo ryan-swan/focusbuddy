@@ -736,6 +736,78 @@ const VALID_KINDS: WidgetKind[] = [
 ]
 
 
+// Auto-filing: read a file's text and propose the tags it should carry (it may
+// belong to several things at once). SUGGEST-ONLY — the caller decides what to
+// accept. Returns an empty list, never a guess, when the content doesn't support
+// a confident tag. The caller extracts and truncates the content and passes the
+// existing tag vocabulary so the model reuses tags rather than inventing synonyms.
+export async function suggestFileTags(
+  content: string,
+  existingTags: string[]
+): Promise<{
+  ok: boolean
+  tags?: Array<{ name: string; isNew: boolean; reason: string }>
+  needsApiKey?: boolean
+  error?: string
+}> {
+  const c = getClient()
+  if (!c) return { ok: false, needsApiKey: true, error: 'No Anthropic API key set. Open Settings → AI · API keys to paste one.' }
+  const text = (content ?? '').trim()
+  if (!text) return { ok: true, tags: [] }
+  const system =
+    'You are a file-tagging assistant for PlexiDesk. Your only job is to assign tags to a file based on its content.\n\n' +
+    'Rules:\n' +
+    '- Prefer tags from the existing vocabulary when they genuinely fit.\n' +
+    '- Invent a new tag only when no existing tag covers the concept and the concept is clearly present in the content. Keep new tags short, reusable nouns in Title Case (e.g. "Invoices", "Acme"), not sentences.\n' +
+    '- Return AT MOST 5 tags. Fewer is better.\n' +
+    '- If you cannot determine relevant tags from the content, return an empty array — do not guess.\n' +
+    '- Never fabricate content you did not see in the provided text.\n' +
+    '- Return ONLY a single valid JSON object. No prose, no markdown fences. The first character must be { and the last must be }.\n' +
+    'Schema: {"tags":[{"name":"string","isNew":boolean,"reason":"string"}]}'
+  const vocab = (existingTags ?? []).filter(Boolean)
+  const userMsg =
+    `Existing tag vocabulary (prefer these):\n${vocab.length ? vocab.join(', ') : '(none)'}\n\n` +
+    `File content (may be truncated):\n"""\n${text.slice(0, 8000)}\n"""\n\nReturn the JSON now.`
+  try {
+    const resp = await c.messages.create({
+      model: resolveModel('file_tag'),
+      max_tokens: 1024,
+      system,
+      messages: [{ role: 'user', content: userMsg }]
+    })
+    if ((resp.stop_reason as string) === 'refusal') return { ok: false, error: 'Claude declined this request.' }
+    if ((resp.stop_reason as string) === 'model_context_window_exceeded') return { ok: false, error: 'The file is too large to analyse.' }
+    const out = resp.content
+      .filter((b) => b.type === 'text')
+      .map((b) => ('text' in b ? b.text : ''))
+      .join('\n')
+      .trim()
+    const jsonStr = extractJson(out)
+    if (!jsonStr) return { ok: false, error: 'AI did not return JSON' }
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(jsonStr)
+    } catch (e) {
+      return { ok: false, error: 'AI returned invalid JSON: ' + (e as Error).message }
+    }
+    const arr = (parsed as { tags?: unknown[] }).tags
+    if (!Array.isArray(arr)) return { ok: false, error: 'AI response missing "tags" array' }
+    const seen = new Set<string>()
+    const tags: Array<{ name: string; isNew: boolean; reason: string }> = []
+    for (const item of arr) {
+      const obj = item as { name?: unknown; isNew?: unknown; reason?: unknown }
+      const name = (obj.name ?? '').toString().trim().slice(0, 40)
+      if (!name || seen.has(name.toLowerCase())) continue
+      seen.add(name.toLowerCase())
+      tags.push({ name, isNew: !!obj.isNew, reason: (obj.reason ?? '').toString().slice(0, 160) })
+      if (tags.length >= 5) break
+    }
+    return { ok: true, tags }
+  } catch (e) {
+    return { ok: false, error: (e as Error).message }
+  }
+}
+
 export async function suggestSetupWidgets(taskId: string): Promise<SetupSuggestResponse> {
   const c = getClient()
   if (!c) return { ok: false, needsApiKey: true, error: 'No Anthropic API key set. Open Settings → AI · API keys to paste one.' }

@@ -565,6 +565,42 @@ function TagEditor({
 }): JSX.Element {
   const [current, setCurrent] = useState<Array<{ tag: string; source: 'user' | 'ai' }>>([])
   const [value, setValue] = useState('')
+  const [suggesting, setSuggesting] = useState(false)
+  const [suggestions, setSuggestions] = useState<Array<{ name: string; isNew: boolean; reason: string }>>([])
+  const [suggestMsg, setSuggestMsg] = useState<string | null>(null)
+
+  async function runSuggest(): Promise<void> {
+    setSuggesting(true)
+    setSuggestMsg(null)
+    setSuggestions([])
+    try {
+      const res = await window.api.files.suggestTags(fileId)
+      if (!res.ok) {
+        setSuggestMsg(
+          res.needsApiKey ? 'Add an Anthropic API key in Settings to use AI filing.' : res.error ?? 'Could not suggest tags.'
+        )
+        return
+      }
+      const have = new Set(current.map((c) => c.tag.toLowerCase()))
+      const fresh = (res.tags ?? []).filter((t) => !have.has(t.name.toLowerCase()))
+      setSuggestions(fresh)
+      if (!fresh.length) {
+        setSuggestMsg(
+          res.tags && res.tags.length ? 'Those tags are already applied.' : 'No confident suggestions — the AI left this one to you.'
+        )
+      }
+    } catch (e) {
+      setSuggestMsg((e as Error).message)
+    } finally {
+      setSuggesting(false)
+    }
+  }
+
+  function accept(name: string): void {
+    onAdd(name)
+    setSuggestions((s) => s.filter((x) => x.name !== name))
+    setCurrent((c) => (c.some((x) => x.tag === name) ? c : [...c, { tag: name, source: 'user' }]))
+  }
 
   const reload = useCallback((): void => {
     void window.api.fileManager.tagsFor(fileId).then(setCurrent).catch(() => setCurrent([]))
@@ -631,6 +667,36 @@ function TagEditor({
         <button onClick={add} disabled={!value.trim()} data-testid="office-tag-add" className="btn-primary text-[12px] px-2.5 py-1 disabled:opacity-50">
           Add
         </button>
+      </div>
+
+      {/* Auto-filing: the AI reads the item and proposes tags. Suggest-only —
+          you accept each one. It may propose several, because a thing relates to
+          several things. */}
+      <div className="pt-1.5 border-t border-stone-100 dark:border-stone-700/60">
+        <button
+          onClick={() => void runSuggest()}
+          disabled={suggesting}
+          data-testid="office-tag-suggest"
+          className="inline-flex items-center gap-1 text-[12px] text-accent hover:underline disabled:opacity-50"
+        >
+          <Icon name="auto_awesome" size={13} /> {suggesting ? 'Reading the file…' : 'Suggest tags with AI'}
+        </button>
+        {suggestMsg && <div className="text-[11px] text-stone-400 mt-1">{suggestMsg}</div>}
+        {suggestions.length > 0 && (
+          <div className="flex items-center gap-1 flex-wrap mt-1.5" data-testid="office-tag-suggestions">
+            {suggestions.map((s) => (
+              <button
+                key={s.name}
+                onClick={() => accept(s.name)}
+                data-testid={`office-tag-suggestion-${s.name}`}
+                title={s.reason}
+                className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full border border-accent/40 bg-accent/[0.06] text-accent hover:bg-accent/[0.14]"
+              >
+                <Icon name="add" size={11} /> {s.name}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   )

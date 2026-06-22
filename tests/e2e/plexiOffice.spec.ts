@@ -304,3 +304,41 @@ test('PO-14 — Drive facets: tag a document, then browse by tag across folders'
     timeout: 4_000
   })
 })
+
+test('PO-15 — AI auto-filing: suggest tags for a document, accept one (suggest-only)', async () => {
+  launched = await launchApp({ env: { PLEXI_APP: 'office' } })
+  const { app, window } = launched
+
+  // Stub the AI suggestion IPC so the test is headless and deterministic.
+  await app.evaluate(({ ipcMain }) => {
+    ipcMain.removeHandler('files:suggestTags')
+    ipcMain.handle('files:suggestTags', async () => ({
+      ok: true,
+      tags: [
+        { name: 'Acme', isNew: true, reason: 'mentions the client Acme' },
+        { name: 'Invoices', isNew: true, reason: 'reads like an invoice' }
+      ]
+    }))
+  })
+
+  await window.locator('[data-testid="office-new-doc"]').click()
+  await expect(window.locator('input').first()).toBeVisible({ timeout: 10_000 })
+  await window.getByRole('button', { name: /Back to list/i }).click()
+  const doc = window.locator('[data-testid="office-doc-Untitled document"]')
+  await expect(doc).toBeVisible({ timeout: 5_000 })
+
+  // Open the tag editor and ask the AI to suggest tags.
+  await doc.hover()
+  await window.locator('[data-testid="office-tagbtn-Untitled document"]').click({ force: true })
+  await window.locator('[data-testid="office-tag-suggest"]').click()
+  await expect(window.locator('[data-testid="office-tag-suggestions"]')).toBeVisible({ timeout: 5_000 })
+  await expect(window.locator('[data-testid="office-tag-suggestion-Acme"]')).toBeVisible()
+
+  // Nothing is applied until accepted (suggest-only). Accept "Acme".
+  await window.locator('[data-testid="office-tag-suggestion-Acme"]').click()
+  await expect(window.locator('[data-testid="office-tag-chip-Acme"]')).toBeVisible({ timeout: 4_000 })
+
+  // The accepted tag now exists as a real facet in the strip.
+  await window.locator('[data-testid="office-tag-editor-close"]').click()
+  await expect(window.locator('[data-testid="office-tag-Acme"]')).toBeVisible({ timeout: 5_000 })
+})

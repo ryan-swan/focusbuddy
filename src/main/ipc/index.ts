@@ -282,6 +282,7 @@ import {
   suggestWidgetSetup,
   suggestPageContent,
   suggestSetupWidgets,
+  suggestFileTags,
   suggestTableRows,
   summarizeRecentTrail,
   suggestDocContent,
@@ -1108,6 +1109,23 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('fileManager:removeTag', (_e, fileId: string, tag: string) => removeFileTag(fileId, tag))
   ipcMain.handle('fileManager:allTags', () => allFileTags())
   ipcMain.handle('fileManager:entriesByTag', (_e, tag: string) => fileEntriesByTag(tag))
+  // Auto-filing: read the item's text + the existing tag vocabulary and let the
+  // AI propose tags. Suggest-only; the renderer decides what to accept.
+  ipcMain.handle('files:suggestTags', async (_e, fileId: string) => {
+    const entry = getFileEntry(fileId)
+    if (!entry) return { ok: false, error: 'Item not found' }
+    let content = ''
+    if (entry.kind === 'doc' && entry.docId) {
+      const doc = getDocument(entry.docId)
+      if (doc) content = `${doc.title}\n${extractDocText(doc.docType, doc.body)}`
+    } else {
+      // A binary file: only its name and type are readable for now.
+      content = `File name: ${entry.name}${entry.ext ? ` (${entry.ext})` : ''}`
+    }
+    const existingTags = allFileTags().map((t) => t.tag)
+    recordAiCall()
+    return suggestFileTags(content, existingTags)
+  })
   ipcMain.handle('fileManager:fileDocument', (_e, docId: string, parentId: string | null) =>
     fileDocument(docId, parentId)
   )
@@ -1691,4 +1709,55 @@ export function registerIpcHandlers(): void {
       return { ok: false, error: short }
     }
   })
+}
+
+// ── Auto-filing text extraction ──────────────────────────────────────────────
+// Best-effort plain text from a document body, by type, for the tag-suggestion
+// AI. Truncated by the caller's prompt; we cap here too so a huge doc can't blow
+// the message up.
+function collectTiptapText(node: unknown): string {
+  if (!node || typeof node !== 'object') return ''
+  const n = node as { type?: string; text?: string; content?: unknown[] }
+  if (typeof n.text === 'string') return n.text
+  const kids = Array.isArray(n.content) ? n.content : []
+  const block = n.type === 'paragraph' || n.type === 'heading'
+  const inner = kids.map(collectTiptapText).join(block ? '' : ' ')
+  return block ? inner + '\n' : inner
+}
+
+function extractDocText(docType: string, body: unknown): string {
+  try {
+    const b = (body ?? {}) as Record<string, unknown>
+    if (docType === 'doc') {
+      const root = (b.doc as unknown) ?? body
+      return collectTiptapText(root).trim().slice(0, 8000)
+    }
+    if (docType === 'sheet') {
+      const sheets = (b.sheets as Array<{ columns?: string[]; rows?: string[][] }>) ?? []
+      const t = sheets[0]
+      if (!t) return ''
+      const header = (t.columns ?? []).join(' | ')
+      const rows = (t.rows ?? []).slice(0, 12).map((r) => (r ?? []).join(' | ')).join('\n')
+      return `${header}\n${rows}`.trim().slice(0, 8000)
+    }
+    if (docType === 'slides') {
+      const slides =
+        (b.slides as Array<{
+          elements?: Array<{ type?: string; paragraphs?: Array<{ runs?: Array<{ text?: string }> }> }>
+        }>) ?? []
+      return slides
+        .map((s) =>
+          (s.elements ?? [])
+            .filter((e) => e.type === 'text')
+            .map((e) => (e.paragraphs ?? []).map((p) => (p.runs ?? []).map((r) => r.text ?? '').join('')).join(' '))
+            .join(' ')
+        )
+        .join('\n')
+        .trim()
+        .slice(0, 8000)
+    }
+  } catch {
+    /* best-effort */
+  }
+  return ''
 }
