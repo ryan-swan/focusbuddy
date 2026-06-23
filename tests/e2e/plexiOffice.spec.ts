@@ -511,3 +511,40 @@ test('PO-20 — office app exposes AI · API keys settings (so a key can be adde
   await expect(modal).toContainText(/Anthropic/i)
   await expect(modal.locator('input[type="password"]').first()).toBeVisible({ timeout: 4_000 })
 })
+
+test('PO-21 — ask your workspace: grounded answer with a clickable citation', async () => {
+  launched = await launchApp({ env: { PLEXI_APP: 'office' } })
+  const { app, window } = launched
+
+  // A real document to cite.
+  await window.locator('[data-testid="office-new-doc"]').click()
+  await expect(window.locator('input').first()).toBeVisible({ timeout: 10_000 })
+  await window.getByRole('button', { name: /Back to list/i }).click()
+  const docId = await window.evaluate(async () => {
+    const api = (window as unknown as { api: { documents: { list: () => Promise<Array<{ id: string }>> } } }).api
+    const docs = await api.documents.list()
+    return docs[0]?.id
+  })
+
+  // Stub the grounded answer so the test is headless and deterministic.
+  await app.evaluate(({ ipcMain }, id) => {
+    ipcMain.removeHandler('workspace:ask')
+    ipcMain.handle('workspace:ask', async () => ({
+      ok: true,
+      answer: 'Acme is $48k per year. [1]',
+      citedDocIds: [id],
+      sources: [{ docId: id, title: 'Untitled document', docType: 'doc', snippet: 'total $48k per year', cited: true }]
+    }))
+  }, docId)
+
+  await window.locator('[data-testid="office-ask-btn"]').click()
+  await expect(window.locator('[data-testid="office-ask-modal"]')).toBeVisible({ timeout: 4_000 })
+  await window.locator('[data-testid="office-ask-input"]').fill('what is acme pricing?')
+  await window.locator('[data-testid="office-ask-submit"]').click()
+  await expect(window.locator('[data-testid="office-ask-answer"]')).toContainText('Acme is $48k', { timeout: 5_000 })
+  const source = window.locator('[data-testid="office-ask-source-Untitled document"]')
+  await expect(source).toBeVisible({ timeout: 4_000 })
+  // Clicking the citation opens the document (and closes the ask modal).
+  await source.click()
+  await expect(window.locator('[data-testid="office-ask-modal"]')).toHaveCount(0, { timeout: 4_000 })
+})

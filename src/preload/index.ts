@@ -673,6 +673,19 @@ const api = {
       error?: string
     }> => ipcRenderer.invoke('files:suggestTags', fileId)
   },
+  // Ask-your-workspace: a grounded, cited answer drawn from your own documents.
+  workspace: {
+    ask: (
+      question: string
+    ): Promise<{
+      ok: boolean
+      answer?: string
+      citedDocIds?: string[]
+      sources?: Array<{ docId: string; title: string; docType: string; snippet: string; cited: boolean }>
+      needsApiKey?: boolean
+      error?: string
+    }> => ipcRenderer.invoke('workspace:ask', question)
+  },
   // The file/folder manager: a foldered library over fb_files (folders,
   // imported files, and references to internal documents).
   fileManager: {

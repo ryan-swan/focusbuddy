@@ -33,6 +33,7 @@ import LiveDocEditorView from '../views/LiveDocEditorView'
 import { createLiveDoc } from '../../lib/docCollabClient'
 import UpdaterBanner from '../UpdaterBanner'
 import ApiKeysSection from '../settings/ApiKeysSection'
+import OfficeAsk from './OfficeAsk'
 import Icon from '../Icon'
 
 export default function PlexiOfficeApp(): JSX.Element {
@@ -48,6 +49,7 @@ export default function PlexiOfficeApp(): JSX.Element {
   const [collabNonce, setCollabNonce] = useState(0)
   const [teamsOpen, setTeamsOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [askOpen, setAskOpen] = useState(false)
 
   // Turn the open document into a live (collaborative) document and open it in the
   // check-out editor. Reuses the same live-docs system as PlexiDesk.
@@ -98,9 +100,17 @@ export default function PlexiOfficeApp(): JSX.Element {
           <Icon name="auto_awesome" size={16} className="text-accent" />
           <span className="font-semibold text-[14px]">PlexiOffice</span>
           <button
+            onClick={() => setAskOpen(true)}
+            data-testid="office-ask-btn"
+            className="ml-auto inline-flex items-center gap-1 text-[12px] px-2 py-0.5 rounded-full border border-accent/40 text-accent hover:bg-accent/10"
+            title="Ask your workspace — a grounded answer from your own documents"
+          >
+            <Icon name="auto_awesome" size={13} /> Ask
+          </button>
+          <button
             onClick={() => setTeamsOpen(true)}
             data-testid="office-teams-btn"
-            className="ml-auto icon-btn text-stone-400 hover:text-accent"
+            className="icon-btn text-stone-400 hover:text-accent"
             title="Teams"
           >
             <Icon name="groups" size={16} />
@@ -227,6 +237,7 @@ export default function PlexiOfficeApp(): JSX.Element {
 
       {shareTarget && <OfficeShareDialog target={shareTarget} onClose={() => setShareTarget(null)} />}
       {teamsOpen && <OfficeTeamsDialog onClose={() => setTeamsOpen(false)} />}
+      {askOpen && <OfficeAsk onClose={() => setAskOpen(false)} />}
       {settingsOpen && (
         <div
           className="fixed inset-0 z-[300] bg-black/40 flex items-center justify-center"
