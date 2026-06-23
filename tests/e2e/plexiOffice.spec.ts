@@ -499,3 +499,15 @@ test('PO-19 — smart folders with a search term: tag AND name must both match',
   await expect(view.locator('[data-testid="office-folder-New folder"]')).toBeVisible({ timeout: 4_000 })
   await expect(view.locator('[data-testid="office-doc-Untitled document"]')).toHaveCount(0)
 })
+
+test('PO-20 — office app exposes AI · API keys settings (so a key can be added)', async () => {
+  launched = await launchApp({ env: { PLEXI_APP: 'office' } })
+  const { window } = launched
+
+  await expect(window.locator('[data-testid="office-settings-btn"]')).toBeVisible({ timeout: 10_000 })
+  await window.locator('[data-testid="office-settings-btn"]').click()
+  const modal = window.locator('[data-testid="office-settings-modal"]')
+  await expect(modal).toBeVisible({ timeout: 4_000 })
+  await expect(modal).toContainText(/Anthropic/i)
+  await expect(modal.locator('input[type="password"]').first()).toBeVisible({ timeout: 4_000 })
+})
