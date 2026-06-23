@@ -548,3 +548,32 @@ test('PO-21 — ask your workspace: grounded answer with a clickable citation', 
   await source.click()
   await expect(window.locator('[data-testid="office-ask-modal"]')).toHaveCount(0, { timeout: 4_000 })
 })
+
+test('PO-22 — ask: turn the answer into a real document', async () => {
+  launched = await launchApp({ env: { PLEXI_APP: 'office' } })
+  const { app, window } = launched
+
+  await app.evaluate(({ ipcMain }) => {
+    ipcMain.removeHandler('workspace:ask')
+    ipcMain.handle('workspace:ask', async () => ({
+      ok: true,
+      answer: 'Acme is $48k per year over three years.',
+      citedDocIds: [],
+      sources: []
+    }))
+  })
+
+  await window.locator('[data-testid="office-ask-btn"]').click()
+  await window.locator('[data-testid="office-ask-input"]').fill('acme pricing summary')
+  await window.locator('[data-testid="office-ask-submit"]').click()
+  await expect(window.locator('[data-testid="office-ask-answer"]')).toContainText('Acme is $48k', { timeout: 5_000 })
+  await window.locator('[data-testid="office-ask-make-doc"]').click()
+  // The ask modal closes and a new document with that title now exists.
+  await expect(window.locator('[data-testid="office-ask-modal"]')).toHaveCount(0, { timeout: 5_000 })
+  const made = await window.evaluate(async () => {
+    const api = (window as unknown as { api: { documents: { list: () => Promise<Array<{ title: string }>> } } }).api
+    const docs = await api.documents.list()
+    return docs.some((d) => (d.title || '').toLowerCase().includes('acme pricing summary'))
+  })
+  expect(made).toBe(true)
+})
