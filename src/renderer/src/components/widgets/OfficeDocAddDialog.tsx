@@ -27,7 +27,14 @@ export default function OfficeDocAddDialog({ docType, onPicked, onClose }: Props
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [existing, setExisting] = useState<DocumentMeta[] | null>(null)
+  const [query, setQuery] = useState('')
   const meta = META[docType]
+  const filtered =
+    existing === null
+      ? null
+      : query.trim()
+        ? existing.filter((d) => (d.title || '').toLowerCase().includes(query.trim().toLowerCase()))
+        : existing
 
   useEffect(() => {
     void window.api.documents
@@ -130,13 +137,24 @@ export default function OfficeDocAddDialog({ docType, onPicked, onClose }: Props
 
         <div className="mt-3">
           <div className="text-[11px] uppercase tracking-wide text-stone-400 mb-1">Place an existing one</div>
+          {existing !== null && existing.length > 0 && (
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder={`Search ${meta.label.toLowerCase()}s…`}
+              data-testid="office-add-search"
+              className="w-full mb-1.5 bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded px-2 py-1 text-[12px] focus:outline-none focus:border-accent"
+            />
+          )}
           <div className="max-h-48 overflow-auto rounded-lg border border-stone-200 dark:border-stone-700 divide-y divide-stone-100 dark:divide-stone-800">
-            {existing === null ? (
+            {filtered === null ? (
               <div className="px-3 py-2 text-[12px] text-stone-400">Loading…</div>
-            ) : existing.length === 0 ? (
-              <div className="px-3 py-2 text-[12px] text-stone-400">No {meta.label.toLowerCase()}s yet.</div>
+            ) : filtered.length === 0 ? (
+              <div className="px-3 py-2 text-[12px] text-stone-400">
+                {existing && existing.length > 0 ? 'No matches.' : `No ${meta.label.toLowerCase()}s yet.`}
+              </div>
             ) : (
-              existing.map((d) => (
+              filtered.map((d) => (
                 <button
                   key={d.id}
                   onClick={() => onPicked(d.id)}
