@@ -80,6 +80,15 @@ function makeSnippet(text: string, terms: string[]): string {
   return (start > 0 ? '…' : '') + text.slice(start, start + 200).trim() + (text.length > start + 200 ? '…' : '')
 }
 
+// Common words carry no signal and, in a long "related documents" query (where
+// the query is a whole document), would otherwise dominate the score.
+const STOPWORDS = new Set([
+  'the', 'and', 'for', 'that', 'this', 'with', 'from', 'are', 'was', 'but', 'not', 'you', 'your', 'our', 'its',
+  'has', 'have', 'had', 'will', 'can', 'all', 'any', 'out', 'who', 'what', 'when', 'how', 'why', 'were', 'they',
+  'their', 'them', 'then', 'than', 'into', 'over', 'per', 'via', 'etc', 'also', 'such', 'each', 'about', 'would',
+  'there', 'which', 'been', 'more', 'some', 'one', 'two', 'get', 'got', 'use', 'using', 'new'
+])
+
 // Score each document by how many query terms it contains, title matches weighted
 // higher; return the top `limit`. Returns [] for an empty/too-short query.
 export function rankSources(
@@ -87,7 +96,7 @@ export function rankSources(
   docs: Array<{ docId: string; title: string; docType: string; text: string }>,
   limit = 6
 ): WorkspaceSource[] {
-  const terms = [...new Set(query.toLowerCase().split(/[^a-z0-9]+/).filter((t) => t.length > 2))]
+  const terms = [...new Set(query.toLowerCase().split(/[^a-z0-9]+/).filter((t) => t.length > 2 && !STOPWORDS.has(t)))]
   if (!terms.length) return []
   const scored: WorkspaceSource[] = []
   for (const d of docs) {

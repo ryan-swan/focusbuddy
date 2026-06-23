@@ -38,4 +38,12 @@ describe('rankSources', () => {
     expect(r[0].docId).toBe('c')
     expect(r[0].snippet.toLowerCase()).toContain('supplier')
   })
+  it('ignores stopwords so only meaningful terms drive the match', () => {
+    const noise = [
+      { docId: 'x', title: 'Notes', docType: 'doc', text: 'the and for that this with from over' },
+      { docId: 'y', title: 'Acme deal', docType: 'doc', text: 'acme pricing for the supplier' }
+    ]
+    // "the" and "for" are stopwords; only "acme" should match → just doc y.
+    expect(rankSources('the acme for', noise).map((s) => s.docId)).toEqual(['y'])
+  })
 })

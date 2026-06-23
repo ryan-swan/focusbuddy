@@ -34,6 +34,7 @@ import { createLiveDoc } from '../../lib/docCollabClient'
 import UpdaterBanner from '../UpdaterBanner'
 import ApiKeysSection from '../settings/ApiKeysSection'
 import OfficeAsk from './OfficeAsk'
+import OfficeRelated from './OfficeRelated'
 import Icon from '../Icon'
 
 export default function PlexiOfficeApp(): JSX.Element {
@@ -185,10 +186,13 @@ export default function PlexiOfficeApp(): JSX.Element {
                   {active.title || 'Untitled'}
                 </button>
               )}
+              <span className="ml-auto">
+                <OfficeRelated key={active.id} docId={active.id} />
+              </span>
               <button
                 onClick={() => void collaborate()}
                 data-testid="office-collaborate-btn"
-                className="ml-auto inline-flex items-center gap-1.5 rounded-lg border border-stone-200 dark:border-stone-700 px-2.5 py-1 text-[12px] hover:border-accent hover:text-accent"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-stone-200 dark:border-stone-700 px-2.5 py-1 text-[12px] hover:border-accent hover:text-accent"
                 title="Collaborate live on this document"
               >
                 <Icon name="group" size={14} />

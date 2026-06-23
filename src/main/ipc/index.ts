@@ -157,7 +157,7 @@ import {
   fileDocument,
   unfiledDocuments
 } from '../db/files'
-import { extractDocText, retrieveSources } from '../workspaceSearch'
+import { extractDocText, retrieveSources, relatedDocuments } from '../workspaceSearch'
 import {
   openExternalUrl,
   openLocalFile,
@@ -1163,6 +1163,15 @@ export function registerIpcHandlers(): void {
       cited: cited.has(s.docId)
     }))
     return { ...res, sources: sourceMeta }
+  })
+  // The documents most related to a given one, by content overlap. No AI.
+  ipcMain.handle('workspace:related', async (_e, docId: string) => {
+    return relatedDocuments(docId, 5).map((s) => ({
+      docId: s.docId,
+      title: s.title,
+      docType: s.docType,
+      snippet: s.snippet
+    }))
   })
   ipcMain.handle('fileManager:fileDocument', (_e, docId: string, parentId: string | null) =>
     fileDocument(docId, parentId)
