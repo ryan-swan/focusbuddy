@@ -99,7 +99,20 @@ function meteredFetch(): typeof fetch {
         headers.set('x-api-key', ownKey)
         return fetch(REAL_ANTHROPIC, { ...init, headers })
       }
-      return res
+      // No fall-back available (no personal key, or 'credits' mode). Replace the
+      // proxy's terse 503 with an actionable message so the user knows to add
+      // their own key, instead of seeing "Credit mode is not available right now".
+      return new Response(
+        JSON.stringify({
+          type: 'error',
+          error: {
+            type: 'proxy_unavailable',
+            message:
+              'AI credits are temporarily unavailable. Add your own Anthropic API key in Settings → AI · API keys to keep using AI.'
+          }
+        }),
+        { status: 503, headers: { 'content-type': 'application/json' } }
+      )
     }
 
     const balHeader = res.headers.get('x-pd-credit-balance')
