@@ -1526,6 +1526,14 @@ export default function Canvas(): JSX.Element {
     // falling back to the centre of the current viewport. Replaces the old
     // centre-plus-jitter drop that often landed off-screen.
     const { x, y } = spawnPositionFor(entry.defaultWidth, entry.defaultHeight)
+    // Office documents go through the chooser (create new / import / place an
+    // existing one) rather than dropping a blank widget — same as the right-click
+    // add path. Convert the top-left spawn point to the centre point the chooser
+    // expects (createOfficeWidget subtracts width/2 and 20).
+    if (activeTaskId && (entry.kind === 'doc' || entry.kind === 'sheet' || entry.kind === 'slides')) {
+      setOfficeAdd({ entry, x: x + entry.defaultWidth / 2, y: y + 20 })
+      return
+    }
     void placeWidget(entry, x, y)
   }
 
