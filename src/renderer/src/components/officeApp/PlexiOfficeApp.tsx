@@ -32,6 +32,7 @@ import OfficeTeamsDialog from './OfficeTeamsDialog'
 import LiveDocEditorView from '../views/LiveDocEditorView'
 import { createLiveDoc } from '../../lib/docCollabClient'
 import UpdaterBanner from '../UpdaterBanner'
+import ApiKeysSection from '../settings/ApiKeysSection'
 import Icon from '../Icon'
 
 export default function PlexiOfficeApp(): JSX.Element {
@@ -46,6 +47,7 @@ export default function PlexiOfficeApp(): JSX.Element {
   const [collabError, setCollabError] = useState<string | null>(null)
   const [collabNonce, setCollabNonce] = useState(0)
   const [teamsOpen, setTeamsOpen] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
 
   // Turn the open document into a live (collaborative) document and open it in the
   // check-out editor. Reuses the same live-docs system as PlexiDesk.
@@ -102,6 +104,14 @@ export default function PlexiOfficeApp(): JSX.Element {
             title="Teams"
           >
             <Icon name="groups" size={16} />
+          </button>
+          <button
+            onClick={() => setSettingsOpen(true)}
+            data-testid="office-settings-btn"
+            className="icon-btn text-stone-400 hover:text-accent"
+            title="Settings — AI · API keys"
+          >
+            <Icon name="settings" size={16} />
           </button>
         </div>
 
@@ -217,6 +227,31 @@ export default function PlexiOfficeApp(): JSX.Element {
 
       {shareTarget && <OfficeShareDialog target={shareTarget} onClose={() => setShareTarget(null)} />}
       {teamsOpen && <OfficeTeamsDialog onClose={() => setTeamsOpen(false)} />}
+      {settingsOpen && (
+        <div
+          className="fixed inset-0 z-[300] bg-black/40 flex items-center justify-center"
+          onMouseDown={() => setSettingsOpen(false)}
+          data-testid="office-settings-modal"
+        >
+          <div
+            className="w-[480px] max-w-[92vw] max-h-[82vh] overflow-auto rounded-xl border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 shadow-2xl p-4"
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-2 mb-2">
+              <Icon name="key" size={15} className="text-accent" />
+              <span className="text-[14px] font-semibold">AI · API keys</span>
+              <button onClick={() => setSettingsOpen(false)} className="ml-auto icon-btn" aria-label="Close">
+                <Icon name="close" size={15} />
+              </button>
+            </div>
+            <p className="text-[12px] text-stone-500 dark:text-stone-400 mb-3">
+              AI features here (slides generation, document rewrites, auto-filing) run on Anthropic. Paste your own key
+              from console.anthropic.com to enable them.
+            </p>
+            <ApiKeysSection onKeySaved={() => setSettingsOpen(false)} />
+          </div>
+        </div>
+      )}
 
       {/* Footer — version pill (click to check for updates) + the shared updater
           banner, mirroring PlexiDesk so updates are visible here too. */}
