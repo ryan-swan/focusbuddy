@@ -36,6 +36,20 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.78',
+    date: '2026-06-23T20:00:00Z',
+    title: 'v2.5.78 — Set your AI key in PlexiOffice',
+    tag: 'fix',
+    summary:
+      'The standalone office app now has a settings gear for your Anthropic API key, so slides generation and the other AI features work even when shared credits are unavailable. Adding a document to a desk also lets you place an existing one.',
+    highlights: [
+      'PlexiOffice now has a Settings gear at the top of the sidebar for AI · API keys. Paste an Anthropic key from console.anthropic.com to turn on slides generation, document rewrites and Drive auto-filing. The office app keeps its own settings, separate from PlexiDesk.',
+      'When AI credits are temporarily unavailable, the message now tells you to add your own key, instead of a cryptic "Credit mode is not available right now".',
+      'Adding a Document, Spreadsheet or Slides to a desk from the palette now opens a chooser, so you can create a new one, import a real Office file, or search for and place an existing document, instead of always starting blank.'
+    ],
+    links: [{ label: 'Finding your way around', href: `${HELP_BASE}/getting-around` }]
+  },
+  {
     version: '2.5.77',
     date: '2026-06-23T18:00:00Z',
     title: 'v2.5.77 — Smart folders can search too',
