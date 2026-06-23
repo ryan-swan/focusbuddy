@@ -157,6 +157,7 @@ import {
   fileDocument,
   unfiledDocuments
 } from '../db/files'
+import { extractDocText, retrieveSources } from '../workspaceSearch'
 import {
   openExternalUrl,
   openLocalFile,
@@ -289,6 +290,7 @@ import {
   suggestPageContent,
   suggestSetupWidgets,
   suggestFileTags,
+  askWorkspace,
   suggestTableRows,
   summarizeRecentTrail,
   suggestDocContent,
@@ -1142,6 +1144,26 @@ export function registerIpcHandlers(): void {
     recordAiCall()
     return suggestFileTags(content, existingTags)
   })
+  // Ask-your-workspace: retrieve the most relevant documents for the question,
+  // then answer grounded in them with citations. Returns the answer plus the
+  // source documents (with snippet + whether each was cited) for the UI.
+  ipcMain.handle('workspace:ask', async (_e, question: string) => {
+    const sources = retrieveSources(question, 6)
+    if (sources.length) recordAiCall()
+    const res = await askWorkspace(
+      question,
+      sources.map((s) => ({ docId: s.docId, title: s.title, docType: s.docType, text: s.text }))
+    )
+    const cited = new Set(res.citedDocIds ?? [])
+    const sourceMeta = sources.map((s) => ({
+      docId: s.docId,
+      title: s.title,
+      docType: s.docType,
+      snippet: s.snippet,
+      cited: cited.has(s.docId)
+    }))
+    return { ...res, sources: sourceMeta }
+  })
   ipcMain.handle('fileManager:fileDocument', (_e, docId: string, parentId: string | null) =>
     fileDocument(docId, parentId)
   )
@@ -1725,55 +1747,4 @@ export function registerIpcHandlers(): void {
       return { ok: false, error: short }
     }
   })
-}
-
-// ── Auto-filing text extraction ──────────────────────────────────────────────
-// Best-effort plain text from a document body, by type, for the tag-suggestion
-// AI. Truncated by the caller's prompt; we cap here too so a huge doc can't blow
-// the message up.
-function collectTiptapText(node: unknown): string {
-  if (!node || typeof node !== 'object') return ''
-  const n = node as { type?: string; text?: string; content?: unknown[] }
-  if (typeof n.text === 'string') return n.text
-  const kids = Array.isArray(n.content) ? n.content : []
-  const block = n.type === 'paragraph' || n.type === 'heading'
-  const inner = kids.map(collectTiptapText).join(block ? '' : ' ')
-  return block ? inner + '\n' : inner
-}
-
-function extractDocText(docType: string, body: unknown): string {
-  try {
-    const b = (body ?? {}) as Record<string, unknown>
-    if (docType === 'doc') {
-      const root = (b.doc as unknown) ?? body
-      return collectTiptapText(root).trim().slice(0, 8000)
-    }
-    if (docType === 'sheet') {
-      const sheets = (b.sheets as Array<{ columns?: string[]; rows?: string[][] }>) ?? []
-      const t = sheets[0]
-      if (!t) return ''
-      const header = (t.columns ?? []).join(' | ')
-      const rows = (t.rows ?? []).slice(0, 12).map((r) => (r ?? []).join(' | ')).join('\n')
-      return `${header}\n${rows}`.trim().slice(0, 8000)
-    }
-    if (docType === 'slides') {
-      const slides =
-        (b.slides as Array<{
-          elements?: Array<{ type?: string; paragraphs?: Array<{ runs?: Array<{ text?: string }> }> }>
-        }>) ?? []
-      return slides
-        .map((s) =>
-          (s.elements ?? [])
-            .filter((e) => e.type === 'text')
-            .map((e) => (e.paragraphs ?? []).map((p) => (p.runs ?? []).map((r) => r.text ?? '').join('')).join(' '))
-            .join(' ')
-        )
-        .join('\n')
-        .trim()
-        .slice(0, 8000)
-    }
-  } catch {
-    /* best-effort */
-  }
-  return ''
 }

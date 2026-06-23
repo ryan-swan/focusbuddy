@@ -736,6 +736,71 @@ const VALID_KINDS: WidgetKind[] = [
 ]
 
 
+// Ask-your-workspace: answer a question grounded ONLY in the workspace documents
+// the caller retrieved, with citations. The honesty discipline is the whole point
+// (the "workslop" failure mode is ungrounded answers): the model is told to say
+// it can't find the answer rather than invent one, and to cite the documents it
+// actually used. Returns the answer plus the doc ids it cited.
+export async function askWorkspace(
+  question: string,
+  sources: Array<{ docId: string; title: string; docType: string; text: string }>
+): Promise<{
+  ok: boolean
+  answer?: string
+  citedDocIds?: string[]
+  needsApiKey?: boolean
+  error?: string
+}> {
+  const c = getClient()
+  if (!c) return { ok: false, needsApiKey: true, error: 'No Anthropic API key set. Open Settings → AI · API keys to paste one.' }
+  if (!sources.length) {
+    return { ok: true, answer: "I couldn't find anything in your documents about that.", citedDocIds: [] }
+  }
+  const system =
+    "You answer the user's question using ONLY the workspace documents provided below. Ground every claim in those documents.\n" +
+    '- If the documents do not contain the answer, say so plainly. NEVER invent facts, numbers, names, dates or quotes that are not present in the sources.\n' +
+    '- Cite the documents you used with [n] markers matching their numbers.\n' +
+    '- Be concise and direct.\n' +
+    'Return ONLY a single valid JSON object, no prose outside it, no markdown fences. The first character must be { and the last must be }.\n' +
+    'Schema: {"answer":"string (may include [n] citation markers)","sources":[1,2]} — sources is the 1-based numbers of the documents you actually used, empty if the answer is not in the documents.'
+  const docList = sources.map((s, i) => `[${i + 1}] ${s.title} (${s.docType})\n${s.text}`).join('\n\n---\n\n')
+  const userMsg = `Question: ${question}\n\nWorkspace documents:\n${docList}\n\nReturn the JSON now.`
+  try {
+    const resp = await c.messages.create({
+      model: resolveModel('chat'),
+      max_tokens: 1500,
+      system,
+      messages: [{ role: 'user', content: userMsg }]
+    })
+    if ((resp.stop_reason as string) === 'refusal') return { ok: false, error: 'Claude declined this request.' }
+    if ((resp.stop_reason as string) === 'model_context_window_exceeded') {
+      return { ok: false, error: 'Too much to read at once — try a narrower question.' }
+    }
+    const out = resp.content
+      .filter((b) => b.type === 'text')
+      .map((b) => ('text' in b ? b.text : ''))
+      .join('\n')
+      .trim()
+    const jsonStr = extractJson(out)
+    if (!jsonStr) return { ok: false, error: 'AI did not return JSON' }
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(jsonStr)
+    } catch (e) {
+      return { ok: false, error: 'AI returned invalid JSON: ' + (e as Error).message }
+    }
+    const answer = String((parsed as { answer?: unknown }).answer ?? '').slice(0, 4000)
+    const rawSources = (parsed as { sources?: unknown }).sources
+    const nums = Array.isArray(rawSources) ? rawSources : []
+    const citedDocIds = nums
+      .map((n) => sources[Number(n) - 1]?.docId)
+      .filter((id): id is string => typeof id === 'string')
+    return { ok: true, answer, citedDocIds: [...new Set(citedDocIds)] }
+  } catch (e) {
+    return { ok: false, error: (e as Error).message }
+  }
+}
+
 // Auto-filing: read a file's text and propose the tags it should carry (it may
 // belong to several things at once). SUGGEST-ONLY — the caller decides what to
 // accept. Returns an empty list, never a guess, when the content doesn't support
