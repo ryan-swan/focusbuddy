@@ -743,7 +743,8 @@ const VALID_KINDS: WidgetKind[] = [
 // actually used. Returns the answer plus the doc ids it cited.
 export async function askWorkspace(
   question: string,
-  sources: Array<{ docId: string; title: string; docType: string; text: string }>
+  sources: Array<{ docId: string; title: string; docType: string; text: string }>,
+  history: Array<{ question: string; answer: string }> = []
 ): Promise<{
   ok: boolean
   answer?: string
@@ -752,19 +753,23 @@ export async function askWorkspace(
   error?: string
 }> {
   const c = getClient()
-  if (!c) return { ok: false, needsApiKey: true, error: 'No Anthropic API key set. Open Settings → AI · API keys to paste one.' }
+  if (!c) return { ok: false, needsApiKey: true, error: 'No Anthropic API key set. Open Settings · AI · API keys to paste one.' }
   if (!sources.length) {
     return { ok: true, answer: "I couldn't find anything in your documents about that.", citedDocIds: [] }
   }
   const system =
     "You answer the user's question using ONLY the workspace documents provided below. Ground every claim in those documents.\n" +
     '- If the documents do not contain the answer, say so plainly. NEVER invent facts, numbers, names, dates or quotes that are not present in the sources.\n' +
+    '- This may be a follow-up: resolve references like "it", "that" or "the second one" using the earlier conversation, but still ground the answer in the documents.\n' +
     '- Cite the documents you used with [n] markers matching their numbers.\n' +
     '- Be concise and direct.\n' +
     'Return ONLY a single valid JSON object, no prose outside it, no markdown fences. The first character must be { and the last must be }.\n' +
     'Schema: {"answer":"string (may include [n] citation markers)","sources":[1,2]} — sources is the 1-based numbers of the documents you actually used, empty if the answer is not in the documents.'
   const docList = sources.map((s, i) => `[${i + 1}] ${s.title} (${s.docType})\n${s.text}`).join('\n\n---\n\n')
-  const userMsg = `Question: ${question}\n\nWorkspace documents:\n${docList}\n\nReturn the JSON now.`
+  const convo = history.length
+    ? 'Earlier in this conversation:\n' + history.map((h) => `Q: ${h.question}\nA: ${h.answer}`).join('\n') + '\n\n'
+    : ''
+  const userMsg = `${convo}Question: ${question}\n\nWorkspace documents:\n${docList}\n\nReturn the JSON now.`
   try {
     const resp = await c.messages.create({
       model: resolveModel('chat'),

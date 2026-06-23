@@ -1147,23 +1147,31 @@ export function registerIpcHandlers(): void {
   // Ask-your-workspace: retrieve the most relevant documents for the question,
   // then answer grounded in them with citations. Returns the answer plus the
   // source documents (with snippet + whether each was cited) for the UI.
-  ipcMain.handle('workspace:ask', async (_e, question: string) => {
-    const sources = retrieveSources(question, 6)
-    if (sources.length) recordAiCall()
-    const res = await askWorkspace(
-      question,
-      sources.map((s) => ({ docId: s.docId, title: s.title, docType: s.docType, text: s.text }))
-    )
-    const cited = new Set(res.citedDocIds ?? [])
-    const sourceMeta = sources.map((s) => ({
-      docId: s.docId,
-      title: s.title,
-      docType: s.docType,
-      snippet: s.snippet,
-      cited: cited.has(s.docId)
-    }))
-    return { ...res, sources: sourceMeta }
-  })
+  ipcMain.handle(
+    'workspace:ask',
+    async (_e, question: string, history?: Array<{ question: string; answer: string }>) => {
+      const hist = Array.isArray(history) ? history.slice(-4) : []
+      // Retrieve using the recent thread so a bare follow-up ("what about year two?")
+      // still pulls the documents the conversation is actually about.
+      const query = [...hist.map((h) => h.question), question].join(' ')
+      const sources = retrieveSources(query, 6)
+      if (sources.length) recordAiCall()
+      const res = await askWorkspace(
+        question,
+        sources.map((s) => ({ docId: s.docId, title: s.title, docType: s.docType, text: s.text })),
+        hist
+      )
+      const cited = new Set(res.citedDocIds ?? [])
+      const sourceMeta = sources.map((s) => ({
+        docId: s.docId,
+        title: s.title,
+        docType: s.docType,
+        snippet: s.snippet,
+        cited: cited.has(s.docId)
+      }))
+      return { ...res, sources: sourceMeta }
+    }
+  )
   // The documents most related to a given one, by content overlap. No AI.
   ipcMain.handle('workspace:related', async (_e, docId: string) => {
     return relatedDocuments(docId, 5).map((s) => ({
