@@ -36,6 +36,21 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.79',
+    date: '2026-06-23T21:00:00Z',
+    title: 'v2.5.79 — Ask your workspace',
+    tag: 'feature',
+    summary:
+      'Ask a question and get an answer grounded in your own documents, with clickable sources, then turn it into a real document or deck. And every document now shows the others related to it.',
+    highlights: [
+      'Ask your workspace: the new Ask pill in PlexiOffice answers questions using only your own documents, shows the sources it drew from so you can check them, and says when it cannot find something rather than guessing.',
+      'Turn an answer into a real, editable Document or Deck in one click, instead of a dead export.',
+      'Related documents: open any document and the Related control surfaces the others that overlap it in content, found automatically with nothing to set up.',
+      'Ask and create run on your own Anthropic key (add it in the office Settings gear); Related works without a key.'
+    ],
+    links: [{ label: 'Finding your way around', href: `${HELP_BASE}/getting-around` }]
+  },
+  {
     version: '2.5.78',
     date: '2026-06-23T20:00:00Z',
     title: 'v2.5.78 — Set your AI key in PlexiOffice',
