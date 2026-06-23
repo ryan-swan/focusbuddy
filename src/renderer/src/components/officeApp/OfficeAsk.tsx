@@ -1,6 +1,13 @@
 import { useState } from 'react'
+import type { DocBody, SlidesBody } from '@shared/types'
+import { htmlToDoc, wrapDocBody } from '@office'
+import { migrateSlidesBody } from '@shared/slidesMigrate'
 import Icon from '../Icon'
 import { useDocumentsStore } from '../../stores/documents'
+
+function esc(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
 
 // Ask-your-workspace: type a question, get an answer grounded in your own
 // documents, with the documents it drew from shown as clickable citations. The
@@ -54,6 +61,55 @@ export default function OfficeAsk({ onClose }: { onClose: () => void }): JSX.Ele
     onClose()
   }
 
+  // Create-from-it: the loop a read-only assistant can't close — turn the answer
+  // into a real, editable document or deck and open it.
+  async function makeDoc(): Promise<void> {
+    if (!answer || busy) return
+    setBusy(true)
+    setMsg(null)
+    try {
+      const heading = `<h2>${esc(q.trim())}</h2>`
+      const paras = answer
+        .split('\n')
+        .map((l) => l.trim())
+        .filter(Boolean)
+        .map((l) => `<p>${esc(l)}</p>`)
+        .join('')
+      const body = wrapDocBody(htmlToDoc(heading + paras), {}) as unknown as DocBody
+      const created = await window.api.documents.create({ docType: 'doc', title: q.trim().slice(0, 60) || 'Answer', body })
+      void open(created.id)
+      onClose()
+    } catch (e) {
+      setMsg((e as Error).message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function makeDeck(): Promise<void> {
+    if (!answer || busy) return
+    setBusy(true)
+    setMsg(null)
+    try {
+      const res = await window.api.documents.generateSlides({
+        mode: 'deck',
+        prompt: `Make a clear slide deck presenting this answer to the question "${q.trim()}":\n\n${answer}`
+      })
+      if (!res.ok || !res.body) {
+        setMsg(res.needsApiKey ? 'Add an Anthropic API key in Settings → AI to build a deck.' : res.error ?? 'Could not build the deck.')
+        return
+      }
+      const body = migrateSlidesBody(res.body) as unknown as SlidesBody
+      const created = await window.api.documents.create({ docType: 'slides', title: q.trim().slice(0, 60) || 'Answer deck', body })
+      void open(created.id)
+      onClose()
+    } catch (e) {
+      setMsg((e as Error).message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
   return (
     <div
       className="fixed inset-0 z-[300] bg-black/40 flex items-start justify-center pt-[12vh]"
@@ -96,6 +152,27 @@ export default function OfficeAsk({ onClose }: { onClose: () => void }): JSX.Ele
           {answer !== null && (
             <div data-testid="office-ask-answer" className="text-[13px] leading-relaxed text-stone-800 dark:text-stone-100 whitespace-pre-wrap">
               {answer}
+            </div>
+          )}
+          {answer !== null && answer.trim().length > 0 && (
+            <div className="mt-3 flex items-center gap-1.5" data-testid="office-ask-create">
+              <span className="text-[11px] text-stone-400">Turn this into</span>
+              <button
+                onClick={() => void makeDoc()}
+                disabled={busy}
+                data-testid="office-ask-make-doc"
+                className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-full border border-stone-200 dark:border-stone-700 hover:border-accent hover:text-accent disabled:opacity-50"
+              >
+                <Icon name="description" size={13} /> Document
+              </button>
+              <button
+                onClick={() => void makeDeck()}
+                disabled={busy}
+                data-testid="office-ask-make-deck"
+                className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-full border border-stone-200 dark:border-stone-700 hover:border-accent hover:text-accent disabled:opacity-50"
+              >
+                <Icon name="slideshow" size={13} /> Deck
+              </button>
             </div>
           )}
           {sources.length > 0 && (
