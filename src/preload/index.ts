@@ -676,7 +676,8 @@ const api = {
   // Ask-your-workspace: a grounded, cited answer drawn from your own documents.
   workspace: {
     ask: (
-      question: string
+      question: string,
+      history?: Array<{ question: string; answer: string }>
     ): Promise<{
       ok: boolean
       answer?: string
@@ -684,7 +685,7 @@ const api = {
       sources?: Array<{ docId: string; title: string; docType: string; snippet: string; cited: boolean }>
       needsApiKey?: boolean
       error?: string
-    }> => ipcRenderer.invoke('workspace:ask', question),
+    }> => ipcRenderer.invoke('workspace:ask', question, history),
     related: (
       docId: string
     ): Promise<Array<{ docId: string; title: string; docType: string; snippet: string }>> =>

@@ -622,3 +622,33 @@ test('PO-24 — Related dropdown opens a related document', async () => {
   await window.locator('[data-testid="office-related-item-Related thing"]').click()
   await expect(window.locator('header')).toContainText('Related thing', { timeout: 4_000 })
 })
+
+test('PO-25 — ask is conversational: a follow-up carries the thread', async () => {
+  launched = await launchApp({ env: { PLEXI_APP: 'office' } })
+  const { app, window } = launched
+
+  // Echo the question + how many prior turns were passed, so we can prove the
+  // thread accumulates and history flows to the backend.
+  await app.evaluate(({ ipcMain }) => {
+    ipcMain.removeHandler('workspace:ask')
+    ipcMain.handle('workspace:ask', async (_e, question: string, history?: unknown[]) => ({
+      ok: true,
+      answer: `A:${question} hist=${Array.isArray(history) ? history.length : 0}`,
+      citedDocIds: [],
+      sources: []
+    }))
+  })
+
+  await window.locator('[data-testid="office-ask-btn"]').click()
+  await expect(window.locator('[data-testid="office-ask-modal"]')).toBeVisible({ timeout: 4_000 })
+
+  await window.locator('[data-testid="office-ask-input"]').fill('first question')
+  await window.locator('[data-testid="office-ask-submit"]').click()
+  await expect(window.locator('[data-testid="office-ask-answer"]').nth(0)).toContainText('A:first question hist=0', { timeout: 5_000 })
+
+  await window.locator('[data-testid="office-ask-input"]').fill('second question')
+  await window.locator('[data-testid="office-ask-submit"]').click()
+  await expect(window.locator('[data-testid="office-ask-answer"]').nth(1)).toContainText('A:second question hist=1', { timeout: 5_000 })
+  // Both turns remain in the thread.
+  await expect(window.locator('[data-testid="office-ask-answer"]')).toHaveCount(2)
+})
