@@ -684,7 +684,11 @@ const api = {
       sources?: Array<{ docId: string; title: string; docType: string; snippet: string; cited: boolean }>
       needsApiKey?: boolean
       error?: string
-    }> => ipcRenderer.invoke('workspace:ask', question)
+    }> => ipcRenderer.invoke('workspace:ask', question),
+    related: (
+      docId: string
+    ): Promise<Array<{ docId: string; title: string; docType: string; snippet: string }>> =>
+      ipcRenderer.invoke('workspace:related', docId)
   },
   // The file/folder manager: a foldered library over fb_files (folders,
   // imported files, and references to internal documents).

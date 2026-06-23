@@ -577,3 +577,48 @@ test('PO-22 — ask: turn the answer into a real document', async () => {
   })
   expect(made).toBe(true)
 })
+
+test('PO-23 — related documents are found by real content overlap', async () => {
+  launched = await launchApp({ env: { PLEXI_APP: 'office' } })
+  const { window } = launched
+
+  const related = await window.evaluate(async () => {
+    const api = (window as unknown as {
+      api: {
+        documents: { create: (d: unknown) => Promise<{ id: string }> }
+        workspace: { related: (id: string) => Promise<Array<{ title: string }>> }
+      }
+    }).api
+    const mk = (title: string, text: string) =>
+      api.documents.create({ docType: 'doc', title, body: { doc: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text }] }] } } })
+    await mk('Acme pricing notes', 'acme pricing agreement total 48000 per year for the supplier contract')
+    const b = await mk('Acme proposal', 'acme pricing proposal supplier contract 48000 three year')
+    await mk('Holiday plans', 'beach trip in july with the family and a boat')
+    return api.workspace.related(b.id)
+  })
+  const titles = related.map((r) => r.title)
+  expect(titles).toContain('Acme pricing notes')
+  expect(titles).not.toContain('Holiday plans')
+})
+
+test('PO-24 — Related dropdown opens a related document', async () => {
+  launched = await launchApp({ env: { PLEXI_APP: 'office' } })
+  const { app, window } = launched
+
+  await window.locator('[data-testid="office-new-doc"]').click()
+  await expect(window.locator('input').first()).toBeVisible({ timeout: 10_000 })
+  const otherId = await window.evaluate(async () => {
+    const api = (window as unknown as { api: { documents: { create: (d: unknown) => Promise<{ id: string }> } } }).api
+    const d = await api.documents.create({ docType: 'doc', title: 'Related thing', body: { doc: { type: 'doc', content: [] } } })
+    return d.id
+  })
+  await app.evaluate(({ ipcMain }, id) => {
+    ipcMain.removeHandler('workspace:related')
+    ipcMain.handle('workspace:related', async () => [{ docId: id, title: 'Related thing', docType: 'doc', snippet: 'shared topic' }])
+  }, otherId)
+
+  await window.locator('[data-testid="office-related-btn"]').click()
+  await expect(window.locator('[data-testid="office-related-panel"]')).toBeVisible({ timeout: 4_000 })
+  await window.locator('[data-testid="office-related-item-Related thing"]').click()
+  await expect(window.locator('header')).toContainText('Related thing', { timeout: 4_000 })
+})
