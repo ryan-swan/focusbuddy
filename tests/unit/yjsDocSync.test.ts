@@ -19,6 +19,9 @@ class Relay {
       } else if (msg.type === 'yjsUpdate') {
         this.log.push(msg.payload.update)
         for (const [key, deliver] of this.clients) if (key !== sender) deliver(msg)
+      } else if (msg.type === 'yjsAwareness') {
+        // Ephemeral: relay to others, never logged.
+        for (const [key, deliver] of this.clients) if (key !== sender) deliver(msg)
       }
     }, 0)
   }
@@ -74,5 +77,27 @@ describe('YjsDocSync', () => {
     await tick()
     a.handleMessage({ type: 'yjsUpdate', payload: { docId: 'OTHER', update: 'zzzz' } })
     expect(a.doc.getText('content').toString()).toBe('')
+  })
+
+  it('relays awareness (cursor presence) to other clients', async () => {
+    const relay = new Relay()
+    const a = makeClient(relay, 'doc1')
+    const b = makeClient(relay, 'doc1')
+    await tick()
+    a.awareness.setLocalStateField('user', { name: 'Alice', color: '#ff0000' })
+    await tick()
+    const seen = [...b.awareness.getStates().values()].some(
+      (s) => (s as { user?: { name?: string } })?.user?.name === 'Alice'
+    )
+    expect(seen).toBe(true)
+  })
+
+  it('rejoin re-enters the room and pushes state (reconnect)', () => {
+    const sent: Array<{ type: string }> = []
+    const sync = new YjsDocSync('doc1', new Y.Doc(), (m) => sent.push(m))
+    sent.length = 0 // drop the constructor's initial join
+    sync.rejoin()
+    expect(sent.some((m) => m.type === 'yjsJoin')).toBe(true)
+    expect(sent.some((m) => m.type === 'yjsUpdate')).toBe(true)
   })
 })
