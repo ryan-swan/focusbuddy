@@ -119,6 +119,8 @@ export default function LiveDocEditorView({ liveDocId, onBack }: Props): JSX.Ele
     // On every (re)connect, re-join the room and push our state so a dropped
     // socket doesn't silently end co-editing or lose offline edits.
     setSocketOpenHandler(() => sync.rejoin())
+    const acct = useAccountStore.getState().account?.id
+    if (acct) sync.awareness.setLocalStateField('account', acct)
     collabRef.current = { docId: liveDocId, ydoc, sync }
     setCollabReady(true)
     return () => {
@@ -160,7 +162,11 @@ export default function LiveDocEditorView({ liveDocId, onBack }: Props): JSX.Ele
     const refresh = (): void => {
       // yToJson returns a fresh object each time, so the editor's body prop
       // changes identity and its body-sync effect folds the merge in.
-      setCollabBody(yToJson(root))
+      const body = yToJson(root)
+      setCollabBody(body)
+      // Persist remote edits too (the elected writer may just be watching);
+      // scheduleSnapshot self-gates so only that one client actually writes.
+      scheduleSnapshot(body)
     }
     // Remote changes (origin not our local marker) refresh + re-key the editor.
     const observer = (_events: unknown, txn: { origin: unknown }): void => {
@@ -182,6 +188,8 @@ export default function LiveDocEditorView({ liveDocId, onBack }: Props): JSX.Ele
     const sync = new YjsDocSync(liveDocId, ydoc, sendSocketMessage, seed)
     setYjsSocketHandler((e) => sync.handleMessage(e))
     setSocketOpenHandler(() => sync.rejoin())
+    const acct = useAccountStore.getState().account?.id
+    if (acct) sync.awareness.setLocalStateField('account', acct)
     jsonCollabRef.current = { docId: liveDocId, ydoc, sync, root }
     return () => {
       root.unobserveDeep(observer)
@@ -251,9 +259,26 @@ export default function LiveDocEditorView({ liveDocId, onBack }: Props): JSX.Ele
 
   // Snapshot the live Yjs content back to stored body_json (debounced), so
   // exports and non-live views of this doc track what people are typing.
+  // Elect a single snapshot writer so N collaborators don't all write body_json.
+  // The writer is the lowest accountId currently present (every surface's provider
+  // publishes its account in awareness). Deterministic, so all clients agree, and
+  // it self-heals when the writer leaves — the next-lowest takes over.
+  function amSnapshotWriter(): boolean {
+    const me = useAccountStore.getState().account?.id
+    if (!me) return false
+    const sync = collabRef.current?.sync ?? jsonCollabRef.current?.sync
+    if (!sync) return false
+    const present = [...sync.awareness.getStates().values()]
+      .map((s) => (s as { account?: string })?.account)
+      .filter((a): a is string => typeof a === 'string')
+    if (!present.includes(me)) present.push(me)
+    return me === [...present].sort()[0]
+  }
+
   function scheduleSnapshot(json: unknown): void {
     if (snapshotTimer.current) clearTimeout(snapshotTimer.current)
     snapshotTimer.current = setTimeout(() => {
+      if (!amSnapshotWriter()) return // only the elected writer persists the body
       const tok = useAccountStore.getState().sessionToken
       if (tok) void snapshotLiveBody(tok, liveDocId, JSON.stringify(json))
     }, 3000)
