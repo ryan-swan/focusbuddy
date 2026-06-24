@@ -106,8 +106,10 @@ export default function DocEditor({ content, title, onChange, ydoc, awareness, u
     // double-insert it on top of what Collaboration loads from the Yjs doc.
     ...(ydoc ? {} : { content: (initial.doc as object) ?? { type: 'doc', content: [{ type: 'paragraph' }] } }),
     onUpdate({ editor }) {
-      // Collaborators sync through the Yjs doc, not the legacy full-body onChange.
-      if (!ydoc) onChange(wrapDocBody(editor.getJSON(), headingStyles))
+      // Non-collab: this IS the save. Collab: peers sync through the Yjs doc, but
+      // we still emit the body so the parent can snapshot it to storage (exports
+      // and non-live views read that), debounced on its side.
+      onChange(wrapDocBody(editor.getJSON(), headingStyles))
     },
     editorProps: {
       attributes: {

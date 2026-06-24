@@ -124,6 +124,12 @@ export async function putLiveBody(
   return { ok: ok && !!json?.ok, version: json?.version ?? null, lock: json?.lock ?? null }
 }
 
+// Persist a CRDT snapshot of the body (co-editing path). Lock-free; the server
+// stores it without notifying anyone, so the live editors aren't disrupted.
+export async function snapshotLiveBody(token: string, id: string, body: string): Promise<void> {
+  await call('PUT', `/livedocs/${id}/snapshot`, token, { body })
+}
+
 export async function renameLiveDoc(token: string, id: string, title: string): Promise<void> {
   await call('POST', `/livedocs/${id}/title`, token, { title })
 }
