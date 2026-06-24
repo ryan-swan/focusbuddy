@@ -42,6 +42,7 @@
     "@anthropic-ai/sdk": "^0.32.1",
     "@tiptap/extension-character-count": "^3.23.6",
     "@tiptap/extension-code-block-lowlight": "^3.23.6",
+    "@tiptap/extension-collaboration": "^3.23.6",
     "@tiptap/extension-color": "^3.23.6",
     "@tiptap/extension-font-family": "^3.23.6",
     "@tiptap/extension-highlight": "^3.23.6",
@@ -86,6 +87,7 @@
     "remark-gfm": "^4.0.1",
     "tiptap-markdown": "^0.9.0",
     "xlsx": "^0.18.5",
+    "yjs": "^13.6.31",
     "zustand": "^5.0.1"
   },
   "optionalDependencies": {
