@@ -36,6 +36,21 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.80',
+    date: '2026-06-25T12:00:00Z',
+    title: 'v2.5.80 — Real-time co-editing, comments, and organizations',
+    tag: 'feature',
+    summary:
+      'Documents, spreadsheets and slides now edit together live, with cursors and comments. Ask your workspace became a conversation. And a new Organization console lets you manage your team and share a document with everyone in it.',
+    highlights: [
+      'Real-time co-editing: open a shared document, spreadsheet or slide deck with someone and edit it at the same time, with each person\'s coloured cursor, automatic reconnect, and no more single-writer lock. Two people on different cells or different slides both keep their edits.',
+      'Comments: select text in a shared document and start a thread, with replies, resolve, and a click-to-jump between the highlight and the panel.',
+      'Ask your workspace is now a conversation: ask a follow-up and it remembers the thread, still answering only from your own documents with clickable sources, and can turn an answer into a real document or deck.',
+      'Organizations: a new Organization area in the sidebar to create a company, invite people by email, and manage their roles, plus the ability to share a document with a whole organization so every member can open it.'
+    ],
+    links: [{ label: 'Finding your way around', href: `${HELP_BASE}/getting-around` }]
+  },
+  {
     version: '2.5.79',
     date: '2026-06-23T21:00:00Z',
     title: 'v2.5.79 — Ask your workspace',
