@@ -17,6 +17,7 @@ import LiveFolderView from './views/LiveFolderView'
 import CollaborationsView from './views/CollaborationsView'
 import InsightsView from './views/InsightsView'
 import FilesView from './views/FilesView'
+import OrgAdminView from './views/OrgAdminView'
 
 // The MainPane routes the central area between the OS-level views.
 // Existing Canvas + chat behavior is preserved for the 'task' view; everything else
@@ -60,6 +61,8 @@ export default function MainPane(): JSX.Element {
       return <InsightsView />
     case 'files':
       return <FilesView />
+    case 'organization':
+      return <OrgAdminView />
     default:
       return <HomeDashboard />
   }
