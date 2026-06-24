@@ -41,6 +41,22 @@ let onYjsEventCb: ((e: YjsSocketEvent) => void) | null = null
 // its room after a reconnect (the server-side room membership is per-socket).
 let onSocketOpenCb: (() => void) | null = null
 
+// A comment was added / resolved / deleted on a doc the account can see.
+export interface DocCommentEvent {
+  docId: string
+  action: 'added' | 'updated' | 'deleted'
+  comment: {
+    id: string
+    docId: string
+    authorAccountId: string
+    parentId: string | null
+    body: string
+    resolved: boolean
+    createdAt: number
+  }
+}
+let onDocCommentCb: ((e: DocCommentEvent) => void) | null = null
+
 /** Register a handler for live-document socket events. */
 export function setDocSocketHandler(cb: ((e: DocSocketEvent) => void) | null): void {
   onDocEventCb = cb
@@ -54,6 +70,11 @@ export function setYjsSocketHandler(cb: ((e: YjsSocketEvent) => void) | null): v
 /** Register a handler that fires whenever the socket (re)authenticates. */
 export function setSocketOpenHandler(cb: (() => void) | null): void {
   onSocketOpenCb = cb
+}
+
+/** Register a handler for live comment changes on the open document. */
+export function setDocCommentHandler(cb: ((e: DocCommentEvent) => void) | null): void {
+  onDocCommentCb = cb
 }
 
 /** Send a raw message over the authenticated socket (used by the Yjs provider).
@@ -131,6 +152,8 @@ function open(): void {
     } else if (msg.type === 'yjsSync' || msg.type === 'yjsUpdate' || msg.type === 'yjsAwareness') {
       // Real-time co-editing updates + cursor presence → the Yjs provider.
       onYjsEventCb?.({ type: msg.type, payload: msg.payload } as YjsSocketEvent)
+    } else if (msg.type === 'docComment') {
+      onDocCommentCb?.(msg.payload as DocCommentEvent)
     } else if (msg.type === 'authenticated') {
       // Socket is live again (initial connect or after a reconnect) — let the
       // Yjs provider re-join its room.

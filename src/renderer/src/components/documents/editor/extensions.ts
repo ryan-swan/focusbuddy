@@ -31,6 +31,7 @@ import { ResizableImage } from './ResizableImage'
 import { SlashCommand } from './SlashMenu'
 import { SearchHighlight } from './searchHighlight'
 import { FocusBlock } from './focusBlock'
+import { CommentMark } from './CommentMark'
 import Collaboration from '@tiptap/extension-collaboration'
 import CollaborationCaret from '@tiptap/extension-collaboration-caret'
 import type { Doc as YDoc } from 'yjs'
@@ -92,7 +93,10 @@ export function buildDocExtensions(opts: BuildOptions = {}): AnyExt[] {
     CodeBlockLowlight.configure({ lowlight }),
     // html:true keeps formatting (colour, alignment, tables) when AI/imported
     // HTML is pasted or inserted, instead of flattening to plain markdown.
-    Markdown.configure({ html: true, transformPastedText: true, transformCopiedText: false }) as AnyExt
+    Markdown.configure({ html: true, transformPastedText: true, transformCopiedText: false }) as AnyExt,
+    // Comment anchors. Always present so a doc carrying comment marks renders the
+    // highlight; the thread bodies live on the server.
+    CommentMark as AnyExt
   ]
 
   if (interactive) {

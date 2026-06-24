@@ -23,6 +23,12 @@ const FOCUS_CSS = `
 .fb-focus-mode .ProseMirror > .fb-focus-block { opacity: 1; }
 `
 
+// Comment-anchored text: a soft amber highlight you can click to open the thread.
+const COMMENT_CSS = `
+.ProseMirror .fb-comment { background: rgba(250, 204, 21, .22); border-bottom: 2px solid rgba(234, 179, 8, .7); border-radius: 2px; cursor: pointer; }
+.ProseMirror .fb-comment:hover { background: rgba(250, 204, 21, .38); }
+`
+
 type Paper = 'letter' | 'a4'
 type Orientation = 'portrait' | 'landscape'
 
@@ -68,6 +74,9 @@ interface Props {
   // Awareness + the local user's label/colour render other people's live cursors.
   awareness?: Awareness
   user?: { name: string; color: string }
+  // Hands the live editor instance to the parent (for comments: apply marks,
+  // read the selection, jump to a range). Called with null on teardown.
+  onEditorReady?: (editor: Editor | null) => void
 }
 
 const REWRITE_ACTIONS = [
@@ -79,7 +88,7 @@ const REWRITE_ACTIONS = [
   'Turn this into a table'
 ]
 
-export default function DocEditor({ content, title, onChange, ydoc, awareness, user }: Props): JSX.Element {
+export default function DocEditor({ content, title, onChange, ydoc, awareness, user, onEditorReady }: Props): JSX.Element {
   const [findOpen, setFindOpen] = useState(false)
   const [focusMode, setFocusMode] = useState(false)
   const [outlineOpen, setOutlineOpen] = useState(false)
@@ -129,6 +138,14 @@ export default function DocEditor({ content, title, onChange, ydoc, awareness, u
   })
 
   const ai = useDocAi(editor)
+
+  // Surface the editor instance to the parent (comments use it). Fire on
+  // create + null on teardown; editor identity only changes on remount.
+  useEffect(() => {
+    onEditorReady?.(editor)
+    return () => onEditorReady?.(null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editor])
 
   // Publish this editor's commands to the global palette (Cmd+K) while it is
   // mounted. Toggles use functional setState so the closures never go stale and
@@ -270,6 +287,7 @@ export default function DocEditor({ content, title, onChange, ydoc, awareness, u
       {/* Named heading styles: one rule per configured level, scoped to this editor. */}
       <style dangerouslySetInnerHTML={{ __html: headingCss(scopeClass, headingStyles) }} />
       <style dangerouslySetInnerHTML={{ __html: FOCUS_CSS }} />
+      <style dangerouslySetInnerHTML={{ __html: COMMENT_CSS }} />
 
       {!focusMode && (
         <div className="max-w-3xl mx-auto px-8 pt-6">
