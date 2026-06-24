@@ -25,6 +25,7 @@ import { getSchema } from '@tiptap/core'
 import { buildDocExtensions } from '../documents/editor/extensions'
 import { parseDocBody } from '../documents/editor/headingStyles'
 import { seedYDocFromPm } from '../../lib/yjsSeed'
+import { reconcileMap, yToJson } from '../../lib/yjsJson'
 import { YjsDocSync } from '../../lib/yjsDocSync'
 import { sendSocketMessage, setYjsSocketHandler, setSocketOpenHandler } from '../../lib/messagingSocket'
 
@@ -81,6 +82,14 @@ export default function LiveDocEditorView({ liveDocId, onBack }: Props): JSX.Ele
   const [commentsOpen, setCommentsOpen] = useState(false)
   const [composing, setComposing] = useState<{ from: number; to: number } | null>(null)
   const [composeText, setComposeText] = useState('')
+  // JSON-body co-editing for sheets/slides (the doc path uses the Tiptap binding
+  // above). The Y.Doc holds the body via the reconcile engine; remote changes
+  // refresh collabBody + bump collabVersion (which re-keys the editor), while
+  // local edits reconcile in under a private origin so they don't re-key.
+  const jsonCollabRef = useRef<{ docId: string; ydoc: Y.Doc; sync: YjsDocSync; root: Y.Map<unknown> } | null>(null)
+  const localOriginRef = useRef<object>({})
+  const [collabBody, setCollabBody] = useState<unknown>(null)
+  const [collabVersion, setCollabVersion] = useState(0)
 
   useEffect(() => {
     void openLive(liveDocId)
@@ -140,13 +149,61 @@ export default function LiveDocEditorView({ liveDocId, onBack }: Props): JSX.Ele
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [meta?.id, meta?.docType, liveDocId])
 
+  // CRDT session for sheets/slides via the JSON reconcile engine.
+  useEffect(() => {
+    if (!meta || meta.id !== liveDocId || !(meta.docType === 'sheet' || meta.docType === 'slides')) return
+    if (jsonCollabRef.current?.docId === liveDocId) return
+    const ydoc = new Y.Doc()
+    const root = ydoc.getMap('root')
+    const LOCAL = {}
+    localOriginRef.current = LOCAL
+    const refresh = (): void => {
+      setCollabBody(yToJson(root))
+      setCollabVersion((v) => v + 1)
+    }
+    // Remote changes (origin not our local marker) refresh + re-key the editor.
+    const observer = (_events: unknown, txn: { origin: unknown }): void => {
+      if (txn.origin === LOCAL) return
+      refresh()
+    }
+    root.observeDeep(observer)
+    const seed = (): void => {
+      if (root.size > 0) {
+        refresh()
+        return
+      }
+      const body = useDocCollabStore.getState().bodyObj
+      if (body && typeof body === 'object') {
+        Y.transact(ydoc, () => reconcileMap(root, body as Record<string, unknown>), LOCAL)
+      }
+      refresh()
+    }
+    const sync = new YjsDocSync(liveDocId, ydoc, sendSocketMessage, seed)
+    setYjsSocketHandler((e) => sync.handleMessage(e))
+    setSocketOpenHandler(() => sync.rejoin())
+    jsonCollabRef.current = { docId: liveDocId, ydoc, sync, root }
+    return () => {
+      root.unobserveDeep(observer)
+      setYjsSocketHandler(null)
+      setSocketOpenHandler(null)
+      if (snapshotTimer.current) clearTimeout(snapshotTimer.current)
+      sync.destroy()
+      ydoc.destroy()
+      jsonCollabRef.current = null
+      setCollabBody(null)
+      setCollabVersion(0)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [meta?.id, meta?.docType, liveDocId])
+
   // Enforce read-only for non-holders by marking the editor subtree inert (the
   // server also rejects writes without the lock, so this is belt-and-braces).
   useEffect(() => {
     const el = surfaceRef.current
-    // Documents are concurrently editable by everyone (CRDT), so never inert.
-    // Other types keep the single-writer lock: read-only unless we hold it.
-    if (el) (el as unknown as { inert: boolean }).inert = meta?.docType === 'doc' ? false : !isHolder
+    // Docs, sheets and slides are concurrently editable by everyone (CRDT), so
+    // never inert. Other types keep the single-writer lock.
+    const co = meta?.docType === 'doc' || meta?.docType === 'sheet' || meta?.docType === 'slides'
+    if (el) (el as unknown as { inert: boolean }).inert = co ? false : !isHolder
   }, [isHolder, meta, bodyObj])
 
   // Load the owner's teams when the invite panel opens, so they can invite a whole
@@ -182,8 +239,10 @@ export default function LiveDocEditorView({ liveDocId, onBack }: Props): JSX.Ele
   const isOwner = meta.ownerAccountId === myId
   const holderHandle = lock?.holder?.handle ?? null
   const lockedByOther = !!lock?.holder && lock.holder.accountId !== myId
-  // Documents co-edit in real time (no lock); other types still check out.
-  const liveCoEdit = meta.docType === 'doc'
+  // Docs, sheets and slides co-edit in real time (no lock); maps still check out.
+  const liveCoEdit = meta.docType === 'doc' || meta.docType === 'sheet' || meta.docType === 'slides'
+  // Comments are a document-only feature for now.
+  const canComment = meta.docType === 'doc'
   // Awareness: who has access, with the live editor (lock holder) highlighted.
   const people = collaborators(meta.members ?? [], lock, myId ?? null)
   // The label + colour shown on my caret to the other editors.
@@ -198,6 +257,15 @@ export default function LiveDocEditorView({ liveDocId, onBack }: Props): JSX.Ele
       const tok = useAccountStore.getState().sessionToken
       if (tok) void snapshotLiveBody(tok, liveDocId, JSON.stringify(json))
     }, 3000)
+  }
+
+  // A local sheet/slides edit: reconcile the new body into the CRDT (private
+  // origin so it doesn't re-key us) and snapshot it to storage.
+  function onJsonChange(body: unknown): void {
+    const ref = jsonCollabRef.current
+    if (!ref || !body || typeof body !== 'object') return
+    Y.transact(ref.ydoc, () => reconcileMap(ref.root, body as Record<string, unknown>), localOriginRef.current)
+    scheduleSnapshot(body)
   }
 
   // Resolve an author id to a handle for the panel (members cover comment authors).
@@ -302,7 +370,7 @@ export default function LiveDocEditorView({ liveDocId, onBack }: Props): JSX.Ele
           {meta.title}
         </span>
         <CollaboratorBar people={people} />
-        {liveCoEdit && (
+        {canComment && (
           <>
             <button
               onClick={startComment}
@@ -490,17 +558,23 @@ export default function LiveDocEditorView({ liveDocId, onBack }: Props): JSX.Ele
               Connecting live editing…
             </div>
           ))}
-        {meta.docType === 'sheet' && (
-          <SheetEditor key={editorKey} body={bodyObj as SheetBody} title={meta.title} onChange={(b) => saveBody(b)} />
-        )}
-        {meta.docType === 'slides' && (
-          <SlidesEditor key={editorKey} body={bodyObj as SlidesBody} title={meta.title} onChange={(b) => saveBody(b)} />
-        )}
+        {meta.docType === 'sheet' &&
+          (collabBody !== null ? (
+            <SheetEditor key={`${meta.id}:c${collabVersion}`} body={collabBody as SheetBody} title={meta.title} onChange={onJsonChange} />
+          ) : (
+            <div className="p-6 text-[13px] text-stone-400" data-testid="livedoc-connecting">Connecting live editing…</div>
+          ))}
+        {meta.docType === 'slides' &&
+          (collabBody !== null ? (
+            <SlidesEditor key={`${meta.id}:c${collabVersion}`} body={collabBody as SlidesBody} title={meta.title} onChange={onJsonChange} />
+          ) : (
+            <div className="p-6 text-[13px] text-stone-400">Connecting live editing…</div>
+          ))}
         {meta.docType === 'map' && (
           <MapEditor key={editorKey} body={bodyObj as MapBody} title={meta.title} onChange={(b) => saveBody(b)} />
         )}
         </div>
-        {liveCoEdit && commentsOpen && (
+        {canComment && commentsOpen && (
           <CommentsPanel
             comments={comments}
             myId={myId ?? null}
