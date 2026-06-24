@@ -3,7 +3,7 @@ import type { SheetBody, SlidesBody, MapBody } from '@shared/types'
 import { useDocCollabStore } from '../../stores/docCollab'
 import { useViewStore } from '../../stores/view'
 import { useAccountStore } from '../../stores/account'
-import { inviteToLiveDoc } from '../../lib/docCollabClient'
+import { inviteToLiveDoc, snapshotLiveBody } from '../../lib/docCollabClient'
 import { listTeams, inviteTeamToDoc, type Team } from '../../lib/teamsClient'
 import { DocEditor, SheetEditor, SlidesEditor, MapEditor } from '@office'
 import Icon from '../Icon'
@@ -60,6 +60,9 @@ export default function LiveDocEditorView({ liveDocId, onBack }: Props): JSX.Ele
   // editor re-renders with it.
   const collabRef = useRef<{ docId: string; ydoc: Y.Doc; sync: YjsDocSync } | null>(null)
   const [collabReady, setCollabReady] = useState(false)
+  // Debounce the body snapshot so co-editing writes storage at most every few
+  // seconds, not on every keystroke.
+  const snapshotTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     void openLive(liveDocId)
@@ -94,6 +97,7 @@ export default function LiveDocEditorView({ liveDocId, onBack }: Props): JSX.Ele
     return () => {
       setYjsSocketHandler(null)
       setSocketOpenHandler(null)
+      if (snapshotTimer.current) clearTimeout(snapshotTimer.current)
       sync.destroy()
       ydoc.destroy()
       collabRef.current = null
@@ -151,6 +155,16 @@ export default function LiveDocEditorView({ liveDocId, onBack }: Props): JSX.Ele
   // The label + colour shown on my caret to the other editors.
   const me = people.find((p) => p.you)
   const meUser = { name: me?.handle ?? 'You', color: me?.color ?? '#888888' }
+
+  // Snapshot the live Yjs content back to stored body_json (debounced), so
+  // exports and non-live views of this doc track what people are typing.
+  function scheduleSnapshot(json: unknown): void {
+    if (snapshotTimer.current) clearTimeout(snapshotTimer.current)
+    snapshotTimer.current = setTimeout(() => {
+      const tok = useAccountStore.getState().sessionToken
+      if (tok) void snapshotLiveBody(tok, liveDocId, JSON.stringify(json))
+    }, 3000)
+  }
 
   async function sendInvite(): Promise<void> {
     if (!token) return
@@ -314,7 +328,7 @@ export default function LiveDocEditorView({ liveDocId, onBack }: Props): JSX.Ele
               key={`${meta.id}:collab`}
               content={bodyObj}
               title={meta.title}
-              onChange={() => {}}
+              onChange={scheduleSnapshot}
               ydoc={collabRef.current.ydoc}
               awareness={collabRef.current.sync.awareness}
               user={meUser}
