@@ -77,6 +77,8 @@ interface Props {
   // Hands the live editor instance to the parent (for comments: apply marks,
   // read the selection, jump to a range). Called with null on teardown.
   onEditorReady?: (editor: Editor | null) => void
+  // Clicking commented (highlighted) text opens its thread.
+  onCommentClick?: (commentId: string) => void
 }
 
 const REWRITE_ACTIONS = [
@@ -88,7 +90,7 @@ const REWRITE_ACTIONS = [
   'Turn this into a table'
 ]
 
-export default function DocEditor({ content, title, onChange, ydoc, awareness, user, onEditorReady }: Props): JSX.Element {
+export default function DocEditor({ content, title, onChange, ydoc, awareness, user, onEditorReady, onCommentClick }: Props): JSX.Element {
   const [findOpen, setFindOpen] = useState(false)
   const [focusMode, setFocusMode] = useState(false)
   const [outlineOpen, setOutlineOpen] = useState(false)
@@ -132,6 +134,13 @@ export default function DocEditor({ content, title, onChange, ydoc, awareness, u
           setFindOpen(true)
           return true
         }
+        return false
+      },
+      handleClick(view, pos) {
+        if (!onCommentClick) return false
+        const mark = view.state.doc.resolve(pos).marks().find((m) => m.type.name === 'comment')
+        const id = mark?.attrs.commentId
+        if (typeof id === 'string') onCommentClick(id)
         return false
       }
     }

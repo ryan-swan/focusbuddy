@@ -102,6 +102,15 @@ function computeFuncMenu(value: string): FuncMenu | null {
 
 export default function SheetEditor({ body: rawBody, title, onChange }: Props): JSX.Element {
   const [body, setBody] = useState<SheetBodyV2>(() => normalizeBody(rawBody))
+  // Accept live external updates (co-editing): when the body prop changes to a
+  // new version, fold it into the grid. We deliberately do NOT touch the active
+  // cell edit (editing/editValue) or the selection (anchor/focus), so a peer's
+  // edit lands without interrupting what you're typing. Only fires on a real
+  // prop change; the parent feeds remote merges here, never our own echoes.
+  useEffect(() => {
+    setBody(normalizeBody(rawBody))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rawBody])
   const [anchor, setAnchor] = useState<Cell>({ r: 0, c: 0 })
   const [focus, setFocus] = useState<Cell>({ r: 0, c: 0 })
   const [editing, setEditing] = useState<Cell | null>(null)
