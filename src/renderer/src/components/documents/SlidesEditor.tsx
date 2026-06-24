@@ -46,6 +46,13 @@ interface Props {
 
 export default function SlidesEditor({ body: rawBody, title, onChange }: Props): JSX.Element {
   const [body, setBody] = useState<SlidesBody>(() => migrateSlidesBody(rawBody))
+  // Accept live external updates (co-editing): fold a new body prop into the
+  // deck without disturbing the current slide selection or any active element
+  // edit. Only fires on a real prop change (remote merges), not our own echoes.
+  useEffect(() => {
+    setBody(migrateSlidesBody(rawBody))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rawBody])
   const [sel, setSel] = useState(0)
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [presenting, setPresenting] = useState(false)

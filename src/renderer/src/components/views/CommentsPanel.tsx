@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Icon from '../Icon'
 import type { DocComment } from '../../lib/docCollabClient'
 
@@ -10,6 +10,8 @@ interface Props {
   comments: DocComment[]
   myId: string | null
   handleOf: (accountId: string) => string
+  // When set, that thread is highlighted and scrolled into view (clicked text).
+  focusId?: string | null
   onReply: (rootId: string, body: string) => void
   onResolve: (rootId: string, resolved: boolean) => void
   onDelete: (commentId: string) => void
@@ -27,6 +29,7 @@ function Thread({
   replies,
   myId,
   handleOf,
+  focused,
   onReply,
   onResolve,
   onDelete,
@@ -36,12 +39,17 @@ function Thread({
   replies: DocComment[]
   myId: string | null
   handleOf: (id: string) => string
+  focused: boolean
   onReply: (rootId: string, body: string) => void
   onResolve: (rootId: string, resolved: boolean) => void
   onDelete: (commentId: string) => void
   onJump: (commentId: string) => void
 }): JSX.Element {
   const [reply, setReply] = useState('')
+  const ref = useRef<HTMLDivElement | null>(null)
+  useEffect(() => {
+    if (focused) ref.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+  }, [focused])
   const submit = (): void => {
     const t = reply.trim()
     if (!t) return
@@ -50,7 +58,8 @@ function Thread({
   }
   return (
     <div
-      className={`rounded-lg border px-2.5 py-2 ${root.resolved ? 'border-stone-200 dark:border-stone-800 opacity-60' : 'border-stone-200 dark:border-stone-700'}`}
+      ref={ref}
+      className={`rounded-lg border px-2.5 py-2 ${focused ? 'border-accent ring-1 ring-accent' : root.resolved ? 'border-stone-200 dark:border-stone-800 opacity-60' : 'border-stone-200 dark:border-stone-700'}`}
       data-testid={`comment-thread-${root.id}`}
     >
       <div className="flex items-start gap-2">
@@ -115,7 +124,7 @@ function Thread({
   )
 }
 
-export default function CommentsPanel({ comments, myId, handleOf, onReply, onResolve, onDelete, onJump, onClose }: Props): JSX.Element {
+export default function CommentsPanel({ comments, myId, handleOf, focusId, onReply, onResolve, onDelete, onJump, onClose }: Props): JSX.Element {
   const roots = comments.filter((c) => !c.parentId).sort((a, b) => a.createdAt - b.createdAt)
   const repliesOf = (id: string): DocComment[] =>
     comments.filter((c) => c.parentId === id).sort((a, b) => a.createdAt - b.createdAt)
@@ -145,6 +154,7 @@ export default function CommentsPanel({ comments, myId, handleOf, onReply, onRes
               replies={repliesOf(root.id)}
               myId={myId}
               handleOf={handleOf}
+              focused={root.id === focusId}
               onReply={onReply}
               onResolve={onResolve}
               onDelete={onDelete}

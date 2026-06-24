@@ -80,6 +80,7 @@ export default function LiveDocEditorView({ liveDocId, onBack }: Props): JSX.Ele
   const [editor, setEditor] = useState<Editor | null>(null)
   const [comments, setComments] = useState<DocComment[]>([])
   const [commentsOpen, setCommentsOpen] = useState(false)
+  const [focusComment, setFocusComment] = useState<string | null>(null)
   const [composing, setComposing] = useState<{ from: number; to: number } | null>(null)
   const [composeText, setComposeText] = useState('')
   // JSON-body co-editing for sheets/slides (the doc path uses the Tiptap binding
@@ -89,7 +90,6 @@ export default function LiveDocEditorView({ liveDocId, onBack }: Props): JSX.Ele
   const jsonCollabRef = useRef<{ docId: string; ydoc: Y.Doc; sync: YjsDocSync; root: Y.Map<unknown> } | null>(null)
   const localOriginRef = useRef<object>({})
   const [collabBody, setCollabBody] = useState<unknown>(null)
-  const [collabVersion, setCollabVersion] = useState(0)
 
   useEffect(() => {
     void openLive(liveDocId)
@@ -158,8 +158,9 @@ export default function LiveDocEditorView({ liveDocId, onBack }: Props): JSX.Ele
     const LOCAL = {}
     localOriginRef.current = LOCAL
     const refresh = (): void => {
+      // yToJson returns a fresh object each time, so the editor's body prop
+      // changes identity and its body-sync effect folds the merge in.
       setCollabBody(yToJson(root))
-      setCollabVersion((v) => v + 1)
     }
     // Remote changes (origin not our local marker) refresh + re-key the editor.
     const observer = (_events: unknown, txn: { origin: unknown }): void => {
@@ -191,7 +192,6 @@ export default function LiveDocEditorView({ liveDocId, onBack }: Props): JSX.Ele
       ydoc.destroy()
       jsonCollabRef.current = null
       setCollabBody(null)
-      setCollabVersion(0)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [meta?.id, meta?.docType, liveDocId])
@@ -552,6 +552,10 @@ export default function LiveDocEditorView({ liveDocId, onBack }: Props): JSX.Ele
               awareness={collabRef.current.sync.awareness}
               user={meUser}
               onEditorReady={setEditor}
+              onCommentClick={(id) => {
+                setCommentsOpen(true)
+                setFocusComment(id)
+              }}
             />
           ) : (
             <div className="p-6 text-[13px] text-stone-400" data-testid="livedoc-connecting">
@@ -560,13 +564,15 @@ export default function LiveDocEditorView({ liveDocId, onBack }: Props): JSX.Ele
           ))}
         {meta.docType === 'sheet' &&
           (collabBody !== null ? (
-            <SheetEditor key={`${meta.id}:c${collabVersion}`} body={collabBody as SheetBody} title={meta.title} onChange={onJsonChange} />
+            // Stable key: the editor stays mounted and folds remote edits in via
+            // its body-sync effect, so an uncommitted cell edit is never lost.
+            <SheetEditor key={`${meta.id}:collab`} body={collabBody as SheetBody} title={meta.title} onChange={onJsonChange} />
           ) : (
             <div className="p-6 text-[13px] text-stone-400" data-testid="livedoc-connecting">Connecting live editing…</div>
           ))}
         {meta.docType === 'slides' &&
           (collabBody !== null ? (
-            <SlidesEditor key={`${meta.id}:c${collabVersion}`} body={collabBody as SlidesBody} title={meta.title} onChange={onJsonChange} />
+            <SlidesEditor key={`${meta.id}:collab`} body={collabBody as SlidesBody} title={meta.title} onChange={onJsonChange} />
           ) : (
             <div className="p-6 text-[13px] text-stone-400">Connecting live editing…</div>
           ))}
@@ -579,6 +585,7 @@ export default function LiveDocEditorView({ liveDocId, onBack }: Props): JSX.Ele
             comments={comments}
             myId={myId ?? null}
             handleOf={handleOf}
+            focusId={focusComment}
             onReply={(rootId, body) => void replyToComment(rootId, body)}
             onResolve={(rootId, resolved) => void resolveThread(rootId, resolved)}
             onDelete={(id) => void removeComment(id)}
