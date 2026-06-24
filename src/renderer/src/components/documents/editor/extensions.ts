@@ -32,7 +32,9 @@ import { SlashCommand } from './SlashMenu'
 import { SearchHighlight } from './searchHighlight'
 import { FocusBlock } from './focusBlock'
 import Collaboration from '@tiptap/extension-collaboration'
+import CollaborationCaret from '@tiptap/extension-collaboration-caret'
 import type { Doc as YDoc } from 'yjs'
+import type { Awareness } from 'y-protocols/awareness'
 
 const lowlight = createLowlight(common)
 
@@ -48,6 +50,10 @@ interface BuildOptions {
   // add the Collaboration extension and turn StarterKit's own undo/redo off,
   // because Collaboration provides CRDT-aware history and the two conflict.
   collab?: YDoc
+  // When set alongside collab, render other people's live cursors/selections.
+  awareness?: Awareness
+  // The local user's label + colour shown on their caret to peers.
+  user?: { name: string; color: string }
 }
 
 export function buildDocExtensions(opts: BuildOptions = {}): AnyExt[] {
@@ -112,6 +118,14 @@ export function buildDocExtensions(opts: BuildOptions = {}): AnyExt[] {
 
   if (collab) {
     exts.push(Collaboration.configure({ document: collab, field: 'default' }) as AnyExt)
+    if (opts.awareness) {
+      exts.push(
+        CollaborationCaret.configure({
+          provider: { awareness: opts.awareness },
+          user: opts.user ?? { name: 'Someone', color: '#888888' }
+        }) as AnyExt
+      )
+    }
   }
 
   return exts

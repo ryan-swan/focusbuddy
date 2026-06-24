@@ -15,7 +15,7 @@ import { buildDocExtensions } from '../documents/editor/extensions'
 import { parseDocBody } from '../documents/editor/headingStyles'
 import { seedYDocFromPm } from '../../lib/yjsSeed'
 import { YjsDocSync } from '../../lib/yjsDocSync'
-import { sendSocketMessage, setYjsSocketHandler } from '../../lib/messagingSocket'
+import { sendSocketMessage, setYjsSocketHandler, setSocketOpenHandler } from '../../lib/messagingSocket'
 
 // Editor for a LIVE (collaborative) document. The body lives on the server; this
 // view checks the doc out (acquires the edit lock) and, while it holds the lock,
@@ -86,10 +86,14 @@ export default function LiveDocEditorView({ liveDocId, onBack }: Props): JSX.Ele
     }
     const sync = new YjsDocSync(liveDocId, ydoc, sendSocketMessage, seed)
     setYjsSocketHandler((e) => sync.handleMessage(e))
+    // On every (re)connect, re-join the room and push our state so a dropped
+    // socket doesn't silently end co-editing or lose offline edits.
+    setSocketOpenHandler(() => sync.rejoin())
     collabRef.current = { docId: liveDocId, ydoc, sync }
     setCollabReady(true)
     return () => {
       setYjsSocketHandler(null)
+      setSocketOpenHandler(null)
       sync.destroy()
       ydoc.destroy()
       collabRef.current = null
@@ -144,6 +148,9 @@ export default function LiveDocEditorView({ liveDocId, onBack }: Props): JSX.Ele
   const liveCoEdit = meta.docType === 'doc'
   // Awareness: who has access, with the live editor (lock holder) highlighted.
   const people = collaborators(meta.members ?? [], lock, myId ?? null)
+  // The label + colour shown on my caret to the other editors.
+  const me = people.find((p) => p.you)
+  const meUser = { name: me?.handle ?? 'You', color: me?.color ?? '#888888' }
 
   async function sendInvite(): Promise<void> {
     if (!token) return
@@ -309,6 +316,8 @@ export default function LiveDocEditorView({ liveDocId, onBack }: Props): JSX.Ele
               title={meta.title}
               onChange={() => {}}
               ydoc={collabRef.current.ydoc}
+              awareness={collabRef.current.sync.awareness}
+              user={meUser}
             />
           ) : (
             <div className="p-6 text-[13px] text-stone-400" data-testid="livedoc-connecting">

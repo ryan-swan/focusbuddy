@@ -31,11 +31,15 @@ let socket: WebSocket | null = null
 export type YjsSocketEvent =
   | { type: 'yjsSync'; payload: { docId: string; updates: string[] } }
   | { type: 'yjsUpdate'; payload: { docId: string; update: string } }
+  | { type: 'yjsAwareness'; payload: { docId: string; update: string } }
 
 let currentToken: string | null = null
 let onMessageCb: ((m: IncomingMessage) => void) | null = null
 let onDocEventCb: ((e: DocSocketEvent) => void) | null = null
 let onYjsEventCb: ((e: YjsSocketEvent) => void) | null = null
+// Fired each time the socket (re)authenticates, so the Yjs provider can re-join
+// its room after a reconnect (the server-side room membership is per-socket).
+let onSocketOpenCb: (() => void) | null = null
 
 /** Register a handler for live-document socket events. */
 export function setDocSocketHandler(cb: ((e: DocSocketEvent) => void) | null): void {
@@ -45,6 +49,11 @@ export function setDocSocketHandler(cb: ((e: DocSocketEvent) => void) | null): v
 /** Register a handler for real-time co-editing (Yjs) socket events. */
 export function setYjsSocketHandler(cb: ((e: YjsSocketEvent) => void) | null): void {
   onYjsEventCb = cb
+}
+
+/** Register a handler that fires whenever the socket (re)authenticates. */
+export function setSocketOpenHandler(cb: (() => void) | null): void {
+  onSocketOpenCb = cb
 }
 
 /** Send a raw message over the authenticated socket (used by the Yjs provider).
@@ -119,9 +128,13 @@ function open(): void {
     ) {
       // Forward live-document events verbatim; the doc-collab store interprets them.
       onDocEventCb?.({ type: msg.type, ...(msg.payload as object) } as DocSocketEvent)
-    } else if (msg.type === 'yjsSync' || msg.type === 'yjsUpdate') {
-      // Real-time co-editing updates → the Yjs provider for the open doc.
+    } else if (msg.type === 'yjsSync' || msg.type === 'yjsUpdate' || msg.type === 'yjsAwareness') {
+      // Real-time co-editing updates + cursor presence → the Yjs provider.
       onYjsEventCb?.({ type: msg.type, payload: msg.payload } as YjsSocketEvent)
+    } else if (msg.type === 'authenticated') {
+      // Socket is live again (initial connect or after a reconnect) — let the
+      // Yjs provider re-join its room.
+      onSocketOpenCb?.()
     }
   }
 
