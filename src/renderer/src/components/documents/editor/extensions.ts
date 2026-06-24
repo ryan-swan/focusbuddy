@@ -31,6 +31,8 @@ import { ResizableImage } from './ResizableImage'
 import { SlashCommand } from './SlashMenu'
 import { SearchHighlight } from './searchHighlight'
 import { FocusBlock } from './focusBlock'
+import Collaboration from '@tiptap/extension-collaboration'
+import type { Doc as YDoc } from 'yjs'
 
 const lowlight = createLowlight(common)
 
@@ -42,10 +44,15 @@ interface BuildOptions {
   // image NodeView). The headless converter only needs the schema, so it omits
   // them — the resulting document JSON is identical either way.
   interactive?: boolean
+  // When set, the editor is a real-time collaborator on this Yjs document: we
+  // add the Collaboration extension and turn StarterKit's own undo/redo off,
+  // because Collaboration provides CRDT-aware history and the two conflict.
+  collab?: YDoc
 }
 
 export function buildDocExtensions(opts: BuildOptions = {}): AnyExt[] {
   const interactive = opts.interactive ?? true
+  const collab = opts.collab
   const exts: AnyExt[] = [
     // StarterKit v3 already provides bold, italic, strike, code, underline,
     // link, bullet/ordered/list-item, blockquote, horizontal-rule, heading and
@@ -55,7 +62,10 @@ export function buildDocExtensions(opts: BuildOptions = {}): AnyExt[] {
     StarterKit.configure({
       codeBlock: false,
       heading: { levels: [1, 2, 3, 4, 5, 6] },
-      link: { openOnClick: false, autolink: true }
+      link: { openOnClick: false, autolink: true },
+      // Collaboration brings its own CRDT-aware undo/redo; StarterKit's would
+      // fight it, so disable it in collab mode.
+      ...(collab ? { undoRedo: false } : {})
     }) as AnyExt,
     // Inline text styling, all carried on the textStyle mark so colour, font and
     // size coexist on one selection and serialise to inline CSS (which is what
@@ -98,6 +108,10 @@ export function buildDocExtensions(opts: BuildOptions = {}): AnyExt[] {
       ResizableImage.configure({ inline: false, allowBase64: true }) as AnyExt,
       CharacterCount as AnyExt
     )
+  }
+
+  if (collab) {
+    exts.push(Collaboration.configure({ document: collab, field: 'default' }) as AnyExt)
   }
 
   return exts

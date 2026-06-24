@@ -10,6 +10,7 @@ import FindReplace from './editor/FindReplace'
 import DocOutline from './editor/DocOutline'
 import { useDocAi } from './editor/useDocAi'
 import { useRegisterEditorCommands, type EditorCommand } from '../../stores/editorCommands'
+import type { Doc as YDoc } from 'yjs'
 import Icon from '../Icon'
 
 // Focus mode dims every block except the one under the cursor, so a long draft
@@ -59,6 +60,10 @@ interface Props {
   content: unknown
   title: string
   onChange: (json: unknown) => void
+  // When set, the editor is a live collaborator on this Yjs document: content
+  // comes from the CRDT (not the `content` prop) and local edits flow to peers
+  // through it rather than through onChange.
+  ydoc?: YDoc
 }
 
 const REWRITE_ACTIONS = [
@@ -70,7 +75,7 @@ const REWRITE_ACTIONS = [
   'Turn this into a table'
 ]
 
-export default function DocEditor({ content, title, onChange }: Props): JSX.Element {
+export default function DocEditor({ content, title, onChange, ydoc }: Props): JSX.Element {
   const [findOpen, setFindOpen] = useState(false)
   const [focusMode, setFocusMode] = useState(false)
   const [outlineOpen, setOutlineOpen] = useState(false)
@@ -92,10 +97,13 @@ export default function DocEditor({ content, title, onChange }: Props): JSX.Elem
   const scopeClass = 'doc-hs-' + useId().replace(/[:]/g, '')
 
   const editor = useEditor({
-    extensions: buildDocExtensions({ interactive: true }),
-    content: (initial.doc as object) ?? { type: 'doc', content: [{ type: 'paragraph' }] },
+    extensions: buildDocExtensions({ interactive: true, collab: ydoc }),
+    // In collab mode the CRDT owns the content; passing `content` too would
+    // double-insert it on top of what Collaboration loads from the Yjs doc.
+    ...(ydoc ? {} : { content: (initial.doc as object) ?? { type: 'doc', content: [{ type: 'paragraph' }] } }),
     onUpdate({ editor }) {
-      onChange(wrapDocBody(editor.getJSON(), headingStyles))
+      // Collaborators sync through the Yjs doc, not the legacy full-body onChange.
+      if (!ydoc) onChange(wrapDocBody(editor.getJSON(), headingStyles))
     },
     editorProps: {
       attributes: {

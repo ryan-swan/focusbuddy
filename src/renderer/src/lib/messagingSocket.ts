@@ -26,13 +26,35 @@ export type DocSocketEvent =
   | { type: 'docTakeoverResponse'; id: string; docId: string; accepted: boolean; message: string | null }
 
 let socket: WebSocket | null = null
+// Real-time co-editing (Yjs CRDT) rides the same socket. The live-doc editor
+// registers a handler while a doc is open; null otherwise.
+export type YjsSocketEvent =
+  | { type: 'yjsSync'; payload: { docId: string; updates: string[] } }
+  | { type: 'yjsUpdate'; payload: { docId: string; update: string } }
+
 let currentToken: string | null = null
 let onMessageCb: ((m: IncomingMessage) => void) | null = null
 let onDocEventCb: ((e: DocSocketEvent) => void) | null = null
+let onYjsEventCb: ((e: YjsSocketEvent) => void) | null = null
 
 /** Register a handler for live-document socket events. */
 export function setDocSocketHandler(cb: ((e: DocSocketEvent) => void) | null): void {
   onDocEventCb = cb
+}
+
+/** Register a handler for real-time co-editing (Yjs) socket events. */
+export function setYjsSocketHandler(cb: ((e: YjsSocketEvent) => void) | null): void {
+  onYjsEventCb = cb
+}
+
+/** Send a raw message over the authenticated socket (used by the Yjs provider).
+ *  No-op if the socket isn't open; the provider re-joins on reconnect. */
+export function sendSocketMessage(msg: object): void {
+  try {
+    socket?.send(JSON.stringify(msg))
+  } catch {
+    /* socket not ready — ignore */
+  }
 }
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null
 let backoffMs = 1000
@@ -97,6 +119,9 @@ function open(): void {
     ) {
       // Forward live-document events verbatim; the doc-collab store interprets them.
       onDocEventCb?.({ type: msg.type, ...(msg.payload as object) } as DocSocketEvent)
+    } else if (msg.type === 'yjsSync' || msg.type === 'yjsUpdate') {
+      // Real-time co-editing updates → the Yjs provider for the open doc.
+      onYjsEventCb?.({ type: msg.type, payload: msg.payload } as YjsSocketEvent)
     }
   }
 
