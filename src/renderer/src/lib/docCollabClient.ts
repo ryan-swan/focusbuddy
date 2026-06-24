@@ -52,7 +52,7 @@ function urlFor(path: string): string {
 
 // Returns the parsed JSON plus ok/status so callers can branch on 409 (locked).
 async function call<T>(
-  method: 'GET' | 'POST' | 'PUT',
+  method: 'GET' | 'POST' | 'PUT' | 'DELETE',
   path: string,
   token: string,
   body?: unknown
@@ -128,6 +128,44 @@ export async function putLiveBody(
 // stores it without notifying anyone, so the live editors aren't disrupted.
 export async function snapshotLiveBody(token: string, id: string, body: string): Promise<void> {
   await call('PUT', `/livedocs/${id}/snapshot`, token, { body })
+}
+
+// ── Comments ────────────────────────────────────────────────────────────────
+export interface DocComment {
+  id: string
+  docId: string
+  authorAccountId: string
+  parentId: string | null
+  body: string
+  resolved: boolean
+  createdAt: number
+}
+
+export async function listComments(token: string, docId: string): Promise<DocComment[]> {
+  const { json } = await call<{ ok: boolean; comments?: DocComment[] }>('GET', `/livedocs/${docId}/comments`, token)
+  return json?.comments ?? []
+}
+
+export async function addComment(
+  token: string,
+  docId: string,
+  body: string,
+  opts?: { id?: string; parentId?: string }
+): Promise<DocComment | null> {
+  const { json } = await call<{ ok: boolean; comment?: DocComment }>('POST', `/livedocs/${docId}/comments`, token, {
+    body,
+    id: opts?.id,
+    parentId: opts?.parentId
+  })
+  return json?.comment ?? null
+}
+
+export async function resolveComment(token: string, commentId: string, resolved: boolean): Promise<void> {
+  await call('POST', `/livedocs/comments/${commentId}/resolve`, token, { resolved })
+}
+
+export async function deleteComment(token: string, commentId: string): Promise<void> {
+  await call('DELETE', `/livedocs/comments/${commentId}`, token)
 }
 
 export async function renameLiveDoc(token: string, id: string, title: string): Promise<void> {

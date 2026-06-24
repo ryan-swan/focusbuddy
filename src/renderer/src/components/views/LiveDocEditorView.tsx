@@ -3,7 +3,18 @@ import type { SheetBody, SlidesBody, MapBody } from '@shared/types'
 import { useDocCollabStore } from '../../stores/docCollab'
 import { useViewStore } from '../../stores/view'
 import { useAccountStore } from '../../stores/account'
-import { inviteToLiveDoc, snapshotLiveBody } from '../../lib/docCollabClient'
+import {
+  inviteToLiveDoc,
+  snapshotLiveBody,
+  listComments,
+  addComment,
+  resolveComment,
+  deleteComment,
+  type DocComment
+} from '../../lib/docCollabClient'
+import { setDocCommentHandler } from '../../lib/messagingSocket'
+import CommentsPanel from './CommentsPanel'
+import type { Editor } from '@tiptap/react'
 import { listTeams, inviteTeamToDoc, type Team } from '../../lib/teamsClient'
 import { DocEditor, SheetEditor, SlidesEditor, MapEditor } from '@office'
 import Icon from '../Icon'
@@ -63,6 +74,13 @@ export default function LiveDocEditorView({ liveDocId, onBack }: Props): JSX.Ele
   // Debounce the body snapshot so co-editing writes storage at most every few
   // seconds, not on every keystroke.
   const snapshotTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Comments: the live editor instance (to anchor marks + jump), the threads,
+  // the panel toggle, and the in-progress new-comment composer.
+  const [editor, setEditor] = useState<Editor | null>(null)
+  const [comments, setComments] = useState<DocComment[]>([])
+  const [commentsOpen, setCommentsOpen] = useState(false)
+  const [composing, setComposing] = useState<{ from: number; to: number } | null>(null)
+  const [composeText, setComposeText] = useState('')
 
   useEffect(() => {
     void openLive(liveDocId)
@@ -103,6 +121,22 @@ export default function LiveDocEditorView({ liveDocId, onBack }: Props): JSX.Ele
       collabRef.current = null
       setCollabReady(false)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [meta?.id, meta?.docType, liveDocId])
+
+  // Load comments for the open document and apply live changes from the socket.
+  useEffect(() => {
+    if (!meta || meta.id !== liveDocId || meta.docType !== 'doc') return
+    const tok = useAccountStore.getState().sessionToken
+    if (tok) void listComments(tok, liveDocId).then(setComments).catch(() => setComments([]))
+    setDocCommentHandler((e) => {
+      if (e.docId !== liveDocId) return
+      setComments((prev) => {
+        if (e.action === 'deleted') return prev.filter((c) => c.id !== e.comment.id && c.parentId !== e.comment.id)
+        return [...prev.filter((c) => c.id !== e.comment.id), e.comment]
+      })
+    })
+    return () => setDocCommentHandler(null)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [meta?.id, meta?.docType, liveDocId])
 
@@ -166,6 +200,68 @@ export default function LiveDocEditorView({ liveDocId, onBack }: Props): JSX.Ele
     }, 3000)
   }
 
+  // Resolve an author id to a handle for the panel (members cover comment authors).
+  const handleOf = (id: string): string => people.find((p) => p.accountId === id)?.handle ?? id
+
+  // Start a comment on the current selection: capture the range and open the
+  // composer. Applying the mark waits until the body is typed and saved.
+  function startComment(): void {
+    if (!editor) return
+    const { from, to, empty } = editor.state.selection
+    if (empty) return
+    setCommentsOpen(true)
+    setComposing({ from, to })
+    setComposeText('')
+  }
+
+  async function submitComment(): Promise<void> {
+    const text = composeText.trim()
+    const tok = useAccountStore.getState().sessionToken
+    if (!editor || !composing || !text || !tok) return
+    const id = 'cmt_' + crypto.randomUUID().replace(/-/g, '').slice(0, 16)
+    editor.chain().setTextSelection({ from: composing.from, to: composing.to }).setComment(id).run()
+    const created = await addComment(tok, liveDocId, text, { id })
+    if (created) setComments((prev) => [...prev.filter((c) => c.id !== created.id), created])
+    else editor.commands.unsetComment(id) // save failed — drop the orphan mark
+    setComposing(null)
+    setComposeText('')
+  }
+
+  async function replyToComment(rootId: string, body: string): Promise<void> {
+    const tok = useAccountStore.getState().sessionToken
+    if (!tok) return
+    const created = await addComment(tok, liveDocId, body, { parentId: rootId })
+    if (created) setComments((prev) => [...prev.filter((c) => c.id !== created.id), created])
+  }
+
+  async function resolveThread(rootId: string, resolved: boolean): Promise<void> {
+    const tok = useAccountStore.getState().sessionToken
+    if (!tok) return
+    setComments((prev) => prev.map((c) => (c.id === rootId ? { ...c, resolved } : c)))
+    if (resolved) editor?.commands.unsetComment(rootId) // clear the highlight when resolved
+    await resolveComment(tok, rootId, resolved)
+  }
+
+  async function removeComment(commentId: string): Promise<void> {
+    const tok = useAccountStore.getState().sessionToken
+    if (!tok) return
+    setComments((prev) => prev.filter((c) => c.id !== commentId && c.parentId !== commentId))
+    editor?.commands.unsetComment(commentId)
+    await deleteComment(tok, commentId)
+  }
+
+  function jumpToComment(commentId: string): void {
+    if (!editor) return
+    let found: { from: number; to: number } | null = null
+    editor.state.doc.descendants((node, pos) => {
+      if (found || !node.isText) return
+      if (node.marks.some((m) => m.type.name === 'comment' && m.attrs.commentId === commentId)) {
+        found = { from: pos, to: pos + node.nodeSize }
+      }
+    })
+    if (found) editor.chain().setTextSelection(found).scrollIntoView().focus().run()
+  }
+
   async function sendInvite(): Promise<void> {
     if (!token) return
     const res = await inviteToLiveDoc(token, liveDocId, inviteHandle.trim())
@@ -206,6 +302,31 @@ export default function LiveDocEditorView({ liveDocId, onBack }: Props): JSX.Ele
           {meta.title}
         </span>
         <CollaboratorBar people={people} />
+        {liveCoEdit && (
+          <>
+            <button
+              onClick={startComment}
+              className="icon-btn text-stone-400 hover:text-accent"
+              title="Comment on the selected text"
+              data-testid="livedoc-comment-add"
+            >
+              <Icon name="add_comment" size={16} />
+            </button>
+            <button
+              onClick={() => setCommentsOpen((v) => !v)}
+              className="icon-btn text-stone-400 hover:text-accent inline-flex items-center"
+              title="Comments"
+              data-testid="livedoc-comments-toggle"
+            >
+              <Icon name="comment" size={16} />
+              {comments.filter((c) => !c.parentId && !c.resolved).length > 0 && (
+                <span className="ml-0.5 text-[10px] font-semibold text-accent">
+                  {comments.filter((c) => !c.parentId && !c.resolved).length}
+                </span>
+              )}
+            </button>
+          </>
+        )}
         {isHolder && (
           <span className="text-[11px] text-stone-400 dark:text-stone-500 inline-flex items-center gap-1 shrink-0">
             <Icon name={saving ? 'sync' : 'cloud_done'} size={13} className={saving ? 'animate-spin' : 'text-emerald-500'} />
@@ -319,8 +440,38 @@ export default function LiveDocEditorView({ liveDocId, onBack }: Props): JSX.Ele
         </div>
       )}
 
-      {/* Surface — inert (read-only) unless we hold the lock */}
-      <div className="flex-1 overflow-auto min-h-0" ref={surfaceRef}>
+      {composing && (
+        <div className="shrink-0 px-4 py-2 border-b border-stone-200 dark:border-stone-800 flex items-center gap-2 bg-amber-50/60 dark:bg-amber-950/20">
+          <Icon name="add_comment" size={14} className="text-amber-600 shrink-0" />
+          <input
+            autoFocus
+            value={composeText}
+            onChange={(e) => setComposeText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') void submitComment()
+              if (e.key === 'Escape') setComposing(null)
+            }}
+            placeholder="Comment on the selected text…"
+            data-testid="livedoc-comment-input"
+            className="flex-1 bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-lg px-3 py-1.5 text-[12px] focus:outline-none focus:border-accent"
+          />
+          <button
+            onClick={() => void submitComment()}
+            disabled={!composeText.trim()}
+            className="btn-primary text-[12px] px-3 py-1.5 disabled:opacity-50"
+            data-testid="livedoc-comment-submit"
+          >
+            Comment
+          </button>
+          <button onClick={() => setComposing(null)} className="icon-btn" aria-label="Cancel">
+            <Icon name="close" size={14} />
+          </button>
+        </div>
+      )}
+
+      {/* Surface + comments panel */}
+      <div className="flex-1 min-h-0 flex">
+        <div className="flex-1 overflow-auto min-h-0" ref={surfaceRef}>
         {meta.docType === 'doc' &&
           (collabReady && collabRef.current ? (
             // Real-time: the CRDT owns the content, edits flow through the Yjs doc.
@@ -332,6 +483,7 @@ export default function LiveDocEditorView({ liveDocId, onBack }: Props): JSX.Ele
               ydoc={collabRef.current.ydoc}
               awareness={collabRef.current.sync.awareness}
               user={meUser}
+              onEditorReady={setEditor}
             />
           ) : (
             <div className="p-6 text-[13px] text-stone-400" data-testid="livedoc-connecting">
@@ -346,6 +498,19 @@ export default function LiveDocEditorView({ liveDocId, onBack }: Props): JSX.Ele
         )}
         {meta.docType === 'map' && (
           <MapEditor key={editorKey} body={bodyObj as MapBody} title={meta.title} onChange={(b) => saveBody(b)} />
+        )}
+        </div>
+        {liveCoEdit && commentsOpen && (
+          <CommentsPanel
+            comments={comments}
+            myId={myId ?? null}
+            handleOf={handleOf}
+            onReply={(rootId, body) => void replyToComment(rootId, body)}
+            onResolve={(rootId, resolved) => void resolveThread(rootId, resolved)}
+            onDelete={(id) => void removeComment(id)}
+            onJump={jumpToComment}
+            onClose={() => setCommentsOpen(false)}
+          />
         )}
       </div>
     </div>
