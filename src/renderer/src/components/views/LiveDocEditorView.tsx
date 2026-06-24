@@ -9,6 +9,13 @@ import { DocEditor, SheetEditor, SlidesEditor, MapEditor } from '@office'
 import Icon from '../Icon'
 import CollaboratorBar from './CollaboratorBar'
 import { collaborators } from '../../lib/presence'
+import * as Y from 'yjs'
+import { getSchema } from '@tiptap/core'
+import { buildDocExtensions } from '../documents/editor/extensions'
+import { parseDocBody } from '../documents/editor/headingStyles'
+import { seedYDocFromPm } from '../../lib/yjsSeed'
+import { YjsDocSync } from '../../lib/yjsDocSync'
+import { sendSocketMessage, setYjsSocketHandler } from '../../lib/messagingSocket'
 
 // Editor for a LIVE (collaborative) document. The body lives on the server; this
 // view checks the doc out (acquires the edit lock) and, while it holds the lock,
@@ -48,6 +55,11 @@ export default function LiveDocEditorView({ liveDocId, onBack }: Props): JSX.Ele
   const [inviteNote, setInviteNote] = useState<string | null>(null)
   const [teams, setTeams] = useState<Team[]>([])
   const surfaceRef = useRef<HTMLDivElement | null>(null)
+  // Real-time co-editing for documents (other types still use check-out). We hold
+  // the Y.Doc + provider in a ref and flip a state flag once it's live so the
+  // editor re-renders with it.
+  const collabRef = useRef<{ docId: string; ydoc: Y.Doc; sync: YjsDocSync } | null>(null)
+  const [collabReady, setCollabReady] = useState(false)
 
   useEffect(() => {
     void openLive(liveDocId)
@@ -55,11 +67,44 @@ export default function LiveDocEditorView({ liveDocId, onBack }: Props): JSX.Ele
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [liveDocId])
 
+  // Stand up the CRDT session for documents once the doc has loaded. The provider
+  // joins the server room and replays the log; if nothing replays (a fresh doc),
+  // onFirstSync seeds it from the body — idempotently, so a join race can't double
+  // the content. Other members' edits arrive through the same socket.
+  useEffect(() => {
+    if (!meta || meta.id !== liveDocId || meta.docType !== 'doc') return
+    if (collabRef.current?.docId === liveDocId) return
+    const ydoc = new Y.Doc()
+    const seed = (): void => {
+      try {
+        const body = useDocCollabStore.getState().bodyObj
+        const pm = (parseDocBody(body).doc as object) ?? { type: 'doc', content: [{ type: 'paragraph' }] }
+        seedYDocFromPm(ydoc, pm, getSchema(buildDocExtensions({ interactive: false })))
+      } catch {
+        /* best-effort seed; an empty doc is recoverable, a duplicated one is not */
+      }
+    }
+    const sync = new YjsDocSync(liveDocId, ydoc, sendSocketMessage, seed)
+    setYjsSocketHandler((e) => sync.handleMessage(e))
+    collabRef.current = { docId: liveDocId, ydoc, sync }
+    setCollabReady(true)
+    return () => {
+      setYjsSocketHandler(null)
+      sync.destroy()
+      ydoc.destroy()
+      collabRef.current = null
+      setCollabReady(false)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [meta?.id, meta?.docType, liveDocId])
+
   // Enforce read-only for non-holders by marking the editor subtree inert (the
   // server also rejects writes without the lock, so this is belt-and-braces).
   useEffect(() => {
     const el = surfaceRef.current
-    if (el) (el as unknown as { inert: boolean }).inert = !isHolder
+    // Documents are concurrently editable by everyone (CRDT), so never inert.
+    // Other types keep the single-writer lock: read-only unless we hold it.
+    if (el) (el as unknown as { inert: boolean }).inert = meta?.docType === 'doc' ? false : !isHolder
   }, [isHolder, meta, bodyObj])
 
   // Load the owner's teams when the invite panel opens, so they can invite a whole
@@ -95,6 +140,8 @@ export default function LiveDocEditorView({ liveDocId, onBack }: Props): JSX.Ele
   const isOwner = meta.ownerAccountId === myId
   const holderHandle = lock?.holder?.handle ?? null
   const lockedByOther = !!lock?.holder && lock.holder.accountId !== myId
+  // Documents co-edit in real time (no lock); other types still check out.
+  const liveCoEdit = meta.docType === 'doc'
   // Awareness: who has access, with the live editor (lock holder) highlighted.
   const people = collaborators(meta.members ?? [], lock, myId ?? null)
 
@@ -155,13 +202,18 @@ export default function LiveDocEditorView({ liveDocId, onBack }: Props): JSX.Ele
       {/* Collaboration status strip */}
       <div
         className={`shrink-0 px-4 py-1.5 text-[12px] flex items-center gap-2 border-b ${
-          lockedByOther
+          lockedByOther && !liveCoEdit
             ? 'bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-900/50 text-amber-800 dark:text-amber-200'
             : 'bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-900/40 text-emerald-800 dark:text-emerald-200'
         }`}
         data-testid="livedoc-status"
       >
-        {lockedByOther ? (
+        {liveCoEdit ? (
+          <>
+            <Icon name="bolt" size={14} />
+            <span data-testid="livedoc-live">Live — everyone here can edit together.</span>
+          </>
+        ) : lockedByOther ? (
           <>
             <Icon name="lock" size={14} />
             <span data-testid="livedoc-locked">Editing — locked by {holderHandle}</span>
@@ -248,9 +300,21 @@ export default function LiveDocEditorView({ liveDocId, onBack }: Props): JSX.Ele
 
       {/* Surface — inert (read-only) unless we hold the lock */}
       <div className="flex-1 overflow-auto min-h-0" ref={surfaceRef}>
-        {meta.docType === 'doc' && (
-          <DocEditor key={editorKey} content={bodyObj} title={meta.title} onChange={(json) => saveBody(json)} />
-        )}
+        {meta.docType === 'doc' &&
+          (collabReady && collabRef.current ? (
+            // Real-time: the CRDT owns the content, edits flow through the Yjs doc.
+            <DocEditor
+              key={`${meta.id}:collab`}
+              content={bodyObj}
+              title={meta.title}
+              onChange={() => {}}
+              ydoc={collabRef.current.ydoc}
+            />
+          ) : (
+            <div className="p-6 text-[13px] text-stone-400" data-testid="livedoc-connecting">
+              Connecting live editing…
+            </div>
+          ))}
         {meta.docType === 'sheet' && (
           <SheetEditor key={editorKey} body={bodyObj as SheetBody} title={meta.title} onChange={(b) => saveBody(b)} />
         )}

@@ -37,11 +37,16 @@ export class YjsDocSync {
   readonly docId: string
   private send: (m: YjsOut) => void
   private destroyed = false
+  private synced = false
+  // Fired once, after the server's replay log has been applied. The caller uses
+  // it to seed the doc from its body only if it's still empty (nothing replayed).
+  private onFirstSync?: () => void
 
-  constructor(docId: string, doc: Y.Doc, send: (m: YjsOut) => void) {
+  constructor(docId: string, doc: Y.Doc, send: (m: YjsOut) => void, onFirstSync?: () => void) {
     this.docId = docId
     this.doc = doc
     this.send = send
+    this.onFirstSync = onFirstSync
     this.doc.on('update', this.onLocalUpdate)
     // Ask the server to add us to the doc room and replay the log.
     this.send({ type: 'yjsJoin', payload: { docId } })
@@ -67,6 +72,10 @@ export class YjsDocSync {
         },
         this
       )
+      if (!this.synced) {
+        this.synced = true
+        this.onFirstSync?.()
+      }
     } else if (msg.type === 'yjsUpdate') {
       Y.applyUpdate(this.doc, fromB64(msg.payload.update), this)
     }
