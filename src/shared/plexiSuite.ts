@@ -146,34 +146,34 @@ export const PLEXI_PRODUCTS: PlexiProduct[] = [
     name: 'PlexiForms',
     group: 'office',
     tagline: 'Capture requests, leads, briefs and data.',
-    status: 'soon',
+    status: 'ready',
     icon: 'dynamic_form',
     accent: '#a855f7',
-    about: 'Design a form from typed fields and share it. Every response lands as a row in a table you can chart, filter and automate.',
+    about: 'Design a form from typed fields, fill it, and every response lands as a row in a real table you can chart in PlexiDash, filter and automate. (Shareable public links are on the way.)',
     edges: [
       'Submissions flow straight into your tables and dashboards.',
       'Built on the same field types as the rest of the suite.',
       'No export-import dance between a forms tool and your data.'
     ],
     insteadOf: 'Google Forms / Microsoft Forms',
-    planned: ['Shareable public form links', 'Responses into a live table', 'Conditional logic and validation', 'Email notifications on submit']
+    launch: 'forms'
   },
   {
     key: 'plexisign',
     name: 'PlexiSign',
     group: 'office',
     tagline: 'Sign, approve and track documents.',
-    status: 'soon',
+    status: 'ready',
     icon: 'draw_abstract',
     accent: '#14b8a6',
-    about: 'Send a document for signature, collect approvals in order, and keep a tamper-evident trail, without leaving your workspace.',
+    about: 'Create an agreement, collect typed or drawn signatures from an ordered set of signers, and keep an append-only audit trail with a tamper-evident completion certificate, without leaving your workspace. (Outside-party signing links are on the way.)',
     edges: [
-      'Signatures on documents that already live in your suite.',
-      'A real audit trail backed by the same identity layer as everything else.',
+      'Signatures backed by the same identity and audit layer as everything else.',
+      'An append-only trail and a sha256 completion certificate.',
       'No per-envelope DocuSign bill.'
     ],
     insteadOf: 'DocuSign / Adobe Sign',
-    planned: ['Drawn and typed signatures', 'Multi-party approval order', 'Audit trail and certificate', 'Status tracking and reminders']
+    launch: 'sign'
   },
 
   // ── PlexiWork ────────────────────────────────────────────────────────────
