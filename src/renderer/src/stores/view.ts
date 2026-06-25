@@ -24,11 +24,13 @@ export type View =
   | { kind: 'insights' }
   | { kind: 'files' }
   | { kind: 'organization' }
+  | { kind: 'people-map' }
   | { kind: 'suite' }
   | { kind: 'product'; productKey: string }
   | { kind: 'knowledge' }
   | { kind: 'meetings' }
   | { kind: 'apps' }
+  | { kind: 'forms' }
 
 interface ViewStore {
   view: View
@@ -52,11 +54,13 @@ interface ViewStore {
   goInsights: () => void
   goFiles: () => void
   goOrg: () => void
+  goPeopleMap: () => void
   goSuite: () => void
   goProduct: (productKey: string) => void
   goKnowledge: () => void
   goMeetings: () => void
   goApps: () => void
+  goForms: () => void
 }
 
 const STORAGE_KEY = 'fb.view.last'
@@ -188,6 +192,11 @@ export const useViewStore = create<ViewStore>((set) => ({
     persistView(v)
     set({ view: v })
   },
+  goPeopleMap: () => {
+    const v: View = { kind: 'people-map' }
+    persistView(v)
+    set({ view: v })
+  },
   goSuite: () => {
     const v: View = { kind: 'suite' }
     persistView(v)
@@ -210,6 +219,11 @@ export const useViewStore = create<ViewStore>((set) => ({
   },
   goApps: () => {
     const v: View = { kind: 'apps' }
+    persistView(v)
+    set({ view: v })
+  },
+  goForms: () => {
+    const v: View = { kind: 'forms' }
     persistView(v)
     set({ view: v })
   }
