@@ -337,13 +337,13 @@ export const PLEXI_PRODUCTS: PlexiProduct[] = [
     name: 'PlexiSearch',
     group: 'ai',
     tagline: 'Find anything across everything.',
-    status: 'planned',
+    status: 'ready',
     icon: 'search',
     accent: '#9333ea',
-    about: 'One search across documents, tables, files, messages and people, that answers in plain language as well as links.',
-    edges: ['One box for the whole workspace.', 'Answers, not just a list of links.', 'Respects who can see what.'],
+    about: 'One search across your tasks, documents, tables, files and knowledge, ranked by meaning, with a plain-language answer drawn from the same sources sitting above the links.',
+    edges: ['One box for the whole workspace.', 'Answers, not just a list of links.', 'Ranks by meaning, not just exact words.'],
     insteadOf: 'searching each app one by one',
-    planned: ['Unified search index', 'Natural-language answers', 'Permission-aware results']
+    launch: 'search'
   },
 
   // ── PlexiData ────────────────────────────────────────────────────────────

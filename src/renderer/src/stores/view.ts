@@ -32,6 +32,7 @@ export type View =
   | { kind: 'apps' }
   | { kind: 'forms' }
   | { kind: 'sign' }
+  | { kind: 'search' }
 
 interface ViewStore {
   view: View
@@ -63,6 +64,7 @@ interface ViewStore {
   goApps: () => void
   goForms: () => void
   goSign: () => void
+  goSearch: () => void
 }
 
 const STORAGE_KEY = 'fb.view.last'
@@ -231,6 +233,11 @@ export const useViewStore = create<ViewStore>((set) => ({
   },
   goSign: () => {
     const v: View = { kind: 'sign' }
+    persistView(v)
+    set({ view: v })
+  },
+  goSearch: () => {
+    const v: View = { kind: 'search' }
     persistView(v)
     set({ view: v })
   }
