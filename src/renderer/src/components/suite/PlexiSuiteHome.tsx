@@ -39,6 +39,8 @@ export function launchProduct(product: PlexiProduct): void {
       return v.goKnowledge()
     case 'meetings':
       return v.goMeetings()
+    case 'apps':
+      return v.goApps()
     case 'canvas':
       return v.goHome()
     default:

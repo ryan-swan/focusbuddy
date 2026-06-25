@@ -72,6 +72,7 @@ import type {
 } from '@shared/fields'
 import type { KnowledgeEntry, KnowledgeDraft, KnowledgePatch } from '@shared/knowledge'
 import type { Meeting, MeetingDraft, MeetingPatch } from '@shared/meetings'
+import type { PlexiApp, PlexiAppDraft, PlexiAppPatch } from '@shared/apps'
 
 type VaultResult = { ok: true } | { ok: false; error: string }
 
@@ -1146,6 +1147,15 @@ const api = {
     update: (id: string, patch: MeetingPatch): Promise<Meeting | null> =>
       ipcRenderer.invoke('meetings:update', id, patch),
     delete: (id: string): Promise<boolean> => ipcRenderer.invoke('meetings:delete', id)
+  },
+  // PlexiBuild — no-code apps.
+  apps: {
+    list: (): Promise<PlexiApp[]> => ipcRenderer.invoke('apps:list'),
+    get: (id: string): Promise<PlexiApp | null> => ipcRenderer.invoke('apps:get', id),
+    create: (draft: PlexiAppDraft): Promise<PlexiApp> => ipcRenderer.invoke('apps:create', draft),
+    update: (id: string, patch: PlexiAppPatch): Promise<PlexiApp | null> =>
+      ipcRenderer.invoke('apps:update', id, patch),
+    delete: (id: string): Promise<boolean> => ipcRenderer.invoke('apps:delete', id)
   },
   // Settings — API-key vault. Replaces the old "edit .env and restart"
   // flow. Plaintext only travels renderer→main on save; reads return

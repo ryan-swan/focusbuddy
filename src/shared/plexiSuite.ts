@@ -401,17 +401,17 @@ export const PLEXI_PRODUCTS: PlexiProduct[] = [
     name: 'PlexiBuild',
     group: 'build',
     tagline: 'Build internal tools without code.',
-    status: 'planned',
+    status: 'ready',
     icon: 'construction',
     accent: '#10b981',
-    about: 'Compose your own apps and tools from the suite’s building blocks: fields, tables, charts, actions and AI, no code required.',
+    about: 'Compose your own apps from typed components, headings, text, input fields, buttons, more, in a Build mode, then run them in Preview. No code. (Phase 1; multi-screen navigation, table data binding and logic are on the way.)',
     edges: [
       'Build on the same primitives the suite is made of.',
-      'Wire data, UI and AI together visually.',
+      'Design in Build mode, run instantly in Preview.',
       'No separate low-code platform to learn.'
     ],
     insteadOf: 'Power Apps / Retool',
-    planned: ['Drag-together app builder', 'Reusable widget templates', 'Custom data-backed tools', 'Share apps across the team']
+    launch: 'apps'
   },
   {
     key: 'plexiwidgets',
