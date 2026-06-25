@@ -255,6 +255,16 @@ import {
   listProjectSummaries
 } from '../db/projectPlan'
 import type { PlanTaskPatch } from '@shared/projects'
+import {
+  listReports,
+  getReport,
+  createReport,
+  updateReport,
+  deleteReport,
+  generateReport,
+  runDueReports
+} from '../db/reports'
+import type { ReportDraft, ReportPatch } from '@shared/reports'
 import { deleteEmbedding } from '../db/embeddings'
 import {
   listMeetings,
@@ -1773,6 +1783,15 @@ export function registerIpcHandlers(): void {
     removeDependency(predId, succId)
   )
   ipcMain.handle('projects:reschedule', (_e, projectId: string) => rescheduleProject(projectId))
+
+  // PlexiReports: scheduled, AI-narrated reports over your tables.
+  ipcMain.handle('reports:list', () => listReports())
+  ipcMain.handle('reports:get', (_e, id: string) => getReport(id))
+  ipcMain.handle('reports:create', (_e, draft: ReportDraft) => createReport(draft))
+  ipcMain.handle('reports:update', (_e, id: string, patch: ReportPatch) => updateReport(id, patch))
+  ipcMain.handle('reports:delete', (_e, id: string) => deleteReport(id))
+  ipcMain.handle('reports:generate', (_e, id: string) => generateReport(id))
+  ipcMain.handle('reports:runDue', () => runDueReports())
   ipcMain.handle(
     'documents:upsert',
     (

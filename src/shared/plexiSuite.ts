@@ -386,13 +386,13 @@ export const PLEXI_PRODUCTS: PlexiProduct[] = [
     name: 'PlexiReports',
     group: 'data',
     tagline: 'Scheduled, shareable reports.',
-    status: 'planned',
+    status: 'ready',
     icon: 'summarize',
     accent: '#0369a1',
-    about: 'Turn a dashboard into a report that is generated on a schedule, narrated by AI, and delivered to the people who need it.',
-    edges: ['Reports built from live dashboards.', 'AI writes the narrative around the numbers.', 'Delivered on a schedule.'],
+    about: 'Turn your tables into a report that is generated on a schedule, narrated by AI, and emailed to the people who need it. With no AI key it falls back to an honest data summary rather than a fabricated narrative.',
+    edges: ['Reports built from your real table data.', 'AI writes the narrative around the numbers, never invents them.', 'Generated and emailed on a schedule.'],
     insteadOf: 'hand-built monthly slide decks',
-    planned: ['Scheduled generation', 'AI narrative summaries', 'PDF and email delivery']
+    launch: 'reports'
   },
 
   // ── PlexiBuild ───────────────────────────────────────────────────────────

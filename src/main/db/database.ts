@@ -261,6 +261,25 @@ CREATE TABLE IF NOT EXISTS fb_task_deps (
 CREATE INDEX IF NOT EXISTS idx_fb_task_deps_succ ON fb_task_deps(succ_id);
 CREATE INDEX IF NOT EXISTS idx_fb_task_deps_pred ON fb_task_deps(pred_id);
 
+-- ── PlexiReports ─────────────────────────────────────────────────────────────
+-- A report is a saved selection of tables plus a schedule and recipients. Its
+-- last generated output (Markdown) is cached with a flag recording whether it was
+-- an AI narrative or the plain data summary, so a deterministic summary is never
+-- shown as a written narrative. next_run_at advances when the report is generated.
+CREATE TABLE IF NOT EXISTS fb_reports (
+  id TEXT PRIMARY KEY,
+  title TEXT NOT NULL,
+  source_table_ids TEXT NOT NULL DEFAULT '[]',
+  schedule TEXT NOT NULL DEFAULT 'manual',
+  recipients TEXT NOT NULL DEFAULT '[]',
+  last_run_at INTEGER,
+  last_output TEXT,
+  last_output_is_ai INTEGER NOT NULL DEFAULT 0,
+  next_run_at INTEGER,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+
 -- ── Inter-widget spatial links ───────────────────────────────────────────────
 -- Obsidian-style backlinks but drawn as lines on the canvas. Each row is a
 -- directed link (source → target). UNIQUE constraint prevents duplicates in
