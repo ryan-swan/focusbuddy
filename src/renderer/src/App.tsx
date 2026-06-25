@@ -15,6 +15,7 @@ import { getPendingReleaseEntry, advanceRunVersion, type ChangelogEntry } from '
 import { useAiCommandBar } from './stores/aiCommandBar'
 import Icon from './components/Icon'
 import SettingsPanel from './components/SettingsPanel'
+import TeamPresenceButton from './components/TeamPresenceButton'
 import Footer from './components/Footer'
 import FocusSessionOverlay from './components/FocusSessionOverlay'
 import BringMeBack from './components/BringMeBack'
@@ -441,6 +442,7 @@ export default function App(): JSX.Element {
               )}
             </button>
           </Tooltip>
+          <TeamPresenceButton />
           <Tooltip content="Appearance settings — theme, accent colour and font" placement="bottom">
             <button
               ref={settingsBtnRef}

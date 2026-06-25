@@ -1,0 +1,209 @@
+/* People Map — scoped, dark glassy map surface. All classes are pm- prefixed so
+   they never collide with the rest of the app. The map reads best dark, so it
+   keeps its own surface regardless of the app theme. */
+
+.pm-root {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: radial-gradient(120% 100% at 50% -10%, #131a32 0%, #0b1020 60%, #080b16 100%);
+  color: #e7ecf6;
+}
+
+.pm-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  flex-wrap: wrap;
+}
+.pm-title {
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.pm-title b { color: #8ea2ff; font-weight: 700; }
+.pm-orgpick {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #e7ecf6;
+  border-radius: 8px;
+  padding: 4px 8px;
+  font-size: 12px;
+}
+.pm-spacer { flex: 1; }
+.pm-tabs { display: inline-flex; gap: 4px; background: rgba(255,255,255,0.05); padding: 3px; border-radius: 10px; }
+.pm-tab {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 12px;
+  border-radius: 8px;
+  color: #aab4cc;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.pm-tab.is-active { background: rgba(123, 140, 255, 0.18); color: #cdd6ff; }
+.pm-iconbtn { color: #aab4cc; padding: 5px; border-radius: 8px; }
+.pm-iconbtn:hover { background: rgba(255,255,255,0.06); color: #fff; }
+
+.pm-body { flex: 1; min-height: 0; overflow: auto; padding: 16px 18px; }
+
+.pm-empty {
+  max-width: 460px;
+  margin: 48px auto;
+  text-align: center;
+  color: #aab4cc;
+}
+.pm-empty h2 { font-size: 16px; color: #e7ecf6; margin-bottom: 6px; }
+.pm-empty p { font-size: 13px; line-height: 1.6; }
+.pm-empty button {
+  margin-top: 14px;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 16px;
+  border-radius: 10px;
+  background: #5566f0;
+  color: #fff;
+}
+.pm-empty button:hover { background: #6675ff; }
+
+/* ---- status + avatar ---- */
+.pm-av {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  color: #fff;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.pm-dot { border-radius: 50%; display: inline-block; }
+.pm-st-online { background: #10b981; }
+.pm-st-away { background: #f59e0b; }
+.pm-st-focus { background: #8b5cf6; }
+.pm-st-busy { background: #f43f5e; }
+.pm-st-offline { background: #6b7280; }
+
+/* ---- day bar ---- */
+.pm-daybar { width: 100%; }
+.pm-daybar__track {
+  position: relative;
+  border-radius: 999px;
+  overflow: hidden;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+.pm-daybar__work {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.16);
+  border-left: 1px solid rgba(255, 255, 255, 0.45);
+  border-right: 1px solid rgba(255, 255, 255, 0.45);
+}
+.pm-daybar__marker {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 3px;
+  height: 140%;
+  background: #fff;
+  border-radius: 2px;
+  box-shadow: 0 0 6px rgba(255, 255, 255, 0.8);
+}
+.pm-daybar__labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10.5px;
+  color: #93a0bd;
+  margin-top: 3px;
+}
+
+/* ---- offices grid ---- */
+.pm-offices { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; }
+.pm-office {
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  padding: 14px;
+}
+.pm-office__top { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.pm-office__name { font-size: 14px; font-weight: 700; }
+.pm-office__kind { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.4px; color: #8b96b3; }
+.pm-office__count { margin-left: auto; font-size: 12px; color: #aab4cc; }
+.pm-office__where { font-size: 11.5px; color: #93a0bd; margin-bottom: 8px; }
+.pm-office__pres { display: flex; gap: 12px; margin: 8px 0; font-size: 11.5px; color: #aab4cc; }
+.pm-office__pres span { display: inline-flex; align-items: center; gap: 5px; }
+.pm-people { display: flex; flex-direction: column; gap: 2px; margin-top: 6px; }
+.pm-prow { display: flex; align-items: center; gap: 9px; padding: 4px 2px; border-radius: 8px; }
+.pm-prow:hover { background: rgba(255, 255, 255, 0.04); }
+.pm-prow__rel { position: relative; }
+.pm-prow__sdot { position: absolute; right: -2px; bottom: -2px; width: 9px; height: 9px; border: 2px solid #0b1020; border-radius: 50%; }
+.pm-prow__name { font-size: 12.5px; font-weight: 600; color: #e7ecf6; }
+.pm-prow__sub { font-size: 11px; color: #8b96b3; }
+.pm-prow__time { margin-left: auto; font-size: 11px; color: #93a0bd; text-align: right; }
+
+/* ---- world map ---- */
+.pm-world {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 72 / 34;
+  background: #0a0f1f;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  overflow: hidden;
+}
+.pm-world__grid { position: absolute; inset: 0; width: 100%; height: 100%; }
+.pm-land { fill: #243154; }
+.pm-land--night { fill: #161d33; }
+.pm-land--twi { fill: #2a2f57; }
+.pm-pin {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  width: 22px;
+  height: 22px;
+  font-size: 9px;
+  font-weight: 700;
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+  z-index: 3;
+}
+.pm-pin--off { opacity: 0.5; filter: grayscale(0.4); }
+.pm-pin__sdot { position: absolute; right: -2px; bottom: -2px; width: 9px; height: 9px; border: 2px solid #0a0f1f; border-radius: 50%; }
+.pm-sun, .pm-moon { position: absolute; transform: translate(-50%, -50%); z-index: 2; pointer-events: none; }
+
+/* ---- hierarchy ---- */
+.pm-tree { padding: 8px 4px; }
+.pm-node { display: flex; flex-direction: column; }
+.pm-node__self { display: inline-flex; }
+.pm-card {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  background: rgba(255, 255, 255, 0.045);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 12px;
+  padding: 7px 11px;
+  margin: 4px 0;
+}
+.pm-card__rel { position: relative; }
+.pm-card__sdot { position: absolute; right: -2px; bottom: -2px; width: 9px; height: 9px; border: 2px solid #0b1020; border-radius: 50%; }
+.pm-card__name { font-size: 12.5px; font-weight: 700; }
+.pm-card__role { font-size: 11px; color: #8b96b3; }
+.pm-node__kids {
+  margin-left: 22px;
+  padding-left: 16px;
+  border-left: 1px solid rgba(255, 255, 255, 0.12);
+}
+.pm-worktag { font-size: 10.5px; padding: 2px 7px; border-radius: 999px; display: inline-flex; align-items: center; gap: 5px; }
+.pm-worktag.is-working { color: #6ee7b7; background: rgba(16, 185, 129, 0.12); }
+.pm-worktag.is-off { color: #93a0bd; background: rgba(255, 255, 255, 0.05); }

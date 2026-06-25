@@ -7,6 +7,7 @@ import type {
 } from '../lib/messagingClient'
 import * as api from '../lib/messagingClient'
 import { connectMessagingSocket, disconnectMessagingSocket } from '../lib/messagingSocket'
+import { usePresenceStore } from './presence'
 
 // Messaging store — the cohesive client state behind direct messages, shared
 // spaces and the unified-inbox unread badge. REST loads history; the socket
@@ -65,10 +66,13 @@ export const useMessagingStore = create<MessagingStore>((set, get) => ({
         void api.markRead(token, incoming.conversationId)
       }
     })
+    // Join account-level presence on the same socket once we're connected.
+    usePresenceStore.getState().start()
     await get().refreshConversations()
   },
 
   disconnect: () => {
+    usePresenceStore.getState().stop()
     disconnectMessagingSocket()
     set({
       token: null,
