@@ -86,6 +86,13 @@ export type WidgetKind =
   | 'shape'
   // Card — a titled callout card: accent bar + bold title + multi-line body.
   | 'card'
+  // Chart (PlexiDash) — a bar / line / area / pie / KPI view bound to a Table.
+  // It reads the real rows of an fb_tables table and aggregates them per its
+  // config (chart type, category column, value series + aggregation), which is
+  // serialised to widget.content as JSON. Several charts on a desk form a
+  // dashboard. Honest by construction: an unbound or empty chart shows a prompt,
+  // never sample data.
+  | 'chart'
   // Custom block — a WYSIWYG form/record designer: freely-placed typed fields
   // the user lays out themselves; doubles as a data-entry form. Layout + values
   // serialised to widget.content as JSON; can be saved as a reusable template.

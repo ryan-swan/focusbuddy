@@ -15,6 +15,7 @@ import FieldWidget from './widgets/FieldWidget'
 import PageWidget from './widgets/PageWidget'
 import LivingDocWidget from './widgets/LivingDocWidget'
 import TableWidget from './widgets/TableWidget'
+import ChartWidget from './widgets/ChartWidget'
 import OfficeDocWidget from './widgets/OfficeDocWidget'
 import OfficeDocAddDialog from './widgets/OfficeDocAddDialog'
 import CalculatorWidget from './widgets/CalculatorWidget'
@@ -158,6 +159,8 @@ function renderWidget(w: Widget): JSX.Element | null {
       return <PageWidget widget={w} />
     case 'table':
       return <TableWidget widget={w} />
+    case 'chart':
+      return <ChartWidget widget={w} />
     case 'doc':
     case 'sheet':
     case 'slides':

@@ -111,6 +111,17 @@ export const WIDGET_CATALOG: WidgetCatalogEntry[] = [
     isWebBased: false
   },
   {
+    kind: 'chart',
+    category: 'Tools',
+    label: 'Chart',
+    icon: 'bar_chart',
+    hint: 'PlexiDash — bar, line, area, pie or KPI charts from a table. Several on a desk make a dashboard.',
+    defaultWidth: 440,
+    defaultHeight: 320,
+    defaultContent: '',
+    isWebBased: false
+  },
+  {
     kind: 'doc',
     category: 'Files',
     label: 'Document',
