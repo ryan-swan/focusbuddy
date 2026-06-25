@@ -236,6 +236,14 @@ import {
   deleteKnowledge
 } from '../db/knowledge'
 import type { KnowledgeDraft, KnowledgePatch } from '@shared/knowledge'
+import {
+  listMeetings,
+  getMeeting,
+  createMeeting,
+  updateMeeting,
+  deleteMeeting
+} from '../db/meetings'
+import type { MeetingDraft, MeetingPatch } from '@shared/meetings'
 import type {
   FbRowDraft,
   FbRowPatch,
@@ -1480,6 +1488,13 @@ export function registerIpcHandlers(): void {
     updateKnowledge(id, patch)
   )
   ipcMain.handle('knowledge:delete', (_e, id: string) => deleteKnowledge(id))
+
+  // ── PlexiMeet meetings ───────────────────────────────────────────────────
+  ipcMain.handle('meetings:list', () => listMeetings())
+  ipcMain.handle('meetings:get', (_e, id: string) => getMeeting(id))
+  ipcMain.handle('meetings:create', (_e, draft: MeetingDraft) => createMeeting(draft))
+  ipcMain.handle('meetings:update', (_e, id: string, patch: MeetingPatch) => updateMeeting(id, patch))
+  ipcMain.handle('meetings:delete', (_e, id: string) => deleteMeeting(id))
 
   // ── haptyx:// deep-link auth handoff ─────────────────────────────────────
   // The renderer calls `auth:get-pending` on mount to drain any token that

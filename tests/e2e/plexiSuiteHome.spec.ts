@@ -101,10 +101,17 @@ test('3 — ready products render full-colour; coming-soon products get badge + 
   await expect(brainTile.locator('text=Planned')).toHaveCount(0)
   await expect(brainTile.locator('[data-testid="upvote-plexibrain"]')).toHaveCount(0)
 
-  // PlexiMeet is 'soon' — use it as the 'soon' representative instead.
+  // PlexiMeet is now 'ready' (meetings shipped). Confirm it has no badge and no upvote.
   const meetTile = window.locator('[data-testid="product-tile-pleximeet"]')
   await expect(meetTile).toBeVisible()
-  await expect(meetTile.locator('text=Coming soon')).toBeVisible()
+  await expect(meetTile.locator('text=Coming soon')).toHaveCount(0)
+  await expect(meetTile.locator('text=Planned')).toHaveCount(0)
+  await expect(meetTile.locator('[data-testid="upvote-pleximeet"]')).toHaveCount(0)
+
+  // PlexiSign is 'soon' — use it as the 'soon' representative.
+  const signTile2 = window.locator('[data-testid="product-tile-plexisign"]')
+  await expect(signTile2).toBeVisible()
+  await expect(signTile2.locator('text=Coming soon')).toBeVisible()
 
   // PlexiOps is 'planned'.
   const opsTile = window.locator('[data-testid="product-tile-plexiops"]')

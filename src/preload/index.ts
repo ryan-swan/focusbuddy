@@ -71,6 +71,7 @@ import type {
   FbTablePatch
 } from '@shared/fields'
 import type { KnowledgeEntry, KnowledgeDraft, KnowledgePatch } from '@shared/knowledge'
+import type { Meeting, MeetingDraft, MeetingPatch } from '@shared/meetings'
 
 type VaultResult = { ok: true } | { ok: false; error: string }
 
@@ -1136,6 +1137,15 @@ const api = {
     update: (id: string, patch: KnowledgePatch): Promise<KnowledgeEntry | null> =>
       ipcRenderer.invoke('knowledge:update', id, patch),
     delete: (id: string): Promise<boolean> => ipcRenderer.invoke('knowledge:delete', id)
+  },
+  // PlexiMeet — meetings with transcript, summary and action items.
+  meetings: {
+    list: (): Promise<Meeting[]> => ipcRenderer.invoke('meetings:list'),
+    get: (id: string): Promise<Meeting | null> => ipcRenderer.invoke('meetings:get', id),
+    create: (draft: MeetingDraft): Promise<Meeting> => ipcRenderer.invoke('meetings:create', draft),
+    update: (id: string, patch: MeetingPatch): Promise<Meeting | null> =>
+      ipcRenderer.invoke('meetings:update', id, patch),
+    delete: (id: string): Promise<boolean> => ipcRenderer.invoke('meetings:delete', id)
   },
   // Settings — API-key vault. Replaces the old "edit .env and restart"
   // flow. Plaintext only travels renderer→main on save; reads return

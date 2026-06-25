@@ -173,6 +173,21 @@ CREATE TABLE IF NOT EXISTS fb_knowledge (
 );
 CREATE INDEX IF NOT EXISTS idx_fb_knowledge_updated ON fb_knowledge(pinned DESC, updated_at DESC);
 
+-- ── PlexiMeet meetings ───────────────────────────────────────────────────────
+-- Recorded or noted meetings with transcript, AI summary and extracted action
+-- items (action_items_json is a JSON string array).
+CREATE TABLE IF NOT EXISTS fb_meetings (
+  id TEXT PRIMARY KEY,
+  title TEXT NOT NULL DEFAULT 'Untitled meeting',
+  transcript TEXT NOT NULL DEFAULT '',
+  summary TEXT NOT NULL DEFAULT '',
+  action_items_json TEXT NOT NULL DEFAULT '[]',
+  duration_sec INTEGER,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_fb_meetings_created ON fb_meetings(created_at DESC);
+
 -- ── Inter-widget spatial links ───────────────────────────────────────────────
 -- Obsidian-style backlinks but drawn as lines on the canvas. Each row is a
 -- directed link (source → target). UNIQUE constraint prevents duplicates in

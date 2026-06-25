@@ -21,6 +21,7 @@ import OrgAdminView from './views/OrgAdminView'
 import PlexiSuiteHome from './suite/PlexiSuiteHome'
 import ProductHome from './suite/ProductHome'
 import KnowledgeView from './views/KnowledgeView'
+import PlexiMeetView from './views/PlexiMeetView'
 
 // The MainPane routes the central area between the OS-level views.
 // Existing Canvas + chat behavior is preserved for the 'task' view; everything else
@@ -72,6 +73,8 @@ export default function MainPane(): JSX.Element {
       return <ProductHome productKey={view.productKey} />
     case 'knowledge':
       return <KnowledgeView />
+    case 'meetings':
+      return <PlexiMeetView />
     default:
       return <HomeDashboard />
   }
