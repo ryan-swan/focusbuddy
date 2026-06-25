@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import Icon from '../Icon'
+import { PLEXI_CARD } from '../plexi'
 import { useAppsStore } from '../../stores/apps'
 import {
   type PlexiApp,
@@ -40,21 +41,21 @@ export default function PlexiBuildView(): JSX.Element {
   }
 
   return (
-    <div className="h-full w-full flex bg-stone-50 dark:bg-stone-950" data-testid="plexibuild-view">
+    <div className="h-full w-full flex bg-[var(--surface-base)] text-[var(--ink-100)]" data-testid="plexibuild-view">
       {/* App list */}
-      <div className="w-[280px] shrink-0 border-r border-stone-200 dark:border-white/[0.06] flex flex-col">
-        <div className="px-4 py-3.5 border-b border-stone-200 dark:border-white/[0.06]">
+      <div className="w-[280px] shrink-0 border-r border-[var(--edge-soft)] flex flex-col">
+        <div className="px-4 py-3.5 border-b border-[var(--edge-soft)]">
           <div className="flex items-center gap-2">
             <Icon name="construction" size={18} className="text-emerald-500" filled />
-            <h1 className="text-[15px] font-bold tracking-tight text-stone-900 dark:text-white">PlexiBuild</h1>
+            <h1 className="text-[15px] font-bold tracking-tight text-[var(--ink-100)]">PlexiBuild</h1>
           </div>
-          <p className="mt-0.5 text-[11.5px] text-stone-500 dark:text-stone-400">Build internal tools without code.</p>
+          <p className="mt-0.5 text-[11.5px] text-[var(--ink-70)]">Build internal tools without code.</p>
         </div>
         <div className="px-3 py-2.5">
           <button
             onClick={() => void addApp()}
             data-testid="build-new-app"
-            className="w-full inline-flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-md bg-emerald-500 text-white text-[12px] font-medium hover:bg-emerald-600"
+            className="w-full inline-flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-md bg-[rgb(var(--accent))] text-white text-[12px] font-medium hover:bg-[rgb(var(--accent-hover))]"
           >
             <Icon name="add" size={15} /> New app
           </button>
@@ -63,7 +64,7 @@ export default function PlexiBuildView(): JSX.Element {
           {loaded && apps.length === 0 ? (
             <div className="px-3 py-10 text-center">
               <Icon name="apps" size={26} className="text-stone-300 dark:text-stone-600" />
-              <p className="mt-2 text-[12px] text-stone-500 dark:text-stone-400 leading-relaxed">
+              <p className="mt-2 text-[12px] text-[var(--ink-70)] leading-relaxed">
                 No apps yet. Build your first internal tool.
               </p>
             </div>
@@ -74,12 +75,12 @@ export default function PlexiBuildView(): JSX.Element {
                 onClick={() => setSelectedId(a.id)}
                 data-testid={`build-app-${a.id}`}
                 className={`w-full text-left rounded-lg px-3 py-2 mb-1 flex items-center gap-2.5 transition-colors ${
-                  a.id === selectedId ? 'bg-emerald-500/10 border border-emerald-400/30' : 'hover:bg-stone-100 dark:hover:bg-white/[0.04] border border-transparent'
+                  a.id === selectedId ? 'bg-[rgb(var(--accent)/0.10)] border border-[rgb(var(--accent)/0.30)]' : 'hover:bg-[var(--surface-sunken)] border border-transparent'
                 }`}
               >
-                <Icon name={a.icon} size={16} className="text-emerald-500 shrink-0" />
-                <span className="text-[13px] font-medium text-stone-900 dark:text-stone-100 truncate">{a.name}</span>
-                <span className="ml-auto text-[10px] text-stone-400">{a.components.length}</span>
+                <Icon name={a.icon} size={16} className="text-[var(--ink-70)] shrink-0" />
+                <span className="text-[13px] font-medium text-[var(--ink-100)] truncate">{a.name}</span>
+                <span className="ml-auto text-[10px] text-[var(--ink-70)] fb-tabular">{a.components.length}</span>
               </button>
             ))
           )}
@@ -101,7 +102,7 @@ export default function PlexiBuildView(): JSX.Element {
         ) : (
           <div className="h-full flex flex-col items-center justify-center text-center px-6">
             <Icon name="construction" size={30} className="text-stone-300 dark:text-stone-600" />
-            <p className="mt-2 text-[13px] text-stone-500 dark:text-stone-400 max-w-sm leading-relaxed">
+            <p className="mt-2 text-[13px] text-[var(--ink-70)] max-w-sm leading-relaxed">
               Select an app to build it, or create a new one. Drop in components, then hit Preview to run it.
             </p>
           </div>
@@ -147,25 +148,25 @@ function AppBuilder({
 
   return (
     <div className="h-full flex flex-col" data-testid="app-builder">
-      <div className="flex items-center gap-2 px-5 py-3 border-b border-stone-200 dark:border-white/[0.06]">
+      <div className="flex items-center gap-2 px-5 py-3 border-b border-[var(--edge-soft)]">
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
           onBlur={() => name !== app.name && onChange({ name })}
-          className="flex-1 bg-transparent text-[17px] font-bold text-stone-900 dark:text-white outline-none"
+          className="flex-1 bg-transparent text-[17px] font-bold text-[var(--ink-100)] outline-none"
           data-testid="app-name"
         />
-        <div className="inline-flex rounded-md border border-stone-300 dark:border-white/10 overflow-hidden">
+        <div className="inline-flex rounded-md border border-[var(--edge-soft)] overflow-hidden">
           <button
             onClick={() => setPreview(false)}
-            className={`px-3 py-1.5 text-[12px] font-medium ${!preview ? 'bg-emerald-500 text-white' : 'text-stone-600 dark:text-stone-300'}`}
+            className={`px-3 py-1.5 text-[12px] font-medium ${!preview ? 'bg-[rgb(var(--accent))] text-white' : 'text-[var(--ink-90)]'}`}
             data-testid="app-build-mode"
           >
             Build
           </button>
           <button
             onClick={() => setPreview(true)}
-            className={`px-3 py-1.5 text-[12px] font-medium ${preview ? 'bg-emerald-500 text-white' : 'text-stone-600 dark:text-stone-300'}`}
+            className={`px-3 py-1.5 text-[12px] font-medium ${preview ? 'bg-[rgb(var(--accent))] text-white' : 'text-[var(--ink-90)]'}`}
             data-testid="app-preview-mode"
           >
             Preview
@@ -182,14 +183,14 @@ function AppBuilder({
       </div>
 
       {!preview && (
-        <div className="px-5 py-2 border-b border-stone-200 dark:border-white/[0.06] flex items-center gap-1.5 flex-wrap">
-          <span className="text-[11px] text-stone-400 mr-1">Add</span>
+        <div className="px-5 py-2 border-b border-[var(--edge-soft)] flex items-center gap-1.5 flex-wrap">
+          <span className="text-[11px] text-[var(--ink-70)] mr-1">Add</span>
           {PALETTE.map((t) => (
             <button
               key={t}
               onClick={() => add(t)}
               data-testid={`palette-${t}`}
-              className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11.5px] text-stone-600 dark:text-stone-300 border border-stone-200 dark:border-white/10 hover:bg-stone-100 dark:hover:bg-white/[0.05]"
+              className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11.5px] text-[var(--ink-90)] border border-[var(--edge-soft)] hover:bg-[var(--surface-sunken)]"
             >
               <Icon name={APP_COMPONENT_META[t].icon} size={13} /> {APP_COMPONENT_META[t].label}
             </button>
@@ -200,7 +201,7 @@ function AppBuilder({
       <div className="flex-1 overflow-auto">
         <div className="mx-auto max-w-[640px] px-6 py-6">
           {components.length === 0 ? (
-            <div className="py-16 text-center text-stone-400 dark:text-stone-500">
+            <div className="py-16 text-center text-[var(--ink-70)]">
               <Icon name="dashboard_customize" size={28} />
               <p className="mt-2 text-[12.5px]">
                 {preview ? 'This app has no components yet.' : 'Add components from the bar above to build your app.'}
@@ -251,22 +252,22 @@ function BuildComponent({
   onMove: (dir: -1 | 1) => void
 }): JSX.Element {
   const inputCls =
-    'w-full text-[12px] bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-white/10 rounded px-2 py-1 text-stone-900 dark:text-stone-100 placeholder:text-stone-400 focus:outline-none focus:border-emerald-400/50'
+    'w-full text-[12px] bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded px-2 py-1 text-[var(--ink-100)] placeholder:text-[var(--ink-50)] focus:outline-none focus:border-[rgb(var(--accent)/0.50)]'
   return (
-    <div className="rounded-xl border border-stone-200 dark:border-white/[0.07] bg-white dark:bg-white/[0.02] p-3" data-testid={`build-component-${c.type}`}>
+    <div className={`${PLEXI_CARD} p-3`} data-testid={`build-component-${c.type}`}>
       <div className="flex items-center gap-1.5 mb-2">
-        <Icon name={APP_COMPONENT_META[c.type].icon} size={14} className="text-emerald-500" />
-        <span className="text-[11px] font-semibold uppercase tracking-wide text-stone-500 dark:text-stone-400">
+        <Icon name={APP_COMPONENT_META[c.type].icon} size={14} className="text-[rgb(var(--accent))]" />
+        <span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--ink-70)]">
           {APP_COMPONENT_META[c.type].label}
         </span>
         <div className="ml-auto flex items-center gap-0.5">
-          <button onClick={() => onMove(-1)} disabled={first} className="p-1 text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 disabled:opacity-30" title="Move up">
+          <button onClick={() => onMove(-1)} disabled={first} className="p-1 text-[var(--ink-70)] hover:text-[var(--ink-100)] disabled:opacity-30" title="Move up">
             <Icon name="arrow_upward" size={13} />
           </button>
-          <button onClick={() => onMove(1)} disabled={last} className="p-1 text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 disabled:opacity-30" title="Move down">
+          <button onClick={() => onMove(1)} disabled={last} className="p-1 text-[var(--ink-70)] hover:text-[var(--ink-100)] disabled:opacity-30" title="Move down">
             <Icon name="arrow_downward" size={13} />
           </button>
-          <button onClick={onRemove} className="p-1 text-stone-400 hover:text-red-600" title="Remove">
+          <button onClick={onRemove} className="p-1 text-[var(--ink-70)] hover:text-red-600" title="Remove">
             <Icon name="close" size={13} />
           </button>
         </div>
@@ -318,7 +319,7 @@ function BuildComponent({
           </div>
         </div>
       )}
-      {c.type === 'divider' && <div className="h-px bg-stone-200 dark:bg-white/10" />}
+      {c.type === 'divider' && <div className="h-px bg-[var(--edge-soft)]" />}
     </div>
   )
 }
@@ -328,22 +329,22 @@ function BuildComponent({
 function PreviewComponent({ c }: { c: AppComponent }): JSX.Element {
   const [val, setVal] = useState<string | boolean>(c.fieldType === 'checkbox' ? false : '')
   const inputCls =
-    'w-full text-[13px] bg-white dark:bg-white/[0.04] border border-stone-300 dark:border-white/10 rounded-md px-3 py-2 text-stone-900 dark:text-stone-100 placeholder:text-stone-400 focus:outline-none focus:border-emerald-400'
+    'w-full text-[13px] bg-[var(--surface-raised)] border border-[var(--edge-soft)] rounded-md px-3 py-2 text-[var(--ink-100)] placeholder:text-[var(--ink-50)] focus:outline-none focus:border-[rgb(var(--accent))]'
 
   switch (c.type) {
     case 'heading':
-      return <h2 className="text-[19px] font-bold text-stone-900 dark:text-white">{c.label || 'Heading'}</h2>
+      return <h2 className="text-[19px] font-bold text-[var(--ink-100)]">{c.label || 'Heading'}</h2>
     case 'text':
-      return <p className="text-[13.5px] leading-relaxed text-stone-600 dark:text-stone-300 whitespace-pre-wrap">{c.text}</p>
+      return <p className="text-[13.5px] leading-relaxed text-[var(--ink-90)] whitespace-pre-wrap">{c.text}</p>
     case 'divider':
-      return <div className="h-px bg-stone-200 dark:bg-white/10" />
+      return <div className="h-px bg-[var(--edge-soft)]" />
     case 'button':
       return (
         <button
           onClick={() => {
             if (c.action?.kind === 'link' && c.action.url) window.open(c.action.url, '_blank')
           }}
-          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-emerald-500 text-white text-[13px] font-semibold hover:bg-emerald-600"
+          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[rgb(var(--accent))] text-white text-[13px] font-semibold hover:bg-[rgb(var(--accent-hover))]"
         >
           {c.label || 'Button'}
         </button>
@@ -351,9 +352,9 @@ function PreviewComponent({ c }: { c: AppComponent }): JSX.Element {
     case 'field':
       return (
         <label className="block">
-          <span className="block text-[12.5px] font-medium text-stone-700 dark:text-stone-200 mb-1">{c.label || 'Field'}</span>
+          <span className="block text-[12.5px] font-medium text-[var(--ink-90)] mb-1">{c.label || 'Field'}</span>
           {c.fieldType === 'checkbox' ? (
-            <input type="checkbox" checked={val === true} onChange={(e) => setVal(e.target.checked)} className="h-4 w-4 accent-emerald-500" />
+            <input type="checkbox" checked={val === true} onChange={(e) => setVal(e.target.checked)} className="h-4 w-4 accent-[rgb(var(--accent))]" />
           ) : c.fieldType === 'select' ? (
             <select value={String(val)} onChange={(e) => setVal(e.target.value)} className={inputCls}>
               <option value="">Choose…</option>

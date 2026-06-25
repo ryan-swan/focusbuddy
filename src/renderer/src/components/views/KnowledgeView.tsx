@@ -45,33 +45,33 @@ export default function KnowledgeView(): JSX.Element {
   }
 
   return (
-    <div className="h-full w-full flex bg-stone-50 dark:bg-stone-950" data-testid="plexibrain-view">
+    <div className="h-full w-full flex bg-[var(--surface-base)] text-[var(--ink-100)]" data-testid="plexibrain-view">
       {/* List */}
-      <div className="w-[320px] shrink-0 border-r border-stone-200 dark:border-white/[0.06] flex flex-col">
-        <div className="px-4 py-3.5 border-b border-stone-200 dark:border-white/[0.06]">
+      <div className="w-[320px] shrink-0 border-r border-[var(--edge-soft)] flex flex-col">
+        <div className="px-4 py-3.5 border-b border-[var(--edge-soft)]">
           <div className="flex items-center gap-2">
             <Icon name="neurology" size={18} className="text-violet-500" filled />
-            <h1 className="text-[15px] font-bold tracking-tight text-stone-900 dark:text-white">PlexiBrain</h1>
+            <h1 className="text-[15px] font-bold tracking-tight text-[var(--ink-100)]">PlexiBrain</h1>
           </div>
-          <p className="mt-0.5 text-[11.5px] text-stone-500 dark:text-stone-400">
+          <p className="mt-0.5 text-[11.5px] text-[var(--ink-70)]">
             Your company's shared memory. People and AI read from it.
           </p>
         </div>
         <div className="px-3 py-2.5 flex items-center gap-2">
-          <div className="flex-1 flex items-center gap-1.5 rounded-md bg-white dark:bg-white/[0.04] border border-stone-200 dark:border-white/10 px-2 py-1.5">
-            <Icon name="search" size={14} className="text-stone-400" />
+          <div className="flex-1 flex items-center gap-1.5 rounded-md bg-[var(--surface-raised)] border border-[var(--edge-soft)] px-2 py-1.5">
+            <Icon name="search" size={14} className="text-[var(--ink-70)]" />
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search knowledge"
               data-testid="brain-search"
-              className="flex-1 bg-transparent text-[12px] text-stone-900 dark:text-stone-100 placeholder:text-stone-400 dark:placeholder:text-stone-500 focus:outline-none"
+              className="flex-1 bg-transparent text-[12px] text-[var(--ink-100)] placeholder:text-[var(--ink-50)] focus:outline-none"
             />
           </div>
           <button
             onClick={() => void addEntry()}
             data-testid="brain-new"
-            className="inline-flex items-center gap-1 px-2 py-1.5 rounded-md bg-violet-500 text-white text-[11.5px] font-medium hover:bg-violet-600"
+            className="inline-flex items-center gap-1 px-2 py-1.5 rounded-md bg-[rgb(var(--accent))] text-white text-[11.5px] font-medium hover:bg-[rgb(var(--accent-hover))]"
             title="New knowledge entry"
           >
             <Icon name="add" size={14} /> New
@@ -82,7 +82,7 @@ export default function KnowledgeView(): JSX.Element {
           {loaded && filtered.length === 0 ? (
             <div className="px-3 py-10 text-center">
               <Icon name="psychology_alt" size={26} className="text-stone-300 dark:text-stone-600" />
-              <p className="mt-2 text-[12px] text-stone-500 dark:text-stone-400 leading-relaxed">
+              <p className="mt-2 text-[12px] text-[var(--ink-70)] leading-relaxed">
                 {entries.length === 0
                   ? 'No knowledge yet. Add what your team and your AI should remember.'
                   : 'Nothing matches that search.'}
@@ -111,7 +111,7 @@ export default function KnowledgeView(): JSX.Element {
         ) : (
           <div className="h-full flex flex-col items-center justify-center text-center px-6">
             <Icon name="neurology" size={30} className="text-stone-300 dark:text-stone-600" />
-            <p className="mt-2 text-[13px] text-stone-500 dark:text-stone-400 max-w-sm leading-relaxed">
+            <p className="mt-2 text-[13px] text-[var(--ink-70)] max-w-sm leading-relaxed">
               Select an entry to read or edit it, or add a new one. Everything here grounds the AI's answers in your own
               documented truth.
             </p>
@@ -128,18 +128,18 @@ function EntryRow({ entry, active, onClick }: { entry: KnowledgeEntry; active: b
       onClick={onClick}
       data-testid={`brain-entry-${entry.id}`}
       className={`w-full text-left rounded-lg px-3 py-2.5 mb-1 transition-colors ${
-        active ? 'bg-violet-500/10 border border-violet-400/30' : 'hover:bg-stone-100 dark:hover:bg-white/[0.04] border border-transparent'
+        active ? 'bg-[rgb(var(--accent)/0.10)] border border-[rgb(var(--accent)/0.30)]' : 'hover:bg-[var(--surface-sunken)] border border-transparent'
       }`}
     >
       <div className="flex items-center gap-1.5">
         {entry.pinned && <Icon name="push_pin" size={12} className="text-violet-500 shrink-0" filled />}
-        <span className="text-[13px] font-semibold text-stone-900 dark:text-stone-100 truncate">{entry.title || 'Untitled'}</span>
+        <span className="text-[13px] font-semibold text-[var(--ink-100)] truncate">{entry.title || 'Untitled'}</span>
       </div>
-      {entry.body && <p className="mt-0.5 text-[11.5px] text-stone-500 dark:text-stone-400 line-clamp-2">{snippet(entry.body)}</p>}
+      {entry.body && <p className="mt-0.5 text-[11.5px] text-[var(--ink-70)] line-clamp-2">{snippet(entry.body)}</p>}
       {entry.tags.length > 0 && (
         <div className="mt-1.5 flex flex-wrap gap-1">
           {entry.tags.slice(0, 4).map((t) => (
-            <span key={t} className="text-[9.5px] px-1.5 py-0.5 rounded-full bg-stone-200/70 dark:bg-white/[0.06] text-stone-500 dark:text-stone-400">
+            <span key={t} className="text-[9.5px] px-1.5 py-0.5 rounded-full bg-stone-200/70 dark:bg-white/[0.06] text-[var(--ink-70)]">
               {t}
             </span>
           ))}
@@ -169,10 +169,10 @@ function Editor({
 
   return (
     <div className="h-full flex flex-col" data-testid="brain-editor">
-      <div className="flex items-center gap-2 px-5 py-3 border-b border-stone-200 dark:border-white/[0.06]">
+      <div className="flex items-center gap-2 px-5 py-3 border-b border-[var(--edge-soft)]">
         <button
           onClick={() => onChange({ pinned: !entry.pinned })}
-          className={`p-1.5 rounded-md ${entry.pinned ? 'text-violet-500 bg-violet-500/10' : 'text-stone-400 hover:bg-stone-100 dark:hover:bg-white/[0.06]'}`}
+          className={`p-1.5 rounded-md ${entry.pinned ? 'text-[rgb(var(--accent))] bg-[rgb(var(--accent)/0.10)]' : 'text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]'}`}
           title={entry.pinned ? 'Unpin' : 'Pin to top and surface first to the AI'}
           data-testid="brain-pin"
         >
@@ -184,7 +184,7 @@ function Editor({
           onBlur={() => title !== entry.title && onChange({ title })}
           placeholder="Entry title"
           data-testid="brain-title"
-          className="flex-1 bg-transparent text-[17px] font-bold text-stone-900 dark:text-white outline-none placeholder-stone-300 dark:placeholder-stone-600"
+          className="flex-1 bg-transparent text-[17px] font-bold text-[var(--ink-100)] outline-none placeholder:text-[var(--ink-50)]"
         />
         <button
           onClick={onDelete}
@@ -196,10 +196,10 @@ function Editor({
         </button>
       </div>
 
-      <div className="px-5 py-2.5 border-b border-stone-200 dark:border-white/[0.06] flex items-center gap-2 flex-wrap">
-        <Icon name="sell" size={14} className="text-stone-400" />
+      <div className="px-5 py-2.5 border-b border-[var(--edge-soft)] flex items-center gap-2 flex-wrap">
+        <Icon name="sell" size={14} className="text-[var(--ink-70)]" />
         {entry.tags.map((t) => (
-          <span key={t} className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-stone-200/70 dark:bg-white/[0.06] text-stone-600 dark:text-stone-300">
+          <span key={t} className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-stone-200/70 dark:bg-white/[0.06] text-[var(--ink-90)]">
             {t}
             <button onClick={() => onChange({ tags: entry.tags.filter((x) => x !== t) })} className="opacity-60 hover:opacity-100">
               <Icon name="close" size={10} />
@@ -216,7 +216,7 @@ function Editor({
             }
           }}
           placeholder="Add tag…"
-          className="bg-transparent text-[11px] text-stone-900 dark:text-stone-100 placeholder:text-stone-400 focus:outline-none w-24"
+          className="bg-transparent text-[11px] text-[var(--ink-100)] placeholder:text-[var(--ink-50)] focus:outline-none w-24"
         />
       </div>
 
@@ -226,7 +226,7 @@ function Editor({
         onBlur={() => body !== entry.body && onChange({ body })}
         placeholder="Write what should be remembered. The AI will ground its answers in this."
         data-testid="brain-body"
-        className="flex-1 w-full resize-none px-5 py-4 bg-transparent text-[14px] leading-relaxed text-stone-800 dark:text-stone-100 placeholder:text-stone-400 dark:placeholder:text-stone-500 focus:outline-none"
+        className="flex-1 w-full resize-none px-5 py-4 bg-transparent text-[14px] leading-relaxed text-[var(--ink-100)] placeholder:text-[var(--ink-50)] focus:outline-none"
       />
     </div>
   )

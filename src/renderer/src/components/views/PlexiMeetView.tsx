@@ -109,15 +109,15 @@ export default function PlexiMeetView(): JSX.Element {
   }
 
   return (
-    <div className="h-full w-full flex bg-stone-50 dark:bg-stone-950" data-testid="pleximeet-view">
+    <div className="h-full w-full flex bg-[var(--surface-base)] text-[var(--ink-100)]" data-testid="pleximeet-view">
       {/* List */}
-      <div className="w-[330px] shrink-0 border-r border-stone-200 dark:border-white/[0.06] flex flex-col">
-        <div className="px-4 py-3.5 border-b border-stone-200 dark:border-white/[0.06]">
+      <div className="w-[330px] shrink-0 border-r border-[var(--edge-soft)] flex flex-col">
+        <div className="px-4 py-3.5 border-b border-[var(--edge-soft)]">
           <div className="flex items-center gap-2">
             <Icon name="groups" size={18} className="text-rose-500" filled />
-            <h1 className="text-[15px] font-bold tracking-tight text-stone-900 dark:text-white">PlexiMeet</h1>
+            <h1 className="text-[15px] font-bold tracking-tight text-[var(--ink-100)]">PlexiMeet</h1>
           </div>
-          <p className="mt-0.5 text-[11.5px] text-stone-500 dark:text-stone-400">Meetings that turn into actions.</p>
+          <p className="mt-0.5 text-[11.5px] text-[var(--ink-70)]">Meetings that turn into actions.</p>
         </div>
 
         <div className="px-3 py-2.5 flex items-center gap-2">
@@ -134,7 +134,7 @@ export default function PlexiMeetView(): JSX.Element {
               onClick={() => void startRecording()}
               data-testid="meet-record"
               disabled={!!busy}
-              className="flex-1 inline-flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-md bg-rose-500 text-white text-[12px] font-medium hover:bg-rose-600 disabled:opacity-50"
+              className="flex-1 inline-flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-md bg-[rgb(var(--accent))] text-white text-[12px] font-medium hover:bg-[rgb(var(--accent-hover))] disabled:opacity-50"
             >
               <Icon name="mic" size={15} /> Record
             </button>
@@ -143,7 +143,7 @@ export default function PlexiMeetView(): JSX.Element {
             onClick={() => void addManual()}
             data-testid="meet-add"
             disabled={!!busy}
-            className="inline-flex items-center gap-1 px-2 py-1.5 rounded-md border border-stone-200 dark:border-white/10 text-stone-600 dark:text-stone-300 text-[12px] hover:bg-stone-100 dark:hover:bg-white/[0.05]"
+            className="inline-flex items-center gap-1 px-2 py-1.5 rounded-md border border-[var(--edge-soft)] text-[var(--ink-90)] text-[12px] hover:bg-[var(--surface-sunken)]"
             title="Add a meeting from notes"
           >
             <Icon name="edit_note" size={15} /> Notes
@@ -151,7 +151,7 @@ export default function PlexiMeetView(): JSX.Element {
         </div>
 
         {busy && (
-          <div className="mx-3 mb-2 flex items-center gap-2 text-[11px] text-stone-500 dark:text-stone-400">
+          <div className="mx-3 mb-2 flex items-center gap-2 text-[11px] text-[var(--ink-70)]">
             <Icon name="progress_activity" size={13} className="animate-spin" /> {busy}
           </div>
         )}
@@ -162,14 +162,14 @@ export default function PlexiMeetView(): JSX.Element {
         )}
 
         <div className="px-3 pb-2">
-          <div className="flex items-center gap-1.5 rounded-md bg-white dark:bg-white/[0.04] border border-stone-200 dark:border-white/10 px-2 py-1.5">
-            <Icon name="search" size={14} className="text-stone-400" />
+          <div className="flex items-center gap-1.5 rounded-md bg-[var(--surface-raised)] border border-[var(--edge-soft)] px-2 py-1.5">
+            <Icon name="search" size={14} className="text-[var(--ink-70)]" />
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search meetings"
               data-testid="meet-search"
-              className="flex-1 bg-transparent text-[12px] text-stone-900 dark:text-stone-100 placeholder:text-stone-400 dark:placeholder:text-stone-500 focus:outline-none"
+              className="flex-1 bg-transparent text-[12px] text-[var(--ink-100)] placeholder:text-[var(--ink-50)] focus:outline-none"
             />
           </div>
         </div>
@@ -178,7 +178,7 @@ export default function PlexiMeetView(): JSX.Element {
           {loaded && filtered.length === 0 ? (
             <div className="px-3 py-10 text-center">
               <Icon name="forum" size={26} className="text-stone-300 dark:text-stone-600" />
-              <p className="mt-2 text-[12px] text-stone-500 dark:text-stone-400 leading-relaxed">
+              <p className="mt-2 text-[12px] text-[var(--ink-70)] leading-relaxed">
                 {meetings.length === 0
                   ? 'No meetings yet. Record one or add notes, and the actions land beside your work.'
                   : 'Nothing matches that search.'}
@@ -191,11 +191,11 @@ export default function PlexiMeetView(): JSX.Element {
                 onClick={() => setSelectedId(m.id)}
                 data-testid={`meet-row-${m.id}`}
                 className={`w-full text-left rounded-lg px-3 py-2.5 mb-1 transition-colors ${
-                  m.id === selectedId ? 'bg-rose-500/10 border border-rose-400/30' : 'hover:bg-stone-100 dark:hover:bg-white/[0.04] border border-transparent'
+                  m.id === selectedId ? 'bg-[rgb(var(--accent)/0.10)] border border-[rgb(var(--accent)/0.30)]' : 'hover:bg-[var(--surface-sunken)] border border-transparent'
                 }`}
               >
-                <div className="text-[13px] font-semibold text-stone-900 dark:text-stone-100 truncate">{m.title}</div>
-                <div className="mt-0.5 flex items-center gap-2 text-[10.5px] text-stone-500 dark:text-stone-400">
+                <div className="text-[13px] font-semibold text-[var(--ink-100)] truncate">{m.title}</div>
+                <div className="mt-0.5 flex items-center gap-2 text-[10.5px] text-[var(--ink-70)] fb-tabular">
                   <span>{fmtDate(m.createdAt)}</span>
                   {m.actionItems.length > 0 && (
                     <span className="inline-flex items-center gap-0.5">
@@ -224,7 +224,7 @@ export default function PlexiMeetView(): JSX.Element {
         ) : (
           <div className="h-full flex flex-col items-center justify-center text-center px-6">
             <Icon name="groups" size={30} className="text-stone-300 dark:text-stone-600" />
-            <p className="mt-2 text-[13px] text-stone-500 dark:text-stone-400 max-w-sm leading-relaxed">
+            <p className="mt-2 text-[13px] text-[var(--ink-70)] max-w-sm leading-relaxed">
               Select a meeting to read its summary, transcript and action items, or record a new one.
             </p>
           </div>
@@ -257,12 +257,12 @@ function MeetingDetail({
 
   return (
     <div className="h-full flex flex-col overflow-auto" data-testid="meet-detail">
-      <div className="flex items-center gap-2 px-5 py-3 border-b border-stone-200 dark:border-white/[0.06]">
+      <div className="flex items-center gap-2 px-5 py-3 border-b border-[var(--edge-soft)]">
         <input
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           onBlur={() => title !== meeting.title && onChange({ title })}
-          className="flex-1 bg-transparent text-[17px] font-bold text-stone-900 dark:text-white outline-none"
+          className="flex-1 bg-transparent text-[17px] font-bold text-[var(--ink-100)] outline-none"
           data-testid="meet-title"
         />
         <button
@@ -277,28 +277,28 @@ function MeetingDetail({
 
       <div className="px-5 py-4 space-y-5">
         <section>
-          <h2 className="text-[11px] font-semibold uppercase tracking-wide text-stone-500 dark:text-stone-400 mb-1.5">Summary</h2>
+          <h2 className="text-[11px] font-semibold uppercase tracking-wide text-[var(--ink-70)] mb-1.5">Summary</h2>
           <textarea
             value={summary}
             onChange={(e) => setSummary(e.target.value)}
             onBlur={() => summary !== meeting.summary && onChange({ summary })}
             placeholder="The AI summary appears here after recording, or write your own notes."
-            className="w-full min-h-[80px] resize-y rounded-lg border border-stone-200 dark:border-white/[0.06] bg-white dark:bg-white/[0.02] px-3 py-2 text-[13px] leading-relaxed text-stone-800 dark:text-stone-100 placeholder:text-stone-400 focus:outline-none focus:border-rose-400/40"
+            className="w-full min-h-[80px] resize-y rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-raised)] px-3 py-2 text-[13px] leading-relaxed text-[var(--ink-100)] placeholder:text-[var(--ink-50)] focus:outline-none focus:border-[rgb(var(--accent)/0.40)]"
           />
         </section>
 
         {meeting.actionItems.length > 0 && (
           <section data-testid="meet-actions">
-            <h2 className="text-[11px] font-semibold uppercase tracking-wide text-stone-500 dark:text-stone-400 mb-1.5">Action items</h2>
+            <h2 className="text-[11px] font-semibold uppercase tracking-wide text-[var(--ink-70)] mb-1.5">Action items</h2>
             <div className="space-y-1.5">
               {meeting.actionItems.map((item, i) => (
-                <div key={i} className="flex items-center gap-2 rounded-lg border border-stone-200 dark:border-white/[0.06] bg-white dark:bg-white/[0.02] px-3 py-2">
-                  <Icon name="task_alt" size={15} className="text-rose-500 shrink-0" />
-                  <span className="flex-1 text-[13px] text-stone-700 dark:text-stone-200">{item}</span>
+                <div key={i} className="flex items-center gap-2 rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-raised)] px-3 py-2">
+                  <Icon name="task_alt" size={15} className="text-[rgb(var(--accent))] shrink-0" />
+                  <span className="flex-1 text-[13px] text-[var(--ink-90)]">{item}</span>
                   <button
                     onClick={() => void makeTask(i, item)}
                     disabled={madeTasks[i]}
-                    className="shrink-0 inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-md border border-stone-200 dark:border-white/10 text-stone-600 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-white/[0.06] disabled:opacity-50"
+                    className="shrink-0 inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-md border border-[var(--edge-soft)] text-[var(--ink-90)] hover:bg-[var(--surface-sunken)] disabled:opacity-50"
                     data-testid={`meet-make-task-${i}`}
                   >
                     <Icon name={madeTasks[i] ? 'check' : 'add_task'} size={13} /> {madeTasks[i] ? 'Added' : 'Task'}
@@ -312,7 +312,7 @@ function MeetingDetail({
         <section>
           <button
             onClick={() => setShowTranscript((v) => !v)}
-            className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-stone-500 dark:text-stone-400 mb-1.5"
+            className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-[var(--ink-70)] mb-1.5"
           >
             <Icon name={showTranscript ? 'expand_less' : 'expand_more'} size={14} /> Transcript
           </button>
@@ -322,7 +322,7 @@ function MeetingDetail({
               onChange={(e) => setTranscript(e.target.value)}
               onBlur={() => transcript !== meeting.transcript && onChange({ transcript })}
               placeholder="The full transcript appears here after recording, or paste your own."
-              className="w-full min-h-[160px] resize-y rounded-lg border border-stone-200 dark:border-white/[0.06] bg-white dark:bg-white/[0.02] px-3 py-2 text-[12.5px] leading-relaxed text-stone-700 dark:text-stone-200 placeholder:text-stone-400 focus:outline-none"
+              className="w-full min-h-[160px] resize-y rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-raised)] px-3 py-2 text-[12.5px] leading-relaxed text-[var(--ink-90)] placeholder:text-[var(--ink-50)] focus:outline-none"
             />
           )}
         </section>
