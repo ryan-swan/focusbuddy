@@ -102,7 +102,7 @@ export default function PlexiFormsView(): JSX.Element {
           />
         ) : (
           <div className="h-full flex flex-col items-center justify-center text-center px-6">
-            <Icon name="dynamic_form" size={30} className="text-stone-300 dark:text-stone-600" />
+            <Icon name="dynamic_form" size={30} className="text-[var(--ink-30)]" />
             <p className="mt-2 text-[13px] text-[var(--ink-70)] max-w-sm leading-relaxed">
               Select a form to design it, fill it, or read its responses. Every response lands as a row in a real table.
             </p>
@@ -179,7 +179,7 @@ function FormEditor({
             </button>
           ))}
         </div>
-        <button onClick={onDelete} className="p-1.5 rounded-md text-stone-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30" title="Delete form" data-testid="form-delete">
+        <button onClick={onDelete} className="p-1.5 rounded-md text-stone-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30" title="Delete form" aria-label="Delete form" data-testid="form-delete">
           <Icon name="delete" size={16} />
         </button>
       </div>
@@ -238,10 +238,10 @@ function BuildTab({
         <div className="space-y-2">
           {columns.map((c) => (
             <div key={c.id} className={`${PLEXI_CARD} flex items-center gap-2 px-3 py-2`} data-testid="form-field-row">
-              <Icon name="drag_indicator" size={14} className="text-stone-300 dark:text-stone-600" />
+              <Icon name="drag_indicator" size={14} className="text-[var(--ink-30)]" />
               <input value={c.label} onChange={(e) => onPatch(c.id, { label: e.target.value })} className={`${inputCls} flex-1`} />
               <span className="text-[11px] text-[var(--ink-70)]">{FIELD_TYPE_LABELS[c.type]}</span>
-              <button onClick={() => onRemove(c.id)} className="p-1 text-[var(--ink-70)] hover:text-red-600" title="Remove field">
+              <button onClick={() => onRemove(c.id)} className="p-1 text-[var(--ink-70)] hover:text-red-600" title="Remove field" aria-label="Remove field">
                 <Icon name="close" size={13} />
               </button>
             </div>
@@ -344,7 +344,7 @@ function ResponsesTab({ columns, rows }: { columns: FieldDefinition[]; rows: FbR
   if (rows.length === 0) {
     return (
       <div className="py-12 text-center">
-        <Icon name="inbox" size={26} className="text-stone-300 dark:text-stone-600" />
+        <Icon name="inbox" size={26} className="text-[var(--ink-30)]" />
         <p className="mt-2 text-[12.5px] text-[var(--ink-70)]">No responses yet. They appear here, and as rows in this form's table.</p>
       </div>
     )

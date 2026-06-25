@@ -105,7 +105,7 @@ export default function PlexiBuildView(): JSX.Element {
           />
         ) : (
           <div className="h-full flex flex-col items-center justify-center text-center px-6">
-            <Icon name="construction" size={30} className="text-stone-300 dark:text-stone-600" />
+            <Icon name="construction" size={30} className="text-[var(--ink-30)]" />
             <p className="mt-2 text-[13px] text-[var(--ink-70)] max-w-sm leading-relaxed">
               Select an app to build it, or create a new one. Drop in components, then hit Preview to run it.
             </p>
@@ -179,7 +179,7 @@ function AppBuilder({
         <button
           onClick={onDelete}
           className="p-1.5 rounded-md text-stone-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30"
-          title="Delete app"
+          title="Delete app" aria-label="Delete app"
           data-testid="app-delete"
         >
           <Icon name="delete" size={16} />
@@ -265,13 +265,13 @@ function BuildComponent({
           {APP_COMPONENT_META[c.type].label}
         </span>
         <div className="ml-auto flex items-center gap-0.5">
-          <button onClick={() => onMove(-1)} disabled={first} className="p-1 text-[var(--ink-70)] hover:text-[var(--ink-100)] disabled:opacity-30" title="Move up">
+          <button onClick={() => onMove(-1)} disabled={first} className="p-1 text-[var(--ink-70)] hover:text-[var(--ink-100)] disabled:opacity-30" title="Move up" aria-label="Move up">
             <Icon name="arrow_upward" size={13} />
           </button>
-          <button onClick={() => onMove(1)} disabled={last} className="p-1 text-[var(--ink-70)] hover:text-[var(--ink-100)] disabled:opacity-30" title="Move down">
+          <button onClick={() => onMove(1)} disabled={last} className="p-1 text-[var(--ink-70)] hover:text-[var(--ink-100)] disabled:opacity-30" title="Move down" aria-label="Move down">
             <Icon name="arrow_downward" size={13} />
           </button>
-          <button onClick={onRemove} className="p-1 text-[var(--ink-70)] hover:text-red-600" title="Remove">
+          <button onClick={onRemove} className="p-1 text-[var(--ink-70)] hover:text-red-600" title="Remove" aria-label="Remove">
             <Icon name="close" size={13} />
           </button>
         </div>
