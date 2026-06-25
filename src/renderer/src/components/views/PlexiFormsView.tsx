@@ -1,0 +1,354 @@
+import { useCallback, useEffect, useState } from 'react'
+import Icon from '../Icon'
+import FieldEditor from '../fields/FieldEditor'
+import { useFormsStore } from '../../stores/forms'
+import type { PlexiForm } from '@shared/forms'
+import {
+  type FbTable,
+  type FbRow,
+  type FieldDefinition,
+  type FieldType,
+  defaultConfig,
+  defaultValue,
+  FIELD_TYPE_LABELS
+} from '@shared/fields'
+
+// PlexiForms: design a form, fill it, and watch responses land as rows in its
+// backing table (so they are instantly chartable and filterable). The fields ARE
+// the table's columns. Reads only real responses; a new form is honestly empty.
+
+const FORM_FIELD_TYPES: FieldType[] = ['text-short', 'text-long', 'number', 'single-select', 'date', 'checkbox']
+
+type Tab = 'build' | 'fill' | 'responses'
+
+export default function PlexiFormsView(): JSX.Element {
+  const forms = useFormsStore((s) => s.forms)
+  const loaded = useFormsStore((s) => s.loaded)
+  const load = useFormsStore((s) => s.load)
+  const createForm = useFormsStore((s) => s.create)
+  const updateForm = useFormsStore((s) => s.update)
+  const removeForm = useFormsStore((s) => s.remove)
+
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+
+  useEffect(() => {
+    void load()
+  }, [load])
+
+  const selected = forms.find((f) => f.id === selectedId) ?? null
+
+  async function addForm(): Promise<void> {
+    const created = await createForm('New form')
+    if (created) setSelectedId(created.id)
+  }
+
+  return (
+    <div className="h-full w-full flex bg-stone-50 dark:bg-stone-950" data-testid="plexiforms-view">
+      <div className="w-[280px] shrink-0 border-r border-stone-200 dark:border-white/[0.06] flex flex-col">
+        <div className="px-4 py-3.5 border-b border-stone-200 dark:border-white/[0.06]">
+          <div className="flex items-center gap-2">
+            <Icon name="dynamic_form" size={18} className="text-fuchsia-500" filled />
+            <h1 className="text-[15px] font-bold tracking-tight text-stone-900 dark:text-white">PlexiForms</h1>
+          </div>
+          <p className="mt-0.5 text-[11.5px] text-stone-500 dark:text-stone-400">Capture requests, leads and data.</p>
+        </div>
+        <div className="px-3 py-2.5">
+          <button
+            onClick={() => void addForm()}
+            data-testid="form-new"
+            className="w-full inline-flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-md bg-fuchsia-500 text-white text-[12px] font-medium hover:bg-fuchsia-600"
+          >
+            <Icon name="add" size={15} /> New form
+          </button>
+        </div>
+        <div className="flex-1 overflow-auto px-2 pb-2">
+          {loaded && forms.length === 0 ? (
+            <div className="px-3 py-10 text-center">
+              <Icon name="dynamic_form" size={26} className="text-stone-300 dark:text-stone-600" />
+              <p className="mt-2 text-[12px] text-stone-500 dark:text-stone-400 leading-relaxed">No forms yet. Build one to start collecting.</p>
+            </div>
+          ) : (
+            forms.map((f) => (
+              <button
+                key={f.id}
+                onClick={() => setSelectedId(f.id)}
+                data-testid={`form-row-${f.id}`}
+                className={`w-full text-left rounded-lg px-3 py-2 mb-1 transition-colors ${
+                  f.id === selectedId ? 'bg-fuchsia-500/10 border border-fuchsia-400/30' : 'hover:bg-stone-100 dark:hover:bg-white/[0.04] border border-transparent'
+                }`}
+              >
+                <span className="text-[13px] font-medium text-stone-900 dark:text-stone-100 truncate block">{f.title}</span>
+              </button>
+            ))
+          )}
+        </div>
+      </div>
+
+      <div className="flex-1 min-w-0">
+        {selected ? (
+          <FormEditor
+            key={selected.id}
+            form={selected}
+            onChangeMeta={(patch) => void updateForm(selected.id, patch)}
+            onDelete={() => {
+              void removeForm(selected.id)
+              setSelectedId(null)
+            }}
+          />
+        ) : (
+          <div className="h-full flex flex-col items-center justify-center text-center px-6">
+            <Icon name="dynamic_form" size={30} className="text-stone-300 dark:text-stone-600" />
+            <p className="mt-2 text-[13px] text-stone-500 dark:text-stone-400 max-w-sm leading-relaxed">
+              Select a form to design it, fill it, or read its responses. Every response lands as a row in a real table.
+            </p>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function FormEditor({
+  form,
+  onChangeMeta,
+  onDelete
+}: {
+  form: PlexiForm
+  onChangeMeta: (patch: { title?: string; description?: string }) => void
+  onDelete: () => void
+}): JSX.Element {
+  const [tab, setTab] = useState<Tab>('build')
+  const [title, setTitle] = useState(form.title)
+  const [table, setTable] = useState<FbTable | null>(null)
+  const [rows, setRows] = useState<FbRow[]>([])
+
+  const loadTable = useCallback(async () => {
+    const t = await window.api.tables.get(form.tableId).catch(() => null)
+    setTable(t)
+    const r = await window.api.tables.listRows(form.tableId).catch(() => [] as FbRow[])
+    setRows(r)
+  }, [form.tableId])
+
+  useEffect(() => {
+    void loadTable()
+  }, [loadTable])
+
+  const columns: FieldDefinition[] = table?.schema.columns ?? []
+
+  async function setColumns(next: FieldDefinition[]): Promise<void> {
+    if (!table) return
+    await window.api.tables.update(form.tableId, { schema: { ...table.schema, columns: next } }).catch(() => null)
+    await loadTable()
+  }
+  async function addField(type: FieldType): Promise<void> {
+    const id = `c-${Math.random().toString(36).slice(2, 8)}`
+    const col = { id, type, label: FIELD_TYPE_LABELS[type], config: defaultConfig(type) } as FieldDefinition
+    await setColumns([...columns, col])
+  }
+  async function patchField(id: string, p: Partial<FieldDefinition>): Promise<void> {
+    await setColumns(columns.map((c) => (c.id === id ? ({ ...c, ...p } as FieldDefinition) : c)))
+  }
+  async function removeField(id: string): Promise<void> {
+    await setColumns(columns.filter((c) => c.id !== id))
+  }
+
+  return (
+    <div className="h-full flex flex-col" data-testid="form-editor">
+      <div className="flex items-center gap-2 px-5 py-3 border-b border-stone-200 dark:border-white/[0.06]">
+        <input
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          onBlur={() => title !== form.title && onChangeMeta({ title })}
+          className="flex-1 bg-transparent text-[17px] font-bold text-stone-900 dark:text-white outline-none"
+          data-testid="form-title"
+        />
+        <div className="inline-flex rounded-md border border-stone-300 dark:border-white/10 overflow-hidden text-[12px] font-medium">
+          {(['build', 'fill', 'responses'] as Tab[]).map((t) => (
+            <button
+              key={t}
+              onClick={() => setTab(t)}
+              data-testid={`form-tab-${t}`}
+              className={`px-3 py-1.5 capitalize ${tab === t ? 'bg-fuchsia-500 text-white' : 'text-stone-600 dark:text-stone-300'}`}
+            >
+              {t === 'responses' ? `Responses${rows.length ? ` (${rows.length})` : ''}` : t}
+            </button>
+          ))}
+        </div>
+        <button onClick={onDelete} className="p-1.5 rounded-md text-stone-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30" title="Delete form" data-testid="form-delete">
+          <Icon name="delete" size={16} />
+        </button>
+      </div>
+
+      <div className="flex-1 overflow-auto">
+        <div className="mx-auto max-w-[620px] px-6 py-6">
+          {tab === 'build' && (
+            <BuildTab
+              form={form}
+              columns={columns}
+              onChangeMeta={onChangeMeta}
+              onAdd={addField}
+              onPatch={patchField}
+              onRemove={removeField}
+            />
+          )}
+          {tab === 'fill' && <FillTab form={form} columns={columns} onSubmitted={loadTable} />}
+          {tab === 'responses' && <ResponsesTab columns={columns} rows={rows} />}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function BuildTab({
+  form,
+  columns,
+  onChangeMeta,
+  onAdd,
+  onPatch,
+  onRemove
+}: {
+  form: PlexiForm
+  columns: FieldDefinition[]
+  onChangeMeta: (p: { description?: string }) => void
+  onAdd: (t: FieldType) => void
+  onPatch: (id: string, p: Partial<FieldDefinition>) => void
+  onRemove: (id: string) => void
+}): JSX.Element {
+  const [desc, setDesc] = useState(form.description)
+  const inputCls =
+    'text-[12px] bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-white/10 rounded px-2 py-1 text-stone-900 dark:text-stone-100 placeholder:text-stone-400 focus:outline-none'
+  return (
+    <div className="space-y-5">
+      <textarea
+        value={desc}
+        onChange={(e) => setDesc(e.target.value)}
+        onBlur={() => desc !== form.description && onChangeMeta({ description: desc })}
+        placeholder="Form description (optional)"
+        rows={2}
+        className="w-full resize-y rounded-lg border border-stone-200 dark:border-white/[0.06] bg-white dark:bg-white/[0.02] px-3 py-2 text-[13px] text-stone-700 dark:text-stone-200 placeholder:text-stone-400 focus:outline-none"
+      />
+
+      <div>
+        <h2 className="text-[11px] font-semibold uppercase tracking-wide text-stone-500 dark:text-stone-400 mb-2">Fields</h2>
+        <div className="space-y-2">
+          {columns.map((c) => (
+            <div key={c.id} className="flex items-center gap-2 rounded-lg border border-stone-200 dark:border-white/[0.07] bg-white dark:bg-white/[0.02] px-3 py-2" data-testid="form-field-row">
+              <Icon name="drag_indicator" size={14} className="text-stone-300 dark:text-stone-600" />
+              <input value={c.label} onChange={(e) => onPatch(c.id, { label: e.target.value })} className={`${inputCls} flex-1`} />
+              <span className="text-[11px] text-stone-400">{FIELD_TYPE_LABELS[c.type]}</span>
+              <button onClick={() => onRemove(c.id)} className="p-1 text-stone-400 hover:text-red-600" title="Remove field">
+                <Icon name="close" size={13} />
+              </button>
+            </div>
+          ))}
+          {columns.length === 0 && <p className="text-[12px] text-stone-400">No fields yet. Add one below.</p>}
+        </div>
+        <div className="mt-3 flex items-center gap-1.5 flex-wrap">
+          <span className="text-[11px] text-stone-400 mr-1">Add field</span>
+          {FORM_FIELD_TYPES.map((t) => (
+            <button
+              key={t}
+              onClick={() => onAdd(t)}
+              data-testid={`form-add-${t}`}
+              className="px-2 py-1 rounded-md text-[11.5px] text-stone-600 dark:text-stone-300 border border-stone-200 dark:border-white/10 hover:bg-stone-100 dark:hover:bg-white/[0.05]"
+            >
+              {FIELD_TYPE_LABELS[t]}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function FillTab({ form, columns, onSubmitted }: { form: PlexiForm; columns: FieldDefinition[]; onSubmitted: () => Promise<void> }): JSX.Element {
+  const [values, setValues] = useState<Record<string, unknown>>({})
+  const [done, setDone] = useState(false)
+
+  async function submit(): Promise<void> {
+    const cells: Record<string, unknown> = {}
+    for (const c of columns) cells[c.id] = values[c.id] ?? defaultValue(c.type)
+    await window.api.tables.createRow({ tableId: form.tableId, cells }).catch(() => null)
+    setValues({})
+    setDone(true)
+    await onSubmitted()
+    setTimeout(() => setDone(false), 2500)
+  }
+
+  if (columns.length === 0) {
+    return <p className="text-[12.5px] text-stone-400 py-8 text-center">Add fields in Build mode first, then this form becomes fillable.</p>
+  }
+
+  return (
+    <div className="space-y-4" data-testid="form-fill">
+      {form.description && <p className="text-[13px] text-stone-600 dark:text-stone-300">{form.description}</p>}
+      {columns.map((c) => (
+        <label key={c.id} className="block">
+          <span className="block text-[12.5px] font-medium text-stone-700 dark:text-stone-200 mb-1">{c.label}</span>
+          <FieldEditor
+            def={c}
+            value={values[c.id] ?? defaultValue(c.type)}
+            variant="cell"
+            onCommit={(v) => setValues((prev) => ({ ...prev, [c.id]: v }))}
+          />
+        </label>
+      ))}
+      <div className="flex items-center gap-3 pt-1">
+        <button
+          onClick={() => void submit()}
+          data-testid="form-submit"
+          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-fuchsia-500 text-white text-[13px] font-semibold hover:bg-fuchsia-600"
+        >
+          <Icon name="send" size={15} /> Submit
+        </button>
+        {done && (
+          <span className="text-[12px] text-emerald-600 dark:text-emerald-400 inline-flex items-center gap-1" data-testid="form-submitted">
+            <Icon name="check_circle" size={14} /> Response saved
+          </span>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function ResponsesTab({ columns, rows }: { columns: FieldDefinition[]; rows: FbRow[] }): JSX.Element {
+  if (rows.length === 0) {
+    return (
+      <div className="py-12 text-center">
+        <Icon name="inbox" size={26} className="text-stone-300 dark:text-stone-600" />
+        <p className="mt-2 text-[12.5px] text-stone-500 dark:text-stone-400">No responses yet. They appear here, and as rows in this form's table.</p>
+      </div>
+    )
+  }
+  return (
+    <div className="overflow-auto" data-testid="form-responses">
+      <table className="w-full text-[12px]">
+        <thead>
+          <tr className="border-b border-stone-200 dark:border-white/10 text-left text-stone-500 dark:text-stone-400">
+            {columns.map((c) => (
+              <th key={c.id} className="px-2 py-1.5 font-medium">{c.label}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.id} className="border-b border-stone-100 dark:border-white/[0.05]">
+              {columns.map((c) => (
+                <td key={c.id} className="px-2 py-1.5 text-stone-700 dark:text-stone-200">
+                  {formatCell(r.cells[c.id])}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function formatCell(v: unknown): string {
+  if (v === null || v === undefined || v === '') return ''
+  if (typeof v === 'boolean') return v ? 'Yes' : 'No'
+  if (Array.isArray(v)) return v.join(', ')
+  return String(v)
+}

@@ -73,6 +73,7 @@ import type {
 import type { KnowledgeEntry, KnowledgeDraft, KnowledgePatch } from '@shared/knowledge'
 import type { Meeting, MeetingDraft, MeetingPatch } from '@shared/meetings'
 import type { PlexiApp, PlexiAppDraft, PlexiAppPatch } from '@shared/apps'
+import type { PlexiForm, PlexiFormDraft, PlexiFormPatch } from '@shared/forms'
 
 type VaultResult = { ok: true } | { ok: false; error: string }
 
@@ -1156,6 +1157,15 @@ const api = {
     update: (id: string, patch: PlexiAppPatch): Promise<PlexiApp | null> =>
       ipcRenderer.invoke('apps:update', id, patch),
     delete: (id: string): Promise<boolean> => ipcRenderer.invoke('apps:delete', id)
+  },
+  // PlexiForms — forms backed by a table.
+  forms: {
+    list: (): Promise<PlexiForm[]> => ipcRenderer.invoke('forms:list'),
+    get: (id: string): Promise<PlexiForm | null> => ipcRenderer.invoke('forms:get', id),
+    create: (draft: PlexiFormDraft): Promise<PlexiForm> => ipcRenderer.invoke('forms:create', draft),
+    update: (id: string, patch: PlexiFormPatch): Promise<PlexiForm | null> =>
+      ipcRenderer.invoke('forms:update', id, patch),
+    delete: (id: string): Promise<boolean> => ipcRenderer.invoke('forms:delete', id)
   },
   // Settings — API-key vault. Replaces the old "edit .env and restart"
   // flow. Plaintext only travels renderer→main on save; reads return

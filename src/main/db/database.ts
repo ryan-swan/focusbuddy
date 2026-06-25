@@ -200,6 +200,19 @@ CREATE TABLE IF NOT EXISTS fb_apps (
 );
 CREATE INDEX IF NOT EXISTS idx_fb_apps_updated ON fb_apps(updated_at DESC);
 
+-- ── PlexiForms forms ─────────────────────────────────────────────────────────
+-- A form points at a backing fb_tables table (fields = columns, responses =
+-- rows). table_id references that table.
+CREATE TABLE IF NOT EXISTS fb_forms (
+  id TEXT PRIMARY KEY,
+  title TEXT NOT NULL DEFAULT 'Untitled form',
+  description TEXT NOT NULL DEFAULT '',
+  table_id TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_fb_forms_updated ON fb_forms(updated_at DESC);
+
 -- ── Inter-widget spatial links ───────────────────────────────────────────────
 -- Obsidian-style backlinks but drawn as lines on the canvas. Each row is a
 -- directed link (source → target). UNIQUE constraint prevents duplicates in
