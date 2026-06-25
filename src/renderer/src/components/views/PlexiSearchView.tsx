@@ -190,6 +190,10 @@ export default function PlexiSearchView(): JSX.Element {
               askSeq.current++
             }}
             aria-label="Search your workspace"
+            role="combobox"
+            aria-expanded={showResults && hits.length > 0}
+            aria-controls="plexisearch-results"
+            aria-activedescendant={focusIdx >= 0 ? `plexisearch-opt-${focusIdx}` : undefined}
             onKeyDown={(e) => {
               if (e.key === 'ArrowDown') {
                 e.preventDefault()
@@ -307,11 +311,12 @@ export default function PlexiSearchView(): JSX.Element {
                 <p className="mt-2 text-[13px] text-[var(--ink-70)]">Nothing matches that yet. Try different words.</p>
               </div>
             ) : (
-              <div className="flex flex-col gap-1">
+              <div className="flex flex-col gap-1" role="listbox" id="plexisearch-results" aria-label="Search results">
                 {hits.map((h, i) => (
                   <ResultRow
                     key={`${h.type}:${h.id}`}
                     hit={h}
+                    optionId={`plexisearch-opt-${i}`}
                     active={i === focusIdx}
                     onOpen={() => openHit(h)}
                     onHover={() => setFocusIdx(i)}
@@ -338,11 +343,13 @@ export default function PlexiSearchView(): JSX.Element {
 
 function ResultRow({
   hit,
+  optionId,
   active,
   onOpen,
   onHover
 }: {
   hit: SearchHit
+  optionId: string
   active: boolean
   onOpen: () => void
   onHover: () => void
@@ -355,6 +362,9 @@ function ResultRow({
   return (
     <button
       ref={ref}
+      id={optionId}
+      role="option"
+      aria-selected={active}
       onClick={onOpen}
       onMouseMove={onHover}
       data-testid={`plexisearch-hit-${hit.id}`}
