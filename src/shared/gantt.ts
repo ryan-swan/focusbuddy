@@ -278,7 +278,10 @@ export function rescheduleOnDrift(
   const efFloor = new Map<string, number>()
   for (const t of base.tasks) {
     const actual = actualFinishById.get(t.id)
-    efFloor.set(t.id, actual !== undefined ? Math.max(actual, t.earliestFinish) : t.earliestFinish)
+    // A milestone is a zero-duration marker: a late actual finish never extends
+    // it into a bar, it is positioned by its predecessors, so it takes no floor.
+    const floor = t.isMilestone || actual === undefined ? t.earliestFinish : Math.max(actual, t.earliestFinish)
+    efFloor.set(t.id, floor)
   }
   // Recompute a forward pass honoring the actual-finish floor, then derive a new
   // schedule by expressing the floor as an adjusted duration per task.
@@ -302,9 +305,11 @@ export function rescheduleOnDrift(
   // CPM so slack and critical path reflect the rescheduled reality.
   const adjusted: GanttInput[] = inputs.map((t) => ({
     id: t.id,
-    durationDays: adjDurationDays.get(t.id) ?? clampDuration(t.durationDays),
+    // A milestone always stays zero-duration; drift shifts its position through
+    // dependencies, it never becomes a bar. Its recorded flag is preserved.
+    durationDays: t.isMilestone ? 0 : adjDurationDays.get(t.id) ?? clampDuration(t.durationDays),
     deps: t.deps,
-    isMilestone: t.isMilestone && (adjDurationDays.get(t.id) ?? 0) === 0
+    isMilestone: t.isMilestone
   }))
   return computeSchedule(adjusted, projectStartMs)
 }

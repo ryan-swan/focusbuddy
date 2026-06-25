@@ -1,5 +1,6 @@
 import { randomUUID } from 'crypto'
 import { getDb } from './database'
+import { deleteEmbedding } from './embeddings'
 import { rankKnowledge } from '@shared/knowledge'
 import type { KnowledgeEntry, KnowledgeDraft, KnowledgePatch } from '@shared/knowledge'
 
@@ -92,6 +93,9 @@ export function updateKnowledge(id: string, patch: KnowledgePatch): KnowledgeEnt
 export function deleteKnowledge(id: string): boolean {
   const db = getDb()
   const r = db.prepare('DELETE FROM fb_knowledge WHERE id = ?').run(id)
+  // Clean up the semantic vector here too, so deleting an entry by any route
+  // never leaves an orphaned embedding that keeps semantic search "active".
+  if (r.changes > 0) deleteEmbedding('knowledge', id)
   return r.changes > 0
 }
 

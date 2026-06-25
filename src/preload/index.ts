@@ -1335,7 +1335,7 @@ const api = {
     delete: (id: string): Promise<boolean> => ipcRenderer.invoke('reports:delete', id),
     generate: (id: string): Promise<import('@shared/reports').GenerateReportResult> =>
       ipcRenderer.invoke('reports:generate', id),
-    runDue: (): Promise<{ generated: number }> => ipcRenderer.invoke('reports:runDue')
+    runDue: (): Promise<{ generated: number; failed: number }> => ipcRenderer.invoke('reports:runDue')
   },
   // PlexiFlow: trigger-and-action automations across the workspace.
   flows: {

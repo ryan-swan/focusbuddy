@@ -122,7 +122,7 @@ export function getProjectPlan(projectId: string, nowMs = Date.now()): ProjectPl
   // Actual finishes (completed_at) as day offsets, for drift detection.
   const actualFinish = new Map<string, number>()
   for (const r of rows) {
-    if (r.completed_at != null) actualFinish.set(r.id, Math.round((r.completed_at - anchor) / DAY_MS))
+    if (r.completed_at != null) actualFinish.set(r.id, Math.max(0, Math.round((r.completed_at - anchor) / DAY_MS)))
   }
   const drift = detectDrift(schedule, actualFinish)
 
@@ -262,7 +262,7 @@ export function rescheduleProject(projectId: string, nowMs = Date.now()): Projec
   }))
   const actualFinish = new Map<string, number>()
   for (const r of rows) {
-    if (r.completed_at != null) actualFinish.set(r.id, Math.round((r.completed_at - anchor) / DAY_MS))
+    if (r.completed_at != null) actualFinish.set(r.id, Math.max(0, Math.round((r.completed_at - anchor) / DAY_MS)))
   }
 
   const rescheduled = rescheduleOnDrift(inputs, anchor, actualFinish)

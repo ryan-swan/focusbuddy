@@ -1,9 +1,10 @@
 import { randomUUID } from 'crypto'
 import { getDb } from './database'
 import { createNode } from './nodes'
-import { createRow } from './tables'
+import { createRow, getTable } from './tables'
 import { createKnowledge } from './knowledge'
 import { sendChat } from '../ai/anthropic'
+import { advanceSchedule } from '@shared/schedule'
 import * as mailAccount from '../mail/mailAccount'
 import { sendMail } from '../mail/smtp'
 import type {
@@ -13,8 +14,7 @@ import type {
   FlowAction,
   FlowRunStep,
   FlowRunResult,
-  FlowTrigger,
-  FlowScheduleEvery
+  FlowTrigger
 } from '@shared/flows'
 
 // PlexiFlow engine and store. A flow is a trigger plus an ordered list of actions
@@ -107,14 +107,7 @@ export function createFlow(draft: FlowDraft): FlowDef {
 
 export function computeNextRun(trigger: FlowTrigger, fromMs: number): number | null {
   if (trigger.kind !== 'schedule') return null
-  const map: Record<FlowScheduleEvery, (d: Date) => void> = {
-    daily: (d) => d.setDate(d.getDate() + 1),
-    weekly: (d) => d.setDate(d.getDate() + 7),
-    monthly: (d) => d.setMonth(d.getMonth() + 1)
-  }
-  const d = new Date(fromMs)
-  map[trigger.every](d)
-  return d.getTime()
+  return advanceSchedule(trigger.every, fromMs)
 }
 
 export function updateFlow(id: string, patch: FlowPatch): FlowDef | null {
@@ -170,6 +163,9 @@ async function runAction(action: FlowAction, ctx: { ai: string }): Promise<FlowR
       }
       case 'add-table-row': {
         if (!action.tableId) return { ...base, ok: false, message: 'No table chosen.' }
+        // Verify the table still exists so a deleted target fails honestly rather
+        // than writing an orphan row and reporting success.
+        if (!getTable(action.tableId)) return { ...base, ok: false, message: 'That table no longer exists.' }
         createRow({ tableId: action.tableId })
         return { ...base, ok: true, message: 'Added a row.' }
       }
@@ -241,6 +237,15 @@ export function listDueFlows(nowMs = Date.now()): FlowDef[] {
 
 export async function runDueFlows(nowMs = Date.now()): Promise<{ ran: number }> {
   const due = listDueFlows(nowMs)
-  for (const f of due) await runFlow(f.id)
-  return { ran: due.length }
+  let ran = 0
+  // Guard each flow so one failing flow does not abort the rest of the batch.
+  for (const f of due) {
+    try {
+      await runFlow(f.id)
+      ran++
+    } catch {
+      // runFlow already records its own per-step failures; a throw here is rare.
+    }
+  }
+  return { ran }
 }
