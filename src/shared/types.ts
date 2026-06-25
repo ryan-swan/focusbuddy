@@ -1154,7 +1154,7 @@ export type DocType = 'doc' | 'sheet' | 'slides' | 'map'
 // `taskId` is the canvas to open for widget / table-row hits, `docType` the
 // document kind. `snippet` is a short, match-centred excerpt for display.
 export interface SearchHit {
-  type: 'task' | 'folder' | 'widget' | 'document' | 'file' | 'table-row'
+  type: 'task' | 'folder' | 'widget' | 'document' | 'file' | 'table-row' | 'knowledge'
   id: string
   title: string
   snippet: string

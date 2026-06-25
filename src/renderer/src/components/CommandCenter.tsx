@@ -83,6 +83,7 @@ export default function CommandCenter({
   const goMail = useViewStore((s) => s.goMail)
   const goDocuments = useViewStore((s) => s.goDocuments)
   const goDocument = useViewStore((s) => s.goDocument)
+  const goKnowledge = useViewStore((s) => s.goKnowledge)
   const goMessages = useViewStore((s) => s.goMessages)
   const goInbox = useViewStore((s) => s.goInbox)
   const view = useViewStore((s) => s.view)
@@ -464,7 +465,7 @@ export default function CommandCenter({
         // top, a weak body match still above the static nav items.
         score: 140 + h.score / 8,
         run: () => {
-          runHit(h, { goProject, goTask, goDocument, goFiles, setActive })
+          runHit(h, { goProject, goTask, goDocument, goFiles, goKnowledge, setActive })
           closePalette()
         }
       })
@@ -496,6 +497,7 @@ export default function CommandCenter({
     goMail,
     goDocuments,
     goDocument,
+    goKnowledge,
     goMessages,
     goInbox,
     spawnWidget,
@@ -721,6 +723,8 @@ function hitIcon(h: SearchHit): string {
       return 'draft'
     case 'table-row':
       return 'table_chart'
+    case 'knowledge':
+      return 'neurology'
     default:
       return 'widgets' // widget
   }
@@ -738,6 +742,8 @@ function hitKindLabel(h: SearchHit): string {
       return 'File'
     case 'table-row':
       return 'Table'
+    case 'knowledge':
+      return 'PlexiBrain'
     default:
       return 'On a desk'
   }
@@ -748,6 +754,7 @@ interface HitNav {
   goTask: (id: string) => void
   goDocument: (id: string) => void
   goFiles: () => void
+  goKnowledge: () => void
   setActive: (id: string | null) => void
 }
 
@@ -773,6 +780,9 @@ function runHit(h: SearchHit, nav: HitNav): void {
       break
     case 'file':
       nav.goFiles()
+      break
+    case 'knowledge':
+      nav.goKnowledge()
       break
   }
 }
