@@ -154,6 +154,7 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
   const goCollaborations = useViewStore((s) => s.goCollaborations)
   const goOrg = useViewStore((s) => s.goOrg)
   const goPeopleMap = useViewStore((s) => s.goPeopleMap)
+  const goSign = useViewStore((s) => s.goSign)
   const goSuite = useViewStore((s) => s.goSuite)
   const goKnowledge = useViewStore((s) => s.goKnowledge)
   const goMeetings = useViewStore((s) => s.goMeetings)
@@ -781,6 +782,15 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
               onClick={() => {
                 setActive(null)
                 goPeopleMap()
+              }}
+            />
+            <NavRow
+              icon="draw"
+              label="PlexiSign"
+              active={viewIsActive({ kind: 'sign' })}
+              onClick={() => {
+                setActive(null)
+                goSign()
               }}
             />
             <NavRow

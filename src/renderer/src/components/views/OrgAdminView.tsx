@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import Icon from '../Icon'
+import { DashboardHeader, StatTile, PLEXI_CARD } from '../plexi'
 import { useAccountStore } from '../../stores/account'
 import {
   listOrgs,
@@ -183,11 +184,20 @@ export default function OrgAdminView(): JSX.Element {
 
   return (
     <div className="h-full overflow-auto desk-paper no-tod p-6" data-testid="org-admin">
-      <div className="max-w-3xl mx-auto">
-        <header className="flex items-center gap-2 mb-4">
-          <Icon name="apartment" size={20} className="text-accent" />
-          <h1 className="text-[18px] font-semibold">Organizations</h1>
-        </header>
+      <div className="max-w-5xl mx-auto">
+        <DashboardHeader
+          title="Organizations"
+          subtitle="Set up your company: members and roles, offices and locations, working hours, and each person's profile — the directory the People Map reads."
+        />
+
+        {detail && (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
+            <StatTile icon="apartment" label="Organizations" value={orgs.filter((o) => !o.personal).length} tone="accent" />
+            <StatTile icon="groups" label="Members" value={detail.members.length} tone="emerald" />
+            <StatTile icon="location_city" label="Offices" value={offices.length} tone="sky" />
+            <StatTile icon="mail" label="Pending invites" value={detail.invites.length} tone="violet" />
+          </div>
+        )}
 
         {/* Org switcher + create */}
         <div className="flex flex-wrap items-center gap-1.5 mb-4">
@@ -223,7 +233,7 @@ export default function OrgAdminView(): JSX.Element {
         {msg && <div className="mb-3 text-[12px] text-stone-500 dark:text-stone-400">{msg}</div>}
 
         {detail && (
-          <div className="rounded-xl border border-stone-200 dark:border-stone-700 p-4">
+          <div className={`${PLEXI_CARD} p-4`}>
             <div className="flex items-center gap-2 mb-3">
               {canAdmin && !detail.org.personal ? (
                 <input
@@ -380,7 +390,7 @@ export default function OrgAdminView(): JSX.Element {
 
         {/* Offices & locations */}
         {detail && (
-          <div className="mt-4 rounded-xl border border-stone-200 dark:border-stone-700 p-4" data-testid="org-offices">
+          <div className={`${PLEXI_CARD} mt-4 p-4`} data-testid="org-offices">
             <div className="flex items-center gap-2 mb-3">
               <Icon name="location_city" size={16} className="text-accent" />
               <h2 className="text-[14px] font-semibold">Offices &amp; locations</h2>

@@ -248,6 +248,18 @@ import { listApps, getApp, createApp, updateApp, deleteApp } from '../db/apps'
 import type { PlexiAppDraft, PlexiAppPatch } from '@shared/apps'
 import { listForms, getForm, createForm, updateForm, deleteForm } from '../db/forms'
 import type { PlexiFormDraft, PlexiFormPatch } from '@shared/forms'
+import {
+  listSignRequests,
+  getSignRequest,
+  createSignRequest,
+  updateSignRequest,
+  deleteSignRequest,
+  sendSignRequest,
+  signSignRequest,
+  declineSignRequest,
+  voidSignRequest
+} from '../db/sign'
+import type { PlexiSignDraft, PlexiSignPatch, SignAction } from '@shared/sign'
 import type {
   FbRowDraft,
   FbRowPatch,
@@ -1513,6 +1525,17 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('forms:create', (_e, draft: PlexiFormDraft) => createForm(draft))
   ipcMain.handle('forms:update', (_e, id: string, patch: PlexiFormPatch) => updateForm(id, patch))
   ipcMain.handle('forms:delete', (_e, id: string) => deleteForm(id))
+
+  // ── PlexiSign signature requests ───────────────────────────────────────────
+  ipcMain.handle('sign:list', () => listSignRequests())
+  ipcMain.handle('sign:get', (_e, id: string) => getSignRequest(id))
+  ipcMain.handle('sign:create', (_e, draft: PlexiSignDraft) => createSignRequest(draft))
+  ipcMain.handle('sign:update', (_e, id: string, patch: PlexiSignPatch) => updateSignRequest(id, patch))
+  ipcMain.handle('sign:delete', (_e, id: string) => deleteSignRequest(id))
+  ipcMain.handle('sign:send', (_e, id: string) => sendSignRequest(id))
+  ipcMain.handle('sign:sign', (_e, id: string, action: SignAction) => signSignRequest(id, action))
+  ipcMain.handle('sign:decline', (_e, id: string, signerId: string, reason: string) => declineSignRequest(id, signerId, reason))
+  ipcMain.handle('sign:void', (_e, id: string) => voidSignRequest(id))
 
   // ── haptyx:// deep-link auth handoff ─────────────────────────────────────
   // The renderer calls `auth:get-pending` on mount to drain any token that

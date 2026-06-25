@@ -19,6 +19,7 @@ import InsightsView from './views/InsightsView'
 import FilesView from './views/FilesView'
 import OrgAdminView from './views/OrgAdminView'
 import PeopleMapView from './views/PeopleMapView'
+import PlexiSignView from './views/PlexiSignView'
 import PlexiSuiteHome from './suite/PlexiSuiteHome'
 import ProductHome from './suite/ProductHome'
 import KnowledgeView from './views/KnowledgeView'
@@ -84,6 +85,8 @@ export default function MainPane(): JSX.Element {
       return <PlexiBuildView />
     case 'forms':
       return <PlexiFormsView />
+    case 'sign':
+      return <PlexiSignView />
     default:
       return <HomeDashboard />
   }

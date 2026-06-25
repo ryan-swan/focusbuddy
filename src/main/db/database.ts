@@ -213,6 +213,24 @@ CREATE TABLE IF NOT EXISTS fb_forms (
 );
 CREATE INDEX IF NOT EXISTS idx_fb_forms_updated ON fb_forms(updated_at DESC);
 
+-- ── PlexiSign signature requests ─────────────────────────────────────────────
+-- One signature request ("envelope"): the agreement body, an ordered set of
+-- signers (JSON), an append-only audit trail (JSON), and a completion
+-- certificate (sha256 over body + signatures). Self-contained, local-first.
+CREATE TABLE IF NOT EXISTS fb_sign_requests (
+  id TEXT PRIMARY KEY,
+  title TEXT NOT NULL DEFAULT 'Untitled agreement',
+  body TEXT NOT NULL DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'draft',
+  signers TEXT NOT NULL DEFAULT '[]',
+  audit TEXT NOT NULL DEFAULT '[]',
+  certificate TEXT,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  completed_at INTEGER
+);
+CREATE INDEX IF NOT EXISTS idx_fb_sign_updated ON fb_sign_requests(updated_at DESC);
+
 -- ── Inter-widget spatial links ───────────────────────────────────────────────
 -- Obsidian-style backlinks but drawn as lines on the canvas. Each row is a
 -- directed link (source → target). UNIQUE constraint prevents duplicates in

@@ -74,6 +74,7 @@ import type { KnowledgeEntry, KnowledgeDraft, KnowledgePatch } from '@shared/kno
 import type { Meeting, MeetingDraft, MeetingPatch } from '@shared/meetings'
 import type { PlexiApp, PlexiAppDraft, PlexiAppPatch } from '@shared/apps'
 import type { PlexiForm, PlexiFormDraft, PlexiFormPatch } from '@shared/forms'
+import type { PlexiSignRequest, PlexiSignDraft, PlexiSignPatch, SignAction } from '@shared/sign'
 
 type VaultResult = { ok: true } | { ok: false; error: string }
 
@@ -1166,6 +1167,21 @@ const api = {
     update: (id: string, patch: PlexiFormPatch): Promise<PlexiForm | null> =>
       ipcRenderer.invoke('forms:update', id, patch),
     delete: (id: string): Promise<boolean> => ipcRenderer.invoke('forms:delete', id)
+  },
+  // PlexiSign — send a document for signature, collect approvals in order.
+  sign: {
+    list: (): Promise<PlexiSignRequest[]> => ipcRenderer.invoke('sign:list'),
+    get: (id: string): Promise<PlexiSignRequest | null> => ipcRenderer.invoke('sign:get', id),
+    create: (draft: PlexiSignDraft): Promise<PlexiSignRequest> => ipcRenderer.invoke('sign:create', draft),
+    update: (id: string, patch: PlexiSignPatch): Promise<PlexiSignRequest | null> =>
+      ipcRenderer.invoke('sign:update', id, patch),
+    delete: (id: string): Promise<boolean> => ipcRenderer.invoke('sign:delete', id),
+    send: (id: string): Promise<PlexiSignRequest | null> => ipcRenderer.invoke('sign:send', id),
+    sign: (id: string, action: SignAction): Promise<PlexiSignRequest | null> =>
+      ipcRenderer.invoke('sign:sign', id, action),
+    decline: (id: string, signerId: string, reason: string): Promise<PlexiSignRequest | null> =>
+      ipcRenderer.invoke('sign:decline', id, signerId, reason),
+    void: (id: string): Promise<PlexiSignRequest | null> => ipcRenderer.invoke('sign:void', id)
   },
   // Settings — API-key vault. Replaces the old "edit .env and restart"
   // flow. Plaintext only travels renderer→main on save; reads return
