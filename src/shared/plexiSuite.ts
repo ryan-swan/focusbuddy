@@ -286,17 +286,17 @@ export const PLEXI_PRODUCTS: PlexiProduct[] = [
     name: 'PlexiBrain',
     group: 'ai',
     tagline: 'The shared memory for people and agents.',
-    status: 'soon',
+    status: 'ready',
     icon: 'neurology',
     accent: '#8b5cf6',
-    about: 'A company knowledge base that both people and AI agents read from and write to, so answers come grounded in your own truth, not a generic guess.',
+    about: 'A company knowledge base that both people and the AI read from, so answers come grounded in your own documented truth, not a generic guess.',
     edges: [
       'One memory shared by your team and your AI.',
-      'Grounds every AI answer in your real documents, with citations.',
-      'Gets smarter as the work happens, automatically.'
+      'Grounds the assistant in your real knowledge, alongside your documents.',
+      'Curate entries with tags and pin what matters most.'
     ],
     insteadOf: 'a wiki nobody updates',
-    planned: ['Curated knowledge entries with tags', 'Full-text and semantic search', 'Cited AI grounding', 'Agent read and write access']
+    launch: 'knowledge'
   },
   {
     key: 'plexiagents',

@@ -70,6 +70,7 @@ import type {
   FbTableDraft,
   FbTablePatch
 } from '@shared/fields'
+import type { KnowledgeEntry, KnowledgeDraft, KnowledgePatch } from '@shared/knowledge'
 
 type VaultResult = { ok: true } | { ok: false; error: string }
 
@@ -1123,6 +1124,18 @@ const api = {
       ipcRenderer.invoke('tables:deleteRow', id),
     reorderRows: (tableId: string, ids: string[]): Promise<void> =>
       ipcRenderer.invoke('tables:reorderRows', tableId, ids)
+  },
+  // PlexiBrain — the company knowledge base.
+  knowledge: {
+    list: (): Promise<KnowledgeEntry[]> => ipcRenderer.invoke('knowledge:list'),
+    get: (id: string): Promise<KnowledgeEntry | null> => ipcRenderer.invoke('knowledge:get', id),
+    search: (query: string): Promise<KnowledgeEntry[]> =>
+      ipcRenderer.invoke('knowledge:search', query),
+    create: (draft: KnowledgeDraft): Promise<KnowledgeEntry> =>
+      ipcRenderer.invoke('knowledge:create', draft),
+    update: (id: string, patch: KnowledgePatch): Promise<KnowledgeEntry | null> =>
+      ipcRenderer.invoke('knowledge:update', id, patch),
+    delete: (id: string): Promise<boolean> => ipcRenderer.invoke('knowledge:delete', id)
   },
   // Settings — API-key vault. Replaces the old "edit .env and restart"
   // flow. Plaintext only travels renderer→main on save; reads return

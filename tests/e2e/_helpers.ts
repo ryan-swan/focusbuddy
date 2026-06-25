@@ -110,8 +110,10 @@ export async function waitForReady(
   // future case rebrands (FocusBuddy → FOCUSBUDDY → Haptyx) survive a
   // one-line edit here. Must NOT match the launch sign-in dialog's
   // "Sign in to FocusBuddy" heading, hence the anchored ^...$ form.
+  // .first() tolerates the PlexiSuiteHome hero card which also renders an
+  // h2 "PlexiDesk", so there can be two matches in the DOM simultaneously.
   await expect(
-    window.getByRole('heading', { name: /^(focusbuddy|haptyx|plexidesk)$/i, level: 2 })
+    window.getByRole('heading', { name: /^(focusbuddy|haptyx|plexidesk)$/i, level: 2 }).first()
   ).toBeVisible({ timeout: 10_000 })
 
   if (!dismissModals) return

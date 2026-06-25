@@ -227,6 +227,15 @@ import {
   updateRow,
   updateTable
 } from '../db/tables'
+import {
+  listKnowledge,
+  getKnowledge,
+  searchKnowledge,
+  createKnowledge,
+  updateKnowledge,
+  deleteKnowledge
+} from '../db/knowledge'
+import type { KnowledgeDraft, KnowledgePatch } from '@shared/knowledge'
 import type {
   FbRowDraft,
   FbRowPatch,
@@ -1461,6 +1470,16 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('tables:reorderRows', (_e, tableId: string, ids: string[]) =>
     reorderRows(tableId, ids)
   )
+
+  // ── PlexiBrain knowledge base ────────────────────────────────────────────
+  ipcMain.handle('knowledge:list', () => listKnowledge())
+  ipcMain.handle('knowledge:get', (_e, id: string) => getKnowledge(id))
+  ipcMain.handle('knowledge:search', (_e, query: string) => searchKnowledge(query))
+  ipcMain.handle('knowledge:create', (_e, draft: KnowledgeDraft) => createKnowledge(draft))
+  ipcMain.handle('knowledge:update', (_e, id: string, patch: KnowledgePatch) =>
+    updateKnowledge(id, patch)
+  )
+  ipcMain.handle('knowledge:delete', (_e, id: string) => deleteKnowledge(id))
 
   // ── haptyx:// deep-link auth handoff ─────────────────────────────────────
   // The renderer calls `auth:get-pending` on mount to drain any token that
