@@ -36,6 +36,20 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.83',
+    date: '2026-06-26T18:00:00Z',
+    title: 'v2.5.83 — People Map, live presence and the org directory',
+    tag: 'feature',
+    summary:
+      'See your whole team on a living map. PlexiTeam places everyone by office and reporting line, shows their real local day and whether they are around right now, and is backed by a proper organization directory you set up once. PlexiMeet, PlexiBuild and PlexiForms also join the suite.',
+    highlights: [
+      'People Map: a new view that maps everyone in your organization three ways — by office, on a live world map with a real day/night line, and as a reporting hierarchy. Each person shows their local time, working-hours band and whether they are online, away, in focus or busy right now.',
+      'Live presence: open PlexiDesk and the people you share an organization or team with can see you are around, and you see them. A Team button in the header shows who is online at a glance.',
+      'Organization setup: define your company working hours, add offices and locations each with their own hours and time zone, and give each person a title, department, office and who they report to. The People Map reads all of it, so a London office on 9 to 5 and a remote teammate light up at the right local time.',
+      'PlexiMeet, PlexiBuild and PlexiForms are now live in the suite.'
+    ]
+  },
+  {
     version: '2.5.82',
     date: '2026-06-26T12:00:00Z',
     title: 'v2.5.82 — PlexiSuite home, PlexiDash charts, and PlexiBrain',
