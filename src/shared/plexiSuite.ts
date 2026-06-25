@@ -233,17 +233,17 @@ export const PLEXI_PRODUCTS: PlexiProduct[] = [
     name: 'PlexiMeet',
     group: 'work',
     tagline: 'Meetings that turn into actions.',
-    status: 'soon',
+    status: 'ready',
     icon: 'groups',
     accent: '#fb7185',
-    about: 'Record or join a meeting and walk away with a clean transcript, a summary, and tasks already created on the right desks.',
+    about: 'Record a meeting and walk away with a clean transcript, an AI summary, and action items you turn into real tasks with one click. Or capture notes by hand. Live transcription uses your configured key.',
     edges: [
-      'Transcription and summary built in, via the recorder you already have.',
+      'Transcription and summary built in.',
       'Action items become real tasks, not notes you retype.',
-      'Notes land beside the work, not in a separate doc.'
+      'Searchable meeting history beside the work.'
     ],
     insteadOf: 'Teams / Google Meet + a notetaker',
-    planned: ['Live meeting capture', 'Transcript and summary', 'Auto-extracted action items', 'Searchable meeting history']
+    launch: 'meetings'
   },
   {
     key: 'plexichat',
