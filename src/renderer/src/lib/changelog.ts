@@ -36,6 +36,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.86',
+    date: '2026-06-27T12:00:00Z',
+    title: 'v2.5.86 — PlexiSearch, PlexiProjects, and search that understands you',
+    tag: 'feature',
+    summary:
+      'Two new products and a smarter search across the suite. PlexiSearch puts one box over your whole workspace and answers in plain language as well as links. PlexiProjects rolls your tasks up into a real Gantt plan with a critical path. And search now finds things by meaning, not just matching words, across PlexiBrain and your documents.',
+    highlights: [
+      'PlexiSearch: one search across your tasks, documents, tables, files and knowledge, ranked by meaning, with a grounded plain-language answer above the links. Keyboard-first, so up and down move through results, Enter opens, and Cmd or Ctrl plus Enter asks for an answer.',
+      'PlexiProjects: roll the tasks you already work in up into a project with dependencies, milestones and a Gantt timeline. A critical-path engine finds the chain that drives the finish date, flags work that has slipped, and reschedules the whole plan from real progress in one click.',
+      'Meaning-based search everywhere: PlexiBrain and your documents now rank by semantic similarity blended with keywords, so "time off" finds an entry titled "annual leave". With no embedding key set it falls back to plain keyword search, so nothing breaks and nothing is faked.'
+    ]
+  },
+  {
     version: '2.5.85',
     date: '2026-06-26T23:00:00Z',
     title: 'v2.5.85 — PlexiBrain search that understands what you mean',
