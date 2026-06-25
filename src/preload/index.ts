@@ -1295,7 +1295,12 @@ const api = {
       body?: import('@shared/types').SlidesBody
       error?: string
       needsApiKey?: boolean
-    }> => ipcRenderer.invoke('documents:generateSlides', input)
+    }> => ipcRenderer.invoke('documents:generateSlides', input),
+    // Backfill embeddings so grounding ranks documents by meaning. Best-effort:
+    // with no embedding key it is a silent no-op and grounding stays keyword-based.
+    reindex: (): Promise<{ embedded: number; reason?: string }> =>
+      ipcRenderer.invoke('documents:reindex'),
+    semanticActive: (): Promise<boolean> => ipcRenderer.invoke('documents:semanticActive')
   },
   // haptyx:// deep-link auth handoff. The brochure at haptyx.app/account/*
   // signs the user in against the signal server, then redirects to

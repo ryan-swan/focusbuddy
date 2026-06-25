@@ -1,0 +1,133 @@
+// Semantic retrieval for documents, the companion to semanticRetrieval.ts which
+// does the same for PlexiBrain knowledge. With an embedding key configured the
+// "ask your workspace" grounding ranks documents by meaning (cosine similarity
+// blended with keyword overlap); without one every document's semantic score is
+// null and the blend degrades to keyword search, the same result the old
+// rankSources path gave. Nothing is invented: a document with no signal scores
+// zero and drops out.
+
+import { listDocuments, getDocument } from './db/documents'
+import { extractDocText, type WorkspaceSource } from './workspaceRank'
+import { embedTexts, embedQuery } from './ai/embeddings'
+import { setEmbedding, listEmbeddings, hasEmbedding } from './db/embeddings'
+import { cosineSim, blendSemantic, type ScoredItem } from '@shared/semantic'
+
+const KIND = 'document'
+// Cap the text we embed so a very long document stays inside the embedding
+// model's token budget. The same slice is what extractDocText already returns,
+// so titles and the document head dominate the vector, which is what we want.
+const EMBED_CHARS = 8000
+
+interface DocItem {
+  docId: string
+  title: string
+  docType: string
+  text: string
+}
+
+// Build the full document pool once: metadata joined to extracted body text,
+// skipping archived docs (listDocuments already excludes them) and any that
+// extract to nothing so an empty doc never becomes a phantom source.
+function loadDocItems(): DocItem[] {
+  const items: DocItem[] = []
+  for (const m of listDocuments()) {
+    const full = getDocument(m.id)
+    if (!full) continue
+    const text = extractDocText(m.docType, full.body)
+    if (text.length === 0) continue
+    items.push({ docId: m.id, title: m.title, docType: m.docType as string, text })
+  }
+  return items
+}
+
+function embedText(item: DocItem): string {
+  return `${item.title}\n${item.text}`.trim().slice(0, EMBED_CHARS)
+}
+
+// Keyword overlap on the same scale the knowledge scorer uses, so the blend
+// weights are comparable across the two corpora: title hits count for more than
+// body hits, summed over the query's terms.
+function keywordScore(item: DocItem, query: string): number {
+  const q = query.trim().toLowerCase()
+  if (!q) return 0
+  const terms = q.split(/\s+/).filter(Boolean)
+  const t = item.title.toLowerCase()
+  const b = item.text.toLowerCase()
+  let s = 0
+  for (const term of terms) {
+    if (t.includes(term)) s += 3
+    if (b.includes(term)) s += 1
+  }
+  return s
+}
+
+function snippet(text: string, query: string): string {
+  const clean = text.replace(/\s+/g, ' ').trim()
+  const q = query.trim().toLowerCase()
+  const i = q ? clean.toLowerCase().indexOf(q.split(/\s+/)[0]) : -1
+  if (i < 0) return clean.slice(0, 200).trim()
+  const start = Math.max(0, i - 60)
+  return (start > 0 ? '… ' : '') + clean.slice(start, start + 200).trim() + (clean.length > start + 200 ? ' …' : '')
+}
+
+// Embed one document and store its vector. Best-effort: no key is a silent no-op
+// so saving a document never blocks or errors on a missing key.
+export async function embedDocument(docId: string): Promise<void> {
+  const full = getDocument(docId)
+  if (!full) return
+  const meta = listDocuments().find((m) => m.id === docId)
+  const text = extractDocText(full.docType, full.body)
+  if (text.length === 0) return
+  const item: DocItem = { docId, title: meta?.title ?? '', docType: full.docType, text }
+  const r = await embedTexts([embedText(item)])
+  if (r.ok && r.vectors[0]) setEmbedding(KIND, docId, r.vectors[0], r.model)
+}
+
+// Backfill embeddings for documents lacking one (or all, when force). Returns the
+// count embedded and, if it could not, why (e.g. no_key) so the UI stays honest.
+export async function reindexDocuments(force = false): Promise<{ embedded: number; reason?: string }> {
+  const items = loadDocItems()
+  const todo = force ? items : items.filter((d) => !hasEmbedding(KIND, d.docId))
+  if (todo.length === 0) return { embedded: 0 }
+  const r = await embedTexts(todo.map(embedText))
+  if (!r.ok) return { embedded: 0, reason: r.reason }
+  todo.forEach((d, i) => {
+    if (r.vectors[i]) setEmbedding(KIND, d.docId, r.vectors[i], r.model)
+  })
+  return { embedded: todo.length }
+}
+
+// Semantic + keyword blended search over documents, returned as WorkspaceSource
+// so the grounding path can use it directly. queryVec is null when there is no
+// embedding key, in which case every semantic score is null and the blend is
+// pure keyword, identical to the old rankSources behaviour.
+export async function semanticSearchDocuments(query: string, limit = 6): Promise<WorkspaceSource[]> {
+  if (!query.trim()) return []
+  const items = loadDocItems()
+  if (items.length === 0) return []
+  const qvec = await embedQuery(query)
+  const vectors = qvec ? listEmbeddings(KIND) : new Map<string, number[]>()
+  const scored: ScoredItem<DocItem>[] = items.map((d) => {
+    const vec = vectors.get(d.docId)
+    return {
+      item: d,
+      keyword: keywordScore(d, query),
+      semantic: qvec && vec ? cosineSim(qvec, vec) : null
+    }
+  })
+  return blendSemantic(scored, { limit }).map((d, i) => ({
+    docId: d.docId,
+    title: d.title || 'Untitled',
+    docType: d.docType,
+    snippet: snippet(d.text, query),
+    text: d.text.slice(0, 6000),
+    // Descending by blended rank so the strongest source leads the grounding.
+    score: 1 - i * 0.01
+  }))
+}
+
+// True when there is at least one stored document vector, i.e. semantic document
+// search is actually active (a key is configured and documents are indexed).
+export function documentSemanticActive(): boolean {
+  return listEmbeddings(KIND).size > 0
+}

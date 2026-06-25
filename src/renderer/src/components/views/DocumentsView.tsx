@@ -52,6 +52,10 @@ export default function DocumentsView(): JSX.Element {
 
   useEffect(() => {
     void refresh()
+    // Backfill document embeddings so "ask your workspace" grounds by meaning.
+    // Best-effort and silent: with no embedding key it is a no-op and grounding
+    // stays keyword-based.
+    void window.api.documents.reindex()
   }, [refresh])
 
   // Turn a local document into a live, shared one and open it. Its current body
