@@ -65,6 +65,20 @@ export function escapeLike(q: string): string {
   return q.replace(/[\\%_]/g, (c) => '\\' + c)
 }
 
+// Score a PlexiBrain knowledge hit on the same global-search scale as everything
+// else. A keyword match uses its plain `scoreMatch` value so knowledge interleaves
+// naturally with tasks, documents and the rest. An entry with no keyword overlap
+// that surfaced only because its meaning is close (semantic search active) gets a
+// mid-band discovery score by rank, so it appears without ever outranking a strong
+// keyword hit. With semantic search inactive a keyword-less entry scores 0 and
+// drops out, exactly as the old keyword-only search behaved. Nothing is invented:
+// the entry was already judged relevant by the blend before it reached here.
+export function knowledgeHitScore(keyword: number, rank: number, semanticActive: boolean): number {
+  if (keyword > 0) return keyword
+  if (!semanticActive) return 0
+  return Math.max(60, 220 - rank * 8)
+}
+
 // Score a hit so titles outrank body matches and earlier/exact matches outrank
 // late ones. Higher is better; 0 means no match.
 export function scoreMatch(title: string, body: string, query: string): number {

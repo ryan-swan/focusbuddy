@@ -1,7 +1,13 @@
 // Unit tests for the pure global-search text helpers (src/main/db/searchText.ts).
 
 import { describe, it, expect } from 'vitest'
-import { contentToText, makeSnippet, escapeLike, scoreMatch } from '../../src/main/db/searchText'
+import {
+  contentToText,
+  makeSnippet,
+  escapeLike,
+  scoreMatch,
+  knowledgeHitScore
+} from '../../src/main/db/searchText'
 
 describe('contentToText', () => {
   it('passes raw (non-JSON) text through', () => {
@@ -65,5 +71,23 @@ describe('scoreMatch', () => {
   })
   it('a title match outranks a body-only match', () => {
     expect(scoreMatch('Budget', 'x', 'budget')).toBeGreaterThan(scoreMatch('x', 'budget', 'budget'))
+  })
+})
+
+describe('knowledgeHitScore', () => {
+  it('uses the keyword score directly when there is a keyword match', () => {
+    expect(knowledgeHitScore(250, 0, true)).toBe(250)
+    expect(knowledgeHitScore(80, 5, false)).toBe(80)
+  })
+  it('gives a semantic-only match a mid-band discovery score that decays by rank', () => {
+    expect(knowledgeHitScore(0, 0, true)).toBe(220)
+    expect(knowledgeHitScore(0, 0, true)).toBeGreaterThan(knowledgeHitScore(0, 3, true))
+  })
+  it('never drops a semantic-only discovery below the floor', () => {
+    expect(knowledgeHitScore(0, 100, true)).toBe(60)
+  })
+  it('scores a keyword-less entry zero when semantic search is inactive', () => {
+    expect(knowledgeHitScore(0, 0, false)).toBe(0)
+    expect(knowledgeHitScore(0, 2, false)).toBe(0)
   })
 })

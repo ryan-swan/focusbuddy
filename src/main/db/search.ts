@@ -1,18 +1,23 @@
 import { getDb } from './database'
-import { contentToText, makeSnippet, escapeLike, scoreMatch } from './searchText'
+import { contentToText, makeSnippet, escapeLike, scoreMatch, knowledgeHitScore } from './searchText'
+import { semanticSearchKnowledge, knowledgeSemanticActive } from '../semanticRetrieval'
 import type { SearchHit } from '@shared/types'
 
 // Global "find anything" search across the local workspace: node titles +
-// descriptions, widget text, document bodies, table-row cells, and file names.
-// Plain SQL LIKE keeps it dependency-free and instant for a personal-sized DB;
-// the searchText helpers turn JSON bodies into readable snippets. Trashed and
-// archived content is excluded so search only surfaces live things.
+// descriptions, widget text, document bodies, table-row cells, file names, and
+// PlexiBrain knowledge. Most categories use plain SQL LIKE, which stays
+// dependency-free and instant for a personal-sized DB; knowledge is ranked by
+// meaning (semantic embeddings blended with keyword) when an embedding key is
+// configured and by keyword otherwise, so the palette finds a "time off" note
+// titled "annual leave" without ever inventing a match. The searchText helpers
+// turn JSON bodies into readable snippets. Trashed and archived content is
+// excluded so search only surfaces live things.
 
 const PER_CATEGORY = 20
 const TOTAL = 40
 const ESC = " ESCAPE '\\'"
 
-export function searchAll(rawQuery: string): SearchHit[] {
+export async function searchAll(rawQuery: string): Promise<SearchHit[]> {
   const query = rawQuery.trim()
   if (query.length < 2) return []
   const db = getDb()
@@ -144,6 +149,26 @@ export function searchAll(rawQuery: string): SearchHit[] {
       score: scoreMatch(name, '', query)
     })
   }
+
+  // PlexiBrain knowledge — ranked by meaning when an embedding key is set, by
+  // keyword otherwise. semanticSearchKnowledge already returns only entries the
+  // blend judged relevant (and ordered best-first), so here we just place each
+  // on the shared global-search score scale: a keyword match keeps its plain
+  // score, a semantic-only discovery gets a mid-band score by rank. With no key
+  // and no keyword overlap an entry never reaches this loop, so nothing is faked.
+  const semanticActive = knowledgeSemanticActive()
+  const kEntries = await semanticSearchKnowledge(query, PER_CATEGORY)
+  kEntries.forEach((e, rank) => {
+    const haystack = `${e.body} ${e.tags.join(' ')}`
+    const keyword = scoreMatch(e.title, haystack, query)
+    hits.push({
+      type: 'knowledge',
+      id: e.id,
+      title: e.title || 'Untitled entry',
+      snippet: makeSnippet(e.body || e.tags.join(' ') || e.title, query),
+      score: knowledgeHitScore(keyword, rank, semanticActive)
+    })
+  })
 
   // Dedupe (a table can match on several rows) by type+id, keeping the best
   // score, then rank and cap.
