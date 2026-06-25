@@ -1,18 +1,36 @@
-// Grounded retrieval over the workspace's documents — the substrate for
-// "ask your workspace". Reads every non-archived document, extracts its text,
-// and ranks by keyword overlap with the question. The pure extraction + ranking
-// live in workspaceRank.ts so they can be unit-tested without the database.
-// No embeddings yet; keyword retrieval plus the model reading the real text is
-// enough for a grounded, cited first version, and it keeps everything local.
+// Grounded retrieval over the workspace — the substrate for "ask your workspace".
+// PlexiBrain knowledge is ranked by meaning (semantic embeddings blended with
+// keyword) when an embedding key is configured, and documents are keyword-ranked.
+// With no key everything degrades to keyword, so grounding never fabricates a
+// match. The pure ranking lives in workspaceRank.ts; the semantic side in
+// semanticRetrieval.ts. Both are unit-testable without the database.
 
 import { listDocuments, getDocument } from './db/documents'
-import { listKnowledge } from './db/knowledge'
 import { extractDocText, rankSources, type WorkspaceSource } from './workspaceRank'
+import { semanticSearchKnowledge } from './semanticRetrieval'
 
 export type { WorkspaceSource } from './workspaceRank'
 export { extractDocText } from './workspaceRank'
 
-export function retrieveSources(query: string, limit = 6): WorkspaceSource[] {
+export async function retrieveSources(query: string, limit = 6): Promise<WorkspaceSource[]> {
+  // Knowledge: curated company truth, ranked semantically (or keyword fallback)
+  // and surfaced first so it grounds the answer ahead of looser document matches.
+  const kEntries = await semanticSearchKnowledge(query, limit)
+  const kSources: WorkspaceSource[] = kEntries
+    .map((e, i) => {
+      const text = `${e.title}\n${e.tags.join(' ')}\n${e.body}`
+      return {
+        docId: e.id,
+        title: e.title,
+        docType: 'knowledge',
+        snippet: text.replace(/\s+/g, ' ').trim().slice(0, 200),
+        text,
+        // Descending by the semantic rank so curated knowledge leads the sources.
+        score: 1 - i * 0.01
+      }
+    })
+    .filter((k) => k.text.trim().length > 0)
+
   const docs = listDocuments()
     .map((m) => {
       const full = getDocument(m.id)
@@ -20,20 +38,9 @@ export function retrieveSources(query: string, limit = 6): WorkspaceSource[] {
       return { docId: m.id, title: m.title, docType: m.docType as string, text: extractDocText(m.docType, full.body) }
     })
     .filter((d): d is { docId: string; title: string; docType: string; text: string } => d !== null && d.text.length > 0)
+  const docSources = rankSources(query, docs, limit)
 
-  // PlexiBrain entries are curated company truth, so they join the same grounding
-  // corpus as documents. Listed first so they win ties against looser document
-  // matches when relevance is otherwise equal.
-  const knowledge = listKnowledge()
-    .map((e) => ({
-      docId: e.id,
-      title: e.title,
-      docType: 'knowledge',
-      text: `${e.title}\n${e.tags.join(' ')}\n${e.body}`
-    }))
-    .filter((k) => k.text.trim().length > 0)
-
-  return rankSources(query, [...knowledge, ...docs], limit)
+  return [...kSources, ...docSources].slice(0, limit)
 }
 
 // The workspace connecting itself: the documents most related to this one, by

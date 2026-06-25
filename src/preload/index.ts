@@ -1139,7 +1139,12 @@ const api = {
       ipcRenderer.invoke('knowledge:create', draft),
     update: (id: string, patch: KnowledgePatch): Promise<KnowledgeEntry | null> =>
       ipcRenderer.invoke('knowledge:update', id, patch),
-    delete: (id: string): Promise<boolean> => ipcRenderer.invoke('knowledge:delete', id)
+    delete: (id: string): Promise<boolean> => ipcRenderer.invoke('knowledge:delete', id),
+    // Backfill embeddings for unindexed entries; returns how many + why-not.
+    reindex: (): Promise<{ embedded: number; reason?: string }> =>
+      ipcRenderer.invoke('knowledge:reindex'),
+    // True once entries are embedded (an embedding key is set and indexed).
+    semanticActive: (): Promise<boolean> => ipcRenderer.invoke('knowledge:semanticActive')
   },
   // PlexiMeet — meetings with transcript, summary and action items.
   meetings: {

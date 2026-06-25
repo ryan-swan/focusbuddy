@@ -231,6 +231,21 @@ CREATE TABLE IF NOT EXISTS fb_sign_requests (
 );
 CREATE INDEX IF NOT EXISTS idx_fb_sign_updated ON fb_sign_requests(updated_at DESC);
 
+-- ── Semantic-retrieval embeddings ────────────────────────────────────────────
+-- A vector store keyed by (item_type, item_id): one table for knowledge,
+-- document and future embeddings. vector_json is a JSON float array; dim + model
+-- are recorded so a model change can be reindexed. Powers semantic search and AI
+-- grounding; populated only when an embedding key is configured.
+CREATE TABLE IF NOT EXISTS fb_embeddings (
+  item_type TEXT NOT NULL,
+  item_id TEXT NOT NULL,
+  vector_json TEXT NOT NULL,
+  model TEXT NOT NULL,
+  dim INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  PRIMARY KEY (item_type, item_id)
+);
+
 -- ── Inter-widget spatial links ───────────────────────────────────────────────
 -- Obsidian-style backlinks but drawn as lines on the canvas. Each row is a
 -- directed link (source → target). UNIQUE constraint prevents duplicates in
