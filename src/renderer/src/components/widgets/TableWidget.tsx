@@ -11,6 +11,7 @@ import type {
 import {
   FIELD_TYPE_ICONS,
   FIELD_TYPE_LABELS,
+  coerceFieldValue,
   defaultConfig,
   defaultValue
 } from '@shared/fields'
@@ -253,6 +254,29 @@ export default function TableWidget({ widget, inline = false }: Props): JSX.Elem
       )
     }
     void setSchema(table!.id, next)
+  }
+
+  // Change a column's field type. Resets its config to the new type's default
+  // and coerces every existing cell value to the new shape (text↔number↔date
+  // carry over; everything else starts clean) so the table never shows a value
+  // the new type can't interpret. The column's label and width are preserved.
+  function setColumnType(columnId: string, type: FieldType): void {
+    const col = table!.schema.columns.find((c) => c.id === columnId)
+    if (!col || col.type === type) return
+    const next: TableSchema = {
+      ...table!.schema,
+      columns: table!.schema.columns.map((c) =>
+        c.id === columnId
+          ? ({ ...c, type, config: defaultConfig(type) } as FieldDefinition)
+          : c
+      )
+    }
+    void setSchema(table!.id, next)
+    for (const r of rows) {
+      if (!(columnId in r.cells)) continue
+      const coerced = coerceFieldValue(col.type, type, r.cells[columnId])
+      if (coerced !== r.cells[columnId]) void updateCells(r.id, { [columnId]: coerced })
+    }
   }
 
   // Build a fresh column definition of the given type. Shared by the trailing
@@ -854,6 +878,7 @@ export default function TableWidget({ widget, inline = false }: Props): JSX.Elem
                   onRename={(label) => renameColumn(col.id, label)}
                   onRemove={() => removeColumn(col.id)}
                   onSetConfig={(c) => setColumnConfig(col.id, c)}
+                  onSetType={(t) => setColumnType(col.id, t)}
                   onContextMenu={(e) => {
                     e.preventDefault()
                     setHeaderMenu({ x: e.clientX, y: e.clientY, columnId: col.id, index })
@@ -1281,6 +1306,7 @@ function ColumnHeader({
   onRename,
   onRemove,
   onSetConfig,
+  onSetType,
   onContextMenu,
   onResizeStart,
   onDragStartCol,
@@ -1296,6 +1322,7 @@ function ColumnHeader({
   onRename: (label: string) => void
   onRemove: () => void
   onSetConfig: (config: unknown) => void
+  onSetType: (type: FieldType) => void
   onContextMenu: (e: React.MouseEvent) => void
   onResizeStart: (e: React.MouseEvent) => void
   onDragStartCol: () => void
@@ -1359,10 +1386,18 @@ function ColumnHeader({
           <div className="text-[10px] uppercase tracking-wider text-stone-400">
             Type
           </div>
-          <div className="text-[10px] text-stone-500 dark:text-stone-400">
-            <Icon name={FIELD_TYPE_ICONS[col.type]} size={10} className="inline mr-1" />
-            {FIELD_TYPE_LABELS[col.type]} (type change coming soon)
-          </div>
+          <select
+            value={col.type}
+            onChange={(e) => onSetType(e.target.value as FieldType)}
+            className="w-full text-[11px] bg-stone-50 dark:bg-stone-800 border border-stone-300 dark:border-stone-700 rounded px-2 py-1"
+            title="Change this column's field type"
+          >
+            {(Object.keys(FIELD_TYPE_LABELS) as FieldType[]).map((t) => (
+              <option key={t} value={t}>
+                {FIELD_TYPE_LABELS[t]}
+              </option>
+            ))}
+          </select>
           {(col.type === 'single-select' || col.type === 'multi-select') && (
             <SelectOptionsMini
               options={
