@@ -188,6 +188,18 @@ CREATE TABLE IF NOT EXISTS fb_meetings (
 );
 CREATE INDEX IF NOT EXISTS idx_fb_meetings_created ON fb_meetings(created_at DESC);
 
+-- ── PlexiBuild apps ──────────────────────────────────────────────────────────
+-- No-code apps: a named component stack (components_json) built and run in-app.
+CREATE TABLE IF NOT EXISTS fb_apps (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL DEFAULT 'Untitled app',
+  icon TEXT NOT NULL DEFAULT 'widgets',
+  components_json TEXT NOT NULL DEFAULT '[]',
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_fb_apps_updated ON fb_apps(updated_at DESC);
+
 -- ── Inter-widget spatial links ───────────────────────────────────────────────
 -- Obsidian-style backlinks but drawn as lines on the canvas. Each row is a
 -- directed link (source → target). UNIQUE constraint prevents duplicates in
