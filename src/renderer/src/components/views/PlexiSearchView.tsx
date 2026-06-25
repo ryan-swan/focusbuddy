@@ -61,6 +61,9 @@ export default function PlexiSearchView(): JSX.Element {
   const [hits, setHits] = useState<SearchHit[]>([])
   const [searching, setSearching] = useState(false)
   const [ask, setAsk] = useState<AskState>({ status: 'idle' })
+  // Which result the keyboard is on. -1 means none focused (e.g. before any
+  // results arrive); it snaps to the top result whenever a fresh result set lands.
+  const [focusIdx, setFocusIdx] = useState(-1)
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -82,7 +85,10 @@ export default function PlexiSearchView(): JSX.Element {
       void window.api.search
         .query(q)
         .then((res) => {
-          if (!cancelled) setHits(res)
+          if (cancelled) return
+          setHits(res)
+          // Snap keyboard focus to the top result so Enter opens it immediately.
+          setFocusIdx(res.length ? 0 : -1)
         })
         .catch(() => {
           if (!cancelled) setHits([])
@@ -170,9 +176,23 @@ export default function PlexiSearchView(): JSX.Element {
               setAsk({ status: 'idle' })
             }}
             onKeyDown={(e) => {
-              if (e.key === 'Enter') void runAsk()
+              if (e.key === 'ArrowDown') {
+                e.preventDefault()
+                setFocusIdx((i) => Math.min(i + 1, hits.length - 1))
+              } else if (e.key === 'ArrowUp') {
+                e.preventDefault()
+                setFocusIdx((i) => Math.max(i - 1, 0))
+              } else if (e.key === 'Enter') {
+                // Cmd/Ctrl+Enter asks the AI; a plain Enter opens the focused
+                // result, which is what a search box with a list should do.
+                if (e.metaKey || e.ctrlKey) {
+                  void runAsk()
+                } else if (focusIdx >= 0 && hits[focusIdx]) {
+                  openHit(hits[focusIdx])
+                }
+              }
             }}
-            placeholder="Search everything, then press Enter to ask"
+            placeholder="Search everything. Up and down to move, Enter to open, Cmd+Enter to ask"
             data-testid="plexisearch-input"
             className="flex-1 min-w-0 bg-transparent text-[15px] text-[var(--ink-100)] placeholder:text-[var(--ink-50)] focus:outline-none"
           />
@@ -268,8 +288,14 @@ export default function PlexiSearchView(): JSX.Element {
               </div>
             ) : (
               <div className="flex flex-col gap-1">
-                {hits.map((h) => (
-                  <ResultRow key={`${h.type}:${h.id}`} hit={h} onOpen={() => openHit(h)} />
+                {hits.map((h, i) => (
+                  <ResultRow
+                    key={`${h.type}:${h.id}`}
+                    hit={h}
+                    active={i === focusIdx}
+                    onOpen={() => openHit(h)}
+                    onHover={() => setFocusIdx(i)}
+                  />
                 ))}
               </div>
             )}
@@ -290,13 +316,33 @@ export default function PlexiSearchView(): JSX.Element {
   )
 }
 
-function ResultRow({ hit, onOpen }: { hit: SearchHit; onOpen: () => void }): JSX.Element {
+function ResultRow({
+  hit,
+  active,
+  onOpen,
+  onHover
+}: {
+  hit: SearchHit
+  active: boolean
+  onOpen: () => void
+  onHover: () => void
+}): JSX.Element {
   const meta = useMemo(() => hitMeta(hit), [hit])
+  const ref = useRef<HTMLButtonElement>(null)
+  useEffect(() => {
+    if (active) ref.current?.scrollIntoView({ block: 'nearest' })
+  }, [active])
   return (
     <button
+      ref={ref}
       onClick={onOpen}
+      onMouseMove={onHover}
       data-testid={`plexisearch-hit-${hit.id}`}
-      className="w-full text-left rounded-lg px-3 py-2.5 border border-transparent hover:bg-[var(--surface-sunken)] transition-colors flex items-start gap-3"
+      className={`w-full text-left rounded-lg px-3 py-2.5 border transition-colors flex items-start gap-3 ${
+        active
+          ? 'bg-[rgb(var(--accent)/0.10)] border-[rgb(var(--accent)/0.30)]'
+          : 'border-transparent hover:bg-[var(--surface-sunken)]'
+      }`}
     >
       <span className="shrink-0 mt-0.5 inline-flex h-7 w-7 items-center justify-center rounded-md bg-[var(--surface-sunken)]">
         <Icon name={meta.icon} size={15} className="text-[var(--ink-70)]" />

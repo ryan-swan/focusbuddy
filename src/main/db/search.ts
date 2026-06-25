@@ -127,6 +127,27 @@ export async function searchAll(rawQuery: string): Promise<SearchHit[]> {
     })
   }
 
+  // Tables by name. The row scan above only finds a table when a cell matches;
+  // this also surfaces a table whose title matches even if no row text does.
+  // Tables not scoped to a task can't be routed, so they're skipped, same as
+  // the row path. Shares the 'table-row' type so a name and a row hit dedupe.
+  const tableRows = db
+    .prepare(
+      `SELECT id, task_id, title FROM fb_tables
+       WHERE task_id IS NOT NULL AND title LIKE ?${ESC} LIMIT ?`
+    )
+    .all(like, PER_CATEGORY) as Array<{ id: string; task_id: string; title: string }>
+  for (const r of tableRows) {
+    hits.push({
+      type: 'table-row',
+      id: r.id,
+      title: r.title || 'Table',
+      snippet: makeSnippet(r.title, query),
+      score: scoreMatch(r.title, '', query),
+      taskId: r.task_id
+    })
+  }
+
   // File-manager entries (by name).
   const fileRows = db
     .prepare(
