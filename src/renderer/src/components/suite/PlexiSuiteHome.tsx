@@ -9,6 +9,7 @@ import {
   type PlexiProduct
 } from '@shared/plexiSuite'
 import UpvoteButton from './UpvoteButton'
+import { PLEXI_CARD } from '../plexi'
 
 // PlexiSuite home: the launcher for the whole suite. Every product reads from the
 // shared catalog, so what is live, what is coming, and what is planned stay
@@ -83,8 +84,8 @@ function ProductTile({ product }: { product: PlexiProduct }): JSX.Element {
       data-testid={`product-tile-${product.key}`}
       className={`group relative text-left rounded-xl border p-3 transition-all ${
         ready
-          ? 'border-stone-200/80 dark:border-white/[0.08] bg-white dark:bg-white/[0.02] hover:border-stone-300 dark:hover:border-white/20 hover:shadow-md'
-          : 'border-stone-200/50 dark:border-white/[0.05] bg-stone-50/50 dark:bg-white/[0.01] hover:border-stone-300/70 dark:hover:border-white/10'
+          ? `${PLEXI_CARD} fb-lift`
+          : 'border-[var(--edge-soft)]/50 bg-[var(--surface-sunken)]/60'
       }`}
     >
       <div className="flex items-start gap-2.5">
@@ -98,7 +99,7 @@ function ProductTile({ product }: { product: PlexiProduct }): JSX.Element {
           <div className="flex items-center gap-1.5">
             <span
               className={`text-[13px] font-semibold truncate ${
-                ready ? 'text-stone-900 dark:text-stone-100' : 'text-stone-400 dark:text-stone-500'
+                ready ? 'text-[var(--ink-100)]' : 'text-[var(--ink-50)]'
               }`}
             >
               {product.name}
@@ -108,7 +109,7 @@ function ProductTile({ product }: { product: PlexiProduct }): JSX.Element {
                 className={`shrink-0 text-[9px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-full ${
                   product.status === 'soon'
                     ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
-                    : 'bg-stone-400/15 text-stone-500 dark:text-stone-400'
+                    : 'bg-[var(--ink-50)]/15 text-[var(--ink-50)]'
                 }`}
               >
                 {STATUS_LABEL[product.status]}
@@ -117,7 +118,7 @@ function ProductTile({ product }: { product: PlexiProduct }): JSX.Element {
           </div>
           <p
             className={`mt-0.5 text-[11px] leading-snug line-clamp-2 ${
-              ready ? 'text-stone-500 dark:text-stone-400' : 'text-stone-400/80 dark:text-stone-500/80'
+              ready ? 'text-[var(--ink-70)]' : 'text-[var(--ink-50)]/70'
             }`}
           >
             {product.tagline}
@@ -126,7 +127,7 @@ function ProductTile({ product }: { product: PlexiProduct }): JSX.Element {
       </div>
       {!ready && (
         <div className="mt-2.5 flex items-center justify-between">
-          <span className="text-[10px] text-stone-400 dark:text-stone-500">Upvote to prioritise</span>
+          <span className="text-[10px] text-[var(--ink-50)]">Upvote to prioritise</span>
           <UpvoteButton featureKey={product.key} />
         </div>
       )}
@@ -146,7 +147,7 @@ function GroupSection({ groupKey }: { groupKey: string }): JSX.Element | null {
         <h2 className="text-[15px] font-bold tracking-tight" style={{ color: group.accent }}>
           {group.name}
         </h2>
-        <span className="text-[12px] text-stone-500 dark:text-stone-400">{group.tagline}</span>
+        <span className="text-[12px] text-[var(--ink-70)]">{group.tagline}</span>
       </div>
       <div className="grid gap-2.5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {products.map((p) => (
@@ -163,15 +164,19 @@ export default function PlexiSuiteHome(): JSX.Element {
   const name = (account?.handle || account?.email || '').split('@')[0]
 
   return (
-    <div className="h-full w-full overflow-auto bg-stone-50 dark:bg-stone-950" data-testid="plexisuite-home">
+    <div
+      className="h-full w-full overflow-auto"
+      style={{ background: 'var(--surface-base)' }}
+      data-testid="plexisuite-home"
+    >
       <div className="mx-auto max-w-[1280px] px-6 py-7">
         {/* Header */}
         <div className="mb-6">
           <div className="flex items-center gap-2">
-            <h1 className="text-[26px] font-bold tracking-tight text-stone-900 dark:text-white">PlexiSuite</h1>
-            {name && <span className="text-[15px] text-stone-500 dark:text-stone-400">· {greeting()}, {name}</span>}
+            <h1 className="text-[26px] font-bold tracking-tight text-[var(--ink-100)] fb-display-hero">PlexiSuite</h1>
+            {name && <span className="text-[15px] text-[var(--ink-70)]">· {greeting()}, {name}</span>}
           </div>
-          <p className="mt-1 text-[14px] text-stone-500 dark:text-stone-400">
+          <p className="mt-1 text-[14px] text-[var(--ink-70)]">
             Everything your team needs to create, run, and grow. One connected workspace, built to leave Microsoft and
             Google behind.
           </p>
@@ -192,10 +197,10 @@ export default function PlexiSuiteHome(): JSX.Element {
             </span>
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
-                <h2 className="text-[19px] font-bold text-stone-900 dark:text-white">PlexiDesk</h2>
+                <h2 className="text-[19px] font-bold text-[var(--ink-100)]">PlexiDesk</h2>
                 <span className="text-[12px] text-emerald-600 dark:text-emerald-400 font-medium">{PLEXI_DESK.tagline}</span>
               </div>
-              <p className="mt-1 text-[13px] text-stone-600 dark:text-stone-300 max-w-2xl leading-relaxed">
+              <p className="mt-1 text-[13px] text-[var(--ink-90)] max-w-2xl leading-relaxed">
                 {PLEXI_DESK.about}
               </p>
             </div>
@@ -212,7 +217,7 @@ export default function PlexiSuiteHome(): JSX.Element {
           ))}
         </div>
 
-        <p className="mt-8 text-center text-[12px] text-stone-400 dark:text-stone-600">
+        <p className="mt-8 text-center text-[12px] text-[var(--ink-50)]">
           Greyed products are on the way. Upvote the ones you want first, and we will tell you the moment they are ready
           to test.
         </p>
