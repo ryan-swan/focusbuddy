@@ -153,6 +153,7 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
   const goFiles = useViewStore((s) => s.goFiles)
   const goCollaborations = useViewStore((s) => s.goCollaborations)
   const goOrg = useViewStore((s) => s.goOrg)
+  const goSuite = useViewStore((s) => s.goSuite)
   const goInsights = useViewStore((s) => s.goInsights)
   const unreadMessages = useMessagingStore((s) => s.unreadTotal)
   const unreadMail = useMailStore(selectMailUnread)
@@ -646,6 +647,15 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
         />
         {workspaceOpen && (
           <div className="mb-2">
+            <NavRow
+              icon="apps"
+              label="PlexiSuite"
+              active={viewIsActive({ kind: 'suite' })}
+              onClick={() => {
+                setActive(null)
+                goSuite()
+              }}
+            />
             <NavRow
               icon="dashboard"
               label="Home"
