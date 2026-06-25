@@ -1351,6 +1351,26 @@ const api = {
     run: (id: string): Promise<import('@shared/flows').FlowRunResult> => ipcRenderer.invoke('flows:run', id),
     runDue: (): Promise<{ ran: number }> => ipcRenderer.invoke('flows:runDue')
   },
+  // PlexiAPI: the local REST server and its scoped tokens.
+  apiAccess: {
+    status: (): Promise<import('@shared/apiAccess').ApiServerConfig> => ipcRenderer.invoke('api:status'),
+    setEnabled: (
+      enabled: boolean
+    ): Promise<import('@shared/apiAccess').ApiServerConfig & { error?: string }> =>
+      ipcRenderer.invoke('api:setEnabled', enabled),
+    setPort: (
+      port: number
+    ): Promise<import('@shared/apiAccess').ApiServerConfig & { error?: string }> =>
+      ipcRenderer.invoke('api:setPort', port),
+    listTokens: (): Promise<import('@shared/apiAccess').ApiTokenPublic[]> =>
+      ipcRenderer.invoke('api:listTokens'),
+    createToken: (
+      name: string,
+      scopes: import('@shared/apiAccess').ApiScope[]
+    ): Promise<import('@shared/apiAccess').CreateTokenResult> =>
+      ipcRenderer.invoke('api:createToken', name, scopes),
+    revokeToken: (id: string): Promise<boolean> => ipcRenderer.invoke('api:revokeToken', id)
+  },
   // haptyx:// deep-link auth handoff. The brochure at haptyx.app/account/*
   // signs the user in against the signal server, then redirects to
   // haptyx://auth?token=...&email=...&handle=... — main process catches

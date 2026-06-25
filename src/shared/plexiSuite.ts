@@ -431,13 +431,13 @@ export const PLEXI_PRODUCTS: PlexiProduct[] = [
     name: 'PlexiAPI',
     group: 'build',
     tagline: 'Programmatic access to your workspace.',
-    status: 'planned',
+    status: 'ready',
     icon: 'api',
     accent: '#047857',
-    about: 'A clean API and webhooks so your workspace data and actions are available to scripts, services and other tools.',
-    edges: ['Read and write your real workspace objects.', 'Webhooks for events.', 'The same permissions as the app.'],
+    about: 'A local REST API over your workspace, for your own scripts and tools. The server binds only to 127.0.0.1 and is off until you enable it; access needs a scoped token whose raw value is shown once and stored only as a hash.',
+    edges: ['Read and write your real workspace objects.', 'Scoped read or read/write tokens.', 'Local only, off by default, no data leaves your machine.'],
     insteadOf: 'screen-scraping or no access at all',
-    planned: ['REST API', 'Webhooks', 'Scoped tokens']
+    launch: 'api'
   },
 
   // ── PlexiConnect ─────────────────────────────────────────────────────────

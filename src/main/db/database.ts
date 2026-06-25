@@ -299,6 +299,26 @@ CREATE TABLE IF NOT EXISTS fb_flows (
   updated_at INTEGER NOT NULL
 );
 
+-- ── PlexiAPI ─────────────────────────────────────────────────────────────────
+-- Local REST API access. Tokens are stored only as a sha256 hash, so the raw
+-- token is shown once at creation and never persisted. scopes_json is a JSON
+-- array, e.g. ["read","write"]. fb_api_config is a single row holding whether the
+-- local server is enabled and on which port; it is off by default and only ever
+-- binds to 127.0.0.1.
+CREATE TABLE IF NOT EXISTS fb_api_tokens (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  token_hash TEXT NOT NULL,
+  scopes_json TEXT NOT NULL DEFAULT '["read"]',
+  created_at INTEGER NOT NULL,
+  last_used_at INTEGER
+);
+CREATE TABLE IF NOT EXISTS fb_api_config (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  enabled INTEGER NOT NULL DEFAULT 0,
+  port INTEGER NOT NULL DEFAULT 8787
+);
+
 -- ── Inter-widget spatial links ───────────────────────────────────────────────
 -- Obsidian-style backlinks but drawn as lines on the canvas. Each row is a
 -- directed link (source → target). UNIQUE constraint prevents duplicates in
