@@ -1337,6 +1337,20 @@ const api = {
       ipcRenderer.invoke('reports:generate', id),
     runDue: (): Promise<{ generated: number }> => ipcRenderer.invoke('reports:runDue')
   },
+  // PlexiFlow: trigger-and-action automations across the workspace.
+  flows: {
+    list: (): Promise<import('@shared/flows').FlowDef[]> => ipcRenderer.invoke('flows:list'),
+    get: (id: string): Promise<import('@shared/flows').FlowDef | null> => ipcRenderer.invoke('flows:get', id),
+    create: (draft: import('@shared/flows').FlowDraft): Promise<import('@shared/flows').FlowDef> =>
+      ipcRenderer.invoke('flows:create', draft),
+    update: (
+      id: string,
+      patch: import('@shared/flows').FlowPatch
+    ): Promise<import('@shared/flows').FlowDef | null> => ipcRenderer.invoke('flows:update', id, patch),
+    delete: (id: string): Promise<boolean> => ipcRenderer.invoke('flows:delete', id),
+    run: (id: string): Promise<import('@shared/flows').FlowRunResult> => ipcRenderer.invoke('flows:run', id),
+    runDue: (): Promise<{ ran: number }> => ipcRenderer.invoke('flows:runDue')
+  },
   // haptyx:// deep-link auth handoff. The brochure at haptyx.app/account/*
   // signs the user in against the signal server, then redirects to
   // haptyx://auth?token=...&email=...&handle=... — main process catches

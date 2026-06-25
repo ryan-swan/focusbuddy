@@ -1,0 +1,360 @@
+import { useEffect, useState } from 'react'
+import Icon from '../Icon'
+import { DashboardHeader, StatusPill } from '../plexi'
+import type { FbTable } from '@shared/fields'
+import {
+  blankAction,
+  ACTION_LABELS,
+  type FlowDef,
+  type FlowAction,
+  type FlowActionType,
+  type FlowTrigger,
+  type FlowRunStep
+} from '@shared/flows'
+
+// PlexiFlow: a visual automation builder. A flow runs an ordered list of actions
+// across the workspace, manually or on a schedule. Each run records an honest
+// per-step log, so a missing AI key or mail account shows as a failed step rather
+// than a fabricated success. An AI step's output can be reused by a later step
+// with the token {{ai}}.
+
+const ACTION_TYPES: FlowActionType[] = ['create-task', 'add-table-row', 'send-email', 'create-knowledge', 'ai-step']
+
+const ACTION_ICON: Record<FlowActionType, string> = {
+  'create-task': 'task_alt',
+  'add-table-row': 'table_chart',
+  'send-email': 'send',
+  'create-knowledge': 'neurology',
+  'ai-step': 'auto_awesome'
+}
+
+export default function PlexiFlowView(): JSX.Element {
+  const [flows, setFlows] = useState<FlowDef[] | null>(null)
+  const [tables, setTables] = useState<FbTable[]>([])
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+
+  async function load(): Promise<void> {
+    const [f, t] = await Promise.all([window.api.flows.list(), window.api.tables.list()])
+    setFlows(f)
+    setTables(t)
+  }
+
+  useEffect(() => {
+    void load()
+    // Run any scheduled flows that have come due since the app was last open.
+    void window.api.flows.runDue()
+  }, [])
+
+  async function addFlow(): Promise<void> {
+    const created = await window.api.flows.create({ title: 'New flow' })
+    await load()
+    setSelectedId(created.id)
+  }
+
+  const selected = flows?.find((f) => f.id === selectedId) ?? null
+
+  return (
+    <div className="h-full w-full flex bg-[var(--surface-base)] text-[var(--ink-100)]" data-testid="plexiflow-view">
+      <div className="w-[300px] shrink-0 border-r border-[var(--edge-soft)] flex flex-col">
+        <div className="px-4 py-3.5 border-b border-[var(--edge-soft)]">
+          <div className="flex items-center gap-2">
+            <Icon name="account_tree" size={18} className="text-[rgb(var(--accent))]" filled />
+            <h1 className="text-[15px] font-bold tracking-tight">PlexiFlow</h1>
+          </div>
+          <p className="mt-0.5 text-[11.5px] text-[var(--ink-70)]">When this happens, do that.</p>
+        </div>
+        <div className="px-3 py-2.5">
+          <button
+            onClick={() => void addFlow()}
+            data-testid="flow-new"
+            className="w-full inline-flex items-center justify-center gap-1.5 h-8 rounded-md bg-[rgb(var(--accent))] text-white text-[12.5px] font-medium hover:bg-[rgb(var(--accent-hover))]"
+          >
+            <Icon name="add" size={15} /> New flow
+          </button>
+        </div>
+        <div className="flex-1 overflow-auto px-2 pb-2">
+          {flows === null ? (
+            <p className="px-3 py-6 text-[12px] text-[var(--ink-70)]">Loading…</p>
+          ) : flows.length === 0 ? (
+            <div className="px-3 py-10 text-center" data-testid="flows-empty">
+              <Icon name="account_tree" size={24} className="text-stone-300 dark:text-stone-600" />
+              <p className="mt-2 text-[12px] text-[var(--ink-70)] leading-relaxed">No flows yet. Create one to automate work across your tools.</p>
+            </div>
+          ) : (
+            flows.map((f) => (
+              <button
+                key={f.id}
+                data-testid={`flow-card-${f.id}`}
+                onClick={() => setSelectedId(f.id)}
+                className={`w-full text-left rounded-lg px-3 py-2.5 mb-1 border transition-colors ${
+                  f.id === selectedId
+                    ? 'bg-[rgb(var(--accent)/0.10)] border-[rgb(var(--accent)/0.30)]'
+                    : 'hover:bg-[var(--surface-sunken)] border-transparent'
+                }`}
+              >
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[13px] font-semibold truncate flex-1">{f.title || 'Untitled flow'}</span>
+                  {!f.enabled && <StatusPill tone="stone" label="Off" dot={false} />}
+                  {f.lastStatus === 'ok' && <StatusPill tone="emerald" label="OK" dot={false} />}
+                  {f.lastStatus === 'error' && <StatusPill tone="rose" label="Error" dot={false} />}
+                </div>
+                <p className="mt-0.5 text-[11px] text-[var(--ink-50)]">{f.actions.length} step(s) · {f.trigger.kind === 'schedule' ? f.trigger.every : 'manual'}</p>
+              </button>
+            ))
+          )}
+        </div>
+      </div>
+
+      <div className="flex-1 min-w-0 overflow-auto">
+        {selected ? (
+          <FlowEditor key={selected.id} flow={selected} tables={tables} onChanged={load} />
+        ) : (
+          <div className="h-full flex flex-col items-center justify-center text-center px-6">
+            <Icon name="account_tree" size={30} className="text-stone-300 dark:text-stone-600" />
+            <p className="mt-2 text-[13px] text-[var(--ink-70)] max-w-sm leading-relaxed">
+              Select a flow to edit it, or create one. A flow runs a sequence of actions across your workspace, by hand
+              or on a schedule.
+            </p>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function FlowEditor({
+  flow,
+  tables,
+  onChanged
+}: {
+  flow: FlowDef
+  tables: FbTable[]
+  onChanged: () => Promise<void>
+}): JSX.Element {
+  const [title, setTitle] = useState(flow.title)
+  const [running, setRunning] = useState(false)
+  const [log, setLog] = useState<FlowRunStep[]>(flow.lastLog)
+
+  async function patch(p: Parameters<typeof window.api.flows.update>[1]): Promise<void> {
+    await window.api.flows.update(flow.id, p)
+    await onChanged()
+  }
+
+  function setTrigger(t: FlowTrigger): void {
+    void patch({ trigger: t })
+  }
+
+  function updateAction(idx: number, next: FlowAction): void {
+    const actions = flow.actions.map((a, i) => (i === idx ? next : a))
+    void patch({ actions })
+  }
+
+  function addAction(type: FlowActionType): void {
+    const id = `a-${Date.now()}-${flow.actions.length}`
+    void patch({ actions: [...flow.actions, blankAction(type, id)] })
+  }
+
+  function removeAction(idx: number): void {
+    void patch({ actions: flow.actions.filter((_, i) => i !== idx) })
+  }
+
+  function moveAction(idx: number, dir: -1 | 1): void {
+    const j = idx + dir
+    if (j < 0 || j >= flow.actions.length) return
+    const next = [...flow.actions]
+    ;[next[idx], next[j]] = [next[j], next[idx]]
+    void patch({ actions: next })
+  }
+
+  async function run(): Promise<void> {
+    setRunning(true)
+    try {
+      const res = await window.api.flows.run(flow.id)
+      setLog(res.steps)
+      await onChanged()
+    } finally {
+      setRunning(false)
+    }
+  }
+
+  return (
+    <div className="max-w-3xl mx-auto px-6 py-6">
+      <DashboardHeader title="Flow" subtitle="A trigger and a sequence of actions across your workspace" />
+
+      <div className="flex items-center gap-3 mb-4">
+        <input
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          onBlur={() => title !== flow.title && void patch({ title })}
+          data-testid="flow-title"
+          placeholder="Flow title"
+          className="flex-1 bg-transparent text-[20px] font-bold text-[var(--ink-100)] outline-none placeholder:text-[var(--ink-50)]"
+        />
+        <label className="flex items-center gap-1.5 text-[12px] text-[var(--ink-90)] cursor-pointer shrink-0">
+          <input
+            type="checkbox"
+            checked={flow.enabled}
+            data-testid="flow-enabled"
+            onChange={(e) => void patch({ enabled: e.target.checked })}
+            className="accent-[rgb(var(--accent))]"
+          />
+          Enabled
+        </label>
+      </div>
+
+      {/* Trigger */}
+      <div className="rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-raised)] p-3 mb-3">
+        <div className="flex items-center gap-2">
+          <Icon name="bolt" size={15} className="text-[rgb(var(--accent))]" />
+          <span className="text-[12px] font-semibold text-[var(--ink-90)]">When</span>
+          <select
+            value={flow.trigger.kind === 'schedule' ? flow.trigger.every : 'manual'}
+            data-testid="flow-trigger"
+            onChange={(e) => {
+              const v = e.target.value
+              setTrigger(v === 'manual' ? { kind: 'manual' } : { kind: 'schedule', every: v as 'daily' | 'weekly' | 'monthly' })
+            }}
+            className="ml-1 rounded-md bg-[var(--surface-base)] border border-[var(--edge-soft)] px-2 py-1 text-[12px] text-[var(--ink-100)] focus:outline-none"
+          >
+            <option value="manual">I run it manually</option>
+            <option value="daily">Every day</option>
+            <option value="weekly">Every week</option>
+            <option value="monthly">Every month</option>
+          </select>
+        </div>
+      </div>
+
+      {/* Actions */}
+      <div className="space-y-2">
+        {flow.actions.map((action, idx) => (
+          <ActionCard
+            key={action.id}
+            action={action}
+            index={idx}
+            total={flow.actions.length}
+            tables={tables}
+            onChange={(next) => updateAction(idx, next)}
+            onRemove={() => removeAction(idx)}
+            onMove={(dir) => moveAction(idx, dir)}
+          />
+        ))}
+      </div>
+
+      <div className="mt-3 flex items-center gap-2 flex-wrap" data-testid="flow-add-actions">
+        <span className="text-[11.5px] text-[var(--ink-50)]">Add step:</span>
+        {ACTION_TYPES.map((t) => (
+          <button
+            key={t}
+            onClick={() => addAction(t)}
+            data-testid={`flow-add-${t}`}
+            className="inline-flex items-center gap-1 px-2 py-1 rounded-md border border-[var(--edge-soft)] text-[11.5px] text-[var(--ink-90)] hover:bg-[var(--surface-sunken)]"
+          >
+            <Icon name={ACTION_ICON[t]} size={13} /> {ACTION_LABELS[t]}
+          </button>
+        ))}
+      </div>
+
+      <div className="mt-5 flex items-center gap-2">
+        <button
+          onClick={() => void run()}
+          disabled={running || flow.actions.length === 0}
+          data-testid="flow-run"
+          className="inline-flex items-center gap-1.5 h-9 px-4 rounded-lg bg-[rgb(var(--accent))] text-white text-[13px] font-medium hover:bg-[rgb(var(--accent-hover))] disabled:opacity-40"
+        >
+          <Icon name="play_arrow" size={16} /> {running ? 'Running…' : 'Run now'}
+        </button>
+        <span className="text-[11.5px] text-[var(--ink-50)]">Use {'{{ai}}'} in a later step to reuse an AI step output.</span>
+      </div>
+
+      {log.length > 0 && (
+        <div className="mt-4" data-testid="flow-log">
+          <span className="text-[11.5px] font-semibold uppercase tracking-wide text-[var(--ink-50)]">Last run</span>
+          <div className="mt-1.5 space-y-1">
+            {log.map((s, i) => (
+              <div key={i} className="flex items-start gap-2 text-[12.5px]">
+                <Icon
+                  name={s.ok ? 'check_circle' : 'error'}
+                  size={14}
+                  className={`mt-0.5 shrink-0 ${s.ok ? 'text-emerald-500' : 'text-rose-500'}`}
+                  filled
+                />
+                <span className="text-[var(--ink-90)]">
+                  <span className="text-[var(--ink-50)]">{ACTION_LABELS[s.type]}:</span> {s.message}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function ActionCard({
+  action,
+  index,
+  total,
+  tables,
+  onChange,
+  onRemove,
+  onMove
+}: {
+  action: FlowAction
+  index: number
+  total: number
+  tables: FbTable[]
+  onChange: (next: FlowAction) => void
+  onRemove: () => void
+  onMove: (dir: -1 | 1) => void
+}): JSX.Element {
+  const field =
+    'w-full rounded-md bg-[var(--surface-base)] border border-[var(--edge-soft)] px-2 py-1.5 text-[12.5px] text-[var(--ink-100)] focus:outline-none focus:border-[rgb(var(--accent)/0.55)] placeholder:text-[var(--ink-50)]'
+  return (
+    <div className="rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-raised)] p-3" data-testid={`flow-action-${index}`}>
+      <div className="flex items-center gap-2 mb-2">
+        <span className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-[var(--surface-sunken)] text-[var(--ink-70)] fb-tabular text-[11px]">{index + 1}</span>
+        <Icon name={ACTION_ICON[action.type]} size={14} className="text-[rgb(var(--accent))]" />
+        <span className="text-[12.5px] font-semibold text-[var(--ink-90)] flex-1">{ACTION_LABELS[action.type]}</span>
+        <button onClick={() => onMove(-1)} disabled={index === 0} className="p-1 rounded text-[var(--ink-50)] hover:text-[var(--ink-100)] disabled:opacity-30">
+          <Icon name="arrow_upward" size={13} />
+        </button>
+        <button onClick={() => onMove(1)} disabled={index === total - 1} className="p-1 rounded text-[var(--ink-50)] hover:text-[var(--ink-100)] disabled:opacity-30">
+          <Icon name="arrow_downward" size={13} />
+        </button>
+        <button onClick={onRemove} className="p-1 rounded text-[var(--ink-50)] hover:text-rose-500">
+          <Icon name="close" size={14} />
+        </button>
+      </div>
+
+      <div className="space-y-2 pl-8">
+        {action.type === 'create-task' && (
+          <input value={action.title} onChange={(e) => onChange({ ...action, title: e.target.value })} placeholder="Task title" className={field} />
+        )}
+        {action.type === 'add-table-row' && (
+          <select value={action.tableId} onChange={(e) => onChange({ ...action, tableId: e.target.value })} className={field}>
+            <option value="">Choose a table…</option>
+            {tables.map((t) => (
+              <option key={t.id} value={t.id}>{t.title || 'Untitled table'}</option>
+            ))}
+          </select>
+        )}
+        {action.type === 'send-email' && (
+          <>
+            <input value={action.to} onChange={(e) => onChange({ ...action, to: e.target.value })} placeholder="to@company.com, ..." className={field} />
+            <input value={action.subject} onChange={(e) => onChange({ ...action, subject: e.target.value })} placeholder="Subject" className={field} />
+            <textarea value={action.body} onChange={(e) => onChange({ ...action, body: e.target.value })} placeholder="Body (use {{ai}} to insert an AI step output)" rows={3} className={`${field} resize-none`} />
+          </>
+        )}
+        {action.type === 'create-knowledge' && (
+          <>
+            <input value={action.title} onChange={(e) => onChange({ ...action, title: e.target.value })} placeholder="Entry title" className={field} />
+            <textarea value={action.body} onChange={(e) => onChange({ ...action, body: e.target.value })} placeholder="Entry body (use {{ai}} to insert an AI step output)" rows={3} className={`${field} resize-none`} />
+          </>
+        )}
+        {action.type === 'ai-step' && (
+          <textarea value={action.prompt} onChange={(e) => onChange({ ...action, prompt: e.target.value })} placeholder="Prompt for the AI. Its output is reusable as {{ai}} in later steps." rows={3} className={`${field} resize-none`} />
+        )}
+      </div>
+    </div>
+  )
+}

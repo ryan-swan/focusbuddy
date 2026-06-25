@@ -265,6 +265,16 @@ import {
   runDueReports
 } from '../db/reports'
 import type { ReportDraft, ReportPatch } from '@shared/reports'
+import {
+  listFlows,
+  getFlow,
+  createFlow,
+  updateFlow,
+  deleteFlow,
+  runFlow,
+  runDueFlows
+} from '../db/flows'
+import type { FlowDraft, FlowPatch } from '@shared/flows'
 import { deleteEmbedding } from '../db/embeddings'
 import {
   listMeetings,
@@ -1792,6 +1802,15 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('reports:delete', (_e, id: string) => deleteReport(id))
   ipcMain.handle('reports:generate', (_e, id: string) => generateReport(id))
   ipcMain.handle('reports:runDue', () => runDueReports())
+
+  // PlexiFlow: trigger-and-action automations across the workspace.
+  ipcMain.handle('flows:list', () => listFlows())
+  ipcMain.handle('flows:get', (_e, id: string) => getFlow(id))
+  ipcMain.handle('flows:create', (_e, draft: FlowDraft) => createFlow(draft))
+  ipcMain.handle('flows:update', (_e, id: string, patch: FlowPatch) => updateFlow(id, patch))
+  ipcMain.handle('flows:delete', (_e, id: string) => deleteFlow(id))
+  ipcMain.handle('flows:run', (_e, id: string) => runFlow(id))
+  ipcMain.handle('flows:runDue', () => runDueFlows())
   ipcMain.handle(
     'documents:upsert',
     (
