@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import './peopleMap.css'
 import Icon from '../Icon'
-import { DashboardHeader, StatTile } from '../plexi'
+import { DashboardHeader, StatTile, RailCard } from '../plexi'
 import { useAccountStore } from '../../stores/account'
 import { useViewStore } from '../../stores/view'
 import { listOrgs, type OrgMembership, type WorkWindow } from '../../lib/orgsClient'
@@ -285,6 +285,97 @@ function HierarchyTab({ data, now }: { data: PeopleMapData; now: Date }): JSX.El
   return <div className="pm-tree">{roots.map((r) => renderNode(r, 0))}</div>
 }
 
+/* ---------------- live right rail ---------------- */
+
+function PeopleRail({ data, now }: { data: PeopleMapData; now: Date }): JSX.Element {
+  const weight = (s: PresenceStatus): number => (s === 'online' ? 0 : s === 'focus' ? 1 : s === 'away' ? 2 : 3)
+  const around = data.people
+    .filter((p) => p.liveStatus !== 'offline')
+    .sort((a, b) => weight(a.liveStatus) - weight(b.liveStatus) || a.handle.localeCompare(b.handle))
+
+  const dayOf = (p: MapPerson): ReturnType<typeof daylightFor> | null =>
+    p.lat != null && p.lng != null && p.tzOffsetMin != null
+      ? daylightFor(p.lat, p.lng, p.tzOffsetMin, now, p.workWindow)
+      : null
+  const wrapping = data.people.filter((p) => dayOf(p)?.workLabel === 'Wrapping up')
+  const starting = data.people.filter((p) => dayOf(p)?.workLabel === 'Early hours')
+  const names = (people: MapPerson[]): string =>
+    people.slice(0, 4).map((p) => p.handle).join(', ') + (people.length > 4 ? ` +${people.length - 4}` : '')
+
+  const deptCount = new Map<string, number>()
+  for (const p of data.people) {
+    const k = p.department || 'Unassigned'
+    deptCount.set(k, (deptCount.get(k) ?? 0) + 1)
+  }
+  const depts = [...deptCount.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6)
+  const maxDept = depts[0]?.[1] ?? 1
+
+  return (
+    <aside className="pm-rail">
+      <RailCard title="Around right now" icon="bolt" tone="emerald">
+        {around.length === 0 ? (
+          <div className="text-[11.5px] text-stone-400">No one is online right now.</div>
+        ) : (
+          <div className="flex flex-col gap-0.5">
+            {around.slice(0, 8).map((p) => {
+              const d = dayOf(p)
+              return (
+                <div key={p.accountId} className="flex items-center gap-2.5 rounded-lg px-1 py-1">
+                  <span className="relative shrink-0">
+                    <Avatar seed={p.handle} size={26} />
+                    <span className={`pm-prow__sdot pm-dot ${STATUS_META[p.liveStatus].cls}`} />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <div className="text-[12px] font-medium text-stone-800 dark:text-stone-100 truncate">{p.handle}</div>
+                    <div className="text-[11px] text-stone-500 truncate">
+                      {p.liveWorkingOn || p.title || STATUS_META[p.liveStatus].label}
+                    </div>
+                  </span>
+                  {d && <span className="text-[11px] text-stone-400 fb-tabular shrink-0">{fmtHour(d.hour)}</span>}
+                </div>
+              )
+            })}
+            {around.length > 8 && <div className="text-[11px] text-stone-400 px-1 pt-1">+{around.length - 8} more online</div>}
+          </div>
+        )}
+      </RailCard>
+
+      <RailCard title="Follow the sun" icon="wb_twilight" tone="amber" className="mt-3">
+        {wrapping.length === 0 && starting.length === 0 ? (
+          <div className="text-[11.5px] text-stone-400">No handoffs in motion right now.</div>
+        ) : (
+          <div className="flex flex-col gap-2.5 text-[12px]">
+            <div>
+              <div className="text-[10.5px] uppercase tracking-wide text-stone-400 mb-1">Wrapping up</div>
+              <div className="text-stone-700 dark:text-stone-200">{wrapping.length ? names(wrapping) : '—'}</div>
+            </div>
+            <div>
+              <div className="text-[10.5px] uppercase tracking-wide text-stone-400 mb-1">Starting their day</div>
+              <div className="text-stone-700 dark:text-stone-200">{starting.length ? names(starting) : '—'}</div>
+            </div>
+          </div>
+        )}
+      </RailCard>
+
+      <RailCard title="By department" icon="donut_small" tone="violet" className="mt-3">
+        <div className="flex flex-col gap-1.5">
+          {depts.map(([name, n]) => (
+            <div key={name} className="text-[12px]">
+              <div className="flex justify-between gap-2">
+                <span className="text-stone-700 dark:text-stone-200 truncate">{name}</span>
+                <span className="text-stone-400 fb-tabular shrink-0">{n}</span>
+              </div>
+              <div className="h-1.5 rounded-full bg-stone-500/10 mt-1 overflow-hidden">
+                <div className="h-full rounded-full bg-accent/60" style={{ width: `${(n / maxDept) * 100}%` }} />
+              </div>
+            </div>
+          ))}
+        </div>
+      </RailCard>
+    </aside>
+  )
+}
+
 /* ---------------- shell ---------------- */
 
 export default function PeopleMapView(): JSX.Element {
@@ -410,7 +501,16 @@ export default function PeopleMapView(): JSX.Element {
           </div>
         )}
       </div>
-      <div className="pm-body">{body}</div>
+      <div className="pm-body">
+        {data && data.people.length > 0 ? (
+          <div className="pm-layout">
+            <div className="pm-main">{body}</div>
+            <PeopleRail data={data} now={now} />
+          </div>
+        ) : (
+          body
+        )}
+      </div>
     </div>
   )
 }
