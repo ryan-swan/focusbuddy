@@ -36,6 +36,20 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.81',
+    date: '2026-06-25T20:00:00Z',
+    title: 'v2.5.81 — Tables feel like a real spreadsheet',
+    tag: 'improvement',
+    summary:
+      'Reorder columns and rows by dragging a grip handle, move between cells with the keyboard, and change a column\'s type after the fact. Plus a fix so the AI assistant text is readable on the dark and futuristic themes.',
+    highlights: [
+      'Drag to reorder: grab the grip on a column header to reorder columns, or the grip on a row to reorder rows. Column reordering used to silently fail on the canvas; it works now.',
+      'Keyboard navigation: arrow keys move between cells, Tab and Shift+Tab step across and wrap to the next or previous row, Enter starts editing then commits and drops down, and Escape leaves editing and then clears the selection.',
+      'Change a column\'s field type after you\'ve created it, with existing values carried across where they make sense (text, number and date) and reset cleanly where they don\'t.',
+      'Fixed: the table AI assistant input showed black, near-invisible text on the dark and futuristic themes. It now uses a readable colour in every theme.'
+    ]
+  },
+  {
     version: '2.5.80',
     date: '2026-06-25T12:00:00Z',
     title: 'v2.5.80 — Real-time co-editing, comments, and organizations',
