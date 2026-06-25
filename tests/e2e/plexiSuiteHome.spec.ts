@@ -80,11 +80,12 @@ test('3 — ready products render full-colour; coming-soon products get badge + 
   // Ready tiles must NOT have an upvote button.
   await expect(dashTile.locator('[data-testid="upvote-plexidash"]')).toHaveCount(0)
 
-  // A coming-soon product (PlexiForms, status=soon).
+  // PlexiForms is now 'ready' (forms shipped). Confirm it has no badge and no upvote.
   const formsTile = window.locator('[data-testid="product-tile-plexiforms"]')
   await expect(formsTile).toBeVisible()
-  await expect(formsTile.locator('text=Coming soon')).toBeVisible()
-  await expect(formsTile.locator('[data-testid="upvote-plexiforms"]')).toBeVisible()
+  await expect(formsTile.locator('text=Coming soon')).toHaveCount(0)
+  await expect(formsTile.locator('text=Planned')).toHaveCount(0)
+  await expect(formsTile.locator('[data-testid="upvote-plexiforms"]')).toHaveCount(0)
 
   // A planned product (PlexiBrain, status=planned — actually PlexiBrain is 'soon').
   // Use PlexiProjects which is 'planned'.
