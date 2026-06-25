@@ -163,6 +163,7 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
   const goSearch = useViewStore((s) => s.goSearch)
   const goProjects = useViewStore((s) => s.goProjects)
   const goReports = useViewStore((s) => s.goReports)
+  const goFlows = useViewStore((s) => s.goFlows)
   const goInsights = useViewStore((s) => s.goInsights)
   const unreadMessages = useMessagingStore((s) => s.unreadTotal)
   const unreadMail = useMailStore(selectMailUnread)
@@ -753,6 +754,15 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
               onClick={() => {
                 setActive(null)
                 goReports()
+              }}
+            />
+            <NavRow
+              icon="bolt"
+              label="PlexiFlow"
+              active={viewIsActive({ kind: 'flows' })}
+              onClick={() => {
+                setActive(null)
+                goFlows()
               }}
             />
             <NavRow

@@ -280,6 +280,25 @@ CREATE TABLE IF NOT EXISTS fb_reports (
   updated_at INTEGER NOT NULL
 );
 
+-- ── PlexiFlow ────────────────────────────────────────────────────────────────
+-- A flow is a trigger plus an ordered list of actions (create task, add table
+-- row, send email, write knowledge, run an AI step). trigger_json and actions_json
+-- hold the typed shapes; last_log caches the most recent honest per-step result.
+-- next_run_at advances when a scheduled flow runs.
+CREATE TABLE IF NOT EXISTS fb_flows (
+  id TEXT PRIMARY KEY,
+  title TEXT NOT NULL,
+  enabled INTEGER NOT NULL DEFAULT 1,
+  trigger_json TEXT NOT NULL DEFAULT '{"kind":"manual"}',
+  actions_json TEXT NOT NULL DEFAULT '[]',
+  last_run_at INTEGER,
+  last_status TEXT,
+  last_log TEXT,
+  next_run_at INTEGER,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+
 -- ── Inter-widget spatial links ───────────────────────────────────────────────
 -- Obsidian-style backlinks but drawn as lines on the canvas. Each row is a
 -- directed link (source → target). UNIQUE constraint prevents duplicates in

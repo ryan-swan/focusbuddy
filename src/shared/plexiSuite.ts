@@ -320,17 +320,17 @@ export const PLEXI_PRODUCTS: PlexiProduct[] = [
     name: 'PlexiFlow',
     group: 'ai',
     tagline: 'Connect tools and trigger work.',
-    status: 'planned',
+    status: 'ready',
     icon: 'account_tree',
     accent: '#7c3aed',
-    about: 'A visual automation builder: when this happens, do that, across your documents, tables, agents and outside services.',
+    about: 'An automation builder: when you run it or on a schedule, do a sequence of actions across your workspace. Create a task, add a table row, send an email, write a knowledge entry, or run an AI step whose output later steps reuse.',
     edges: [
-      'Automations that reach into your real workspace objects.',
+      'Actions that reach into your real workspace objects.',
       'AI steps as first-class actions, not an afterthought.',
       'No separate Zapier subscription.'
     ],
     insteadOf: 'Zapier / Power Automate',
-    planned: ['Trigger / action builder', 'Cross-tool workflows', 'AI steps', 'Scheduling and webhooks']
+    launch: 'flows'
   },
   {
     key: 'plexisearch',
