@@ -170,19 +170,20 @@ test('4 — brain-search filters entries by query; clearing restores all', async
   const allRows = window.locator('[data-testid^="brain-entry-"]')
   await expect(allRows).toHaveCount(2, { timeout: 3_000 })
 
-  // Type a query that matches only one.
+  // Type a query that matches only one. Search is now async+debounced (~200ms)
+  // so we wait 400ms after typing before asserting.
   const searchInput = window.locator('[data-testid="brain-search"]')
   await searchInput.fill('Refund')
-  await window.waitForTimeout(200)
+  await window.waitForTimeout(400)
 
   const filteredRows = window.locator('[data-testid^="brain-entry-"]')
   const filteredCount = await filteredRows.count()
   expect(filteredCount, 'search narrows to matching entries').toBe(1)
   await expect(filteredRows.first().locator('text=Refund Rules')).toBeVisible()
 
-  // Clear search — all entries return.
+  // Clear search — all entries return. Wait for debounce.
   await searchInput.fill('')
-  await window.waitForTimeout(200)
+  await window.waitForTimeout(400)
   await expect(window.locator('[data-testid^="brain-entry-"]')).toHaveCount(2)
 })
 

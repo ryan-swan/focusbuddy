@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import Icon from '../Icon'
 import { useKnowledgeStore } from '../../stores/knowledge'
 import type { KnowledgeEntry } from '@shared/knowledge'
@@ -22,20 +22,35 @@ export default function KnowledgeView(): JSX.Element {
 
   const [query, setQuery] = useState('')
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  // Search hits from the main process (semantic + keyword blended). null = no
+  // active search, so the full list shows.
+  const [searchHits, setSearchHits] = useState<KnowledgeEntry[] | null>(null)
 
   useEffect(() => {
     void load()
+    // Backfill embeddings so search ranks by meaning. Best-effort and silent:
+    // with no embedding key it is a no-op and search stays keyword-based.
+    void window.api.knowledge.reindex()
   }, [load])
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase()
-    if (!q) return entries
-    const terms = q.split(/\s+/).filter(Boolean)
-    return entries.filter((e) => {
-      const hay = `${e.title} ${e.body} ${e.tags.join(' ')}`.toLowerCase()
-      return terms.every((t) => hay.includes(t))
-    })
-  }, [entries, query])
+  // Debounced search through the main process so results rank by meaning when a
+  // key is set, and by keyword otherwise. An empty query shows everything.
+  useEffect(() => {
+    const q = query.trim()
+    if (!q) {
+      setSearchHits(null)
+      return
+    }
+    const id = setTimeout(() => {
+      void window.api.knowledge
+        .search(q)
+        .then(setSearchHits)
+        .catch(() => setSearchHits([]))
+    }, 200)
+    return () => clearTimeout(id)
+  }, [query])
+
+  const filtered = searchHits ?? entries
 
   const selected = entries.find((e) => e.id === selectedId) ?? null
 

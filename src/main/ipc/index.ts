@@ -230,12 +230,18 @@ import {
 import {
   listKnowledge,
   getKnowledge,
-  searchKnowledge,
   createKnowledge,
   updateKnowledge,
   deleteKnowledge
 } from '../db/knowledge'
 import type { KnowledgeDraft, KnowledgePatch } from '@shared/knowledge'
+import {
+  semanticSearchKnowledge,
+  embedKnowledgeEntry,
+  reindexKnowledge,
+  knowledgeSemanticActive
+} from '../semanticRetrieval'
+import { deleteEmbedding } from '../db/embeddings'
 import {
   listMeetings,
   getMeeting,
@@ -1187,7 +1193,7 @@ export function registerIpcHandlers(): void {
       // Retrieve using the recent thread so a bare follow-up ("what about year two?")
       // still pulls the documents the conversation is actually about.
       const query = [...hist.map((h) => h.question), question].join(' ')
-      const sources = retrieveSources(query, 6)
+      const sources = await retrieveSources(query, 6)
       if (sources.length) recordAiCall()
       const res = await askWorkspace(
         question,
@@ -1498,12 +1504,25 @@ export function registerIpcHandlers(): void {
   // ── PlexiBrain knowledge base ────────────────────────────────────────────
   ipcMain.handle('knowledge:list', () => listKnowledge())
   ipcMain.handle('knowledge:get', (_e, id: string) => getKnowledge(id))
-  ipcMain.handle('knowledge:search', (_e, query: string) => searchKnowledge(query))
-  ipcMain.handle('knowledge:create', (_e, draft: KnowledgeDraft) => createKnowledge(draft))
-  ipcMain.handle('knowledge:update', (_e, id: string, patch: KnowledgePatch) =>
-    updateKnowledge(id, patch)
-  )
-  ipcMain.handle('knowledge:delete', (_e, id: string) => deleteKnowledge(id))
+  // Semantic + keyword blended search (falls back to keyword with no embed key).
+  ipcMain.handle('knowledge:search', (_e, query: string) => semanticSearchKnowledge(query))
+  ipcMain.handle('knowledge:create', (_e, draft: KnowledgeDraft) => {
+    const entry = createKnowledge(draft)
+    void embedKnowledgeEntry(entry) // best-effort index; never blocks the save
+    return entry
+  })
+  ipcMain.handle('knowledge:update', (_e, id: string, patch: KnowledgePatch) => {
+    const entry = updateKnowledge(id, patch)
+    if (entry) void embedKnowledgeEntry(entry)
+    return entry
+  })
+  ipcMain.handle('knowledge:delete', (_e, id: string) => {
+    deleteEmbedding('knowledge', id)
+    return deleteKnowledge(id)
+  })
+  // Backfill embeddings for entries that lack one (called on opening PlexiBrain).
+  ipcMain.handle('knowledge:reindex', () => reindexKnowledge())
+  ipcMain.handle('knowledge:semanticActive', () => knowledgeSemanticActive())
 
   // ── PlexiMeet meetings ───────────────────────────────────────────────────
   ipcMain.handle('meetings:list', () => listMeetings())
