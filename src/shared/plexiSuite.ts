@@ -199,17 +199,17 @@ export const PLEXI_PRODUCTS: PlexiProduct[] = [
     name: 'PlexiProjects',
     group: 'work',
     tagline: 'Plans, milestones and Gantt.',
-    status: 'planned',
+    status: 'ready',
     icon: 'account_tree',
     accent: '#f43f5e',
-    about: 'Roll tasks up into projects with dependencies, milestones and a timeline that reschedules itself when reality shifts.',
+    about: 'Roll tasks up into projects with dependencies, milestones and a Gantt timeline. A critical-path engine finds the chain that drives the finish date, flags tasks that have slipped, and reschedules the plan from what actually happened.',
     edges: [
       'Plans built from the same tasks you already work in.',
       'Critical-path and drift detection, not a static chart.',
-      'AI keeps the plan honest as work moves.'
+      'Reschedule the whole plan from real progress in one click.'
     ],
     insteadOf: 'Microsoft Project / Asana',
-    planned: ['Gantt timeline', 'Dependencies and milestones', 'Auto-reschedule on drift', 'Portfolio view']
+    launch: 'projects'
   },
   {
     key: 'plexicalendar',
