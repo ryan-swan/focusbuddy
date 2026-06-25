@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import './peopleMap.css'
 import Icon from '../Icon'
+import { DashboardHeader, StatTile } from '../plexi'
 import { useAccountStore } from '../../stores/account'
 import { useViewStore } from '../../stores/view'
 import { listOrgs, type OrgMembership, type WorkWindow } from '../../lib/orgsClient'
@@ -310,6 +311,21 @@ export default function PeopleMapView(): JSX.Element {
 
   const { data, loading, error, refresh } = usePeopleMap(orgId)
   const selectedOrg = orgs.find((o) => o.id === orgId) ?? null
+  const account = useAccountStore((s) => s.account)
+
+  const hh = now.getHours()
+  const who = account?.handle || account?.email?.split('@')[0] || ''
+  const greeting = `Good ${hh < 12 ? 'morning' : hh < 18 ? 'afternoon' : 'evening'}${who ? `, ${who}` : ''}`
+  const aroundNow = data ? data.people.filter((p) => p.liveStatus !== 'offline').length : 0
+  const workingNow = data
+    ? data.people.filter(
+        (p) =>
+          p.lat != null &&
+          p.lng != null &&
+          p.tzOffsetMin != null &&
+          daylightFor(p.lat, p.lng, p.tzOffsetMin, now, p.workWindow).working
+      ).length
+    : 0
 
   let body: JSX.Element
   if (!token) {
@@ -350,42 +366,51 @@ export default function PeopleMapView(): JSX.Element {
 
   return (
     <div className="pm-root" data-testid="people-map">
-      <div className="pm-head">
-        <span className="pm-title">
-          <Icon name="travel_explore" size={20} className="" />
-          Plexi<b>Team</b> · People Map
-        </span>
-        {orgs.filter((o) => !o.personal).length > 0 && (
-          <select className="pm-orgpick" value={orgId ?? ''} onChange={(e) => setOrgId(e.target.value || null)} data-testid="people-map-org">
-            {orgs.filter((o) => !o.personal).map((o) => (
-              <option key={o.id} value={o.id}>
-                {o.name}
-              </option>
-            ))}
-          </select>
-        )}
-        <span className="pm-spacer" />
-        <div className="pm-tabs">
-          {TABS.map((t) => (
-            <button key={t.id} className={`pm-tab ${tab === t.id ? 'is-active' : ''}`} onClick={() => setTab(t.id)} data-testid={`people-map-tab-${t.id}`}>
-              <Icon name={t.icon} size={14} className="" />
-              {t.label}
-            </button>
-          ))}
-        </div>
-        <button className="pm-iconbtn" onClick={refresh} title="Refresh">
-          <Icon name="refresh" size={16} className="" />
-        </button>
-      </div>
-      <div className="pm-body">
-        {selectedOrg && data && (
-          <div style={{ fontSize: 11.5, color: '#8b96b3', marginBottom: 10 }}>
-            {data.people.length} {data.people.length === 1 ? 'person' : 'people'} · {data.offices.length}{' '}
-            {data.offices.length === 1 ? 'office' : 'offices'} · company hours {data.defaultHours.start}:00–{data.defaultHours.end}:00
+      <div style={{ padding: '16px 20px 0' }}>
+        <DashboardHeader
+          title="People Map"
+          greeting={greeting}
+          subtitle={selectedOrg ? `PlexiTeam · ${selectedOrg.name}` : 'See everyone, where they are, and who is around right now'}
+          actions={
+            <>
+              {orgs.filter((o) => !o.personal).length > 0 && (
+                <select
+                  className="text-[12px] bg-transparent text-stone-700 dark:text-stone-200 border border-stone-200 dark:border-white/10 rounded-lg px-2 py-1.5 focus:outline-none focus:border-accent"
+                  value={orgId ?? ''}
+                  onChange={(e) => setOrgId(e.target.value || null)}
+                  data-testid="people-map-org"
+                >
+                  {orgs.filter((o) => !o.personal).map((o) => (
+                    <option key={o.id} value={o.id}>
+                      {o.name}
+                    </option>
+                  ))}
+                </select>
+              )}
+              <div className="pm-tabs">
+                {TABS.map((t) => (
+                  <button key={t.id} className={`pm-tab ${tab === t.id ? 'is-active' : ''}`} onClick={() => setTab(t.id)} data-testid={`people-map-tab-${t.id}`}>
+                    <Icon name={t.icon} size={14} className="" />
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+              <button className="pm-iconbtn" onClick={refresh} title="Refresh">
+                <Icon name="refresh" size={16} className="" />
+              </button>
+            </>
+          }
+        />
+        {data && (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <StatTile icon="groups" label="People" value={data.people.length} tone="accent" hint={`Company hours ${data.defaultHours.start}:00–${data.defaultHours.end}:00`} />
+            <StatTile icon="bolt" label="Around now" value={aroundNow} tone="emerald" />
+            <StatTile icon="av_timer" label="In working hours" value={workingNow} tone="violet" />
+            <StatTile icon="location_city" label="Offices" value={data.offices.length} tone="sky" />
           </div>
         )}
-        {body}
       </div>
+      <div className="pm-body">{body}</div>
     </div>
   )
 }
