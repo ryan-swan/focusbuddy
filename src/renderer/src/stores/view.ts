@@ -26,6 +26,7 @@ export type View =
   | { kind: 'organization' }
   | { kind: 'suite' }
   | { kind: 'product'; productKey: string }
+  | { kind: 'knowledge' }
 
 interface ViewStore {
   view: View
@@ -51,15 +52,18 @@ interface ViewStore {
   goOrg: () => void
   goSuite: () => void
   goProduct: (productKey: string) => void
+  goKnowledge: () => void
 }
 
 const STORAGE_KEY = 'fb.view.last'
 
 function readLastView(): View {
-  if (typeof localStorage === 'undefined') return { kind: 'home' }
+  // PlexiSuite is the default landing: anyone without a saved view starts on the
+  // suite launcher. Returning users still resume their last view.
+  if (typeof localStorage === 'undefined') return { kind: 'suite' }
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) return { kind: 'home' }
+    if (!raw) return { kind: 'suite' }
     const parsed = JSON.parse(raw) as Partial<View>
     if (parsed && typeof parsed.kind === 'string') {
       return parsed as View
@@ -67,7 +71,7 @@ function readLastView(): View {
   } catch {
     // ignore
   }
-  return { kind: 'home' }
+  return { kind: 'suite' }
 }
 
 function persistView(view: View): void {
@@ -187,6 +191,11 @@ export const useViewStore = create<ViewStore>((set) => ({
   },
   goProduct: (productKey) => {
     const v: View = { kind: 'product', productKey }
+    persistView(v)
+    set({ view: v })
+  },
+  goKnowledge: () => {
+    const v: View = { kind: 'knowledge' }
     persistView(v)
     set({ view: v })
   }

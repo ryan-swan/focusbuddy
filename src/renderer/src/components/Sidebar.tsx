@@ -154,6 +154,7 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
   const goCollaborations = useViewStore((s) => s.goCollaborations)
   const goOrg = useViewStore((s) => s.goOrg)
   const goSuite = useViewStore((s) => s.goSuite)
+  const goKnowledge = useViewStore((s) => s.goKnowledge)
   const goInsights = useViewStore((s) => s.goInsights)
   const unreadMessages = useMessagingStore((s) => s.unreadTotal)
   const unreadMail = useMailStore(selectMailUnread)
@@ -681,6 +682,15 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
               onClick={() => {
                 setActive(null)
                 goCalendar()
+              }}
+            />
+            <NavRow
+              icon="neurology"
+              label="PlexiBrain"
+              active={viewIsActive({ kind: 'knowledge' })}
+              onClick={() => {
+                setActive(null)
+                goKnowledge()
               }}
             />
             <NavRow

@@ -1,0 +1,233 @@
+import { useEffect, useMemo, useState } from 'react'
+import Icon from '../Icon'
+import { useKnowledgeStore } from '../../stores/knowledge'
+import type { KnowledgeEntry } from '@shared/knowledge'
+
+// PlexiBrain: the company knowledge base. People curate entries here and the AI
+// grounds its answers in them. Reads only real entries; an empty brain shows an
+// honest empty state, never sample knowledge.
+
+function snippet(body: string, n = 120): string {
+  const s = body.replace(/\s+/g, ' ').trim()
+  return s.length > n ? s.slice(0, n) + '…' : s
+}
+
+export default function KnowledgeView(): JSX.Element {
+  const entries = useKnowledgeStore((s) => s.entries)
+  const loaded = useKnowledgeStore((s) => s.loaded)
+  const load = useKnowledgeStore((s) => s.load)
+  const createEntry = useKnowledgeStore((s) => s.create)
+  const updateEntry = useKnowledgeStore((s) => s.update)
+  const removeEntry = useKnowledgeStore((s) => s.remove)
+
+  const [query, setQuery] = useState('')
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+
+  useEffect(() => {
+    void load()
+  }, [load])
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    if (!q) return entries
+    const terms = q.split(/\s+/).filter(Boolean)
+    return entries.filter((e) => {
+      const hay = `${e.title} ${e.body} ${e.tags.join(' ')}`.toLowerCase()
+      return terms.every((t) => hay.includes(t))
+    })
+  }, [entries, query])
+
+  const selected = entries.find((e) => e.id === selectedId) ?? null
+
+  async function addEntry(): Promise<void> {
+    const created = await createEntry({ title: 'New entry', body: '', tags: [] })
+    if (created) setSelectedId(created.id)
+  }
+
+  return (
+    <div className="h-full w-full flex bg-stone-50 dark:bg-stone-950" data-testid="plexibrain-view">
+      {/* List */}
+      <div className="w-[320px] shrink-0 border-r border-stone-200 dark:border-white/[0.06] flex flex-col">
+        <div className="px-4 py-3.5 border-b border-stone-200 dark:border-white/[0.06]">
+          <div className="flex items-center gap-2">
+            <Icon name="neurology" size={18} className="text-violet-500" filled />
+            <h1 className="text-[15px] font-bold tracking-tight text-stone-900 dark:text-white">PlexiBrain</h1>
+          </div>
+          <p className="mt-0.5 text-[11.5px] text-stone-500 dark:text-stone-400">
+            Your company's shared memory. People and AI read from it.
+          </p>
+        </div>
+        <div className="px-3 py-2.5 flex items-center gap-2">
+          <div className="flex-1 flex items-center gap-1.5 rounded-md bg-white dark:bg-white/[0.04] border border-stone-200 dark:border-white/10 px-2 py-1.5">
+            <Icon name="search" size={14} className="text-stone-400" />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search knowledge"
+              data-testid="brain-search"
+              className="flex-1 bg-transparent text-[12px] text-stone-900 dark:text-stone-100 placeholder:text-stone-400 dark:placeholder:text-stone-500 focus:outline-none"
+            />
+          </div>
+          <button
+            onClick={() => void addEntry()}
+            data-testid="brain-new"
+            className="inline-flex items-center gap-1 px-2 py-1.5 rounded-md bg-violet-500 text-white text-[11.5px] font-medium hover:bg-violet-600"
+            title="New knowledge entry"
+          >
+            <Icon name="add" size={14} /> New
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-auto px-2 pb-2">
+          {loaded && filtered.length === 0 ? (
+            <div className="px-3 py-10 text-center">
+              <Icon name="psychology_alt" size={26} className="text-stone-300 dark:text-stone-600" />
+              <p className="mt-2 text-[12px] text-stone-500 dark:text-stone-400 leading-relaxed">
+                {entries.length === 0
+                  ? 'No knowledge yet. Add what your team and your AI should remember.'
+                  : 'Nothing matches that search.'}
+              </p>
+            </div>
+          ) : (
+            filtered.map((e) => (
+              <EntryRow key={e.id} entry={e} active={e.id === selectedId} onClick={() => setSelectedId(e.id)} />
+            ))
+          )}
+        </div>
+      </div>
+
+      {/* Editor */}
+      <div className="flex-1 min-w-0">
+        {selected ? (
+          <Editor
+            key={selected.id}
+            entry={selected}
+            onChange={(patch) => void updateEntry(selected.id, patch)}
+            onDelete={() => {
+              void removeEntry(selected.id)
+              setSelectedId(null)
+            }}
+          />
+        ) : (
+          <div className="h-full flex flex-col items-center justify-center text-center px-6">
+            <Icon name="neurology" size={30} className="text-stone-300 dark:text-stone-600" />
+            <p className="mt-2 text-[13px] text-stone-500 dark:text-stone-400 max-w-sm leading-relaxed">
+              Select an entry to read or edit it, or add a new one. Everything here grounds the AI's answers in your own
+              documented truth.
+            </p>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function EntryRow({ entry, active, onClick }: { entry: KnowledgeEntry; active: boolean; onClick: () => void }): JSX.Element {
+  return (
+    <button
+      onClick={onClick}
+      data-testid={`brain-entry-${entry.id}`}
+      className={`w-full text-left rounded-lg px-3 py-2.5 mb-1 transition-colors ${
+        active ? 'bg-violet-500/10 border border-violet-400/30' : 'hover:bg-stone-100 dark:hover:bg-white/[0.04] border border-transparent'
+      }`}
+    >
+      <div className="flex items-center gap-1.5">
+        {entry.pinned && <Icon name="push_pin" size={12} className="text-violet-500 shrink-0" filled />}
+        <span className="text-[13px] font-semibold text-stone-900 dark:text-stone-100 truncate">{entry.title || 'Untitled'}</span>
+      </div>
+      {entry.body && <p className="mt-0.5 text-[11.5px] text-stone-500 dark:text-stone-400 line-clamp-2">{snippet(entry.body)}</p>}
+      {entry.tags.length > 0 && (
+        <div className="mt-1.5 flex flex-wrap gap-1">
+          {entry.tags.slice(0, 4).map((t) => (
+            <span key={t} className="text-[9.5px] px-1.5 py-0.5 rounded-full bg-stone-200/70 dark:bg-white/[0.06] text-stone-500 dark:text-stone-400">
+              {t}
+            </span>
+          ))}
+        </div>
+      )}
+    </button>
+  )
+}
+
+function Editor({
+  entry,
+  onChange,
+  onDelete
+}: {
+  entry: KnowledgeEntry
+  onChange: (patch: { title?: string; body?: string; tags?: string[]; pinned?: boolean }) => void
+  onDelete: () => void
+}): JSX.Element {
+  const [title, setTitle] = useState(entry.title)
+  const [body, setBody] = useState(entry.body)
+  const [tagInput, setTagInput] = useState('')
+
+  function commitTags(raw: string): void {
+    const tags = Array.from(new Set(raw.split(',').map((t) => t.trim()).filter(Boolean)))
+    onChange({ tags })
+  }
+
+  return (
+    <div className="h-full flex flex-col" data-testid="brain-editor">
+      <div className="flex items-center gap-2 px-5 py-3 border-b border-stone-200 dark:border-white/[0.06]">
+        <button
+          onClick={() => onChange({ pinned: !entry.pinned })}
+          className={`p-1.5 rounded-md ${entry.pinned ? 'text-violet-500 bg-violet-500/10' : 'text-stone-400 hover:bg-stone-100 dark:hover:bg-white/[0.06]'}`}
+          title={entry.pinned ? 'Unpin' : 'Pin to top and surface first to the AI'}
+          data-testid="brain-pin"
+        >
+          <Icon name="push_pin" size={16} filled={entry.pinned} />
+        </button>
+        <input
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          onBlur={() => title !== entry.title && onChange({ title })}
+          placeholder="Entry title"
+          data-testid="brain-title"
+          className="flex-1 bg-transparent text-[17px] font-bold text-stone-900 dark:text-white outline-none placeholder-stone-300 dark:placeholder-stone-600"
+        />
+        <button
+          onClick={onDelete}
+          className="p-1.5 rounded-md text-stone-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30"
+          title="Delete entry"
+          data-testid="brain-delete"
+        >
+          <Icon name="delete" size={16} />
+        </button>
+      </div>
+
+      <div className="px-5 py-2.5 border-b border-stone-200 dark:border-white/[0.06] flex items-center gap-2 flex-wrap">
+        <Icon name="sell" size={14} className="text-stone-400" />
+        {entry.tags.map((t) => (
+          <span key={t} className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-stone-200/70 dark:bg-white/[0.06] text-stone-600 dark:text-stone-300">
+            {t}
+            <button onClick={() => onChange({ tags: entry.tags.filter((x) => x !== t) })} className="opacity-60 hover:opacity-100">
+              <Icon name="close" size={10} />
+            </button>
+          </span>
+        ))}
+        <input
+          value={tagInput}
+          onChange={(e) => setTagInput(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && tagInput.trim()) {
+              commitTags([...entry.tags, tagInput].join(','))
+              setTagInput('')
+            }
+          }}
+          placeholder="Add tag…"
+          className="bg-transparent text-[11px] text-stone-900 dark:text-stone-100 placeholder:text-stone-400 focus:outline-none w-24"
+        />
+      </div>
+
+      <textarea
+        value={body}
+        onChange={(e) => setBody(e.target.value)}
+        onBlur={() => body !== entry.body && onChange({ body })}
+        placeholder="Write what should be remembered. The AI will ground its answers in this."
+        data-testid="brain-body"
+        className="flex-1 w-full resize-none px-5 py-4 bg-transparent text-[14px] leading-relaxed text-stone-800 dark:text-stone-100 placeholder:text-stone-400 dark:placeholder:text-stone-500 focus:outline-none"
+      />
+    </div>
+  )
+}

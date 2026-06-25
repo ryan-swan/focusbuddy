@@ -158,6 +158,21 @@ CREATE TABLE IF NOT EXISTS fb_rows (
 );
 CREATE INDEX IF NOT EXISTS idx_fb_rows_table_sort ON fb_rows(table_id, sort_order ASC);
 
+-- ── PlexiBrain knowledge base ────────────────────────────────────────────────
+-- Curated company knowledge that both people and the AI read from. tags_json is
+-- a JSON string array; pinned entries sort first and are surfaced first to the
+-- assistant's grounding.
+CREATE TABLE IF NOT EXISTS fb_knowledge (
+  id TEXT PRIMARY KEY,
+  title TEXT NOT NULL DEFAULT 'Untitled entry',
+  body TEXT NOT NULL DEFAULT '',
+  tags_json TEXT NOT NULL DEFAULT '[]',
+  pinned INTEGER NOT NULL DEFAULT 0,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_fb_knowledge_updated ON fb_knowledge(pinned DESC, updated_at DESC);
+
 -- ── Inter-widget spatial links ───────────────────────────────────────────────
 -- Obsidian-style backlinks but drawn as lines on the canvas. Each row is a
 -- directed link (source → target). UNIQUE constraint prevents duplicates in
