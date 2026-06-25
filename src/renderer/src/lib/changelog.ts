@@ -36,6 +36,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.84',
+    date: '2026-06-26T22:00:00Z',
+    title: 'v2.5.84 — PlexiSign, and one consistent look across the suite',
+    tag: 'feature',
+    summary:
+      'Sign documents without leaving your workspace, and watch the whole suite settle into one design. PlexiSign collects signatures with a real audit trail, and PlexiBrain, PlexiMeet, PlexiBuild and PlexiForms now share the same look and adapt to every theme.',
+    highlights: [
+      'PlexiSign: create an agreement, collect typed or drawn signatures from a set of signers in order, and keep an append-only audit trail with a tamper-evident completion certificate. No per-envelope DocuSign bill, and it is now live in the launcher.',
+      'One consistent look: PlexiBrain, PlexiMeet, PlexiBuild and PlexiForms were rebuilt onto the shared Plexi design system, so they feel like one product and read correctly in light, dark and the futuristic themes rather than each carrying its own colours.',
+      'PlexiForms is live in the launcher too: design a form, fill it, and every response lands as a row in a real table you can chart in PlexiDash.'
+    ]
+  },
+  {
     version: '2.5.83',
     date: '2026-06-26T18:00:00Z',
     title: 'v2.5.83 — People Map, live presence and the org directory',
