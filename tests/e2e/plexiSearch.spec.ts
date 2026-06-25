@@ -161,7 +161,12 @@ test('clicking a knowledge result row navigates to plexibrain-view', async () =>
 // 5. Pressing Enter / clicking Ask shows an honest answer card (real or nokey)
 // ──────────────────────────────────────────────────────────────────────────────
 
-test('pressing Enter on a query renders plexisearch-answer (real answer or honest nokey, never fake)', async () => {
+// NOTE: After the keyboard-nav change, plain Enter opens the focused result
+// instead of triggering the AI answer. Cmd+Enter / the Ask button now owns the
+// answer-card path. This test is updated to match the new contract: Cmd+Enter
+// (Meta+Enter on Mac) shows the answer card. The old plain-Enter-triggers-Ask
+// behaviour is also asserted in plexiSearchV2.spec.ts (test 4 and 6).
+test('Cmd+Enter on a query renders plexisearch-answer (real answer or honest nokey, never fake)', async () => {
   launched = await launchApp()
   const { window } = launched
   await waitForReady(window)
@@ -183,31 +188,23 @@ test('pressing Enter on a query renders plexisearch-answer (real answer or hones
   await input.fill(token)
   await window.waitForTimeout(400)
 
-  // Press Enter to trigger Ask.
-  await input.press('Enter')
+  // Wait for results to arrive so focusIdx is set, then press Cmd+Enter to Ask.
+  await expect(window.locator('[data-testid^="plexisearch-hit-"]').first()).toBeVisible({ timeout: 4_000 })
+  await input.press('Meta+Enter')
 
-  // Answer card must appear within a reasonable timeout (AI call can take ~5s).
+  // Answer card must appear.
   const answer = window.locator('[data-testid="plexisearch-answer"]')
   await expect(answer).toBeVisible({ timeout: 20_000 })
 
-  // Inspect what state rendered inside the card.
-  const cardText = await answer.textContent()
+  // plexisearch-view must still be present (Cmd+Enter did not navigate away).
+  await expect(window.locator('[data-testid="plexisearch-view"]')).toBeVisible()
 
-  // The honest nokey path renders "Add an Anthropic key" text.
-  // A real answer renders inside the card with non-trivial text.
-  // A fabricated answer is impossible by design (the component only renders
-  // what workspace.ask returns).
-  // Either is a PASS; we just confirm the card is not blank.
+  const cardText = await answer.textContent()
   expect(cardText?.trim().length, 'answer card must have content').toBeGreaterThan(5)
 
-  // Confirm there is no silent fabrication: if it is the nokey state,
-  // "Add an Anthropic key" must be present; if it is answered, some
-  // non-empty text that is not "undefined" or "[object Object]" must be present.
   if (cardText?.includes('Add an Anthropic key')) {
-    // Honest nokey path — acceptable.
     expect(cardText).toContain('Add an Anthropic key')
   } else {
-    // Should be a real answer — must not contain fabrication markers.
     expect(cardText).not.toContain('undefined')
     expect(cardText).not.toContain('[object Object]')
     expect(cardText?.trim().length).toBeGreaterThan(10)

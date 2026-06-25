@@ -6,7 +6,7 @@ import {
   makeSnippet,
   escapeLike,
   scoreMatch,
-  knowledgeHitScore
+  semanticHitScore
 } from '../../src/main/db/searchText'
 
 describe('contentToText', () => {
@@ -74,20 +74,20 @@ describe('scoreMatch', () => {
   })
 })
 
-describe('knowledgeHitScore', () => {
+describe('semanticHitScore', () => {
   it('uses the keyword score directly when there is a keyword match', () => {
-    expect(knowledgeHitScore(250, 0, true)).toBe(250)
-    expect(knowledgeHitScore(80, 5, false)).toBe(80)
+    expect(semanticHitScore(250, 0, true)).toBe(250)
+    expect(semanticHitScore(80, 5, false)).toBe(80)
   })
   it('gives a semantic-only match a mid-band discovery score that decays by rank', () => {
-    expect(knowledgeHitScore(0, 0, true)).toBe(220)
-    expect(knowledgeHitScore(0, 0, true)).toBeGreaterThan(knowledgeHitScore(0, 3, true))
+    expect(semanticHitScore(0, 0, true)).toBe(220)
+    expect(semanticHitScore(0, 0, true)).toBeGreaterThan(semanticHitScore(0, 3, true))
   })
   it('never drops a semantic-only discovery below the floor', () => {
-    expect(knowledgeHitScore(0, 100, true)).toBe(60)
+    expect(semanticHitScore(0, 100, true)).toBe(60)
   })
   it('scores a keyword-less entry zero when semantic search is inactive', () => {
-    expect(knowledgeHitScore(0, 0, false)).toBe(0)
-    expect(knowledgeHitScore(0, 2, false)).toBe(0)
+    expect(semanticHitScore(0, 0, false)).toBe(0)
+    expect(semanticHitScore(0, 2, false)).toBe(0)
   })
 })

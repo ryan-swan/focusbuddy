@@ -1,7 +1,8 @@
 import { getDb } from './database'
-import { contentToText, makeSnippet, escapeLike, scoreMatch, knowledgeHitScore } from './searchText'
+import { contentToText, makeSnippet, escapeLike, scoreMatch, semanticHitScore } from './searchText'
 import { semanticSearchKnowledge, knowledgeSemanticActive } from '../semanticRetrieval'
-import type { SearchHit } from '@shared/types'
+import { semanticSearchDocuments, documentSemanticActive } from '../documentRetrieval'
+import type { SearchHit, DocType } from '@shared/types'
 
 // Global "find anything" search across the local workspace: node titles +
 // descriptions, widget text, document bodies, table-row cells, file names, and
@@ -76,26 +77,41 @@ export async function searchAll(rawQuery: string): Promise<SearchHit[]> {
     })
   }
 
-  // Documents (doc / sheet / slides).
-  const docRows = db
+  // Documents (doc / sheet / slides) ranked by meaning when an embedding key is
+  // set and by keyword otherwise, the same blend knowledge uses, so the results
+  // list honours "ranks by meaning, not just exact words" rather than only the
+  // AI answer. semanticSearchDocuments returns only documents the blend judged
+  // relevant; each is placed on the shared score scale via semanticHitScore.
+  const docSemanticActive = documentSemanticActive()
+  const docHits = await semanticSearchDocuments(query, PER_CATEGORY)
+  docHits.forEach((d, rank) => {
+    const keyword = scoreMatch(d.title, d.text, query)
+    hits.push({
+      type: 'document',
+      id: d.docId,
+      title: d.title || 'Untitled document',
+      snippet: d.snippet,
+      score: semanticHitScore(keyword, rank, docSemanticActive),
+      docType: d.docType as DocType
+    })
+  })
+
+  // A document whose body extracts to nothing (e.g. titled but not yet written)
+  // is skipped by the semantic pool, so a light title-only pass keeps it findable
+  // by name. Dedupe below merges these with the ranked hits, keeping the best score.
+  const docTitleRows = db
     .prepare(
-      `SELECT id, doc_type, title, body FROM documents
-       WHERE archived = 0 AND (title LIKE ?${ESC} OR body LIKE ?${ESC}) LIMIT ?`
+      `SELECT id, doc_type, title FROM documents
+       WHERE archived = 0 AND title LIKE ?${ESC} LIMIT ?`
     )
-    .all(like, like, PER_CATEGORY) as Array<{
-    id: string
-    doc_type: 'doc' | 'sheet' | 'slides'
-    title: string
-    body: string
-  }>
-  for (const r of docRows) {
-    const text = contentToText(r.body)
+    .all(like, PER_CATEGORY) as Array<{ id: string; doc_type: 'doc' | 'sheet' | 'slides'; title: string }>
+  for (const r of docTitleRows) {
     hits.push({
       type: 'document',
       id: r.id,
       title: r.title || 'Untitled document',
-      snippet: makeSnippet(text || r.title, query),
-      score: scoreMatch(r.title, text, query),
+      snippet: makeSnippet(r.title, query),
+      score: scoreMatch(r.title, '', query),
       docType: r.doc_type
     })
   }
@@ -187,7 +203,7 @@ export async function searchAll(rawQuery: string): Promise<SearchHit[]> {
       id: e.id,
       title: e.title || 'Untitled entry',
       snippet: makeSnippet(e.body || e.tags.join(' ') || e.title, query),
-      score: knowledgeHitScore(keyword, rank, semanticActive)
+      score: semanticHitScore(keyword, rank, semanticActive)
     })
   })
 
