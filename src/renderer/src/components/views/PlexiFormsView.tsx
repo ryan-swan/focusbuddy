@@ -63,9 +63,13 @@ export default function PlexiFormsView(): JSX.Element {
           </button>
         </div>
         <div className="flex-1 overflow-auto px-2 pb-2">
-          {loaded && forms.length === 0 ? (
+          {!loaded ? (
+            <div className="px-3 py-10 flex items-center justify-center gap-2 text-[12px] text-[var(--ink-70)]">
+              <Icon name="progress_activity" size={15} className="text-[rgb(var(--accent))] animate-spin" /> Loading…
+            </div>
+          ) : forms.length === 0 ? (
             <div className="px-3 py-10 text-center">
-              <Icon name="dynamic_form" size={26} className="text-stone-300 dark:text-stone-600" />
+              <Icon name="dynamic_form" size={26} className="text-[var(--ink-30)]" />
               <p className="mt-2 text-[12px] text-[var(--ink-70)] leading-relaxed">No forms yet. Build one to start collecting.</p>
             </div>
           ) : (
@@ -265,15 +269,33 @@ function BuildTab({
 function FillTab({ form, columns, onSubmitted }: { form: PlexiForm; columns: FieldDefinition[]; onSubmitted: () => Promise<void> }): JSX.Element {
   const [values, setValues] = useState<Record<string, unknown>>({})
   const [done, setDone] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   async function submit(): Promise<void> {
+    if (submitting) return // guard against a double submit creating duplicate rows
+    setSubmitting(true)
+    setError(null)
     const cells: Record<string, unknown> = {}
     for (const c of columns) cells[c.id] = values[c.id] ?? defaultValue(c.type)
-    await window.api.tables.createRow({ tableId: form.tableId, cells }).catch(() => null)
-    setValues({})
-    setDone(true)
-    await onSubmitted()
-    setTimeout(() => setDone(false), 2500)
+    try {
+      const row = await window.api.tables.createRow({ tableId: form.tableId, cells })
+      // Only confirm a save that actually happened. A null result means the
+      // backing table is gone or the write failed; say so honestly and keep the
+      // entered values so the response is not lost.
+      if (!row) {
+        setError('Could not save your response. The form may no longer be connected to a table.')
+        return
+      }
+      setValues({})
+      setDone(true)
+      await onSubmitted()
+      setTimeout(() => setDone(false), 2500)
+    } catch {
+      setError('Could not save your response. Please try again.')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   if (columns.length === 0) {
@@ -297,14 +319,20 @@ function FillTab({ form, columns, onSubmitted }: { form: PlexiForm; columns: Fie
       <div className="flex items-center gap-3 pt-1">
         <button
           onClick={() => void submit()}
+          disabled={submitting}
           data-testid="form-submit"
-          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[rgb(var(--accent))] text-white text-[13px] font-semibold hover:bg-[rgb(var(--accent-hover))]"
+          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[rgb(var(--accent))] text-white text-[13px] font-semibold hover:bg-[rgb(var(--accent-hover))] disabled:opacity-40"
         >
-          <Icon name="send" size={15} /> Submit
+          <Icon name="send" size={15} /> {submitting ? 'Saving…' : 'Submit'}
         </button>
         {done && (
           <span className="text-[12px] text-emerald-600 dark:text-emerald-400 inline-flex items-center gap-1" data-testid="form-submitted">
             <Icon name="check_circle" size={14} /> Response saved
+          </span>
+        )}
+        {error && (
+          <span className="text-[12px] text-rose-500 inline-flex items-center gap-1" data-testid="form-submit-error">
+            <Icon name="error_outline" size={14} /> {error}
           </span>
         )}
       </div>

@@ -113,7 +113,14 @@ function SignBox({ signer, onSign }: { signer: Signer; onSign: (kind: SignatureK
         <DrawPad onChange={setDrawn} />
       )}
       <button
-        onClick={() => onSign(kind, kind === 'typed' ? typed : (drawn ?? ''))}
+        onClick={() => {
+          // Never submit empty signature data: the canSign guard already blocks
+          // it, this makes the intent explicit so a future change cannot slip an
+          // empty signature through.
+          const data = kind === 'typed' ? typed.trim() : drawn
+          if (!data) return
+          onSign(kind, data)
+        }}
         disabled={!canSign}
         className="mt-2 w-full text-[13px] font-semibold py-2 rounded-lg bg-accent text-white disabled:opacity-40"
         data-testid="sign-submit"
@@ -127,11 +134,19 @@ function SignBox({ signer, onSign }: { signer: Signer; onSign: (kind: SignatureK
 /* ---------------- detail ---------------- */
 
 function RequestDetail({ req }: { req: PlexiSignRequest }): JSX.Element {
-  const { update, send, sign, voidRequest, decline } = useSignStore()
+  const { update, send, sign, voidRequest, decline, error, clearError } = useSignStore()
   const isDraft = req.status === 'draft'
   const turn = nextSigner(req)
   return (
     <div className={`${PLEXI_CARD} p-4`} data-testid="sign-detail">
+      {error && (
+        <div className="mb-3 flex items-center gap-2 text-[12px] text-rose-500" data-testid="sign-error">
+          <Icon name="error_outline" size={14} /> {error}
+          <button aria-label="Dismiss error" onClick={clearError} className="ml-auto text-[var(--ink-50)] hover:text-[var(--ink-100)]">
+            <Icon name="close" size={13} />
+          </button>
+        </div>
+      )}
       <div className="flex items-start gap-2 mb-3">
         <div className="min-w-0 flex-1">
           {isDraft ? (
@@ -210,7 +225,7 @@ function RequestDetail({ req }: { req: PlexiSignRequest }): JSX.Element {
           <div className="flex items-center gap-1.5 text-[12px] font-semibold text-emerald-600 dark:text-emerald-400">
             <Icon name="verified" size={15} /> Completed &amp; certified
           </div>
-          <div className="mt-1 text-[11px] text-stone-500">Tamper-evident certificate (sha256 over the agreement + every signature):</div>
+          <div className="mt-1 text-[11px] text-stone-500">Tamper-evident certificate (sha256 over the agreement + every signature). Signatures are self-attested, not identity-verified.</div>
           <div className="mt-1 font-mono text-[10.5px] break-all text-stone-600 dark:text-stone-300">{req.certificate}</div>
         </div>
       )}
@@ -308,10 +323,18 @@ export default function PlexiSignView(): JSX.Element {
               </div>
             )}
             {requests.map((r) => (
-              <button
+              <div
                 key={r.id}
+                role="button"
+                tabIndex={0}
                 onClick={() => setSelId(r.id)}
-                className={`${PLEXI_CARD} p-3 text-left fb-lift ${selId === r.id ? '!border-accent' : ''}`}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    setSelId(r.id)
+                  }
+                }}
+                className={`${PLEXI_CARD} p-3 text-left fb-lift cursor-pointer ${selId === r.id ? '!border-accent' : ''}`}
                 data-testid={`sign-row-${r.id}`}
               >
                 <div className="flex items-center gap-2">
@@ -322,25 +345,26 @@ export default function PlexiSignView(): JSX.Element {
                   <span>{signedCount(r)}/{r.signers.length} signed</span>
                   <span>·</span>
                   <span>{fmt(r.updatedAt)}</span>
-                  <span
-                    className="ml-auto opacity-0 hover:opacity-100 focus:opacity-100"
+                  <button
+                    type="button"
+                    aria-label="Delete agreement"
+                    className="ml-auto opacity-0 hover:opacity-100 focus:opacity-100 rounded"
                     onClick={(e) => {
                       e.stopPropagation()
                       void remove(r.id)
                       if (selId === r.id) setSelId(null)
                     }}
-                    title="Delete"
                   >
                     <Icon name="delete" size={13} />
-                  </span>
+                  </button>
                 </div>
-              </button>
+              </div>
             ))}
           </div>
 
           <div className="flex-1 min-w-0">
             {selected ? (
-              <RequestDetail req={selected} />
+              <RequestDetail key={selected.id} req={selected} />
             ) : (
               <div className={`${PLEXI_CARD} p-10 text-center text-stone-400 text-[13px]`}>
                 Select an agreement, or create a new one to get started.
