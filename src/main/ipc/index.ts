@@ -275,7 +275,7 @@ import {
   runDueFlows
 } from '../db/flows'
 import type { FlowDraft, FlowPatch } from '@shared/flows'
-import { listTokens, createToken, revokeToken, getApiConfig, setApiConfig } from '../db/apiTokens'
+import { listTokens, createToken, revokeToken, getApiConfig, setApiConfig, isValidApiPort } from '../db/apiTokens'
 import { startApiServer, stopApiServer, isApiServerRunning, initApiServer } from '../apiServer'
 import type { ApiScope } from '@shared/apiAccess'
 import { applyTemplate } from '../templates'
@@ -1837,11 +1837,20 @@ export function registerIpcHandlers(): void {
     return apiStatus()
   })
   ipcMain.handle('api:setPort', async (_e, port: number) => {
-    setApiConfig({ port })
+    if (!isValidApiPort(port)) return { ...apiStatus(), error: 'Port must be a whole number between 1024 and 65535.' }
     if (isApiServerRunning()) {
+      // Rebind atomically: try the new port before committing it, and fall back
+      // to the previous port on failure so the server is never left down.
+      const previous = getApiConfig().port
       await stopApiServer()
-      const r = await startApiServer(getApiConfig().port)
-      if (!r.ok) return { ...apiStatus(), error: r.error }
+      const r = await startApiServer(port)
+      if (!r.ok) {
+        await startApiServer(previous)
+        return { ...apiStatus(), error: r.error }
+      }
+      setApiConfig({ port })
+    } else {
+      setApiConfig({ port })
     }
     return apiStatus()
   })

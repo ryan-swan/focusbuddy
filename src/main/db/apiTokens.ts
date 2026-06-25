@@ -50,7 +50,10 @@ export function createToken(name: string, scopes: ApiScope[]): CreateTokenResult
   // A 32-byte token, prefixed so it is recognisable in logs and config files.
   const secret = `plx_${randomBytes(32).toString('hex')}`
   const now = Date.now()
-  const cleanScopes: ApiScope[] = scopes.length ? scopes : ['read']
+  // Only ever store known scopes, regardless of what the caller passed, so a
+  // malformed or future scope can never be silently granted by an old token.
+  const filtered = scopes.filter((s): s is ApiScope => s === 'read' || s === 'write')
+  const cleanScopes: ApiScope[] = filtered.length ? Array.from(new Set(filtered)) : ['read']
   db.prepare(
     'INSERT INTO fb_api_tokens (id, name, token_hash, scopes_json, created_at) VALUES (?, ?, ?, ?, ?)'
   ).run(id, name || 'Token', hashToken(secret), JSON.stringify(cleanScopes), now)
@@ -96,11 +99,18 @@ export function getApiConfig(): { enabled: boolean; port: number } {
   return { enabled: r.enabled === 1, port: r.port }
 }
 
+// A valid local API port: a non-privileged, in-range port. Privileged ports
+// (under 1024) and out-of-range values are rejected so the server never tries to
+// bind something it cannot or should not.
+export function isValidApiPort(port: number): boolean {
+  return Number.isInteger(port) && port >= 1024 && port <= 65535
+}
+
 export function setApiConfig(patch: { enabled?: boolean; port?: number }): { enabled: boolean; port: number } {
   const db = getDb()
   readConfigRow()
   if (patch.enabled !== undefined) db.prepare('UPDATE fb_api_config SET enabled = ? WHERE id = 1').run(patch.enabled ? 1 : 0)
-  if (patch.port !== undefined && patch.port > 0) db.prepare('UPDATE fb_api_config SET port = ? WHERE id = 1').run(Math.floor(patch.port))
+  if (patch.port !== undefined && isValidApiPort(patch.port)) db.prepare('UPDATE fb_api_config SET port = ? WHERE id = 1').run(patch.port)
   return getApiConfig()
 }
 
