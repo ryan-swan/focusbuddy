@@ -70,6 +70,64 @@ interface Props {
 // and rows on mount; edits go through the tables store (which writes through
 // to SQLite via IPC). A fresh widget (no content yet) auto-creates a backing
 // table on first render so the user never sees a "create table" step.
+// Pointer-based drag-to-reorder, shared by columns and rows. HTML5 drag and
+// drop is unreliable here: the table lives inside the canvas widget frame
+// (react-rnd intercepts the gesture) and DataTransfer payloads are flaky in
+// Electron. So we track the pointer ourselves. The caller marks each reorderable
+// element with a data-<axis>-index attribute; on every move we find which
+// element's bounding box the cursor sits inside along the drag axis (x for
+// columns, y for rows) and read its index, committing that target on release.
+// Hit-testing by rect (rather than elementFromPoint) is deterministic, works
+// under test harnesses, and naturally scopes to the table under the cursor
+// because only its elements span that screen position.
+function usePointerReorder(
+  indexAttr: string,
+  axis: 'x' | 'y',
+  onCommit: (id: string, targetIndex: number) => void
+): {
+  dragId: string | null
+  overIndex: number | null
+  start: (e: React.MouseEvent, id: string) => void
+} {
+  const [drag, setDrag] = useState<{ id: string; over: number | null } | null>(null)
+  const ref = useRef<{ id: string; over: number | null } | null>(null)
+  const set = (v: { id: string; over: number | null } | null): void => {
+    ref.current = v
+    setDrag(v)
+  }
+  const start = (e: React.MouseEvent, id: string): void => {
+    e.preventDefault()
+    e.stopPropagation()
+    set({ id, over: null })
+    const onMove = (ev: MouseEvent): void => {
+      const cur = ref.current
+      if (!cur) return
+      const els = Array.from(document.querySelectorAll(`[${indexAttr}]`)) as HTMLElement[]
+      for (const el of els) {
+        const r = el.getBoundingClientRect()
+        const within =
+          axis === 'x'
+            ? ev.clientX >= r.left && ev.clientX <= r.right
+            : ev.clientY >= r.top && ev.clientY <= r.bottom
+        if (within) {
+          set({ id: cur.id, over: Number(el.getAttribute(indexAttr)) })
+          break
+        }
+      }
+    }
+    const onUp = (): void => {
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup', onUp)
+      const cur = ref.current
+      if (cur && cur.over != null) onCommit(cur.id, cur.over)
+      set(null)
+    }
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
+  }
+  return { dragId: drag?.id ?? null, overIndex: drag?.over ?? null, start }
+}
+
 export default function TableWidget({ widget, inline = false }: Props): JSX.Element {
   const tables = useTablesStore((s) => s.tables)
   const rowsByTable = useTablesStore((s) => s.rows)
@@ -81,6 +139,7 @@ export default function TableWidget({ widget, inline = false }: Props): JSX.Elem
   const addRow = useTablesStore((s) => s.addRow)
   const updateCells = useTablesStore((s) => s.updateCells)
   const deleteRow = useTablesStore((s) => s.deleteRow)
+  const reorderRows = useTablesStore((s) => s.reorderRows)
   const updateWidget = useWidgetStore((s) => s.update)
 
   const tableId = widget.content
@@ -187,10 +246,10 @@ export default function TableWidget({ widget, inline = false }: Props): JSX.Elem
     columnId: string
     index: number
   } | null>(null)
-  // Drag-to-reorder: the column id currently being dragged and the index it
-  // is hovering over, so we can paint a drop indicator.
-  const [dragColId, setDragColId] = useState<string | null>(null)
-  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
+  // Drag-to-reorder columns and rows via grip handles. The controller tracks
+  // the dragged id + the index under the cursor so we can paint a drop marker.
+  const colReorder = usePointerReorder('data-col-index', 'x', (id, target) => moveColumn(id, target))
+  const rowReorder = usePointerReorder('data-row-index', 'y', (id, target) => moveRow(id, target))
   // Live resize override. While the user drags a column edge we hold the
   // in-flight width here so the render is smooth, then commit to the schema
   // (widthHint) on mouse-up. null when no resize is in progress.
@@ -200,6 +259,12 @@ export default function TableWidget({ widget, inline = false }: Props): JSX.Elem
   const [cellSel, setCellSel] = useState<{ a: RC; f: RC } | null>(null)
   const [selNote, setSelNote] = useState<string | null>(null)
   const selDrag = useRef(false)
+  // The keyboard-focused cell (arrows / Tab / Enter navigate it). Distinct from
+  // text editing: a cell is "active" first, and only enters edit when you type,
+  // press Enter, or click into its input. bodyRef lets us pull focus back out of
+  // a cell input so the arrow keys navigate instead of moving the text cursor.
+  const [activeCell, setActiveCell] = useState<RC | null>(null)
+  const bodyRef = useRef<HTMLDivElement | null>(null)
   // End a cell-range drag on any mouseup. Declared here (above the early return)
   // so the hook order is stable whether or not the table has loaded yet.
   useEffect(() => {
@@ -313,6 +378,22 @@ export default function TableWidget({ widget, inline = false }: Props): JSX.Elem
     if (insertAt === fromIdx) return // no-op drop onto itself
     cols.splice(insertAt, 0, moved)
     void setSchema(table!.id, { ...table!.schema, columns: cols })
+  }
+
+  // Reorder a row to land at targetIndex, mirroring moveColumn's geometry.
+  // Persists the full id order via reorderRows. Only meaningful in the flat,
+  // unfiltered table view (rowsReorderable below gates the grip handle), where
+  // the rendered index maps directly onto the stored row order.
+  function moveRow(fromId: string, targetIndex: number): void {
+    const ids = rows.map((r) => r.id)
+    const fromIdx = ids.indexOf(fromId)
+    if (fromIdx === -1) return
+    ids.splice(fromIdx, 1)
+    let insertAt = fromIdx < targetIndex ? targetIndex - 1 : targetIndex
+    insertAt = Math.max(0, Math.min(ids.length, insertAt))
+    if (insertAt === fromIdx) return
+    ids.splice(insertAt, 0, fromId)
+    void reorderRows(table!.id, ids)
   }
 
   // Persist a resized width as the column's widthHint.
@@ -559,12 +640,18 @@ export default function TableWidget({ widget, inline = false }: Props): JSX.Elem
   // Range selection geometry only makes sense in the flat table view; grouping
   // and the other view modes reorder/transform rows.
   const cellSelectable = !groups && viewMode === 'table'
+  // Row drag-to-reorder is only coherent in the flat, ungrouped, unfiltered
+  // table view — there the rendered order is the stored order, so a drop index
+  // maps straight onto the persisted row sequence.
+  const rowsReorderable =
+    viewMode === 'table' && !groups && !(viewConfig.filter?.rules?.length)
   const selRange: RCRange | null = cellSel ? normCellRange(cellSel.a, cellSel.f) : null
 
   function onCellSelDown(r: number, c: number, shift: boolean): void {
     if (!cellSelectable) return
     if (shift && cellSel) setCellSel({ a: cellSel.a, f: { r, c } })
     else setCellSel({ a: { r, c }, f: { r, c } })
+    setActiveCell({ r, c })
     selDrag.current = true
     setSelNote(null)
   }
@@ -597,21 +684,105 @@ export default function TableWidget({ widget, inline = false }: Props): JSX.Elem
         : null
     )
   }
-  function onTableKeyDown(e: React.KeyboardEvent): void {
-    if (!cellSelectable || !selRange) return
-    if (e.key === 'Escape') {
-      setCellSel(null)
-      return
+  // Pull keyboard focus out of any cell input back to the table body, so the
+  // arrow keys navigate cells instead of moving a text cursor.
+  function focusBody(): void {
+    bodyRef.current?.focus()
+  }
+  // Enter edit mode on a cell: focus its input/textarea and select its text.
+  function editCell(r: number, c: number): void {
+    const td = bodyRef.current?.querySelector(`[data-testid="table-cell-${r}-${c}"]`)
+    const input = td?.querySelector('input, textarea, [contenteditable="true"]') as HTMLElement | null
+    input?.focus()
+    if (input instanceof HTMLInputElement || input instanceof HTMLTextAreaElement) input.select()
+  }
+  // Move the active cell by (dr, dc), wrapping horizontal overflow onto the next
+  // or previous row (Tab behaviour). extend grows the selection from its anchor
+  // instead of moving a single-cell selection.
+  function moveActive(dr: number, dc: number, extend: boolean): void {
+    const rowCount = filteredRows.length
+    const colCount = cols0.length
+    if (rowCount === 0 || colCount === 0) return
+    const base = activeCell ?? cellSel?.f ?? { r: 0, c: 0 }
+    let r = base.r + dr
+    let c = base.c + dc
+    if (c >= colCount) {
+      c = 0
+      r += 1
+    } else if (c < 0) {
+      c = colCount - 1
+      r -= 1
     }
-    const mod = e.metaKey || e.ctrlKey
-    if (!mod) return
-    const ae = document.activeElement
-    const editingInput =
+    r = Math.max(0, Math.min(rowCount - 1, r))
+    c = Math.max(0, Math.min(colCount - 1, c))
+    const target = { r, c }
+    if (extend && cellSel) setCellSel({ a: cellSel.a, f: target })
+    else setCellSel({ a: target, f: target })
+    setActiveCell(target)
+    focusBody()
+  }
+  function onTableKeyDown(e: React.KeyboardEvent): void {
+    if (!cellSelectable) return
+    // Use e.target (the element that received the keydown), not
+    // document.activeElement: a cell input blurs itself synchronously on Enter
+    // before this bubbles, so activeElement would already be the body and we'd
+    // misread "editing" as "navigating". e.target is fixed at dispatch.
+    const ae = e.target as Element
+    const inEditor =
       (ae instanceof HTMLInputElement || ae instanceof HTMLTextAreaElement) &&
       ae.closest('[data-testid^="table-cell-"]') != null
+
+    if (e.key === 'Escape') {
+      // First Escape leaves edit mode; a second clears the selection.
+      if (inEditor) {
+        focusBody()
+        e.preventDefault()
+      } else {
+        setCellSel(null)
+        setActiveCell(null)
+      }
+      return
+    }
+
+    // Enter: while editing, commit (blur via focusBody) and step down; while just
+    // navigating, drop into edit on the active cell.
+    if (e.key === 'Enter' && !e.metaKey && !e.ctrlKey) {
+      e.preventDefault()
+      if (inEditor) moveActive(e.shiftKey ? -1 : 1, 0, false)
+      else if (activeCell) editCell(activeCell.r, activeCell.c)
+      else moveActive(0, 0, false)
+      return
+    }
+
+    // Tab steps horizontally and wraps across rows; it always leaves edit mode.
+    if (e.key === 'Tab') {
+      e.preventDefault()
+      moveActive(0, e.shiftKey ? -1 : 1, false)
+      return
+    }
+
+    // Arrow keys navigate. While editing a text input they move the text cursor
+    // instead (press Escape or Tab to leave the cell first). Shift extends the
+    // range for copy.
+    const arrows: Record<string, [number, number]> = {
+      ArrowUp: [-1, 0],
+      ArrowDown: [1, 0],
+      ArrowLeft: [0, -1],
+      ArrowRight: [0, 1]
+    }
+    if (e.key in arrows) {
+      if (inEditor) return
+      e.preventDefault()
+      const [dr, dc] = arrows[e.key]
+      moveActive(dr, dc, e.shiftKey)
+      return
+    }
+
+    // Cmd/Ctrl + C / V over the selection.
+    const mod = e.metaKey || e.ctrlKey
+    if (!mod || !selRange) return
     const multi = selRange.r0 !== selRange.r1 || selRange.c0 !== selRange.c1
-    // While editing a single cell, let the browser paste/copy into that input.
-    if (editingInput && !multi) return
+    if (inEditor && !multi) return // editing one cell — let the input copy/paste
     if (e.key.toLowerCase() === 'c') {
       e.preventDefault()
       void copySelection()
@@ -627,20 +798,38 @@ export default function TableWidget({ widget, inline = false }: Props): JSX.Elem
     return (
       <tr
         key={row.id}
+        data-row-index={idx}
         className={`border-b border-stone-200 dark:border-stone-700 group ${
           idx % 2 === 0
             ? 'bg-white dark:bg-stone-900'
             : 'bg-stone-50/60 dark:bg-stone-800/30'
-        } hover:bg-accent/[0.04] dark:hover:bg-accent/[0.08]`}
+        } hover:bg-accent/[0.04] dark:hover:bg-accent/[0.08] ${
+          rowReorder.dragId === row.id ? 'opacity-40' : ''
+        } ${
+          rowReorder.overIndex === idx && rowReorder.dragId !== null && rowReorder.dragId !== row.id
+            ? 'border-t-2 border-t-accent'
+            : ''
+        }`}
       >
-        <td className="w-8 px-1 py-1 text-center border-r border-stone-200 dark:border-stone-700">
-          <button
-            onClick={() => void deleteRow(row.id)}
-            className="text-stone-300 dark:text-stone-600 hover:text-red-600 transition-colors"
-            title="Delete row"
-          >
-            <Icon name="delete" size={13} />
-          </button>
+        <td className="w-8 px-0.5 py-1 border-r border-stone-200 dark:border-stone-700 align-middle">
+          <div className="flex flex-col items-center gap-0.5">
+            {rowsReorderable && (
+              <span
+                onMouseDown={(e) => rowReorder.start(e, row.id)}
+                className="widget-nodrag text-stone-300 dark:text-stone-600 hover:text-accent cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 transition-opacity"
+                title="Drag to reorder row"
+              >
+                <Icon name="drag_indicator" size={12} />
+              </span>
+            )}
+            <button
+              onClick={() => void deleteRow(row.id)}
+              className="text-stone-300 dark:text-stone-600 hover:text-red-600 transition-colors"
+              title="Delete row"
+            >
+              <Icon name="delete" size={13} />
+            </button>
+          </div>
         </td>
         {table!.schema.columns.map((col, ci) => (
           <td
@@ -648,6 +837,10 @@ export default function TableWidget({ widget, inline = false }: Props): JSX.Elem
             data-testid={`table-cell-${idx}-${ci}`}
             className={`border-r border-stone-200 dark:border-stone-700 align-top ${
               cellSelectable && inCellRange(selRange, idx, ci) ? 'bg-accent/[0.12]' : ''
+            } ${
+              cellSelectable && activeCell?.r === idx && activeCell?.c === ci
+                ? 'ring-2 ring-inset ring-accent'
+                : ''
             }`}
             style={{ minWidth: 140 }}
             onMouseDown={(e) => onCellSelDown(idx, ci, e.shiftKey)}
@@ -687,6 +880,7 @@ export default function TableWidget({ widget, inline = false }: Props): JSX.Elem
 
   const body = (
     <div
+      ref={bodyRef}
       className="h-full w-full bg-white dark:bg-stone-900 overflow-auto relative outline-none"
       data-testid="table-body"
       tabIndex={0}
@@ -873,8 +1067,12 @@ export default function TableWidget({ widget, inline = false }: Props): JSX.Elem
                   col={col}
                   index={index}
                   tableId={table.id}
-                  isDragging={dragColId === col.id}
-                  isDragOver={dragOverIndex === index && dragColId !== null && dragColId !== col.id}
+                  isDragging={colReorder.dragId === col.id}
+                  isDragOver={
+                    colReorder.overIndex === index &&
+                    colReorder.dragId !== null &&
+                    colReorder.dragId !== col.id
+                  }
                   onRename={(label) => renameColumn(col.id, label)}
                   onRemove={() => removeColumn(col.id)}
                   onSetConfig={(c) => setColumnConfig(col.id, c)}
@@ -884,21 +1082,7 @@ export default function TableWidget({ widget, inline = false }: Props): JSX.Elem
                     setHeaderMenu({ x: e.clientX, y: e.clientY, columnId: col.id, index })
                   }}
                   onResizeStart={(e) => startResize(e, col)}
-                  onDragStartCol={() => setDragColId(col.id)}
-                  onDragOverCol={(e) => {
-                    if (!dragColId || dragColId === col.id) return
-                    e.preventDefault()
-                    setDragOverIndex(index)
-                  }}
-                  onDropCol={() => {
-                    if (dragColId && dragColId !== col.id) moveColumn(dragColId, index)
-                    setDragColId(null)
-                    setDragOverIndex(null)
-                  }}
-                  onDragEndCol={() => {
-                    setDragColId(null)
-                    setDragOverIndex(null)
-                  }}
+                  onReorderDown={(e) => colReorder.start(e, col.id)}
                 />
               ))}
               <th className="px-1 py-1.5">
@@ -998,7 +1182,7 @@ export default function TableWidget({ widget, inline = false }: Props): JSX.Elem
             }}
             placeholder='e.g. "Add 5 fictional podcast episodes about climate tech"'
             rows={2}
-            className="w-full text-[13px] px-2.5 py-1.5 bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-md resize-none focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
+            className="w-full text-[13px] px-2.5 py-1.5 bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-md resize-none text-stone-900 dark:text-stone-100 placeholder:text-stone-400 dark:placeholder:text-stone-500 focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
           />
           <div className="flex items-center gap-2 text-[11px] flex-wrap">
             <label className="text-stone-500 dark:text-stone-400">Rows:</label>
@@ -1299,7 +1483,7 @@ function GroupRows({
 // right-clicking opens the insert/delete context menu (onContextMenu).
 function ColumnHeader({
   col,
-  index: _index,
+  index,
   tableId,
   isDragging,
   isDragOver,
@@ -1309,10 +1493,7 @@ function ColumnHeader({
   onSetType,
   onContextMenu,
   onResizeStart,
-  onDragStartCol,
-  onDragOverCol,
-  onDropCol,
-  onDragEndCol
+  onReorderDown
 }: {
   col: FieldDefinition
   index: number
@@ -1325,10 +1506,7 @@ function ColumnHeader({
   onSetType: (type: FieldType) => void
   onContextMenu: (e: React.MouseEvent) => void
   onResizeStart: (e: React.MouseEvent) => void
-  onDragStartCol: () => void
-  onDragOverCol: (e: React.DragEvent) => void
-  onDropCol: () => void
-  onDragEndCol: () => void
+  onReorderDown: (e: React.MouseEvent) => void
 }): JSX.Element {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLTableCellElement | null>(null)
@@ -1343,30 +1521,31 @@ function ColumnHeader({
   return (
     <th
       ref={ref}
+      data-col-index={index}
       onContextMenu={onContextMenu}
-      onDragOver={onDragOverCol}
-      onDrop={onDropCol}
       className={`text-left px-2 py-1 font-medium text-[11px] text-stone-700 dark:text-stone-200 relative ${
         isDragging ? 'opacity-40' : ''
       } ${isDragOver ? 'border-l-2 border-l-accent' : ''}`}
     >
-      <button
-        draggable={!open}
-        onDragStart={(e) => {
-          // Reorder gesture. setData makes the drag valid in Electron/Chromium
-          // and the move effect shows the right cursor.
-          e.dataTransfer.effectAllowed = 'move'
-          e.dataTransfer.setData('text/plain', col.id)
-          onDragStartCol()
-        }}
-        onDragEnd={onDragEndCol}
-        onClick={() => setOpen((v) => !v)}
-        className="inline-flex items-center gap-1 hover:bg-stone-100 dark:hover:bg-stone-800 rounded px-1 py-0.5 w-full text-left cursor-grab active:cursor-grabbing"
-        title="Click to edit · drag to reorder · right-click for more"
-      >
-        <Icon name={FIELD_TYPE_ICONS[col.type]} size={11} className="text-stone-400 shrink-0" />
-        <span className="truncate">{col.label}</span>
-      </button>
+      <div className="flex items-center gap-0.5">
+        {/* Grip — press and drag to reorder this column. widget-nodrag stops the
+            same gesture from moving the table widget on the canvas. */}
+        <span
+          onMouseDown={onReorderDown}
+          className="widget-nodrag shrink-0 text-stone-300 dark:text-stone-600 hover:text-accent cursor-grab active:cursor-grabbing"
+          title="Drag to reorder column"
+        >
+          <Icon name="drag_indicator" size={12} />
+        </span>
+        <button
+          onClick={() => setOpen((v) => !v)}
+          className="inline-flex items-center gap-1 hover:bg-stone-100 dark:hover:bg-stone-800 rounded px-1 py-0.5 flex-1 min-w-0 text-left"
+          title="Click to edit · right-click for more"
+        >
+          <Icon name={FIELD_TYPE_ICONS[col.type]} size={11} className="text-stone-400 shrink-0" />
+          <span className="truncate">{col.label}</span>
+        </button>
+      </div>
       {/* Resize handle — a thin grab strip on the right edge. Uses raw mouse
           events (not HTML5 drag) so it never starts a column-reorder. */}
       <div
@@ -1381,7 +1560,7 @@ function ColumnHeader({
             value={col.label}
             onChange={(e) => onRename(e.target.value)}
             placeholder="Column name"
-            className="w-full text-[11px] bg-stone-50 dark:bg-stone-800 border border-stone-300 dark:border-stone-700 rounded px-2 py-1"
+            className="w-full text-[11px] bg-stone-50 dark:bg-stone-800 border border-stone-300 dark:border-stone-700 rounded px-2 py-1 text-stone-900 dark:text-stone-100 placeholder:text-stone-400 dark:placeholder:text-stone-500"
           />
           <div className="text-[10px] uppercase tracking-wider text-stone-400">
             Type
@@ -1389,7 +1568,7 @@ function ColumnHeader({
           <select
             value={col.type}
             onChange={(e) => onSetType(e.target.value as FieldType)}
-            className="w-full text-[11px] bg-stone-50 dark:bg-stone-800 border border-stone-300 dark:border-stone-700 rounded px-2 py-1"
+            className="w-full text-[11px] bg-stone-50 dark:bg-stone-800 border border-stone-300 dark:border-stone-700 rounded px-2 py-1 text-stone-900 dark:text-stone-100 placeholder:text-stone-400 dark:placeholder:text-stone-500"
             title="Change this column's field type"
           >
             {(Object.keys(FIELD_TYPE_LABELS) as FieldType[]).map((t) => (
@@ -1483,7 +1662,7 @@ function SelectOptionsMini({
             if (e.key === 'Enter') add()
           }}
           placeholder="New option…"
-          className="flex-1 text-[10px] bg-stone-50 dark:bg-stone-800 border border-stone-300 dark:border-stone-700 rounded px-1.5 py-0.5"
+          className="flex-1 text-[10px] bg-stone-50 dark:bg-stone-800 border border-stone-300 dark:border-stone-700 rounded px-1.5 py-0.5 text-stone-900 dark:text-stone-100 placeholder:text-stone-400 dark:placeholder:text-stone-500"
         />
         <button
           onClick={add}
