@@ -1321,6 +1321,22 @@ const api = {
     reschedule: (projectId: string): Promise<import('@shared/projects').ProjectPlan> =>
       ipcRenderer.invoke('projects:reschedule', projectId)
   },
+  // PlexiReports: scheduled, AI-narrated reports over your tables.
+  reports: {
+    list: (): Promise<import('@shared/reports').ReportDef[]> => ipcRenderer.invoke('reports:list'),
+    get: (id: string): Promise<import('@shared/reports').ReportDef | null> =>
+      ipcRenderer.invoke('reports:get', id),
+    create: (draft: import('@shared/reports').ReportDraft): Promise<import('@shared/reports').ReportDef> =>
+      ipcRenderer.invoke('reports:create', draft),
+    update: (
+      id: string,
+      patch: import('@shared/reports').ReportPatch
+    ): Promise<import('@shared/reports').ReportDef | null> => ipcRenderer.invoke('reports:update', id, patch),
+    delete: (id: string): Promise<boolean> => ipcRenderer.invoke('reports:delete', id),
+    generate: (id: string): Promise<import('@shared/reports').GenerateReportResult> =>
+      ipcRenderer.invoke('reports:generate', id),
+    runDue: (): Promise<{ generated: number }> => ipcRenderer.invoke('reports:runDue')
+  },
   // haptyx:// deep-link auth handoff. The brochure at haptyx.app/account/*
   // signs the user in against the signal server, then redirects to
   // haptyx://auth?token=...&email=...&handle=... — main process catches

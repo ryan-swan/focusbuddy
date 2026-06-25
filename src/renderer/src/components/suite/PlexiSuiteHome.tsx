@@ -49,6 +49,8 @@ export function launchProduct(product: PlexiProduct): void {
       return v.goSearch()
     case 'projects':
       return v.goProjects()
+    case 'reports':
+      return v.goReports()
     case 'canvas':
       return v.goHome()
     default:

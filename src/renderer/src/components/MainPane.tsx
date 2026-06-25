@@ -28,6 +28,7 @@ import PlexiBuildView from './views/PlexiBuildView'
 import PlexiFormsView from './views/PlexiFormsView'
 import PlexiSearchView from './views/PlexiSearchView'
 import PlexiProjectsView from './views/PlexiProjectsView'
+import PlexiReportsView from './views/PlexiReportsView'
 
 // The MainPane routes the central area between the OS-level views.
 // Existing Canvas + chat behavior is preserved for the 'task' view; everything else
@@ -93,6 +94,8 @@ export default function MainPane(): JSX.Element {
       return <PlexiSearchView />
     case 'projects':
       return <PlexiProjectsView />
+    case 'reports':
+      return <PlexiReportsView />
     default:
       return <HomeDashboard />
   }
