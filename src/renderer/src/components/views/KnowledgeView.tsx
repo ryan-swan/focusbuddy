@@ -106,7 +106,7 @@ export default function KnowledgeView(): JSX.Element {
         <div className="flex-1 overflow-auto px-2 pb-2">
           {loaded && filtered.length === 0 ? (
             <div className="px-3 py-10 text-center">
-              <Icon name="psychology_alt" size={26} className="text-stone-300 dark:text-stone-600" />
+              <Icon name="psychology_alt" size={26} className="text-[var(--ink-30)]" />
               <p className="mt-2 text-[12px] text-[var(--ink-70)] leading-relaxed">
                 {entries.length === 0
                   ? 'No knowledge yet. Add what your team and your AI should remember.'
@@ -135,7 +135,7 @@ export default function KnowledgeView(): JSX.Element {
           />
         ) : (
           <div className="h-full flex flex-col items-center justify-center text-center px-6">
-            <Icon name="neurology" size={30} className="text-stone-300 dark:text-stone-600" />
+            <Icon name="neurology" size={30} className="text-[var(--ink-30)]" />
             <p className="mt-2 text-[13px] text-[var(--ink-70)] max-w-sm leading-relaxed">
               Select an entry to read or edit it, or add a new one. Everything here grounds the AI's answers in your own
               documented truth.

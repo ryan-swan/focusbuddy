@@ -60,11 +60,15 @@ export default function PlexiSearchView(): JSX.Element {
   const [query, setQuery] = useState('')
   const [hits, setHits] = useState<SearchHit[]>([])
   const [searching, setSearching] = useState(false)
+  const [searchError, setSearchError] = useState(false)
   const [ask, setAsk] = useState<AskState>({ status: 'idle' })
   // Which result the keyboard is on. -1 means none focused (e.g. before any
   // results arrive); it snaps to the top result whenever a fresh result set lands.
   const [focusIdx, setFocusIdx] = useState(-1)
   const inputRef = useRef<HTMLInputElement>(null)
+  // Monotonic token so a slow ask for an old query cannot overwrite the answer
+  // for the current one.
+  const askSeq = useRef(0)
 
   useEffect(() => {
     inputRef.current?.focus()
@@ -77,9 +81,11 @@ export default function PlexiSearchView(): JSX.Element {
     if (q.length < 2) {
       setHits([])
       setSearching(false)
+      setSearchError(false)
       return
     }
     setSearching(true)
+    setSearchError(false)
     let cancelled = false
     const t = window.setTimeout(() => {
       void window.api.search
@@ -91,7 +97,11 @@ export default function PlexiSearchView(): JSX.Element {
           setFocusIdx(res.length ? 0 : -1)
         })
         .catch(() => {
-          if (!cancelled) setHits([])
+          // A failed search is an honest error, not "no results".
+          if (!cancelled) {
+            setHits([])
+            setSearchError(true)
+          }
         })
         .finally(() => {
           if (!cancelled) setSearching(false)
@@ -107,10 +117,12 @@ export default function PlexiSearchView(): JSX.Element {
   // keystroke, so it never burns a model call the user did not ask for.
   async function runAsk(): Promise<void> {
     const q = query.trim()
-    if (q.length < 2) return
+    if (q.length < 2 || ask.status === 'asking') return
+    const seq = ++askSeq.current
     setAsk({ status: 'asking' })
     try {
       const r = await window.api.workspace.ask(q)
+      if (seq !== askSeq.current) return // a newer query superseded this answer
       if (!r.ok) {
         if (r.needsApiKey) setAsk({ status: 'nokey' })
         else setAsk({ status: 'error', message: r.error || 'Could not answer that right now.' })
@@ -118,7 +130,7 @@ export default function PlexiSearchView(): JSX.Element {
       }
       setAsk({ status: 'answered', answer: r.answer || '', sources: r.sources || [] })
     } catch {
-      setAsk({ status: 'error', message: 'Could not answer that right now.' })
+      if (seq === askSeq.current) setAsk({ status: 'error', message: 'Could not answer that right now.' })
     }
   }
 
@@ -174,7 +186,10 @@ export default function PlexiSearchView(): JSX.Element {
             onChange={(e) => {
               setQuery(e.target.value)
               setAsk({ status: 'idle' })
+              // Invalidate any in-flight ask so its answer cannot land on the new query.
+              askSeq.current++
             }}
+            aria-label="Search your workspace"
             onKeyDown={(e) => {
               if (e.key === 'ArrowDown') {
                 e.preventDefault()
@@ -281,9 +296,14 @@ export default function PlexiSearchView(): JSX.Element {
                 <Icon name="progress_activity" size={16} className="text-[rgb(var(--accent))] animate-spin" />
                 Searching…
               </div>
+            ) : searchError ? (
+              <div className="px-3 py-10 text-center" data-testid="plexisearch-error">
+                <Icon name="error_outline" size={26} className="text-rose-500" />
+                <p className="mt-2 text-[13px] text-[var(--ink-70)]">Search failed. Try again.</p>
+              </div>
             ) : hits.length === 0 ? (
               <div className="px-3 py-10 text-center">
-                <Icon name="search_off" size={26} className="text-stone-300 dark:text-stone-600" />
+                <Icon name="search_off" size={26} className="text-[var(--ink-30)]" />
                 <p className="mt-2 text-[13px] text-[var(--ink-70)]">Nothing matches that yet. Try different words.</p>
               </div>
             ) : (
@@ -304,7 +324,7 @@ export default function PlexiSearchView(): JSX.Element {
 
         {!showResults && ask.status === 'idle' && (
           <div className="mt-16 text-center">
-            <Icon name="search" size={30} className="text-stone-300 dark:text-stone-600" />
+            <Icon name="search" size={30} className="text-[var(--ink-30)]" />
             <p className="mt-3 text-[14px] text-[var(--ink-70)] max-w-md mx-auto leading-relaxed">
               One box for the whole workspace. Search your tasks, documents, knowledge and files, and press Enter to get
               a plain-language answer grounded in your own content.

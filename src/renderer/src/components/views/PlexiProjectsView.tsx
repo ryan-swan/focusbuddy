@@ -39,9 +39,14 @@ function fmtDate(ms: number): string {
 export default function PlexiProjectsView(): JSX.Element {
   const [projects, setProjects] = useState<ProjectSummary[] | null>(null)
   const [openId, setOpenId] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   const loadPortfolio = useCallback(() => {
-    void window.api.projects.list().then(setProjects)
+    setError(null)
+    window.api.projects
+      .list()
+      .then(setProjects)
+      .catch((e) => setError(`Could not load projects: ${e instanceof Error ? e.message : String(e)}`))
   }, [])
 
   useEffect(() => {
@@ -57,6 +62,8 @@ export default function PlexiProjectsView(): JSX.Element {
       <div className="max-w-5xl mx-auto px-6 py-6">
         <DashboardHeader title="Projects" subtitle="Plans, milestones and a timeline built from the tasks you already work in" />
 
+        {error && <p className="mb-3 text-rose-500 text-[12px]" data-testid="projects-error">{error}</p>}
+
         {projects === null ? (
           <div className="flex items-center gap-2 px-3 py-10 text-[13px] text-[var(--ink-70)]">
             <Icon name="progress_activity" size={16} className="text-[rgb(var(--accent))] animate-spin" />
@@ -64,7 +71,7 @@ export default function PlexiProjectsView(): JSX.Element {
           </div>
         ) : projects.length === 0 ? (
           <div className="px-3 py-16 text-center" data-testid="projects-empty">
-            <Icon name="account_tree" size={30} className="text-stone-300 dark:text-stone-600" />
+            <Icon name="account_tree" size={30} className="text-[var(--ink-30)]" />
             <p className="mt-3 text-[14px] text-[var(--ink-70)] max-w-md mx-auto leading-relaxed">
               No projects yet. A project is any folder that contains tasks. Create a folder, add tasks under it, and it
               shows up here with a timeline.
@@ -104,7 +111,7 @@ function ProjectCard({ project, onOpen }: { project: ProjectSummary; onOpen: () 
         <div className="mt-1 h-1.5 rounded-full bg-[var(--surface-sunken)] overflow-hidden">
           <div
             className="h-full rounded-full bg-[rgb(var(--accent))]"
-            style={{ width: `${project.percentComplete}%` }}
+            style={{ width: `${project.percentComplete}%`, minWidth: project.percentComplete > 0 ? '0.375rem' : '0' }}
           />
         </div>
       </div>
@@ -119,9 +126,14 @@ function ProjectGantt({ projectId, onBack }: { projectId: string; onBack: () => 
   const [plan, setPlan] = useState<ProjectPlan | null>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const load = useCallback(() => {
-    void window.api.projects.plan(projectId).then(setPlan)
+    setError(null)
+    window.api.projects
+      .plan(projectId)
+      .then(setPlan)
+      .catch((e) => setError(`Could not load the plan: ${e instanceof Error ? e.message : String(e)}`))
   }, [projectId])
 
   useEffect(() => {
@@ -130,9 +142,12 @@ function ProjectGantt({ projectId, onBack }: { projectId: string; onBack: () => 
 
   async function reschedule(): Promise<void> {
     setBusy(true)
+    setError(null)
     try {
       const next = await window.api.projects.reschedule(projectId)
       setPlan(next)
+    } catch (e) {
+      setError(`Could not reschedule: ${e instanceof Error ? e.message : String(e)}`)
     } finally {
       setBusy(false)
     }
@@ -178,7 +193,7 @@ function ProjectGantt({ projectId, onBack }: { projectId: string; onBack: () => 
             <Icon name="arrow_back" size={16} /> Projects
           </button>
           <span className="text-[var(--ink-30)]">/</span>
-          <h1 className="text-[16px] font-bold tracking-tight text-[var(--ink-100)] truncate">{plan?.title ?? 'Project'}</h1>
+          <h1 className="fb-display text-[16px] font-bold tracking-tight text-[var(--ink-100)] truncate">{plan?.title ?? 'Project'}</h1>
           <div className="ml-auto flex items-center gap-2">
             <GanttLegend />
             <button
@@ -204,6 +219,7 @@ function ProjectGantt({ projectId, onBack }: { projectId: string; onBack: () => 
             This plan has a circular dependency. Remove a link to restore a valid schedule.
           </div>
         )}
+        {error && <p className="mt-2 text-rose-500 text-[12px]" data-testid="gantt-error">{error}</p>}
       </div>
 
       <div className="flex-1 min-h-0 flex">
@@ -214,7 +230,7 @@ function ProjectGantt({ projectId, onBack }: { projectId: string; onBack: () => 
             </div>
           ) : plan.tasks.length === 0 ? (
             <div className="px-6 py-16 text-center">
-              <Icon name="account_tree" size={28} className="text-stone-300 dark:text-stone-600" />
+              <Icon name="account_tree" size={28} className="text-[var(--ink-30)]" />
               <p className="mt-2 text-[13px] text-[var(--ink-70)]">This project has no tasks yet. Add tasks to the folder to build a plan.</p>
             </div>
           ) : geom ? (
@@ -342,8 +358,8 @@ function TodayLine({ x, height }: { x: number; height: number }): JSX.Element | 
   if (x < 0) return null
   return (
     <div className="absolute top-0 pointer-events-none" style={{ left: x, height }}>
-      <div className="h-full w-px" style={{ background: 'rgb(56 189 248)', opacity: 0.8 }} />
-      <div className="absolute -top-0.5 -left-1 h-2 w-2 rounded-full" style={{ background: 'rgb(56 189 248)' }} />
+      <div className="h-full w-px bg-sky-400 opacity-80" />
+      <div className="absolute -top-0.5 -left-1 h-2 w-2 rounded-full bg-sky-400" />
     </div>
   )
 }
@@ -371,10 +387,19 @@ function TaskBar({
     return (
       <div
         data-testid={`gantt-bar-${task.id}`}
+        role="button"
+        tabIndex={0}
+        aria-label={`${task.title || 'Untitled'}, ${fmtDate(task.scheduledStartMs)}`}
         onClick={onClick}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            if (e.key === ' ') e.preventDefault()
+            onClick()
+          }
+        }}
         className="absolute cursor-pointer"
         style={{ left: x - 7, top: y + (ROW_H - 12) / 2 }}
-        title={`${task.title} — ${fmtDate(task.scheduledStartMs)}`}
+        title={`${task.title}, ${fmtDate(task.scheduledStartMs)}`}
       >
         <div className="h-3 w-3 rotate-45 bg-violet-500 ring-2 ring-[var(--surface-raised)]" />
       </div>
@@ -391,10 +416,19 @@ function TaskBar({
   return (
     <div
       data-testid={`gantt-bar-${task.id}`}
+      role="button"
+      tabIndex={0}
+      aria-label={`${task.title || 'Untitled'}, ${fmtDate(task.scheduledStartMs)} to ${fmtDate(task.scheduledEndMs)}`}
       onClick={onClick}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          if (e.key === ' ') e.preventDefault()
+          onClick()
+        }
+      }}
       className={`absolute rounded-[4px] cursor-pointer transition-colors flex items-center px-1.5 overflow-hidden ${cls}`}
       style={{ left: x, top, width: w, height: 16 }}
-      title={`${task.title} — ${fmtDate(task.scheduledStartMs)} to ${fmtDate(task.scheduledEndMs)}${task.slackDays > 0 ? `, ${task.slackDays}d slack` : ', critical'}${late ? (done ? ', finished late' : ', running late') : ''}`}
+      title={`${task.title}, ${fmtDate(task.scheduledStartMs)} to ${fmtDate(task.scheduledEndMs)}${task.slackDays > 0 ? `, ${task.slackDays}d slack` : ', critical'}${late ? (done ? ', finished late' : ', running late') : ''}`}
     >
       {w > 44 && (
         <span className="text-[10px] truncate text-[var(--ink-90)] flex-1">{task.title}</span>
@@ -468,32 +502,47 @@ function TaskEditor({
 }): JSX.Element {
   const [depPick, setDepPick] = useState('')
   const [depError, setDepError] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   async function patch(p: Parameters<typeof window.api.projects.setTaskPlan>[1]): Promise<void> {
-    await window.api.projects.setTaskPlan(task.id, p)
-    onChanged()
+    setError(null)
+    try {
+      await window.api.projects.setTaskPlan(task.id, p)
+      onChanged()
+    } catch (e) {
+      setError(`Could not save the change: ${e instanceof Error ? e.message : String(e)}`)
+    }
   }
 
   async function addDep(predId: string): Promise<void> {
     setDepError(null)
-    const r = await window.api.projects.addDep(predId, task.id)
-    if (!r.ok) {
-      setDepError(
-        r.reason === 'cycle'
-          ? 'That would create a circular dependency.'
-          : r.reason === 'duplicate'
-            ? 'That dependency already exists.'
-            : 'Could not add that dependency.'
-      )
-      return
+    try {
+      const r = await window.api.projects.addDep(predId, task.id)
+      if (!r.ok) {
+        setDepError(
+          r.reason === 'cycle'
+            ? 'That would create a circular dependency.'
+            : r.reason === 'duplicate'
+              ? 'That dependency already exists.'
+              : 'Could not add that dependency.'
+        )
+        return
+      }
+      setDepPick('')
+      onChanged()
+    } catch (e) {
+      setDepError(`Could not add that dependency: ${e instanceof Error ? e.message : String(e)}`)
     }
-    setDepPick('')
-    onChanged()
   }
 
   async function removeDep(predId: string): Promise<void> {
-    await window.api.projects.removeDep(predId, task.id)
-    onChanged()
+    setError(null)
+    try {
+      await window.api.projects.removeDep(predId, task.id)
+      onChanged()
+    } catch (e) {
+      setError(`Could not remove that dependency: ${e instanceof Error ? e.message : String(e)}`)
+    }
   }
 
   const candidates = allTasks.filter((t) => t.id !== task.id && !task.deps.includes(t.id))
@@ -540,8 +589,15 @@ function TaskEditor({
               placeholder="e.g. 3"
               data-testid="task-estimate-days"
               onChange={(e) => {
-                const days = Number(e.target.value)
-                void patch({ estimateMinutes: days > 0 ? Math.round(days) * 8 * 60 : null })
+                const raw = e.target.value
+                if (raw.trim() === '') {
+                  void patch({ estimateMinutes: null })
+                  return
+                }
+                const days = Math.min(3650, Math.round(Number(raw)))
+                if (Number.isInteger(days) && days > 0) {
+                  void patch({ estimateMinutes: days * 8 * 60 })
+                }
               }}
               className="mt-1 w-full rounded-md bg-[var(--surface-base)] border border-[var(--edge-soft)] px-2 py-1.5 text-[12px] text-[var(--ink-100)] focus:outline-none focus:border-[rgb(var(--accent)/0.55)]"
             />
@@ -593,6 +649,8 @@ function TaskEditor({
           )}
           {depError && <p className="mt-1 text-[11px] text-rose-500">{depError}</p>}
         </div>
+
+        {error && <p className="text-rose-500 text-[12px]" data-testid="task-editor-error">{error}</p>}
 
         <div className="pt-1 text-[11px] text-[var(--ink-50)] space-y-0.5">
           <p className="fb-tabular">Scheduled {fmtDate(task.scheduledStartMs)} to {fmtDate(task.scheduledEndMs)}</p>

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import Icon from '../Icon'
-import { DashboardHeader, StatusPill } from '../plexi'
+import { DashboardHeader, StatusPill, PLEXI_CARD } from '../plexi'
 import { TEMPLATES, type TemplateCategory, type TemplateMeta, type AppliedItem } from '@shared/templates'
 
 // PlexiMarketplace: a gallery of built-in starter templates. Applying one creates
@@ -14,7 +14,7 @@ const CATEGORIES: TemplateCategory[] = ['Tables', 'Reports', 'Automations', 'Kno
 export default function PlexiMarketplaceView(): JSX.Element {
   const [applyingKey, setApplyingKey] = useState<string | null>(null)
   const [result, setResult] = useState<{ key: string; created: AppliedItem[] } | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<{ key: string; message: string } | null>(null)
 
   async function apply(t: TemplateMeta): Promise<void> {
     setApplyingKey(t.key)
@@ -23,7 +23,9 @@ export default function PlexiMarketplaceView(): JSX.Element {
     try {
       const r = await window.api.marketplace.apply(t.key)
       if (r.ok) setResult({ key: t.key, created: r.created })
-      else setError(r.error || 'Could not apply the template.')
+      else setError({ key: t.key, message: r.error || 'Could not apply the template.' })
+    } catch (e) {
+      setError({ key: t.key, message: `Could not apply the template: ${e instanceof Error ? e.message : String(e)}` })
     } finally {
       setApplyingKey(null)
     }
@@ -50,7 +52,7 @@ export default function PlexiMarketplaceView(): JSX.Element {
                   <div
                     key={t.key}
                     data-testid={`template-card-${t.key}`}
-                    className="rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-raised)] p-4 flex flex-col"
+                    className={`${PLEXI_CARD} p-4 flex flex-col`}
                   >
                     <div className="flex items-start gap-2.5">
                       <span className="shrink-0 inline-flex h-9 w-9 items-center justify-center rounded-lg bg-[rgb(var(--accent)/0.10)]">
@@ -86,18 +88,17 @@ export default function PlexiMarketplaceView(): JSX.Element {
                         </span>
                       )}
                     </div>
+                    {error?.key === t.key && (
+                      <p className="mt-2 flex items-center gap-1.5 text-rose-500 text-[12px]" data-testid={`template-error-${t.key}`}>
+                        <Icon name="error_outline" size={14} /> {error.message}
+                      </p>
+                    )}
                   </div>
                 ))}
               </div>
             </div>
           )
         })}
-
-        {error && (
-          <div className="flex items-center gap-2 text-[12px] text-rose-500" data-testid="template-error">
-            <Icon name="error_outline" size={14} /> {error}
-          </div>
-        )}
 
         <div className="mt-2 flex items-center gap-2 text-[11.5px] text-[var(--ink-50)]">
           <StatusPill tone="stone" label="Community publishing coming" dot={false} />

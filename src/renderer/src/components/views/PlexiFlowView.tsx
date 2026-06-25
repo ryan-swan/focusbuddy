@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Icon from '../Icon'
-import { DashboardHeader, StatusPill } from '../plexi'
+import { DashboardHeader, StatusPill, PLEXI_CARD } from '../plexi'
 import type { FbTable } from '@shared/fields'
 import {
   blankAction,
@@ -32,23 +32,37 @@ export default function PlexiFlowView(): JSX.Element {
   const [flows, setFlows] = useState<FlowDef[] | null>(null)
   const [tables, setTables] = useState<FbTable[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   async function load(): Promise<void> {
-    const [f, t] = await Promise.all([window.api.flows.list(), window.api.tables.list()])
-    setFlows(f)
-    setTables(t)
+    setError(null)
+    try {
+      const [f, t] = await Promise.all([window.api.flows.list(), window.api.tables.list()])
+      setFlows(f)
+      setTables(t)
+    } catch (e) {
+      setError(`Could not load flows: ${e instanceof Error ? e.message : String(e)}`)
+    }
   }
 
   useEffect(() => {
     void load()
     // Run any scheduled flows that have come due since the app was last open.
-    void window.api.flows.runDue()
+    void window.api.flows
+      .runDue()
+      .then(() => load())
+      .catch((e) => setError(`Could not run due flows: ${e instanceof Error ? e.message : String(e)}`))
   }, [])
 
   async function addFlow(): Promise<void> {
-    const created = await window.api.flows.create({ title: 'New flow' })
-    await load()
-    setSelectedId(created.id)
+    setError(null)
+    try {
+      const created = await window.api.flows.create({ title: 'New flow' })
+      await load()
+      setSelectedId(created.id)
+    } catch (e) {
+      setError(`Could not create a flow: ${e instanceof Error ? e.message : String(e)}`)
+    }
   }
 
   const selected = flows?.find((f) => f.id === selectedId) ?? null
@@ -59,7 +73,7 @@ export default function PlexiFlowView(): JSX.Element {
         <div className="px-4 py-3.5 border-b border-[var(--edge-soft)]">
           <div className="flex items-center gap-2">
             <Icon name="account_tree" size={18} className="text-[rgb(var(--accent))]" filled />
-            <h1 className="text-[15px] font-bold tracking-tight">PlexiFlow</h1>
+            <h1 className="fb-display text-[15px] font-bold tracking-tight">PlexiFlow</h1>
           </div>
           <p className="mt-0.5 text-[11.5px] text-[var(--ink-70)]">When this happens, do that.</p>
         </div>
@@ -71,13 +85,14 @@ export default function PlexiFlowView(): JSX.Element {
           >
             <Icon name="add" size={15} /> New flow
           </button>
+          {error && <p className="mt-2 text-rose-500 text-[12px]" data-testid="flows-error">{error}</p>}
         </div>
         <div className="flex-1 overflow-auto px-2 pb-2">
           {flows === null ? (
             <p className="px-3 py-6 text-[12px] text-[var(--ink-70)]">Loading…</p>
           ) : flows.length === 0 ? (
             <div className="px-3 py-10 text-center" data-testid="flows-empty">
-              <Icon name="account_tree" size={24} className="text-stone-300 dark:text-stone-600" />
+              <Icon name="account_tree" size={24} className="text-[var(--ink-30)]" />
               <p className="mt-2 text-[12px] text-[var(--ink-70)] leading-relaxed">No flows yet. Create one to automate work across your tools.</p>
             </div>
           ) : (
@@ -110,7 +125,7 @@ export default function PlexiFlowView(): JSX.Element {
           <FlowEditor key={selected.id} flow={selected} tables={tables} onChanged={load} />
         ) : (
           <div className="h-full flex flex-col items-center justify-center text-center px-6">
-            <Icon name="account_tree" size={30} className="text-stone-300 dark:text-stone-600" />
+            <Icon name="account_tree" size={30} className="text-[var(--ink-30)]" />
             <p className="mt-2 text-[13px] text-[var(--ink-70)] max-w-sm leading-relaxed">
               Select a flow to edit it, or create one. A flow runs a sequence of actions across your workspace, by hand
               or on a schedule.
@@ -134,11 +149,31 @@ function FlowEditor({
   const [title, setTitle] = useState(flow.title)
   const [running, setRunning] = useState(false)
   const [log, setLog] = useState<FlowRunStep[]>(flow.lastLog)
+  const [error, setError] = useState<string | null>(null)
 
   async function patch(p: Parameters<typeof window.api.flows.update>[1]): Promise<void> {
-    await window.api.flows.update(flow.id, p)
-    await onChanged()
+    setError(null)
+    try {
+      await window.api.flows.update(flow.id, p)
+      await onChanged()
+    } catch (e) {
+      setError(`Could not save the flow: ${e instanceof Error ? e.message : String(e)}`)
+    }
   }
+
+  // Flush a pending title edit if this editor unmounts (it is keyed by flow.id
+  // and remounts on selection change), so switching flows before blur does not
+  // lose the edit.
+  const titleRef = useRef(title)
+  titleRef.current = title
+  useEffect(() => {
+    return () => {
+      if (titleRef.current !== flow.title) {
+        void window.api.flows.update(flow.id, { title: titleRef.current }).catch(() => {})
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [flow.id])
 
   function setTrigger(t: FlowTrigger): void {
     void patch({ trigger: t })
@@ -168,10 +203,13 @@ function FlowEditor({
 
   async function run(): Promise<void> {
     setRunning(true)
+    setError(null)
     try {
       const res = await window.api.flows.run(flow.id)
       setLog(res.steps)
       await onChanged()
+    } catch (e) {
+      setError(`Could not run the flow: ${e instanceof Error ? e.message : String(e)}`)
     } finally {
       setRunning(false)
     }
@@ -188,7 +226,8 @@ function FlowEditor({
           onBlur={() => title !== flow.title && void patch({ title })}
           data-testid="flow-title"
           placeholder="Flow title"
-          className="flex-1 bg-transparent text-[20px] font-bold text-[var(--ink-100)] outline-none placeholder:text-[var(--ink-50)]"
+          aria-label="Flow title"
+          className="fb-display-hero flex-1 bg-transparent text-[20px] font-bold text-[var(--ink-100)] outline-none placeholder:text-[var(--ink-50)]"
         />
         <label className="flex items-center gap-1.5 text-[12px] text-[var(--ink-90)] cursor-pointer shrink-0">
           <input
@@ -203,7 +242,7 @@ function FlowEditor({
       </div>
 
       {/* Trigger */}
-      <div className="rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-raised)] p-3 mb-3">
+      <div className={`${PLEXI_CARD} p-3 mb-3`}>
         <div className="flex items-center gap-2">
           <Icon name="bolt" size={15} className="text-[rgb(var(--accent))]" />
           <span className="text-[12px] font-semibold text-[var(--ink-90)]">When</span>
@@ -266,6 +305,8 @@ function FlowEditor({
         <span className="text-[11.5px] text-[var(--ink-50)]">Use {'{{ai}}'} in a later step to reuse an AI step output.</span>
       </div>
 
+      {error && <p className="mt-3 text-rose-500 text-[12px]" data-testid="flow-editor-error">{error}</p>}
+
       {log.length > 0 && (
         <div className="mt-4" data-testid="flow-log">
           <span className="text-[11.5px] font-semibold uppercase tracking-wide text-[var(--ink-50)]">Last run</span>
@@ -309,50 +350,90 @@ function ActionCard({
 }): JSX.Element {
   const field =
     'w-full rounded-md bg-[var(--surface-base)] border border-[var(--edge-soft)] px-2 py-1.5 text-[12.5px] text-[var(--ink-100)] focus:outline-none focus:border-[rgb(var(--accent)/0.55)] placeholder:text-[var(--ink-50)]'
+
+  // Hold the editable action locally so typing is snappy and never races the
+  // parent prop. Changes commit upward on blur (and on unmount, so switching
+  // actions or flows before blur does not drop an unsaved field).
+  const [local, setLocal] = useState<FlowAction>(action)
+  // Re-seed from the prop when the action identity or type changes (e.g. a
+  // reorder swaps which action lives at this slot), but keep local edits while
+  // the same action is being typed into.
+  useEffect(() => {
+    setLocal(action)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [action.id, action.type])
+
+  const localRef = useRef(local)
+  localRef.current = local
+  const onChangeRef = useRef(onChange)
+  onChangeRef.current = onChange
+  const commit = (): void => {
+    if (JSON.stringify(localRef.current) !== JSON.stringify(action)) {
+      onChangeRef.current(localRef.current)
+    }
+  }
+  useEffect(() => {
+    return () => {
+      if (JSON.stringify(localRef.current) !== JSON.stringify(action)) {
+        onChangeRef.current(localRef.current)
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [action.id])
+
   return (
-    <div className="rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-raised)] p-3" data-testid={`flow-action-${index}`}>
+    <div className={`${PLEXI_CARD} p-3`} data-testid={`flow-action-${index}`}>
       <div className="flex items-center gap-2 mb-2">
         <span className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-[var(--surface-sunken)] text-[var(--ink-70)] fb-tabular text-[11px]">{index + 1}</span>
         <Icon name={ACTION_ICON[action.type]} size={14} className="text-[rgb(var(--accent))]" />
         <span className="text-[12.5px] font-semibold text-[var(--ink-90)] flex-1">{ACTION_LABELS[action.type]}</span>
-        <button onClick={() => onMove(-1)} disabled={index === 0} className="p-1 rounded text-[var(--ink-50)] hover:text-[var(--ink-100)] disabled:opacity-30">
+        <button aria-label="Move step up" onClick={() => onMove(-1)} disabled={index === 0} className="p-1 rounded text-[var(--ink-50)] hover:text-[var(--ink-100)] disabled:opacity-30">
           <Icon name="arrow_upward" size={13} />
         </button>
-        <button onClick={() => onMove(1)} disabled={index === total - 1} className="p-1 rounded text-[var(--ink-50)] hover:text-[var(--ink-100)] disabled:opacity-30">
+        <button aria-label="Move step down" onClick={() => onMove(1)} disabled={index === total - 1} className="p-1 rounded text-[var(--ink-50)] hover:text-[var(--ink-100)] disabled:opacity-30">
           <Icon name="arrow_downward" size={13} />
         </button>
-        <button onClick={onRemove} className="p-1 rounded text-[var(--ink-50)] hover:text-rose-500">
+        <button aria-label="Remove step" onClick={onRemove} className="p-1 rounded text-[var(--ink-50)] hover:text-rose-500">
           <Icon name="close" size={14} />
         </button>
       </div>
 
       <div className="space-y-2 pl-8">
-        {action.type === 'create-task' && (
-          <input value={action.title} onChange={(e) => onChange({ ...action, title: e.target.value })} placeholder="Task title" className={field} />
+        {local.type === 'create-task' && (
+          <input value={local.title} onChange={(e) => setLocal({ ...local, title: e.target.value })} onBlur={commit} placeholder="Task title" className={field} />
         )}
-        {action.type === 'add-table-row' && (
-          <select value={action.tableId} onChange={(e) => onChange({ ...action, tableId: e.target.value })} className={field}>
+        {local.type === 'add-table-row' && (
+          <select
+            value={local.tableId}
+            onChange={(e) => {
+              const next = { ...local, tableId: e.target.value }
+              setLocal(next)
+              // A select has no meaningful blur step, so commit immediately.
+              if (JSON.stringify(next) !== JSON.stringify(action)) onChangeRef.current(next)
+            }}
+            className={field}
+          >
             <option value="">Choose a table…</option>
             {tables.map((t) => (
               <option key={t.id} value={t.id}>{t.title || 'Untitled table'}</option>
             ))}
           </select>
         )}
-        {action.type === 'send-email' && (
+        {local.type === 'send-email' && (
           <>
-            <input value={action.to} onChange={(e) => onChange({ ...action, to: e.target.value })} placeholder="to@company.com, ..." className={field} />
-            <input value={action.subject} onChange={(e) => onChange({ ...action, subject: e.target.value })} placeholder="Subject" className={field} />
-            <textarea value={action.body} onChange={(e) => onChange({ ...action, body: e.target.value })} placeholder="Body (use {{ai}} to insert an AI step output)" rows={3} className={`${field} resize-none`} />
+            <input value={local.to} onChange={(e) => setLocal({ ...local, to: e.target.value })} onBlur={commit} placeholder="to@company.com, ..." className={field} />
+            <input value={local.subject} onChange={(e) => setLocal({ ...local, subject: e.target.value })} onBlur={commit} placeholder="Subject" className={field} />
+            <textarea value={local.body} onChange={(e) => setLocal({ ...local, body: e.target.value })} onBlur={commit} placeholder="Body (use {{ai}} to insert an AI step output)" rows={3} className={`${field} resize-none`} />
           </>
         )}
-        {action.type === 'create-knowledge' && (
+        {local.type === 'create-knowledge' && (
           <>
-            <input value={action.title} onChange={(e) => onChange({ ...action, title: e.target.value })} placeholder="Entry title" className={field} />
-            <textarea value={action.body} onChange={(e) => onChange({ ...action, body: e.target.value })} placeholder="Entry body (use {{ai}} to insert an AI step output)" rows={3} className={`${field} resize-none`} />
+            <input value={local.title} onChange={(e) => setLocal({ ...local, title: e.target.value })} onBlur={commit} placeholder="Entry title" className={field} />
+            <textarea value={local.body} onChange={(e) => setLocal({ ...local, body: e.target.value })} onBlur={commit} placeholder="Entry body (use {{ai}} to insert an AI step output)" rows={3} className={`${field} resize-none`} />
           </>
         )}
-        {action.type === 'ai-step' && (
-          <textarea value={action.prompt} onChange={(e) => onChange({ ...action, prompt: e.target.value })} placeholder="Prompt for the AI. Its output is reusable as {{ai}} in later steps." rows={3} className={`${field} resize-none`} />
+        {local.type === 'ai-step' && (
+          <textarea value={local.prompt} onChange={(e) => setLocal({ ...local, prompt: e.target.value })} onBlur={commit} placeholder="Prompt for the AI. Its output is reusable as {{ai}} in later steps." rows={3} className={`${field} resize-none`} />
         )}
       </div>
     </div>
