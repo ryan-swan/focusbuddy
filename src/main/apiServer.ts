@@ -117,6 +117,10 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
       send(res, b.reason === 'too_large' ? 413 : 400, {
         error: b.reason === 'too_large' ? 'Request body too large.' : 'Malformed JSON body.'
       })
+      // For an oversized body the client may still be uploading; once the 413 has
+      // flushed, tear the socket down so it frees promptly rather than lingering
+      // until the request timeout.
+      if (b.reason === 'too_large') res.on('finish', () => req.destroy())
       return { ok: false }
     }
     return { ok: true, value: (b.value && typeof b.value === 'object' ? b.value : {}) as Record<string, unknown> }

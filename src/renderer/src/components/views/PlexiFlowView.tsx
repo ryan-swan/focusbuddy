@@ -179,8 +179,12 @@ function FlowEditor({
     void patch({ trigger: t })
   }
 
-  function updateAction(idx: number, next: FlowAction): void {
-    const actions = flow.actions.map((a, i) => (i === idx ? next : a))
+  // Match by action id, not index, so a deferred commit (e.g. an unmount-flush
+  // after the action was deleted or reordered) can never land on the wrong slot:
+  // if the id is gone it is a no-op, and a moved action still updates in place.
+  function updateAction(next: FlowAction): void {
+    if (!flow.actions.some((a) => a.id === next.id)) return
+    const actions = flow.actions.map((a) => (a.id === next.id ? next : a))
     void patch({ actions })
   }
 
@@ -189,8 +193,8 @@ function FlowEditor({
     void patch({ actions: [...flow.actions, blankAction(type, id)] })
   }
 
-  function removeAction(idx: number): void {
-    void patch({ actions: flow.actions.filter((_, i) => i !== idx) })
+  function removeAction(id: string): void {
+    void patch({ actions: flow.actions.filter((a) => a.id !== id) })
   }
 
   function moveAction(idx: number, dir: -1 | 1): void {
@@ -272,8 +276,8 @@ function FlowEditor({
             index={idx}
             total={flow.actions.length}
             tables={tables}
-            onChange={(next) => updateAction(idx, next)}
-            onRemove={() => removeAction(idx)}
+            onChange={(next) => updateAction(next)}
+            onRemove={() => removeAction(action.id)}
             onMove={(dir) => moveAction(idx, dir)}
           />
         ))}
@@ -352,8 +356,11 @@ function ActionCard({
     'w-full rounded-md bg-[var(--surface-base)] border border-[var(--edge-soft)] px-2 py-1.5 text-[12.5px] text-[var(--ink-100)] focus:outline-none focus:border-[rgb(var(--accent)/0.55)] placeholder:text-[var(--ink-50)]'
 
   // Hold the editable action locally so typing is snappy and never races the
-  // parent prop. Changes commit upward on blur (and on unmount, so switching
-  // actions or flows before blur does not drop an unsaved field).
+  // parent prop. The edit commits upward on blur. Committing here is keyed by the
+  // action id (see updateAction), so even a late blur cannot land on the wrong
+  // slot. We deliberately do NOT flush on unmount: switching flows or actions
+  // blurs the focused field first, which commits it, and a delete must not
+  // resurrect the row it just removed by re-committing a stale array.
   const [local, setLocal] = useState<FlowAction>(action)
   // Re-seed from the prop when the action identity or type changes (e.g. a
   // reorder swaps which action lives at this slot), but keep local edits while
@@ -363,23 +370,9 @@ function ActionCard({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [action.id, action.type])
 
-  const localRef = useRef(local)
-  localRef.current = local
-  const onChangeRef = useRef(onChange)
-  onChangeRef.current = onChange
   const commit = (): void => {
-    if (JSON.stringify(localRef.current) !== JSON.stringify(action)) {
-      onChangeRef.current(localRef.current)
-    }
+    if (JSON.stringify(local) !== JSON.stringify(action)) onChange(local)
   }
-  useEffect(() => {
-    return () => {
-      if (JSON.stringify(localRef.current) !== JSON.stringify(action)) {
-        onChangeRef.current(localRef.current)
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [action.id])
 
   return (
     <div className={`${PLEXI_CARD} p-3`} data-testid={`flow-action-${index}`}>
@@ -393,7 +386,12 @@ function ActionCard({
         <button aria-label="Move step down" onClick={() => onMove(1)} disabled={index === total - 1} className="p-1 rounded text-[var(--ink-50)] hover:text-[var(--ink-100)] disabled:opacity-30">
           <Icon name="arrow_downward" size={13} />
         </button>
-        <button aria-label="Remove step" onClick={onRemove} className="p-1 rounded text-[var(--ink-50)] hover:text-rose-500">
+        <button
+          aria-label="Remove step"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={onRemove}
+          className="p-1 rounded text-[var(--ink-50)] hover:text-rose-500"
+        >
           <Icon name="close" size={14} />
         </button>
       </div>
@@ -409,7 +407,7 @@ function ActionCard({
               const next = { ...local, tableId: e.target.value }
               setLocal(next)
               // A select has no meaningful blur step, so commit immediately.
-              if (JSON.stringify(next) !== JSON.stringify(action)) onChangeRef.current(next)
+              if (JSON.stringify(next) !== JSON.stringify(action)) onChange(next)
             }}
             className={field}
           >
