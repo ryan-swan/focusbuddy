@@ -27,7 +27,7 @@ export type View =
   | { kind: 'people-map' }
   | { kind: 'suite' }
   | { kind: 'product'; productKey: string }
-  | { kind: 'knowledge' }
+  | { kind: 'knowledge'; entryId?: string }
   | { kind: 'meetings' }
   | { kind: 'apps' }
   | { kind: 'forms' }
@@ -60,7 +60,7 @@ interface ViewStore {
   goPeopleMap: () => void
   goSuite: () => void
   goProduct: (productKey: string) => void
-  goKnowledge: () => void
+  goKnowledge: (entryId?: string) => void
   goMeetings: () => void
   goApps: () => void
   goForms: () => void
@@ -213,8 +213,8 @@ export const useViewStore = create<ViewStore>((set) => ({
     persistView(v)
     set({ view: v })
   },
-  goKnowledge: () => {
-    const v: View = { kind: 'knowledge' }
+  goKnowledge: (entryId?: string) => {
+    const v: View = { kind: 'knowledge', entryId }
     persistView(v)
     set({ view: v })
   },
