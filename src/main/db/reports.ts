@@ -2,6 +2,7 @@ import { randomUUID } from 'crypto'
 import { getDb } from './database'
 import { listTables, getTable, listRows } from './tables'
 import { sendChat } from '../ai/anthropic'
+import { advanceSchedule } from '@shared/schedule'
 import type {
   ReportDef,
   ReportDraft,
@@ -123,11 +124,20 @@ export function deleteReport(id: string): boolean {
 // the grounding for the AI narrative and the fallback output when there is no
 // key. Numbers come straight from the rows; nothing is estimated.
 function buildDataSummary(tableIds: string[]): string {
-  const tables = tableIds.length
+  const usingSelection = tableIds.length > 0
+  const tables = usingSelection
     ? tableIds.map((id) => getTable(id)).filter((t): t is NonNullable<typeof t> => t !== null)
     : listTables()
-  if (tables.length === 0) return 'No tables selected, so there is no data to report on yet.'
+  // Be honest when selected tables have since been deleted: say so rather than
+  // narrate a smaller set as if it were the whole report.
+  const missing = usingSelection ? tableIds.length - tables.length : 0
+  if (tables.length === 0) {
+    return usingSelection
+      ? 'Every table this report was built on has since been deleted, so there is no data to report on.'
+      : 'No tables exist yet, so there is no data to report on.'
+  }
   const parts: string[] = []
+  if (missing > 0) parts.push(`${missing} of the ${tableIds.length} selected tables no longer exist and were skipped.`, '')
   for (const t of tables) {
     const rows = listRows(t.id)
     const cols = t.schema.columns
@@ -155,11 +165,7 @@ function buildDataSummary(tableIds: string[]): string {
 
 export function computeNextRun(schedule: ReportSchedule, fromMs: number): number | null {
   if (schedule === 'manual') return null
-  const d = new Date(fromMs)
-  if (schedule === 'daily') d.setDate(d.getDate() + 1)
-  else if (schedule === 'weekly') d.setDate(d.getDate() + 7)
-  else if (schedule === 'monthly') d.setMonth(d.getMonth() + 1)
-  return d.getTime()
+  return advanceSchedule(schedule, fromMs)
 }
 
 // Generate the report now: build the data summary, narrate it with the model when
@@ -178,12 +184,18 @@ export async function generateReport(id: string): Promise<GenerateReportResult> 
     `Write a concise executive report titled "${report.title}" based only on the real workspace data below. ` +
     `Summarise the current state and call out anything notable in two to four short paragraphs. ` +
     `Do not invent any numbers or facts beyond what the data shows.\n\n${summary}`
-  const res = await sendChat({ taskId: null, messages: [{ role: 'user', content: prompt, ts: Date.now() }] })
-  if (res.ok && res.message?.content) {
-    output = res.message.content
-    isAi = true
-  } else if (res.needsApiKey) {
-    needsApiKey = true
+  // The model call is best-effort: any failure falls back to the honest data
+  // summary, marked not-AI, rather than throwing and leaving the report unwritten.
+  try {
+    const res = await sendChat({ taskId: null, messages: [{ role: 'user', content: prompt, ts: Date.now() }] })
+    if (res.ok && res.message?.content) {
+      output = res.message.content
+      isAi = true
+    } else if (res.needsApiKey) {
+      needsApiKey = true
+    }
+  } catch {
+    // Keep the data summary; isAi stays false so it is never shown as a narrative.
   }
 
   const now = Date.now()
@@ -202,8 +214,20 @@ export function listDueReports(nowMs = Date.now()): ReportDef[] {
 
 // Generate every due report. Returns how many ran, for an honest "N generated"
 // message. Never invents a run: a report with no schedule is skipped.
-export async function runDueReports(nowMs = Date.now()): Promise<{ generated: number }> {
+export async function runDueReports(nowMs = Date.now()): Promise<{ generated: number; failed: number }> {
   const due = listDueReports(nowMs)
-  for (const r of due) await generateReport(r.id)
-  return { generated: due.length }
+  let generated = 0
+  let failed = 0
+  // Guard each report so one failure does not abort the rest of the batch, and
+  // report a real count rather than assuming every due report succeeded.
+  for (const r of due) {
+    try {
+      const res = await generateReport(r.id)
+      if (res.ok) generated++
+      else failed++
+    } catch {
+      failed++
+    }
+  }
+  return { generated, failed }
 }

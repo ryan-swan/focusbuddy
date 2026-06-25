@@ -167,4 +167,40 @@ describe('rescheduleOnDrift', () => {
     const r = rescheduleOnDrift(inputs, ANCHOR, new Map())
     expect(r.projectDurationDays).toBe(base.projectDurationDays)
   })
+
+  it('keeps a milestone zero-duration even when its actual finish is late', () => {
+    // m is a milestone after a(2). Marked done on day 5, well past its day-2 slot.
+    // A milestone must never become a bar; it stays an instant.
+    const inputs = [t('a', 2), t('m', 0, ['a'], true)]
+    const r = rescheduleOnDrift(inputs, ANCHOR, new Map([['m', 5]]))
+    const m = r.tasks.find((x) => x.id === 'm')!
+    expect(m.isMilestone).toBe(true)
+    expect(m.durationDays).toBe(0)
+    expect(m.earliestStart).toBe(m.earliestFinish)
+  })
+
+  it('still pushes a successor when its predecessor task slips', () => {
+    const inputs = [t('a', 2), t('m', 0, ['a'], true)]
+    // a actually finished on day 5; the milestone shifts to day 5 but stays 0-dur.
+    const r = rescheduleOnDrift(inputs, ANCHOR, new Map([['a', 5]]))
+    const m = r.tasks.find((x) => x.id === 'm')!
+    expect(m.earliestStart).toBe(5)
+    expect(m.durationDays).toBe(0)
+  })
+})
+
+describe('computeSchedule edge cases', () => {
+  it('returns an empty schedule for a project with no tasks', () => {
+    const r = computeSchedule([], ANCHOR)
+    expect(r.tasks).toEqual([])
+    expect(r.projectDurationDays).toBe(0)
+    expect(r.criticalPath).toEqual([])
+    expect(r.hasCycle).toBe(false)
+  })
+
+  it('an all-milestone project has a zero-length schedule and no crash', () => {
+    const r = computeSchedule([t('m1', 0, [], true), t('m2', 0, ['m1'], true)], ANCHOR)
+    expect(r.projectDurationDays).toBe(0)
+    expect(r.tasks.every((x) => x.durationDays === 0)).toBe(true)
+  })
 })

@@ -1,5 +1,6 @@
 import { randomUUID } from 'crypto'
 import { getDb } from './database'
+import { deleteEmbedding } from './embeddings'
 import type {
   DocBody,
   DocumentDraft,
@@ -182,5 +183,8 @@ export function upsertDocument(input: {
 export function deleteDocument(id: string): boolean {
   const db = getDb()
   const info = db.prepare('DELETE FROM documents WHERE id = ?').run(id)
+  // Remove the document's semantic vector on the same path, so no delete route
+  // leaves an orphaned embedding behind.
+  if (info.changes > 0) deleteEmbedding('document', id)
   return info.changes > 0
 }
