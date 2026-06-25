@@ -123,7 +123,10 @@ export function deleteReport(id: string): boolean {
 // Build an honest, real data summary in Markdown from the chosen tables. This is
 // the grounding for the AI narrative and the fallback output when there is no
 // key. Numbers come straight from the rows; nothing is estimated.
-function buildDataSummary(tableIds: string[]): string {
+function buildDataSummary(rawTableIds: string[]): string {
+  // De-duplicate so a table chosen twice does not double-count or render twice,
+  // and so the "N of M no longer exist" line stays accurate.
+  const tableIds = Array.from(new Set(rawTableIds))
   const usingSelection = tableIds.length > 0
   const tables = usingSelection
     ? tableIds.map((id) => getTable(id)).filter((t): t is NonNullable<typeof t> => t !== null)
