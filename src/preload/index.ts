@@ -1371,6 +1371,11 @@ const api = {
       ipcRenderer.invoke('api:createToken', name, scopes),
     revokeToken: (id: string): Promise<boolean> => ipcRenderer.invoke('api:revokeToken', id)
   },
+  // PlexiMarketplace: built-in starter templates applied with one click.
+  marketplace: {
+    apply: (key: string): Promise<import('@shared/templates').ApplyTemplateResult> =>
+      ipcRenderer.invoke('marketplace:apply', key)
+  },
   // haptyx:// deep-link auth handoff. The brochure at haptyx.app/account/*
   // signs the user in against the signal server, then redirects to
   // haptyx://auth?token=...&email=...&handle=... — main process catches

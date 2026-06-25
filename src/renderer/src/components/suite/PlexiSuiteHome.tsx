@@ -55,6 +55,8 @@ export function launchProduct(product: PlexiProduct): void {
       return v.goFlows()
     case 'api':
       return v.goApi()
+    case 'marketplace':
+      return v.goMarketplace()
     case 'canvas':
       return v.goHome()
     default:
