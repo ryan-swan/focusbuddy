@@ -153,10 +153,12 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
   const goFiles = useViewStore((s) => s.goFiles)
   const goCollaborations = useViewStore((s) => s.goCollaborations)
   const goOrg = useViewStore((s) => s.goOrg)
+  const goPeopleMap = useViewStore((s) => s.goPeopleMap)
   const goSuite = useViewStore((s) => s.goSuite)
   const goKnowledge = useViewStore((s) => s.goKnowledge)
   const goMeetings = useViewStore((s) => s.goMeetings)
   const goApps = useViewStore((s) => s.goApps)
+  const goForms = useViewStore((s) => s.goForms)
   const goInsights = useViewStore((s) => s.goInsights)
   const unreadMessages = useMessagingStore((s) => s.unreadTotal)
   const unreadMail = useMailStore(selectMailUnread)
@@ -714,6 +716,15 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
               }}
             />
             <NavRow
+              icon="dynamic_form"
+              label="PlexiForms"
+              active={viewIsActive({ kind: 'forms' })}
+              onClick={() => {
+                setActive(null)
+                goForms()
+              }}
+            />
+            <NavRow
               icon="insights"
               label="Insights"
               active={viewIsActive({ kind: 'insights' })}
@@ -761,6 +772,15 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
               onClick={() => {
                 setActive(null)
                 goOrg()
+              }}
+            />
+            <NavRow
+              icon="travel_explore"
+              label="People Map"
+              active={viewIsActive({ kind: 'people-map' })}
+              onClick={() => {
+                setActive(null)
+                goPeopleMap()
               }}
             />
             <NavRow
