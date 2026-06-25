@@ -158,6 +158,51 @@ export function defaultValue<T extends FieldType>(type: T): FieldValueByType[T] 
   }
 }
 
+// Best-effort conversion of a stored cell value when a column's type changes.
+// Keeps the value where the two shapes are compatible (plain text ↔ text,
+// text ↔ number, date ↔ number) and otherwise resets to the new type's default
+// rather than carrying a value the new type cannot interpret, such as a stale
+// option id rendered as text. text-rich (Tiptap JSON) and the id-bearing types
+// (selects, relation, attachment) never carry across a type change.
+export function coerceFieldValue(from: FieldType, to: FieldType, value: unknown): unknown {
+  if (from === to) return value
+  if (value === null || value === undefined) return defaultValue(to)
+  const plainText = (t: FieldType): boolean => t === 'text-short' || t === 'text-long'
+  if (plainText(to)) {
+    if (plainText(from) || from === 'number') return String(value)
+    if (from === 'date' && typeof value === 'number') return new Date(value).toISOString().slice(0, 10)
+    if (from === 'checkbox') return value ? 'true' : ''
+    return defaultValue(to)
+  }
+  if (to === 'number') {
+    if (from === 'number') return value
+    if (plainText(from)) {
+      const n = parseFloat(String(value))
+      return Number.isFinite(n) ? n : null
+    }
+    if (from === 'date' && typeof value === 'number') return value
+    if (from === 'checkbox') return value ? 1 : 0
+    return null
+  }
+  if (to === 'date') {
+    if (from === 'date' || (from === 'number' && typeof value === 'number')) return value
+    if (plainText(from)) {
+      const t = Date.parse(String(value))
+      return Number.isNaN(t) ? null : t
+    }
+    return null
+  }
+  if (to === 'checkbox') {
+    if (from === 'checkbox') return value
+    if (from === 'number') return value !== 0
+    if (plainText(from)) return String(value).trim().length > 0
+    return false
+  }
+  // single-select, multi-select, attachment, relation, text-rich, button:
+  // no safe carry-over from a different type — start clean.
+  return defaultValue(to)
+}
+
 export const FIELD_TYPE_LABELS: Record<FieldType, string> = {
   'text-short': 'Short text',
   'text-long': 'Long text',
