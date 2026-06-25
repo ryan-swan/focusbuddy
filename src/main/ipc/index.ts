@@ -246,6 +246,8 @@ import {
 import type { MeetingDraft, MeetingPatch } from '@shared/meetings'
 import { listApps, getApp, createApp, updateApp, deleteApp } from '../db/apps'
 import type { PlexiAppDraft, PlexiAppPatch } from '@shared/apps'
+import { listForms, getForm, createForm, updateForm, deleteForm } from '../db/forms'
+import type { PlexiFormDraft, PlexiFormPatch } from '@shared/forms'
 import type {
   FbRowDraft,
   FbRowPatch,
@@ -1504,6 +1506,13 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('apps:create', (_e, draft: PlexiAppDraft) => createApp(draft))
   ipcMain.handle('apps:update', (_e, id: string, patch: PlexiAppPatch) => updateApp(id, patch))
   ipcMain.handle('apps:delete', (_e, id: string) => deleteApp(id))
+
+  // ── PlexiForms forms ─────────────────────────────────────────────────────
+  ipcMain.handle('forms:list', () => listForms())
+  ipcMain.handle('forms:get', (_e, id: string) => getForm(id))
+  ipcMain.handle('forms:create', (_e, draft: PlexiFormDraft) => createForm(draft))
+  ipcMain.handle('forms:update', (_e, id: string, patch: PlexiFormPatch) => updateForm(id, patch))
+  ipcMain.handle('forms:delete', (_e, id: string) => deleteForm(id))
 
   // ── haptyx:// deep-link auth handoff ─────────────────────────────────────
   // The renderer calls `auth:get-pending` on mount to drain any token that
