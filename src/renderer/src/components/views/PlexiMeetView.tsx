@@ -152,7 +152,7 @@ export default function PlexiMeetView(): JSX.Element {
             data-testid="meet-add"
             disabled={!!busy}
             className="inline-flex items-center gap-1 px-2 py-1.5 rounded-md border border-[var(--edge-soft)] text-[var(--ink-90)] text-[12px] hover:bg-[var(--surface-sunken)]"
-            title="Add a meeting from notes"
+            title="Add a meeting from notes" aria-label="Add a meeting from notes"
           >
             <Icon name="edit_note" size={15} /> Notes
           </button>
@@ -235,7 +235,7 @@ export default function PlexiMeetView(): JSX.Element {
           />
         ) : (
           <div className="h-full flex flex-col items-center justify-center text-center px-6">
-            <Icon name="groups" size={30} className="text-stone-300 dark:text-stone-600" />
+            <Icon name="groups" size={30} className="text-[var(--ink-30)]" />
             <p className="mt-2 text-[13px] text-[var(--ink-70)] max-w-sm leading-relaxed">
               Select a meeting to read its summary, transcript and action items, or record a new one.
             </p>
@@ -280,7 +280,7 @@ function MeetingDetail({
         <button
           onClick={onDelete}
           className="p-1.5 rounded-md text-stone-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30"
-          title="Delete meeting"
+          title="Delete meeting" aria-label="Delete meeting"
           data-testid="meet-delete"
         >
           <Icon name="delete" size={16} />
