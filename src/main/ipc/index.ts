@@ -275,6 +275,9 @@ import {
   runDueFlows
 } from '../db/flows'
 import type { FlowDraft, FlowPatch } from '@shared/flows'
+import { listTokens, createToken, revokeToken, getApiConfig, setApiConfig } from '../db/apiTokens'
+import { startApiServer, stopApiServer, isApiServerRunning, initApiServer } from '../apiServer'
+import type { ApiScope } from '@shared/apiAccess'
 import { deleteEmbedding } from '../db/embeddings'
 import {
   listMeetings,
@@ -1811,6 +1814,41 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('flows:delete', (_e, id: string) => deleteFlow(id))
   ipcMain.handle('flows:run', (_e, id: string) => runFlow(id))
   ipcMain.handle('flows:runDue', () => runDueFlows())
+
+  // PlexiAPI: the local REST server and its scoped tokens. Off by default; the
+  // server only ever binds to 127.0.0.1.
+  function apiStatus(): { enabled: boolean; port: number; host: string; running: boolean } {
+    const cfg = getApiConfig()
+    return { enabled: cfg.enabled, port: cfg.port, host: '127.0.0.1', running: isApiServerRunning() }
+  }
+  ipcMain.handle('api:status', () => apiStatus())
+  ipcMain.handle('api:setEnabled', async (_e, enabled: boolean) => {
+    setApiConfig({ enabled })
+    if (enabled) {
+      const r = await startApiServer(getApiConfig().port)
+      if (!r.ok) {
+        setApiConfig({ enabled: false })
+        return { ...apiStatus(), error: r.error }
+      }
+    } else {
+      await stopApiServer()
+    }
+    return apiStatus()
+  })
+  ipcMain.handle('api:setPort', async (_e, port: number) => {
+    setApiConfig({ port })
+    if (isApiServerRunning()) {
+      await stopApiServer()
+      const r = await startApiServer(getApiConfig().port)
+      if (!r.ok) return { ...apiStatus(), error: r.error }
+    }
+    return apiStatus()
+  })
+  ipcMain.handle('api:listTokens', () => listTokens())
+  ipcMain.handle('api:createToken', (_e, name: string, scopes: ApiScope[]) => createToken(name, scopes))
+  ipcMain.handle('api:revokeToken', (_e, id: string) => revokeToken(id))
+  // Bring the server up if the user enabled it in a previous session.
+  void initApiServer()
   ipcMain.handle(
     'documents:upsert',
     (
