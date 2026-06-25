@@ -152,6 +152,19 @@ function ProjectGantt({ projectId, onBack }: { projectId: string; onBack: () => 
   }, [plan])
 
   const critPathSet = useMemo(() => new Set(plan?.criticalPath ?? []), [plan])
+  // A task is "late" if it finished after plan (in plan.drift) or is still open
+  // and already past its scheduled finish. The second case is the actionable one,
+  // a task slipping right now, which the finished-late drift data cannot show.
+  const lateSet = useMemo(() => {
+    if (!plan) return new Set<string>()
+    const now = Date.now()
+    const late = new Set(plan.drift.map((d) => d.id))
+    for (const t of plan.tasks) {
+      const done = t.status === 'done' || t.completedAt != null
+      if (!done && !t.isMilestone && t.scheduledEndMs < now) late.add(t.id)
+    }
+    return late
+  }, [plan])
 
   return (
     <div className="h-full w-full flex flex-col bg-[var(--surface-base)] text-[var(--ink-100)]" data-testid="plexiprojects-view">
@@ -244,6 +257,7 @@ function ProjectGantt({ projectId, onBack }: { projectId: string; onBack: () => 
                       x={geom.xOf(t.scheduledStartMs)}
                       y={i * ROW_H}
                       critical={critPathSet.has(t.id) || t.critical}
+                      late={lateSet.has(t.id)}
                       onClick={() => setSelectedId(t.id)}
                     />
                   ))}
@@ -339,12 +353,14 @@ function TaskBar({
   x,
   y,
   critical,
+  late,
   onClick
 }: {
   task: PlanTask
   x: number
   y: number
   critical: boolean
+  late: boolean
   onClick: () => void
 }): JSX.Element {
   const done = task.status === 'done' || task.completedAt != null
@@ -378,10 +394,15 @@ function TaskBar({
       onClick={onClick}
       className={`absolute rounded-[4px] cursor-pointer transition-colors flex items-center px-1.5 overflow-hidden ${cls}`}
       style={{ left: x, top, width: w, height: 16 }}
-      title={`${task.title} — ${fmtDate(task.scheduledStartMs)} to ${fmtDate(task.scheduledEndMs)}${task.slackDays > 0 ? `, ${task.slackDays}d slack` : ', critical'}`}
+      title={`${task.title} — ${fmtDate(task.scheduledStartMs)} to ${fmtDate(task.scheduledEndMs)}${task.slackDays > 0 ? `, ${task.slackDays}d slack` : ', critical'}${late ? (done ? ', finished late' : ', running late') : ''}`}
     >
       {w > 44 && (
-        <span className="text-[10px] truncate text-[var(--ink-90)]">{task.title}</span>
+        <span className="text-[10px] truncate text-[var(--ink-90)] flex-1">{task.title}</span>
+      )}
+      {late && (
+        <span className="shrink-0 ml-auto inline-flex" data-testid={`gantt-late-${task.id}`}>
+          <Icon name="warning" size={11} className="text-amber-500" filled />
+        </span>
       )}
     </div>
   )
@@ -508,6 +529,24 @@ function TaskEditor({
             className="mt-1 w-full rounded-md bg-[var(--surface-base)] border border-[var(--edge-soft)] px-2 py-1.5 text-[12px] text-[var(--ink-100)] focus:outline-none focus:border-[rgb(var(--accent)/0.55)]"
           />
         </label>
+
+        {!task.isMilestone && (
+          <label className="block">
+            <span className="text-[11px] text-[var(--ink-70)]">Length in working days (used when no finish date)</span>
+            <input
+              type="number"
+              min={1}
+              value={task.estimateMinutes ? Math.max(1, Math.round(task.estimateMinutes / (60 * 8))) : ''}
+              placeholder="e.g. 3"
+              data-testid="task-estimate-days"
+              onChange={(e) => {
+                const days = Number(e.target.value)
+                void patch({ estimateMinutes: days > 0 ? Math.round(days) * 8 * 60 : null })
+              }}
+              className="mt-1 w-full rounded-md bg-[var(--surface-base)] border border-[var(--edge-soft)] px-2 py-1.5 text-[12px] text-[var(--ink-100)] focus:outline-none focus:border-[rgb(var(--accent)/0.55)]"
+            />
+          </label>
+        )}
 
         <label className="flex items-center gap-2 cursor-pointer">
           <input

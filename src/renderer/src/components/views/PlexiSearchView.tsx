@@ -145,13 +145,13 @@ export default function PlexiSearchView(): JSX.Element {
         goFiles()
         break
       case 'knowledge':
-        goKnowledge()
+        goKnowledge(h.id)
         break
     }
   }
 
   function openSource(s: AskSource): void {
-    if (s.docType === 'knowledge') goKnowledge()
+    if (s.docType === 'knowledge') goKnowledge(s.docId)
     else goDocument(s.docId)
   }
 

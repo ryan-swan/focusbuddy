@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import Icon from '../Icon'
 import { useKnowledgeStore } from '../../stores/knowledge'
+import { useViewStore } from '../../stores/view'
 import type { KnowledgeEntry } from '@shared/knowledge'
 
 // PlexiBrain: the company knowledge base. People curate entries here and the AI
@@ -20,8 +21,12 @@ export default function KnowledgeView(): JSX.Element {
   const updateEntry = useKnowledgeStore((s) => s.update)
   const removeEntry = useKnowledgeStore((s) => s.remove)
 
+  // When the view was opened with a specific entry (e.g. from PlexiSearch), start
+  // on that entry. Reads the route once on mount via the store's current value.
+  const routedEntryId = useViewStore((s) => (s.view.kind === 'knowledge' ? s.view.entryId : undefined))
+
   const [query, setQuery] = useState('')
-  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [selectedId, setSelectedId] = useState<string | null>(routedEntryId ?? null)
   // Search hits from the main process (semantic + keyword blended). null = no
   // active search, so the full list shows.
   const [searchHits, setSearchHits] = useState<KnowledgeEntry[] | null>(null)
@@ -32,6 +37,11 @@ export default function KnowledgeView(): JSX.Element {
     // with no embedding key it is a no-op and search stays keyword-based.
     void window.api.knowledge.reindex()
   }, [load])
+
+  // Follow a later deep-link (open PlexiSearch again on a different entry).
+  useEffect(() => {
+    if (routedEntryId) setSelectedId(routedEntryId)
+  }, [routedEntryId])
 
   // Debounced search through the main process so results rank by meaning when a
   // key is set, and by keyword otherwise. An empty query shows everything.

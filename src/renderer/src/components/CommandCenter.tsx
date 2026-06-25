@@ -754,7 +754,7 @@ interface HitNav {
   goTask: (id: string) => void
   goDocument: (id: string) => void
   goFiles: () => void
-  goKnowledge: () => void
+  goKnowledge: (entryId?: string) => void
   setActive: (id: string | null) => void
 }
 
@@ -782,7 +782,7 @@ function runHit(h: SearchHit, nav: HitNav): void {
       nav.goFiles()
       break
     case 'knowledge':
-      nav.goKnowledge()
+      nav.goKnowledge(h.id)
       break
   }
 }
