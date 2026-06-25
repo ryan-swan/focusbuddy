@@ -199,7 +199,9 @@ function ChartCanvas({
   if (config.series.length === 0) {
     return <EmptyState icon="functions" text="Add at least one value series in the Data panel." />
   }
-  if (computed.empty && config.type !== 'kpi') {
+  // Applies to KPI too: a metric over a table with no rows shows the honest
+  // empty state rather than a bold "0" that reads like a real measured value.
+  if (computed.empty) {
     return <EmptyState icon="table_rows" text="This table has no rows yet. The chart fills in as data arrives." />
   }
 

@@ -215,8 +215,9 @@ CREATE INDEX IF NOT EXISTS idx_fb_forms_updated ON fb_forms(updated_at DESC);
 
 -- ── PlexiSign signature requests ─────────────────────────────────────────────
 -- One signature request ("envelope"): the agreement body, an ordered set of
--- signers (JSON), an append-only audit trail (JSON), and a completion
--- certificate (sha256 over body + signatures). Self-contained, local-first.
+-- signers (JSON), an append-ordered audit trail (JSON, ordering maintained by the
+-- engine, not a cryptographic chain), and a completion certificate (sha256 over
+-- body + signatures). Self-contained, local-first.
 CREATE TABLE IF NOT EXISTS fb_sign_requests (
   id TEXT PRIMARY KEY,
   title TEXT NOT NULL DEFAULT 'Untitled agreement',

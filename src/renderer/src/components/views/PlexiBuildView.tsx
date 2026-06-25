@@ -61,9 +61,13 @@ export default function PlexiBuildView(): JSX.Element {
           </button>
         </div>
         <div className="flex-1 overflow-auto px-2 pb-2">
-          {loaded && apps.length === 0 ? (
+          {!loaded ? (
+            <div className="px-3 py-10 flex items-center justify-center gap-2 text-[12px] text-[var(--ink-70)]">
+              <Icon name="progress_activity" size={15} className="text-[rgb(var(--accent))] animate-spin" /> Loading…
+            </div>
+          ) : apps.length === 0 ? (
             <div className="px-3 py-10 text-center">
-              <Icon name="apps" size={26} className="text-stone-300 dark:text-stone-600" />
+              <Icon name="apps" size={26} className="text-[var(--ink-30)]" />
               <p className="mt-2 text-[12px] text-[var(--ink-70)] leading-relaxed">
                 No apps yet. Build your first internal tool.
               </p>

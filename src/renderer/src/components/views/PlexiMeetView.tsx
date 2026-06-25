@@ -77,30 +77,38 @@ export default function PlexiMeetView(): JSX.Element {
 
   async function transcribeAndSave(buffer: ArrayBuffer, mimeType: string): Promise<void> {
     setBusy('Transcribing the recording…')
-    const t = await window.api.voiceNote.transcribe({ buffer, mimeType })
-    if (!t.ok) {
+    setError(null)
+    try {
+      // Unguarded before: a rejected transcribe left the spinner stuck forever.
+      const t = await window.api.voiceNote.transcribe({ buffer, mimeType })
+      if (!t.ok) {
+        setError(
+          t.reason === 'no_key'
+            ? 'Recording captured, but transcription needs a key. Add an OpenAI or Anthropic key in Settings, then record again.'
+            : `Transcription failed: ${t.error}`
+        )
+        return
+      }
+      setBusy('Summarising…')
+      const sum = await window.api.voiceNote.process({ transcript: t.transcript, mode: 'summary' }).catch(() => null)
+      setBusy('Pulling out action items…')
+      const acts = await window.api.voiceNote.extractActions({ transcript: t.transcript }).catch(() => null)
+      const actionItems = acts?.ok ? acts.proposals.flatMap(proposalLabels).filter(Boolean) : []
+      const created = await createMeeting({
+        title: `Meeting · ${fmtDate(Date.now())}`,
+        transcript: t.transcript,
+        // An empty summary when the AI step failed is honest: the transcript is
+        // the real captured value, and nothing fake is filled in.
+        summary: sum?.ok ? sum.text : '',
+        actionItems,
+        durationSec: t.durationSec
+      })
+      if (created) setSelectedId(created.id)
+    } catch {
+      setError('Something went wrong saving the recording. The audio was captured; please try again.')
+    } finally {
       setBusy(null)
-      setError(
-        t.reason === 'no_key'
-          ? 'Recording captured, but transcription needs a key. Add an OpenAI or Anthropic key in Settings, then record again.'
-          : `Transcription failed: ${t.error}`
-      )
-      return
     }
-    setBusy('Summarising…')
-    const sum = await window.api.voiceNote.process({ transcript: t.transcript, mode: 'summary' }).catch(() => null)
-    setBusy('Pulling out action items…')
-    const acts = await window.api.voiceNote.extractActions({ transcript: t.transcript }).catch(() => null)
-    const actionItems = acts?.ok ? acts.proposals.flatMap(proposalLabels).filter(Boolean) : []
-    const created = await createMeeting({
-      title: `Meeting · ${fmtDate(Date.now())}`,
-      transcript: t.transcript,
-      summary: sum?.ok ? sum.text : '',
-      actionItems,
-      durationSec: t.durationSec
-    })
-    setBusy(null)
-    if (created) setSelectedId(created.id)
   }
 
   async function addManual(): Promise<void> {
@@ -175,9 +183,13 @@ export default function PlexiMeetView(): JSX.Element {
         </div>
 
         <div className="flex-1 overflow-auto px-2 pb-2">
-          {loaded && filtered.length === 0 ? (
+          {!loaded ? (
+            <div className="px-3 py-10 flex items-center justify-center gap-2 text-[12px] text-[var(--ink-70)]">
+              <Icon name="progress_activity" size={15} className="text-[rgb(var(--accent))] animate-spin" /> Loading…
+            </div>
+          ) : filtered.length === 0 ? (
             <div className="px-3 py-10 text-center">
-              <Icon name="forum" size={26} className="text-stone-300 dark:text-stone-600" />
+              <Icon name="forum" size={26} className="text-[var(--ink-30)]" />
               <p className="mt-2 text-[12px] text-[var(--ink-70)] leading-relaxed">
                 {meetings.length === 0
                   ? 'No meetings yet. Record one or add notes, and the actions land beside your work.'
