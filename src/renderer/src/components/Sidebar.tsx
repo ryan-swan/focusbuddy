@@ -165,6 +165,7 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
   const goReports = useViewStore((s) => s.goReports)
   const goFlows = useViewStore((s) => s.goFlows)
   const goApi = useViewStore((s) => s.goApi)
+  const goMarketplace = useViewStore((s) => s.goMarketplace)
   const goInsights = useViewStore((s) => s.goInsights)
   const unreadMessages = useMessagingStore((s) => s.unreadTotal)
   const unreadMail = useMailStore(selectMailUnread)
@@ -773,6 +774,15 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
               onClick={() => {
                 setActive(null)
                 goApi()
+              }}
+            />
+            <NavRow
+              icon="storefront"
+              label="Marketplace"
+              active={viewIsActive({ kind: 'marketplace' })}
+              onClick={() => {
+                setActive(null)
+                goMarketplace()
               }}
             />
             <NavRow

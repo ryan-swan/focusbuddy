@@ -475,14 +475,14 @@ export const PLEXI_PRODUCTS: PlexiProduct[] = [
     key: 'pleximarketplace',
     name: 'PlexiMarketplace',
     group: 'connect',
-    tagline: 'Templates, widgets and integrations.',
-    status: 'planned',
+    tagline: 'Start from a template.',
+    status: 'ready',
     icon: 'storefront',
     accent: '#4338ca',
-    about: 'A marketplace of desk templates, widgets, automations and integrations built by the team and the community.',
-    edges: ['Start from a proven template, not a blank desk.', 'Install integrations in a click.', 'Share what you build.'],
+    about: 'A gallery of built-in starter templates, tables, reports, automations and knowledge, that you add to your workspace with one click. Community publishing, where teams share their own templates, is on the way.',
+    edges: ['Start from a proven template, not a blank desk.', 'Applies real, editable objects, not a demo.', 'One click to add a whole setup.'],
     insteadOf: 'building everything from scratch',
-    planned: ['Template gallery', 'One-click integrations', 'Community publishing']
+    launch: 'marketplace'
   },
 
   // ── PlexiOps (the future business suite) ─────────────────────────────────

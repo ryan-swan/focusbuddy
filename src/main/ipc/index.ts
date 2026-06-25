@@ -278,6 +278,7 @@ import type { FlowDraft, FlowPatch } from '@shared/flows'
 import { listTokens, createToken, revokeToken, getApiConfig, setApiConfig } from '../db/apiTokens'
 import { startApiServer, stopApiServer, isApiServerRunning, initApiServer } from '../apiServer'
 import type { ApiScope } from '@shared/apiAccess'
+import { applyTemplate } from '../templates'
 import { deleteEmbedding } from '../db/embeddings'
 import {
   listMeetings,
@@ -1844,6 +1845,9 @@ export function registerIpcHandlers(): void {
     }
     return apiStatus()
   })
+  // PlexiMarketplace: built-in starter templates applied with one click.
+  ipcMain.handle('marketplace:apply', (_e, key: string) => applyTemplate(key))
+
   ipcMain.handle('api:listTokens', () => listTokens())
   ipcMain.handle('api:createToken', (_e, name: string, scopes: ApiScope[]) => createToken(name, scopes))
   ipcMain.handle('api:revokeToken', (_e, id: string) => revokeToken(id))
