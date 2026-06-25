@@ -8,6 +8,7 @@
 import { listDocuments, getDocument } from './db/documents'
 import { extractDocText, rankSources, type WorkspaceSource } from './workspaceRank'
 import { semanticSearchKnowledge } from './semanticRetrieval'
+import { semanticSearchDocuments } from './documentRetrieval'
 
 export type { WorkspaceSource } from './workspaceRank'
 export { extractDocText } from './workspaceRank'
@@ -31,14 +32,11 @@ export async function retrieveSources(query: string, limit = 6): Promise<Workspa
     })
     .filter((k) => k.text.trim().length > 0)
 
-  const docs = listDocuments()
-    .map((m) => {
-      const full = getDocument(m.id)
-      if (!full) return null
-      return { docId: m.id, title: m.title, docType: m.docType as string, text: extractDocText(m.docType, full.body) }
-    })
-    .filter((d): d is { docId: string; title: string; docType: string; text: string } => d !== null && d.text.length > 0)
-  const docSources = rankSources(query, docs, limit)
+  // Documents are ranked by meaning when an embedding key is set and by keyword
+  // otherwise, the same honest fallback knowledge uses. semanticSearchDocuments
+  // builds the document pool itself, so the duplicate listDocuments walk that
+  // used to live here is gone.
+  const docSources = await semanticSearchDocuments(query, limit)
 
   return [...kSources, ...docSources].slice(0, limit)
 }

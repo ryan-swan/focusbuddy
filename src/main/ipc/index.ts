@@ -241,6 +241,11 @@ import {
   reindexKnowledge,
   knowledgeSemanticActive
 } from '../semanticRetrieval'
+import {
+  embedDocument,
+  reindexDocuments,
+  documentSemanticActive
+} from '../documentRetrieval'
 import { deleteEmbedding } from '../db/embeddings'
 import {
   listMeetings,
@@ -1731,11 +1736,22 @@ export function registerIpcHandlers(): void {
   // ── Office documents (doc / sheet / slides) ─────────────────────────────
   ipcMain.handle('documents:list', () => listDocuments())
   ipcMain.handle('documents:get', (_e, id: string) => getDocument(id))
-  ipcMain.handle('documents:create', (_e, draft: DocumentDraft) => createDocument(draft))
-  ipcMain.handle('documents:update', (_e, id: string, patch: DocumentPatch) =>
-    updateDocument(id, patch)
-  )
-  ipcMain.handle('documents:delete', (_e, id: string) => deleteDocument(id))
+  ipcMain.handle('documents:create', (_e, draft: DocumentDraft) => {
+    const doc = createDocument(draft)
+    void embedDocument(doc.id) // best-effort index; never blocks the save
+    return doc
+  })
+  ipcMain.handle('documents:update', (_e, id: string, patch: DocumentPatch) => {
+    const doc = updateDocument(id, patch)
+    if (doc) void embedDocument(doc.id)
+    return doc
+  })
+  ipcMain.handle('documents:delete', (_e, id: string) => {
+    deleteEmbedding('document', id)
+    return deleteDocument(id)
+  })
+  ipcMain.handle('documents:reindex', () => reindexDocuments())
+  ipcMain.handle('documents:semanticActive', () => documentSemanticActive())
   ipcMain.handle(
     'documents:upsert',
     (
@@ -1748,7 +1764,11 @@ export function registerIpcHandlers(): void {
         archived?: boolean
         updatedAt?: number
       }
-    ) => upsertDocument(input)
+    ) => {
+      const doc = upsertDocument(input)
+      if (doc) void embedDocument(doc.id)
+      return doc
+    }
   )
   ipcMain.handle(
     'documents:generate',
