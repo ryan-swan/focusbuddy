@@ -1,0 +1,168 @@
+import { useEffect, useRef, useState } from 'react'
+import Icon from './Icon'
+import Tooltip from './Tooltip'
+import { usePresenceStore, type PresenceStatus } from '../stores/presence'
+import { useAccountStore } from '../stores/account'
+
+// Header entry point for account-level presence (the "People Map"): who across
+// your org/team is online right now and what they're doing. Reads only real
+// server presence — when nobody else is online it shows an honest empty team,
+// never sample people.
+
+const STATUS_META: Record<PresenceStatus, { label: string; dot: string; text: string }> = {
+  online: { label: 'Online', dot: 'bg-emerald-500', text: 'text-emerald-600 dark:text-emerald-400' },
+  away: { label: 'Away', dot: 'bg-amber-500', text: 'text-amber-600 dark:text-amber-400' },
+  focus: { label: 'In focus', dot: 'bg-violet-500', text: 'text-violet-600 dark:text-violet-400' },
+  busy: { label: 'Busy', dot: 'bg-rose-500', text: 'text-rose-600 dark:text-rose-400' },
+  offline: { label: 'Offline', dot: 'bg-stone-400', text: 'text-stone-500' }
+}
+
+const AVATAR_COLORS = ['#6366f1', '#0ea5e9', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6', '#14b8a6', '#ef4444']
+function colorFor(seed: string): string {
+  let h = 0
+  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) | 0
+  return AVATAR_COLORS[Math.abs(h) % AVATAR_COLORS.length]
+}
+
+function Avatar({ handle }: { handle: string }): JSX.Element {
+  const initial = (handle || '?').trim()[0]?.toUpperCase() ?? '?'
+  return (
+    <span
+      className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[12px] font-semibold text-white ring-1 ring-black/10"
+      style={{ backgroundColor: colorFor(handle) }}
+    >
+      {initial}
+    </span>
+  )
+}
+
+export default function TeamPresenceButton(): JSX.Element {
+  const [open, setOpen] = useState(false)
+  const btnRef = useRef<HTMLButtonElement | null>(null)
+  const popRef = useRef<HTMLDivElement | null>(null)
+  const peers = usePresenceStore((s) => s.peers)
+  const myStatus = usePresenceStore((s) => s.myStatus)
+  const setStatus = usePresenceStore((s) => s.setStatus)
+  const account = useAccountStore((s) => s.account)
+
+  const list = Object.values(peers).sort((a, b) => {
+    // Online-ish first by status weight, then by handle.
+    const w = (s: PresenceStatus) => (s === 'offline' ? 3 : s === 'away' ? 1 : s === 'busy' ? 2 : 0)
+    return w(a.status) - w(b.status) || a.handle.localeCompare(b.handle)
+  })
+  const onlineCount = list.length
+
+  useEffect(() => {
+    if (!open) return
+    const onDown = (e: MouseEvent): void => {
+      const t = e.target as Node
+      if (popRef.current?.contains(t) || btnRef.current?.contains(t)) return
+      setOpen(false)
+    }
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') setOpen(false)
+    }
+    window.addEventListener('mousedown', onDown)
+    window.addEventListener('keydown', onKey)
+    return () => {
+      window.removeEventListener('mousedown', onDown)
+      window.removeEventListener('keydown', onKey)
+    }
+  }, [open])
+
+  const myHandle = account?.handle || account?.email || 'You'
+
+  return (
+    <div className="relative">
+      <Tooltip content="Team — who's online right now" placement="bottom">
+        <button
+          ref={btnRef}
+          onClick={() => setOpen((v) => !v)}
+          className={`icon-btn relative ${open ? '!text-accent' : ''}`}
+          aria-label="Team presence"
+        >
+          <Icon name="group" size={16} filled={open} />
+          {onlineCount > 0 && (
+            <span className="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] px-1 inline-flex items-center justify-center rounded-full bg-emerald-500 text-white text-[9px] font-semibold leading-none">
+              {onlineCount}
+            </span>
+          )}
+        </button>
+      </Tooltip>
+
+      {open && (
+        <div
+          ref={popRef}
+          className="absolute right-0 top-[calc(100%+8px)] z-50 w-72 rounded-xl border border-stone-200 dark:border-white/10 bg-white dark:bg-stone-900 shadow-xl overflow-hidden"
+        >
+          <div className="px-3 py-2.5 border-b border-stone-200 dark:border-white/10">
+            <div className="flex items-center justify-between">
+              <h3 className="text-[12px] font-semibold uppercase tracking-tight text-stone-700 dark:text-stone-200">
+                Team
+              </h3>
+              <span className="text-[11px] text-stone-500 dark:text-stone-400">
+                {onlineCount === 0 ? 'No one else online' : `${onlineCount} online`}
+              </span>
+            </div>
+          </div>
+
+          {/* Your own status, with a quick toggle. */}
+          <div className="px-3 py-2.5 flex items-center gap-2.5 border-b border-stone-100 dark:border-white/[0.06]">
+            <Avatar handle={myHandle} />
+            <div className="min-w-0 flex-1">
+              <div className="text-[12.5px] font-medium text-stone-900 dark:text-stone-100 truncate">{myHandle}</div>
+              <div className={`text-[11px] flex items-center gap-1.5 ${STATUS_META[myStatus].text}`}>
+                <span className={`h-1.5 w-1.5 rounded-full ${STATUS_META[myStatus].dot}`} />
+                You · {STATUS_META[myStatus].label}
+              </div>
+            </div>
+            <button
+              onClick={() => setStatus(myStatus === 'busy' ? 'online' : 'busy')}
+              className="text-[10.5px] px-2 py-1 rounded-md border border-stone-200 dark:border-white/10 text-stone-600 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-white/[0.06]"
+              title="Toggle do-not-disturb"
+            >
+              {myStatus === 'busy' ? 'Available' : 'Busy'}
+            </button>
+          </div>
+
+          <div className="max-h-72 overflow-auto py-1">
+            {list.length === 0 ? (
+              <div className="px-3 py-6 text-center">
+                <Icon name="person_off" size={20} className="text-stone-300 dark:text-stone-600" />
+                <p className="mt-1.5 text-[11.5px] text-stone-500 dark:text-stone-400 leading-relaxed">
+                  No teammates online right now. They'll appear here the moment they open PlexiDesk.
+                </p>
+              </div>
+            ) : (
+              list.map((p) => {
+                const meta = STATUS_META[p.status]
+                return (
+                  <div
+                    key={p.accountId}
+                    className="px-3 py-2 flex items-center gap-2.5 hover:bg-stone-50 dark:hover:bg-white/[0.04]"
+                  >
+                    <span className="relative">
+                      <Avatar handle={p.handle} />
+                      <span
+                        className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full ring-2 ring-white dark:ring-stone-900 ${meta.dot}`}
+                      />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-[12.5px] font-medium text-stone-900 dark:text-stone-100 truncate">
+                        {p.handle}
+                      </div>
+                      <div className="text-[11px] text-stone-500 dark:text-stone-400 truncate">
+                        {p.workingOn ? p.workingOn : meta.label}
+                      </div>
+                    </div>
+                    <span className={`text-[10.5px] ${meta.text}`}>{meta.label}</span>
+                  </div>
+                )
+              })
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}

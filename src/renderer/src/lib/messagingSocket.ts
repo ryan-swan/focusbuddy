@@ -33,13 +33,31 @@ export type YjsSocketEvent =
   | { type: 'yjsUpdate'; payload: { docId: string; update: string } }
   | { type: 'yjsAwareness'; payload: { docId: string; update: string } }
 
+// Account-level presence (the People Map) rides the same authenticated socket.
+// The presence store registers a handler; null when presence isn't active.
+export type PresencePeer = {
+  accountId: string
+  handle: string
+  status: 'online' | 'away' | 'focus' | 'busy' | 'offline'
+  workingOn: string | null
+  surface: string | null
+  updatedAt: number
+}
+export type PresenceSocketEvent =
+  | { type: 'presenceSnapshot'; payload: { peers: PresencePeer[] } }
+  | { type: 'presenceUpdate'; payload: PresencePeer & { online: boolean } }
+
 let currentToken: string | null = null
 let onMessageCb: ((m: IncomingMessage) => void) | null = null
 let onDocEventCb: ((e: DocSocketEvent) => void) | null = null
 let onYjsEventCb: ((e: YjsSocketEvent) => void) | null = null
+let onPresenceCb: ((e: PresenceSocketEvent) => void) | null = null
 // Fired each time the socket (re)authenticates, so the Yjs provider can re-join
 // its room after a reconnect (the server-side room membership is per-socket).
 let onSocketOpenCb: (() => void) | null = null
+// Same idea for presence: re-send presenceJoin after a reconnect, since the
+// server tracks presence membership per-socket.
+let onPresenceOpenCb: (() => void) | null = null
 
 // A comment was added / resolved / deleted on a doc the account can see.
 export interface DocCommentEvent {
@@ -70,6 +88,16 @@ export function setYjsSocketHandler(cb: ((e: YjsSocketEvent) => void) | null): v
 /** Register a handler that fires whenever the socket (re)authenticates. */
 export function setSocketOpenHandler(cb: (() => void) | null): void {
   onSocketOpenCb = cb
+}
+
+/** Register a handler for account-presence socket events (People Map). */
+export function setPresenceSocketHandler(cb: ((e: PresenceSocketEvent) => void) | null): void {
+  onPresenceCb = cb
+}
+
+/** Register a handler that fires on every (re)auth so presence can re-join. */
+export function setPresenceOpenHandler(cb: (() => void) | null): void {
+  onPresenceOpenCb = cb
 }
 
 /** Register a handler for live comment changes on the open document. */
@@ -152,12 +180,16 @@ function open(): void {
     } else if (msg.type === 'yjsSync' || msg.type === 'yjsUpdate' || msg.type === 'yjsAwareness') {
       // Real-time co-editing updates + cursor presence → the Yjs provider.
       onYjsEventCb?.({ type: msg.type, payload: msg.payload } as YjsSocketEvent)
+    } else if (msg.type === 'presenceSnapshot' || msg.type === 'presenceUpdate') {
+      // Account-level presence (who's online across the org/team) → presence store.
+      onPresenceCb?.({ type: msg.type, payload: msg.payload } as PresenceSocketEvent)
     } else if (msg.type === 'docComment') {
       onDocCommentCb?.(msg.payload as DocCommentEvent)
     } else if (msg.type === 'authenticated') {
       // Socket is live again (initial connect or after a reconnect) — let the
-      // Yjs provider re-join its room.
+      // Yjs provider re-join its room and presence re-announce itself.
       onSocketOpenCb?.()
+      onPresenceOpenCb?.()
     }
   }
 

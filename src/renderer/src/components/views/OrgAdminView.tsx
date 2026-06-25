@@ -10,17 +10,36 @@ import {
   setMemberRole,
   removeMember,
   revokeInvite,
+  listOffices,
+  createOffice,
+  updateOffice,
+  deleteOffice,
+  getOrgHours,
+  setOrgHours,
+  getMemberProfile,
+  setMemberProfile,
   type OrgMembership,
   type OrgDetail,
-  type OrgRole
+  type OrgRole,
+  type Office,
+  type OfficeKind,
+  type OfficeInput,
+  type MemberProfile,
+  type WorkWindow
 } from '../../lib/orgsClient'
 
 // The customer-facing organization admin console: switch between the orgs you
-// belong to, manage members and their roles, invite people by email, and revoke
-// pending invites. The server enforces every role guard; the UI surfaces its
-// errors. SSO (via WorkOS) plugs in here later without changing this surface.
+// belong to, manage members and their roles, invite people by email, and set up
+// the workforce — company working hours, offices/locations (with the geo + time
+// zone the People Map needs), and each member's profile (title, department,
+// office, who they report to, personal hours). The server enforces every role
+// guard; the UI surfaces its errors.
 
 const ROLE_OPTIONS: OrgRole[] = ['owner', 'admin', 'member', 'guest']
+const OFFICE_KINDS: OfficeKind[] = ['physical', 'remote', 'external']
+
+const numOrNull = (v: string): number | null => (v.trim() === '' ? null : Number.isFinite(Number(v)) ? Number(v) : null)
+const hourStr = (v: number | null): string => (v == null ? '' : String(v))
 
 export default function OrgAdminView(): JSX.Element {
   const token = useAccountStore((s) => s.sessionToken)
@@ -32,6 +51,12 @@ export default function OrgAdminView(): JSX.Element {
   const [inviteRole, setInviteRole] = useState<OrgRole>('member')
   const [newOrg, setNewOrg] = useState('')
   const [msg, setMsg] = useState<string | null>(null)
+  // People-Map setup state
+  const [offices, setOffices] = useState<Office[]>([])
+  const [orgHours, setHoursState] = useState<WorkWindow>({ start: 9, end: 17 })
+  const [profiles, setProfiles] = useState<Record<string, MemberProfile>>({})
+  const [openProfile, setOpenProfile] = useState<string | null>(null)
+  const [newOffice, setNewOffice] = useState('')
 
   const refreshOrgs = useCallback(async () => {
     if (!token) return
@@ -48,12 +73,35 @@ export default function OrgAdminView(): JSX.Element {
     setDetail(await getOrg(token, selId))
   }, [token, selId])
 
+  const refreshAux = useCallback(async () => {
+    if (!token || !selId) {
+      setOffices([])
+      setProfiles({})
+      return
+    }
+    setOffices(await listOffices(token, selId))
+    setHoursState(await getOrgHours(token, selId))
+    setProfiles({})
+    setOpenProfile(null)
+  }, [token, selId])
+
   useEffect(() => {
     void refreshOrgs()
   }, [refreshOrgs])
   useEffect(() => {
     void refreshDetail()
   }, [refreshDetail])
+  useEffect(() => {
+    void refreshAux()
+  }, [refreshAux])
+
+  // Lazily load a member's raw profile when its editor opens.
+  useEffect(() => {
+    if (!token || !selId || !openProfile || profiles[openProfile]) return
+    void getMemberProfile(token, selId, openProfile).then((p) => {
+      if (p) setProfiles((m) => ({ ...m, [openProfile]: p }))
+    })
+  }, [token, selId, openProfile, profiles])
 
   const canAdmin = detail?.role === 'owner' || detail?.role === 'admin'
 
@@ -98,6 +146,40 @@ export default function OrgAdminView(): JSX.Element {
     await revokeInvite(token, selId, inviteId)
     void refreshDetail()
   }
+
+  // ---- People-Map setup actions ----
+  async function saveHours(w: WorkWindow): Promise<void> {
+    if (!token || !selId) return
+    setHoursState(w)
+    const res = await setOrgHours(token, selId, w)
+    if (!res.ok) setMsg(res.error ?? 'Could not save working hours.')
+  }
+  async function addOffice(): Promise<void> {
+    if (!token || !selId || !newOffice.trim()) return
+    const res = await createOffice(token, selId, { name: newOffice.trim(), kind: 'physical' })
+    setNewOffice('')
+    if (res.ok) setOffices(await listOffices(token, selId))
+    else setMsg(res.error ?? 'Could not add office.')
+  }
+  async function patchOffice(officeId: string, patch: OfficeInput): Promise<void> {
+    if (!token || !selId) return
+    const res = await updateOffice(token, selId, officeId, patch)
+    if (res.ok && res.office) setOffices((list) => list.map((o) => (o.id === officeId ? res.office! : o)))
+    else setMsg(res.error ?? 'Could not update office.')
+  }
+  async function removeOfficeById(officeId: string): Promise<void> {
+    if (!token || !selId) return
+    await deleteOffice(token, selId, officeId)
+    setOffices((list) => list.filter((o) => o.id !== officeId))
+  }
+  async function saveProfile(accountId: string, patch: Partial<MemberProfile>): Promise<void> {
+    if (!token || !selId) return
+    const res = await setMemberProfile(token, selId, accountId, patch)
+    if (res.ok && res.profile) setProfiles((m) => ({ ...m, [accountId]: res.profile! }))
+    else setMsg(res.error ?? 'Could not save profile.')
+  }
+
+  const officeName = (id: string | null): string => offices.find((o) => o.id === id)?.name ?? '—'
 
   return (
     <div className="h-full overflow-auto desk-paper no-tod p-6" data-testid="org-admin">
@@ -156,37 +238,95 @@ export default function OrgAdminView(): JSX.Element {
               <span className="text-[11px] text-stone-400">you are {detail.role}</span>
             </div>
 
+            {/* Company working hours */}
+            <div className="mb-3 pb-3 border-b border-stone-200 dark:border-stone-800 flex items-center gap-2 flex-wrap" data-testid="org-hours">
+              <Icon name="schedule" size={15} className="text-stone-400" />
+              <span className="text-[12px] text-stone-600 dark:text-stone-300">Company working hours</span>
+              {canAdmin ? (
+                <span className="inline-flex items-center gap-1.5">
+                  <input
+                    type="number" min={0} max={24}
+                    defaultValue={orgHours.start}
+                    key={`hs-${orgHours.start}`}
+                    onBlur={(e) => void saveHours({ start: numOrNull(e.target.value) ?? 9, end: orgHours.end })}
+                    data-testid="org-hours-start"
+                    className="w-14 text-[12px] text-center bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded px-1.5 py-0.5 focus:outline-none"
+                  />
+                  <span className="text-[11px] text-stone-400">to</span>
+                  <input
+                    type="number" min={0} max={24}
+                    defaultValue={orgHours.end}
+                    key={`he-${orgHours.end}`}
+                    onBlur={(e) => void saveHours({ start: orgHours.start, end: numOrNull(e.target.value) ?? 17 })}
+                    data-testid="org-hours-end"
+                    className="w-14 text-[12px] text-center bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded px-1.5 py-0.5 focus:outline-none"
+                  />
+                  <span className="text-[11px] text-stone-400">local · inherited by every office and person</span>
+                </span>
+              ) : (
+                <span className="text-[12px] text-stone-500">{orgHours.start}:00 – {orgHours.end}:00 local</span>
+              )}
+            </div>
+
             {/* Members */}
             <div className="space-y-1">
-              {detail.members.map((m) => (
-                <div key={m.accountId} className="flex items-center gap-2 py-1" data-testid={`org-member-${m.accountId}`}>
-                  <span className="text-[13px] text-stone-800 dark:text-stone-100 flex-1 truncate">
-                    {m.handle}
-                    {m.accountId === myId && <span className="text-[11px] text-stone-400"> (you)</span>}
-                  </span>
-                  {canAdmin ? (
-                    <select
-                      value={m.role}
-                      onChange={(e) => void doRole(m.accountId, e.target.value as OrgRole)}
-                      data-testid={`org-role-${m.accountId}`}
-                      className="text-[12px] bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded px-1.5 py-0.5 focus:outline-none"
-                    >
-                      {ROLE_OPTIONS.map((r) => (
-                        <option key={r} value={r}>
-                          {r}
-                        </option>
-                      ))}
-                    </select>
-                  ) : (
-                    <span className="text-[12px] text-stone-500">{m.role}</span>
-                  )}
-                  {(canAdmin || m.accountId === myId) && (
-                    <button onClick={() => void doRemove(m.accountId)} className="icon-btn" title={m.accountId === myId ? 'Leave' : 'Remove'} data-testid={`org-remove-${m.accountId}`}>
-                      <Icon name={m.accountId === myId ? 'logout' : 'person_remove'} size={14} />
-                    </button>
-                  )}
-                </div>
-              ))}
+              {detail.members.map((m) => {
+                const editable = canAdmin || m.accountId === myId
+                const isOpen = openProfile === m.accountId
+                const prof = profiles[m.accountId]
+                return (
+                  <div key={m.accountId} className="border-b border-stone-100 dark:border-white/[0.04] last:border-0" data-testid={`org-member-${m.accountId}`}>
+                    <div className="flex items-center gap-2 py-1">
+                      {editable && (
+                        <button
+                          onClick={() => setOpenProfile(isOpen ? null : m.accountId)}
+                          className="icon-btn"
+                          title="Edit profile"
+                          data-testid={`org-profile-toggle-${m.accountId}`}
+                        >
+                          <Icon name={isOpen ? 'expand_more' : 'chevron_right'} size={15} />
+                        </button>
+                      )}
+                      <span className="text-[13px] text-stone-800 dark:text-stone-100 flex-1 truncate">
+                        {m.handle}
+                        {m.accountId === myId && <span className="text-[11px] text-stone-400"> (you)</span>}
+                        {prof?.title && <span className="text-[11px] text-stone-400"> · {prof.title}</span>}
+                        {prof?.officeId && <span className="text-[11px] text-stone-400"> · {officeName(prof.officeId)}</span>}
+                      </span>
+                      {canAdmin ? (
+                        <select
+                          value={m.role}
+                          onChange={(e) => void doRole(m.accountId, e.target.value as OrgRole)}
+                          data-testid={`org-role-${m.accountId}`}
+                          className="text-[12px] bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded px-1.5 py-0.5 focus:outline-none"
+                        >
+                          {ROLE_OPTIONS.map((r) => (
+                            <option key={r} value={r}>
+                              {r}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <span className="text-[12px] text-stone-500">{m.role}</span>
+                      )}
+                      {editable && (
+                        <button onClick={() => void doRemove(m.accountId)} className="icon-btn" title={m.accountId === myId ? 'Leave' : 'Remove'} data-testid={`org-remove-${m.accountId}`}>
+                          <Icon name={m.accountId === myId ? 'logout' : 'person_remove'} size={14} />
+                        </button>
+                      )}
+                    </div>
+
+                    {isOpen && (
+                      <ProfileEditor
+                        profile={prof}
+                        offices={offices}
+                        members={detail.members.filter((x) => x.accountId !== m.accountId)}
+                        onSave={(patch) => void saveProfile(m.accountId, patch)}
+                      />
+                    )}
+                  </div>
+                )
+              })}
             </div>
 
             {/* Pending invites */}
@@ -237,6 +377,177 @@ export default function OrgAdminView(): JSX.Element {
             )}
           </div>
         )}
+
+        {/* Offices & locations */}
+        {detail && (
+          <div className="mt-4 rounded-xl border border-stone-200 dark:border-stone-700 p-4" data-testid="org-offices">
+            <div className="flex items-center gap-2 mb-3">
+              <Icon name="location_city" size={16} className="text-accent" />
+              <h2 className="text-[14px] font-semibold">Offices &amp; locations</h2>
+              <span className="text-[11px] text-stone-400">where people sit · drives the People Map</span>
+            </div>
+
+            {offices.length === 0 && (
+              <p className="text-[12px] text-stone-500 dark:text-stone-400 mb-2">
+                No offices yet. Add one (including a “Remote” location) so workers can be placed on the map.
+              </p>
+            )}
+
+            <div className="space-y-2">
+              {offices.map((o) => (
+                <OfficeRow key={o.id} office={o} canAdmin={canAdmin} onSave={(p) => void patchOffice(o.id, p)} onDelete={() => void removeOfficeById(o.id)} />
+              ))}
+            </div>
+
+            {canAdmin && (
+              <div className="mt-3 pt-3 border-t border-stone-200 dark:border-stone-800 flex items-center gap-1.5">
+                <input
+                  value={newOffice}
+                  onChange={(e) => setNewOffice(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') void addOffice()
+                  }}
+                  placeholder="New office or location name…"
+                  data-testid="org-office-new"
+                  className="flex-1 bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded px-2 py-1 text-[12px] focus:outline-none focus:border-accent"
+                />
+                <button onClick={() => void addOffice()} disabled={!newOffice.trim()} className="btn-primary text-[12px] px-2.5 py-1 disabled:opacity-50" data-testid="org-office-add">
+                  Add office
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+/* ---------------- per-member profile editor ---------------- */
+
+function ProfileEditor({
+  profile,
+  offices,
+  members,
+  onSave
+}: {
+  profile: MemberProfile | undefined
+  offices: Office[]
+  members: { accountId: string; handle: string }[]
+  onSave: (patch: Partial<MemberProfile>) => void
+}): JSX.Element {
+  if (!profile) {
+    return <div className="pl-7 pb-2 text-[11px] text-stone-400">Loading profile…</div>
+  }
+  const field = 'text-[12px] bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded px-2 py-1 focus:outline-none focus:border-accent'
+  return (
+    <div className="pl-7 pb-3 grid grid-cols-2 gap-2" data-testid="org-profile-editor">
+      <label className="flex flex-col gap-0.5">
+        <span className="text-[10px] uppercase tracking-wide text-stone-400">Title</span>
+        <input defaultValue={profile.title ?? ''} onBlur={(e) => onSave({ title: e.target.value || null })} className={field} data-testid="profile-title" placeholder="e.g. Senior Engineer" />
+      </label>
+      <label className="flex flex-col gap-0.5">
+        <span className="text-[10px] uppercase tracking-wide text-stone-400">Department</span>
+        <input defaultValue={profile.department ?? ''} onBlur={(e) => onSave({ department: e.target.value || null })} className={field} placeholder="e.g. Engineering" />
+      </label>
+      <label className="flex flex-col gap-0.5">
+        <span className="text-[10px] uppercase tracking-wide text-stone-400">Office</span>
+        <select value={profile.officeId ?? ''} onChange={(e) => onSave({ officeId: e.target.value || null })} className={field} data-testid="profile-office">
+          <option value="">— none —</option>
+          {offices.map((o) => (
+            <option key={o.id} value={o.id}>
+              {o.name}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="flex flex-col gap-0.5">
+        <span className="text-[10px] uppercase tracking-wide text-stone-400">Reports to</span>
+        <select value={profile.managerAccountId ?? ''} onChange={(e) => onSave({ managerAccountId: e.target.value || null })} className={field} data-testid="profile-manager">
+          <option value="">— no manager —</option>
+          {members.map((m) => (
+            <option key={m.accountId} value={m.accountId}>
+              {m.handle}
+            </option>
+          ))}
+        </select>
+      </label>
+      <div className="col-span-2 flex items-center gap-2">
+        <span className="text-[10px] uppercase tracking-wide text-stone-400">Personal hours</span>
+        <input
+          type="number" min={0} max={24}
+          defaultValue={hourStr(profile.workStart)}
+          key={`pws-${profile.workStart}`}
+          onBlur={(e) => onSave({ workStart: numOrNull(e.target.value) })}
+          placeholder="start"
+          className="w-16 text-[12px] text-center bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded px-1.5 py-0.5 focus:outline-none"
+        />
+        <span className="text-[11px] text-stone-400">to</span>
+        <input
+          type="number" min={0} max={24}
+          defaultValue={hourStr(profile.workEnd)}
+          key={`pwe-${profile.workEnd}`}
+          onBlur={(e) => onSave({ workEnd: numOrNull(e.target.value) })}
+          placeholder="end"
+          className="w-16 text-[12px] text-center bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded px-1.5 py-0.5 focus:outline-none"
+        />
+        <span className="text-[11px] text-stone-400">blank = inherit office, then company</span>
+      </div>
+    </div>
+  )
+}
+
+/* ---------------- one office row ---------------- */
+
+function OfficeRow({
+  office,
+  canAdmin,
+  onSave,
+  onDelete
+}: {
+  office: Office
+  canAdmin: boolean
+  onSave: (patch: OfficeInput) => void
+  onDelete: () => void
+}): JSX.Element {
+  const field = 'text-[12px] bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded px-2 py-1 focus:outline-none focus:border-accent'
+  const small = 'w-16 text-[12px] text-center bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded px-1.5 py-0.5 focus:outline-none'
+  if (!canAdmin) {
+    return (
+      <div className="text-[12px] text-stone-600 dark:text-stone-300 flex items-center gap-2">
+        <Icon name="business" size={13} className="text-stone-400" />
+        {office.name}
+        <span className="text-[11px] text-stone-400">{office.kind}{office.city ? ` · ${office.city}` : ''}</span>
+      </div>
+    )
+  }
+  return (
+    <div className="rounded-lg border border-stone-200/70 dark:border-white/10 p-2" data-testid={`office-row-${office.id}`}>
+      <div className="flex items-center gap-2 flex-wrap">
+        <input defaultValue={office.name} onBlur={(e) => onSave({ name: e.target.value })} className={`${field} flex-1 min-w-[120px] font-medium`} data-testid="office-name" />
+        <select defaultValue={office.kind} onChange={(e) => onSave({ kind: e.target.value as OfficeKind })} className={field}>
+          {OFFICE_KINDS.map((k) => (
+            <option key={k} value={k}>
+              {k}
+            </option>
+          ))}
+        </select>
+        <button onClick={onDelete} className="icon-btn" title="Delete office" data-testid="office-delete">
+          <Icon name="delete" size={14} />
+        </button>
+      </div>
+      <div className="mt-2 flex items-center gap-2 flex-wrap text-[11px] text-stone-400">
+        <input defaultValue={office.city ?? ''} onBlur={(e) => onSave({ city: e.target.value || null })} placeholder="City" className={`${field} w-28`} />
+        <span>lat</span>
+        <input defaultValue={office.lat == null ? '' : String(office.lat)} onBlur={(e) => onSave({ lat: numOrNull(e.target.value) })} placeholder="lat" className={small} />
+        <span>lng</span>
+        <input defaultValue={office.lng == null ? '' : String(office.lng)} onBlur={(e) => onSave({ lng: numOrNull(e.target.value) })} placeholder="lng" className={small} />
+        <span>tz min</span>
+        <input defaultValue={String(office.tzOffsetMin)} onBlur={(e) => onSave({ tzOffsetMin: numOrNull(e.target.value) ?? 0 })} placeholder="0" className={small} />
+        <span>hours</span>
+        <input defaultValue={hourStr(office.workStart)} key={`ows-${office.workStart}`} onBlur={(e) => onSave({ workStart: numOrNull(e.target.value) })} placeholder="start" className={small} />
+        <span>to</span>
+        <input defaultValue={hourStr(office.workEnd)} key={`owe-${office.workEnd}`} onBlur={(e) => onSave({ workEnd: numOrNull(e.target.value) })} placeholder="end" className={small} />
       </div>
     </div>
   )
