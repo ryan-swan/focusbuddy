@@ -36,6 +36,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.85',
+    date: '2026-06-26T23:00:00Z',
+    title: 'v2.5.85 — PlexiBrain search that understands what you mean',
+    tag: 'feature',
+    summary:
+      'PlexiBrain now finds knowledge by meaning, not just matching words. Search for "time off" and an entry titled "annual leave policy" comes up, and the assistant grounds its answers in the same meaning-aware results. With no embedding key set it falls back to plain keyword search, so nothing breaks and nothing is faked.',
+    highlights: [
+      'Meaning-based search: PlexiBrain ranks entries by semantic similarity to your query, blended with keyword relevance, so related ideas surface even when the words differ. Set an embedding key in Settings and your knowledge is indexed in the background automatically.',
+      'Better-grounded AI: when you ask your workspace a question, the assistant now retrieves the most relevant knowledge by meaning before answering, so its grounding is tighter and less literal.',
+      'Honest fallback: with no embedding key configured, search and grounding stay on keyword matching exactly as before. No invented matches, no silent degradation, just the strongest signal available.'
+    ]
+  },
+  {
     version: '2.5.84',
     date: '2026-06-26T22:00:00Z',
     title: 'v2.5.84 — PlexiSign, and one consistent look across the suite',
