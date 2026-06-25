@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Icon from '../Icon'
-import { DashboardHeader, StatusPill } from '../plexi'
+import { DashboardHeader, StatusPill, PLEXI_CARD } from '../plexi'
 import { API_ENDPOINTS, type ApiServerConfig, type ApiTokenPublic, type ApiScope } from '@shared/apiAccess'
 
 // PlexiApi: a local REST API over your workspace. The server binds only to
@@ -21,12 +21,22 @@ export default function PlexiApiView(): JSX.Element {
   const [newName, setNewName] = useState('')
   const [newWrite, setNewWrite] = useState(false)
   const [revealed, setRevealed] = useState<{ id: string; secret: string } | null>(null)
+  const [creating, setCreating] = useState(false)
+  // Synchronous re-entry guard: React state updates async, so two clicks in the
+  // same tick both see creating=false. A ref flips immediately and blocks the
+  // second, which matters because the token secret is shown only once.
+  const creatingRef = useRef(false)
 
   async function load(): Promise<void> {
-    const [s, t] = await Promise.all([window.api.apiAccess.status(), window.api.apiAccess.listTokens()])
-    setStatus(s)
-    setPortText(String(s.port))
-    setTokens(t)
+    setError(null)
+    try {
+      const [s, t] = await Promise.all([window.api.apiAccess.status(), window.api.apiAccess.listTokens()])
+      setStatus(s)
+      setPortText(String(s.port))
+      setTokens(t)
+    } catch (e) {
+      setError(`Could not load the API status: ${e instanceof Error ? e.message : String(e)}`)
+    }
   }
 
   useEffect(() => {
@@ -35,9 +45,14 @@ export default function PlexiApiView(): JSX.Element {
 
   async function toggle(enabled: boolean): Promise<void> {
     setError(null)
-    const s = await window.api.apiAccess.setEnabled(enabled)
-    setStatus(s)
-    if (s.error) setError(s.error)
+    try {
+      const s = await window.api.apiAccess.setEnabled(enabled)
+      setStatus(s)
+      setPortText(String(s.port))
+      if (s.error) setError(s.error)
+    } catch (e) {
+      setError(`Could not change the server state: ${e instanceof Error ? e.message : String(e)}`)
+    }
   }
 
   async function savePort(): Promise<void> {
@@ -47,24 +62,45 @@ export default function PlexiApiView(): JSX.Element {
       return
     }
     setError(null)
-    const s = await window.api.apiAccess.setPort(port)
-    setStatus(s)
-    if (s.error) setError(s.error)
+    try {
+      const s = await window.api.apiAccess.setPort(port)
+      setStatus(s)
+      setPortText(String(s.port))
+      if (s.error) setError(s.error)
+    } catch (e) {
+      setError(`Could not set the port: ${e instanceof Error ? e.message : String(e)}`)
+    }
   }
 
   async function createToken(): Promise<void> {
-    const scopes: ApiScope[] = newWrite ? ['read', 'write'] : ['read']
-    const res = await window.api.apiAccess.createToken(newName || 'Token', scopes)
-    setRevealed({ id: res.token.id, secret: res.secret })
-    setNewName('')
-    setNewWrite(false)
-    await load()
+    if (creatingRef.current) return
+    creatingRef.current = true
+    setCreating(true)
+    setError(null)
+    try {
+      const scopes: ApiScope[] = newWrite ? ['read', 'write'] : ['read']
+      const res = await window.api.apiAccess.createToken(newName || 'Token', scopes)
+      setRevealed({ id: res.token.id, secret: res.secret })
+      setNewName('')
+      setNewWrite(false)
+      await load()
+    } catch (e) {
+      setError(`Could not create the token: ${e instanceof Error ? e.message : String(e)}`)
+    } finally {
+      setCreating(false)
+      creatingRef.current = false
+    }
   }
 
   async function revoke(id: string): Promise<void> {
-    await window.api.apiAccess.revokeToken(id)
-    if (revealed?.id === id) setRevealed(null)
-    await load()
+    setError(null)
+    try {
+      await window.api.apiAccess.revokeToken(id)
+      if (revealed?.id === id) setRevealed(null)
+      await load()
+    } catch (e) {
+      setError(`Could not revoke the token: ${e instanceof Error ? e.message : String(e)}`)
+    }
   }
 
   const baseUrl = status ? `http://${status.host}:${status.port}` : ''
@@ -75,7 +111,7 @@ export default function PlexiApiView(): JSX.Element {
         <DashboardHeader title="API access" subtitle="A local REST API over your workspace, for your own scripts and tools" />
 
         {/* Server control */}
-        <div className="rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-raised)] p-4">
+        <div className={`${PLEXI_CARD} p-4`}>
           <div className="flex items-center gap-3">
             <Icon name="api" size={18} className="text-[rgb(var(--accent))]" />
             <div className="flex-1">
@@ -121,7 +157,7 @@ export default function PlexiApiView(): JSX.Element {
 
         {/* Tokens */}
         <div className="mt-5">
-          <h2 className="text-[13px] font-semibold text-[var(--ink-90)] mb-2">Access tokens</h2>
+          <h2 className="fb-display text-[13px] font-semibold text-[var(--ink-90)] mb-2">Access tokens</h2>
 
           {revealed && (
             <div className="rounded-lg border border-[rgb(var(--accent)/0.30)] bg-[rgb(var(--accent)/0.06)] p-3 mb-3" data-testid="api-token-revealed">
@@ -146,10 +182,11 @@ export default function PlexiApiView(): JSX.Element {
             </label>
             <button
               onClick={() => void createToken()}
+              disabled={creating}
               data-testid="api-token-create"
-              className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg bg-[rgb(var(--accent))] text-white text-[12.5px] font-medium hover:bg-[rgb(var(--accent-hover))]"
+              className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg bg-[rgb(var(--accent))] text-white text-[12.5px] font-medium hover:bg-[rgb(var(--accent-hover))] disabled:opacity-40"
             >
-              <Icon name="add" size={14} /> Create
+              <Icon name="add" size={14} /> {creating ? 'Creating…' : 'Create'}
             </button>
           </div>
 
@@ -158,12 +195,12 @@ export default function PlexiApiView(): JSX.Element {
           ) : (
             <div className="space-y-1">
               {tokens.map((t) => (
-                <div key={t.id} data-testid={`api-token-${t.id}`} className="flex items-center gap-2 rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-raised)] px-3 py-2">
+                <div key={t.id} data-testid={`api-token-${t.id}`} className={`${PLEXI_CARD} flex items-center gap-2 px-3 py-2`}>
                   <Icon name="key" size={14} className="text-[var(--ink-70)]" />
                   <span className="text-[12.5px] font-medium truncate flex-1">{t.name}</span>
                   <StatusPill tone={t.scopes.includes('write') ? 'amber' : 'stone'} label={t.scopes.includes('write') ? 'read/write' : 'read'} dot={false} />
                   <span className="text-[11px] text-[var(--ink-50)] fb-tabular">used {fmtWhen(t.lastUsedAt)}</span>
-                  <button onClick={() => void revoke(t.id)} className="p-1 rounded text-[var(--ink-50)] hover:text-rose-500" title="Revoke">
+                  <button onClick={() => void revoke(t.id)} aria-label="Revoke token" className="p-1 rounded text-[var(--ink-50)] hover:text-rose-500" title="Revoke">
                     <Icon name="delete" size={14} />
                   </button>
                 </div>
@@ -174,8 +211,8 @@ export default function PlexiApiView(): JSX.Element {
 
         {/* Endpoint reference */}
         <div className="mt-6">
-          <h2 className="text-[13px] font-semibold text-[var(--ink-90)] mb-2">Endpoints</h2>
-          <div className="rounded-lg border border-[var(--edge-soft)] overflow-hidden">
+          <h2 className="fb-display text-[13px] font-semibold text-[var(--ink-90)] mb-2">Endpoints</h2>
+          <div className={`${PLEXI_CARD} overflow-hidden`}>
             {API_ENDPOINTS.map((e, i) => (
               <div key={i} className={`flex items-center gap-3 px-3 py-2 text-[12px] ${i % 2 ? 'bg-[var(--surface-raised)]' : 'bg-[var(--surface-base)]'}`}>
                 <span className={`fb-tabular font-semibold w-12 ${e.method === 'GET' ? 'text-sky-600 dark:text-sky-400' : 'text-emerald-600 dark:text-emerald-400'}`}>{e.method}</span>
