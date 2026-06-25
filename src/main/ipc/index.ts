@@ -246,6 +246,15 @@ import {
   reindexDocuments,
   documentSemanticActive
 } from '../documentRetrieval'
+import {
+  getProjectPlan,
+  setTaskPlan,
+  addDependency,
+  removeDependency,
+  rescheduleProject,
+  listProjectSummaries
+} from '../db/projectPlan'
+import type { PlanTaskPatch } from '@shared/projects'
 import { deleteEmbedding } from '../db/embeddings'
 import {
   listMeetings,
@@ -1752,6 +1761,18 @@ export function registerIpcHandlers(): void {
   })
   ipcMain.handle('documents:reindex', () => reindexDocuments())
   ipcMain.handle('documents:semanticActive', () => documentSemanticActive())
+
+  // PlexiProjects: project plans, the Gantt schedule, dependencies and reschedule.
+  ipcMain.handle('projects:list', () => listProjectSummaries())
+  ipcMain.handle('projects:plan', (_e, projectId: string) => getProjectPlan(projectId))
+  ipcMain.handle('projects:setTaskPlan', (_e, taskId: string, patch: PlanTaskPatch) =>
+    setTaskPlan(taskId, patch)
+  )
+  ipcMain.handle('projects:addDep', (_e, predId: string, succId: string) => addDependency(predId, succId))
+  ipcMain.handle('projects:removeDep', (_e, predId: string, succId: string) =>
+    removeDependency(predId, succId)
+  )
+  ipcMain.handle('projects:reschedule', (_e, projectId: string) => rescheduleProject(projectId))
   ipcMain.handle(
     'documents:upsert',
     (

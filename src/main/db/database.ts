@@ -246,6 +246,21 @@ CREATE TABLE IF NOT EXISTS fb_embeddings (
   PRIMARY KEY (item_type, item_id)
 );
 
+-- ── PlexiProjects task dependencies ──────────────────────────────────────────
+-- Finish-to-start links between task nodes that drive the Gantt schedule and the
+-- critical path. pred_id must finish before succ_id can start. Both reference
+-- nodes; the row is removed when either task is deleted. UNIQUE prevents a
+-- duplicate edge in the same direction.
+CREATE TABLE IF NOT EXISTS fb_task_deps (
+  id TEXT PRIMARY KEY,
+  pred_id TEXT NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
+  succ_id TEXT NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
+  created_at INTEGER NOT NULL,
+  UNIQUE (pred_id, succ_id)
+);
+CREATE INDEX IF NOT EXISTS idx_fb_task_deps_succ ON fb_task_deps(succ_id);
+CREATE INDEX IF NOT EXISTS idx_fb_task_deps_pred ON fb_task_deps(pred_id);
+
 -- ── Inter-widget spatial links ───────────────────────────────────────────────
 -- Obsidian-style backlinks but drawn as lines on the canvas. Each row is a
 -- directed link (source → target). UNIQUE constraint prevents duplicates in
@@ -391,6 +406,10 @@ export function getDb(): Database.Database {
   ensureColumn(db, 'nodes', 'resume_markdown', 'TEXT')
   ensureColumn(db, 'nodes', 'resume_updated_at', 'INTEGER')
   ensureColumn(db, 'nodes', 'due_date', 'INTEGER')
+  // PlexiProjects planning fields. plan_start is the planned start date (due_date
+  // is reused as the planned finish); is_milestone marks a zero-duration marker.
+  ensureColumn(db, 'nodes', 'plan_start', 'INTEGER')
+  ensureColumn(db, 'nodes', 'is_milestone', 'INTEGER NOT NULL DEFAULT 0')
   // Set on nodes reconstructed from a share someone sent you. Drives the
   // "Shared by <handle>" badge + avatar in the sidebar. Null = your own node.
   ensureColumn(db, 'nodes', 'shared_from_handle', 'TEXT')

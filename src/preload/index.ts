@@ -1302,6 +1302,25 @@ const api = {
       ipcRenderer.invoke('documents:reindex'),
     semanticActive: (): Promise<boolean> => ipcRenderer.invoke('documents:semanticActive')
   },
+  // PlexiProjects: roll tasks up into a scheduled plan with a critical path.
+  projects: {
+    list: (): Promise<import('@shared/projects').ProjectSummary[]> => ipcRenderer.invoke('projects:list'),
+    plan: (projectId: string): Promise<import('@shared/projects').ProjectPlan> =>
+      ipcRenderer.invoke('projects:plan', projectId),
+    setTaskPlan: (
+      taskId: string,
+      patch: import('@shared/projects').PlanTaskPatch
+    ): Promise<boolean> => ipcRenderer.invoke('projects:setTaskPlan', taskId, patch),
+    addDep: (
+      predId: string,
+      succId: string
+    ): Promise<import('@shared/projects').AddDepResult> =>
+      ipcRenderer.invoke('projects:addDep', predId, succId),
+    removeDep: (predId: string, succId: string): Promise<boolean> =>
+      ipcRenderer.invoke('projects:removeDep', predId, succId),
+    reschedule: (projectId: string): Promise<import('@shared/projects').ProjectPlan> =>
+      ipcRenderer.invoke('projects:reschedule', projectId)
+  },
   // haptyx:// deep-link auth handoff. The brochure at haptyx.app/account/*
   // signs the user in against the signal server, then redirects to
   // haptyx://auth?token=...&email=...&handle=... — main process catches
