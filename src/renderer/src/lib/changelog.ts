@@ -39,7 +39,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '2.5.81',
     date: '2026-06-25T20:00:00Z',
     title: 'v2.5.81 — Tables feel like a real spreadsheet',
-    tag: 'improvement',
+    tag: 'feature',
     summary:
       'Reorder columns and rows by dragging a grip handle, move between cells with the keyboard, and change a column\'s type after the fact. Plus a fix so the AI assistant text is readable on the dark and futuristic themes.',
     highlights: [
