@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import Icon from '../Icon'
+import { PLEXI_CARD } from '../plexi'
 import FieldEditor from '../fields/FieldEditor'
 import { useFormsStore } from '../../stores/forms'
 import type { PlexiForm } from '@shared/forms'
@@ -43,20 +44,20 @@ export default function PlexiFormsView(): JSX.Element {
   }
 
   return (
-    <div className="h-full w-full flex bg-stone-50 dark:bg-stone-950" data-testid="plexiforms-view">
-      <div className="w-[280px] shrink-0 border-r border-stone-200 dark:border-white/[0.06] flex flex-col">
-        <div className="px-4 py-3.5 border-b border-stone-200 dark:border-white/[0.06]">
+    <div className="h-full w-full flex bg-[var(--surface-base)] text-[var(--ink-100)]" data-testid="plexiforms-view">
+      <div className="w-[280px] shrink-0 border-r border-[var(--edge-soft)] flex flex-col">
+        <div className="px-4 py-3.5 border-b border-[var(--edge-soft)]">
           <div className="flex items-center gap-2">
             <Icon name="dynamic_form" size={18} className="text-fuchsia-500" filled />
-            <h1 className="text-[15px] font-bold tracking-tight text-stone-900 dark:text-white">PlexiForms</h1>
+            <h1 className="text-[15px] font-bold tracking-tight text-[var(--ink-100)]">PlexiForms</h1>
           </div>
-          <p className="mt-0.5 text-[11.5px] text-stone-500 dark:text-stone-400">Capture requests, leads and data.</p>
+          <p className="mt-0.5 text-[11.5px] text-[var(--ink-70)]">Capture requests, leads and data.</p>
         </div>
         <div className="px-3 py-2.5">
           <button
             onClick={() => void addForm()}
             data-testid="form-new"
-            className="w-full inline-flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-md bg-fuchsia-500 text-white text-[12px] font-medium hover:bg-fuchsia-600"
+            className="w-full inline-flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-md bg-[rgb(var(--accent))] text-white text-[12px] font-medium hover:bg-[rgb(var(--accent-hover))]"
           >
             <Icon name="add" size={15} /> New form
           </button>
@@ -65,7 +66,7 @@ export default function PlexiFormsView(): JSX.Element {
           {loaded && forms.length === 0 ? (
             <div className="px-3 py-10 text-center">
               <Icon name="dynamic_form" size={26} className="text-stone-300 dark:text-stone-600" />
-              <p className="mt-2 text-[12px] text-stone-500 dark:text-stone-400 leading-relaxed">No forms yet. Build one to start collecting.</p>
+              <p className="mt-2 text-[12px] text-[var(--ink-70)] leading-relaxed">No forms yet. Build one to start collecting.</p>
             </div>
           ) : (
             forms.map((f) => (
@@ -74,10 +75,10 @@ export default function PlexiFormsView(): JSX.Element {
                 onClick={() => setSelectedId(f.id)}
                 data-testid={`form-row-${f.id}`}
                 className={`w-full text-left rounded-lg px-3 py-2 mb-1 transition-colors ${
-                  f.id === selectedId ? 'bg-fuchsia-500/10 border border-fuchsia-400/30' : 'hover:bg-stone-100 dark:hover:bg-white/[0.04] border border-transparent'
+                  f.id === selectedId ? 'bg-[rgb(var(--accent)/0.10)] border border-[rgb(var(--accent)/0.30)]' : 'hover:bg-[var(--surface-sunken)] border border-transparent'
                 }`}
               >
-                <span className="text-[13px] font-medium text-stone-900 dark:text-stone-100 truncate block">{f.title}</span>
+                <span className="text-[13px] font-medium text-[var(--ink-100)] truncate block">{f.title}</span>
               </button>
             ))
           )}
@@ -98,7 +99,7 @@ export default function PlexiFormsView(): JSX.Element {
         ) : (
           <div className="h-full flex flex-col items-center justify-center text-center px-6">
             <Icon name="dynamic_form" size={30} className="text-stone-300 dark:text-stone-600" />
-            <p className="mt-2 text-[13px] text-stone-500 dark:text-stone-400 max-w-sm leading-relaxed">
+            <p className="mt-2 text-[13px] text-[var(--ink-70)] max-w-sm leading-relaxed">
               Select a form to design it, fill it, or read its responses. Every response lands as a row in a real table.
             </p>
           </div>
@@ -154,21 +155,21 @@ function FormEditor({
 
   return (
     <div className="h-full flex flex-col" data-testid="form-editor">
-      <div className="flex items-center gap-2 px-5 py-3 border-b border-stone-200 dark:border-white/[0.06]">
+      <div className="flex items-center gap-2 px-5 py-3 border-b border-[var(--edge-soft)]">
         <input
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           onBlur={() => title !== form.title && onChangeMeta({ title })}
-          className="flex-1 bg-transparent text-[17px] font-bold text-stone-900 dark:text-white outline-none"
+          className="flex-1 bg-transparent text-[17px] font-bold text-[var(--ink-100)] outline-none"
           data-testid="form-title"
         />
-        <div className="inline-flex rounded-md border border-stone-300 dark:border-white/10 overflow-hidden text-[12px] font-medium">
+        <div className="inline-flex rounded-md border border-[var(--edge-soft)] overflow-hidden text-[12px] font-medium">
           {(['build', 'fill', 'responses'] as Tab[]).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
               data-testid={`form-tab-${t}`}
-              className={`px-3 py-1.5 capitalize ${tab === t ? 'bg-fuchsia-500 text-white' : 'text-stone-600 dark:text-stone-300'}`}
+              className={`px-3 py-1.5 capitalize ${tab === t ? 'bg-[rgb(var(--accent))] text-white' : 'text-[var(--ink-90)]'}`}
             >
               {t === 'responses' ? `Responses${rows.length ? ` (${rows.length})` : ''}` : t}
             </button>
@@ -216,7 +217,7 @@ function BuildTab({
 }): JSX.Element {
   const [desc, setDesc] = useState(form.description)
   const inputCls =
-    'text-[12px] bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-white/10 rounded px-2 py-1 text-stone-900 dark:text-stone-100 placeholder:text-stone-400 focus:outline-none'
+    'text-[12px] bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded px-2 py-1 text-[var(--ink-100)] placeholder:text-[var(--ink-50)] focus:outline-none'
   return (
     <div className="space-y-5">
       <textarea
@@ -225,32 +226,32 @@ function BuildTab({
         onBlur={() => desc !== form.description && onChangeMeta({ description: desc })}
         placeholder="Form description (optional)"
         rows={2}
-        className="w-full resize-y rounded-lg border border-stone-200 dark:border-white/[0.06] bg-white dark:bg-white/[0.02] px-3 py-2 text-[13px] text-stone-700 dark:text-stone-200 placeholder:text-stone-400 focus:outline-none"
+        className="w-full resize-y rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-raised)] px-3 py-2 text-[13px] text-[var(--ink-90)] placeholder:text-[var(--ink-50)] focus:outline-none"
       />
 
       <div>
-        <h2 className="text-[11px] font-semibold uppercase tracking-wide text-stone-500 dark:text-stone-400 mb-2">Fields</h2>
+        <h2 className="text-[11px] font-semibold uppercase tracking-wide text-[var(--ink-70)] mb-2">Fields</h2>
         <div className="space-y-2">
           {columns.map((c) => (
-            <div key={c.id} className="flex items-center gap-2 rounded-lg border border-stone-200 dark:border-white/[0.07] bg-white dark:bg-white/[0.02] px-3 py-2" data-testid="form-field-row">
+            <div key={c.id} className={`${PLEXI_CARD} flex items-center gap-2 px-3 py-2`} data-testid="form-field-row">
               <Icon name="drag_indicator" size={14} className="text-stone-300 dark:text-stone-600" />
               <input value={c.label} onChange={(e) => onPatch(c.id, { label: e.target.value })} className={`${inputCls} flex-1`} />
-              <span className="text-[11px] text-stone-400">{FIELD_TYPE_LABELS[c.type]}</span>
-              <button onClick={() => onRemove(c.id)} className="p-1 text-stone-400 hover:text-red-600" title="Remove field">
+              <span className="text-[11px] text-[var(--ink-70)]">{FIELD_TYPE_LABELS[c.type]}</span>
+              <button onClick={() => onRemove(c.id)} className="p-1 text-[var(--ink-70)] hover:text-red-600" title="Remove field">
                 <Icon name="close" size={13} />
               </button>
             </div>
           ))}
-          {columns.length === 0 && <p className="text-[12px] text-stone-400">No fields yet. Add one below.</p>}
+          {columns.length === 0 && <p className="text-[12px] text-[var(--ink-70)]">No fields yet. Add one below.</p>}
         </div>
         <div className="mt-3 flex items-center gap-1.5 flex-wrap">
-          <span className="text-[11px] text-stone-400 mr-1">Add field</span>
+          <span className="text-[11px] text-[var(--ink-70)] mr-1">Add field</span>
           {FORM_FIELD_TYPES.map((t) => (
             <button
               key={t}
               onClick={() => onAdd(t)}
               data-testid={`form-add-${t}`}
-              className="px-2 py-1 rounded-md text-[11.5px] text-stone-600 dark:text-stone-300 border border-stone-200 dark:border-white/10 hover:bg-stone-100 dark:hover:bg-white/[0.05]"
+              className="px-2 py-1 rounded-md text-[11.5px] text-[var(--ink-90)] border border-[var(--edge-soft)] hover:bg-[var(--surface-sunken)]"
             >
               {FIELD_TYPE_LABELS[t]}
             </button>
@@ -276,15 +277,15 @@ function FillTab({ form, columns, onSubmitted }: { form: PlexiForm; columns: Fie
   }
 
   if (columns.length === 0) {
-    return <p className="text-[12.5px] text-stone-400 py-8 text-center">Add fields in Build mode first, then this form becomes fillable.</p>
+    return <p className="text-[12.5px] text-[var(--ink-70)] py-8 text-center">Add fields in Build mode first, then this form becomes fillable.</p>
   }
 
   return (
     <div className="space-y-4" data-testid="form-fill">
-      {form.description && <p className="text-[13px] text-stone-600 dark:text-stone-300">{form.description}</p>}
+      {form.description && <p className="text-[13px] text-[var(--ink-90)]">{form.description}</p>}
       {columns.map((c) => (
         <label key={c.id} className="block">
-          <span className="block text-[12.5px] font-medium text-stone-700 dark:text-stone-200 mb-1">{c.label}</span>
+          <span className="block text-[12.5px] font-medium text-[var(--ink-90)] mb-1">{c.label}</span>
           <FieldEditor
             def={c}
             value={values[c.id] ?? defaultValue(c.type)}
@@ -297,7 +298,7 @@ function FillTab({ form, columns, onSubmitted }: { form: PlexiForm; columns: Fie
         <button
           onClick={() => void submit()}
           data-testid="form-submit"
-          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-fuchsia-500 text-white text-[13px] font-semibold hover:bg-fuchsia-600"
+          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[rgb(var(--accent))] text-white text-[13px] font-semibold hover:bg-[rgb(var(--accent-hover))]"
         >
           <Icon name="send" size={15} /> Submit
         </button>
@@ -316,15 +317,15 @@ function ResponsesTab({ columns, rows }: { columns: FieldDefinition[]; rows: FbR
     return (
       <div className="py-12 text-center">
         <Icon name="inbox" size={26} className="text-stone-300 dark:text-stone-600" />
-        <p className="mt-2 text-[12.5px] text-stone-500 dark:text-stone-400">No responses yet. They appear here, and as rows in this form's table.</p>
+        <p className="mt-2 text-[12.5px] text-[var(--ink-70)]">No responses yet. They appear here, and as rows in this form's table.</p>
       </div>
     )
   }
   return (
     <div className="overflow-auto" data-testid="form-responses">
-      <table className="w-full text-[12px]">
+      <table className="w-full text-[12px] fb-tabular">
         <thead>
-          <tr className="border-b border-stone-200 dark:border-white/10 text-left text-stone-500 dark:text-stone-400">
+          <tr className="border-b border-[var(--edge-soft)] text-left text-[var(--ink-70)]">
             {columns.map((c) => (
               <th key={c.id} className="px-2 py-1.5 font-medium">{c.label}</th>
             ))}
@@ -332,9 +333,9 @@ function ResponsesTab({ columns, rows }: { columns: FieldDefinition[]; rows: FbR
         </thead>
         <tbody>
           {rows.map((r) => (
-            <tr key={r.id} className="border-b border-stone-100 dark:border-white/[0.05]">
+            <tr key={r.id} className="border-b border-[var(--edge-soft)]">
               {columns.map((c) => (
-                <td key={c.id} className="px-2 py-1.5 text-stone-700 dark:text-stone-200">
+                <td key={c.id} className="px-2 py-1.5 text-[var(--ink-90)]">
                   {formatCell(r.cells[c.id])}
                 </td>
               ))}
