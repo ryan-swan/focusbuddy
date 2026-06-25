@@ -36,6 +36,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.82',
+    date: '2026-06-26T12:00:00Z',
+    title: 'v2.5.82 — PlexiSuite home, PlexiDash charts, and PlexiBrain',
+    tag: 'feature',
+    summary:
+      'A new home screen for the whole suite, charts and dashboards from your data, and a company knowledge base that grounds the AI in your own truth.',
+    highlights: [
+      'PlexiSuite home: a new launcher, now your default landing, that shows every product in the suite grouped and clearly marked. What is live is full colour and opens its own page; what is on the way is greyed with a badge you can upvote to push up the queue.',
+      'PlexiDash: chart widgets (bar, line, area, pie and KPI) that read a table and update as its data does. Drop a few on a desk and you have a live dashboard, no exports, no separate BI tool.',
+      'PlexiBrain: a company knowledge base where you curate what your team and your AI should remember, with tags, pinning and search. The assistant now grounds its answers in your knowledge as well as your documents.'
+    ]
+  },
+  {
     version: '2.5.81',
     date: '2026-06-25T20:00:00Z',
     title: 'v2.5.81 — Tables feel like a real spreadsheet',
