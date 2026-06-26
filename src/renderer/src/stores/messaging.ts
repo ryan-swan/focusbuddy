@@ -6,8 +6,38 @@ import type {
   MessageAttachment
 } from '../lib/messagingClient'
 import * as api from '../lib/messagingClient'
-import { connectMessagingSocket, disconnectMessagingSocket } from '../lib/messagingSocket'
+import { connectMessagingSocket, disconnectMessagingSocket, setReactionHandler, type ReactionEvent } from '../lib/messagingSocket'
 import { usePresenceStore } from './presence'
+import { useAccountStore } from './account'
+
+// Apply a reaction add/remove to a message in the conversation map, immutably and
+// idempotently (so the actor's own optimistic update plus the echoed broadcast do
+// not double count). Returns a new messagesByConv.
+export function applyReaction(
+  byConv: Record<string, ChatMessage[]>,
+  e: ReactionEvent
+): Record<string, ChatMessage[]> {
+  const list = byConv[e.conversationId]
+  if (!list) return byConv
+  let changed = false
+  const next = list.map((m) => {
+    if (m.id !== e.messageId) return m
+    const reactions = (m.reactions ?? []).map((r) => ({ emoji: r.emoji, accountIds: [...r.accountIds] }))
+    let entry = reactions.find((r) => r.emoji === e.emoji)
+    if (e.added) {
+      if (!entry) {
+        entry = { emoji: e.emoji, accountIds: [] }
+        reactions.push(entry)
+      }
+      if (!entry.accountIds.includes(e.accountId)) entry.accountIds.push(e.accountId)
+    } else if (entry) {
+      entry.accountIds = entry.accountIds.filter((id) => id !== e.accountId)
+    }
+    changed = true
+    return { ...m, reactions: reactions.filter((r) => r.accountIds.length > 0) }
+  })
+  return changed ? { ...byConv, [e.conversationId]: next } : byConv
+}
 
 // Messaging store — the cohesive client state behind direct messages, shared
 // spaces and the unified-inbox unread badge. REST loads history; the socket
@@ -29,6 +59,7 @@ interface MessagingStore {
   openConversation: (id: string) => Promise<void>
   startDm: (handle: string) => Promise<{ ok: true; id: string } | { ok: false; error: string }>
   send: (body: string, attachment?: MessageAttachment | null) => Promise<void>
+  react: (messageId: string, emoji: string) => Promise<void>
   inviteContact: (
     email: string
   ) => Promise<{ ok: true; status: 'requested' | 'invited' } | { ok: false; error: string }>
@@ -66,6 +97,8 @@ export const useMessagingStore = create<MessagingStore>((set, get) => ({
         void api.markRead(token, incoming.conversationId)
       }
     })
+    // Live emoji reactions: apply each add/remove to the message in place.
+    setReactionHandler((e) => set((s) => ({ messagesByConv: applyReaction(s.messagesByConv, e) })))
     // Join account-level presence on the same socket once we're connected.
     usePresenceStore.getState().start()
     await get().refreshConversations()
@@ -136,6 +169,21 @@ export const useMessagingStore = create<MessagingStore>((set, get) => ({
       return { messagesByConv: { ...s.messagesByConv, [activeId]: [...existing, message] } }
     })
     await get().refreshConversations()
+  },
+
+  react: async (messageId, emoji) => {
+    const { token, activeId, messagesByConv } = get()
+    if (!token || !activeId) return
+    const me = useAccountStore.getState().account?.id
+    if (!me) return
+    const msg = (messagesByConv[activeId] ?? []).find((m) => m.id === messageId)
+    if (!msg) return
+    const mine = (msg.reactions ?? []).find((r) => r.emoji === emoji)?.accountIds.includes(me) ?? false
+    // Optimistically toggle, then call the server. The server echoes the change
+    // back over the socket, which applyReaction folds in idempotently.
+    set((s) => ({ messagesByConv: applyReaction(s.messagesByConv, { conversationId: activeId, messageId, emoji, accountId: me, added: !mine }) }))
+    if (mine) await api.removeReaction(token, activeId, messageId, emoji)
+    else await api.addReaction(token, activeId, messageId, emoji)
   },
 
   inviteContact: async (email) => {

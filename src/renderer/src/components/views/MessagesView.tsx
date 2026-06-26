@@ -3,7 +3,106 @@ import { useMessagingStore } from '../../stores/messaging'
 import { useAccountStore } from '../../stores/account'
 import { useCallStore } from '../../stores/call'
 import { useSignInPrompt } from '../../stores/signInPrompt'
+import type { ChatMessage } from '../../lib/messagingClient'
 import Icon from '../Icon'
+
+const QUICK_EMOJIS = ['👍', '❤️', '😂', '🎉', '✅', '👀']
+
+function ReactPicker({ onPick }: { onPick: (emoji: string) => void }): JSX.Element {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className="relative self-center">
+      <button
+        onClick={() => setOpen((o) => !o)}
+        aria-label="Add reaction"
+        data-testid="react-open"
+        className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 h-6 w-6 inline-flex items-center justify-center rounded-full text-[var(--ink-50)] hover:bg-[var(--surface-sunken)] transition-opacity"
+      >
+        <Icon name="add_reaction" size={14} />
+      </button>
+      {open && (
+        <div
+          className="absolute z-20 bottom-full mb-1 left-1/2 -translate-x-1/2 flex items-center gap-0.5 p-1 rounded-lg bg-[var(--surface-raised)] border border-[var(--edge-soft)] shadow-lg"
+          data-testid="react-palette"
+        >
+          {QUICK_EMOJIS.map((e) => (
+            <button
+              key={e}
+              data-testid={`react-pick-${e}`}
+              onClick={() => {
+                onPick(e)
+                setOpen(false)
+              }}
+              className="h-7 w-7 inline-flex items-center justify-center rounded hover:bg-[var(--surface-sunken)] text-[15px]"
+            >
+              {e}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function MessageRow({
+  m,
+  mine,
+  myId,
+  onReact
+}: {
+  m: ChatMessage
+  mine: boolean
+  myId: string
+  onReact: (emoji: string) => void
+}): JSX.Element {
+  const reactions = m.reactions ?? []
+  return (
+    <div className={`group flex items-center gap-1.5 ${mine ? 'justify-end' : 'justify-start'}`}>
+      {mine && <ReactPicker onPick={onReact} />}
+      <div className={`flex flex-col max-w-[70%] ${mine ? 'items-end' : 'items-start'}`}>
+        <div
+          className={`rounded-2xl px-3 py-1.5 text-[13px] ${
+            mine
+              ? 'bg-accent text-white rounded-br-sm'
+              : 'bg-stone-100 dark:bg-stone-800 text-stone-900 dark:text-stone-100 rounded-bl-sm'
+          }`}
+        >
+          {m.body && <div className="whitespace-pre-wrap break-words">{m.body}</div>}
+          {m.attachment && (
+            <div className={`mt-1 inline-flex items-center gap-1 text-[11px] rounded px-1.5 py-0.5 ${mine ? 'bg-white/20' : 'bg-black/5 dark:bg-white/10'}`}>
+              <Icon name="folder_shared" size={11} />
+              {m.attachment.label}
+            </div>
+          )}
+          <div className={`text-[9px] mt-0.5 ${mine ? 'text-white/70' : 'text-stone-400'}`}>{fmtTime(m.createdAt)}</div>
+        </div>
+        {reactions.length > 0 && (
+          <div className="mt-1 flex flex-wrap gap-1" data-testid={`reactions-${m.id}`}>
+            {reactions.map((r) => {
+              const reactedByMe = r.accountIds.includes(myId)
+              return (
+                <button
+                  key={r.emoji}
+                  onClick={() => onReact(r.emoji)}
+                  data-testid={`reaction-${m.id}-${r.emoji}`}
+                  className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[11px] border transition-colors ${
+                    reactedByMe
+                      ? 'bg-[rgb(var(--accent)/0.12)] border-[rgb(var(--accent)/0.40)] text-[var(--ink-100)]'
+                      : 'bg-[var(--surface-sunken)] border-[var(--edge-soft)] text-[var(--ink-90)] hover:border-[var(--edge-firm)]'
+                  }`}
+                >
+                  <span>{r.emoji}</span>
+                  <span className="fb-tabular">{r.accountIds.length}</span>
+                </button>
+              )
+            })}
+          </div>
+        )}
+      </div>
+      {!mine && <ReactPicker onPick={onReact} />}
+    </div>
+  )
+}
 
 // Messages — direct messages and shared-space chat in one place, the first
 // surface of the cohesive messaging system. Conversation list on the left, the
@@ -19,6 +118,7 @@ export default function MessagesView(): JSX.Element {
   const conversations = useMessagingStore((s) => s.conversations)
   const messagesByConv = useMessagingStore((s) => s.messagesByConv)
   const activeId = useMessagingStore((s) => s.activeId)
+  const react = useMessagingStore((s) => s.react)
   const startCall = useCallStore((s) => s.startCall)
   const open = useMessagingStore((s) => s.openConversation)
   const send = useMessagingStore((s) => s.send)
@@ -209,31 +309,15 @@ export default function MessagesView(): JSX.Element {
               )}
             </div>
             <div ref={threadRef} className="flex-1 overflow-auto px-4 py-3 space-y-2">
-              {messages.map((m) => {
-                const mine = m.fromAccount === account.id
-                return (
-                  <div key={m.id} className={`flex ${mine ? 'justify-end' : 'justify-start'}`}>
-                    <div
-                      className={`max-w-[70%] rounded-2xl px-3 py-1.5 text-[13px] ${
-                        mine
-                          ? 'bg-accent text-white rounded-br-sm'
-                          : 'bg-stone-100 dark:bg-stone-800 text-stone-900 dark:text-stone-100 rounded-bl-sm'
-                      }`}
-                    >
-                      {m.body && <div className="whitespace-pre-wrap break-words">{m.body}</div>}
-                      {m.attachment && (
-                        <div className={`mt-1 inline-flex items-center gap-1 text-[11px] rounded px-1.5 py-0.5 ${mine ? 'bg-white/20' : 'bg-black/5 dark:bg-white/10'}`}>
-                          <Icon name="folder_shared" size={11} />
-                          {m.attachment.label}
-                        </div>
-                      )}
-                      <div className={`text-[9px] mt-0.5 ${mine ? 'text-white/70' : 'text-stone-400'}`}>
-                        {fmtTime(m.createdAt)}
-                      </div>
-                    </div>
-                  </div>
-                )
-              })}
+              {messages.map((m) => (
+                <MessageRow
+                  key={m.id}
+                  m={m}
+                  mine={m.fromAccount === account.id}
+                  myId={account.id}
+                  onReact={(emoji) => void react(m.id, emoji)}
+                />
+              ))}
             </div>
             <div className="px-4 py-3 border-t border-stone-200 dark:border-stone-800 flex items-end gap-2">
               <textarea

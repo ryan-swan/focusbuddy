@@ -61,6 +61,13 @@ let onDocEventCb: ((e: DocSocketEvent) => void) | null = null
 let onYjsEventCb: ((e: YjsSocketEvent) => void) | null = null
 let onPresenceCb: ((e: PresenceSocketEvent) => void) | null = null
 let onCallCb: ((e: CallSocketEvent) => void) | null = null
+
+// A live emoji-reaction change on a message in some conversation.
+export type ReactionEvent = { conversationId: string; messageId: string; emoji: string; accountId: string; added: boolean }
+let onReactionCb: ((e: ReactionEvent) => void) | null = null
+export function setReactionHandler(cb: ((e: ReactionEvent) => void) | null): void {
+  onReactionCb = cb
+}
 // Fired each time the socket (re)authenticates, so the Yjs provider can re-join
 // its room after a reconnect (the server-side room membership is per-socket).
 let onSocketOpenCb: (() => void) | null = null
@@ -198,6 +205,8 @@ function open(): void {
       onPresenceCb?.({ type: msg.type, payload: msg.payload } as PresenceSocketEvent)
     } else if (msg.type === 'docComment') {
       onDocCommentCb?.(msg.payload as DocCommentEvent)
+    } else if (msg.type === 'reaction') {
+      onReactionCb?.(msg.payload as ReactionEvent)
     } else if (
       msg.type === 'callIncoming' ||
       msg.type === 'callSignal' ||
