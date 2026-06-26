@@ -80,6 +80,18 @@ export function setTypingHandler(cb: ((e: TypingEvent) => void) | null): void {
 export function sendTyping(conversationId: string): void {
   sendSocketMessage({ type: 'typing', payload: { conversationId } })
 }
+
+// PlexiPeople knock-to-connect: someone knocked to reach you.
+export type KnockEvent = { from: { accountId: string; handle: string }; note: string | null }
+let onKnockCb: ((e: KnockEvent) => void) | null = null
+export function setKnockHandler(cb: ((e: KnockEvent) => void) | null): void {
+  onKnockCb = cb
+}
+
+/** Knock to reach a person you can see, with an optional short note. */
+export function sendKnock(to: string, note?: string): void {
+  sendSocketMessage({ type: 'knock', payload: { to, note } })
+}
 // Fired each time the socket (re)authenticates, so the Yjs provider can re-join
 // its room after a reconnect (the server-side room membership is per-socket).
 let onSocketOpenCb: (() => void) | null = null
@@ -221,6 +233,8 @@ function open(): void {
       onReactionCb?.(msg.payload as ReactionEvent)
     } else if (msg.type === 'typing') {
       onTypingCb?.(msg.payload as TypingEvent)
+    } else if (msg.type === 'knocked') {
+      onKnockCb?.(msg.payload as KnockEvent)
     } else if (
       msg.type === 'callIncoming' ||
       msg.type === 'callSignal' ||

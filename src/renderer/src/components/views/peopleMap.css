@@ -112,16 +112,18 @@
 .pm-worktag.is-working { color: #059669; background: rgb(16 185 129 / 0.12); }
 .pm-worktag.is-off { color: var(--ink-50); background: var(--surface-sunken); }
 
-/* PlexiCam click-to-call: a hover-revealed call button on a person row/card.
-   Invisible at rest so the layout never shifts, revealed on row hover. */
-.pm-prow__call,
-.pm-card__call {
+/* PlexiPeople reach actions: a hover-revealed message / knock / call cluster on a
+   person row or card. Invisible at rest so the layout never shifts, revealed on
+   row hover or when any action inside it is focused. */
+.pm-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
   opacity: 0;
   transition: opacity var(--dur-quick, 120ms) var(--ease-spring-crisp, ease);
 }
-.pm-prow:hover .pm-prow__call,
-.pm-card:hover .pm-card__call,
-.pm-prow__call:focus-visible,
-.pm-card__call:focus-visible {
+.pm-prow:hover .pm-actions,
+.pm-card:hover .pm-actions,
+.pm-actions:focus-within {
   opacity: 1;
 }

@@ -5,6 +5,8 @@ import { DashboardHeader, StatTile, RailCard } from '../plexi'
 import { useAccountStore } from '../../stores/account'
 import { useViewStore } from '../../stores/view'
 import { useCallStore } from '../../stores/call'
+import { useMessagingStore } from '../../stores/messaging'
+import { useKnockStore } from '../../stores/knock'
 import { listOrgs, type OrgMembership, type WorkWindow } from '../../lib/orgsClient'
 import { usePeopleMap, type MapPerson, type PeopleMapData } from '../../lib/peopleMap/usePeopleMap'
 import type { PresenceStatus } from '../../stores/presence'
@@ -89,6 +91,11 @@ function DayBar({
 
 /* ---------------- offices ---------------- */
 
+// Presence sort order: who is reachable right now comes first.
+function statusRank(s: PresenceStatus): number {
+  return s === 'online' ? 0 : s === 'focus' ? 1 : s === 'busy' ? 2 : s === 'away' ? 3 : 4
+}
+
 function OfficesTab({ data, now }: { data: PeopleMapData; now: Date }): JSX.Element {
   const groups = groupByOffice(data.people, data.offices)
   const liveCount = (people: MapPerson[], st: PresenceStatus): number =>
@@ -122,9 +129,11 @@ function OfficesTab({ data, now }: { data: PeopleMapData; now: Date }): JSX.Elem
               <span><i className="pm-dot pm-st-busy" style={{ width: 7, height: 7 }} /> {liveCount(people, 'busy')} busy</span>
             </div>
             <div className="pm-people">
-              {people.map((p) => (
-                <PersonRow key={p.accountId} person={p} now={now} />
-              ))}
+              {[...people]
+                .sort((a, b) => statusRank(a.liveStatus) - statusRank(b.liveStatus) || a.handle.localeCompare(b.handle))
+                .map((p) => (
+                  <PersonRow key={p.accountId} person={p} now={now} />
+                ))}
               {people.length === 0 && <div className="pm-office__where">No one here yet.</div>}
             </div>
           </div>
@@ -134,9 +143,64 @@ function OfficesTab({ data, now }: { data: PeopleMapData; now: Date }): JSX.Elem
   )
 }
 
+// The reach-anyone-in-a-click action cluster shown on a person row or card:
+// message, knock, and call. Hidden for yourself and for anyone offline (you
+// cannot reach them). When it is after hours where the person is, the knock
+// switches to a moon and warns, so you think twice before knocking at 2am.
+function PersonActions({
+  person,
+  offHours = false,
+  className = ''
+}: {
+  person: MapPerson
+  offHours?: boolean
+  className?: string
+}): JSX.Element | null {
+  const startCall = useCallStore((s) => s.startCall)
+  const startDm = useMessagingStore((s) => s.startDm)
+  const goMessages = useViewStore((s) => s.goMessages)
+  const knock = useKnockStore((s) => s.knock)
+  if (person.isSelf || person.liveStatus === 'offline') return null
+  const target = { accountId: person.accountId, handle: person.handle }
+  async function chat(): Promise<void> {
+    await startDm(person.handle) // opens the conversation on success
+    goMessages()
+  }
+  return (
+    <span className={`pm-actions ${className}`} onClick={(e) => e.stopPropagation()}>
+      <button
+        className="pm-iconbtn"
+        data-testid="person-chat"
+        title={`Message ${person.handle}`}
+        aria-label={`Message ${person.handle}`}
+        onClick={() => void chat()}
+      >
+        <Icon name="chat_bubble" size={14} />
+      </button>
+      <button
+        className="pm-iconbtn"
+        data-testid="person-knock"
+        title={offHours ? `Knock ${person.handle} (it is after hours for them)` : `Knock ${person.handle}`}
+        aria-label={`Knock ${person.handle}`}
+        onClick={() => knock(target)}
+      >
+        <Icon name={offHours ? 'bedtime' : 'sensor_door'} size={14} className={offHours ? 'text-[var(--ink-50)]' : ''} />
+      </button>
+      <button
+        className="pm-iconbtn"
+        data-testid="call-btn"
+        title={`Call ${person.handle}`}
+        aria-label={`Call ${person.handle}`}
+        onClick={() => void startCall(target, 'video')}
+      >
+        <Icon name="video_call" size={14} />
+      </button>
+    </span>
+  )
+}
+
 function PersonRow({ person, now }: { person: MapPerson; now: Date }): JSX.Element {
   const meta = STATUS_META[person.liveStatus]
-  const startCall = useCallStore((s) => s.startCall)
   const hasGeo = person.lat != null && person.lng != null && person.tzOffsetMin != null
   const day = hasGeo ? daylightFor(person.lat!, person.lng!, person.tzOffsetMin!, now, person.workWindow) : null
   return (
@@ -162,17 +226,7 @@ function PersonRow({ person, now }: { person: MapPerson; now: Date }): JSX.Eleme
           <span style={{ color: day.working ? '#6ee7b7' : '#93a0bd' }}>{day.workLabel}</span>
         </span>
       )}
-      {!person.isSelf && person.liveStatus !== 'offline' && (
-        <button
-          className="pm-iconbtn pm-prow__call"
-          data-testid="call-btn"
-          title={`Call ${person.handle}`}
-          aria-label={`Call ${person.handle}`}
-          onClick={() => void startCall({ accountId: person.accountId, handle: person.handle }, 'video')}
-        >
-          <Icon name="video_call" size={14} />
-        </button>
-      )}
+      <PersonActions person={person} offHours={day ? !day.working : false} className="pm-prow__call" />
     </div>
   )
 }
@@ -260,7 +314,6 @@ function GlobalTab({ data, now }: { data: PeopleMapData; now: Date }): JSX.Eleme
 
 function HierarchyTab({ data, now }: { data: PeopleMapData; now: Date }): JSX.Element {
   const { roots, childrenOf } = buildHierarchy(data.people)
-  const startCall = useCallStore((s) => s.startCall)
 
   const renderNode = (p: MapPerson, depth: number): JSX.Element => {
     const meta = STATUS_META[p.liveStatus]
@@ -287,17 +340,7 @@ function HierarchyTab({ data, now }: { data: PeopleMapData; now: Date }): JSX.El
                 {day.working ? 'working' : day.workLabel.toLowerCase()}
               </span>
             )}
-            {!p.isSelf && p.liveStatus !== 'offline' && (
-              <button
-                className="pm-iconbtn pm-card__call"
-                data-testid="call-btn"
-                title={`Call ${p.handle}`}
-                aria-label={`Call ${p.handle}`}
-                onClick={() => void startCall({ accountId: p.accountId, handle: p.handle }, 'video')}
-              >
-                <Icon name="video_call" size={14} />
-              </button>
-            )}
+            <PersonActions person={p} offHours={day ? !day.working : false} className="pm-card__call" />
           </div>
         </div>
         {children.length > 0 && depth < 12 && (
