@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import Icon from './Icon'
 import Tooltip from './Tooltip'
 import { usePresenceStore, type PresenceStatus } from '../stores/presence'
@@ -64,9 +65,13 @@ export default function TeamPresenceButton(): JSX.Element {
     const onKey = (e: KeyboardEvent): void => {
       if (e.key === 'Escape') setOpen(false)
     }
-    window.addEventListener('mousedown', onDown)
+    // Arm the outside-click a tick late so the same click that opened the panel
+    // does not immediately close it (the panel is portaled, so it is no longer a
+    // DOM descendant of the button). Matches the HabitGarden popover pattern.
+    const armId = window.setTimeout(() => window.addEventListener('mousedown', onDown), 50)
     window.addEventListener('keydown', onKey)
     return () => {
+      window.clearTimeout(armId)
       window.removeEventListener('mousedown', onDown)
       window.removeEventListener('keydown', onKey)
     }
@@ -92,11 +97,21 @@ export default function TeamPresenceButton(): JSX.Element {
         </button>
       </Tooltip>
 
-      {open && (
-        <div
-          ref={popRef}
-          className="absolute right-0 top-[calc(100%+8px)] z-50 w-72 rounded-xl border border-stone-200 dark:border-white/10 bg-white dark:bg-stone-900 shadow-xl overflow-hidden"
-        >
+      {open &&
+        createPortal(
+          <div
+            ref={popRef}
+            // Portaled to the body so it escapes the header's backdrop-filter
+            // stacking context (which otherwise paints it behind the page).
+            // Positioned under the trigger via its on-screen rect.
+            style={(() => {
+              const r = btnRef.current?.getBoundingClientRect()
+              return r
+                ? { top: r.bottom + 8, right: Math.max(8, window.innerWidth - r.right) }
+                : { top: 48, right: 8 }
+            })()}
+            className="fixed z-[200] w-72 rounded-xl border border-stone-200 dark:border-white/10 bg-white dark:bg-stone-900 shadow-xl overflow-hidden"
+          >
           <div className="px-3 py-2.5 border-b border-stone-200 dark:border-white/10">
             <div className="flex items-center justify-between">
               <h3 className="text-[12px] font-semibold uppercase tracking-tight text-stone-700 dark:text-stone-200">
@@ -202,8 +217,9 @@ export default function TeamPresenceButton(): JSX.Element {
               })
             )}
           </div>
-        </div>
-      )}
+          </div>,
+          document.body
+        )}
     </div>
   )
 }
