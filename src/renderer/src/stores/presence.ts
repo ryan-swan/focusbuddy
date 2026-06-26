@@ -25,15 +25,39 @@ interface PresenceStore {
   // This client's own published status.
   myStatus: PresenceStatus
   myWorkingOn: string | null
+  // Appear-offline: when true, the server hides us from everyone else's presence
+  // even while we're connected. We still see everyone normally. This is our own
+  // switch with no admin override; the choice persists across restarts.
+  myInvisible: boolean
   // True once we've joined presence on the live socket.
   active: boolean
 
   start: () => void
   stop: () => void
   setStatus: (status: PresenceStatus, workingOn?: string | null) => void
+  setInvisible: (invisible: boolean) => void
 }
 
 let unsubFocus: (() => void) | null = null
+
+// The appear-offline choice is the user's, so it persists locally and is
+// re-asserted on every (re)connect. The client is the authority on its own
+// visibility; nothing server-side or admin-side can override it.
+const INVISIBLE_KEY = 'plexi.presence.invisible'
+function loadInvisible(): boolean {
+  try {
+    return localStorage.getItem(INVISIBLE_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+function saveInvisible(v: boolean): void {
+  try {
+    localStorage.setItem(INVISIBLE_KEY, v ? '1' : '0')
+  } catch {
+    /* ignore */
+  }
+}
 
 function applyEvent(e: PresenceSocketEvent, set: (fn: (s: PresenceStore) => Partial<PresenceStore>) => void): void {
   if (e.type === 'presenceSnapshot') {
@@ -73,21 +97,23 @@ export const usePresenceStore = create<PresenceStore>((set, get) => ({
   peers: {},
   myStatus: 'online',
   myWorkingOn: null,
+  myInvisible: loadInvisible(),
   active: false,
 
   start: () => {
     if (get().active) return
     setPresenceSocketHandler((e) => applyEvent(e, set))
     // Re-announce on every (re)authentication, since the server tracks presence
-    // per-socket and a reconnect starts a fresh one.
+    // per-socket and a reconnect starts a fresh one. We carry our visibility
+    // choice every time so a reconnect never briefly outs an invisible user.
     setPresenceOpenHandler(() => {
       const { status, workingOn } = deriveStatus()
-      sendSocketMessage({ type: 'presenceJoin', payload: { status, workingOn } })
+      sendSocketMessage({ type: 'presenceJoin', payload: { status, workingOn, visible: !get().myInvisible } })
       set(() => ({ myStatus: status, myWorkingOn: workingOn }))
     })
     // Join now in case the socket is already authenticated (no open event coming).
     const { status, workingOn } = deriveStatus()
-    sendSocketMessage({ type: 'presenceJoin', payload: { status, workingOn } })
+    sendSocketMessage({ type: 'presenceJoin', payload: { status, workingOn, visible: !get().myInvisible } })
     // Keep our status in sync with focus-session changes.
     unsubFocus = useFocusSessionStore.subscribe(() => {
       const d = deriveStatus()
@@ -111,7 +137,18 @@ export const usePresenceStore = create<PresenceStore>((set, get) => ({
   },
 
   setStatus: (status, workingOn) => {
-    sendSocketMessage({ type: 'presenceUpdate', payload: { status, workingOn: workingOn ?? null } })
+    // Carry visibility on every update so a status change while invisible never
+    // accidentally re-announces us as online.
+    sendSocketMessage({ type: 'presenceUpdate', payload: { status, workingOn: workingOn ?? null, visible: !get().myInvisible } })
     set(() => ({ myStatus: status, myWorkingOn: workingOn ?? null }))
+  },
+
+  setInvisible: (invisible) => {
+    saveInvisible(invisible)
+    set(() => ({ myInvisible: invisible }))
+    // Tell the server. The server turns this into an honest offline (going
+    // invisible) or online (coming back) event for our audience.
+    const { myStatus, myWorkingOn } = get()
+    sendSocketMessage({ type: 'presenceUpdate', payload: { status: myStatus, workingOn: myWorkingOn, visible: !invisible } })
   }
 }))
