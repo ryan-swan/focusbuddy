@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useAccountStore } from '../../stores/account'
 import { usePresenceStore, type PresenceStatus } from '../../stores/presence'
-import { getPeopleMap, type PeopleMap, type PeopleMapPerson, type Office, type WorkWindow } from '../orgsClient'
+import { getPeopleMap, absolutePhotoUrl, type PeopleMap, type PeopleMapPerson, type Office, type WorkWindow } from '../orgsClient'
 
 // One person as the People Map renders them: their static org profile (from the
 // server) plus their live presence status (from the presence socket). No sample
@@ -68,7 +68,9 @@ export function usePeopleMap(orgId: string | null): Result {
           const peer = peers[p.accountId]
           const liveStatus: PresenceStatus = isSelf ? myStatus : peer ? peer.status : 'offline'
           const liveWorkingOn = isSelf ? myWorkingOn : peer ? peer.workingOn : null
-          return { ...p, liveStatus, liveWorkingOn, isSelf }
+          // The feed gives a relative photo URL; resolve it so an <img> can load it.
+          const photoUrl = p.photoUrl ? absolutePhotoUrl(p.photoUrl) : null
+          return { ...p, liveStatus, liveWorkingOn, isSelf, photoUrl }
         })
       }
     : null

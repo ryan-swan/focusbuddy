@@ -184,3 +184,40 @@
 }
 .pm-collab__person:hover { border-color: var(--edge-firm); background: var(--surface-raised); }
 .pm-collab__pname { font-size: 12px; font-weight: 500; color: var(--ink-100); }
+
+/* Avatar photo variant: a real image fills the same circular footprint. */
+.pm-av--photo { object-fit: cover; border-radius: 50%; display: inline-block; }
+
+/* Org editing in the hierarchy: drag-to-reparent + dotted-line chips. */
+.pm-card--draggable { cursor: grab; }
+.pm-card--draggable:active { cursor: grabbing; }
+.pm-card--drop { outline: 2px dashed rgb(var(--accent) / 0.6); outline-offset: 2px; }
+.pm-tree__hint { font-size: 11px; color: var(--ink-50); margin-bottom: 10px; }
+.pm-tree__err { color: rgb(var(--rose, 244 63 94)); }
+.pm-dotted { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0 2px 40px; align-items: center; }
+.pm-dotted__chip {
+  display: inline-flex; align-items: center; gap: 3px; font-size: 10.5px;
+  padding: 1px 6px; border-radius: 999px; border: 1px dashed var(--edge-firm);
+  color: var(--ink-70); background: var(--surface-sunken);
+}
+.pm-dotted__x, .pm-dotted__cancel {
+  display: inline-flex; align-items: center; padding: 0; margin-left: 2px;
+  color: var(--ink-50); border: none; background: none; cursor: pointer;
+}
+.pm-dotted__x:hover, .pm-dotted__cancel:hover { color: var(--ink-90); }
+.pm-dotted__add {
+  display: inline-flex; align-items: center; gap: 2px; font-size: 10.5px;
+  padding: 1px 6px; border-radius: 999px; border: 1px dashed var(--edge-soft);
+  color: var(--ink-50); background: none; cursor: pointer;
+}
+.pm-dotted__add:hover { color: var(--ink-90); border-color: var(--edge-firm); }
+.pm-dotted__form { display: inline-flex; align-items: center; gap: 3px; }
+.pm-dotted__form select {
+  font-size: 10.5px; padding: 1px 4px; border-radius: 6px;
+  border: 1px solid var(--edge-soft); background: var(--surface-sunken); color: var(--ink-90);
+}
+.pm-dotted__save {
+  font-size: 10.5px; padding: 1px 8px; border-radius: 6px; border: none;
+  background: rgb(var(--accent)); color: #fff; cursor: pointer;
+}
+.pm-dotted__save:disabled { opacity: 0.4; }

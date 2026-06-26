@@ -176,7 +176,14 @@ export interface PeopleMapPerson {
   lng: number | null
   tzOffsetMin: number | null
   workWindow: WorkWindow
+  // Relative URL of the member's avatar, or null. Resolved to an absolute URL by
+  // the People Map merge.
+  photoUrl: string | null
+  // This person's outgoing dotted-line relationships.
+  relationships: { toAccountId: string; kind: RelationshipKind }[]
 }
+
+export type RelationshipKind = 'oversight' | 'matrix' | 'stakeholder' | 'vendor'
 export interface PeopleMap {
   orgId: string
   defaultHours: WorkWindow
@@ -219,4 +226,53 @@ export async function setMemberProfile(token: string, id: string, accountId: str
 export async function getPeopleMap(token: string, id: string): Promise<PeopleMap | null> {
   const { json } = await call<{ ok: boolean; map?: PeopleMap }>('GET', `/orgs/${id}/people-map`, token)
   return json?.map ?? null
+}
+
+/** Resolve a relative people-map photo URL to an absolute one the browser can load. */
+export function absolutePhotoUrl(relative: string): string {
+  return url(relative)
+}
+
+export async function addRelationship(
+  token: string,
+  id: string,
+  accountId: string,
+  toAccountId: string,
+  kind: RelationshipKind
+): Promise<{ ok: boolean; error?: string }> {
+  const { json } = await call<{ ok: boolean; error?: string }>('POST', `/orgs/${id}/members/${accountId}/relationships`, token, { toAccountId, kind })
+  return json ?? { ok: false, error: 'Request failed.' }
+}
+
+export async function removeRelationship(
+  token: string,
+  id: string,
+  accountId: string,
+  toAccountId: string,
+  kind: RelationshipKind
+): Promise<{ ok: boolean; error?: string }> {
+  const { json } = await call<{ ok: boolean; error?: string }>('DELETE', `/orgs/${id}/members/${accountId}/relationships/${toAccountId}/${kind}`, token)
+  return json ?? { ok: false, error: 'Request failed.' }
+}
+
+/** Upload a member's avatar image (admin or self). Sends the raw bytes with the
+ *  image type as a query param. Returns the new photo URL on success. */
+export async function uploadMemberPhoto(
+  token: string,
+  id: string,
+  accountId: string,
+  bytes: ArrayBuffer,
+  mime: string
+): Promise<{ ok: boolean; photoUrl?: string; error?: string }> {
+  try {
+    const res = await fetch(url(`/orgs/${id}/members/${accountId}/photo?mime=${encodeURIComponent(mime)}`), {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/octet-stream' },
+      body: bytes
+    })
+    const json = (await res.json()) as { ok: boolean; photoUrl?: string; error?: string }
+    return json
+  } catch {
+    return { ok: false, error: 'Upload failed.' }
+  }
 }

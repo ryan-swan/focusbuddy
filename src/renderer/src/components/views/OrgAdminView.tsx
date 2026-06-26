@@ -19,6 +19,8 @@ import {
   setOrgHours,
   getMemberProfile,
   setMemberProfile,
+  uploadMemberPhoto,
+  absolutePhotoUrl,
   type OrgMembership,
   type OrgDetail,
   type OrgRole,
@@ -332,6 +334,12 @@ export default function OrgAdminView(): JSX.Element {
                         offices={offices}
                         members={detail.members.filter((x) => x.accountId !== m.accountId)}
                         onSave={(patch) => void saveProfile(m.accountId, patch)}
+                        onUploadPhoto={async (bytes, mime) => {
+                          if (!token || !selId) return
+                          const r = await uploadMemberPhoto(token, selId, m.accountId, bytes, mime)
+                          if (!r.ok) setMsg(r.error ?? 'Photo upload failed.')
+                          void refreshDetail()
+                        }}
                       />
                     )}
                   </div>
@@ -439,19 +447,57 @@ function ProfileEditor({
   profile,
   offices,
   members,
-  onSave
+  onSave,
+  onUploadPhoto
 }: {
   profile: MemberProfile | undefined
   offices: Office[]
   members: { accountId: string; handle: string }[]
   onSave: (patch: Partial<MemberProfile>) => void
+  onUploadPhoto: (bytes: ArrayBuffer, mime: string) => Promise<void>
 }): JSX.Element {
+  const [photoBust, setPhotoBust] = useState(0)
+  const [uploading, setUploading] = useState(false)
   if (!profile) {
     return <div className="pl-7 pb-2 text-[11px] text-stone-400">Loading profile…</div>
   }
   const field = 'text-[12px] bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded px-2 py-1 focus:outline-none focus:border-accent'
+  const photoSrc = absolutePhotoUrl(`/orgs/${profile.orgId}/members/${profile.accountId}/photo`) + (photoBust ? `?v=${photoBust}` : '')
   return (
     <div className="pl-7 pb-3 grid grid-cols-2 gap-2" data-testid="org-profile-editor">
+      <div className="col-span-2 flex items-center gap-3">
+        <img
+          src={photoSrc}
+          alt=""
+          className="h-11 w-11 rounded-full object-cover bg-stone-100 dark:bg-stone-800 ring-1 ring-black/10"
+          onError={(e) => {
+            e.currentTarget.style.visibility = 'hidden'
+          }}
+          onLoad={(e) => {
+            e.currentTarget.style.visibility = 'visible'
+          }}
+        />
+        <label className="flex flex-col gap-0.5">
+          <span className="text-[10px] uppercase tracking-wide text-stone-400">Photo</span>
+          <input
+            type="file"
+            accept="image/png,image/jpeg,image/webp,image/gif"
+            data-testid="profile-photo"
+            disabled={uploading}
+            className="text-[11px] text-stone-500"
+            onChange={async (e) => {
+              const f = e.target.files?.[0]
+              if (!f) return
+              setUploading(true)
+              const bytes = await f.arrayBuffer()
+              await onUploadPhoto(bytes, f.type)
+              setUploading(false)
+              setPhotoBust(Date.now())
+              e.target.value = ''
+            }}
+          />
+        </label>
+      </div>
       <label className="flex flex-col gap-0.5">
         <span className="text-[10px] uppercase tracking-wide text-stone-400">Title</span>
         <input defaultValue={profile.title ?? ''} onBlur={(e) => onSave({ title: e.target.value || null })} className={field} data-testid="profile-title" placeholder="e.g. Senior Engineer" />
