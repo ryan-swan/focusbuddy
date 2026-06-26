@@ -28,9 +28,17 @@ export interface ChatMessage {
   reactions?: MessageReaction[]
 }
 
+export interface OrgChannel {
+  id: string
+  title: string
+  memberCount: number
+  isMember: boolean
+  lastMessageAt: number
+}
+
 export interface ConversationSummary {
   id: string
-  kind: 'dm' | 'space'
+  kind: 'dm' | 'space' | 'channel'
   title: string
   lastMessageAt: number
   unreadCount: number
@@ -142,6 +150,21 @@ export async function removeReaction(
   emoji: string
 ): Promise<void> {
   await req('DELETE', `/conversations/${conversationId}/messages/${messageId}/reactions/${encodeURIComponent(emoji)}`, token)
+}
+
+export async function listOrgChannels(token: string, orgId: string): Promise<OrgChannel[]> {
+  const json = await req<{ ok: boolean; channels?: OrgChannel[] }>('GET', `/orgs/${orgId}/channels`, token)
+  return json?.ok ? json.channels ?? [] : []
+}
+
+export async function createChannel(token: string, orgId: string, name: string): Promise<string | null> {
+  const json = await req<{ ok: boolean; conversationId?: string }>('POST', `/orgs/${orgId}/channels`, token, { name })
+  return json?.ok ? json.conversationId ?? null : null
+}
+
+export async function joinChannel(token: string, conversationId: string): Promise<boolean> {
+  const json = await req<{ ok: boolean }>('POST', `/conversations/${conversationId}/join`, token, {})
+  return json?.ok ?? false
 }
 
 export async function getUnreadTotal(token: string): Promise<number> {

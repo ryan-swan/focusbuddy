@@ -3,7 +3,8 @@ import { useMessagingStore } from '../../stores/messaging'
 import { useAccountStore } from '../../stores/account'
 import { useCallStore } from '../../stores/call'
 import { useSignInPrompt } from '../../stores/signInPrompt'
-import type { ChatMessage } from '../../lib/messagingClient'
+import type { ChatMessage, OrgChannel } from '../../lib/messagingClient'
+import { listOrgs, type OrgMembership } from '../../lib/orgsClient'
 import Icon from '../Icon'
 
 const QUICK_EMOJIS = ['👍', '❤️', '😂', '🎉', '✅', '👀']
@@ -129,6 +130,7 @@ export default function MessagesView(): JSX.Element {
   const [draft, setDraft] = useState('')
   const [newHandle, setNewHandle] = useState('')
   const [composingNew, setComposingNew] = useState(false)
+  const [browsing, setBrowsing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const threadRef = useRef<HTMLDivElement | null>(null)
 
@@ -211,15 +213,26 @@ export default function MessagesView(): JSX.Element {
       <div className="w-64 shrink-0 border-r border-stone-200 dark:border-stone-800 flex flex-col">
         <div className="px-3 py-3 flex items-center justify-between">
           <h1 className="text-sm font-semibold text-stone-900 dark:text-stone-100">Messages</h1>
-          <button
-            onClick={() => setComposingNew((v) => !v)}
-            className="icon-btn"
-            title="New message"
-            data-testid="messages-new"
-          >
-            <Icon name="edit_square" size={15} />
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setBrowsing(true)}
+              className="icon-btn"
+              title="Browse and create channels"
+              data-testid="messages-channels"
+            >
+              <Icon name="tag" size={15} />
+            </button>
+            <button
+              onClick={() => setComposingNew((v) => !v)}
+              className="icon-btn"
+              title="New message"
+              data-testid="messages-new"
+            >
+              <Icon name="edit_square" size={15} />
+            </button>
+          </div>
         </div>
+        {browsing && <ChannelBrowser onClose={() => setBrowsing(false)} />}
 
         {composingNew && (
           <div className="px-3 pb-2">
@@ -258,8 +271,12 @@ export default function MessagesView(): JSX.Element {
               >
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-[13px] font-medium text-stone-900 dark:text-stone-100 truncate inline-flex items-center gap-1.5">
-                    <Icon name={c.kind === 'space' ? 'folder_shared' : 'person'} size={13} className="text-stone-400" />
-                    {c.title}
+                    <Icon
+                      name={c.kind === 'channel' ? 'tag' : c.kind === 'space' ? 'folder_shared' : 'person'}
+                      size={13}
+                      className="text-stone-400"
+                    />
+                    {c.kind === 'channel' ? `#${c.title}` : c.title}
                   </span>
                   {c.unreadCount > 0 && (
                     <span className="shrink-0 text-[10px] font-semibold text-white bg-accent rounded-full px-1.5 py-0.5 min-w-[18px] text-center">
@@ -344,6 +361,179 @@ export default function MessagesView(): JSX.Element {
               </button>
             </div>
           </>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// Browse the channels in your organization, join one, or create a new one.
+// Channels are org-scoped: only people in the same organization see and join them.
+function ChannelBrowser({ onClose }: { onClose: () => void }): JSX.Element {
+  const token = useMessagingStore((s) => s.token)
+  const browseChannels = useMessagingStore((s) => s.browseChannels)
+  const createChannel = useMessagingStore((s) => s.createChannel)
+  const joinChannel = useMessagingStore((s) => s.joinChannel)
+  const [orgs, setOrgs] = useState<OrgMembership[]>([])
+  const [orgId, setOrgId] = useState<string | null>(null)
+  const [channels, setChannels] = useState<OrgChannel[]>([])
+  const [name, setName] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [err, setErr] = useState<string | null>(null)
+
+  useEffect(() => {
+    let alive = true
+    void (async () => {
+      if (!token) {
+        setLoading(false)
+        return
+      }
+      const os = await listOrgs(token)
+      if (!alive) return
+      setOrgs(os)
+      setOrgId(os[0]?.id ?? null)
+      setLoading(false)
+    })()
+    return () => {
+      alive = false
+    }
+  }, [token])
+
+  useEffect(() => {
+    let alive = true
+    void (async () => {
+      if (!orgId) {
+        setChannels([])
+        return
+      }
+      const cs = await browseChannels(orgId)
+      if (alive) setChannels(cs)
+    })()
+    return () => {
+      alive = false
+    }
+  }, [orgId, browseChannels])
+
+  async function onCreate(): Promise<void> {
+    if (!orgId) return
+    const r = await createChannel(orgId, name)
+    if (!r.ok) {
+      setErr(r.error)
+      return
+    }
+    onClose() // createChannel opens the new channel
+  }
+
+  async function onJoin(id: string): Promise<void> {
+    await joinChannel(id)
+    onClose()
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-40 flex items-center justify-center bg-black/30"
+      onClick={onClose}
+      data-testid="channel-browser"
+    >
+      <div
+        className="w-[420px] max-h-[70vh] flex flex-col rounded-xl bg-[var(--surface-raised)] border border-[var(--edge-soft)] shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="px-4 py-3 border-b border-[var(--edge-soft)] flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-[var(--ink-100)] inline-flex items-center gap-1.5">
+            <Icon name="tag" size={15} className="text-accent" /> Channels
+          </h2>
+          <button onClick={onClose} className="icon-btn" aria-label="Close" data-testid="channel-browser-close">
+            <Icon name="close" size={15} />
+          </button>
+        </div>
+
+        {orgs.length > 1 && (
+          <div className="px-4 pt-3">
+            <select
+              value={orgId ?? ''}
+              onChange={(e) => setOrgId(e.target.value)}
+              className="w-full bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded px-2 py-1 text-[12px] text-[var(--ink-90)]"
+              data-testid="channel-browser-org"
+            >
+              {orgs.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        <div className="flex-1 overflow-auto px-4 py-3 space-y-1">
+          {loading ? (
+            <p className="text-[12px] text-[var(--ink-50)]">Loading channels…</p>
+          ) : !orgId ? (
+            <p className="text-[12px] text-[var(--ink-50)] leading-snug">
+              You are not part of an organization yet. Channels live inside an organization, so create or join one first.
+            </p>
+          ) : channels.length === 0 ? (
+            <p className="text-[12px] text-[var(--ink-50)] leading-snug">No channels yet. Create the first one below.</p>
+          ) : (
+            channels.map((c) => (
+              <div
+                key={c.id}
+                className="flex items-center justify-between gap-2 px-2 py-1.5 rounded-lg hover:bg-[var(--surface-sunken)]"
+                data-testid="channel-row"
+              >
+                <span className="min-w-0">
+                  <span className="text-[13px] font-medium text-[var(--ink-100)] truncate inline-flex items-center gap-1">
+                    <span className="text-[var(--ink-50)]">#</span>
+                    {c.title}
+                  </span>
+                  <span className="block text-[11px] text-[var(--ink-50)]">
+                    {c.memberCount} {c.memberCount === 1 ? 'member' : 'members'}
+                  </span>
+                </span>
+                {c.isMember ? (
+                  <span className="shrink-0 text-[11px] text-[var(--ink-50)] inline-flex items-center gap-1">
+                    <Icon name="check" size={13} /> Joined
+                  </span>
+                ) : (
+                  <button
+                    onClick={() => void onJoin(c.id)}
+                    className="shrink-0 h-7 px-3 rounded-lg border border-[var(--edge-soft)] text-[12px] text-[var(--ink-90)] hover:bg-[var(--surface-sunken)]"
+                    data-testid="channel-join"
+                  >
+                    Join
+                  </button>
+                )}
+              </div>
+            ))
+          )}
+        </div>
+
+        {orgId && (
+          <div className="px-4 py-3 border-t border-[var(--edge-soft)]">
+            <div className="flex gap-1.5">
+              <span className="inline-flex items-center text-[var(--ink-50)] text-[13px] pl-1">#</span>
+              <input
+                value={name}
+                onChange={(e) => {
+                  setName(e.target.value)
+                  setErr(null)
+                }}
+                onKeyDown={(e) => e.key === 'Enter' && void onCreate()}
+                placeholder="new-channel-name"
+                data-testid="channel-create-name"
+                className="flex-1 bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded px-2 py-1 text-[12px] text-[var(--ink-90)]"
+              />
+              <button
+                onClick={() => void onCreate()}
+                disabled={!name.trim()}
+                className="btn-primary px-3 py-1 text-[12px] disabled:opacity-40"
+                data-testid="channel-create"
+              >
+                Create
+              </button>
+            </div>
+            {err && <div className="text-[11px] text-red-500 mt-1">{err}</div>}
+          </div>
         )}
       </div>
     </div>

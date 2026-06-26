@@ -60,6 +60,9 @@ interface MessagingStore {
   startDm: (handle: string) => Promise<{ ok: true; id: string } | { ok: false; error: string }>
   send: (body: string, attachment?: MessageAttachment | null) => Promise<void>
   react: (messageId: string, emoji: string) => Promise<void>
+  browseChannels: (orgId: string) => Promise<api.OrgChannel[]>
+  createChannel: (orgId: string, name: string) => Promise<{ ok: true; id: string } | { ok: false; error: string }>
+  joinChannel: (conversationId: string) => Promise<void>
   inviteContact: (
     email: string
   ) => Promise<{ ok: true; status: 'requested' | 'invited' } | { ok: false; error: string }>
@@ -184,6 +187,33 @@ export const useMessagingStore = create<MessagingStore>((set, get) => ({
     set((s) => ({ messagesByConv: applyReaction(s.messagesByConv, { conversationId: activeId, messageId, emoji, accountId: me, added: !mine }) }))
     if (mine) await api.removeReaction(token, activeId, messageId, emoji)
     else await api.addReaction(token, activeId, messageId, emoji)
+  },
+
+  browseChannels: async (orgId) => {
+    const { token } = get()
+    if (!token) return []
+    return api.listOrgChannels(token, orgId)
+  },
+
+  createChannel: async (orgId, name) => {
+    const { token } = get()
+    if (!token) return { ok: false, error: 'Not signed in.' }
+    const trimmed = name.trim()
+    if (!trimmed) return { ok: false, error: 'A channel needs a name.' }
+    const id = await api.createChannel(token, orgId, trimmed)
+    if (!id) return { ok: false, error: 'Could not create the channel.' }
+    await get().refreshConversations()
+    await get().openConversation(id)
+    return { ok: true, id }
+  },
+
+  joinChannel: async (conversationId) => {
+    const { token } = get()
+    if (!token) return
+    const ok = await api.joinChannel(token, conversationId)
+    if (!ok) return
+    await get().refreshConversations()
+    await get().openConversation(conversationId)
   },
 
   inviteContact: async (email) => {
