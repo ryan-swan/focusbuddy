@@ -43,6 +43,8 @@ export default function TeamPresenceButton(): JSX.Element {
   const peers = usePresenceStore((s) => s.peers)
   const myStatus = usePresenceStore((s) => s.myStatus)
   const setStatus = usePresenceStore((s) => s.setStatus)
+  const myInvisible = usePresenceStore((s) => s.myInvisible)
+  const setInvisible = usePresenceStore((s) => s.setInvisible)
   const account = useAccountStore((s) => s.account)
 
   const list = Object.values(peers).sort((a, b) => {
@@ -106,23 +108,62 @@ export default function TeamPresenceButton(): JSX.Element {
             </div>
           </div>
 
-          {/* Your own status, with a quick toggle. */}
+          {/* Your own status, with quick toggles for do-not-disturb and appear-offline. */}
           <div className="px-3 py-2.5 flex items-center gap-2.5 border-b border-stone-100 dark:border-white/[0.06]">
-            <Avatar handle={myHandle} />
+            <span className="relative">
+              <Avatar handle={myHandle} />
+              {myInvisible && (
+                <span
+                  className="absolute -right-0.5 -bottom-0.5 h-3 w-3 rounded-full bg-stone-400 dark:bg-stone-500 ring-2 ring-white dark:ring-stone-900 inline-flex items-center justify-center"
+                  title="Appearing offline"
+                >
+                  <Icon name="visibility_off" size={8} className="text-white" />
+                </span>
+              )}
+            </span>
             <div className="min-w-0 flex-1">
               <div className="text-[12.5px] font-medium text-stone-900 dark:text-stone-100 truncate">{myHandle}</div>
-              <div className={`text-[11px] flex items-center gap-1.5 ${STATUS_META[myStatus].text}`}>
-                <span className={`h-1.5 w-1.5 rounded-full ${STATUS_META[myStatus].dot}`} />
-                You · {STATUS_META[myStatus].label}
-              </div>
+              {myInvisible ? (
+                <div className="text-[11px] flex items-center gap-1.5 text-stone-500 dark:text-stone-400" data-testid="presence-self-invisible">
+                  <Icon name="visibility_off" size={11} />
+                  Appearing offline to others
+                </div>
+              ) : (
+                <div className={`text-[11px] flex items-center gap-1.5 ${STATUS_META[myStatus].text}`}>
+                  <span className={`h-1.5 w-1.5 rounded-full ${STATUS_META[myStatus].dot}`} />
+                  You · {STATUS_META[myStatus].label}
+                </div>
+              )}
             </div>
-            <button
-              onClick={() => setStatus(myStatus === 'busy' ? 'online' : 'busy')}
-              className="text-[10.5px] px-2 py-1 rounded-md border border-stone-200 dark:border-white/10 text-stone-600 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-white/[0.06]"
-              title="Toggle do-not-disturb"
-            >
-              {myStatus === 'busy' ? 'Available' : 'Busy'}
-            </button>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setStatus(myStatus === 'busy' ? 'online' : 'busy')}
+                disabled={myInvisible}
+                className="text-[10.5px] px-2 py-1 rounded-md border border-stone-200 dark:border-white/10 text-stone-600 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-white/[0.06] disabled:opacity-40"
+                title="Toggle do-not-disturb"
+              >
+                {myStatus === 'busy' ? 'Available' : 'Busy'}
+              </button>
+              <button
+                onClick={() => setInvisible(!myInvisible)}
+                data-testid="presence-appear-offline"
+                className={`text-[10.5px] px-2 py-1 rounded-md border inline-flex items-center gap-1 ${
+                  myInvisible
+                    ? 'border-accent/40 text-accent hover:bg-accent/[0.06]'
+                    : 'border-stone-200 dark:border-white/10 text-stone-600 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-white/[0.06]'
+                }`}
+                title={myInvisible ? 'Go back online to your team' : 'Hide yourself from the People Map and team presence'}
+              >
+                <Icon name={myInvisible ? 'visibility' : 'visibility_off'} size={12} />
+                {myInvisible ? 'Go visible' : 'Appear offline'}
+              </button>
+            </div>
+          </div>
+          {/* Honest, plain framing so presence feels controlled, not done to you. */}
+          <div className="px-3 py-1.5 text-[10.5px] text-stone-400 dark:text-stone-500 border-b border-stone-100 dark:border-white/[0.06] leading-snug">
+            {myInvisible
+              ? 'Your team sees you as offline. You can still see everyone. No admin can override this.'
+              : 'Your team can see you are online. Appear offline any time, it is your call and no admin can override it.'}
           </div>
 
           <div className="max-h-72 overflow-auto py-1">
