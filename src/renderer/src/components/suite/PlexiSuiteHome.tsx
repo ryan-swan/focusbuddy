@@ -10,6 +10,8 @@ import {
 } from '@shared/plexiSuite'
 import UpvoteButton from './UpvoteButton'
 import { PLEXI_CARD } from '../plexi'
+import { useNodeStore } from '../../stores/nodes'
+import HomeDashboardRegion from './HomeDashboardRegion'
 
 // PlexiSuite home: the launcher for the whole suite. Every product reads from the
 // shared catalog, so what is live, what is coming, and what is planned stay
@@ -161,7 +163,24 @@ function GroupSection({ groupKey }: { groupKey: string }): JSX.Element | null {
 export default function PlexiSuiteHome(): JSX.Element {
   const account = useAccountStore((s) => s.account)
   const goProduct = useViewStore((s) => s.goProduct)
+  const v = useViewStore()
+  const createNode = useNodeStore((s) => s.create)
+  const setActive = useNodeStore((s) => s.setActive)
   const name = (account?.handle || account?.email || '').split('@')[0]
+
+  async function newDesk(): Promise<void> {
+    const desk = await createNode({ parentId: null, kind: 'task', title: 'New desk' })
+    setActive(desk.id)
+    v.goTask(desk.id)
+  }
+
+  const quickActions: { icon: string; label: string; onClick: () => void }[] = [
+    { icon: 'dashboard', label: 'Open my desk', onClick: () => v.goHome() },
+    { icon: 'add', label: 'New desk', onClick: () => void newDesk() },
+    { icon: 'grid_view', label: 'Templates', onClick: () => v.goMarketplace() },
+    { icon: 'check_circle', label: 'All tasks', onClick: () => v.goAllTasks() },
+    { icon: 'calendar_today', label: 'Calendar', onClick: () => v.goCalendar() }
+  ]
 
   return (
     <div
@@ -182,33 +201,61 @@ export default function PlexiSuiteHome(): JSX.Element {
           </p>
         </div>
 
-        {/* PlexiDesk hero */}
+        {/* Global search: opens PlexiSearch over the whole workspace */}
         <button
-          onClick={() => goProduct(PLEXI_DESK.key)}
-          data-testid="hero-plexidesk"
-          className="group relative w-full text-left rounded-2xl border border-indigo-300/30 dark:border-indigo-400/20 bg-gradient-to-br from-indigo-500/10 via-violet-500/[0.06] to-transparent p-5 mb-7 overflow-hidden hover:border-indigo-400/40 transition-colors"
+          onClick={() => v.goSearch()}
+          data-testid="suite-search-bar"
+          className="w-full flex items-center gap-3 h-12 px-4 rounded-xl border border-[var(--edge-firm)] bg-[var(--surface-raised)] hover:border-[rgb(var(--accent)/0.55)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--accent)/0.40)] transition-colors mb-5 group"
         >
-          <div className="flex items-center gap-4">
-            <span
-              className="shrink-0 inline-flex h-14 w-14 items-center justify-center rounded-2xl"
-              style={{ backgroundColor: `${PLEXI_DESK.accent}24`, color: PLEXI_DESK.accent }}
-            >
-              <Icon name={PLEXI_DESK.icon} size={28} filled />
-            </span>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
-                <h2 className="text-[19px] font-bold text-[var(--ink-100)]">PlexiDesk</h2>
-                <span className="text-[12px] text-emerald-600 dark:text-emerald-400 font-medium">{PLEXI_DESK.tagline}</span>
-              </div>
-              <p className="mt-1 text-[13px] text-[var(--ink-90)] max-w-2xl leading-relaxed">
-                {PLEXI_DESK.about}
-              </p>
-            </div>
-            <span className="shrink-0 hidden sm:inline-flex items-center gap-1 text-[13px] font-semibold text-indigo-600 dark:text-indigo-300">
-              Explore <Icon name="arrow_forward" size={16} />
-            </span>
-          </div>
+          <Icon name="search" size={18} className="text-[var(--ink-50)] group-hover:text-accent transition-colors" />
+          <span className="flex-1 text-left text-[14px] text-[var(--ink-50)]">Search anything in Plexi</span>
+          <span className="shrink-0 hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[var(--surface-sunken)] border border-[var(--edge-soft)] text-[11px] text-[var(--ink-50)] fb-tabular">
+            ⌘K
+          </span>
         </button>
+
+        {/* PlexiDesk hero */}
+        <div className="relative rounded-2xl border border-indigo-300/30 dark:border-indigo-400/20 bg-gradient-to-br from-indigo-500/10 via-violet-500/[0.06] to-transparent p-5 mb-7 overflow-hidden">
+          <button
+            onClick={() => goProduct(PLEXI_DESK.key)}
+            data-testid="hero-plexidesk"
+            className="group w-full text-left"
+          >
+            <div className="flex items-center gap-4">
+              <span
+                className="shrink-0 inline-flex h-14 w-14 items-center justify-center rounded-2xl"
+                style={{ backgroundColor: `${PLEXI_DESK.accent}24`, color: PLEXI_DESK.accent }}
+              >
+                <Icon name={PLEXI_DESK.icon} size={28} filled />
+              </span>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <h2 className="text-[19px] font-bold text-[var(--ink-100)]">PlexiDesk</h2>
+                  <span className="text-[12px] text-emerald-600 dark:text-emerald-400 font-medium">{PLEXI_DESK.tagline}</span>
+                </div>
+                <p className="mt-1 text-[13px] text-[var(--ink-90)] max-w-2xl leading-relaxed">
+                  {PLEXI_DESK.about}
+                </p>
+              </div>
+              <span className="shrink-0 hidden sm:inline-flex items-center gap-1 text-[13px] font-semibold text-indigo-600 dark:text-indigo-300 group-hover:gap-2 transition-all">
+                Explore <Icon name="arrow_forward" size={16} />
+              </span>
+            </div>
+          </button>
+          {/* Quick actions, siblings of the hero button to keep interactives un-nested */}
+          <div className="mt-3.5 flex flex-wrap items-center gap-2" data-testid="hero-quick-actions">
+            {quickActions.map((a) => (
+              <button
+                key={a.label}
+                onClick={a.onClick}
+                data-testid={`hero-action-${a.label.toLowerCase().replace(/\s+/g, '-')}`}
+                className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border border-indigo-300/30 dark:border-indigo-400/20 bg-white/40 dark:bg-white/[0.06] hover:bg-white/60 dark:hover:bg-white/10 text-[12px] font-medium text-[var(--ink-90)] hover:text-[var(--ink-100)] transition-colors"
+              >
+                <Icon name={a.icon} size={14} /> {a.label}
+              </button>
+            ))}
+          </div>
+        </div>
 
         {/* Product groups */}
         <div className="space-y-7">
@@ -221,6 +268,9 @@ export default function PlexiSuiteHome(): JSX.Element {
           Greyed products are on the way. Upvote the ones you want first, and we will tell you the moment they are ready
           to test.
         </p>
+
+        {/* Live dashboard: your real upcoming, tasks, desks, documents and team */}
+        <HomeDashboardRegion />
       </div>
     </div>
   )
