@@ -297,6 +297,15 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
 
   // Section collapse state — let users hide noise they aren't using yet.
   const [workspaceOpen, setWorkspaceOpen] = useState(true)
+  // Product nav is grouped into labelled, collapsible sections so the long list
+  // is scannable instead of one undifferentiated run.
+  const [knowledgeOpen, setKnowledgeOpen] = useState(true)
+  const [toolsOpen, setToolsOpen] = useState(true)
+  const [planOpen, setPlanOpen] = useState(true)
+  const [discoverOpen, setDiscoverOpen] = useState(true)
+  const [filesOpen, setFilesOpen] = useState(true)
+  const [teamOpen, setTeamOpen] = useState(true)
+  const [inboxOpen, setInboxOpen] = useState(true)
   const [projectsOpen, setProjectsOpen] = useState(true)
   const [appsOpen, setAppsOpen] = useState(true)
 
@@ -695,6 +704,11 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
                 goCalendar()
               }}
             />
+          </div>
+        )}
+        <SectionHeader label="Knowledge" open={knowledgeOpen} onToggle={() => setKnowledgeOpen((v) => !v)} />
+        {knowledgeOpen && (
+          <div className="mb-2">
             <NavRow
               icon="neurology"
               label="PlexiBrain"
@@ -713,6 +727,11 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
                 goSearch()
               }}
             />
+          </div>
+        )}
+        <SectionHeader label="Create and meet" open={toolsOpen} onToggle={() => setToolsOpen((v) => !v)} />
+        {toolsOpen && (
+          <div className="mb-2">
             <NavRow
               icon="groups"
               label="PlexiMeet"
@@ -740,6 +759,11 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
                 goForms()
               }}
             />
+          </div>
+        )}
+        <SectionHeader label="Plan and automate" open={planOpen} onToggle={() => setPlanOpen((v) => !v)} />
+        {planOpen && (
+          <div className="mb-2">
             <NavRow
               icon="account_tree"
               label="PlexiProjects"
@@ -776,6 +800,11 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
                 goApi()
               }}
             />
+          </div>
+        )}
+        <SectionHeader label="Discover" open={discoverOpen} onToggle={() => setDiscoverOpen((v) => !v)} />
+        {discoverOpen && (
+          <div className="mb-2">
             <NavRow
               icon="storefront"
               label="Marketplace"
@@ -794,6 +823,11 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
                 goInsights()
               }}
             />
+          </div>
+        )}
+        <SectionHeader label="Files" open={filesOpen} onToggle={() => setFilesOpen((v) => !v)} />
+        {filesOpen && (
+          <div className="mb-2">
             <NavRow
               icon="folder_open"
               label="Documents"
@@ -826,6 +860,11 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
                 goCollaborations()
               }}
             />
+          </div>
+        )}
+        <SectionHeader label="Team" open={teamOpen} onToggle={() => setTeamOpen((v) => !v)} />
+        {teamOpen && (
+          <div className="mb-2">
             <NavRow
               icon="apartment"
               label="Organization"
@@ -853,6 +892,11 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
                 goSign()
               }}
             />
+          </div>
+        )}
+        <SectionHeader label="Inbox" open={inboxOpen} onToggle={() => setInboxOpen((v) => !v)} />
+        {inboxOpen && (
+          <div className="mb-2">
             <NavRow
               icon="inbox"
               label="PlexiInbox"
