@@ -4,6 +4,7 @@ import Icon from '../Icon'
 import { DashboardHeader, StatTile, RailCard } from '../plexi'
 import { useAccountStore } from '../../stores/account'
 import { useViewStore } from '../../stores/view'
+import { useCallStore } from '../../stores/call'
 import { listOrgs, type OrgMembership, type WorkWindow } from '../../lib/orgsClient'
 import { usePeopleMap, type MapPerson, type PeopleMapData } from '../../lib/peopleMap/usePeopleMap'
 import type { PresenceStatus } from '../../stores/presence'
@@ -135,6 +136,7 @@ function OfficesTab({ data, now }: { data: PeopleMapData; now: Date }): JSX.Elem
 
 function PersonRow({ person, now }: { person: MapPerson; now: Date }): JSX.Element {
   const meta = STATUS_META[person.liveStatus]
+  const startCall = useCallStore((s) => s.startCall)
   const hasGeo = person.lat != null && person.lng != null && person.tzOffsetMin != null
   const day = hasGeo ? daylightFor(person.lat!, person.lng!, person.tzOffsetMin!, now, person.workWindow) : null
   return (
@@ -159,6 +161,17 @@ function PersonRow({ person, now }: { person: MapPerson; now: Date }): JSX.Eleme
           <br />
           <span style={{ color: day.working ? '#6ee7b7' : '#93a0bd' }}>{day.workLabel}</span>
         </span>
+      )}
+      {!person.isSelf && person.liveStatus !== 'offline' && (
+        <button
+          className="pm-iconbtn pm-prow__call"
+          data-testid="call-btn"
+          title={`Call ${person.handle}`}
+          aria-label={`Call ${person.handle}`}
+          onClick={() => void startCall({ accountId: person.accountId, handle: person.handle }, 'video')}
+        >
+          <Icon name="video_call" size={14} />
+        </button>
       )}
     </div>
   )
@@ -247,6 +260,7 @@ function GlobalTab({ data, now }: { data: PeopleMapData; now: Date }): JSX.Eleme
 
 function HierarchyTab({ data, now }: { data: PeopleMapData; now: Date }): JSX.Element {
   const { roots, childrenOf } = buildHierarchy(data.people)
+  const startCall = useCallStore((s) => s.startCall)
 
   const renderNode = (p: MapPerson, depth: number): JSX.Element => {
     const meta = STATUS_META[p.liveStatus]
@@ -272,6 +286,17 @@ function HierarchyTab({ data, now }: { data: PeopleMapData; now: Date }): JSX.El
               <span className={`pm-worktag ${day.working ? 'is-working' : 'is-off'}`} title={`${day.label} · ${fmtHour(day.hour)} local`}>
                 {day.working ? 'working' : day.workLabel.toLowerCase()}
               </span>
+            )}
+            {!p.isSelf && p.liveStatus !== 'offline' && (
+              <button
+                className="pm-iconbtn pm-card__call"
+                data-testid="call-btn"
+                title={`Call ${p.handle}`}
+                aria-label={`Call ${p.handle}`}
+                onClick={() => void startCall({ accountId: p.accountId, handle: p.handle }, 'video')}
+              >
+                <Icon name="video_call" size={14} />
+              </button>
             )}
           </div>
         </div>

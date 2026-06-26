@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useMessagingStore } from '../../stores/messaging'
 import { useAccountStore } from '../../stores/account'
+import { useCallStore } from '../../stores/call'
 import { useSignInPrompt } from '../../stores/signInPrompt'
 import Icon from '../Icon'
 
@@ -18,6 +19,7 @@ export default function MessagesView(): JSX.Element {
   const conversations = useMessagingStore((s) => s.conversations)
   const messagesByConv = useMessagingStore((s) => s.messagesByConv)
   const activeId = useMessagingStore((s) => s.activeId)
+  const startCall = useCallStore((s) => s.startCall)
   const open = useMessagingStore((s) => s.openConversation)
   const send = useMessagingStore((s) => s.send)
   const startDm = useMessagingStore((s) => s.startDm)
@@ -98,6 +100,10 @@ export default function MessagesView(): JSX.Element {
   }
 
   const activeConv = conversations.find((c) => c.id === activeId) ?? null
+  // For a 1:1 DM, the other member is the call target. Spaces are multi-member,
+  // so the header call button only shows for DMs (a 1:1 mesh call).
+  const dmOther = activeConv?.kind === 'dm' ? activeConv.members.find((m) => m.accountId !== account.id) : null
+  const callTarget = dmOther ? { accountId: dmOther.accountId, handle: dmOther.handle ?? 'teammate' } : null
 
   return (
     <div className="h-full flex desk-paper no-tod">
@@ -185,11 +191,22 @@ export default function MessagesView(): JSX.Element {
           // list, and the receiver must be able to reply immediately. Title
           // falls back until the list catches up.
           <>
-            <div className="px-4 py-3 border-b border-stone-200 dark:border-stone-800">
-              <h2 className="text-sm font-semibold text-stone-900 dark:text-stone-100 inline-flex items-center gap-1.5">
-                <Icon name={activeConv?.kind === 'space' ? 'folder_shared' : 'person'} size={14} className="text-accent" />
-                {activeConv?.title ?? 'Conversation'}
+            <div className="px-4 py-3 border-b border-stone-200 dark:border-stone-800 flex items-center justify-between gap-2">
+              <h2 className="text-sm font-semibold text-stone-900 dark:text-stone-100 inline-flex items-center gap-1.5 min-w-0">
+                <Icon name={activeConv?.kind === 'space' ? 'folder_shared' : 'person'} size={14} className="text-accent shrink-0" />
+                <span className="truncate">{activeConv?.title ?? 'Conversation'}</span>
               </h2>
+              {callTarget && (
+                <button
+                  onClick={() => void startCall(callTarget, 'video')}
+                  aria-label={`Call ${callTarget.handle}`}
+                  title="Start a video call"
+                  data-testid="messages-call"
+                  className="shrink-0 inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border border-[var(--edge-soft)] text-[12.5px] text-[var(--ink-90)] hover:bg-[var(--surface-sunken)]"
+                >
+                  <Icon name="videocam" size={15} /> Call
+                </button>
+              )}
             </div>
             <div ref={threadRef} className="flex-1 overflow-auto px-4 py-3 space-y-2">
               {messages.map((m) => {
