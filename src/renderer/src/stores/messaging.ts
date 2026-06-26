@@ -23,6 +23,45 @@ import { useAccountStore } from './account'
 // Throttle outbound typing pings so a fast typist sends at most one every 2s.
 let lastTypingSentAt = 0
 
+type ThreadState = {
+  messagesByConv: Record<string, ChatMessage[]>
+  threadsByParent: Record<string, ChatMessage[]>
+}
+
+// Route an incoming message into the right place: a threaded reply goes into its
+// open thread (if loaded) and bumps the parent's reply count, never entering the
+// main timeline; a top-level message appends to the main timeline. Pure and
+// dedupes by id, so an echoed message is folded in idempotently.
+export function routeIncomingMessage(state: ThreadState, conversationId: string, message: ChatMessage): ThreadState {
+  if (message.parentId) {
+    const parentId = message.parentId
+    const thread = state.threadsByParent[parentId]
+    const threadsByParent =
+      thread && !thread.some((m) => m.id === message.id)
+        ? { ...state.threadsByParent, [parentId]: [...thread, message] }
+        : state.threadsByParent
+    const conv = state.messagesByConv[conversationId]
+    // Only bump the count once, when we are first seeing this reply.
+    const alreadySeen = thread?.some((m) => m.id === message.id) ?? false
+    const messagesByConv =
+      conv && !alreadySeen
+        ? {
+            ...state.messagesByConv,
+            [conversationId]: conv.map((m) =>
+              m.id === parentId ? { ...m, replyCount: (m.replyCount ?? 0) + 1 } : m
+            )
+          }
+        : state.messagesByConv
+    return { messagesByConv, threadsByParent }
+  }
+  const existing = state.messagesByConv[conversationId] ?? []
+  if (existing.some((m) => m.id === message.id)) return state
+  return {
+    messagesByConv: { ...state.messagesByConv, [conversationId]: [...existing, message] },
+    threadsByParent: state.threadsByParent
+  }
+}
+
 export function applyReaction(
   byConv: Record<string, ChatMessage[]>,
   e: ReactionEvent
@@ -64,6 +103,10 @@ interface MessagingStore {
   // conversationId -> accountId -> who is typing and when we last heard. The UI
   // shows recent entries and they self-clear on a timeout.
   typingByConv: Record<string, Record<string, { handle: string; at: number }>>
+  // parentMessageId -> the replies loaded for that thread.
+  threadsByParent: Record<string, ChatMessage[]>
+  // The parent message whose thread panel is open, or null.
+  activeThreadId: string | null
 
   connect: (token: string) => Promise<void>
   disconnect: () => void
@@ -73,6 +116,9 @@ interface MessagingStore {
   startDm: (handle: string) => Promise<{ ok: true; id: string } | { ok: false; error: string }>
   send: (body: string, attachment?: MessageAttachment | null) => Promise<void>
   react: (messageId: string, emoji: string) => Promise<void>
+  openThread: (parentId: string) => Promise<void>
+  closeThread: () => void
+  sendThreadReply: (parentId: string, body: string) => Promise<void>
   notifyTyping: () => void
   browseChannels: (orgId: string) => Promise<api.OrgChannel[]>
   createChannel: (orgId: string, name: string) => Promise<{ ok: true; id: string } | { ok: false; error: string }>
@@ -93,6 +139,8 @@ export const useMessagingStore = create<MessagingStore>((set, get) => ({
   unreadTotal: 0,
   connected: false,
   typingByConv: {},
+  threadsByParent: {},
+  activeThreadId: null,
 
   connect: async (token) => {
     set({ token, connected: true })
@@ -100,16 +148,8 @@ export const useMessagingStore = create<MessagingStore>((set, get) => ({
     // unread counts + ordering stay correct. If the pushed message is for the
     // open conversation, mark it read immediately.
     connectMessagingSocket(token, (incoming) => {
-      const { activeId, messagesByConv } = get()
-      const existing = messagesByConv[incoming.conversationId] ?? []
-      if (!existing.some((m) => m.id === incoming.message.id)) {
-        set({
-          messagesByConv: {
-            ...messagesByConv,
-            [incoming.conversationId]: [...existing, incoming.message]
-          }
-        })
-      }
+      const { activeId } = get()
+      set((s) => routeIncomingMessage(s, incoming.conversationId, incoming.message))
       void get().refreshConversations()
       if (incoming.conversationId === activeId) {
         void api.markRead(token, incoming.conversationId)
@@ -153,7 +193,9 @@ export const useMessagingStore = create<MessagingStore>((set, get) => ({
       inboxItems: [],
       activeId: null,
       unreadTotal: 0,
-      typingByConv: {}
+      typingByConv: {},
+      threadsByParent: {},
+      activeThreadId: null
     })
   },
 
@@ -176,7 +218,8 @@ export const useMessagingStore = create<MessagingStore>((set, get) => ({
   openConversation: async (id) => {
     const { token } = get()
     if (!token) return
-    set({ activeId: id })
+    // Switching conversations closes any open thread panel.
+    set({ activeId: id, activeThreadId: null })
     const messages = await api.getMessages(token, id)
     set((s) => ({ messagesByConv: { ...s.messagesByConv, [id]: messages } }))
     await api.markRead(token, id)
@@ -223,6 +266,38 @@ export const useMessagingStore = create<MessagingStore>((set, get) => ({
     set((s) => ({ messagesByConv: applyReaction(s.messagesByConv, { conversationId: activeId, messageId, emoji, accountId: me, added: !mine }) }))
     if (mine) await api.removeReaction(token, activeId, messageId, emoji)
     else await api.addReaction(token, activeId, messageId, emoji)
+  },
+
+  openThread: async (parentId) => {
+    const { token, activeId } = get()
+    if (!token || !activeId) return
+    set({ activeThreadId: parentId })
+    const replies = await api.getThreadReplies(token, activeId, parentId)
+    set((s) => ({ threadsByParent: { ...s.threadsByParent, [parentId]: replies } }))
+  },
+
+  closeThread: () => set({ activeThreadId: null }),
+
+  sendThreadReply: async (parentId, body) => {
+    const { token, activeId } = get()
+    if (!token || !activeId) return
+    const trimmed = body.trim()
+    if (!trimmed) return
+    const message = await api.sendMessage(token, activeId, trimmed, null, parentId)
+    if (!message) return
+    set((s) => {
+      const thread = s.threadsByParent[parentId] ?? []
+      const nextThread = thread.some((m) => m.id === message.id) ? thread : [...thread, message]
+      const conv = s.messagesByConv[activeId]
+      const nextConv = conv
+        ? conv.map((m) => (m.id === parentId ? { ...m, replyCount: (m.replyCount ?? 0) + 1 } : m))
+        : conv
+      return {
+        threadsByParent: { ...s.threadsByParent, [parentId]: nextThread },
+        messagesByConv: nextConv ? { ...s.messagesByConv, [activeId]: nextConv } : s.messagesByConv
+      }
+    })
+    await get().refreshConversations()
   },
 
   notifyTyping: () => {

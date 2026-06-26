@@ -49,14 +49,17 @@ function MessageRow({
   m,
   mine,
   myId,
-  onReact
+  onReact,
+  onOpenThread
 }: {
   m: ChatMessage
   mine: boolean
   myId: string
   onReact: (emoji: string) => void
+  onOpenThread?: () => void
 }): JSX.Element {
   const reactions = m.reactions ?? []
+  const replyCount = m.replyCount ?? 0
   return (
     <div className={`group flex items-center gap-1.5 ${mine ? 'justify-end' : 'justify-start'}`}>
       {mine && <ReactPicker onPick={onReact} />}
@@ -99,6 +102,24 @@ function MessageRow({
             })}
           </div>
         )}
+        {onOpenThread &&
+          (replyCount > 0 ? (
+            <button
+              onClick={onOpenThread}
+              data-testid={`thread-open-${m.id}`}
+              className="mt-1 text-[11px] text-accent inline-flex items-center gap-1 hover:underline"
+            >
+              <Icon name="forum" size={12} /> {replyCount} {replyCount === 1 ? 'reply' : 'replies'}
+            </button>
+          ) : (
+            <button
+              onClick={onOpenThread}
+              data-testid={`thread-reply-${m.id}`}
+              className="mt-1 text-[11px] text-[var(--ink-50)] inline-flex items-center gap-1 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity hover:text-[var(--ink-90)]"
+            >
+              <Icon name="reply" size={12} /> Reply in thread
+            </button>
+          ))}
       </div>
       {!mine && <ReactPicker onPick={onReact} />}
     </div>
@@ -122,6 +143,8 @@ export default function MessagesView(): JSX.Element {
   const react = useMessagingStore((s) => s.react)
   const notifyTyping = useMessagingStore((s) => s.notifyTyping)
   const typingByConv = useMessagingStore((s) => s.typingByConv)
+  const openThread = useMessagingStore((s) => s.openThread)
+  const activeThreadId = useMessagingStore((s) => s.activeThreadId)
   const startCall = useCallStore((s) => s.startCall)
   const open = useMessagingStore((s) => s.openConversation)
   const send = useMessagingStore((s) => s.send)
@@ -350,6 +373,7 @@ export default function MessagesView(): JSX.Element {
                   mine={m.fromAccount === account.id}
                   myId={account.id}
                   onReact={(emoji) => void react(m.id, emoji)}
+                  onOpenThread={() => void openThread(m.id)}
                 />
               ))}
             </div>
@@ -385,6 +409,98 @@ export default function MessagesView(): JSX.Element {
             </div>
           </>
         )}
+      </div>
+
+      {activeThreadId && (
+        <ThreadPanel
+          parentId={activeThreadId}
+          parent={messages.find((m) => m.id === activeThreadId) ?? null}
+          myId={account.id}
+        />
+      )}
+    </div>
+  )
+}
+
+// The thread panel: the parent message, its replies, and a reply composer. Opens
+// as a right-side column when a message's thread is opened.
+function ThreadPanel({
+  parentId,
+  parent,
+  myId
+}: {
+  parentId: string
+  parent: ChatMessage | null
+  myId: string
+}): JSX.Element {
+  const threadsByParent = useMessagingStore((s) => s.threadsByParent)
+  const sendThreadReply = useMessagingStore((s) => s.sendThreadReply)
+  const react = useMessagingStore((s) => s.react)
+  const closeThread = useMessagingStore((s) => s.closeThread)
+  const replies = threadsByParent[parentId] ?? []
+  const [draft, setDraft] = useState('')
+  const endRef = useRef<HTMLDivElement | null>(null)
+
+  useEffect(() => {
+    endRef.current?.scrollIntoView({ block: 'end' })
+  }, [replies.length])
+
+  async function submit(): Promise<void> {
+    const body = draft
+    setDraft('')
+    await sendThreadReply(parentId, body)
+  }
+
+  return (
+    <div
+      className="w-80 shrink-0 border-l border-stone-200 dark:border-stone-800 flex flex-col"
+      data-testid="thread-panel"
+    >
+      <div className="px-4 py-3 border-b border-stone-200 dark:border-stone-800 flex items-center justify-between">
+        <h2 className="text-sm font-semibold text-stone-900 dark:text-stone-100 inline-flex items-center gap-1.5">
+          <Icon name="forum" size={14} className="text-accent" /> Thread
+        </h2>
+        <button onClick={closeThread} className="icon-btn" aria-label="Close thread" data-testid="thread-close">
+          <Icon name="close" size={15} />
+        </button>
+      </div>
+      <div className="flex-1 overflow-auto px-4 py-3 space-y-2">
+        {parent && (
+          <>
+            <MessageRow m={parent} mine={parent.fromAccount === myId} myId={myId} onReact={(e) => void react(parent.id, e)} />
+            <div className="text-[10px] uppercase tracking-wide text-stone-400 border-b border-stone-100 dark:border-stone-800/60 pb-1">
+              {replies.length} {replies.length === 1 ? 'reply' : 'replies'}
+            </div>
+          </>
+        )}
+        {replies.map((m) => (
+          <MessageRow key={m.id} m={m} mine={m.fromAccount === myId} myId={myId} onReact={(e) => void react(m.id, e)} />
+        ))}
+        <div ref={endRef} />
+      </div>
+      <div className="px-3 py-3 border-t border-stone-200 dark:border-stone-800 flex items-end gap-2">
+        <textarea
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault()
+              void submit()
+            }
+          }}
+          placeholder="Reply…"
+          rows={1}
+          data-testid="thread-composer"
+          className="flex-1 resize-none bg-white dark:bg-stone-800 border border-stone-300 dark:border-stone-600 rounded-lg px-3 py-2 text-[13px] focus:outline-none focus:border-accent"
+        />
+        <button
+          onClick={() => void submit()}
+          disabled={!draft.trim()}
+          className="btn-primary"
+          data-testid="thread-send"
+        >
+          <Icon name="send" size={14} />
+        </button>
       </div>
     </div>
   )

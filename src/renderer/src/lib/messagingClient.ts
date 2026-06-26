@@ -26,6 +26,10 @@ export interface ChatMessage {
   createdAt: number
   // Emoji reactions; absent on a freshly-sent message until reactions arrive.
   reactions?: MessageReaction[]
+  // Set when this message is a threaded reply; null/absent for a top-level message.
+  parentId?: string | null
+  // For a top-level message, how many threaded replies it has.
+  replyCount?: number
 }
 
 export interface OrgChannel {
@@ -119,15 +123,29 @@ export async function sendMessage(
   token: string,
   conversationId: string,
   body: string,
-  attachment: MessageAttachment | null = null
+  attachment: MessageAttachment | null = null,
+  parentId: string | null = null
 ): Promise<ChatMessage | null> {
   const json = await req<{ ok: boolean; message?: ChatMessage }>(
     'POST',
     `/conversations/${conversationId}/messages`,
     token,
-    { body, attachment }
+    { body, attachment, parentId: parentId ?? undefined }
   )
   return json?.ok ? json.message ?? null : null
+}
+
+export async function getThreadReplies(
+  token: string,
+  conversationId: string,
+  parentId: string
+): Promise<ChatMessage[]> {
+  const json = await req<{ ok: boolean; messages?: ChatMessage[] }>(
+    'GET',
+    `/conversations/${conversationId}/messages/${parentId}/thread`,
+    token
+  )
+  return json?.ok ? json.messages ?? [] : []
 }
 
 export async function markRead(token: string, conversationId: string): Promise<void> {
