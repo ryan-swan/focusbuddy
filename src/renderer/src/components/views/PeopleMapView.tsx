@@ -13,7 +13,15 @@ import {
   suggestedConnections,
   isolatedRemotes
 } from '../../lib/peopleMap/collaboration'
-import { listOrgs, type OrgMembership, type WorkWindow } from '../../lib/orgsClient'
+import {
+  listOrgs,
+  setMemberProfile,
+  addRelationship,
+  removeRelationship,
+  type OrgMembership,
+  type WorkWindow,
+  type RelationshipKind
+} from '../../lib/orgsClient'
 import { usePeopleMap, type MapPerson, type PeopleMapData } from '../../lib/peopleMap/usePeopleMap'
 import type { PresenceStatus } from '../../stores/presence'
 import { daylightFor, dayBarGradient, fmtHour } from '../../lib/peopleMap/daylight'
@@ -49,7 +57,20 @@ function initials(handle: string): string {
   return (handle.replace(/^@/, '').slice(0, 2) || '?').toUpperCase()
 }
 
-function Avatar({ seed, size = 30 }: { seed: string; size?: number }): JSX.Element {
+function Avatar({ seed, size = 30, photoUrl }: { seed: string; size?: number; photoUrl?: string | null }): JSX.Element {
+  if (photoUrl) {
+    return (
+      <img
+        className="pm-av pm-av--photo"
+        src={photoUrl}
+        alt={seed}
+        width={size}
+        height={size}
+        style={{ width: size, height: size }}
+        loading="lazy"
+      />
+    )
+  }
   return (
     <span className="pm-av" style={{ width: size, height: size, fontSize: size * 0.4, background: colorFor(seed) }}>
       {initials(seed)}
@@ -212,7 +233,7 @@ function PersonRow({ person, now }: { person: MapPerson; now: Date }): JSX.Eleme
   return (
     <div className="pm-prow">
       <span className="pm-prow__rel">
-        <Avatar seed={person.handle} size={28} />
+        <Avatar seed={person.handle} size={28} photoUrl={person.photoUrl} />
         <span className={`pm-prow__sdot pm-dot ${meta.cls}`} />
       </span>
       <span style={{ minWidth: 0, flex: 1 }}>
@@ -401,7 +422,7 @@ function PersonCard({ person, now }: { person: MapPerson; now: Date }): JSX.Elem
     <div className="pm-pcard">
       <div className="pm-pcard__head">
         <span className="pm-prow__rel">
-          <Avatar seed={person.handle} size={34} />
+          <Avatar seed={person.handle} size={34} photoUrl={person.photoUrl} />
           <span className={`pm-prow__sdot pm-dot ${meta.cls}`} />
         </span>
         <span style={{ minWidth: 0 }}>
@@ -427,8 +448,37 @@ function PersonCard({ person, now }: { person: MapPerson; now: Date }): JSX.Elem
 
 /* ---------------- hierarchy ---------------- */
 
-function HierarchyTab({ data, now }: { data: PeopleMapData; now: Date }): JSX.Element {
+function HierarchyTab({ data, now, refresh }: { data: PeopleMapData; now: Date; refresh: () => void }): JSX.Element {
   const { roots, childrenOf } = buildHierarchy(data.people)
+  const token = useAccountStore((s) => s.sessionToken)
+  // Only an owner or admin can reshape the org chart.
+  const myRole = data.people.find((p) => p.isSelf)?.role
+  const canEdit = myRole === 'owner' || myRole === 'admin'
+  const byId = new Map(data.people.map((p) => [p.accountId, p]))
+  const [dragId, setDragId] = useState<string | null>(null)
+  const [editErr, setEditErr] = useState<string | null>(null)
+  const [addingFor, setAddingFor] = useState<string | null>(null)
+
+  async function reparent(childId: string, managerId: string | null): Promise<void> {
+    if (!token || !canEdit || childId === managerId) return
+    setEditErr(null)
+    const r = await setMemberProfile(token, data.orgId, childId, { managerAccountId: managerId })
+    if (!r.ok) setEditErr(r.error ?? 'Could not change reporting line.')
+    refresh()
+  }
+  async function addRel(fromId: string, toId: string, kind: RelationshipKind): Promise<void> {
+    if (!token) return
+    setEditErr(null)
+    const r = await addRelationship(token, data.orgId, fromId, toId, kind)
+    if (!r.ok) setEditErr(r.error ?? 'Could not add the dotted line.')
+    setAddingFor(null)
+    refresh()
+  }
+  async function removeRel(fromId: string, toId: string, kind: RelationshipKind): Promise<void> {
+    if (!token) return
+    await removeRelationship(token, data.orgId, fromId, toId, kind)
+    refresh()
+  }
 
   const renderNode = (p: MapPerson, depth: number): JSX.Element => {
     const meta = STATUS_META[p.liveStatus]
@@ -438,9 +488,26 @@ function HierarchyTab({ data, now }: { data: PeopleMapData; now: Date }): JSX.El
     return (
       <div className="pm-node" key={p.accountId}>
         <div className="pm-node__self">
-          <div className="pm-card">
+          <div
+            className={`pm-card ${canEdit ? 'pm-card--draggable' : ''} ${dragId && dragId !== p.accountId ? 'pm-card--drop' : ''}`}
+            draggable={canEdit}
+            onDragStart={canEdit ? () => setDragId(p.accountId) : undefined}
+            onDragEnd={canEdit ? () => setDragId(null) : undefined}
+            onDragOver={canEdit && dragId && dragId !== p.accountId ? (e) => e.preventDefault() : undefined}
+            onDrop={
+              canEdit && dragId && dragId !== p.accountId
+                ? (e) => {
+                    e.preventDefault()
+                    const child = dragId
+                    setDragId(null)
+                    void reparent(child, p.accountId)
+                  }
+                : undefined
+            }
+            title={canEdit ? 'Drag onto another person to change who they report to' : undefined}
+          >
             <span className="pm-card__rel">
-              <Avatar seed={p.handle} size={32} />
+              <Avatar seed={p.handle} size={32} photoUrl={p.photoUrl} />
               <span className={`pm-card__sdot pm-dot ${meta.cls}`} />
             </span>
             <span>
@@ -458,6 +525,42 @@ function HierarchyTab({ data, now }: { data: PeopleMapData; now: Date }): JSX.El
             )}
             <PersonActions person={p} offHours={day ? !day.working : false} className="pm-card__call" />
           </div>
+          {(p.relationships.length > 0 || canEdit) && (
+            <div className="pm-dotted" data-testid="pm-dotted">
+              {p.relationships.map((r) => (
+                <span className="pm-dotted__chip" key={`${r.toAccountId}-${r.kind}`} title={`${r.kind} relationship`}>
+                  <Icon name="link" size={11} />
+                  {r.kind} · {byId.get(r.toAccountId)?.handle ?? 'unknown'}
+                  {canEdit && (
+                    <button
+                      className="pm-dotted__x"
+                      aria-label="Remove dotted line"
+                      data-testid="pm-dotted-remove"
+                      onClick={() => void removeRel(p.accountId, r.toAccountId, r.kind)}
+                    >
+                      <Icon name="close" size={10} />
+                    </button>
+                  )}
+                </span>
+              ))}
+              {canEdit &&
+                (addingFor === p.accountId ? (
+                  <DottedLineAdd
+                    people={data.people.filter((x) => x.accountId !== p.accountId)}
+                    onAdd={(toId, kind) => void addRel(p.accountId, toId, kind)}
+                    onCancel={() => setAddingFor(null)}
+                  />
+                ) : (
+                  <button
+                    className="pm-dotted__add"
+                    data-testid="pm-dotted-add"
+                    onClick={() => setAddingFor(p.accountId)}
+                  >
+                    <Icon name="add" size={11} /> dotted line
+                  </button>
+                ))}
+            </div>
+          )}
         </div>
         {children.length > 0 && depth < 12 && (
           <div className="pm-node__kids">{children.map((c) => renderNode(c, depth + 1))}</div>
@@ -466,7 +569,63 @@ function HierarchyTab({ data, now }: { data: PeopleMapData; now: Date }): JSX.El
     )
   }
 
-  return <div className="pm-tree">{roots.map((r) => renderNode(r, 0))}</div>
+  return (
+    <div className="pm-tree">
+      {canEdit && (
+        <div className="pm-tree__hint">
+          {editErr ? (
+            <span className="pm-tree__err">{editErr}</span>
+          ) : (
+            'Drag a person onto another to change who they report to. Loops are blocked.'
+          )}
+        </div>
+      )}
+      {roots.map((r) => renderNode(r, 0))}
+    </div>
+  )
+}
+
+// A compact picker to add a dotted-line relationship: a person and a kind.
+function DottedLineAdd({
+  people,
+  onAdd,
+  onCancel
+}: {
+  people: MapPerson[]
+  onAdd: (toId: string, kind: RelationshipKind) => void
+  onCancel: () => void
+}): JSX.Element {
+  const [toId, setToId] = useState('')
+  const [kind, setKind] = useState<RelationshipKind>('matrix')
+  return (
+    <span className="pm-dotted__form">
+      <select value={toId} onChange={(e) => setToId(e.target.value)} data-testid="pm-dotted-target">
+        <option value="">to…</option>
+        {people.map((p) => (
+          <option key={p.accountId} value={p.accountId}>
+            {p.handle}
+          </option>
+        ))}
+      </select>
+      <select value={kind} onChange={(e) => setKind(e.target.value as RelationshipKind)} data-testid="pm-dotted-kind">
+        <option value="oversight">oversight</option>
+        <option value="matrix">matrix</option>
+        <option value="stakeholder">stakeholder</option>
+        <option value="vendor">vendor</option>
+      </select>
+      <button
+        className="pm-dotted__save"
+        disabled={!toId}
+        data-testid="pm-dotted-save"
+        onClick={() => toId && onAdd(toId, kind)}
+      >
+        Add
+      </button>
+      <button className="pm-dotted__cancel" onClick={onCancel} aria-label="Cancel">
+        <Icon name="close" size={11} />
+      </button>
+    </span>
+  )
 }
 
 /* ---------------- collaboration ---------------- */
@@ -489,7 +648,7 @@ function CollabPerson({ person, context }: { person: MapPerson; context?: string
       }}
     >
       <span className="pm-prow__rel">
-        <Avatar seed={person.handle} size={24} />
+        <Avatar seed={person.handle} size={24} photoUrl={person.photoUrl} />
         <span className={`pm-prow__sdot pm-dot ${meta.cls}`} />
       </span>
       <span className="pm-collab__pname">{person.handle}</span>
@@ -636,7 +795,7 @@ function PeopleRail({ data, now }: { data: PeopleMapData; now: Date }): JSX.Elem
               return (
                 <div key={p.accountId} className="flex items-center gap-2.5 rounded-lg px-1 py-1">
                   <span className="relative shrink-0">
-                    <Avatar seed={p.handle} size={26} />
+                    <Avatar seed={p.handle} size={26} photoUrl={p.photoUrl} />
                     <span className={`pm-prow__sdot pm-dot ${STATUS_META[p.liveStatus].cls}`} />
                   </span>
                   <span className="min-w-0 flex-1">
@@ -768,7 +927,7 @@ export default function PeopleMapView(): JSX.Element {
   } else if (tab === 'global') {
     body = <GlobalTab data={data} now={now} />
   } else if (tab === 'hierarchy') {
-    body = <HierarchyTab data={data} now={now} />
+    body = <HierarchyTab data={data} now={now} refresh={refresh} />
   } else {
     body = <CollaborationTab data={data} now={now} />
   }
