@@ -11,6 +11,7 @@ import { ImapFlow } from 'imapflow'
 import { simpleParser } from 'mailparser'
 import type { AddressObject } from 'mailparser'
 import type { MailAccountConfig } from './mailAccount'
+import { parseThreadingHeaders } from './threadingHeaders'
 
 // Flatten a mailparser address header (a single object or an array of them)
 // into the bare list of email addresses, lower-cased and de-duplicated.
@@ -40,6 +41,10 @@ export interface MailListItem {
   flagged: boolean
   // True when the message carries at least one real attachment.
   hasAttachments: boolean
+  // RFC 5322 threading headers, used to group the mailbox into conversations.
+  messageId: string | null
+  inReplyTo: string | null
+  references: string[]
 }
 
 export interface MailFullMessage {
@@ -245,7 +250,8 @@ export async function testConnection(
   }
 }
 
-/** The most recent `limit` INBOX messages, newest first (envelope only). */
+/** The most recent `limit` INBOX messages, newest first. Carries threading
+ *  headers so the renderer can group the mailbox into conversations. */
 export async function listInbox(
   config: MailAccountConfig,
   limit = 40
@@ -262,10 +268,12 @@ export async function listInbox(
       uid: true,
       envelope: true,
       flags: true,
-      bodyStructure: true
+      bodyStructure: true,
+      headers: ['in-reply-to', 'references']
     })) {
       const from = msg.envelope?.from?.[0]
       const flags = msg.flags ?? new Set<string>()
+      const threading = parseThreadingHeaders(msg.headers)
       items.push({
         uid: msg.uid,
         fromName: from?.name || from?.address || 'Unknown sender',
@@ -274,7 +282,10 @@ export async function listInbox(
         date: msg.envelope?.date ? new Date(msg.envelope.date).getTime() : 0,
         seen: flags.has('\\Seen'),
         flagged: flags.has('\\Flagged'),
-        hasAttachments: hasRealAttachment(msg.bodyStructure)
+        hasAttachments: hasRealAttachment(msg.bodyStructure),
+        messageId: msg.envelope?.messageId || null,
+        inReplyTo: threading.inReplyTo,
+        references: threading.references
       })
     }
   } finally {

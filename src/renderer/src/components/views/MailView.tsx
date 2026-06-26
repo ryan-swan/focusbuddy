@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useMailStore, selectMailUnread } from '../../stores/mail'
 import { useViewStore } from '../../stores/view'
 import type { MailAccountInput } from '@shared/types'
+import { threadMailbox } from '../../lib/mailThreads'
 import Icon from '../Icon'
 import ComposeDialog from '../ComposeDialog'
 import EmailTaskDialog from '../mail/EmailTaskDialog'
@@ -521,7 +522,8 @@ export default function MailView(): JSX.Element {
     if (deepUid && account) void openMessage(deepUid)
   }, [deepUid, account, openMessage])
 
-  const sorted = useMemo(() => messages, [messages])
+  // Group the inbox into conversation threads (Gmail-style), newest first.
+  const threads = useMemo(() => threadMailbox(messages), [messages])
 
   if (loaded && !account) {
     return <SetupForm onConnected={() => undefined} />
@@ -592,46 +594,65 @@ export default function MailView(): JSX.Element {
               {error}
             </div>
           )}
-          {sorted.length === 0 && !loadingList ? (
+          {threads.length === 0 && !loadingList ? (
             <p className="text-[12px] text-stone-500 dark:text-stone-400 px-3 py-4">
               {error ? 'Could not load your inbox.' : 'No messages.'}
             </p>
           ) : (
-            sorted.map((m) => (
-              <button
-                key={m.uid}
-                onClick={() => void openMessage(m.uid)}
-                className={`w-full text-left px-3 py-2.5 border-b border-stone-100 dark:border-stone-800/60 hover:bg-stone-100 dark:hover:bg-stone-800/50 transition-colors ${
-                  m.uid === openUid ? 'bg-accent/[0.06]' : ''
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  {!m.seen && <span className="h-2 w-2 rounded-full bg-accent shrink-0" />}
-                  <span
-                    className={`text-[13px] truncate flex-1 ${
-                      m.seen
-                        ? 'text-stone-600 dark:text-stone-300'
-                        : 'font-semibold text-stone-900 dark:text-stone-100'
-                    }`}
-                  >
-                    {m.fromName}
-                  </span>
-                  {m.hasAttachments && (
-                    <Icon name="attach_file" size={12} className="text-stone-400 shrink-0" />
-                  )}
-                  <span className="text-[10px] text-stone-400 shrink-0">{fmtTime(m.date)}</span>
-                </div>
-                <div
-                  className={`text-[12px] truncate mt-0.5 ${
-                    m.seen
-                      ? 'text-stone-500 dark:text-stone-400'
-                      : 'text-stone-700 dark:text-stone-200'
+            threads.map((t) => {
+              // A thread is "active" when the open message belongs to it.
+              const active = openUid != null && t.messages.some((m) => m.uid === openUid)
+              // Who to show: distinct participants, abbreviated for multi-person threads.
+              const who =
+                t.participants.length <= 2
+                  ? t.participants.join(', ')
+                  : `${t.participants[0]}, ${t.participants[1]} +${t.participants.length - 2}`
+              return (
+                <button
+                  key={t.id}
+                  data-testid="mail-thread"
+                  onClick={() => void openMessage(t.latest.uid)}
+                  className={`w-full text-left px-3 py-2.5 border-b border-stone-100 dark:border-stone-800/60 hover:bg-stone-100 dark:hover:bg-stone-800/50 transition-colors ${
+                    active ? 'bg-accent/[0.06]' : ''
                   }`}
                 >
-                  {m.subject}
-                </div>
-              </button>
-            ))
+                  <div className="flex items-center gap-2">
+                    {t.unread && <span className="h-2 w-2 rounded-full bg-accent shrink-0" />}
+                    <span
+                      className={`text-[13px] truncate flex-1 ${
+                        t.unread
+                          ? 'font-semibold text-stone-900 dark:text-stone-100'
+                          : 'text-stone-600 dark:text-stone-300'
+                      }`}
+                    >
+                      {who}
+                    </span>
+                    {t.count > 1 && (
+                      <span
+                        className="shrink-0 text-[10px] font-medium text-stone-500 dark:text-stone-400 bg-stone-200/70 dark:bg-stone-700/60 rounded-full px-1.5 leading-[16px]"
+                        title={`${t.count} messages in this conversation`}
+                        data-testid="mail-thread-count"
+                      >
+                        {t.count}
+                      </span>
+                    )}
+                    {t.hasAttachments && (
+                      <Icon name="attach_file" size={12} className="text-stone-400 shrink-0" />
+                    )}
+                    <span className="text-[10px] text-stone-400 shrink-0">{fmtTime(t.date)}</span>
+                  </div>
+                  <div
+                    className={`text-[12px] truncate mt-0.5 ${
+                      t.unread
+                        ? 'text-stone-700 dark:text-stone-200'
+                        : 'text-stone-500 dark:text-stone-400'
+                    }`}
+                  >
+                    {t.subject}
+                  </div>
+                </button>
+              )
+            })
           )}
         </div>
       </div>

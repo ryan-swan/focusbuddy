@@ -1101,6 +1101,12 @@ export interface MailListItem {
   seen: boolean
   flagged: boolean
   hasAttachments: boolean
+  // RFC 5322 threading headers, used to group the mailbox into conversations.
+  // messageId is this message's Message-ID; inReplyTo and references point at the
+  // ancestors it was a reply to. All may be empty for a message with no headers.
+  messageId: string | null
+  inReplyTo: string | null
+  references: string[]
 }
 
 export interface MailFullMessage {
