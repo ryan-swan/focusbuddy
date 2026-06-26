@@ -7,6 +7,12 @@ import { useViewStore } from '../../stores/view'
 import { useCallStore } from '../../stores/call'
 import { useMessagingStore } from '../../stores/messaging'
 import { useKnockStore } from '../../stores/knock'
+import {
+  reachableNow,
+  followTheSunPairs,
+  suggestedConnections,
+  isolatedRemotes
+} from '../../lib/peopleMap/collaboration'
 import { listOrgs, type OrgMembership, type WorkWindow } from '../../lib/orgsClient'
 import { usePeopleMap, type MapPerson, type PeopleMapData } from '../../lib/peopleMap/usePeopleMap'
 import type { PresenceStatus } from '../../stores/presence'
@@ -21,7 +27,7 @@ import { groupByOffice, buildHierarchy, officeWindow } from '../../lib/peopleMap
 // the live presence socket. No sample data — an org with nothing set up shows
 // an honest empty state pointing to the admin console.
 
-type Tab = 'offices' | 'global' | 'hierarchy'
+type Tab = 'offices' | 'global' | 'hierarchy' | 'collaboration'
 
 const STATUS_META: Record<PresenceStatus, { label: string; cls: string }> = {
   online: { label: 'Online', cls: 'pm-st-online' },
@@ -463,6 +469,135 @@ function HierarchyTab({ data, now }: { data: PeopleMapData; now: Date }): JSX.El
   return <div className="pm-tree">{roots.map((r) => renderNode(r, 0))}</div>
 }
 
+/* ---------------- collaboration ---------------- */
+
+// A person reference inside a Collaboration insight: avatar, handle, an optional
+// bit of context, and click-to-message. Works whether or not they are online,
+// since opening a chat is always possible.
+function CollabPerson({ person, context }: { person: MapPerson; context?: string }): JSX.Element {
+  const meta = STATUS_META[person.liveStatus]
+  const startDm = useMessagingStore((s) => s.startDm)
+  const goMessages = useViewStore((s) => s.goMessages)
+  return (
+    <button
+      className="pm-collab__person"
+      data-testid="collab-person"
+      title={`Message ${person.handle}`}
+      onClick={() => {
+        void startDm(person.handle)
+        goMessages()
+      }}
+    >
+      <span className="pm-prow__rel">
+        <Avatar seed={person.handle} size={24} />
+        <span className={`pm-prow__sdot pm-dot ${meta.cls}`} />
+      </span>
+      <span className="pm-collab__pname">{person.handle}</span>
+      {context && <span className="pm-collab__pctx">{context}</span>}
+    </button>
+  )
+}
+
+// The Collaboration tab: real, data-derived team-rhythm insights. Every figure is
+// computed from work windows, time zones, presence, departments and manager
+// links. Where a signal cannot be computed it shows an honest empty state rather
+// than a fabricated one.
+function CollaborationTab({ data, now }: { data: PeopleMapData; now: Date }): JSX.Element {
+  const people = data.people
+  const reach = reachableNow(people)
+  const handoffs = followTheSunPairs(people, now)
+  const connections = suggestedConnections(people)
+  const isolated = isolatedRemotes(people)
+  const geoPeople = people.filter((p) => p.lat != null && p.lng != null && p.tzOffsetMin != null)
+  const inHours = geoPeople.filter((p) => daylightFor(p.lat!, p.lng!, p.tzOffsetMin!, now, p.workWindow).working)
+
+  return (
+    <div className="pm-collab">
+      <RailCard title="Reachable right now" icon="bolt" tone="emerald">
+        {reach.length === 0 ? (
+          <div className="pm-collab__empty">No one is online right now.</div>
+        ) : (
+          <>
+            <div className="pm-collab__lead">
+              {reach.length} {reach.length === 1 ? 'person is' : 'people are'} around and reachable.
+            </div>
+            <div className="pm-collab__people">
+              {reach.slice(0, 10).map((p) => (
+                <CollabPerson key={p.accountId} person={p} />
+              ))}
+            </div>
+          </>
+        )}
+      </RailCard>
+
+      <RailCard title="Working-hours coverage" icon="schedule" tone="sky">
+        {geoPeople.length === 0 ? (
+          <div className="pm-collab__empty">No one has a location set, so working hours are not known.</div>
+        ) : (
+          <div className="pm-collab__lead">
+            {inHours.length} of {geoPeople.length} {geoPeople.length === 1 ? 'person is' : 'people are'} inside their
+            working hours right now. The rest are before or after their day where they are.
+          </div>
+        )}
+      </RailCard>
+
+      <RailCard title="Follow-the-sun handoffs" icon="wb_twilight" tone="amber">
+        {handoffs.length === 0 ? (
+          <div className="pm-collab__empty">
+            No handoffs to make right now. No one is wrapping up while a teammate is just coming online.
+          </div>
+        ) : (
+          <div className="pm-collab__pairs">
+            {handoffs.map((h) => (
+              <div className="pm-collab__pair" key={`${h.from.accountId}-${h.to.accountId}`}>
+                <CollabPerson person={h.from} context="wrapping up" />
+                <Icon name="arrow_forward" size={14} className="pm-collab__arrow" />
+                <CollabPerson person={h.to} context={h.sameTeam ? 'starting, same team' : 'starting'} />
+              </div>
+            ))}
+          </div>
+        )}
+      </RailCard>
+
+      <RailCard title="Suggested connections" icon="handshake" tone="violet">
+        {connections.length === 0 ? (
+          <div className="pm-collab__empty">
+            No new cross-team connections to suggest. The people whose hours overlap already share a team.
+          </div>
+        ) : (
+          <div className="pm-collab__pairs">
+            {connections.map((c) => (
+              <div className="pm-collab__pair" key={`${c.a.accountId}-${c.b.accountId}`}>
+                <CollabPerson person={c.a} context={c.a.department ?? undefined} />
+                <span className="pm-collab__overlap">{c.overlapHours}h overlap</span>
+                <CollabPerson person={c.b} context={c.b.department ?? undefined} />
+              </div>
+            ))}
+          </div>
+        )}
+      </RailCard>
+
+      <RailCard title="Isolated by time zone" icon="public_off" tone="rose">
+        {isolated.length === 0 ? (
+          <div className="pm-collab__empty">No one is isolated by time zone. The team overlaps well.</div>
+        ) : (
+          <>
+            <div className="pm-collab__lead">
+              These teammates share only a little of their day with the rest of the team. A check-in or an async ritual
+              keeps them in the loop.
+            </div>
+            <div className="pm-collab__people">
+              {isolated.map((r) => (
+                <CollabPerson key={r.person.accountId} person={r.person} context={`${r.medianOverlap}h overlap`} />
+              ))}
+            </div>
+          </>
+        )}
+      </RailCard>
+    </div>
+  )
+}
+
 /* ---------------- live right rail ---------------- */
 
 function PeopleRail({ data, now }: { data: PeopleMapData; now: Date }): JSX.Element {
@@ -632,14 +767,17 @@ export default function PeopleMapView(): JSX.Element {
     body = <OfficesTab data={data} now={now} />
   } else if (tab === 'global') {
     body = <GlobalTab data={data} now={now} />
-  } else {
+  } else if (tab === 'hierarchy') {
     body = <HierarchyTab data={data} now={now} />
+  } else {
+    body = <CollaborationTab data={data} now={now} />
   }
 
   const TABS: { id: Tab; label: string; icon: string }[] = [
     { id: 'offices', label: 'Offices', icon: 'location_city' },
     { id: 'global', label: 'Global', icon: 'public' },
-    { id: 'hierarchy', label: 'Hierarchy', icon: 'account_tree' }
+    { id: 'hierarchy', label: 'Hierarchy', icon: 'account_tree' },
+    { id: 'collaboration', label: 'Collaboration', icon: 'handshake' }
   ]
 
   return (

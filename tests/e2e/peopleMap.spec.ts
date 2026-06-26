@@ -60,6 +60,7 @@ test('People Map: mounts with honest empty state and no fake data in unauthentic
     // persists across tab clicks, but clicking tabs must be error-free.
     await window.locator('[data-testid="people-map-tab-global"]').click()
     await window.locator('[data-testid="people-map-tab-hierarchy"]').click()
+    await window.locator('[data-testid="people-map-tab-collaboration"]').click()
     await window.locator('[data-testid="people-map-tab-offices"]').click()
 
     // Allow a brief moment for any async reactions to settle.
