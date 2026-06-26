@@ -122,7 +122,7 @@ function ProductTile({ product }: { product: PlexiProduct }): JSX.Element {
             )}
           </div>
           <p
-            className={`mt-0.5 text-[11px] leading-snug line-clamp-2 ${
+            className={`mt-0.5 text-[11px] leading-snug line-clamp-2 min-h-[2.75em] ${
               ready ? 'text-[var(--ink-70)]' : 'text-[var(--ink-50)]/70'
             }`}
           >
