@@ -93,7 +93,10 @@ function ProductTile({ product }: { product: PlexiProduct }): JSX.Element {
       <div className="flex items-start gap-2.5">
         <span
           className={`shrink-0 inline-flex h-9 w-9 items-center justify-center rounded-lg ${ready ? '' : 'opacity-50 grayscale'}`}
-          style={{ backgroundColor: `${product.accent}1f`, color: product.accent }}
+          // Calm, unified icon treatment: a neutral glyph on a quiet accent-tinted
+          // chip, so each product keeps a whisper of its colour without the whole
+          // grid reading as a saturated rainbow.
+          style={{ backgroundColor: `${product.accent}26`, color: 'var(--ink-90)' }}
         >
           <Icon name={product.icon} size={18} filled />
         </span>
