@@ -36,6 +36,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.87',
+    date: '2026-06-27T18:00:00Z',
+    title: 'v2.5.87 — a real communication suite: live calls, Slack-class chat, threaded mail',
+    tag: 'feature',
+    summary:
+      'PlexiDesk now talks. PlexiCam brings live video and audio calls you can start from a conversation or straight from a teammate on the People Map. PlexiChat grows into a full team chat with organization channels, emoji reactions, typing indicators and threaded replies, all in real time. And PlexiMail groups your inbox into conversations the way the best mail clients do, so a reply collapses into its thread instead of cluttering the list.',
+    highlights: [
+      'PlexiCam live calls: start a one-to-one video or audio call from a direct message or by clicking a teammate on the People Map. The call connects peer to peer and shows an honest status if your network cannot connect, rather than pretending it did.',
+      'PlexiChat is now Slack-class: create and join named channels for your organization, react to messages with emoji, see when someone is typing, and reply in threads that keep the main conversation clean. Everything updates live across everyone in the conversation.',
+      'PlexiMail conversations: the inbox groups related messages into threads using the mail reference graph and subject, with a count on each conversation, so a long back-and-forth reads as one row instead of twenty.'
+    ]
+  },
+  {
     version: '2.5.86',
     date: '2026-06-27T12:00:00Z',
     title: 'v2.5.86 — PlexiSearch, PlexiProjects, and search that understands you',
