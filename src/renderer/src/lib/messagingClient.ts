@@ -12,6 +12,11 @@ export interface MessageAttachment {
   label: string
 }
 
+export interface MessageReaction {
+  emoji: string
+  accountIds: string[]
+}
+
 export interface ChatMessage {
   id: string
   conversationId: string
@@ -19,6 +24,8 @@ export interface ChatMessage {
   body: string
   attachment: MessageAttachment | null
   createdAt: number
+  // Emoji reactions; absent on a freshly-sent message until reactions arrive.
+  reactions?: MessageReaction[]
 }
 
 export interface ConversationSummary {
@@ -36,7 +43,7 @@ function urlFor(path: string): string {
 }
 
 async function req<T>(
-  method: 'GET' | 'POST',
+  method: 'GET' | 'POST' | 'DELETE',
   path: string,
   token: string,
   body?: unknown
@@ -117,6 +124,24 @@ export async function sendMessage(
 
 export async function markRead(token: string, conversationId: string): Promise<void> {
   await req('POST', `/conversations/${conversationId}/read`, token, {})
+}
+
+export async function addReaction(
+  token: string,
+  conversationId: string,
+  messageId: string,
+  emoji: string
+): Promise<void> {
+  await req('POST', `/conversations/${conversationId}/messages/${messageId}/reactions`, token, { emoji })
+}
+
+export async function removeReaction(
+  token: string,
+  conversationId: string,
+  messageId: string,
+  emoji: string
+): Promise<void> {
+  await req('DELETE', `/conversations/${conversationId}/messages/${messageId}/reactions/${encodeURIComponent(emoji)}`, token)
 }
 
 export async function getUnreadTotal(token: string): Promise<number> {
