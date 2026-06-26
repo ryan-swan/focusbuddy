@@ -68,6 +68,18 @@ let onReactionCb: ((e: ReactionEvent) => void) | null = null
 export function setReactionHandler(cb: ((e: ReactionEvent) => void) | null): void {
   onReactionCb = cb
 }
+
+// Someone is typing in a conversation. Ephemeral; the store clears it on a timeout.
+export type TypingEvent = { conversationId: string; accountId: string; handle: string }
+let onTypingCb: ((e: TypingEvent) => void) | null = null
+export function setTypingHandler(cb: ((e: TypingEvent) => void) | null): void {
+  onTypingCb = cb
+}
+
+/** Tell the server we are typing in a conversation. No-op if the socket isn't open. */
+export function sendTyping(conversationId: string): void {
+  sendSocketMessage({ type: 'typing', payload: { conversationId } })
+}
 // Fired each time the socket (re)authenticates, so the Yjs provider can re-join
 // its room after a reconnect (the server-side room membership is per-socket).
 let onSocketOpenCb: (() => void) | null = null
@@ -207,6 +219,8 @@ function open(): void {
       onDocCommentCb?.(msg.payload as DocCommentEvent)
     } else if (msg.type === 'reaction') {
       onReactionCb?.(msg.payload as ReactionEvent)
+    } else if (msg.type === 'typing') {
+      onTypingCb?.(msg.payload as TypingEvent)
     } else if (
       msg.type === 'callIncoming' ||
       msg.type === 'callSignal' ||

@@ -120,6 +120,8 @@ export default function MessagesView(): JSX.Element {
   const messagesByConv = useMessagingStore((s) => s.messagesByConv)
   const activeId = useMessagingStore((s) => s.activeId)
   const react = useMessagingStore((s) => s.react)
+  const notifyTyping = useMessagingStore((s) => s.notifyTyping)
+  const typingByConv = useMessagingStore((s) => s.typingByConv)
   const startCall = useCallStore((s) => s.startCall)
   const open = useMessagingStore((s) => s.openConversation)
   const send = useMessagingStore((s) => s.send)
@@ -206,6 +208,21 @@ export default function MessagesView(): JSX.Element {
   // so the header call button only shows for DMs (a 1:1 mesh call).
   const dmOther = activeConv?.kind === 'dm' ? activeConv.members.find((m) => m.accountId !== account.id) : null
   const callTarget = dmOther ? { accountId: dmOther.accountId, handle: dmOther.handle ?? 'teammate' } : null
+
+  // Who is currently typing in the open conversation (recent pings only).
+  const typers = activeId
+    ? Object.values(typingByConv[activeId] ?? {})
+        .filter((t) => Date.now() - t.at < 5000)
+        .map((t) => t.handle)
+    : []
+  const typingLabel =
+    typers.length === 0
+      ? null
+      : typers.length === 1
+        ? `${typers[0]} is typing…`
+        : typers.length === 2
+          ? `${typers[0]} and ${typers[1]} are typing…`
+          : 'Several people are typing…'
 
   return (
     <div className="h-full flex desk-paper no-tod">
@@ -336,10 +353,16 @@ export default function MessagesView(): JSX.Element {
                 />
               ))}
             </div>
+            <div className="h-4 px-4 text-[11px] text-stone-500 dark:text-stone-400 italic" data-testid="typing-indicator">
+              {typingLabel}
+            </div>
             <div className="px-4 py-3 border-t border-stone-200 dark:border-stone-800 flex items-end gap-2">
               <textarea
                 value={draft}
-                onChange={(e) => setDraft(e.target.value)}
+                onChange={(e) => {
+                  setDraft(e.target.value)
+                  notifyTyping()
+                }}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault()
