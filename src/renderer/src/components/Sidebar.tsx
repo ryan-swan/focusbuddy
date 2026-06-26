@@ -800,6 +800,15 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
                 goApi()
               }}
             />
+            <NavRow
+              icon="insights"
+              label="Insights"
+              active={viewIsActive({ kind: 'insights' })}
+              onClick={() => {
+                setActive(null)
+                goInsights()
+              }}
+            />
           </div>
         )}
         <SectionHeader label="Discover" open={discoverOpen} onToggle={() => setDiscoverOpen((v) => !v)} />
@@ -812,15 +821,6 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
               onClick={() => {
                 setActive(null)
                 goMarketplace()
-              }}
-            />
-            <NavRow
-              icon="insights"
-              label="Insights"
-              active={viewIsActive({ kind: 'insights' })}
-              onClick={() => {
-                setActive(null)
-                goInsights()
               }}
             />
           </div>
