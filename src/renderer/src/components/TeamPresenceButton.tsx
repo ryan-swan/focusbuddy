@@ -162,7 +162,7 @@ export default function TeamPresenceButton(): JSX.Element {
           {/* Honest, plain framing so presence feels controlled, not done to you. */}
           <div className="px-3 py-1.5 text-[10.5px] text-stone-400 dark:text-stone-500 border-b border-stone-100 dark:border-white/[0.06] leading-snug">
             {myInvisible
-              ? 'Your team sees you as offline. You can still see everyone. No admin can override this.'
+              ? 'Your team sees you as offline and you can still see everyone. While hidden, nothing about your session is logged for anyone to read back. No admin can override this.'
               : 'Your team can see you are online. Appear offline any time, it is your call and no admin can override it.'}
           </div>
 
