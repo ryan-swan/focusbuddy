@@ -6,13 +6,23 @@ import type {
   MessageAttachment
 } from '../lib/messagingClient'
 import * as api from '../lib/messagingClient'
-import { connectMessagingSocket, disconnectMessagingSocket, setReactionHandler, type ReactionEvent } from '../lib/messagingSocket'
+import {
+  connectMessagingSocket,
+  disconnectMessagingSocket,
+  setReactionHandler,
+  setTypingHandler,
+  sendTyping as socketSendTyping,
+  type ReactionEvent
+} from '../lib/messagingSocket'
 import { usePresenceStore } from './presence'
 import { useAccountStore } from './account'
 
 // Apply a reaction add/remove to a message in the conversation map, immutably and
 // idempotently (so the actor's own optimistic update plus the echoed broadcast do
 // not double count). Returns a new messagesByConv.
+// Throttle outbound typing pings so a fast typist sends at most one every 2s.
+let lastTypingSentAt = 0
+
 export function applyReaction(
   byConv: Record<string, ChatMessage[]>,
   e: ReactionEvent
@@ -51,6 +61,9 @@ interface MessagingStore {
   activeId: string | null
   unreadTotal: number
   connected: boolean
+  // conversationId -> accountId -> who is typing and when we last heard. The UI
+  // shows recent entries and they self-clear on a timeout.
+  typingByConv: Record<string, Record<string, { handle: string; at: number }>>
 
   connect: (token: string) => Promise<void>
   disconnect: () => void
@@ -60,6 +73,7 @@ interface MessagingStore {
   startDm: (handle: string) => Promise<{ ok: true; id: string } | { ok: false; error: string }>
   send: (body: string, attachment?: MessageAttachment | null) => Promise<void>
   react: (messageId: string, emoji: string) => Promise<void>
+  notifyTyping: () => void
   browseChannels: (orgId: string) => Promise<api.OrgChannel[]>
   createChannel: (orgId: string, name: string) => Promise<{ ok: true; id: string } | { ok: false; error: string }>
   joinChannel: (conversationId: string) => Promise<void>
@@ -78,6 +92,7 @@ export const useMessagingStore = create<MessagingStore>((set, get) => ({
   activeId: null,
   unreadTotal: 0,
   connected: false,
+  typingByConv: {},
 
   connect: async (token) => {
     set({ token, connected: true })
@@ -102,6 +117,26 @@ export const useMessagingStore = create<MessagingStore>((set, get) => ({
     })
     // Live emoji reactions: apply each add/remove to the message in place.
     setReactionHandler((e) => set((s) => ({ messagesByConv: applyReaction(s.messagesByConv, e) })))
+    // Live typing indicators: record who is typing, and clear them after a short
+    // timeout unless a fresher ping arrives.
+    setTypingHandler((e) => {
+      const at = Date.now()
+      set((s) => ({
+        typingByConv: {
+          ...s.typingByConv,
+          [e.conversationId]: { ...(s.typingByConv[e.conversationId] ?? {}), [e.accountId]: { handle: e.handle, at } }
+        }
+      }))
+      window.setTimeout(() => {
+        set((s) => {
+          const conv = s.typingByConv[e.conversationId]
+          if (!conv || conv[e.accountId]?.at !== at) return s
+          const nextConv = { ...conv }
+          delete nextConv[e.accountId]
+          return { typingByConv: { ...s.typingByConv, [e.conversationId]: nextConv } }
+        })
+      }, 5000)
+    })
     // Join account-level presence on the same socket once we're connected.
     usePresenceStore.getState().start()
     await get().refreshConversations()
@@ -117,7 +152,8 @@ export const useMessagingStore = create<MessagingStore>((set, get) => ({
       messagesByConv: {},
       inboxItems: [],
       activeId: null,
-      unreadTotal: 0
+      unreadTotal: 0,
+      typingByConv: {}
     })
   },
 
@@ -187,6 +223,15 @@ export const useMessagingStore = create<MessagingStore>((set, get) => ({
     set((s) => ({ messagesByConv: applyReaction(s.messagesByConv, { conversationId: activeId, messageId, emoji, accountId: me, added: !mine }) }))
     if (mine) await api.removeReaction(token, activeId, messageId, emoji)
     else await api.addReaction(token, activeId, messageId, emoji)
+  },
+
+  notifyTyping: () => {
+    const { activeId } = get()
+    if (!activeId) return
+    const now = Date.now()
+    if (now - lastTypingSentAt < 2000) return
+    lastTypingSentAt = now
+    socketSendTyping(activeId)
   },
 
   browseChannels: async (orgId) => {
