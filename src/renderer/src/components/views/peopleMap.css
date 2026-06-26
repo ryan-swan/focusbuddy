@@ -163,3 +163,24 @@
   letter-spacing: 0.02em; text-transform: uppercase; vertical-align: middle;
   color: var(--ink-50); background: var(--surface-sunken); border: 1px solid var(--edge-soft);
 }
+
+/* Collaboration tab: a grid of insight panels, matching the offices grid. */
+.pm-collab {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px;
+}
+.pm-collab__empty { font-size: 12px; color: var(--ink-50); line-height: 1.45; }
+.pm-collab__lead { font-size: 12px; color: var(--ink-70); line-height: 1.45; margin-bottom: 8px; }
+.pm-collab__people { display: flex; flex-wrap: wrap; gap: 6px; }
+.pm-collab__pairs { display: flex; flex-direction: column; gap: 8px; }
+.pm-collab__pair { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.pm-collab__arrow { color: var(--ink-50); }
+.pm-collab__overlap, .pm-collab__pctx {
+  font-size: 10.5px; color: var(--ink-50); white-space: nowrap;
+}
+.pm-collab__person {
+  display: inline-flex; align-items: center; gap: 6px; padding: 3px 8px 3px 4px;
+  border-radius: 999px; border: 1px solid var(--edge-soft); background: var(--surface-sunken);
+  color: var(--ink-90); cursor: pointer; max-width: 100%;
+}
+.pm-collab__person:hover { border-color: var(--edge-firm); background: var(--surface-raised); }
+.pm-collab__pname { font-size: 12px; font-weight: 500; color: var(--ink-100); }
