@@ -213,6 +213,7 @@ function PersonRow({ person, now }: { person: MapPerson; now: Date }): JSX.Eleme
         <div className="pm-prow__name">
           {person.handle}
           {person.isSelf && <span style={{ color: '#8b96b3', fontWeight: 500 }}> (you)</span>}
+          {person.role === 'guest' && <span className="pm-badge-guest">Guest</span>}
         </div>
         <div className="pm-prow__sub">
           {person.liveWorkingOn || person.title || meta.label}
@@ -234,6 +235,8 @@ function PersonRow({ person, now }: { person: MapPerson; now: Date }): JSX.Eleme
 /* ---------------- global map ---------------- */
 
 function GlobalTab({ data, now }: { data: PeopleMapData; now: Date }): JSX.Element {
+  // Which pin's popover is open, if any.
+  const [sel, setSel] = useState<{ kind: 'person' | 'office'; id: string } | null>(null)
   const sun = useMemo(() => subsolarPoint(now), [now])
   const sunPos = project(sun.lat, sun.lng)
   const moonPos = project(-sun.lat, ((sun.lng + 360) % 360) - 180)
@@ -262,6 +265,7 @@ function GlobalTab({ data, now }: { data: PeopleMapData; now: Date }): JSX.Eleme
   )
 
   return (
+    <div className="pm-global">
     <div className="pm-world">
       <svg className="pm-world__grid" viewBox={`0 0 ${COLS} ${ROWS}`} preserveAspectRatio="none">
         {dots.map((d) => (
@@ -279,14 +283,15 @@ function GlobalTab({ data, now }: { data: PeopleMapData; now: Date }): JSX.Eleme
         const { x, y } = project(office.lat!, office.lng!)
         const info = daylightFor(office.lat!, office.lng!, office.tzOffsetMin, now, officeWindow(office, data.defaultHours))
         return (
-          <span
+          <button
             key={office.id}
-            className="pm-pin"
+            className={`pm-pin ${sel?.kind === 'office' && sel.id === office.id ? 'pm-pin--sel' : ''}`}
             style={{ left: `${x * 100}%`, top: `${y * 100}%`, background: office.accent ?? '#5566f0', width: 26, height: 26 }}
             title={`${office.name} — ${count} people · ${info.label}, ${fmtHour(info.hour)} local`}
+            onClick={() => setSel({ kind: 'office', id: office.id })}
           >
             {count}
-          </span>
+          </button>
         )
       })}
 
@@ -295,17 +300,121 @@ function GlobalTab({ data, now }: { data: PeopleMapData; now: Date }): JSX.Eleme
         const meta = STATUS_META[p.liveStatus]
         const working = daylightFor(p.lat!, p.lng!, p.tzOffsetMin ?? 0, now, p.workWindow).working
         return (
-          <span
+          <button
             key={p.accountId}
-            className={`pm-pin ${working ? '' : 'pm-pin--off'}`}
+            className={`pm-pin ${working ? '' : 'pm-pin--off'} ${sel?.kind === 'person' && sel.id === p.accountId ? 'pm-pin--sel' : ''}`}
             style={{ left: `${x * 100}%`, top: `${y * 100}%`, background: colorFor(p.handle) }}
             title={`${p.handle} — ${meta.label}${p.city ? ` · ${p.city}` : ''}`}
+            onClick={() => setSel({ kind: 'person', id: p.accountId })}
           >
             {initials(p.handle)}
             <span className={`pm-pin__sdot pm-dot ${meta.cls}`} />
-          </span>
+          </button>
         )
       })}
+    </div>
+    {sel && <MapPopover sel={sel} data={data} now={now} onClose={() => setSel(null)} />}
+    </div>
+  )
+}
+
+// A card that pops over the world map when a pin is clicked: a person's details
+// and reach actions, or an office's roster. Positioned near the pin, clamped to
+// stay on the map. A backdrop closes it.
+function MapPopover({
+  sel,
+  data,
+  now,
+  onClose
+}: {
+  sel: { kind: 'person' | 'office'; id: string }
+  data: PeopleMapData
+  now: Date
+  onClose: () => void
+}): JSX.Element | null {
+  const person = sel.kind === 'person' ? data.people.find((p) => p.accountId === sel.id) ?? null : null
+  const office = sel.kind === 'office' ? data.offices.find((o) => o.id === sel.id) ?? null : null
+  const anchor =
+    person && person.lat != null && person.lng != null
+      ? project(person.lat, person.lng)
+      : office && office.lat != null && office.lng != null
+        ? project(office.lat, office.lng)
+        : null
+  if (!anchor) return null
+  // Clamp horizontally so the card never runs off the map edges.
+  const left = Math.min(86, Math.max(14, anchor.x * 100))
+  const below = anchor.y < 0.34
+  const officePeople = office
+    ? [...data.people.filter((p) => p.officeId === office.id)].sort(
+        (a, b) => statusRank(a.liveStatus) - statusRank(b.liveStatus) || a.handle.localeCompare(b.handle)
+      )
+    : []
+
+  return (
+    <>
+      <div className="pm-pop__backdrop" onClick={onClose} />
+      <div
+        className="pm-pop"
+        style={{ left: `${left}%`, top: `${anchor.y * 100}%`, transform: `translate(-50%, ${below ? '16px' : 'calc(-100% - 16px)'})` }}
+        data-testid="map-popover"
+      >
+        {person && (
+          <div className="pm-pop__person">
+            <PersonCard person={person} now={now} />
+          </div>
+        )}
+        {office && (
+          <div className="pm-pop__office">
+            <div className="pm-pop__title">
+              {office.name}
+              <span className="pm-pop__sub">
+                {officePeople.length} {officePeople.length === 1 ? 'person' : 'people'}
+              </span>
+            </div>
+            <div className="pm-pop__list">
+              {officePeople.length === 0 ? (
+                <div className="pm-office__where">No one here yet.</div>
+              ) : (
+                officePeople.map((p) => <PersonRow key={p.accountId} person={p} now={now} />)
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    </>
+  )
+}
+
+// A compact person card for the map popover: who they are, their local time and
+// day, and the reach actions.
+function PersonCard({ person, now }: { person: MapPerson; now: Date }): JSX.Element {
+  const meta = STATUS_META[person.liveStatus]
+  const hasGeo = person.lat != null && person.lng != null && person.tzOffsetMin != null
+  const day = hasGeo ? daylightFor(person.lat!, person.lng!, person.tzOffsetMin!, now, person.workWindow) : null
+  return (
+    <div className="pm-pcard">
+      <div className="pm-pcard__head">
+        <span className="pm-prow__rel">
+          <Avatar seed={person.handle} size={34} />
+          <span className={`pm-prow__sdot pm-dot ${meta.cls}`} />
+        </span>
+        <span style={{ minWidth: 0 }}>
+          <div className="pm-pcard__name">{person.handle}</div>
+          <div className="pm-pcard__role">
+            {person.title || meta.label}
+            {person.department ? ` · ${person.department}` : ''}
+          </div>
+        </span>
+      </div>
+      {day && (
+        <div className="pm-pcard__when">
+          {fmtHour(day.hour)} local · <span style={{ color: day.working ? '#34d399' : '#94a3b8' }}>{day.workLabel}</span>
+          {person.city ? ` · ${person.city}` : ''}
+        </div>
+      )}
+      <div className="pm-pcard__actions">
+        <PersonActions person={person} offHours={day ? !day.working : false} className="pm-pcard__act" />
+      </div>
     </div>
   )
 }
@@ -332,6 +441,7 @@ function HierarchyTab({ data, now }: { data: PeopleMapData; now: Date }): JSX.El
               <div className="pm-card__name">
                 {p.handle}
                 {p.isSelf && <span style={{ color: '#8b96b3', fontWeight: 500 }}> (you)</span>}
+                {p.role === 'guest' && <span className="pm-badge-guest">Guest</span>}
               </div>
               <div className="pm-card__role">{p.title || p.role}{p.department ? ` · ${p.department}` : ''}</div>
             </span>
@@ -356,6 +466,7 @@ function HierarchyTab({ data, now }: { data: PeopleMapData; now: Date }): JSX.El
 /* ---------------- live right rail ---------------- */
 
 function PeopleRail({ data, now }: { data: PeopleMapData; now: Date }): JSX.Element {
+  const [expanded, setExpanded] = useState(false)
   const weight = (s: PresenceStatus): number => (s === 'online' ? 0 : s === 'focus' ? 1 : s === 'away' ? 2 : 3)
   const around = data.people
     .filter((p) => p.liveStatus !== 'offline')
@@ -385,7 +496,7 @@ function PeopleRail({ data, now }: { data: PeopleMapData; now: Date }): JSX.Elem
           <div className="text-[11.5px] text-stone-400">No one is online right now.</div>
         ) : (
           <div className="flex flex-col gap-0.5">
-            {around.slice(0, 8).map((p) => {
+            {(expanded ? around : around.slice(0, 6)).map((p) => {
               const d = dayOf(p)
               return (
                 <div key={p.accountId} className="flex items-center gap-2.5 rounded-lg px-1 py-1">
@@ -403,7 +514,15 @@ function PeopleRail({ data, now }: { data: PeopleMapData; now: Date }): JSX.Elem
                 </div>
               )
             })}
-            {around.length > 8 && <div className="text-[11px] text-stone-400 px-1 pt-1">+{around.length - 8} more online</div>}
+            {around.length > 6 && (
+              <button
+                onClick={() => setExpanded((v) => !v)}
+                data-testid="rail-around-toggle"
+                className="text-[11px] text-accent px-1 pt-1 text-left hover:underline"
+              >
+                {expanded ? 'Show less' : `Show ${around.length - 6} more online`}
+              </button>
+            )}
           </div>
         )}
       </RailCard>

@@ -21,9 +21,14 @@ test('People Map: mounts with honest empty state and no fake data in unauthentic
     await waitForReady(window)
 
     // --- Navigate to People Map via sidebar ---
-    // The Sidebar renders a NavRow with label "People Map".
-    // We click by text since data-testid was not added to the nav row itself.
-    const navItem = window.getByText('People Map', { exact: true })
+    // The Sidebar renders a NavRow (button) with text "People Map".
+    // The HomeDashboard now also has a "People Map" quick-action button, so we
+    // scope to the one that is NOT inside [data-testid="home-dashboard"] to
+    // avoid a strict-mode violation.
+    const navItem = window
+      .getByRole('button', { name: 'People Map' })
+      .filter({ hasNot: window.locator('[data-testid="home-dashboard"]') })
+      .first()
     await expect(navItem).toBeVisible({ timeout: 8_000 })
     await navItem.click()
 

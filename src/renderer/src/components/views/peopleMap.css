@@ -127,3 +127,39 @@
 .pm-actions:focus-within {
   opacity: 1;
 }
+
+/* Interactive world-map pins: clickable buttons that open a popover. */
+.pm-global { position: relative; }
+.pm-pin { border: none; padding: 0; cursor: pointer; font-family: inherit; }
+.pm-pin:hover { transform: translate(-50%, -50%) scale(1.14); }
+.pm-pin--sel { outline: 2px solid rgb(var(--accent)); outline-offset: 2px; }
+
+/* The popover over the map: a person's details + reach actions, or an office roster. */
+.pm-pop__backdrop { position: fixed; inset: 0; z-index: 40; }
+.pm-pop {
+  position: absolute; z-index: 41; width: 264px; max-height: 320px; overflow: auto;
+  background: var(--surface-raised); border: 1px solid var(--edge-firm);
+  border-radius: var(--radius-lg); box-shadow: var(--shadow-cast); color: var(--ink-100);
+}
+.pm-pop__title {
+  padding: 10px 12px 6px; font-size: 13px; font-weight: 600;
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+}
+.pm-pop__sub { font-size: 11px; color: var(--ink-50); font-weight: 500; }
+.pm-pop__list { padding: 0 6px 8px; }
+
+.pm-pcard { padding: 12px; }
+.pm-pcard__head { display: flex; gap: 10px; align-items: center; }
+.pm-pcard__name { font-size: 13px; font-weight: 600; color: var(--ink-100); }
+.pm-pcard__role { font-size: 11.5px; color: var(--ink-50); }
+.pm-pcard__when { font-size: 11.5px; color: var(--ink-70); margin-top: 8px; }
+.pm-pcard__actions { margin-top: 10px; display: flex; }
+/* In the popover the actions are always visible, not hover-revealed. */
+.pm-pcard .pm-actions { opacity: 1; }
+
+/* External-party proxy: a muted badge on a guest (contractor/client/partner). */
+.pm-badge-guest {
+  margin-left: 6px; padding: 0 6px; border-radius: 999px; font-size: 9.5px; font-weight: 600;
+  letter-spacing: 0.02em; text-transform: uppercase; vertical-align: middle;
+  color: var(--ink-50); background: var(--surface-sunken); border: 1px solid var(--edge-soft);
+}
