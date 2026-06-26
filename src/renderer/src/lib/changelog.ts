@@ -36,6 +36,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.88',
+    date: '2026-06-27T22:00:00Z',
+    title: 'v2.5.88 — PlexiPeople: reach anyone in a click, and edit your org chart',
+    tag: 'feature',
+    summary:
+      'The People Map becomes the live front door to your organization. Knock to reach a teammate, message or call them from wherever you see them, and read the room with a new Collaboration view that shows who is reachable now, follow-the-sun handoffs and people isolated by time zone. The world map is now interactive, and admins can edit the org chart directly: drag to change reporting lines, add dotted-line relationships, and give people a photo.',
+    highlights: [
+      'Reach anyone in a click: a message, knock and call cluster on every teammate across the map, with an after-hours warning so you think twice before knocking someone at 2am. A knock lands as a notification they can answer by replying or calling back.',
+      'Collaboration view: a new People Map tab with real team-rhythm insights computed from working hours, time zones and live presence. Who is reachable right now, follow-the-sun handoffs between someone wrapping up and a teammate just starting, suggested cross-team connections, and a supportive nudge for anyone isolated by time zone.',
+      'Edit your org chart: owners and admins can drag a person onto another to change who they report to (loops are blocked), add dotted-line relationships for oversight, matrix, stakeholder and vendor links, and upload a profile photo. Click a world-map pin to open a person card with all the same actions.'
+    ]
+  },
+  {
     version: '2.5.87',
     date: '2026-06-27T18:00:00Z',
     title: 'v2.5.87 — a real communication suite: live calls, Slack-class chat, threaded mail',
