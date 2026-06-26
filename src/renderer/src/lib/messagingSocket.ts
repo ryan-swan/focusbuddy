@@ -47,11 +47,20 @@ export type PresenceSocketEvent =
   | { type: 'presenceSnapshot'; payload: { peers: PresencePeer[] } }
   | { type: 'presenceUpdate'; payload: PresencePeer & { online: boolean } }
 
+// PlexiCam live-call signaling, relayed verbatim from the server to the call store.
+export type CallSocketEvent =
+  | { type: 'callIncoming'; payload: { callId: string; from: { accountId: string; handle: string }; media: 'audio' | 'video' } }
+  | { type: 'callSignal'; payload: { callId: string; from: string; data: string } }
+  | { type: 'callAccepted'; payload: { callId: string; from: string } }
+  | { type: 'callDeclined'; payload: { callId: string; from: string } }
+  | { type: 'callEnded'; payload: { callId: string; from: string } }
+
 let currentToken: string | null = null
 let onMessageCb: ((m: IncomingMessage) => void) | null = null
 let onDocEventCb: ((e: DocSocketEvent) => void) | null = null
 let onYjsEventCb: ((e: YjsSocketEvent) => void) | null = null
 let onPresenceCb: ((e: PresenceSocketEvent) => void) | null = null
+let onCallCb: ((e: CallSocketEvent) => void) | null = null
 // Fired each time the socket (re)authenticates, so the Yjs provider can re-join
 // its room after a reconnect (the server-side room membership is per-socket).
 let onSocketOpenCb: (() => void) | null = null
@@ -91,6 +100,10 @@ export function setSocketOpenHandler(cb: (() => void) | null): void {
 }
 
 /** Register a handler for account-presence socket events (People Map). */
+export function setCallSocketHandler(cb: ((e: CallSocketEvent) => void) | null): void {
+  onCallCb = cb
+}
+
 export function setPresenceSocketHandler(cb: ((e: PresenceSocketEvent) => void) | null): void {
   onPresenceCb = cb
 }
@@ -185,6 +198,15 @@ function open(): void {
       onPresenceCb?.({ type: msg.type, payload: msg.payload } as PresenceSocketEvent)
     } else if (msg.type === 'docComment') {
       onDocCommentCb?.(msg.payload as DocCommentEvent)
+    } else if (
+      msg.type === 'callIncoming' ||
+      msg.type === 'callSignal' ||
+      msg.type === 'callAccepted' ||
+      msg.type === 'callDeclined' ||
+      msg.type === 'callEnded'
+    ) {
+      // PlexiCam live-call signaling → the call store.
+      onCallCb?.({ type: msg.type, payload: msg.payload } as CallSocketEvent)
     } else if (msg.type === 'authenticated') {
       // Socket is live again (initial connect or after a reconnect) — let the
       // Yjs provider re-join its room and presence re-announce itself.

@@ -18,6 +18,8 @@ import SettingsPanel from './components/SettingsPanel'
 import TeamPresenceButton from './components/TeamPresenceButton'
 import Footer from './components/Footer'
 import FocusSessionOverlay from './components/FocusSessionOverlay'
+import CallOverlay from './components/CallOverlay'
+import { useCallStore } from './stores/call'
 import BringMeBack from './components/BringMeBack'
 import HyperfocusGuardian from './components/HyperfocusGuardian'
 import PreTaskBridge from './components/PreTaskBridge'
@@ -129,6 +131,10 @@ export default function App(): JSX.Element {
   const connectMessaging = useMessagingStore((s) => s.connect)
   const disconnectMessaging = useMessagingStore((s) => s.disconnect)
   const initDocCollab = useDocCollabStore((s) => s.init)
+  // Wire the PlexiCam call signaling handler once; it rides the same socket.
+  useEffect(() => {
+    useCallStore.getState().init()
+  }, [])
   useEffect(() => {
     if (account && sessionToken) {
       void connectMessaging(sessionToken)
@@ -503,6 +509,7 @@ export default function App(): JSX.Element {
       <Footer />
 
       <FocusSessionOverlay />
+      <CallOverlay />
       <BringMeBack />
       <HyperfocusGuardian />
       <PreTaskBridge />
