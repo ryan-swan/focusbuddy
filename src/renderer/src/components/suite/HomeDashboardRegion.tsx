@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import { RailCard, StatusPill } from '../plexi'
+import Icon from '../Icon'
 import { useViewStore } from '../../stores/view'
 import { useNodeStore } from '../../stores/nodes'
 import { useDocumentsStore } from '../../stores/documents'
 import { usePresenceStore } from '../../stores/presence'
+import { useCallStore } from '../../stores/call'
 import type { TimeBlock, FbNode, DocumentMeta } from '@shared/types'
 
 // The live-dashboard region of the PlexiSuite home: Upcoming, My Tasks, Recent
@@ -67,6 +69,7 @@ export default function HomeDashboardRegion(): JSX.Element {
   const docs = useDocumentsStore((s) => s.list)
   const refreshDocs = useDocumentsStore((s) => s.refresh)
   const peersMap = usePresenceStore((s) => s.peers)
+  const startCall = useCallStore((s) => s.startCall)
 
   const [blocks, setBlocks] = useState<TimeBlock[] | null>(null)
 
@@ -225,6 +228,15 @@ export default function HomeDashboardRegion(): JSX.Element {
                         <p className="text-[12px] font-medium text-[var(--ink-100)] truncate">{p.handle ?? p.accountId}</p>
                         {p.workingOn && <p className="text-[11px] text-[var(--ink-50)] truncate">{p.workingOn}</p>}
                       </div>
+                      <button
+                        onClick={() => void startCall({ accountId: p.accountId, handle: p.handle ?? p.accountId }, 'video')}
+                        aria-label={`Call ${p.handle ?? 'teammate'}`}
+                        title="Start a video call"
+                        data-testid={`home-call-${p.accountId}`}
+                        className="shrink-0 inline-flex h-7 w-7 items-center justify-center rounded-full text-[var(--ink-50)] hover:text-[rgb(var(--accent))] hover:bg-[var(--surface-sunken)]"
+                      >
+                        <Icon name="videocam" size={15} />
+                      </button>
                     </li>
                   ))}
                 </ul>
