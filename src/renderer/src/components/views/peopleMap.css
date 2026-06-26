@@ -111,3 +111,17 @@
 .pm-worktag { font-size: 10.5px; padding: 2px 7px; border-radius: 999px; display: inline-flex; align-items: center; gap: 5px; }
 .pm-worktag.is-working { color: #059669; background: rgb(16 185 129 / 0.12); }
 .pm-worktag.is-off { color: var(--ink-50); background: var(--surface-sunken); }
+
+/* PlexiCam click-to-call: a hover-revealed call button on a person row/card.
+   Invisible at rest so the layout never shifts, revealed on row hover. */
+.pm-prow__call,
+.pm-card__call {
+  opacity: 0;
+  transition: opacity var(--dur-quick, 120ms) var(--ease-spring-crisp, ease);
+}
+.pm-prow:hover .pm-prow__call,
+.pm-card:hover .pm-card__call,
+.pm-prow__call:focus-visible,
+.pm-card__call:focus-visible {
+  opacity: 1;
+}
