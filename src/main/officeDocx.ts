@@ -69,10 +69,19 @@ export async function exportDocx(input: { html: string; title: string }): Promis
   if (res.canceled || !res.filePath) return { ok: false }
   try {
     const HTMLtoDOCX = (await import('@turbodocx/html-to-docx')).default
-    const fullHtml = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${safe}</title></head><body>${input.html}</body></html>`
+    // Give tables a visible default border so a Plexi table doesn't arrive in Word
+    // as an invisible grid, and wrap the body with a base font so the document
+    // reads like a real Word file rather than browser default.
+    const styledHtml = `<style>table,th,td{border:1px solid #999;border-collapse:collapse;padding:4px}</style>${input.html}`
+    const fullHtml = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${safe}</title></head><body>${styledHtml}</body></html>`
     const fileBuffer = (await HTMLtoDOCX(fullHtml, undefined, {
       title: safe,
-      table: { row: { cantSplit: true } }
+      font: 'Calibri',
+      fontSize: 22, // half-points = 11pt
+      margins: { top: 1440, right: 1440, bottom: 1440, left: 1440 }, // 1 inch (twips)
+      table: { row: { cantSplit: true } },
+      footer: true,
+      pageNumber: true
     })) as Buffer | ArrayBuffer
     const buf = Buffer.isBuffer(fileBuffer) ? fileBuffer : Buffer.from(fileBuffer as ArrayBuffer)
     await writeFile(res.filePath, buf)

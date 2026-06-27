@@ -51,6 +51,15 @@ export async function exportPptx(body: SlidesBody, _title: string, outPath: stri
       s.background = { color: hex(bg, 'FFFFFF') }
       for (const el of (slide.elements ?? []).slice().sort((a, b) => a.z - b.z)) {
         const pos = { x: px2inX(el.x), y: px2inY(el.y), w: px2inX(el.w), h: px2inY(el.h) }
+        // Framing shared by every element type: rotation and a drop-shadow preset,
+        // so a rotated or shadowed element survives into PowerPoint.
+        const frame: Record<string, unknown> = {}
+        if (el.rotation) frame.rotate = Math.round(el.rotation)
+        if (el.shadow) {
+          const blur = el.shadow === 'sm' ? 3 : el.shadow === 'md' ? 6 : 10
+          const offset = el.shadow === 'sm' ? 2 : el.shadow === 'md' ? 4 : 7
+          frame.shadow = { type: 'outer', blur, offset, angle: 45, color: '000000', opacity: 0.4 }
+        }
         if (el.type === 'text') {
           const runs = el.paragraphs.flatMap((p, pi) =>
             p.runs.map((r) => ({
@@ -67,14 +76,18 @@ export async function exportPptx(body: SlidesBody, _title: string, outPath: stri
               }
             }))
           )
-          s.addText(runs.length ? runs : [{ text: '', options: {} }], { ...pos, valign: el.vAlign ?? 'top' })
+          s.addText(runs.length ? runs : [{ text: '', options: {} }], { ...pos, ...frame, valign: el.vAlign ?? 'top' })
         } else if (el.type === 'image') {
-          s.addImage({ ...pos, data: el.src })
+          s.addImage({ ...pos, ...frame, data: el.src, rounding: !!el.cornerRadius })
         } else if (el.type === 'shape') {
+          const isRound = el.shape === 'roundRect' || (el.shape === 'rect' && !!el.cornerRadius)
           const map: Record<string, string> = { rect: 'rect', roundRect: 'roundRect', ellipse: 'ellipse', triangle: 'triangle' }
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          s.addShape((map[el.shape] ?? 'rect') as any, {
+          s.addShape((isRound ? 'roundRect' : (map[el.shape] ?? 'rect')) as any, {
             ...pos,
+            ...frame,
+            // Corner radius as a fraction of the shorter side (pptxgenjs convention).
+            rectRadius: isRound && el.cornerRadius ? Math.min(0.5, el.cornerRadius / Math.min(el.w, el.h)) : undefined,
             fill: el.fill?.type === 'solid' ? { color: hex(el.fill.color, hex(theme.accent)) } : { type: 'none' },
             line: el.border ? { color: hex(el.border.color), width: el.border.width } : undefined
           })
@@ -82,6 +95,7 @@ export async function exportPptx(body: SlidesBody, _title: string, outPath: stri
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           s.addShape('line' as any, {
             ...pos,
+            ...frame,
             line: { color: hex(el.stroke, hex(theme.accent)), width: el.strokeWidth, endArrowType: el.arrowEnd ? 'triangle' : 'none' }
           })
         }
