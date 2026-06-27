@@ -71,6 +71,10 @@ export interface ChatMessage {
   parentId?: string | null
   // For a top-level message, how many threaded replies it has.
   replyCount?: number
+  // When the body was last edited, or null/absent if never.
+  editedAt?: number | null
+  // When the message was deleted (soft delete); body is blanked when set.
+  deletedAt?: number | null
 }
 
 export interface OrgChannel {
@@ -96,7 +100,7 @@ function urlFor(path: string): string {
 }
 
 async function req<T>(
-  method: 'GET' | 'POST' | 'DELETE',
+  method: 'GET' | 'POST' | 'DELETE' | 'PATCH',
   path: string,
   token: string,
   body?: unknown
@@ -174,6 +178,30 @@ export async function sendMessage(
     { body, attachment, parentId: parentId ?? undefined }
   )
   return json?.ok ? json.message ?? null : null
+}
+
+export async function editMessage(
+  token: string,
+  conversationId: string,
+  messageId: string,
+  body: string
+): Promise<ChatMessage | null> {
+  const json = await req<{ ok: boolean; message?: ChatMessage }>(
+    'PATCH',
+    `/conversations/${conversationId}/messages/${messageId}`,
+    token,
+    { body }
+  )
+  return json?.ok ? json.message ?? null : null
+}
+
+export async function deleteMessage(token: string, conversationId: string, messageId: string): Promise<boolean> {
+  const json = await req<{ ok: boolean }>(
+    'DELETE',
+    `/conversations/${conversationId}/messages/${messageId}`,
+    token
+  )
+  return json?.ok ?? false
 }
 
 export async function getThreadReplies(

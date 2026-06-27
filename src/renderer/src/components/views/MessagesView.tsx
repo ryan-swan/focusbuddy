@@ -118,30 +118,119 @@ function MessageRow({
   mine,
   myId,
   onReact,
-  onOpenThread
+  onOpenThread,
+  onEdit,
+  onDelete
 }: {
   m: ChatMessage
   mine: boolean
   myId: string
   onReact: (emoji: string) => void
   onOpenThread?: () => void
+  onEdit?: (body: string) => void
+  onDelete?: () => void
 }): JSX.Element {
   const reactions = m.reactions ?? []
   const replyCount = m.replyCount ?? 0
+  const deleted = !!m.deletedAt
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [editing, setEditing] = useState(false)
+  const [editText, setEditText] = useState(m.body)
   return (
     <div className={`group flex items-center gap-1.5 ${mine ? 'justify-end' : 'justify-start'}`}>
-      {mine && <ReactPicker onPick={onReact} />}
+      {mine && !deleted && !editing && <ReactPicker onPick={onReact} />}
+      {/* Own-message menu (edit / delete) */}
+      {mine && !deleted && (onEdit || onDelete) && !editing && (
+        <div className="relative self-center">
+          <button
+            onClick={() => setMenuOpen((o) => !o)}
+            aria-label="Message actions"
+            data-testid={`msg-menu-${m.id}`}
+            className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 h-6 w-6 inline-flex items-center justify-center rounded-full text-[var(--ink-50)] hover:bg-[var(--surface-sunken)] transition-opacity"
+          >
+            <Icon name="more_horiz" size={14} />
+          </button>
+          {menuOpen && (
+            <div className="absolute z-20 bottom-full mb-1 right-0 rounded-lg bg-[var(--surface-raised)] border border-[var(--edge-soft)] shadow-lg py-1 w-28">
+              {onEdit && (
+                <button
+                  onClick={() => {
+                    setEditText(m.body)
+                    setEditing(true)
+                    setMenuOpen(false)
+                  }}
+                  data-testid={`msg-edit-${m.id}`}
+                  className="block w-full text-left px-3 py-1.5 text-[12px] hover:bg-[var(--surface-sunken)]"
+                >
+                  Edit
+                </button>
+              )}
+              {onDelete && (
+                <button
+                  onClick={() => {
+                    setMenuOpen(false)
+                    onDelete()
+                  }}
+                  data-testid={`msg-delete-${m.id}`}
+                  className="block w-full text-left px-3 py-1.5 text-[12px] text-rose-500 hover:bg-[var(--surface-sunken)]"
+                >
+                  Delete
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      )}
       <div className={`flex flex-col max-w-[70%] ${mine ? 'items-end' : 'items-start'}`}>
         <div
           className={`rounded-2xl px-3 py-1.5 text-[13px] ${
-            mine
-              ? 'bg-accent text-white rounded-br-sm'
-              : 'bg-stone-100 dark:bg-stone-800 text-stone-900 dark:text-stone-100 rounded-bl-sm'
+            deleted
+              ? 'bg-[var(--surface-sunken)] text-[var(--ink-50)] italic'
+              : mine
+                ? 'bg-accent text-white rounded-br-sm'
+                : 'bg-stone-100 dark:bg-stone-800 text-stone-900 dark:text-stone-100 rounded-bl-sm'
           }`}
         >
-          {m.body && <div className="whitespace-pre-wrap break-words">{m.body}</div>}
-          <AttachmentView m={m} mine={mine} />
-          <div className={`text-[9px] mt-0.5 ${mine ? 'text-white/70' : 'text-stone-400'}`}>{fmtTime(m.createdAt)}</div>
+          {deleted ? (
+            <div className="text-[12px]">This message was deleted</div>
+          ) : editing ? (
+            <div className="flex flex-col gap-1">
+              <textarea
+                autoFocus
+                value={editText}
+                onChange={(e) => setEditText(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault()
+                    const t = editText.trim()
+                    if (t) onEdit?.(t)
+                    setEditing(false)
+                  } else if (e.key === 'Escape') {
+                    setEditing(false)
+                  }
+                }}
+                rows={1}
+                data-testid={`msg-edit-input-${m.id}`}
+                className="resize-none rounded-md px-2 py-1 text-[13px] text-stone-900 bg-white/95 focus:outline-none min-w-[180px]"
+              />
+              <div className="flex items-center gap-2 text-[10px] text-white/80">
+                <button onClick={() => { const t = editText.trim(); if (t) onEdit?.(t); setEditing(false) }} className="underline">Save</button>
+                <button onClick={() => setEditing(false)} className="underline">Cancel</button>
+                <span>Enter to save, Esc to cancel</span>
+              </div>
+            </div>
+          ) : (
+            <>
+              {m.body && <div className="whitespace-pre-wrap break-words">{m.body}</div>}
+              <AttachmentView m={m} mine={mine} />
+            </>
+          )}
+          {!editing && (
+            <div className={`text-[9px] mt-0.5 ${deleted ? 'text-[var(--ink-40)]' : mine ? 'text-white/70' : 'text-stone-400'}`}>
+              {fmtTime(m.createdAt)}
+              {!deleted && m.editedAt ? ' · edited' : ''}
+            </div>
+          )}
         </div>
         {reactions.length > 0 && (
           <div className="mt-1 flex flex-wrap gap-1" data-testid={`reactions-${m.id}`}>
@@ -205,6 +294,8 @@ export default function MessagesView(): JSX.Element {
   const messagesByConv = useMessagingStore((s) => s.messagesByConv)
   const activeId = useMessagingStore((s) => s.activeId)
   const react = useMessagingStore((s) => s.react)
+  const editMessage = useMessagingStore((s) => s.editMessage)
+  const deleteMessage = useMessagingStore((s) => s.deleteMessage)
   const notifyTyping = useMessagingStore((s) => s.notifyTyping)
   const typingByConv = useMessagingStore((s) => s.typingByConv)
   const openThread = useMessagingStore((s) => s.openThread)
@@ -442,6 +533,8 @@ export default function MessagesView(): JSX.Element {
                   myId={account.id}
                   onReact={(emoji) => void react(m.id, emoji)}
                   onOpenThread={() => void openThread(m.id)}
+                  onEdit={(b) => void editMessage(m.id, b)}
+                  onDelete={() => void deleteMessage(m.id)}
                 />
               ))}
             </div>

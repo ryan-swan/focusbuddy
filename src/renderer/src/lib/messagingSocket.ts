@@ -88,6 +88,25 @@ export function setKnockHandler(cb: ((e: KnockEvent) => void) | null): void {
   onKnockCb = cb
 }
 
+export interface MessageEditEvent {
+  conversationId: string
+  messageId: string
+  body: string
+  editedAt: number
+}
+export interface MessageDeleteEvent {
+  conversationId: string
+  messageId: string
+}
+let onMessageEditCb: ((e: MessageEditEvent) => void) | null = null
+let onMessageDeleteCb: ((e: MessageDeleteEvent) => void) | null = null
+export function setMessageEditHandler(cb: ((e: MessageEditEvent) => void) | null): void {
+  onMessageEditCb = cb
+}
+export function setMessageDeleteHandler(cb: ((e: MessageDeleteEvent) => void) | null): void {
+  onMessageDeleteCb = cb
+}
+
 /** Knock to reach a person you can see, with an optional short note. */
 export function sendKnock(to: string, note?: string): void {
   sendSocketMessage({ type: 'knock', payload: { to, note } })
@@ -231,6 +250,10 @@ function open(): void {
       onDocCommentCb?.(msg.payload as DocCommentEvent)
     } else if (msg.type === 'reaction') {
       onReactionCb?.(msg.payload as ReactionEvent)
+    } else if (msg.type === 'messageEdited') {
+      onMessageEditCb?.(msg.payload as MessageEditEvent)
+    } else if (msg.type === 'messageDeleted') {
+      onMessageDeleteCb?.(msg.payload as MessageDeleteEvent)
     } else if (msg.type === 'typing') {
       onTypingCb?.(msg.payload as TypingEvent)
     } else if (msg.type === 'knocked') {
