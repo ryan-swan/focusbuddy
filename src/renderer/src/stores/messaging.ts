@@ -10,6 +10,8 @@ import {
   connectMessagingSocket,
   disconnectMessagingSocket,
   setReactionHandler,
+  setMessageEditHandler,
+  setMessageDeleteHandler,
   setTypingHandler,
   sendTyping as socketSendTyping,
   type ReactionEvent
@@ -90,6 +92,47 @@ export function applyReaction(
   return changed ? { ...byConv, [e.conversationId]: next } : byConv
 }
 
+// Apply a transform to one message within a conversation's list, returning a new
+// map only if it changed (keeps referential stability for unaffected lists).
+export function mapMessage(
+  byConv: Record<string, ChatMessage[]>,
+  conversationId: string,
+  messageId: string,
+  fn: (m: ChatMessage) => ChatMessage
+): Record<string, ChatMessage[]> {
+  const list = byConv[conversationId]
+  if (!list) return byConv
+  let changed = false
+  const next = list.map((m) => {
+    if (m.id !== messageId) return m
+    changed = true
+    return fn(m)
+  })
+  return changed ? { ...byConv, [conversationId]: next } : byConv
+}
+
+// Same, for the per-parent thread reply lists (the edited/deleted message may be
+// a reply, or a parent whose copy is also shown in an open thread panel).
+export function mapThreadMessage(
+  byParent: Record<string, ChatMessage[]>,
+  messageId: string,
+  fn: (m: ChatMessage) => ChatMessage
+): Record<string, ChatMessage[]> {
+  let changed = false
+  const out: Record<string, ChatMessage[]> = {}
+  for (const [parent, list] of Object.entries(byParent)) {
+    let listChanged = false
+    const next = list.map((m) => {
+      if (m.id !== messageId) return m
+      listChanged = true
+      changed = true
+      return fn(m)
+    })
+    out[parent] = listChanged ? next : list
+  }
+  return changed ? out : byParent
+}
+
 // Messaging store — the cohesive client state behind direct messages, shared
 // spaces and the unified-inbox unread badge. REST loads history; the socket
 // pushes new messages in real time into the same state.
@@ -118,6 +161,8 @@ interface MessagingStore {
   startDm: (handle: string) => Promise<{ ok: true; id: string } | { ok: false; error: string }>
   send: (body: string, attachment?: MessageAttachment | null) => Promise<void>
   react: (messageId: string, emoji: string) => Promise<void>
+  editMessage: (messageId: string, body: string) => Promise<boolean>
+  deleteMessage: (messageId: string) => Promise<boolean>
   openThread: (parentId: string) => Promise<void>
   closeThread: () => void
   sendThreadReply: (parentId: string, body: string) => Promise<void>
@@ -173,6 +218,34 @@ export const useMessagingStore = create<MessagingStore>((set, get) => ({
     })
     // Live emoji reactions: apply each add/remove to the message in place.
     setReactionHandler((e) => set((s) => ({ messagesByConv: applyReaction(s.messagesByConv, e) })))
+    // Live edits / deletes: update the message in place across the conversation
+    // list and any open thread.
+    setMessageEditHandler((e) =>
+      set((s) => ({
+        messagesByConv: mapMessage(s.messagesByConv, e.conversationId, e.messageId, (m) => ({
+          ...m,
+          body: e.body,
+          editedAt: e.editedAt
+        })),
+        threadsByParent: mapThreadMessage(s.threadsByParent, e.messageId, (m) => ({ ...m, body: e.body, editedAt: e.editedAt }))
+      }))
+    )
+    setMessageDeleteHandler((e) =>
+      set((s) => ({
+        messagesByConv: mapMessage(s.messagesByConv, e.conversationId, e.messageId, (m) => ({
+          ...m,
+          body: '',
+          attachment: null,
+          deletedAt: Date.now()
+        })),
+        threadsByParent: mapThreadMessage(s.threadsByParent, e.messageId, (m) => ({
+          ...m,
+          body: '',
+          attachment: null,
+          deletedAt: Date.now()
+        }))
+      }))
+    )
     // Live typing indicators: record who is typing, and clear them after a short
     // timeout unless a fresher ping arrives.
     setTypingHandler((e) => {
@@ -282,6 +355,51 @@ export const useMessagingStore = create<MessagingStore>((set, get) => ({
     set((s) => ({ messagesByConv: applyReaction(s.messagesByConv, { conversationId: activeId, messageId, emoji, accountId: me, added: !mine }) }))
     if (mine) await api.removeReaction(token, activeId, messageId, emoji)
     else await api.addReaction(token, activeId, messageId, emoji)
+  },
+
+  editMessage: async (messageId, body) => {
+    const { token, activeId } = get()
+    if (!token || !activeId) return false
+    const trimmed = body.trim()
+    if (!trimmed) return false
+    const updated = await api.editMessage(token, activeId, messageId, trimmed)
+    if (!updated) return false
+    set((s) => ({
+      messagesByConv: mapMessage(s.messagesByConv, activeId, messageId, (m) => ({
+        ...m,
+        body: updated.body,
+        editedAt: updated.editedAt ?? Date.now()
+      })),
+      threadsByParent: mapThreadMessage(s.threadsByParent, messageId, (m) => ({
+        ...m,
+        body: updated.body,
+        editedAt: updated.editedAt ?? Date.now()
+      }))
+    }))
+    return true
+  },
+
+  deleteMessage: async (messageId) => {
+    const { token, activeId } = get()
+    if (!token || !activeId) return false
+    const ok = await api.deleteMessage(token, activeId, messageId)
+    if (!ok) return false
+    set((s) => ({
+      messagesByConv: mapMessage(s.messagesByConv, activeId, messageId, (m) => ({
+        ...m,
+        body: '',
+        attachment: null,
+        deletedAt: Date.now()
+      })),
+      threadsByParent: mapThreadMessage(s.threadsByParent, messageId, (m) => ({
+        ...m,
+        body: '',
+        attachment: null,
+        deletedAt: Date.now()
+      }))
+    }))
+    void get().refreshConversations()
+    return true
   },
 
   openThread: async (parentId) => {
