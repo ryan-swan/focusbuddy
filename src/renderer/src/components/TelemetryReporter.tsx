@@ -13,6 +13,7 @@ import { useEffect, useRef } from 'react'
 import { useAccountStore } from '../stores/account'
 import { signalConfig } from '../lib/signalConfig'
 import { deliverTelemetry } from '../lib/telemetryReport'
+import { telemetryEnabled } from '../lib/telemetryPrefs'
 
 const REPORT_INTERVAL_MS = 6 * 60 * 60 * 1000 // every 6 hours while open
 const FOCUS_THROTTLE_MS = 10 * 60 * 1000 // at most one focus-triggered report / 10 min
@@ -33,6 +34,9 @@ export default function TelemetryReporter(): null {
     // Report with retry/backoff. Coalesces concurrent callers via inFlight.
     async function report(): Promise<void> {
       if (cancelled || inFlight.current) return
+      // Honour the opt-out: when usage sharing is off, send nothing. Checked at
+      // call time so toggling it takes effect immediately, without a reload.
+      if (!telemetryEnabled()) return
       inFlight.current = true
       try {
         const ok = await deliverTelemetry({

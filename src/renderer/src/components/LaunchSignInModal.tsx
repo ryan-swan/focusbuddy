@@ -363,8 +363,10 @@ export default function LaunchSignInModal(): JSX.Element | null {
         </form>
 
         <p className="mt-4 pt-3 border-t border-white/[0.04] text-[10px] text-stone-500 leading-relaxed">
-          Your local data stays on this device. Only the items you share — and
-          your email — touch our server. No telemetry, no tracking.
+          Your local data stays on this device. Only the items you share, and your
+          email, touch our server. No third-party trackers or ads. Anonymous,
+          aggregate usage helps us improve the app, and you can turn that off in
+          Settings.
         </p>
       </div>
     </div>,
