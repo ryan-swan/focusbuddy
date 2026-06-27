@@ -385,16 +385,16 @@ export default function App(): JSX.Element {
               first affordance the eye lands on. Cmd+Shift+K opens it
               from anywhere. */}
           <Tooltip
-            content="Ask AI — describe what you want in plain English and PlexiDesk builds it on your desk (⌘⇧K)"
+            content="Build with AI — describe what you want and it builds the tools and widgets on your desk. For help thinking through a task, use the Assistant panel on the right. (⌘⇧K)"
             placement="bottom"
           >
             <button
               onClick={() => setAiBarOpen(true)}
               className="h-7 px-2.5 inline-flex items-center gap-1.5 rounded-md text-[11px] font-medium text-stone-700 dark:text-stone-200 hover:bg-stone-100 dark:hover:bg-white/[0.06] border border-transparent hover:border-stone-200 dark:hover:border-white/[0.06] transition-colors"
-              aria-label="AI command bar"
+              aria-label="Build with AI"
             >
               <Icon name="auto_awesome" size={12} className="text-accent" />
-              <span>Ask AI</span>
+              <span>Build</span>
               <kbd className="text-[9px] font-mono opacity-60 ml-0.5">⌘⇧K</kbd>
             </button>
           </Tooltip>

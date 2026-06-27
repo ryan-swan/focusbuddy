@@ -2236,10 +2236,10 @@ export default function Canvas(): JSX.Element {
           <button
             onClick={() => useAiCommandBar.getState().setOpen(true)}
             className="btn-ghost !text-accent"
-            title="Ask AI — describe what you want and AI builds it on this desk (⌘⇧K)"
+            title="Build with AI — describe what you want and it builds it on this desk (⌘⇧K)"
           >
             <Icon name="auto_awesome" size={14} className="text-accent" />
-            <span>Ask AI</span>
+            <span>Build</span>
           </button>
           <FivePromiseButton taskId={activeTask.id} />
           <button
