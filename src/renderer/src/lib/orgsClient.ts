@@ -86,6 +86,41 @@ export async function listAudit(token: string, id: string): Promise<AuditEvent[]
   const { json } = await call<{ ok: boolean; events?: AuditEvent[] }>('GET', `/orgs/${id}/audit`, token)
   return json?.ok ? json.events ?? [] : []
 }
+
+export interface OrgSsoConfig {
+  orgId: string
+  connectionId: string
+  domain: string
+  createdAt: number
+}
+
+// Returns whether the server can do SSO at all (creds present) and this org's
+// config if set.
+export async function getSso(
+  token: string,
+  id: string
+): Promise<{ configured: boolean; config: OrgSsoConfig | null }> {
+  const { json } = await call<{ ok: boolean; configured?: boolean; config?: OrgSsoConfig | null }>(
+    'GET',
+    `/orgs/${id}/sso`,
+    token
+  )
+  return { configured: !!json?.configured, config: json?.config ?? null }
+}
+
+export async function setSso(
+  token: string,
+  id: string,
+  connectionId: string,
+  domain: string
+): Promise<{ ok: boolean; error?: string }> {
+  const { json } = await call<{ ok: boolean; error?: string }>('PUT', `/orgs/${id}/sso`, token, { connectionId, domain })
+  return { ok: !!json?.ok, error: json?.error }
+}
+
+export async function clearSso(token: string, id: string): Promise<void> {
+  await call('DELETE', `/orgs/${id}/sso`, token)
+}
 export async function getOrg(token: string, id: string): Promise<OrgDetail | null> {
   const { json } = await call<{ ok: boolean } & OrgDetail>('GET', `/orgs/${id}`, token)
   return json?.ok ? { org: json.org, role: json.role, members: json.members, invites: json.invites } : null
