@@ -3,6 +3,7 @@ import { verifyToken, getApiConfig } from './db/apiTokens'
 import { listNodes, createNode } from './db/nodes'
 import { listTables, getTable, listRows, createRow } from './db/tables'
 import { listKnowledge, createKnowledge } from './db/knowledge'
+import { getFlow, runFlow } from './db/flows'
 import type { ApiScope } from '@shared/apiAccess'
 
 // The PlexiAPI local server. A small REST surface over the workspace, bound only
@@ -94,6 +95,20 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
   // Liveness probe, still behind the Origin guard above so browsers cannot use it
   // to fingerprint the app.
   if (path === '/api/health') return send(res, 200, { ok: true })
+
+  // Inbound webhook trigger: POST /webhooks/:flowId runs a flow whose trigger is
+  // 'webhook'. No bearer token — the flow id (a UUID) is the shared secret. Bound
+  // to 127.0.0.1 like everything here, so an external service needs a tunnel to
+  // reach it; local tools and scripts can call it directly.
+  const hookMatch = path.match(/^\/webhooks\/([^/]+)$/)
+  if (hookMatch && method === 'POST') {
+    const flow = getFlow(hookMatch[1])
+    if (!flow || flow.trigger.kind !== 'webhook' || !flow.enabled) {
+      return send(res, 404, { error: 'No active webhook flow with that id.' })
+    }
+    const result = await runFlow(flow.id)
+    return send(res, 200, { ok: result.ok, ran: true })
+  }
 
   const scopes = authScopes(req)
   if (!scopes) return send(res, 401, { error: 'Missing or invalid bearer token.' })

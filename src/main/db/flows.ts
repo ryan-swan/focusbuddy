@@ -46,7 +46,8 @@ interface FlowRow {
 function parseTrigger(raw: string): FlowTrigger {
   try {
     const t = JSON.parse(raw)
-    if (t && (t.kind === 'manual' || t.kind === 'schedule' || t.kind === 'event')) return t as FlowTrigger
+    if (t && (t.kind === 'manual' || t.kind === 'schedule' || t.kind === 'event' || t.kind === 'webhook'))
+      return t as FlowTrigger
   } catch {
     /* fall through */
   }
@@ -207,6 +208,37 @@ async function runAction(action: FlowAction, ctx: { ai: string }): Promise<FlowR
         }
         ctx.ai = res.message.content
         return { ...base, ok: true, message: 'AI step produced output for later steps.' }
+      }
+      case 'http-request': {
+        const url = fill(action.url, ctx).trim()
+        if (!/^https?:\/\//i.test(url)) return { ...base, ok: false, message: 'A valid http(s) URL is required.' }
+        // Parse "Key: Value" header lines.
+        const headers: Record<string, string> = {}
+        for (const line of (action.headers || '').split('\n')) {
+          const i = line.indexOf(':')
+          if (i > 0) headers[line.slice(0, i).trim()] = fill(line.slice(i + 1).trim(), ctx)
+        }
+        const method = action.method || 'POST'
+        const sendsBody = method !== 'GET' && method !== 'DELETE'
+        const filledBody = fill(action.body || '', ctx)
+        if (sendsBody && filledBody && !('Content-Type' in headers) && !('content-type' in headers)) {
+          headers['Content-Type'] = 'application/json'
+        }
+        try {
+          const resp = await fetch(url, {
+            method,
+            headers,
+            body: sendsBody && filledBody ? filledBody : undefined
+          })
+          // An honest result: a non-2xx is a failed step carrying the real status,
+          // never a fabricated success.
+          if (!resp.ok) return { ...base, ok: false, message: `Request failed: HTTP ${resp.status}.` }
+          // Make the response text available to later steps via {{ai}}.
+          ctx.ai = (await resp.text()).slice(0, 10000)
+          return { ...base, ok: true, message: `Called ${new URL(url).host} (HTTP ${resp.status}).` }
+        } catch (err) {
+          return { ...base, ok: false, message: err instanceof Error ? err.message : 'Request failed.' }
+        }
       }
     }
   } catch (err) {

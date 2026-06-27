@@ -16,11 +16,16 @@ export type FlowTrigger =
   | { kind: 'manual' }
   | { kind: 'schedule'; every: FlowScheduleEvery }
   | { kind: 'event'; event: FlowEventName; tableId?: string }
+  // Inbound webhook: an external (or local) HTTP POST to the flow's webhook URL on
+  // the local PlexiAPI server runs the flow. The path is keyed by the flow id.
+  | { kind: 'webhook' }
 
 export const FLOW_EVENT_LABELS: Record<FlowEventName, string> = {
   'task-completed': 'When a task is completed',
   'row-added': 'When a table row is added'
 }
+
+export type FlowHttpMethod = 'POST' | 'GET' | 'PUT' | 'PATCH' | 'DELETE'
 
 export type FlowAction =
   | { id: string; type: 'create-task'; title: string }
@@ -28,6 +33,10 @@ export type FlowAction =
   | { id: string; type: 'send-email'; to: string; subject: string; body: string }
   | { id: string; type: 'create-knowledge'; title: string; body: string }
   | { id: string; type: 'ai-step'; prompt: string }
+  // Call an external service (Slack, Stripe, any webhook/API). The {{ai}} token is
+  // substituted in url/body as with other actions. headers is one "Key: Value" per
+  // line. This is the outbound half of two-way integration.
+  | { id: string; type: 'http-request'; url: string; method: FlowHttpMethod; headers: string; body: string }
 
 export type FlowActionType = FlowAction['type']
 
@@ -82,6 +91,8 @@ export function blankAction(type: FlowActionType, id: string): FlowAction {
       return { id, type, title: '', body: '' }
     case 'ai-step':
       return { id, type, prompt: '' }
+    case 'http-request':
+      return { id, type, url: '', method: 'POST', headers: '', body: '' }
   }
 }
 
@@ -90,5 +101,6 @@ export const ACTION_LABELS: Record<FlowActionType, string> = {
   'add-table-row': 'Add a table row',
   'send-email': 'Send an email',
   'create-knowledge': 'Add a knowledge entry',
-  'ai-step': 'Run an AI step'
+  'ai-step': 'Run an AI step',
+  'http-request': 'Call a webhook / API'
 }
