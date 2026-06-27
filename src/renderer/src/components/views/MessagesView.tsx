@@ -4,8 +4,10 @@ import { useAccountStore } from '../../stores/account'
 import { useCallStore } from '../../stores/call'
 import { useSignInPrompt } from '../../stores/signInPrompt'
 import type { ChatMessage, OrgChannel } from '../../lib/messagingClient'
+import { attachmentUrl } from '../../lib/messagingClient'
 import { listOrgs, type OrgMembership } from '../../lib/orgsClient'
 import Icon from '../Icon'
+import { ChatComposer } from './chat/ChatComposer'
 
 const QUICK_EMOJIS = ['👍', '❤️', '😂', '🎉', '✅', '👀']
 
@@ -45,6 +47,71 @@ function ReactPicker({ onPick }: { onPick: (emoji: string) => void }): JSX.Eleme
   )
 }
 
+// A short text label for a message whose body is empty but which carries an
+// attachment, used in the conversation-list preview.
+function attachmentPreviewLabel(att: ChatMessage['attachment']): string {
+  if (!att) return ''
+  if (att.kind === 'share') return att.label
+  if (att.kind === 'voice') return 'Voice note'
+  if (att.kind === 'gif') return 'GIF'
+  if (att.kind === 'image') return 'Photo'
+  return att.name
+}
+
+function fmtBytes(n: number): string {
+  if (n < 1024) return `${n} B`
+  if (n < 1024 * 1024) return `${Math.round(n / 1024)} KB`
+  return `${(n / (1024 * 1024)).toFixed(1)} MB`
+}
+
+// Renders the one attachment a message may carry: a shared folder/task, an image
+// or GIF inline, a downloadable file chip, or a voice-note player. Image/voice
+// bytes load from the conversation-scoped, token-authenticated attachment route.
+function AttachmentView({ m, mine }: { m: ChatMessage; mine: boolean }): JSX.Element | null {
+  const token = useAccountStore((s) => s.sessionToken)
+  const att = m.attachment
+  if (!att) return null
+  if (att.kind === 'share') {
+    return (
+      <div
+        className={`mt-1 inline-flex items-center gap-1 text-[11px] rounded px-1.5 py-0.5 ${mine ? 'bg-white/20' : 'bg-black/5 dark:bg-white/10'}`}
+      >
+        <Icon name="folder_shared" size={11} />
+        {att.label}
+      </div>
+    )
+  }
+  const url = token ? attachmentUrl(m.conversationId, att.id, token) : ''
+  if (att.kind === 'image' || att.kind === 'gif') {
+    return (
+      <img
+        src={url}
+        alt={att.name}
+        loading="lazy"
+        className="mt-1 max-w-[260px] max-h-[260px] rounded-lg object-cover cursor-zoom-in"
+        onClick={() => url && window.open(url, '_blank')}
+        data-testid={`attachment-image-${m.id}`}
+      />
+    )
+  }
+  if (att.kind === 'voice') {
+    return <audio controls src={url} className="mt-1 max-w-[240px] h-9" data-testid={`attachment-voice-${m.id}`} />
+  }
+  // file
+  return (
+    <a
+      href={url}
+      download={att.name}
+      className={`mt-1 inline-flex items-center gap-1.5 text-[11px] rounded-lg px-2 py-1 ${mine ? 'bg-white/20 text-white' : 'bg-black/5 dark:bg-white/10 text-stone-800 dark:text-stone-100'} hover:underline`}
+      data-testid={`attachment-file-${m.id}`}
+    >
+      <Icon name="description" size={13} />
+      <span className="truncate max-w-[180px]">{att.name}</span>
+      <span className="opacity-60">{fmtBytes(att.sizeBytes)}</span>
+    </a>
+  )
+}
+
 function MessageRow({
   m,
   mine,
@@ -72,12 +139,7 @@ function MessageRow({
           }`}
         >
           {m.body && <div className="whitespace-pre-wrap break-words">{m.body}</div>}
-          {m.attachment && (
-            <div className={`mt-1 inline-flex items-center gap-1 text-[11px] rounded px-1.5 py-0.5 ${mine ? 'bg-white/20' : 'bg-black/5 dark:bg-white/10'}`}>
-              <Icon name="folder_shared" size={11} />
-              {m.attachment.label}
-            </div>
-          )}
+          <AttachmentView m={m} mine={mine} />
           <div className={`text-[9px] mt-0.5 ${mine ? 'text-white/70' : 'text-stone-400'}`}>{fmtTime(m.createdAt)}</div>
         </div>
         {reactions.length > 0 && (
@@ -136,6 +198,7 @@ function fmtTime(ms: number): string {
 
 export default function MessagesView(): JSX.Element {
   const account = useAccountStore((s) => s.account)
+  const sessionToken = useAccountStore((s) => s.sessionToken)
   const requestSignIn = useSignInPrompt((s) => s.requestOpen)
   const conversations = useMessagingStore((s) => s.conversations)
   const messagesByConv = useMessagingStore((s) => s.messagesByConv)
@@ -152,7 +215,6 @@ export default function MessagesView(): JSX.Element {
   const inviteContact = useMessagingStore((s) => s.inviteContact)
   const refresh = useMessagingStore((s) => s.refreshConversations)
 
-  const [draft, setDraft] = useState('')
   const [newHandle, setNewHandle] = useState('')
   const [composingNew, setComposingNew] = useState(false)
   const [browsing, setBrowsing] = useState(false)
@@ -218,12 +280,6 @@ export default function MessagesView(): JSX.Element {
     }
     setComposingNew(false)
     setNewHandle('')
-  }
-
-  async function submitDraft(): Promise<void> {
-    const body = draft
-    setDraft('')
-    await send(body)
   }
 
   const activeConv = conversations.find((c) => c.id === activeId) ?? null
@@ -325,9 +381,9 @@ export default function MessagesView(): JSX.Element {
                   )}
                 </div>
                 {c.lastMessage && (
-                  <div className="text-[11px] text-stone-500 dark:text-stone-400 truncate mt-0.5">
-                    {c.lastMessage.attachment ? '📎 ' : ''}
-                    {c.lastMessage.body || (c.lastMessage.attachment?.label ?? '')}
+                  <div className="text-[11px] text-stone-500 dark:text-stone-400 truncate mt-0.5 flex items-center gap-1">
+                    {c.lastMessage.attachment && <Icon name="attach_file" size={11} />}
+                    {c.lastMessage.body || attachmentPreviewLabel(c.lastMessage.attachment)}
                   </div>
                 )}
               </button>
@@ -380,33 +436,14 @@ export default function MessagesView(): JSX.Element {
             <div className="h-4 px-4 text-[11px] text-stone-500 dark:text-stone-400 italic" data-testid="typing-indicator">
               {typingLabel}
             </div>
-            <div className="px-4 py-3 border-t border-stone-200 dark:border-stone-800 flex items-end gap-2">
-              <textarea
-                value={draft}
-                onChange={(e) => {
-                  setDraft(e.target.value)
-                  notifyTyping()
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault()
-                    void submitDraft()
-                  }
-                }}
-                placeholder="Write a message…"
-                rows={1}
-                data-testid="message-composer"
-                className="flex-1 resize-none bg-white dark:bg-stone-800 border border-stone-300 dark:border-stone-600 rounded-lg px-3 py-2 text-[13px] focus:outline-none focus:border-accent"
+            {activeId && sessionToken && (
+              <ChatComposer
+                conversationId={activeId}
+                token={sessionToken}
+                onSend={(body, attachment) => send(body, attachment)}
+                onTyping={notifyTyping}
               />
-              <button
-                onClick={() => void submitDraft()}
-                disabled={!draft.trim()}
-                className="btn-primary"
-                data-testid="message-send"
-              >
-                <Icon name="send" size={14} />
-              </button>
-            </div>
+            )}
           </>
         )}
       </div>

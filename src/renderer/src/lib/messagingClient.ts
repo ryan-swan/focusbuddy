@@ -5,11 +5,52 @@ import { signalConfig } from './signalConfig'
 // WebSocket (see messagingSocket.ts). Mirrors the server's cohesive model:
 // a conversation is a DM or a shared space; messages can carry a share.
 
-export interface MessageAttachment {
-  kind: 'share'
-  token: string
-  entityKind: string
-  label: string
+// A 'share' carries a folder/task/widget token; the blob kinds reference an
+// uploaded blob by id (fetched from the conversation-scoped attachment route).
+export type MessageAttachment =
+  | { kind: 'share'; token: string; entityKind: string; label: string }
+  | {
+      kind: 'image' | 'file' | 'voice' | 'gif'
+      id: string
+      name: string
+      mimeType: string
+      sizeBytes: number
+      durationMs?: number
+    }
+
+export type MessageBlobKind = 'image' | 'file' | 'voice' | 'gif'
+
+// The authenticated URL bytes are served from. The token rides as a query param
+// because <img>/<audio> elements can't set an Authorization header.
+export function attachmentUrl(conversationId: string, blobId: string, token: string): string {
+  return `${signalConfig.httpUrl.replace(/\/+$/, '')}/conversations/${conversationId}/attachments/${blobId}?token=${encodeURIComponent(token)}`
+}
+
+// Upload bytes into a conversation, returning the blob id to reference when
+// sending the message. Returns null on any failure (honest: caller shows error).
+export async function uploadAttachment(
+  token: string,
+  conversationId: string,
+  kind: MessageBlobKind,
+  bytes: ArrayBuffer,
+  meta: { name: string; mime: string; ext: string }
+): Promise<{ id: string; sizeBytes: number } | null> {
+  try {
+    const qs = new URLSearchParams({ kind, name: meta.name, mime: meta.mime, ext: meta.ext }).toString()
+    const res = await fetch(
+      `${signalConfig.httpUrl.replace(/\/+$/, '')}/conversations/${conversationId}/attachments?${qs}`,
+      {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/octet-stream' },
+        body: bytes
+      }
+    )
+    if (!res.ok) return null
+    const json = (await res.json()) as { ok: boolean; attachment?: { id: string; sizeBytes: number } }
+    return json?.ok ? json.attachment ?? null : null
+  } catch {
+    return null
+  }
 }
 
 export interface MessageReaction {
