@@ -36,6 +36,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.93',
+    date: '2026-07-03T12:00:00Z',
+    title: 'v2.5.93 — your spreadsheets, slides and documents survive the trip to Office',
+    tag: 'feature',
+    summary:
+      'Export fidelity, so a file you send to someone on real Microsoft Office looks the way you made it. Spreadsheets now keep their visual formatting on export, bold cells, fills, text colour, alignment, number formats like currency and percent, frozen panes and column widths, not just the raw numbers. Slides keep element rotation, drop shadows and rounded corners. And Word exports come out as a proper document with a real font, one-inch margins, page numbers and visible table borders. The earlier loss of formatting when a file left Plexi was the fastest way to look unprofessional; this fixes it.',
+    highlights: [
+      'Spreadsheets export with their formatting intact: bold, fills, text colour and alignment, number formats (currency, percent, dates), frozen panes and column widths all carry into Excel, where before only the values came across.',
+      'Slides keep their design on export: an element that is rotated, has a drop shadow, or has rounded corners now exports to PowerPoint that way instead of flattening to a plain box.',
+      'Word exports look like real documents: a proper base font and margins, page numbers in the footer, and visible table borders so a table is not an invisible grid.'
+    ]
+  },
+  {
     version: '2.5.92',
     date: '2026-07-02T12:00:00Z',
     title: 'v2.5.92 — your workspace follows you, an audit log you can read, and flows that talk to the world',
