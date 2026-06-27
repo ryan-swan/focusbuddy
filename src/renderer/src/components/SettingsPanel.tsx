@@ -32,6 +32,7 @@ import DocumentsSyncSection from './settings/DocumentsSyncSection'
 import ApiKeysSection from './settings/ApiKeysSection'
 import BackupSection from './settings/BackupSection'
 import NavigationSection from './settings/NavigationSection'
+import PrivacyHelpSection from './settings/PrivacyHelpSection'
 
 interface Props {
   mode: ThemeMode
@@ -507,6 +508,8 @@ export default function SettingsPanel({
       <BackupSection />
 
       <NavigationSection />
+
+      <PrivacyHelpSection />
 
       {voicePrefs && (
         <div className="px-3 py-3 border-t border-stone-200 dark:border-stone-700 space-y-3">

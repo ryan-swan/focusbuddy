@@ -11,6 +11,7 @@ import {
   type ThemeMode
 } from '../lib/theme'
 import { captureRitualOrigin, playThemeRitual } from '../lib/themeRitual'
+import { UI_SCALES, loadUiScale, saveUiScale, applyUiScale } from '../lib/uiScale'
 import Icon from './Icon'
 
 interface Props {
@@ -59,6 +60,7 @@ export default function ThemeBuilder({
   // Local text mirror of the hex so typing an in-progress value (e.g. "#7c3")
   // doesn't immediately clobber the live colour until it's a valid 6-digit hex.
   const [hexText, setHexText] = useState(customAccentHex)
+  const [uiScale, setUiScale] = useState(loadUiScale())
 
   useEffect(() => {
     setHexText(customAccentHex)
@@ -292,6 +294,43 @@ export default function ThemeBuilder({
                 )
               })}
             </div>
+          </section>
+
+          {/* Text size — app-wide, like the browser's Ctrl-+ */}
+          <section>
+            <div className="text-[11px] uppercase tracking-[0.12em] text-stone-500 dark:text-stone-400 font-semibold mb-2">
+              Text size
+            </div>
+            <div className="grid grid-cols-5 gap-1.5">
+              {UI_SCALES.map((o) => {
+                const active = Math.abs(uiScale - o.value) < 0.001
+                return (
+                  <button
+                    key={o.value}
+                    onClick={() => {
+                      setUiScale(o.value)
+                      saveUiScale(o.value)
+                      applyUiScale(o.value)
+                    }}
+                    className={`flex flex-col items-center gap-0.5 py-2 rounded-md border transition-colors ${
+                      active
+                        ? 'border-accent bg-accent/10 text-stone-900 dark:text-stone-100'
+                        : 'border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 text-stone-700 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-700'
+                    }`}
+                    data-testid={`themestudio-uiscale-${o.value}`}
+                  >
+                    <span className="font-semibold" style={{ fontSize: `${Math.round(11 * o.value)}px` }}>
+                      A
+                    </span>
+                    <span className="text-[10px]">{o.label}</span>
+                  </button>
+                )
+              })}
+            </div>
+            <p className="text-[10px] text-stone-500 dark:text-stone-400 mt-1.5 leading-snug">
+              Makes everything in the app larger or smaller, the same as your browser's zoom. Affects all menus,
+              lists, and buttons.
+            </p>
           </section>
 
           {/* Canvas background */}

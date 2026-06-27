@@ -2,7 +2,12 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App'
 import ErrorBoundary from './components/ErrorBoundary'
+import { applyUiScale, loadUiScale } from './lib/uiScale'
 import './styles/globals.css'
+
+// Restore the user's chosen text size before the app renders, so it comes up at
+// the size they set rather than the default.
+applyUiScale(loadUiScale())
 
 // Belt-and-braces: when an unmodified Space (or Shift+Space) is pressed
 // inside a text input, textarea or contenteditable, short-circuit ALL

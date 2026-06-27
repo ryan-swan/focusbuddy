@@ -1647,6 +1647,12 @@ export function registerIpcHandlers(): void {
       win.focus()
     }
   })
+  // App-wide text size: drive Chromium page zoom so every surface (menus, lists,
+  // labels, buttons) scales together. Clamped to a sensible range.
+  ipcMain.handle('app:setZoomFactor', (_e, factor: number) => {
+    const f = typeof factor === 'number' && factor >= 0.8 && factor <= 2 ? factor : 1
+    for (const win of BrowserWindow.getAllWindows()) win.webContents.setZoomFactor(f)
+  })
 
   // ── Settings: API-key vault ──────────────────────────────────────────────
   // Replaces the old "edit projects/focusbuddy/.env and restart" flow with

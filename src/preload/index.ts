@@ -1589,7 +1589,9 @@ const api = {
       firstInstall: boolean
     }> => ipcRenderer.invoke('app:get-launch-info'),
     // Bring the main window forward (used when a desktop notification is clicked).
-    focusWindow: (): Promise<void> => ipcRenderer.invoke('app:focus-window')
+    focusWindow: (): Promise<void> => ipcRenderer.invoke('app:focus-window'),
+    // App-wide text size via Chromium page zoom (1 = default).
+    setZoomFactor: (factor: number): Promise<void> => ipcRenderer.invoke('app:setZoomFactor', factor)
   }
 }
 
