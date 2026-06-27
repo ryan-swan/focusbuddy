@@ -36,6 +36,20 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.90',
+    date: '2026-06-29T12:00:00Z',
+    title: 'v2.5.90 — two-factor sign-in, desktop alerts, an assistant that acts, and real automation',
+    tag: 'feature',
+    summary:
+      'Five things land together. You can turn on two-factor authentication for your account, so a new sign-in needs a code from your authenticator app, with recovery codes if you lose it. The app now raises desktop notifications for a new message, a knock, or an incoming call, so you no longer miss them when the window is in the background. The assistant can now act on your work, not just create new things: it can mark a task done, change its due date or title, and save a fact to PlexiBrain, all through the same approve-each-card flow. PlexiFlow gained event triggers so a flow can run automatically when a task is completed or a row is added, and scheduled flows and reports now run on their own in the background instead of only when you have that screen open.',
+    highlights: [
+      'Two-factor authentication: turn it on from Settings, confirm a code from your authenticator app, and keep the one-time recovery codes. After that a new sign-in asks for a code. It is your choice and off by default.',
+      'Desktop notifications: a new message, a knock, or an incoming call now raises an OS notification when the app is in the background, and clicking it brings the app forward and opens the right place. You never get a banner for the conversation you are already reading.',
+      'An assistant that acts: ask it to mark the current task done, push its due date, rename it, or remember a fact, and it proposes the change as a card you approve. Saved knowledge always comes from what was actually said, never invented.',
+      'Real automation: PlexiFlow can now trigger when a task is completed or a table row is added, not just manually or on a schedule, and scheduled flows and reports run in the background so a daily digest actually fires whether or not you have the Flow screen open.'
+    ]
+  },
+  {
     version: '2.5.89',
     date: '2026-06-28T12:00:00Z',
     title: 'v2.5.89 — appear offline, a roomier workspace, and a calmer home',
