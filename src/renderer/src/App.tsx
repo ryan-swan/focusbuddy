@@ -45,6 +45,7 @@ import { useTemplateStore } from './stores/templates'
 import { useVaultStore } from './stores/vault'
 import { useAccountStore } from './stores/account'
 import { installInboxPoller } from './lib/inboxPoller'
+import { startWorkspaceSync, stopWorkspaceSync } from './lib/workspaceSync'
 import { applyCustomization, applyFont, applyTheme, loadCustomization, loadTheme, useTheme } from './lib/theme'
 import { typingClick } from './lib/audioBeep'
 import { setActiveWidgetForSound } from './lib/soundPrefs'
@@ -149,7 +150,14 @@ export default function App(): JSX.Element {
       // we're signed in, so the very first AI call routes correctly (credits vs
       // BYOK) instead of bouncing off a dormant proxy.
       void window.api.ai.refreshCredits()
-    } else disconnectMessaging()
+      // Multi-device sync: keep this account's tasks + canvas widgets in step with
+      // its other devices. Default-on; pushes local changes and pulls remote ones.
+      startWorkspaceSync()
+    } else {
+      disconnectMessaging()
+      stopWorkspaceSync()
+    }
+    return () => stopWorkspaceSync()
   }, [account, sessionToken, connectMessaging, disconnectMessaging, initDocCollab])
 
   // Mail is local (IMAP straight from the desktop), so it loads independently
