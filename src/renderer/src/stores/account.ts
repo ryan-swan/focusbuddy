@@ -46,7 +46,7 @@ interface AccountStore {
     handle?: string | null
   }) => Promise<AuthResult>
   // Log in via the server, persist + populate on success.
-  login: (input: { email: string; password: string }) => Promise<AuthResult>
+  login: (input: { email: string; password: string; code?: string }) => Promise<AuthResult>
   // Sign out — wipe local + main session, tell the server to invalidate.
   signOut: () => Promise<void>
   // Tell main to remember the user dismissed the launch modal.

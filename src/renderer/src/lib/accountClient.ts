@@ -37,7 +37,7 @@ interface AuthSuccess {
 interface AuthFailure {
   ok: false
   error: string
-  code: 'EMAIL_EXISTS' | 'INVALID_CREDENTIALS' | 'NETWORK' | 'BAD_INPUT' | 'SERVER'
+  code: 'EMAIL_EXISTS' | 'INVALID_CREDENTIALS' | 'NETWORK' | 'BAD_INPUT' | 'SERVER' | 'TWO_FACTOR'
 }
 
 export type AuthResult = AuthSuccess | AuthFailure
@@ -126,6 +126,7 @@ export async function signup(input: {
 export async function login(input: {
   email: string
   password: string
+  code?: string
 }): Promise<AuthResult> {
   try {
     const { res, json } = await postJson<{
@@ -133,8 +134,14 @@ export async function login(input: {
       sessionToken?: string
       account?: ServerAccount
       error?: string
+      twoFactorRequired?: boolean
     }>('/accounts/login', input)
     if (!res.ok || !json) {
+      // Password was right but a second factor is needed (or the supplied code
+      // was wrong) — surface this distinctly so the UI can prompt for the code.
+      if (json?.twoFactorRequired) {
+        return { ok: false, error: json.error || 'Enter your authentication code.', code: 'TWO_FACTOR' }
+      }
       const code: AuthFailure['code'] =
         res.status === 401 ? 'INVALID_CREDENTIALS' : 'SERVER'
       return {
@@ -181,6 +188,65 @@ export async function getMe(token: string): Promise<ServerAccount | null> {
     return json.account
   } catch {
     return null
+  }
+}
+
+// ── Two-factor (TOTP) ─────────────────────────────────────────────────────
+
+export async function twoFactorStatus(token: string): Promise<{ enabled: boolean; pending: boolean }> {
+  try {
+    const { res, json } = await getJson<{ ok: boolean; enabled?: boolean; pending?: boolean }>('/account/2fa', token)
+    if (!res.ok || !json?.ok) return { enabled: false, pending: false }
+    return { enabled: !!json.enabled, pending: !!json.pending }
+  } catch {
+    return { enabled: false, pending: false }
+  }
+}
+
+export async function twoFactorSetup(
+  token: string
+): Promise<{ ok: true; secret: string; otpauthUrl: string } | { ok: false; error: string }> {
+  try {
+    const { res, json } = await postJson<{ ok: boolean; secret?: string; otpauthUrl?: string; error?: string }>(
+      '/account/2fa/setup',
+      {},
+      token
+    )
+    if (!res.ok || !json?.ok || !json.secret || !json.otpauthUrl) {
+      return { ok: false, error: json?.error || 'Could not start setup.' }
+    }
+    return { ok: true, secret: json.secret, otpauthUrl: json.otpauthUrl }
+  } catch (err) {
+    return { ok: false, error: `Could not reach the server: ${(err as Error).message}` }
+  }
+}
+
+export async function twoFactorEnable(
+  token: string,
+  code: string
+): Promise<{ ok: true; recoveryCodes: string[] } | { ok: false; error: string }> {
+  try {
+    const { res, json } = await postJson<{ ok: boolean; recoveryCodes?: string[]; error?: string }>(
+      '/account/2fa/enable',
+      { code },
+      token
+    )
+    if (!res.ok || !json?.ok || !json.recoveryCodes) {
+      return { ok: false, error: json?.error || 'That code is not valid.' }
+    }
+    return { ok: true, recoveryCodes: json.recoveryCodes }
+  } catch (err) {
+    return { ok: false, error: `Could not reach the server: ${(err as Error).message}` }
+  }
+}
+
+export async function twoFactorDisable(token: string, code: string): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const { res, json } = await postJson<{ ok: boolean; error?: string }>('/account/2fa/disable', { code }, token)
+    if (!res.ok || !json?.ok) return { ok: false, error: json?.error || 'That code is not valid.' }
+    return { ok: true }
+  } catch (err) {
+    return { ok: false, error: `Could not reach the server: ${(err as Error).message}` }
   }
 }
 
