@@ -17,6 +17,7 @@ import {
 function triggerSummary(t: FlowTrigger): string {
   if (t.kind === 'schedule') return `every ${t.every === 'daily' ? 'day' : t.every === 'weekly' ? 'week' : 'month'}`
   if (t.kind === 'event') return FLOW_EVENT_LABELS[t.event].toLowerCase()
+  if (t.kind === 'webhook') return 'incoming webhook'
   return 'manual'
 }
 
@@ -26,14 +27,15 @@ function triggerSummary(t: FlowTrigger): string {
 // than a fabricated success. An AI step's output can be reused by a later step
 // with the token {{ai}}.
 
-const ACTION_TYPES: FlowActionType[] = ['create-task', 'add-table-row', 'send-email', 'create-knowledge', 'ai-step']
+const ACTION_TYPES: FlowActionType[] = ['create-task', 'add-table-row', 'send-email', 'create-knowledge', 'ai-step', 'http-request']
 
 const ACTION_ICON: Record<FlowActionType, string> = {
   'create-task': 'task_alt',
   'add-table-row': 'table_chart',
   'send-email': 'send',
   'create-knowledge': 'neurology',
-  'ai-step': 'auto_awesome'
+  'ai-step': 'auto_awesome',
+  'http-request': 'http'
 }
 
 export default function PlexiFlowView(): JSX.Element {
@@ -264,12 +266,15 @@ function FlowEditor({
                 ? flow.trigger.every
                 : flow.trigger.kind === 'event'
                   ? flow.trigger.event
-                  : 'manual'
+                  : flow.trigger.kind === 'webhook'
+                    ? 'webhook'
+                    : 'manual'
             }
             data-testid="flow-trigger"
             onChange={(e) => {
               const v = e.target.value
               if (v === 'manual') setTrigger({ kind: 'manual' })
+              else if (v === 'webhook') setTrigger({ kind: 'webhook' })
               else if (v === 'task-completed' || v === 'row-added') setTrigger({ kind: 'event', event: v })
               else setTrigger({ kind: 'schedule', every: v as 'daily' | 'weekly' | 'monthly' })
             }}
@@ -281,8 +286,17 @@ function FlowEditor({
             <option value="monthly">Every month</option>
             <option value="task-completed">When a task is completed</option>
             <option value="row-added">When a table row is added</option>
+            <option value="webhook">When a webhook is called</option>
           </select>
         </div>
+        {flow.trigger.kind === 'webhook' && (
+          <p className="mt-2 text-[11px] text-[var(--ink-50)] leading-relaxed">
+            POST to{' '}
+            <code className="font-mono text-[var(--ink-90)]">http://127.0.0.1:&lt;api-port&gt;/webhooks/{flow.id}</code>{' '}
+            to run this flow. The local PlexiAPI server must be on (Settings). It is bound to your machine, so an
+            outside service needs a tunnel to reach it.
+          </p>
+        )}
       </div>
 
       {/* Actions */}
@@ -450,6 +464,28 @@ function ActionCard({
         )}
         {local.type === 'ai-step' && (
           <textarea value={local.prompt} onChange={(e) => setLocal({ ...local, prompt: e.target.value })} onBlur={commit} placeholder="Prompt for the AI. Its output is reusable as {{ai}} in later steps." rows={3} className={`${field} resize-none`} />
+        )}
+        {local.type === 'http-request' && (
+          <>
+            <div className="flex items-center gap-1.5">
+              <select
+                value={local.method}
+                onChange={(e) => {
+                  const next = { ...local, method: e.target.value as typeof local.method }
+                  setLocal(next)
+                  if (JSON.stringify(next) !== JSON.stringify(action)) onChange(next)
+                }}
+                className={`${field} w-24 shrink-0`}
+              >
+                {(['POST', 'GET', 'PUT', 'PATCH', 'DELETE'] as const).map((m) => (
+                  <option key={m} value={m}>{m}</option>
+                ))}
+              </select>
+              <input value={local.url} onChange={(e) => setLocal({ ...local, url: e.target.value })} onBlur={commit} placeholder="https://hooks.slack.com/services/…" className={field} />
+            </div>
+            <textarea value={local.headers} onChange={(e) => setLocal({ ...local, headers: e.target.value })} onBlur={commit} placeholder={'Headers, one per line:\nAuthorization: Bearer …'} rows={2} className={`${field} resize-none font-mono text-[11px]`} />
+            <textarea value={local.body} onChange={(e) => setLocal({ ...local, body: e.target.value })} onBlur={commit} placeholder={'Request body (JSON). Use {{ai}} to insert a prior step output.'} rows={3} className={`${field} resize-none font-mono text-[11px]`} />
+          </>
         )}
       </div>
     </div>
