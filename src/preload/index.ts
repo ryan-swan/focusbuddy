@@ -1238,6 +1238,21 @@ const api = {
       | { ok: false; error: string }
     > => ipcRenderer.invoke('gif:search', query)
   },
+  // Multi-device workspace sync — the renderer drives the network, main owns the
+  // local DB. These expose the local half (collect changes, apply pulls, cursor).
+  workspaceSync: {
+    pending: (): Promise<{
+      upserts: Array<{ id: string; itemType: 'node' | 'widget'; body: Record<string, unknown>; baseRev: number }>
+      deletes: Array<{ id: string; itemType: 'node' | 'widget'; baseRev: number }>
+    }> => ipcRenderer.invoke('workspace:pending'),
+    markPushed: (itemType: 'node' | 'widget', id: string, rev: number): Promise<void> =>
+      ipcRenderer.invoke('workspace:markPushed', itemType, id, rev),
+    applyRemote: (
+      items: Array<{ id: string; itemType: 'node' | 'widget'; body: Record<string, unknown> | null; rev: number; deleted: boolean }>
+    ): Promise<{ applied: number }> => ipcRenderer.invoke('workspace:applyRemote', items),
+    getCursor: (): Promise<number> => ipcRenderer.invoke('workspace:getCursor'),
+    setCursor: (n: number): Promise<void> => ipcRenderer.invoke('workspace:setCursor', n)
+  },
   // Mail (IMAP) — the user's own mailbox, connected straight from the desktop.
   // The password never crosses this boundary on read; the renderer only ever
   // sees host/port/user and the message list/body it asks for.

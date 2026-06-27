@@ -501,6 +501,30 @@ export function getDb(): Database.Database {
   ensureColumn(db, 'widgets', 'living_paused', 'INTEGER NOT NULL DEFAULT 0')
   // Linked duplicates: widgets sharing a sync_group_id mirror content/title/colour.
   ensureColumn(db, 'widgets', 'sync_group_id', 'TEXT')
+  // Multi-device sync. sync_rev is the server rev this row was last reconciled at
+  // (0 = never synced); needs_sync = 1 means this row has local changes to push.
+  // Every local write sets needs_sync = 1; a push or an applied pull clears it.
+  ensureColumn(db, 'nodes', 'sync_rev', 'INTEGER NOT NULL DEFAULT 0')
+  ensureColumn(db, 'nodes', 'needs_sync', 'INTEGER NOT NULL DEFAULT 1')
+  ensureColumn(db, 'widgets', 'sync_rev', 'INTEGER NOT NULL DEFAULT 0')
+  ensureColumn(db, 'widgets', 'needs_sync', 'INTEGER NOT NULL DEFAULT 1')
+  // Small key/value store for sync bookkeeping (the pull cursor).
+  db.exec('CREATE TABLE IF NOT EXISTS sync_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)')
+  // Mark a row dirty on any content update so the sync engine knows to push it.
+  // The WHEN guard fires only on a content change (sync columns untouched) of a
+  // currently-clean row, so a sync-bookkeeping write (which sets sync_rev /
+  // needs_sync) never trips it and there is no recursion. New rows default
+  // needs_sync = 1, so inserts are already marked.
+  db.exec(`
+    CREATE TRIGGER IF NOT EXISTS nodes_mark_dirty AFTER UPDATE ON nodes
+    WHEN NEW.needs_sync = OLD.needs_sync AND NEW.sync_rev = OLD.sync_rev AND OLD.needs_sync = 0
+    BEGIN UPDATE nodes SET needs_sync = 1 WHERE id = NEW.id; END;
+  `)
+  db.exec(`
+    CREATE TRIGGER IF NOT EXISTS widgets_mark_dirty AFTER UPDATE ON widgets
+    WHEN NEW.needs_sync = OLD.needs_sync AND NEW.sync_rev = OLD.sync_rev AND OLD.needs_sync = 0
+    BEGIN UPDATE widgets SET needs_sync = 1 WHERE id = NEW.id; END;
+  `)
   // Usage telemetry + favourites for Connected Apps. `use_count` and `last_used_at`
   // feed the recency × frequency sort that promotes apps into the Favourites strip;
   // `pinned` lets the user override. `vault_entry_id` binds an app to a vault entry

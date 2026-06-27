@@ -19,6 +19,14 @@ import {
   type AiMode
 } from '../settingsStore'
 import { searchGifs } from '../gifSearch'
+import {
+  collectPending,
+  markPushed,
+  applyRemote,
+  getSyncCursor,
+  setSyncCursor,
+  type RemoteItem
+} from '../db/workspaceSync'
 import { invalidateAnthropicClient } from '../ai/anthropic'
 import { getAiStatus, refreshCredits, startTopUp } from '../ai/creditMode'
 import * as mailAccount from '../mail/mailAccount'
@@ -1961,6 +1969,19 @@ export function registerIpcHandlers(): void {
 
   // GIF search runs in main so the Tenor key never reaches the renderer.
   ipcMain.handle('gif:search', (_e, query: string) => searchGifs(typeof query === 'string' ? query : ''))
+
+  // Multi-device workspace sync. The renderer drives the network (it has the
+  // signal URL + token); these expose the local-DB half: what to push, what to
+  // mark pushed, applying pulled rows, and the pull cursor.
+  ipcMain.handle('workspace:pending', () => collectPending())
+  ipcMain.handle('workspace:markPushed', (_e, itemType: 'node' | 'widget', id: string, rev: number) =>
+    markPushed(itemType, id, rev)
+  )
+  ipcMain.handle('workspace:applyRemote', (_e, items: RemoteItem[]) =>
+    applyRemote(Array.isArray(items) ? items : [])
+  )
+  ipcMain.handle('workspace:getCursor', () => getSyncCursor())
+  ipcMain.handle('workspace:setCursor', (_e, n: number) => setSyncCursor(typeof n === 'number' ? n : 0))
 
   // Validate the stored key by sending a 1-token "ping" prompt. Costs
   // roughly $0.0001 on Haiku — small enough that a "Test" button click is
