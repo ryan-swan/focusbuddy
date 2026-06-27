@@ -478,11 +478,11 @@ export default function App(): JSX.Element {
         </div>
       </header>
       <main className="flex-1 min-h-0">
-        <PanelGroup direction="horizontal" autoSaveId="focusbuddy-main">
+        <PanelGroup direction="horizontal" autoSaveId="focusbuddy-main-v2">
           <Panel
             ref={sidebarRef}
-            defaultSize={20}
-            minSize={14}
+            defaultSize={15}
+            minSize={12}
             maxSize={40}
             collapsible
             collapsedSize={0}
@@ -492,13 +492,13 @@ export default function App(): JSX.Element {
             <Sidebar onCollapse={collapseSidebar} />
           </Panel>
           <PanelResizeHandle className="w-px bg-stone-200 dark:bg-stone-700 hover:bg-stone-400 dark:hover:bg-stone-500 transition-colors" />
-          <Panel defaultSize={56} minSize={30}>
+          <Panel defaultSize={65} minSize={30}>
             <MainPane />
           </Panel>
           <PanelResizeHandle className="w-px bg-stone-200 dark:bg-stone-700 hover:bg-stone-400 dark:hover:bg-stone-500 transition-colors" />
           <Panel
             ref={chatRef}
-            defaultSize={24}
+            defaultSize={20}
             minSize={16}
             maxSize={45}
             collapsible

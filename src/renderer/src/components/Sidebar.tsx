@@ -98,7 +98,7 @@ function renderConnectedAppRow(
           </span>
         )}
         <span
-          className={`text-sm truncate flex-1 ${
+          className={`text-[13px] flex-1 min-w-0 break-words line-clamp-2 leading-tight ${
             active
               ? 'text-stone-900 dark:text-stone-100 font-medium'
               : 'text-stone-800 dark:text-stone-200'
@@ -1600,7 +1600,7 @@ function NavRow({ icon, label, active, onClick, badge }: NavRowProps): JSX.Eleme
   return (
     <button
       onClick={onClick}
-      className={`w-full flex items-center gap-2 px-3 py-1.5 text-left transition-colors ${
+      className={`w-full flex items-center gap-2 px-2.5 py-1 text-left transition-colors ${
         active
           ? 'bg-stone-100/80 dark:bg-stone-800/60 text-stone-900 dark:text-stone-100'
           : 'text-stone-700 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800'
@@ -1611,9 +1611,12 @@ function NavRow({ icon, label, active, onClick, badge }: NavRowProps): JSX.Eleme
         name={icon}
         size={16}
         filled={active}
-        className={active ? 'text-accent' : 'text-stone-500 dark:text-stone-400'}
+        className={`shrink-0 ${active ? 'text-accent' : 'text-stone-500 dark:text-stone-400'}`}
       />
-      <span className={`text-sm flex-1 ${active ? 'font-medium' : ''}`}>{label}</span>
+      {/* Label wraps within the narrow rail instead of forcing the sidebar wider. */}
+      <span className={`text-[13px] flex-1 min-w-0 break-words leading-tight ${active ? 'font-medium' : ''}`}>
+        {label}
+      </span>
       {badge && (
         <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-stone-200 dark:bg-stone-700 text-stone-600 dark:text-stone-300">
           {badge}
