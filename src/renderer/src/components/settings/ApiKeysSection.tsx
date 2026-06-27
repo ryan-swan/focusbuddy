@@ -112,6 +112,30 @@ export default function ApiKeysSection({ onKeySaved }: Props): JSX.Element {
         onKeySaved={onKeySaved}
       />
 
+      <ApiKeyRow
+        config={{
+          label: 'Tenor API key',
+          purpose: 'GIF search in chat. Optional — without it the GIF picker shows a prompt to add a key.',
+          placeholder: 'AIza…',
+          helpUrl: 'https://developers.google.com/tenor/guides/quickstart',
+          helpLabel: 'Get a free key from Google Tenor →',
+          removeWarning: 'Remove the Tenor API key? GIF search will stop working until you add it back.',
+          api: {
+            hint: () => window.api.settings.hintTenor(),
+            save: (p) => window.api.settings.saveTenorKey(p),
+            clear: () => window.api.settings.clearTenorKey(),
+            // No dedicated test endpoint; a search confirms the key end to end.
+            test: async () => {
+              const r = await window.api.gif.search('hello')
+              if (r.ok) return { ok: true }
+              return { ok: false, error: 'needsKey' in r ? 'No key set yet.' : r.error }
+            }
+          }
+        }}
+        encryption={encryption}
+        onKeySaved={onKeySaved}
+      />
+
       <div className="text-[10px] text-stone-500 dark:text-stone-400 leading-relaxed">
         Each key is encrypted with the macOS Keychain and stored locally only.
         When you use your own key, prompts go direct from this Mac to Anthropic /
