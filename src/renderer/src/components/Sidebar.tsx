@@ -761,7 +761,7 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
             />
           </div>
         )}
-        <SectionHeader label="Plan and automate" open={planOpen} onToggle={() => setPlanOpen((v) => !v)} />
+        <SectionHeader label="Work" open={planOpen} onToggle={() => setPlanOpen((v) => !v)} />
         {planOpen && (
           <div className="mb-2">
             <NavRow
@@ -811,7 +811,7 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
             />
           </div>
         )}
-        <SectionHeader label="Discover" open={discoverOpen} onToggle={() => setDiscoverOpen((v) => !v)} />
+        <SectionHeader label="Add-ons" open={discoverOpen} onToggle={() => setDiscoverOpen((v) => !v)} />
         {discoverOpen && (
           <div className="mb-2">
             <NavRow

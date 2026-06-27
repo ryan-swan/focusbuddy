@@ -249,10 +249,30 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
         className="flex-1 overflow-auto px-3 py-3 space-y-3"
       >
         {messages.length === 0 && (
-          <p className="text-xs text-stone-500 dark:text-stone-400 mt-2 text-center leading-relaxed">
-            Ask anything about your task — research, plan, break it down, draft text.<br/>
-            <span className="text-stone-400 dark:text-stone-500">The assistant sees the active task.</span>
-          </p>
+          <div className="mt-1 px-0.5">
+            <p className="text-[12.5px] text-stone-500 dark:text-stone-400 leading-relaxed mb-3">
+              Ask anything about your task. The assistant sees your active task and can research, plan, draft, and act on
+              it. Try one of these to start:
+            </p>
+            <div className="space-y-1.5">
+              {[
+                { icon: 'list_alt', text: 'Break this into clear steps' },
+                { icon: 'edit_note', text: 'Draft a first version for me' },
+                { icon: 'travel_explore', text: 'Research this and summarize what matters' },
+                { icon: 'arrow_forward', text: 'What should I work on next?' }
+              ].map((s) => (
+                <button
+                  key={s.text}
+                  onClick={() => setDraft(s.text)}
+                  data-testid="chat-suggestion"
+                  className="w-full text-left text-[12.5px] px-3 py-2 rounded-lg border border-stone-200 dark:border-stone-700 text-stone-700 dark:text-stone-300 hover:border-accent hover:bg-stone-50 dark:hover:bg-stone-800/50 transition-colors flex items-center gap-2"
+                >
+                  <Icon name={s.icon} size={14} className="text-accent shrink-0" />
+                  <span>{s.text}</span>
+                </button>
+              ))}
+            </div>
+          </div>
         )}
         {messages.map((m, i) => {
           // Per-message proposals: rendered as cards below the assistant bubble.
