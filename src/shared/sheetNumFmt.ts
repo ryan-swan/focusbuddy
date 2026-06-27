@@ -33,3 +33,15 @@ export function toExcelNumFmt(f: SheetNumberFormat | undefined): string | undefi
   const dec = f.decimals > 0 ? `.${'0'.repeat(f.decimals)}` : ''
   return `${f.thousands ? '#,##0' : '0'}${dec}`
 }
+
+// A CSS hex colour ('#rrggbb' or '#rgb') → Excel ARGB ('FFRRGGBB'), which is what
+// exceljs wants for fonts and fills. Returns undefined for anything unparseable so
+// a bad colour is simply skipped rather than producing a corrupt cell.
+export function hexToArgb(hex: string | undefined): string | undefined {
+  if (!hex) return undefined
+  let h = hex.replace('#', '').trim()
+  if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2]
+  if (h.length === 6 && /^[0-9a-fA-F]{6}$/.test(h)) return 'FF' + h.toUpperCase()
+  if (h.length === 8 && /^[0-9a-fA-F]{8}$/.test(h)) return h.toUpperCase()
+  return undefined
+}
