@@ -16,6 +16,8 @@ import {
 } from '../lib/messagingSocket'
 import { usePresenceStore } from './presence'
 import { useAccountStore } from './account'
+import { useViewStore } from './view'
+import { notifyExternal } from '../lib/notify'
 
 // Apply a reaction add/remove to a message in the conversation map, immutably and
 // idempotently (so the actor's own optimistic update plus the echoed broadcast do
@@ -148,8 +150,22 @@ export const useMessagingStore = create<MessagingStore>((set, get) => ({
     // unread counts + ordering stay correct. If the pushed message is for the
     // open conversation, mark it read immediately.
     connectMessagingSocket(token, (incoming) => {
-      const { activeId } = get()
+      const { activeId, conversations } = get()
       set((s) => routeIncomingMessage(s, incoming.conversationId, incoming.message))
+      // Desktop notification when the app is in the background. notifyExternal
+      // self-suppresses when the window is focused, so no banner for the chat you
+      // are reading. Resolve a friendly sender name from the conversation members.
+      const conv = conversations.find((c) => c.id === incoming.conversationId)
+      const sender =
+        conv?.members.find((m) => m.accountId === incoming.message.fromAccount)?.handle ?? 'New message'
+      const preview = incoming.message.body || (incoming.message.attachment ? 'Shared something' : '')
+      notifyExternal(conv ? conv.title : sender, conv ? `${sender}: ${preview}` : preview, {
+        tag: `msg-${incoming.conversationId}`,
+        onClick: () => {
+          useViewStore.getState().goMessages()
+          void get().openConversation(incoming.conversationId)
+        }
+      })
       void get().refreshConversations()
       if (incoming.conversationId === activeId) {
         void api.markRead(token, incoming.conversationId)

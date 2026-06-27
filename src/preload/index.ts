@@ -1553,7 +1553,9 @@ const api = {
       previousVersion: string | null
       wasUpdated: boolean
       firstInstall: boolean
-    }> => ipcRenderer.invoke('app:get-launch-info')
+    }> => ipcRenderer.invoke('app:get-launch-info'),
+    // Bring the main window forward (used when a desktop notification is clicked).
+    focusWindow: (): Promise<void> => ipcRenderer.invoke('app:focus-window')
   }
 }
 

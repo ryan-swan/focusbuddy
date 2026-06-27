@@ -1629,6 +1629,15 @@ export function registerIpcHandlers(): void {
   // update? Authoritative because main persists the last-run version in
   // userData (the renderer can't tell a fresh install from an upgrade).
   ipcMain.handle('app:get-launch-info', () => getLaunchInfo())
+  // Bring the main window to the front (used when a desktop notification is clicked).
+  ipcMain.handle('app:focus-window', () => {
+    const win = BrowserWindow.getAllWindows()[0]
+    if (win) {
+      if (win.isMinimized()) win.restore()
+      win.show()
+      win.focus()
+    }
+  })
 
   // ── Settings: API-key vault ──────────────────────────────────────────────
   // Replaces the old "edit projects/focusbuddy/.env and restart" flow with
