@@ -9,6 +9,10 @@ import { listOrgs, type OrgMembership } from '../../lib/orgsClient'
 import Icon from '../Icon'
 import { ChatComposer } from './chat/ChatComposer'
 import { useViewStore } from '../../stores/view'
+import { useNodeStore } from '../../stores/nodes'
+import { useWidgetStore } from '../../stores/widgets'
+import { catalogFor } from '../../lib/widgetCatalog'
+import { spawnPositionFor } from '../../lib/spawnPosition'
 
 const QUICK_EMOJIS = ['👍', '❤️', '😂', '🎉', '✅', '👀']
 
@@ -375,6 +379,32 @@ export default function MessagesView(): JSX.Element {
     setNewHandle('')
   }
 
+  // Pin the open conversation to the current desk as a chat-thread widget. Needs
+  // an active desk; if there is none, tell the user rather than failing silently.
+  async function pinToCanvas(): Promise<void> {
+    const conv = conversations.find((c) => c.id === activeId)
+    if (!conv) return
+    const taskId = useNodeStore.getState().activeTaskId
+    if (!taskId) {
+      setError('Open a desk first, then pin the conversation to it.')
+      return
+    }
+    const entry = catalogFor('chat-thread')
+    const pos = spawnPositionFor(entry?.defaultWidth ?? 320, entry?.defaultHeight ?? 300)
+    await useWidgetStore.getState().create({
+      taskId,
+      kind: 'chat-thread',
+      title: conv.title,
+      content: JSON.stringify({ conversationId: conv.id, channelName: conv.title }),
+      x: pos.x,
+      y: pos.y,
+      width: entry?.defaultWidth ?? 320,
+      height: entry?.defaultHeight ?? 300,
+      color: null
+    })
+    useViewStore.getState().goTask(taskId)
+  }
+
   const activeConv = conversations.find((c) => c.id === activeId) ?? null
   // For a 1:1 DM, the other member is the call target. Spaces are multi-member,
   // so the header call button only shows for DMs (a 1:1 mesh call).
@@ -521,6 +551,14 @@ export default function MessagesView(): JSX.Element {
                   className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border border-[var(--edge-soft)] text-[12.5px] text-[var(--ink-90)] hover:bg-[var(--surface-sunken)]"
                 >
                   <Icon name="groups" size={15} /> Meet
+                </button>
+                <button
+                  onClick={() => pinToCanvas()}
+                  title="Pin this conversation to your current desk"
+                  data-testid="messages-pin"
+                  className="inline-flex items-center justify-center h-8 w-8 rounded-lg border border-[var(--edge-soft)] text-[var(--ink-90)] hover:bg-[var(--surface-sunken)]"
+                >
+                  <Icon name="push_pin" size={15} />
                 </button>
               </div>
             </div>

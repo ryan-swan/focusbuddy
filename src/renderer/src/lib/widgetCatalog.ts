@@ -262,6 +262,17 @@ export const WIDGET_CATALOG: WidgetCatalogEntry[] = [
     hideFromPicker: true
   },
   {
+    kind: 'chat-thread',
+    category: 'Comms',
+    label: 'Chat thread',
+    icon: 'forum',
+    hint: 'Pin a PlexiChat conversation to this desk — see the latest messages and open the full thread',
+    defaultWidth: 320,
+    defaultHeight: 300,
+    defaultContent: '',
+    isWebBased: false
+  },
+  {
     kind: 'email',
     category: 'Comms',
     label: 'Email',

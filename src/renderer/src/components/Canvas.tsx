@@ -14,6 +14,7 @@ import FileWidget from './widgets/FileWidget'
 import FieldWidget from './widgets/FieldWidget'
 import PageWidget from './widgets/PageWidget'
 import LivingDocWidget from './widgets/LivingDocWidget'
+import ChatThreadWidget from './widgets/ChatThreadWidget'
 import TableWidget from './widgets/TableWidget'
 import ChartWidget from './widgets/ChartWidget'
 import OfficeDocWidget from './widgets/OfficeDocWidget'
@@ -209,6 +210,8 @@ function renderWidget(w: Widget): JSX.Element | null {
     case 'gslide':
     case 'email':
       return <WebViewWidget widget={w} />
+    case 'chat-thread':
+      return <ChatThreadWidget widget={w} />
     default:
       return null
   }
