@@ -258,6 +258,7 @@ function taskBlock(taskId: string): string {
   const linksSummary = summarizeLinks(taskId, widgets)
   const lines = [
     `Task: ${node.title}`,
+    `Task id: ${node.id}`,
     node.description ? `Notes: ${node.description}` : '',
     `Status: ${node.status}`,
     `Priority/Interest/Importance: ${node.priority}/${node.interest}/${node.importance} (1-5)`,
@@ -298,6 +299,8 @@ function buildSystemPrompt(taskId: string | null): string {
     '  { "kind": "update-widget", "widgetId": "<from canvas summary>", "label": "the launch checklist", "title": "...", "content": "...", "reason": "..." }\n' +
     '  { "kind": "delete-widget", "widgetId": "<from canvas summary>", "label": "the empty sticky", "reason": "..." }\n' +
     '  { "kind": "start-focus-session", "minutes": 5, "reason": "..." }\n' +
+    '  { "kind": "update-task", "taskId": "<the Task id shown above>", "label": "this task", "status": "done", "dueDate": null, "title": "new title", "reason": "user marked it complete" }\n' +
+    '  { "kind": "create-knowledge-entry", "title": "Brand voice rule", "body": "We write in first-person plural and never use em dashes.", "tags": ["brand"], "reason": "user stated this as a rule" }\n' +
     '\n' +
     '⚠ HARD RULES:\n' +
     '1. The user sees ONLY two things: (a) the "reply" field rendered as markdown, and (b) one action card for each item in the "actions" array. They do NOT see anything else you write. Describing widgets in prose inside "reply" does NOT create them — the actions array must contain the entries.\n' +
@@ -309,6 +312,8 @@ function buildSystemPrompt(taskId: string | null): string {
     '7. For modifying existing widgets, use their id from the canvas summary (shown as `id=...`). Same for an existing tableId.\n' +
     '7a. To add rows to a table you are creating in the SAME response, the table does not have a real id yet. Give the create-table action an "id" field (e.g. "tbl-1"), then in sibling add-table-row actions set "tableId": "$tbl-1" (literal $ prefix + the matching id). The system resolves it at apply time. NEVER guess a uuid for a not-yet-created table.\n' +
     '8. Delete only on explicit user request, never speculatively.\n' +
+    '7b. To change the CURRENT task (mark it done, rename it, move its due date) use "update-task" with "taskId" set to the exact "Task id" shown in the context above. status must be one of open|in_progress|done|parked. Use dueDate as unix ms, or null to clear it. Omit fields you are not changing.\n' +
+    '7c. To remember a fact, decision, or rule the user states, use "create-knowledge-entry". The "body" MUST be real content from this conversation. Never invent facts, names, numbers, or decisions; if the user did not state it, do not store it.\n' +
     '9. "reply" should be short (1-2 sentences). Markdown is rendered. Don\'t list the widgets in reply — let the cards speak.\n\n' +
     'CORRECT for "set up a podcast launch workspace":\n' +
     '{\n' +
@@ -539,6 +544,53 @@ export function parseChatJson(raw: string): {
           >['fieldType'],
           options: Array.isArray(action.options)
             ? (action.options as string[])
+            : undefined,
+          reason
+        })
+        break
+      }
+      case 'update-task': {
+        const taskId = typeof action.taskId === 'string' ? action.taskId.trim() : ''
+        // Require a target and at least one thing to change.
+        const hasChange =
+          typeof action.title === 'string' ||
+          typeof action.status === 'string' ||
+          typeof action.notes === 'string' ||
+          action.dueDate === null ||
+          typeof action.dueDate === 'number'
+        if (!taskId || !hasChange) break
+        proposals.push({
+          id: makeProposalId('utask', i++),
+          kind: 'update-task',
+          taskId,
+          label: typeof action.label === 'string' && action.label ? action.label : 'this task',
+          title: typeof action.title === 'string' ? action.title : undefined,
+          status:
+            typeof action.status === 'string'
+              ? (action.status as Extract<ActionProposal, { kind: 'update-task' }>['status'])
+              : undefined,
+          dueDate:
+            action.dueDate === null
+              ? null
+              : typeof action.dueDate === 'number'
+                ? action.dueDate
+                : undefined,
+          notes: typeof action.notes === 'string' ? action.notes : undefined,
+          reason
+        })
+        break
+      }
+      case 'create-knowledge-entry': {
+        const title = typeof action.title === 'string' ? action.title.trim() : ''
+        const body = typeof action.body === 'string' ? action.body.trim() : ''
+        if (!title || !body) break
+        proposals.push({
+          id: makeProposalId('kb', i++),
+          kind: 'create-knowledge-entry',
+          title,
+          body,
+          tags: Array.isArray(action.tags)
+            ? (action.tags as unknown[]).filter((t): t is string => typeof t === 'string')
             : undefined,
           reason
         })
