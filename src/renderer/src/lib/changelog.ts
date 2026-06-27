@@ -36,6 +36,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.89',
+    date: '2026-06-28T12:00:00Z',
+    title: 'v2.5.89 — appear offline, a roomier workspace, and a calmer home',
+    tag: 'feature',
+    summary:
+      'A privacy control and a design pass. You can now appear offline from the Team panel: your team sees you as offline while you still see everyone, no admin can override it, and a hidden session is not logged. The workspace also got roomier and calmer: a slimmer side menu grouped into clear sections, a wider canvas, calmer product icons, and a clearer split between Build (which makes tools for you) and the Assistant (which helps you think through a task).',
+    highlights: [
+      'Appear offline: one toggle in the Team panel hides you from the People Map and team presence while you stay connected and can still reach and be reached by everyone. It is your call, no admin can override it, and while hidden nothing about your session is recorded.',
+      'A roomier workspace: the side menu is slimmer by default and grouped into labelled sections (Workspace, Knowledge, Create and meet, Work, Files, Team and more) so it is scannable instead of one long list, and the main canvas is wider. Long labels wrap instead of being cut off.',
+      'A calmer, clearer home: product icons are unified and quieter so the grid reads as one set, the assistant panel opens with starter suggestions instead of empty space, and the AI builder is now clearly labelled "Build" so it is no longer confused with the task Assistant.'
+    ]
+  },
+  {
     version: '2.5.88',
     date: '2026-06-27T22:00:00Z',
     title: 'v2.5.88 — PlexiPeople: reach anyone in a click, and edit your org chart',
