@@ -1575,7 +1575,7 @@ interface SectionHeaderProps {
 
 function SectionHeader({ label, open, onToggle, action }: SectionHeaderProps): JSX.Element {
   return (
-    <div className="px-2 pt-2 pb-1 flex items-center justify-between sticky top-0 bg-stone-50 dark:bg-stone-900 z-10">
+    <div className="px-2 pt-1.5 pb-0.5 flex items-center justify-between sticky top-0 bg-stone-50 dark:bg-stone-900 z-10">
       <button
         onClick={onToggle}
         className="flex items-center gap-1 text-[10px] uppercase tracking-[0.12em] font-semibold text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-100 transition-colors"
