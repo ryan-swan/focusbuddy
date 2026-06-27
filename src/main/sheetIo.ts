@@ -10,6 +10,7 @@ import { readFile, writeFile } from 'fs/promises'
 import * as XLSX from 'xlsx'
 import type { SheetBodyV2, SheetTab, SheetNumberFormat } from '@shared/types'
 import { mapNumFmt, toExcelNumFmt } from '@shared/sheetNumFmt'
+import { buildStyledXlsx } from './sheetXlsxWriter'
 
 export interface SheetImportResult {
   ok: boolean
@@ -154,11 +155,9 @@ export async function exportSheet(input: {
       const csv = XLSX.utils.sheet_to_csv(ws)
       await writeFile(res.filePath, csv)
     } else {
-      const wb = XLSX.utils.book_new()
-      for (const tab of input.body.sheets) {
-        XLSX.utils.book_append_sheet(wb, tabToWorksheet(tab), tab.name.slice(0, 31) || 'Sheet')
-      }
-      const out = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }) as Buffer
+      // xlsx export goes through exceljs so visual styles (fonts, fills, colours,
+      // alignment) survive into real Excel, not just values + number formats.
+      const out = await buildStyledXlsx(input.body)
       await writeFile(res.filePath, out)
     }
     return { ok: true, path: res.filePath }
