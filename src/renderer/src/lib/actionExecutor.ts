@@ -7,7 +7,7 @@
 // Each handler returns { ok, message } so the chat UI can show a confirmation
 // chip ("✓ Created Project tracker" / "✗ Couldn't open URL") inline.
 
-import type { ActionProposal, WidgetKind, WidgetPatch } from '@shared/types'
+import type { ActionProposal, WidgetKind, WidgetPatch, NodePatch, TaskStatus } from '@shared/types'
 import type { FieldDefinition, TableSchema } from '@shared/fields'
 import { defaultConfig, defaultValue } from '@shared/fields'
 import { useNodeStore } from '../stores/nodes'
@@ -15,6 +15,7 @@ import { useWidgetStore } from '../stores/widgets'
 import { useFocusSessionStore } from '../stores/focusSession'
 import { useTablesStore } from '../stores/tables'
 import { useLinksStore } from '../stores/links'
+import { useKnowledgeStore } from '../stores/knowledge'
 import { catalogFor } from './widgetCatalog'
 import { spawnPositionFor } from './spawnPosition'
 
@@ -85,10 +86,55 @@ export async function applyProposal(
       return applyAddTableRow(proposal, ctx)
     case 'create-field':
       return applyCreateField(proposal, ctx)
+    case 'update-task':
+      return applyUpdateTask(proposal, ctx)
+    case 'create-knowledge-entry':
+      return applyCreateKnowledgeEntry(proposal)
     default:
       // Exhaustive switch — TS yells if a new kind is added without a handler.
       return { ok: false, message: 'Unknown action kind.' }
   }
+}
+
+// Update an existing task. taskId comes from the model's context (a real node
+// id); falls back to the active task if the model omitted it. Validates status
+// before writing so an invalid value can't silently corrupt the node. Goes
+// through the node store so the in-memory list stays in sync and undo is logged.
+async function applyUpdateTask(
+  p: Extract<ActionProposal, { kind: 'update-task' }>,
+  ctx: { activeTaskId: string | null }
+): Promise<ApplyResult> {
+  const nodeId = p.taskId || ctx.activeTaskId
+  if (!nodeId) return { ok: false, message: 'No task to update.' }
+  const node = useNodeStore.getState().nodes.find((n) => n.id === nodeId)
+  if (!node) return { ok: false, message: `Task "${p.label || nodeId.slice(0, 8)}…" not found.` }
+  const patch: NodePatch = {}
+  if (p.title !== undefined) patch.title = p.title
+  if (p.notes !== undefined) patch.description = p.notes
+  if (p.status !== undefined) {
+    const VALID: TaskStatus[] = ['open', 'in_progress', 'done', 'parked']
+    if (!VALID.includes(p.status)) return { ok: false, message: `Invalid status "${p.status}".` }
+    patch.status = p.status
+  }
+  if (p.dueDate !== undefined) patch.dueDate = p.dueDate
+  if (Object.keys(patch).length === 0) return { ok: false, message: 'Nothing to update.' }
+  await useNodeStore.getState().update(nodeId, patch)
+  return { ok: true, message: `Updated task "${node.title}"` }
+}
+
+// Save a fact / decision / process into PlexiBrain. The body is real content the
+// model captured from the conversation (the prompt forbids fabrication).
+async function applyCreateKnowledgeEntry(
+  p: Extract<ActionProposal, { kind: 'create-knowledge-entry' }>
+): Promise<ApplyResult> {
+  const entry = await useKnowledgeStore.getState().create({
+    title: p.title,
+    body: p.body ?? '',
+    tags: p.tags ?? [],
+    pinned: p.pinned ?? false
+  })
+  if (!entry) return { ok: false, message: 'Could not save to PlexiBrain.' }
+  return { ok: true, message: `Added "${p.title}" to PlexiBrain` }
 }
 
 async function applyCreateWidget(
@@ -746,6 +792,16 @@ export function describeProposal(
         verb: 'Arrange',
         subject: p.widgetIds && p.widgetIds.length > 0 ? `${p.widgetIds.length} widgets` : p.label
       }
+    case 'update-task': {
+      const bits = [
+        p.status ? `→ ${p.status.replace('_', ' ')}` : null,
+        p.title ? `rename to "${p.title}"` : null,
+        p.dueDate === null ? 'clear due date' : p.dueDate !== undefined ? 'set due date' : null
+      ].filter(Boolean)
+      return { icon: 'edit', verb: 'Update task', subject: `${p.label}${bits.length ? ` · ${bits.join(', ')}` : ''}` }
+    }
+    case 'create-knowledge-entry':
+      return { icon: 'psychology', verb: 'Add to PlexiBrain', subject: p.title }
     default:
       return { icon: 'auto_awesome', verb: 'Action', subject: '' }
   }

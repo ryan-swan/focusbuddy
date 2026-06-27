@@ -521,6 +521,33 @@ export type ActionProposal =
       options?: string[]
       reason?: string
     }
+  | {
+      // Update an EXISTING task. taskId is a real node id the model was shown in
+      // its context (see taskBlock). Any of the optional fields, when present,
+      // is applied; omitted fields are left unchanged. This lets the assistant
+      // act on work ("mark the Q3 brief done", "push the due date to Friday")
+      // rather than only creating new things.
+      id: string
+      kind: 'update-task'
+      taskId: string
+      label: string // user-facing description of the task ("Q3 brief")
+      title?: string
+      status?: TaskStatus
+      dueDate?: number | null // unix ms; null clears the date
+      notes?: string // maps to the task description
+      reason?: string
+    }
+  | {
+      // Save a fact, decision, or process into PlexiBrain knowledge. Body must
+      // carry real content from the conversation, never fabricated facts.
+      id: string
+      kind: 'create-knowledge-entry'
+      title: string
+      body: string
+      tags?: string[]
+      pinned?: boolean
+      reason?: string
+    }
 
 // ── AI model routing ─────────────────────────────────────────────────────────
 // The user picks a mode (Auto / Haiku / Sonnet / Opus). In Auto mode, each AI
