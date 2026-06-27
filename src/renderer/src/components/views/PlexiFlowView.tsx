@@ -5,12 +5,20 @@ import type { FbTable } from '@shared/fields'
 import {
   blankAction,
   ACTION_LABELS,
+  FLOW_EVENT_LABELS,
   type FlowDef,
   type FlowAction,
   type FlowActionType,
   type FlowTrigger,
   type FlowRunStep
 } from '@shared/flows'
+
+// One-line description of a trigger for the flow list.
+function triggerSummary(t: FlowTrigger): string {
+  if (t.kind === 'schedule') return `every ${t.every === 'daily' ? 'day' : t.every === 'weekly' ? 'week' : 'month'}`
+  if (t.kind === 'event') return FLOW_EVENT_LABELS[t.event].toLowerCase()
+  return 'manual'
+}
 
 // PlexiFlow: a visual automation builder. A flow runs an ordered list of actions
 // across the workspace, manually or on a schedule. Each run records an honest
@@ -113,7 +121,7 @@ export default function PlexiFlowView(): JSX.Element {
                   {f.lastStatus === 'ok' && <StatusPill tone="emerald" label="OK" dot={false} />}
                   {f.lastStatus === 'error' && <StatusPill tone="rose" label="Error" dot={false} />}
                 </div>
-                <p className="mt-0.5 text-[11px] text-[var(--ink-50)]">{f.actions.length} step(s) · {f.trigger.kind === 'schedule' ? f.trigger.every : 'manual'}</p>
+                <p className="mt-0.5 text-[11px] text-[var(--ink-50)]">{f.actions.length} step(s) · {triggerSummary(f.trigger)}</p>
               </button>
             ))
           )}
@@ -251,11 +259,19 @@ function FlowEditor({
           <Icon name="bolt" size={15} className="text-[rgb(var(--accent))]" />
           <span className="text-[12px] font-semibold text-[var(--ink-90)]">When</span>
           <select
-            value={flow.trigger.kind === 'schedule' ? flow.trigger.every : 'manual'}
+            value={
+              flow.trigger.kind === 'schedule'
+                ? flow.trigger.every
+                : flow.trigger.kind === 'event'
+                  ? flow.trigger.event
+                  : 'manual'
+            }
             data-testid="flow-trigger"
             onChange={(e) => {
               const v = e.target.value
-              setTrigger(v === 'manual' ? { kind: 'manual' } : { kind: 'schedule', every: v as 'daily' | 'weekly' | 'monthly' })
+              if (v === 'manual') setTrigger({ kind: 'manual' })
+              else if (v === 'task-completed' || v === 'row-added') setTrigger({ kind: 'event', event: v })
+              else setTrigger({ kind: 'schedule', every: v as 'daily' | 'weekly' | 'monthly' })
             }}
             className="ml-1 rounded-md bg-[var(--surface-base)] border border-[var(--edge-soft)] px-2 py-1 text-[12px] text-[var(--ink-100)] focus:outline-none"
           >
@@ -263,6 +279,8 @@ function FlowEditor({
             <option value="daily">Every day</option>
             <option value="weekly">Every week</option>
             <option value="monthly">Every month</option>
+            <option value="task-completed">When a task is completed</option>
+            <option value="row-added">When a table row is added</option>
           </select>
         </div>
       </div>

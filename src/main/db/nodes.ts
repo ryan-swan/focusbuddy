@@ -1,5 +1,6 @@
 import { randomUUID } from 'crypto'
 import { getDb } from './database'
+import { emitAutomationEvent } from './automationEvents'
 import type { FbNode, NodeDraft, NodePatch } from '@shared/types'
 
 interface NodeRow {
@@ -153,6 +154,10 @@ export function updateNode(id: string, patch: NodePatch): FbNode | null {
   if (fields.length === 0) return existing
   fields.push('updated_at = @now')
   db.prepare(`UPDATE nodes SET ${fields.join(', ')} WHERE id = @id`).run(params)
+  // Let PlexiFlow react to a task being completed (suppressed during flow runs).
+  if (patch.status === 'done' && existing.status !== 'done' && existing.kind === 'task') {
+    emitAutomationEvent({ name: 'task-completed', nodeId: id })
+  }
   return getNode(id)
 }
 
