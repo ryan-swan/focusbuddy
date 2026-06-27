@@ -9,6 +9,7 @@ import { useAccountStore } from '../../stores/account'
 import { useSignInPrompt } from '../../stores/signInPrompt'
 import { useCapabilityStore } from '../../stores/capabilities'
 import Icon from '../Icon'
+import TwoFactorSettings from './TwoFactorSettings'
 
 export default function AccountSection(): JSX.Element {
   const account = useAccountStore((s) => s.account)
@@ -72,6 +73,7 @@ export default function AccountSection(): JSX.Element {
             Your local data stays on this device. Signing out keeps it; it only
             disconnects shared-item sync and your plan until you sign back in.
           </p>
+          <TwoFactorSettings />
         </div>
       ) : (
         <div className="space-y-2.5">

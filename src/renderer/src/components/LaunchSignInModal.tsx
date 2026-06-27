@@ -49,6 +49,9 @@ export default function LaunchSignInModal(): JSX.Element | null {
   const [handle, setHandle] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Set once the server says this account has 2FA on; reveals the code field.
+  const [twoFactor, setTwoFactor] = useState(false)
+  const [code, setCode] = useState('')
 
   useEffect(() => {
     if (cachedEmail && !email) {
@@ -86,7 +89,8 @@ export default function LaunchSignInModal(): JSX.Element | null {
         mode === 'login'
           ? await loginAction({
               email: email.trim().toLowerCase(),
-              password
+              password,
+              code: twoFactor ? code.trim() : undefined
             })
           : await signupAction({
               email: email.trim().toLowerCase(),
@@ -96,6 +100,13 @@ export default function LaunchSignInModal(): JSX.Element | null {
       if (result.ok) {
         // Modal will unmount because `account` is now populated. No
         // additional close needed.
+        return
+      }
+      if (result.code === 'TWO_FACTOR') {
+        // Password was accepted; the account needs a code. Reveal the field and
+        // keep the password in place so the user just adds the code.
+        setTwoFactor(true)
+        setError(twoFactor ? result.error : null)
         return
       }
       if (result.code === 'EMAIL_EXISTS') {
@@ -269,6 +280,30 @@ export default function LaunchSignInModal(): JSX.Element | null {
             />
           </div>
 
+          {mode === 'login' && twoFactor && (
+            <div>
+              <label className="block text-[10px] uppercase tracking-wider text-stone-400 font-semibold mb-1">
+                Authentication code
+              </label>
+              <input
+                type="text"
+                inputMode="numeric"
+                value={code}
+                onChange={(e) => setCode(e.target.value)}
+                required
+                autoFocus
+                data-testid="signin-2fa-code"
+                className="w-full px-3 py-2 rounded-md text-stone-100 placeholder:text-stone-500 focus:outline-none tracking-[0.3em] font-mono"
+                style={{ background: 'rgba(0,0,0,0.32)', border: '1px solid rgba(255,255,255,0.08)' }}
+                placeholder="123456"
+                autoComplete="one-time-code"
+              />
+              <p className="mt-1 text-[10px] text-stone-500">
+                From your authenticator app, or use a recovery code.
+              </p>
+            </div>
+          )}
+
           {error && (
             <div
               className="text-[11px] px-3 py-2 rounded-md"
@@ -293,13 +328,15 @@ export default function LaunchSignInModal(): JSX.Element | null {
             </button>
             <button
               type="submit"
-              disabled={busy || !email || !password}
+              disabled={busy || !email || !password || (mode === 'login' && twoFactor && !code.trim())}
               className="btn-primary !text-[12px] disabled:opacity-50"
             >
               {busy
                 ? 'Working…'
                 : mode === 'login'
-                  ? 'Log in'
+                  ? twoFactor
+                    ? 'Verify'
+                    : 'Log in'
                   : 'Create account'}
             </button>
           </div>
