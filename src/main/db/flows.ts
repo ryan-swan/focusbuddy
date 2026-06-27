@@ -7,6 +7,11 @@ import { sendChat } from '../ai/anthropic'
 import { advanceSchedule } from '@shared/schedule'
 import * as mailAccount from '../mail/mailAccount'
 import { sendMail } from '../mail/smtp'
+import {
+  setAutomationDispatcher,
+  withAutomationSuppressed,
+  type AutomationEvent
+} from './automationEvents'
 import type {
   FlowDef,
   FlowDraft,
@@ -41,7 +46,7 @@ interface FlowRow {
 function parseTrigger(raw: string): FlowTrigger {
   try {
     const t = JSON.parse(raw)
-    if (t && (t.kind === 'manual' || t.kind === 'schedule')) return t as FlowTrigger
+    if (t && (t.kind === 'manual' || t.kind === 'schedule' || t.kind === 'event')) return t as FlowTrigger
   } catch {
     /* fall through */
   }
@@ -216,9 +221,13 @@ export async function runFlow(id: string): Promise<FlowRunResult> {
   if (!flow) return { ok: false, steps: [{ actionId: '', type: 'ai-step', ok: false, message: 'Flow not found.' }] }
   const ctx = { ai: '' }
   const steps: FlowRunStep[] = []
-  for (const action of flow.actions) {
-    steps.push(await runAction(action, ctx))
-  }
+  // Suppress automation events for the duration so a flow that adds a row or
+  // completes a task does not re-trigger event flows (no cascades or loops).
+  await withAutomationSuppressed(async () => {
+    for (const action of flow.actions) {
+      steps.push(await runAction(action, ctx))
+    }
+  })
   const ok = steps.every((s) => s.ok)
   const now = Date.now()
   const db = getDb()
@@ -249,3 +258,37 @@ export async function runDueFlows(nowMs = Date.now()): Promise<{ ran: number }> 
   }
   return { ran }
 }
+
+// Enabled flows whose event trigger matches this event. A row-added trigger with a
+// tableId only matches that table; without one it matches any table.
+export function flowsForEvent(e: AutomationEvent): FlowDef[] {
+  return listFlows().filter((f) => {
+    if (!f.enabled || f.trigger.kind !== 'event' || f.trigger.event !== e.name) return false
+    if (e.name === 'row-added' && f.trigger.tableId) return f.trigger.tableId === e.tableId
+    return true
+  })
+}
+
+// Run every flow whose event trigger matches. Each run is guarded so one failure
+// does not block the others. runFlow itself suppresses further events, so a
+// reacting flow cannot trigger another round.
+export async function runFlowsForEvent(e: AutomationEvent): Promise<{ ran: number }> {
+  const matches = flowsForEvent(e)
+  let ran = 0
+  for (const f of matches) {
+    try {
+      await runFlow(f.id)
+      ran++
+    } catch {
+      // runFlow records its own per-step failures.
+    }
+  }
+  return { ran }
+}
+
+// Wire the engine to the event bus at module load. nodes/tables emit; we react.
+// runFlowsForEvent is async; we intentionally do not await it from the emitter so
+// the triggering mutation returns immediately.
+setAutomationDispatcher((e) => {
+  void runFlowsForEvent(e)
+})

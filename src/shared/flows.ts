@@ -7,7 +7,20 @@
 
 export type FlowScheduleEvery = 'daily' | 'weekly' | 'monthly'
 
-export type FlowTrigger = { kind: 'manual' } | { kind: 'schedule'; every: FlowScheduleEvery }
+// Event triggers fire a flow when something happens in the workspace, turning
+// PlexiFlow from a macro runner into a real automation platform. tableId scopes a
+// row-added trigger to one table; omitted means any table.
+export type FlowEventName = 'task-completed' | 'row-added'
+
+export type FlowTrigger =
+  | { kind: 'manual' }
+  | { kind: 'schedule'; every: FlowScheduleEvery }
+  | { kind: 'event'; event: FlowEventName; tableId?: string }
+
+export const FLOW_EVENT_LABELS: Record<FlowEventName, string> = {
+  'task-completed': 'When a task is completed',
+  'row-added': 'When a table row is added'
+}
 
 export type FlowAction =
   | { id: string; type: 'create-task'; title: string }

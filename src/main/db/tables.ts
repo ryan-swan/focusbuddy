@@ -1,5 +1,6 @@
 import { randomUUID } from 'crypto'
 import { getDb } from './database'
+import { emitAutomationEvent } from './automationEvents'
 import type {
   FbRow,
   FbRowDraft,
@@ -170,6 +171,8 @@ export function createRow(draft: FbRowDraft): FbRow {
     now
   })
   const row = db.prepare('SELECT * FROM fb_rows WHERE id = ?').get(id) as RowRow
+  // Let PlexiFlow react to a new row (suppressed automatically during flow runs).
+  emitAutomationEvent({ name: 'row-added', tableId: draft.tableId })
   return rowToFbRow(row)
 }
 
