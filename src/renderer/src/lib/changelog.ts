@@ -36,6 +36,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.95',
+    date: '2026-07-05T12:00:00Z',
+    title: 'v2.5.95 — readable at any size, an honest privacy switch, and help where you can find it',
+    tag: 'polish',
+    summary:
+      'Accessibility and trust. You can now set the text size for the whole app, the same way your browser zooms, so the menus, lists and buttons are comfortable to read rather than squinting at tiny grey text. The privacy switch is now honest and real: you can turn off anonymous usage sharing and it genuinely stops, and the sign-in screen now describes plainly what is and is not collected. And there is now a Help and support section in Settings with the guides and pricing, so help is findable instead of hidden.',
+    highlights: [
+      'Text size for the whole app: choose Small through Largest in Settings under Appearance, and every menu, list, label and button scales together, like your browser’s zoom. Your choice is remembered.',
+      'An honest, working privacy switch: turn off "Share anonymous usage data" in Settings and it actually stops. We collect only anonymous, aggregate usage, never the contents of your documents or messages, and no third-party trackers.',
+      'Help where you can find it: a Help and support section in Settings links to the guides and to plans and pricing, with a plain note on what stays on your device and what does not.'
+    ]
+  },
+  {
     version: '2.5.94',
     date: '2026-07-04T12:00:00Z',
     title: 'v2.5.94 — single sign-on, and groundwork for running at scale',
