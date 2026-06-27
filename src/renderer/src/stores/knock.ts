@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { setKnockHandler, sendKnock, type KnockEvent } from '../lib/messagingSocket'
+import { notifyExternal } from '../lib/notify'
 import { useMessagingStore } from './messaging'
 import { useViewStore } from './view'
 import { useCallStore } from './call'
@@ -37,7 +38,14 @@ export const useKnockStore = create<KnockStore>((set, get) => ({
 
   init: () => {
     if (get().ready) return
-    setKnockHandler((e: KnockEvent) => set({ incoming: { from: e.from, note: e.note, at: Date.now() } }))
+    setKnockHandler((e: KnockEvent) => {
+      set({ incoming: { from: e.from, note: e.note, at: Date.now() } })
+      // Alert when the app is in the background; clicking opens the chat.
+      notifyExternal(`${e.from.handle} knocked`, e.note ?? 'wants to reach you', {
+        tag: `knock-${e.from.accountId}`,
+        onClick: () => void get().reply()
+      })
+    })
     set({ ready: true })
   },
 

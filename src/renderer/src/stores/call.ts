@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { sendSocketMessage, setCallSocketHandler, type CallSocketEvent } from '../lib/messagingSocket'
+import { notifyExternal } from '../lib/notify'
 
 // PlexiCam: peer-to-peer live audio/video calls. The signal server only relays
 // the SDP offer/answer and ICE candidates between two accounts in the same
@@ -144,6 +145,12 @@ export const useCallStore = create<CallStore>((set, get) => {
         peer: e.payload.from,
         media: e.payload.media,
         error: null
+      })
+      // Alert even if the app is focused — an incoming call is interruptive by
+      // nature. Clicking just brings the window forward; the overlay handles answer.
+      notifyExternal(`Incoming ${e.payload.media} call`, `${e.payload.from.handle} is calling`, {
+        force: true,
+        tag: `call-${e.payload.callId}`
       })
       return
     }
