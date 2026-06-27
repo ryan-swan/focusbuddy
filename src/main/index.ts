@@ -14,6 +14,8 @@ import { installActivityTracker } from './activityTracker'
 import { registerHaptyxAuthProtocol } from './authProtocol'
 import { installAutoUpdater } from './autoUpdate'
 import { detectOfficeBuild } from './appMode'
+import { runDueFlows } from './db/flows'
+import { runDueReports } from './db/reports'
 
 loadEnv({ path: join(app.getAppPath(), '.env') })
 loadEnv({ path: join(app.getAppPath(), '..', '.env') })
@@ -340,6 +342,17 @@ app.whenReady().then(() => {
   // Auto-updater — polls GitHub Releases on boot + every 4h, broadcasts
   // state via the `update:state` IPC event. No-op in dev builds.
   installAutoUpdater()
+
+  // Automation scheduler — runs due PlexiFlows and scheduled PlexiReports in the
+  // background so a daily digest or a weekly report actually fires whether or not
+  // the user has the Flow/Report view open. Runs shortly after boot and then on a
+  // five-minute tick; each run only executes items whose next-run time has passed.
+  const runDueAutomation = (): void => {
+    void runDueFlows().catch((err) => console.error('[scheduler] flows:', err))
+    void runDueReports().catch((err) => console.error('[scheduler] reports:', err))
+  }
+  setTimeout(runDueAutomation, 20_000)
+  setInterval(runDueAutomation, 5 * 60_000)
 
   // Wire `fb-file://<id>` → file on disk. Uses Electron's modern `protocol.handle`
   // which supports Range requests transparently (critical for streaming
