@@ -33,7 +33,7 @@ import { join } from 'node:path'
 // API). Adding a new secret = adding it here + a row in the API Keys
 // settings panel. Existing envelopes are forward-compatible (missing
 // keys just resolve to null).
-export type SecretName = 'anthropic' | 'openai'
+export type SecretName = 'anthropic' | 'openai' | 'tenor'
 
 // How the app sources AI: 'auto' prefers PlexiDesk credits when the user is
 // signed in and has balance, falling back to their own key; 'credits' forces
@@ -191,5 +191,17 @@ export function resolveOpenAIKey(): string | null {
   const fromStore = getSecret('openai')
   if (fromStore) return fromStore
   const fromEnv = process.env.OPENAI_API_KEY
+  return fromEnv && fromEnv.trim() ? fromEnv.trim() : null
+}
+
+/**
+ * Resolve the Tenor (GIF search) key — same precedence rules. GIF search needs a
+ * key from Google's Tenor API; without one the picker shows an honest empty state
+ * rather than fabricating results.
+ */
+export function resolveTenorKey(): string | null {
+  const fromStore = getSecret('tenor')
+  if (fromStore) return fromStore
+  const fromEnv = process.env.TENOR_API_KEY
   return fromEnv && fromEnv.trim() ? fromEnv.trim() : null
 }

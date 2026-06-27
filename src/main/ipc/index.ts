@@ -18,6 +18,7 @@ import {
   setAiMode,
   type AiMode
 } from '../settingsStore'
+import { searchGifs } from '../gifSearch'
 import { invalidateAnthropicClient } from '../ai/anthropic'
 import { getAiStatus, refreshCredits, startTopUp } from '../ai/creditMode'
 import * as mailAccount from '../mail/mailAccount'
@@ -1938,6 +1939,28 @@ export function registerIpcHandlers(): void {
       return { ok: false, error: (err as Error).message }
     }
   })
+
+  // Tenor (GIF search) key — same encrypted-store pattern.
+  ipcMain.handle('settings:hintTenor', () => hint('tenor'))
+  ipcMain.handle('settings:saveTenorKey', (_e, plaintext: string) => {
+    try {
+      setSecret('tenor', plaintext)
+      return { ok: true, ...hint('tenor') }
+    } catch (err) {
+      return { ok: false, error: (err as Error).message }
+    }
+  })
+  ipcMain.handle('settings:clearTenorKey', () => {
+    try {
+      clearSecret('tenor')
+      return { ok: true }
+    } catch (err) {
+      return { ok: false, error: (err as Error).message }
+    }
+  })
+
+  // GIF search runs in main so the Tenor key never reaches the renderer.
+  ipcMain.handle('gif:search', (_e, query: string) => searchGifs(typeof query === 'string' ? query : ''))
 
   // Validate the stored key by sending a 1-token "ping" prompt. Costs
   // roughly $0.0001 on Haiku — small enough that a "Test" button click is

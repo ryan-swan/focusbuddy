@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import Icon from '../../Icon'
 import { uploadAttachment, type MessageAttachment } from '../../../lib/messagingClient'
 import { EmojiPicker } from './EmojiPicker'
+import { GifPicker } from './GifPicker'
 
 // The message composer: text plus the ways to enrich a message — attach a file or
 // image, record a voice note, insert an emoji. A pending attachment is uploaded
@@ -31,6 +32,7 @@ export function ChatComposer({
   const [error, setError] = useState<string | null>(null)
   const [recording, setRecording] = useState(false)
   const [showEmoji, setShowEmoji] = useState(false)
+  const [showGif, setShowGif] = useState(false)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const recorderRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<Blob[]>([])
@@ -124,6 +126,38 @@ export function ChatComposer({
     setRecording(false)
   }
 
+  // Selecting a GIF: download the chosen gif bytes and upload them as a 'gif'
+  // attachment, so it persists in our blob store and renders through the same
+  // authenticated route as other attachments (no hotlinking).
+  async function pickGif(url: string, description: string): Promise<void> {
+    setShowGif(false)
+    setError(null)
+    setBusy(true)
+    try {
+      const resp = await fetch(url)
+      if (!resp.ok) {
+        setError('Could not fetch that GIF.')
+        return
+      }
+      const buf = await resp.arrayBuffer()
+      const result = await uploadAttachment(token, conversationId, 'gif', buf, {
+        name: `${description || 'gif'}.gif`.slice(0, 80),
+        mime: 'image/gif',
+        ext: '.gif'
+      })
+      if (!result) {
+        setError('Could not attach that GIF.')
+        return
+      }
+      setPending({
+        attachment: { kind: 'gif', id: result.id, name: description || 'GIF', mimeType: 'image/gif', sizeBytes: result.sizeBytes },
+        previewUrl: url
+      })
+    } finally {
+      setBusy(false)
+    }
+  }
+
   function clearPending(): void {
     if (pending?.previewUrl) URL.revokeObjectURL(pending.previewUrl)
     setPending(null)
@@ -213,6 +247,17 @@ export function ChatComposer({
               onClose={() => setShowEmoji(false)}
             />
           )}
+        </div>
+        <div className="relative shrink-0">
+          <button
+            onClick={() => setShowGif((s) => !s)}
+            className="icon-btn"
+            title="GIF"
+            data-testid="composer-gif"
+          >
+            <Icon name="gif_box" size={16} />
+          </button>
+          {showGif && <GifPicker onSelect={(url, desc) => void pickGif(url, desc)} onClose={() => setShowGif(false)} />}
         </div>
         <textarea
           value={draft}

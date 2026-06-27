@@ -1217,7 +1217,26 @@ const api = {
     clearOpenAIKey: (): Promise<{ ok: boolean; error?: string }> =>
       ipcRenderer.invoke('settings:clearOpenAIKey'),
     testOpenAIKey: (): Promise<{ ok: boolean; model?: string; error?: string }> =>
-      ipcRenderer.invoke('settings:testOpenAIKey')
+      ipcRenderer.invoke('settings:testOpenAIKey'),
+    // Tenor key — used by GIF search. Same hint/save/clear surface as the others.
+    hintTenor: (): Promise<{ hasKey: boolean; last4: string | null }> =>
+      ipcRenderer.invoke('settings:hintTenor'),
+    saveTenorKey: (
+      plaintext: string
+    ): Promise<{ ok: boolean; hasKey?: boolean; last4?: string | null; error?: string }> =>
+      ipcRenderer.invoke('settings:saveTenorKey', plaintext),
+    clearTenorKey: (): Promise<{ ok: boolean; error?: string }> =>
+      ipcRenderer.invoke('settings:clearTenorKey')
+  },
+  // GIF search (Tenor) — runs in main so the key stays out of the renderer.
+  gif: {
+    search: (
+      query: string
+    ): Promise<
+      | { ok: true; results: Array<{ id: string; previewUrl: string; url: string; width: number; height: number; description: string }> }
+      | { ok: false; needsKey: true }
+      | { ok: false; error: string }
+    > => ipcRenderer.invoke('gif:search', query)
   },
   // Mail (IMAP) — the user's own mailbox, connected straight from the desktop.
   // The password never crosses this boundary on read; the renderer only ever

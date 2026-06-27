@@ -8,6 +8,7 @@ import { attachmentUrl } from '../../lib/messagingClient'
 import { listOrgs, type OrgMembership } from '../../lib/orgsClient'
 import Icon from '../Icon'
 import { ChatComposer } from './chat/ChatComposer'
+import { useViewStore } from '../../stores/view'
 
 const QUICK_EMOJIS = ['👍', '❤️', '😂', '🎉', '✅', '👀']
 
@@ -209,6 +210,7 @@ export default function MessagesView(): JSX.Element {
   const openThread = useMessagingStore((s) => s.openThread)
   const activeThreadId = useMessagingStore((s) => s.activeThreadId)
   const startCall = useCallStore((s) => s.startCall)
+  const goMeetings = useViewStore((s) => s.goMeetings)
   const open = useMessagingStore((s) => s.openConversation)
   const send = useMessagingStore((s) => s.send)
   const startDm = useMessagingStore((s) => s.startDm)
@@ -409,17 +411,27 @@ export default function MessagesView(): JSX.Element {
                 <Icon name={activeConv?.kind === 'space' ? 'folder_shared' : 'person'} size={14} className="text-accent shrink-0" />
                 <span className="truncate">{activeConv?.title ?? 'Conversation'}</span>
               </h2>
-              {callTarget && (
+              <div className="flex items-center gap-1.5 shrink-0">
+                {callTarget && (
+                  <button
+                    onClick={() => void startCall(callTarget, 'video')}
+                    aria-label={`Call ${callTarget.handle}`}
+                    title="Start a video call"
+                    data-testid="messages-call"
+                    className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border border-[var(--edge-soft)] text-[12.5px] text-[var(--ink-90)] hover:bg-[var(--surface-sunken)]"
+                  >
+                    <Icon name="videocam" size={15} /> Call
+                  </button>
+                )}
                 <button
-                  onClick={() => void startCall(callTarget, 'video')}
-                  aria-label={`Call ${callTarget.handle}`}
-                  title="Start a video call"
-                  data-testid="messages-call"
-                  className="shrink-0 inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border border-[var(--edge-soft)] text-[12.5px] text-[var(--ink-90)] hover:bg-[var(--surface-sunken)]"
+                  onClick={() => goMeetings()}
+                  title="Start a meeting in PlexiMeet"
+                  data-testid="messages-meet"
+                  className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border border-[var(--edge-soft)] text-[12.5px] text-[var(--ink-90)] hover:bg-[var(--surface-sunken)]"
                 >
-                  <Icon name="videocam" size={15} /> Call
+                  <Icon name="groups" size={15} /> Meet
                 </button>
-              )}
+              </div>
             </div>
             <div ref={threadRef} className="flex-1 overflow-auto px-4 py-3 space-y-2">
               {messages.map((m) => (
