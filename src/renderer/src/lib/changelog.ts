@@ -36,6 +36,20 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.91',
+    date: '2026-06-30T12:00:00Z',
+    title: 'v2.5.91 — a richer chat: attachments, voice notes, emoji, GIFs, edits, and pin-to-desk',
+    tag: 'feature',
+    summary:
+      'PlexiChat grows up. You can now attach a file or image to a message, record and send a voice note, drop in an emoji from a built-in picker, and search for a GIF. Sent the wrong thing or made a typo? Edit or delete your own messages, with edits and deletions showing up live for everyone. Start a meeting straight from a conversation with the new Meet button, and pin a conversation to your desk as a live widget so an important thread sits right next to your work. Attachments are private to the conversation they are shared in.',
+    highlights: [
+      'Attachments, voice notes, emoji and GIFs: attach a file or image, record a voice note, add an emoji, or search a GIF, all from the message composer. Images and GIFs show inline, files as a download chip, voice notes as a player. Attachments are scoped to their conversation so only its members can open them.',
+      'Edit and delete your messages: fix a typo or remove a message you sent. Edited messages show an "edited" marker and deletions leave a quiet "message was deleted" placeholder, both updating live for everyone in the conversation.',
+      'Meet and pin from a conversation: the Meet button opens PlexiMeet in one click, and the pin button drops the conversation onto your current desk as a live widget that shows the latest messages with a one-click Open.',
+      'GIF search uses Google Tenor and needs a free API key, added in Settings under API keys. Without a key the GIF picker says so plainly rather than showing anything fake.'
+    ]
+  },
+  {
     version: '2.5.90',
     date: '2026-06-29T12:00:00Z',
     title: 'v2.5.90 — two-factor sign-in, desktop alerts, an assistant that acts, and real automation',
