@@ -21,6 +21,8 @@ import {
   setMemberProfile,
   uploadMemberPhoto,
   absolutePhotoUrl,
+  listAudit,
+  type AuditEvent,
   type OrgMembership,
   type OrgDetail,
   type OrgRole,
@@ -60,6 +62,7 @@ export default function OrgAdminView(): JSX.Element {
   const [profiles, setProfiles] = useState<Record<string, MemberProfile>>({})
   const [openProfile, setOpenProfile] = useState<string | null>(null)
   const [newOffice, setNewOffice] = useState('')
+  const [audit, setAudit] = useState<AuditEvent[]>([])
 
   const refreshOrgs = useCallback(async () => {
     if (!token) return
@@ -84,6 +87,7 @@ export default function OrgAdminView(): JSX.Element {
     }
     setOffices(await listOffices(token, selId))
     setHoursState(await getOrgHours(token, selId))
+    setAudit(await listAudit(token, selId)) // server returns [] for non-admins
     setProfiles({})
     setOpenProfile(null)
   }, [token, selId])
@@ -436,9 +440,70 @@ export default function OrgAdminView(): JSX.Element {
             )}
           </div>
         )}
+
+        {detail && canAdmin && (
+          <div className={`${PLEXI_CARD} mt-4 p-4`} data-testid="org-audit">
+            <div className="flex items-center gap-2 mb-3">
+              <Icon name="history" size={16} className="text-accent" />
+              <h2 className="text-[14px] font-semibold">Audit log</h2>
+              <span className="text-[11px] text-stone-400">membership, role, and sign-in activity</span>
+            </div>
+            {audit.length === 0 ? (
+              <p className="text-[12px] text-stone-500 dark:text-stone-400">No activity recorded yet.</p>
+            ) : (
+              <div className="space-y-1 max-h-[360px] overflow-auto">
+                {audit.map((e) => {
+                  const who = detail.members.find((m) => m.accountId === e.actorAccountId)?.handle ?? e.actorAccountId.slice(0, 8)
+                  return (
+                    <div
+                      key={e.id}
+                      className="flex items-center gap-2 text-[12px] py-1 border-b border-stone-100 dark:border-stone-800 last:border-0"
+                    >
+                      <span className="text-stone-400 dark:text-stone-500 fb-tabular shrink-0 w-[130px]">
+                        {new Date(e.createdAt).toLocaleString(undefined, {
+                          month: 'short',
+                          day: 'numeric',
+                          hour: 'numeric',
+                          minute: '2-digit'
+                        })}
+                      </span>
+                      <span className="font-medium text-stone-700 dark:text-stone-200 shrink-0">{who}</span>
+                      <span className="text-stone-500 dark:text-stone-400">{humanizeAudit(e.action)}</span>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   )
+}
+
+// Turn an audit action code into a readable phrase for the log.
+function humanizeAudit(action: string): string {
+  const map: Record<string, string> = {
+    'auth.login': 'signed in',
+    'auth.logout': 'signed out',
+    'auth.password_reset': 'reset their password',
+    'auth.2fa_enabled': 'turned on two-factor',
+    'auth.2fa_disabled': 'turned off two-factor',
+    'org.created': 'created the organization',
+    'org.deleted': 'deleted the organization',
+    'member.added': 'added a member',
+    'member.invited': 'invited a member',
+    'member.removed': 'removed a member',
+    'member.left': 'left the organization',
+    'member.role_changed': 'changed a member role',
+    'member.profile_updated': 'updated a member profile',
+    'member.photo_updated': 'updated a member photo',
+    'member.relationship_added': 'added a reporting line',
+    'office.created': 'added an office',
+    'office.deleted': 'removed an office',
+    'livedoc.shared_with_org': 'shared a folder with the org'
+  }
+  return map[action] ?? action
 }
 
 /* ---------------- per-member profile editor ---------------- */

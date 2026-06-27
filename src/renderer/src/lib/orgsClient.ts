@@ -70,6 +70,22 @@ export async function listOrgs(token: string): Promise<OrgMembership[]> {
   const { json } = await call<{ ok: boolean; orgs?: OrgMembership[] }>('GET', '/orgs', token)
   return json?.orgs ?? []
 }
+
+export interface AuditEvent {
+  id: string
+  orgId: string | null
+  actorAccountId: string
+  action: string
+  targetType: string | null
+  targetId: string | null
+  detail: string | null
+  createdAt: number
+}
+
+export async function listAudit(token: string, id: string): Promise<AuditEvent[]> {
+  const { json } = await call<{ ok: boolean; events?: AuditEvent[] }>('GET', `/orgs/${id}/audit`, token)
+  return json?.ok ? json.events ?? [] : []
+}
 export async function getOrg(token: string, id: string): Promise<OrgDetail | null> {
   const { json } = await call<{ ok: boolean } & OrgDetail>('GET', `/orgs/${id}`, token)
   return json?.ok ? { org: json.org, role: json.role, members: json.members, invites: json.invites } : null
