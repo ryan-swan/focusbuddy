@@ -36,6 +36,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.94',
+    date: '2026-07-04T12:00:00Z',
+    title: 'v2.5.94 — single sign-on, and groundwork for running at scale',
+    tag: 'feature',
+    summary:
+      'Enterprise sign-on and the plumbing to grow. Organizations can now connect single sign-on through WorkOS: an admin sets their connection and email domain in the admin console, and their team signs in with the company identity provider straight from the sign-in screen. Until a workspace turns it on, the option simply says it is not enabled rather than getting in the way. Under the hood this release also lays the groundwork for running the service across multiple servers, so presence and real-time messaging stay correct as the user base grows; that is invisible today and switches on when the backing services are provisioned.',
+    highlights: [
+      'Sign in with SSO: from the sign-in screen, enter your work email and authenticate with your company identity provider (via WorkOS). New people are placed into the right organization automatically.',
+      'SSO admin setup: organization owners and admins configure their WorkOS connection and email domain in the admin console, with a clear status showing whether SSO is active.',
+      'Scale groundwork: the real-time layer (presence and message delivery) can now run across multiple server instances. This is invisible in normal use and activates when the backing infrastructure is in place.'
+    ]
+  },
+  {
     version: '2.5.93',
     date: '2026-07-03T12:00:00Z',
     title: 'v2.5.93 — your spreadsheets, slides and documents survive the trip to Office',
