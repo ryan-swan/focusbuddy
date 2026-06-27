@@ -8,7 +8,7 @@ import { useWidgetStore } from '../stores/widgets'
 import { useActionHistory } from '../stores/actionHistory'
 import { chimeIn } from '../lib/audioBeep'
 import CanvasContextMenu, { type CtxMenuItem } from './CanvasContextMenu'
-import { useModelMode, AUTO_ROUTING_DISPLAY } from '../lib/modelPrefs'
+import { useModelMode } from '../lib/modelPrefs'
 import { useBodyDouble } from '../lib/bodyDouble'
 import { applyProposal, describeProposal } from '../lib/actionExecutor'
 import Icon from './Icon'
@@ -169,16 +169,16 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
             <span className="truncate">
               {activeTask ? activeTask.title : 'no task selected'}
             </span>
-            <span
-              className="font-mono text-[9px] px-1 py-0.5 rounded bg-stone-200 dark:bg-stone-700 text-stone-600 dark:text-stone-300 shrink-0"
-              title={
-                modelMode === 'auto'
-                  ? `Auto — chat uses ${AUTO_ROUTING_DISPLAY.chat.model}, trail summaries use ${AUTO_ROUTING_DISPLAY.trail_summary.model}. Change in Settings.`
-                  : `Locked to ${modelMode}. Change in Settings.`
-              }
-            >
-              {modelMode === 'auto' ? 'auto' : modelMode}
-            </span>
+            {/* Only surface the model when it is locked to something specific; in
+                the default auto mode the chip is just noise in a narrow header. */}
+            {modelMode !== 'auto' && (
+              <span
+                className="font-mono text-[9px] px-1 py-0.5 rounded bg-stone-200 dark:bg-stone-700 text-stone-600 dark:text-stone-300 shrink-0"
+                title={`Locked to ${modelMode}. Change in Settings.`}
+              >
+                {modelMode}
+              </span>
+            )}
           </p>
         </div>
         <div className="flex items-center gap-1">
