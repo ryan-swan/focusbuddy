@@ -36,6 +36,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.92',
+    date: '2026-07-02T12:00:00Z',
+    title: 'v2.5.92 — your workspace follows you, an audit log you can read, and flows that talk to the world',
+    tag: 'feature',
+    summary:
+      'Three foundations for working across devices and with other tools. Your own tasks and canvas widgets now sync across the devices you sign in on, so a second machine no longer starts empty. Organization admins get a readable audit log, including who signed in and who changed roles, the record an auditor asks for. And PlexiFlow can now reach outside Plexi: a flow can call any webhook or API, and an incoming webhook can trigger a flow, so a completed task can post to Slack and an outside event can start an automation.',
+    highlights: [
+      'Multi-device sync: the tasks and canvas widgets in your personal workspace now follow you across the devices you sign in on, syncing in the background. Changes merge with last-write-wins and deletes propagate, so your second machine stays in step instead of starting blank.',
+      'A readable audit log: the organization admin console now shows the audit trail, membership and role changes plus sign-in, sign-out, password-reset and two-factor activity, each as a clear "when, who, what" line for admins.',
+      'Flows that talk to the world: a new "call a webhook / API" step lets a flow POST to Slack, Stripe, or any service (with headers and a JSON body), and a new webhook trigger runs a flow when its URL is called. A failed call shows the real HTTP status rather than a fake success.'
+    ]
+  },
+  {
     version: '2.5.91',
     date: '2026-06-30T12:00:00Z',
     title: 'v2.5.91 — a richer chat: attachments, voice notes, emoji, GIFs, edits, and pin-to-desk',
