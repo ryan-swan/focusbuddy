@@ -9,6 +9,7 @@ import { basename } from 'path'
 import { readFile, writeFile } from 'fs/promises'
 import * as XLSX from 'xlsx'
 import type { SheetBodyV2, SheetTab, SheetNumberFormat } from '@shared/types'
+import { mapNumFmt, toExcelNumFmt } from '@shared/sheetNumFmt'
 
 export interface SheetImportResult {
   ok: boolean
@@ -32,21 +33,6 @@ function tabId(): string {
   return `imp-${seq}`
 }
 
-// Map a SheetJS number-format code (cell.z) to our format model, best-effort.
-function mapNumFmt(z: string | undefined): SheetNumberFormat | undefined {
-  if (!z || z === 'General') return undefined
-  const lc = z.toLowerCase()
-  if (lc.includes('%')) return { kind: 'percent', decimals: (z.split('.')[1]?.length ?? 0) }
-  if (lc.includes('$') || lc.includes('"$"') || lc.includes('usd')) {
-    return { kind: 'currency', decimals: z.includes('.') ? z.split('.')[1].replace(/[^0]/g, '').length : 2, symbol: '$' }
-  }
-  if (/[ymd]/.test(lc) && !lc.includes('e')) return { kind: 'date', pattern: 'YYYY-MM-DD' }
-  if (lc.includes('#,##0') || lc.includes('0.0')) {
-    const decimals = z.includes('.') ? z.split('.')[1].replace(/[^0]/g, '').length : 0
-    return { kind: 'number', decimals, thousands: z.includes(',') }
-  }
-  return undefined
-}
 
 function worksheetToTab(ws: XLSX.WorkSheet, name: string): SheetTab {
   const ref = ws['!ref']
@@ -123,6 +109,27 @@ function tabToWorksheet(tab: SheetTab): XLSX.WorkSheet {
         ws[addr] = { t: 'n', f: raw.slice(1) } as XLSX.CellObject
       }
     }
+  }
+  // Carry per-cell number formats so currency/percent/date render in Excel rather
+  // than as bare numbers. (Fonts/fills/colours need a styled writer — exceljs — and
+  // are a separate fidelity pass; this keeps numeric meaning intact today.)
+  if (tab.formats) {
+    for (const [key, fmt] of Object.entries(tab.formats)) {
+      const z = toExcelNumFmt(fmt.numFmt)
+      if (!z) continue
+      const [r, c] = key.split(',').map(Number)
+      const addr = XLSX.utils.encode_cell({ r, c })
+      const existing = ws[addr] as XLSX.CellObject | undefined
+      if (existing) existing.z = z
+    }
+  }
+  // Column widths (px → approximate Excel character width).
+  if (tab.colWidths && Object.keys(tab.colWidths).length > 0) {
+    const maxCol = Math.max(...tab.rows.map((r) => r.length), 1)
+    ws['!cols'] = Array.from({ length: maxCol }, (_, c) => {
+      const px = tab.colWidths?.[c]
+      return px ? { wch: Math.max(2, Math.round(px / 7)) } : {}
+    })
   }
   return ws
 }
