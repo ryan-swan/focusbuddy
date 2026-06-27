@@ -22,7 +22,11 @@ import {
   uploadMemberPhoto,
   absolutePhotoUrl,
   listAudit,
+  getSso,
+  setSso as setSsoConfig,
+  clearSso,
   type AuditEvent,
+  type OrgSsoConfig,
   type OrgMembership,
   type OrgDetail,
   type OrgRole,
@@ -63,6 +67,9 @@ export default function OrgAdminView(): JSX.Element {
   const [openProfile, setOpenProfile] = useState<string | null>(null)
   const [newOffice, setNewOffice] = useState('')
   const [audit, setAudit] = useState<AuditEvent[]>([])
+  const [sso, setSsoState] = useState<{ configured: boolean; config: OrgSsoConfig | null }>({ configured: false, config: null })
+  const [ssoConn, setSsoConn] = useState('')
+  const [ssoDomain, setSsoDomain] = useState('')
 
   const refreshOrgs = useCallback(async () => {
     if (!token) return
@@ -88,6 +95,10 @@ export default function OrgAdminView(): JSX.Element {
     setOffices(await listOffices(token, selId))
     setHoursState(await getOrgHours(token, selId))
     setAudit(await listAudit(token, selId)) // server returns [] for non-admins
+    const s = await getSso(token, selId)
+    setSsoState(s)
+    setSsoConn(s.config?.connectionId ?? '')
+    setSsoDomain(s.config?.domain ?? '')
     setProfiles({})
     setOpenProfile(null)
   }, [token, selId])
@@ -472,6 +483,72 @@ export default function OrgAdminView(): JSX.Element {
                     </div>
                   )
                 })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {detail && canAdmin && (
+          <div className={`${PLEXI_CARD} mt-4 p-4`} data-testid="org-sso">
+            <div className="flex items-center gap-2 mb-3">
+              <Icon name="vpn_key" size={16} className="text-accent" />
+              <h2 className="text-[14px] font-semibold">Single sign-on (SSO)</h2>
+              <span className="text-[11px] text-stone-400">WorkOS, sign in with your identity provider</span>
+            </div>
+            {!sso.configured ? (
+              <p className="text-[12px] text-stone-500 dark:text-stone-400 leading-relaxed">
+                SSO is not enabled on this server yet. Once WorkOS is configured server-side, set your connection here
+                and your team can sign in with your identity provider.
+              </p>
+            ) : (
+              <div className="space-y-2">
+                <p className="text-[11px] text-stone-500 dark:text-stone-400 leading-relaxed">
+                  Paste your WorkOS connection id and the email domain your team signs in with. People with that domain
+                  can then use Sign in with SSO.
+                </p>
+                <input
+                  value={ssoConn}
+                  onChange={(e) => setSsoConn(e.target.value)}
+                  placeholder="WorkOS connection id (conn_…)"
+                  data-testid="org-sso-conn"
+                  className="w-full bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded px-2 py-1 text-[12px] focus:outline-none focus:border-accent"
+                />
+                <input
+                  value={ssoDomain}
+                  onChange={(e) => setSsoDomain(e.target.value)}
+                  placeholder="Email domain (acme.com)"
+                  data-testid="org-sso-domain"
+                  className="w-full bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded px-2 py-1 text-[12px] focus:outline-none focus:border-accent"
+                />
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={async () => {
+                      if (!token || !selId) return
+                      const r = await setSsoConfig(token, selId, ssoConn.trim(), ssoDomain.trim())
+                      setMsg(r.ok ? 'SSO connection saved.' : r.error ?? 'Could not save SSO.')
+                      if (r.ok) await refreshAux()
+                    }}
+                    disabled={!ssoConn.trim() || !ssoDomain.trim()}
+                    className="btn-primary text-[12px] px-2.5 py-1 disabled:opacity-50"
+                    data-testid="org-sso-save"
+                  >
+                    Save SSO
+                  </button>
+                  {sso.config && (
+                    <button
+                      onClick={async () => {
+                        if (!token || !selId) return
+                        await clearSso(token, selId)
+                        setMsg('SSO connection removed.')
+                        await refreshAux()
+                      }}
+                      className="text-[12px] px-2.5 py-1 rounded text-rose-500 hover:bg-rose-500/10"
+                    >
+                      Remove
+                    </button>
+                  )}
+                  {sso.config && <span className="text-[11px] text-emerald-600 dark:text-emerald-400">Active for {sso.config.domain}</span>}
+                </div>
               </div>
             )}
           </div>

@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { useAccountStore } from '../stores/account'
 import { useSignInPrompt } from '../stores/signInPrompt'
 import { useOnboarding } from '../stores/onboarding'
+import { signalConfig } from '../lib/signalConfig'
 import Icon from './Icon'
 
 // LaunchSignInModal — appears on app boot when the user isn't signed in
@@ -315,6 +316,25 @@ export default function LaunchSignInModal(): JSX.Element | null {
             >
               {error}
             </div>
+          )}
+
+          {mode === 'login' && (
+            <button
+              type="button"
+              onClick={() => {
+                const domain = email.split('@')[1]?.trim().toLowerCase()
+                if (!domain) {
+                  setError('Enter your work email first, then use Sign in with SSO.')
+                  return
+                }
+                const url = `${signalConfig.httpUrl.replace(/\/+$/, '')}/auth/sso/start?domain=${encodeURIComponent(domain)}`
+                void window.api.files.openExternal(url)
+              }}
+              data-testid="signin-sso"
+              className="w-full text-[12px] text-accent hover:underline py-1"
+            >
+              Sign in with SSO
+            </button>
           )}
 
           <div className="pt-1 flex items-center justify-between gap-2">
