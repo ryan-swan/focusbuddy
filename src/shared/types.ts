@@ -19,6 +19,9 @@ export type WidgetKind =
   | 'gsheet'
   | 'gslide'
   | 'email'
+  // A pinned PlexiChat conversation: stores { conversationId, channelName } in
+  // content, renders a compact live view of the thread with an Open button.
+  | 'chat-thread'
   | 'calculator'
   | 'color'
   | 'image'
