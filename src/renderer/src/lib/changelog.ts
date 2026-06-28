@@ -36,6 +36,18 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.99',
+    date: '2026-07-15T12:00:00Z',
+    title: 'v2.5.99 — modules open to your work, and delete you can take back',
+    tag: 'polish',
+    summary:
+      'Two fixes that take friction out of everyday use. Reports, Flows, Forms and Build now open straight to the thing you were last working on instead of an empty landing screen, so you are in your work in one move; the module overview is still one click away whenever you want it. And deleting a task in Projects now shows a clear "Undo" you can click to bring it straight back, the same safety net the sidebar already gives, so a delete is never a worry.',
+    highlights: [
+      'Modules open on your latest item, not an empty screen. Reports, Flows, Forms and Build land you in real work, with an Overview button to see the module dashboard when you want it.',
+      'Visible undo when you delete a task in Projects: a clear "Undo" appears so a delete is always reversible, not a hidden keyboard trick.'
+    ]
+  },
+  {
     version: '2.5.98',
     date: '2026-07-14T12:00:00Z',
     title: 'v2.5.98 — every meeting ends with a summary and the things to make next',
