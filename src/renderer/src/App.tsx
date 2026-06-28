@@ -19,8 +19,10 @@ import TeamPresenceButton from './components/TeamPresenceButton'
 import Footer from './components/Footer'
 import FocusSessionOverlay from './components/FocusSessionOverlay'
 import CallOverlay from './components/CallOverlay'
+import MeetingOverlay from './components/MeetingOverlay'
 import KnockOverlay from './components/KnockOverlay'
 import { useCallStore } from './stores/call'
+import { useMeetingRoomStore } from './stores/meetingRoom'
 import { useKnockStore } from './stores/knock'
 import BringMeBack from './components/BringMeBack'
 import HyperfocusGuardian from './components/HyperfocusGuardian'
@@ -138,6 +140,7 @@ export default function App(): JSX.Element {
   // the same socket.
   useEffect(() => {
     useCallStore.getState().init()
+    useMeetingRoomStore.getState().init()
     useKnockStore.getState().init()
   }, [])
   useEffect(() => {
@@ -522,6 +525,7 @@ export default function App(): JSX.Element {
 
       <FocusSessionOverlay />
       <CallOverlay />
+      <MeetingOverlay />
       <KnockOverlay />
       <BringMeBack />
       <HyperfocusGuardian />

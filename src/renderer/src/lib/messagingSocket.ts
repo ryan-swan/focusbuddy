@@ -55,12 +55,27 @@ export type CallSocketEvent =
   | { type: 'callDeclined'; payload: { callId: string; from: string } }
   | { type: 'callEnded'; payload: { callId: string; from: string } }
 
+// PlexiMeet multi-party room signaling → the meeting store. A mesh of peer
+// connections; the server only relays roster + SDP/ICE, never the media.
+export type MeetingSocketEvent =
+  | { type: 'meetingRoster'; payload: { roomId: string; peers: Array<{ accountId: string; handle: string }> } }
+  | { type: 'meetingPeerJoined'; payload: { roomId: string; peer: { accountId: string; handle: string } } }
+  | { type: 'meetingPeerLeft'; payload: { roomId: string; accountId: string } }
+  | { type: 'meetingSignal'; payload: { roomId: string; from: string; data: string } }
+  | { type: 'meetingInvited'; payload: { roomId: string; from: { accountId: string; handle: string }; title: string | null } }
+
 let currentToken: string | null = null
 let onMessageCb: ((m: IncomingMessage) => void) | null = null
 let onDocEventCb: ((e: DocSocketEvent) => void) | null = null
 let onYjsEventCb: ((e: YjsSocketEvent) => void) | null = null
 let onPresenceCb: ((e: PresenceSocketEvent) => void) | null = null
 let onCallCb: ((e: CallSocketEvent) => void) | null = null
+let onMeetingCb: ((e: MeetingSocketEvent) => void) | null = null
+
+/** Register a handler for PlexiMeet room socket events. */
+export function setMeetingSocketHandler(cb: ((e: MeetingSocketEvent) => void) | null): void {
+  onMeetingCb = cb
+}
 
 // A live emoji-reaction change on a message in some conversation.
 export type ReactionEvent = { conversationId: string; messageId: string; emoji: string; accountId: string; added: boolean }
@@ -267,6 +282,15 @@ function open(): void {
     ) {
       // PlexiCam live-call signaling → the call store.
       onCallCb?.({ type: msg.type, payload: msg.payload } as CallSocketEvent)
+    } else if (
+      msg.type === 'meetingRoster' ||
+      msg.type === 'meetingPeerJoined' ||
+      msg.type === 'meetingPeerLeft' ||
+      msg.type === 'meetingSignal' ||
+      msg.type === 'meetingInvited'
+    ) {
+      // PlexiMeet multi-party room signaling → the meeting store.
+      onMeetingCb?.({ type: msg.type, payload: msg.payload } as MeetingSocketEvent)
     } else if (msg.type === 'authenticated') {
       // Socket is live again (initial connect or after a reconnect) — let the
       // Yjs provider re-join its room and presence re-announce itself.
