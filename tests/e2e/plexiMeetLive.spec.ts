@@ -2,7 +2,7 @@
 //
 // Exercises: start-live button, message picker honest-empty state,
 // start-meeting error path (no getUserMedia in headless), MeetingOverlay
-// presence and controls when status transitions, module-home create label,
+// presence and controls when status transitions, module-dashboard create label,
 // and existing record/list regressions.
 //
 // What is NOT verified here (requires two live peers with real media):
@@ -134,21 +134,21 @@ test('3 — meet-start-live does not crash app; getUserMedia denial shows honest
   }
 })
 
-// ── Check 4: ModuleHome renders when no meeting selected; create label correct ─
+// ── Check 4: ModuleDashboard renders when no meeting selected; create label correct ─
 
-test('4 — module-home-meet renders; "Start a meeting" is the create-action label', async () => {
+test('4 — module-dashboard-meet renders; "Start a meeting" is the create-action label', async () => {
   launched = await launchApp()
   const { window } = launched
   await waitForReady(window)
   await openMeet(window)
 
-  // No meeting selected → ModuleHome is rendered.
-  const home = window.locator('[data-testid="module-home-meet"]')
+  // No meeting selected → ModuleDashboard is rendered.
+  const home = window.locator('[data-testid="module-dashboard-meet"]')
   await expect(home).toBeVisible({ timeout: 5_000 })
 
-  // The create button inside ModuleHome is data-testid="module-home-create-meet"
-  // (ModuleHome stamps this from moduleKey). Verify it says "Start a meeting".
-  const createBtn = home.locator('[data-testid="module-home-create-meet"]')
+  // The create button inside ModuleDashboard (empty recent-items state) is
+  // data-testid="module-dashboard-create-meet". Verify it says "Start a meeting".
+  const createBtn = home.locator('[data-testid="module-dashboard-create-meet"]')
   await expect(createBtn).toBeVisible()
   await expect(createBtn).toContainText('Start a meeting')
 })

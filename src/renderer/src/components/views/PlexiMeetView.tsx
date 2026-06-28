@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Icon from '../Icon'
-import ModuleHome from '../ModuleHome'
+import ModuleDashboard from '../ModuleDashboard'
+import { bucketByWeek, periodDelta } from '../../lib/dashboardMetrics'
 import { useMeetingsStore } from '../../stores/meetings'
 import { useMeetingRoomStore } from '../../stores/meetingRoom'
 import { usePresenceStore } from '../../stores/presence'
@@ -55,6 +56,7 @@ export default function PlexiMeetView(): JSX.Element {
   }, [meetings, query])
 
   const selected = meetings.find((m) => m.id === selectedId) ?? null
+  const now = Date.now()
 
   async function startRecording(): Promise<void> {
     setError(null)
@@ -398,35 +400,64 @@ export default function PlexiMeetView(): JSX.Element {
             }}
           />
         ) : (
-          <ModuleHome
+          <ModuleDashboard
             moduleKey="meet"
             title="Meetings"
             subtitle="Record a meeting and it becomes a summary, a transcript and real action items"
             icon="groups"
             accentClass="text-rose-500"
             stats={[
-              { label: 'Meetings', value: meetings.length, icon: 'groups' },
-              { label: 'Action items', value: meetings.reduce((n, m) => n + m.actionItems.length, 0), icon: 'task_alt' },
-              { label: 'Transcribed', value: meetings.filter((m) => m.transcript.trim().length > 0).length, icon: 'description' }
+              {
+                icon: 'groups',
+                label: 'Meetings',
+                value: meetings.length,
+                tone: 'rose',
+                delta: periodDelta(meetings.map((m) => m.createdAt), 7 * 86400000, now),
+                sparkline: bucketByWeek(meetings.map((m) => m.createdAt), 8, now)
+              },
+              { icon: 'task_alt', label: 'Action items', value: meetings.reduce((n, m) => n + m.actionItems.length, 0), tone: 'accent' },
+              {
+                icon: 'schedule',
+                label: 'Avg length',
+                value: (() => {
+                  const d = meetings.map((m) => m.durationSec).filter((s): s is number => typeof s === 'number')
+                  return d.length ? `${Math.round(d.reduce((a, c) => a + c, 0) / d.length / 60)}m` : '—'
+                })(),
+                tone: 'sky'
+              },
+              { icon: 'description', label: 'Transcribed', value: meetings.filter((m) => m.transcript.trim().length > 0).length, tone: 'violet' }
             ]}
-            items={meetings.map((m) => ({
-              id: m.id,
-              title: m.title,
-              subtitle: m.summary ? m.summary.slice(0, 90) : m.actionItems.length ? `${m.actionItems.length} action item(s)` : 'No summary yet',
-              meta: fmtDate(m.createdAt),
-              status: m.actionItems.length ? { tone: 'accent' as const, label: `${m.actionItems.length} actions` } : undefined,
-              onOpen: () => setSelectedId(m.id)
-            }))}
-            recentLabel="Recent meetings"
-            onCreate={startLive}
-            createLabel="Start a meeting"
-            emptyHint="Start a live meeting and invite your teammates, or record notes and a message to send. Action items become real tasks."
-            tips={[
-              { icon: 'video_call', text: 'Start a live meeting and invite teammates who are online, like a quick Meet or Zoom call.' },
-              { icon: 'voicemail', text: 'Someone away? Record a short message and send it to them instead.' },
-              { icon: 'mic', text: 'Record notes and they are transcribed and summarised, with a key set; surfaced plainly when one is missing.' },
-              { icon: 'task_alt', text: 'Action items become real tasks beside the rest of your work.' }
-            ]}
+            timeline={{
+              title: 'Meetings over time',
+              points: bucketByWeek(meetings.map((m) => m.createdAt), 8, now),
+              bucketLabel: 'last 8 weeks',
+              unit: 'meetings',
+              tone: 'rose',
+              emptyHint: 'Hold your first meeting to see your cadence here.'
+            }}
+            breakdown={{
+              title: 'Capture',
+              icon: 'donut_small',
+              items: [
+                { label: 'Transcribed', value: meetings.filter((m) => m.transcript.trim().length > 0).length, tone: 'violet' as const },
+                { label: 'Notes only', value: meetings.filter((m) => m.transcript.trim().length === 0).length, tone: 'stone' as const }
+              ].filter((i) => i.value > 0),
+              emptyHint: 'No meetings yet.'
+            }}
+            recentItems={{
+              label: 'Recent meetings',
+              items: meetings.slice(0, 6).map((m) => ({
+                id: m.id,
+                title: m.title,
+                subtitle: m.summary ? m.summary.slice(0, 90) : m.actionItems.length ? `${m.actionItems.length} action item(s)` : 'No summary yet',
+                meta: fmtDate(m.createdAt),
+                status: m.actionItems.length ? { tone: 'accent' as const, label: `${m.actionItems.length} actions` } : undefined,
+                onOpen: () => setSelectedId(m.id)
+              })),
+              onCreate: startLive,
+              createLabel: 'Start a meeting',
+              emptyHint: 'Start a live meeting and invite your teammates, or record notes and a message to send. Action items become real tasks.'
+            }}
           />
         )}
       </div>

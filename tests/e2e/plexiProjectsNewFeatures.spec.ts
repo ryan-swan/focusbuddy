@@ -13,10 +13,10 @@ import { launchApp, waitForReady } from './_helpers'
 //   • gantt-bar-<id> elements are draggable (pointer-down + move + up commits
 //     a new planStart); a no-drag click still opens the editor
 //
-// FEATURE 2 — ModuleHome dashboards replace blank panels
-//   • PlexiFlow, PlexiForms, PlexiBuild, PlexiMeet show module-home-<key>
+// FEATURE 2 — ModuleDashboard dashboards replace blank panels
+//   • PlexiFlow, PlexiForms, PlexiBuild, PlexiMeet show module-dashboard-<key>
 //     when nothing is selected
-//   • Each module-home has a create button and a Customize button
+//   • Each module-dashboard has a create button and a Customize button
 //   • Customize button opens a popover with section checkboxes
 //   • Create button creates an item (smoke test via IPC verification)
 //   • No crash occurs
@@ -389,7 +389,7 @@ test('F1-7. task-delete removes the task from the Gantt', async () => {
 // FEATURE 2 — ModuleHome dashboards
 // ─────────────────────────────────────────────────────────────────────────────
 
-test('F2-1. PlexiFlow: module-home-flows renders with create + customize buttons', async () => {
+test('F2-1. PlexiFlow: module-dashboard-flows renders with create + customize buttons', async () => {
   const { window, dispose } = await launchApp()
   try {
     await waitForReady(window)
@@ -397,44 +397,39 @@ test('F2-1. PlexiFlow: module-home-flows renders with create + customize buttons
     await window.getByRole('button', { name: 'PlexiFlow' }).first().click()
     await expect(window.locator('[data-testid="plexiflow-view"]')).toBeVisible({ timeout: 8_000 })
 
-    // Nothing selected → ModuleHome renders in the right panel
-    await expect(window.locator('[data-testid="module-home-flows"]')).toBeVisible({ timeout: 5_000 })
-    await expect(window.locator('[data-testid="module-home-create-flows"]')).toBeVisible()
-    await expect(window.locator('[data-testid="module-home-customize-flows"]')).toBeVisible()
+    // Nothing selected → ModuleDashboard renders in the right panel
+    await expect(window.locator('[data-testid="module-dashboard-flows"]')).toBeVisible({ timeout: 5_000 })
+    await expect(window.locator('[data-testid="module-dashboard-create-flows"]')).toBeVisible()
+    await expect(window.locator('[data-testid="module-dashboard-customize-flows"]')).toBeVisible()
 
-    // Stat tiles (stats section) should be visible; 3 stats are always passed
-    // They render inside module-home-flows
-    const homeEl = window.locator('[data-testid="module-home-flows"]')
-    await expect(homeEl).toContainText('Flows')
+    // Stat tiles (stats section) should be visible — "Flows" label appears in the tiles
+    const dashEl = window.locator('[data-testid="module-dashboard-flows"]')
+    await expect(dashEl).toContainText('Flows')
 
-    // Customize button opens popover with section checkboxes
-    await window.locator('[data-testid="module-home-customize-flows"]').click()
-    // The popover is a w-56 rounded-xl card that appears immediately after the button
-    // in the DOM. Scope to the popover div so we avoid matching the section headings
-    // in the main dashboard (which also contain "Your flows" as an h2).
-    // The popover renders as the second child of the relative-positioned wrapper.
-    // We identify it by the "Sections on this home" label that only appears inside it.
+    // Customize button opens popover with real section checkboxes
+    await window.locator('[data-testid="module-dashboard-customize-flows"]').click()
+    // The popover is a w-56 rounded-xl card. Identify it by the meta label inside it.
     const popover = window.locator('.w-56.rounded-xl')
     await expect(popover).toBeVisible({ timeout: 3_000 })
     await expect(popover.getByText('Overview tiles')).toBeVisible()
     await expect(popover.getByText('Your flows')).toBeVisible()
     // Dismiss popover by clicking the fixed overlay (which sits behind the popover)
-    await window.locator('[data-testid="module-home-flows"]').click({ position: { x: 5, y: 5 } })
+    await window.locator('[data-testid="module-dashboard-flows"]').click({ position: { x: 5, y: 5 } })
   } finally {
     await dispose()
   }
 })
 
-test('F2-2. PlexiFlow module-home create button creates a flow (smoke)', async () => {
+test('F2-2. PlexiFlow module-dashboard create button creates a flow (smoke)', async () => {
   const { window, dispose } = await launchApp()
   try {
     await waitForReady(window)
 
     await window.getByRole('button', { name: 'PlexiFlow' }).first().click()
-    await expect(window.locator('[data-testid="module-home-flows"]')).toBeVisible({ timeout: 8_000 })
+    await expect(window.locator('[data-testid="module-dashboard-flows"]')).toBeVisible({ timeout: 8_000 })
 
-    // Click the create button in ModuleHome
-    await window.locator('[data-testid="module-home-create-flows"]').click()
+    // Click the create button in ModuleDashboard empty recent-items state
+    await window.locator('[data-testid="module-dashboard-create-flows"]').click()
     await window.waitForTimeout(500)
 
     // IPC should now have a flow
@@ -448,7 +443,7 @@ test('F2-2. PlexiFlow module-home create button creates a flow (smoke)', async (
   }
 })
 
-test('F2-3. PlexiForms: module-home-forms renders with create + customize buttons', async () => {
+test('F2-3. PlexiForms: module-dashboard-forms renders with create + customize buttons', async () => {
   const { window, dispose } = await launchApp()
   try {
     await waitForReady(window)
@@ -456,22 +451,22 @@ test('F2-3. PlexiForms: module-home-forms renders with create + customize button
     await window.getByRole('button', { name: 'PlexiForms' }).first().click()
     await expect(window.locator('[data-testid="plexiforms-view"]')).toBeVisible({ timeout: 8_000 })
 
-    // Nothing selected → ModuleHome
-    await expect(window.locator('[data-testid="module-home-forms"]')).toBeVisible({ timeout: 5_000 })
-    await expect(window.locator('[data-testid="module-home-create-forms"]')).toBeVisible()
-    await expect(window.locator('[data-testid="module-home-customize-forms"]')).toBeVisible()
+    // Nothing selected → ModuleDashboard
+    await expect(window.locator('[data-testid="module-dashboard-forms"]')).toBeVisible({ timeout: 5_000 })
+    await expect(window.locator('[data-testid="module-dashboard-create-forms"]')).toBeVisible()
+    await expect(window.locator('[data-testid="module-dashboard-customize-forms"]')).toBeVisible()
 
-    // Customize opens popover
-    await window.locator('[data-testid="module-home-customize-forms"]').click()
+    // Customize opens popover with real section checkboxes
+    await window.locator('[data-testid="module-dashboard-customize-forms"]').click()
     await expect(window.getByText('Overview tiles')).toBeVisible({ timeout: 3_000 })
     // Dismiss
-    await window.locator('[data-testid="module-home-forms"]').click({ position: { x: 5, y: 5 } })
+    await window.locator('[data-testid="module-dashboard-forms"]').click({ position: { x: 5, y: 5 } })
   } finally {
     await dispose()
   }
 })
 
-test('F2-4. PlexiBuild: module-home-build renders with create + customize buttons', async () => {
+test('F2-4. PlexiBuild: module-dashboard-build renders with create + customize buttons', async () => {
   const { window, dispose } = await launchApp()
   try {
     await waitForReady(window)
@@ -479,16 +474,16 @@ test('F2-4. PlexiBuild: module-home-build renders with create + customize button
     await window.getByRole('button', { name: 'PlexiBuild' }).first().click()
     await expect(window.locator('[data-testid="plexibuild-view"]')).toBeVisible({ timeout: 8_000 })
 
-    // Nothing selected → ModuleHome
-    await expect(window.locator('[data-testid="module-home-build"]')).toBeVisible({ timeout: 5_000 })
-    await expect(window.locator('[data-testid="module-home-create-build"]')).toBeVisible()
-    await expect(window.locator('[data-testid="module-home-customize-build"]')).toBeVisible()
+    // Nothing selected → ModuleDashboard
+    await expect(window.locator('[data-testid="module-dashboard-build"]')).toBeVisible({ timeout: 5_000 })
+    await expect(window.locator('[data-testid="module-dashboard-create-build"]')).toBeVisible()
+    await expect(window.locator('[data-testid="module-dashboard-customize-build"]')).toBeVisible()
   } finally {
     await dispose()
   }
 })
 
-test('F2-5. PlexiMeet: module-home-meet renders with create + customize buttons', async () => {
+test('F2-5. PlexiMeet: module-dashboard-meet renders with create + customize buttons', async () => {
   const { window, dispose } = await launchApp()
   try {
     await waitForReady(window)
@@ -496,17 +491,17 @@ test('F2-5. PlexiMeet: module-home-meet renders with create + customize buttons'
     await window.getByRole('button', { name: 'PlexiMeet' }).first().click()
     await expect(window.locator('[data-testid="pleximeet-view"]')).toBeVisible({ timeout: 8_000 })
 
-    // Nothing selected → ModuleHome
-    await expect(window.locator('[data-testid="module-home-meet"]')).toBeVisible({ timeout: 5_000 })
-    await expect(window.locator('[data-testid="module-home-create-meet"]')).toBeVisible()
-    await expect(window.locator('[data-testid="module-home-customize-meet"]')).toBeVisible()
+    // Nothing selected → ModuleDashboard
+    await expect(window.locator('[data-testid="module-dashboard-meet"]')).toBeVisible({ timeout: 5_000 })
+    await expect(window.locator('[data-testid="module-dashboard-create-meet"]')).toBeVisible()
+    await expect(window.locator('[data-testid="module-dashboard-customize-meet"]')).toBeVisible()
   } finally {
     await dispose()
   }
 })
 
-test('F2-6. PlexiReports: module-home-reports renders; existing empty state still works', async () => {
-  // PlexiReports uses ModuleHome AND has a sidebar empty state. Both must coexist.
+test('F2-6. PlexiReports: module-dashboard-reports renders; existing empty state still works', async () => {
+  // PlexiReports uses ModuleDashboard AND has a sidebar empty state. Both must coexist.
   const { window, dispose } = await launchApp()
   try {
     await waitForReady(window)
@@ -514,10 +509,10 @@ test('F2-6. PlexiReports: module-home-reports renders; existing empty state stil
     await window.getByRole('button', { name: 'PlexiReports' }).first().click()
     await expect(window.locator('[data-testid="plexireports-view"]')).toBeVisible({ timeout: 8_000 })
 
-    // ModuleHome renders in the right pane when nothing is selected
-    await expect(window.locator('[data-testid="module-home-reports"]')).toBeVisible({ timeout: 5_000 })
-    await expect(window.locator('[data-testid="module-home-create-reports"]')).toBeVisible()
-    await expect(window.locator('[data-testid="module-home-customize-reports"]')).toBeVisible()
+    // ModuleDashboard renders in the right pane when nothing is selected
+    await expect(window.locator('[data-testid="module-dashboard-reports"]')).toBeVisible({ timeout: 5_000 })
+    await expect(window.locator('[data-testid="module-dashboard-create-reports"]')).toBeVisible()
+    await expect(window.locator('[data-testid="module-dashboard-customize-reports"]')).toBeVisible()
 
     // No crash
     const errors: string[] = []
@@ -533,48 +528,57 @@ test('F2-6. PlexiReports: module-home-reports renders; existing empty state stil
 })
 
 test('F2-7. Customize popover: toggling a section checkbox hides/shows that section', async () => {
+  // The new ModuleDashboard exposes sections: "Overview tiles", "Flows created"
+  // (chart), "By trigger" (breakdown), "Your flows" (recent). We toggle the stats
+  // section ("Overview tiles") to verify the hide/show mechanism is live.
   const { window, dispose } = await launchApp()
   try {
     await waitForReady(window)
 
     await window.getByRole('button', { name: 'PlexiFlow' }).first().click()
-    await expect(window.locator('[data-testid="module-home-flows"]')).toBeVisible({ timeout: 8_000 })
+    await expect(window.locator('[data-testid="module-dashboard-flows"]')).toBeVisible({ timeout: 8_000 })
+
+    const dashEl = window.locator('[data-testid="module-dashboard-flows"]')
+
+    // Confirm the stats section is currently visible (has stat tile labels)
+    await expect(dashEl.locator('text=Flows').first()).toBeVisible({ timeout: 3_000 })
 
     // Open customize popover
-    await window.locator('[data-testid="module-home-customize-flows"]').click()
+    await window.locator('[data-testid="module-dashboard-customize-flows"]').click()
 
-    // Scope to the popover card (w-56 rounded-xl) to avoid strict-mode violations
-    // from matching both the popover label <span> and the section <h2> heading.
+    // Scope to the popover card (w-56 rounded-xl)
     const popover = window.locator('.w-56.rounded-xl')
     await expect(popover).toBeVisible({ timeout: 3_000 })
 
-    // "What you can do here" appears both as a popover checkbox label and as a
-    // dashboard section h2. Scope to popover for the presence check.
-    await expect(popover.getByText('What you can do here')).toBeVisible()
+    // "Overview tiles" must be a checkbox option in the popover
+    await expect(popover.getByText('Overview tiles')).toBeVisible()
 
-    const homeEl = window.locator('[data-testid="module-home-flows"]')
+    // Uncheck "Overview tiles" to hide the stats row
+    const statsCheckbox = popover.locator('label').filter({ hasText: 'Overview tiles' }).locator('input[type="checkbox"]')
+    await statsCheckbox.uncheck()
 
-    // The checkbox is inside the label scoped to the popover
-    const tipsCheckbox = popover.locator('label').filter({ hasText: 'What you can do here' }).locator('input[type="checkbox"]')
-    await tipsCheckbox.uncheck()
-
-    // Dismiss popover by clicking outside
-    await homeEl.click({ position: { x: 5, y: 5 } })
+    // Dismiss popover by clicking the fixed overlay
+    await dashEl.click({ position: { x: 5, y: 5 } })
     await window.waitForTimeout(200)
 
-    // The tips section heading should now be hidden
-    // The heading is an h2 rendered inside module-home-flows (text "WHAT YOU CAN DO HERE")
-    const tipsHeading = homeEl.locator('h2').filter({ hasText: /what you can do here/i })
-    await expect(tipsHeading).not.toBeVisible({ timeout: 3_000 })
+    // Stats grid (4-column) should no longer be visible. The grid has class
+    // "grid-cols-2 sm:grid-cols-4" — scoped to the dashboard root.
+    // We verify by checking that the StatTile for "Overview tiles" label is gone.
+    // The easiest reliable check: the 4-cell stats grid div is absent.
+    const statsGrid = dashEl.locator('.grid-cols-2').first()
+    await expect(statsGrid).not.toBeVisible({ timeout: 3_000 })
 
-    // Re-open and re-check to restore
-    await window.locator('[data-testid="module-home-customize-flows"]').click()
-    await tipsCheckbox.check()
-    await homeEl.click({ position: { x: 5, y: 5 } })
+    // Re-open customize and restore
+    await window.locator('[data-testid="module-dashboard-customize-flows"]').click()
+    const popover2 = window.locator('.w-56.rounded-xl')
+    await expect(popover2).toBeVisible({ timeout: 3_000 })
+    const statsCheckbox2 = popover2.locator('label').filter({ hasText: 'Overview tiles' }).locator('input[type="checkbox"]')
+    await statsCheckbox2.check()
+    await dashEl.click({ position: { x: 5, y: 5 } })
     await window.waitForTimeout(200)
 
-    // Tips heading should be visible again
-    await expect(tipsHeading).toBeVisible({ timeout: 3_000 })
+    // Stats grid should be visible again
+    await expect(dashEl.locator('.grid-cols-2').first()).toBeVisible({ timeout: 3_000 })
   } finally {
     await dispose()
   }

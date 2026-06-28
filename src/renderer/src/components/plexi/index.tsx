@@ -15,7 +15,20 @@ import Icon from '../Icon'
 export const PLEXI_CARD =
   'rounded-xl border border-stone-200/80 dark:border-white/10 bg-white/80 dark:bg-white/[0.03] backdrop-blur-sm fb-glass-soft'
 
-type Tone = 'accent' | 'emerald' | 'amber' | 'rose' | 'violet' | 'sky' | 'stone'
+export type Tone = 'accent' | 'emerald' | 'amber' | 'rose' | 'violet' | 'sky' | 'stone'
+
+// Stroke/fill colour per tone for the inline SVG chart primitives. Accent follows
+// the live theme via its CSS var; the rest are fixed Tailwind-500 values so they
+// read correctly in light and dark without a class round-trip.
+const TONE_STROKE: Record<Tone, string> = {
+  accent: 'rgb(var(--accent))',
+  emerald: 'rgb(16 185 129)',
+  amber: 'rgb(245 158 11)',
+  rose: 'rgb(244 63 94)',
+  violet: 'rgb(139 92 246)',
+  sky: 'rgb(14 165 233)',
+  stone: 'rgb(120 113 108)'
+}
 
 const TONE_TEXT: Record<Tone, string> = {
   accent: 'text-accent',
@@ -172,5 +185,128 @@ export function StatusPill({ tone, label, dot = true }: { tone: PillTone; label:
       {dot && <span className={`h-1.5 w-1.5 rounded-full ${p.dot}`} />}
       {label}
     </span>
+  )
+}
+
+// ── Inline chart primitives ─────────────────────────────────────────────────
+// Tiny, dependency-free SVG charts for use inside tiles, headers and rail cards.
+// They render real values only; with no data they return null (Sparkline/MiniBars)
+// or an honest zero (Ring), never a placeholder that could read as real data. For
+// full-size panel charts use recharts inside a RailCard instead.
+
+/** A small line over a numeric series in time order. Null below two points. */
+export function Sparkline({
+  points,
+  width = 84,
+  height = 28,
+  tone = 'accent'
+}: {
+  points: number[]
+  width?: number
+  height?: number
+  tone?: Tone
+}): JSX.Element | null {
+  if (points.length < 2) return null
+  const min = Math.min(...points)
+  const max = Math.max(...points)
+  const range = max - min || 1
+  const d = points
+    .map((v, i) => {
+      const x = (i / (points.length - 1)) * width
+      const y = height - ((v - min) / range) * (height - 4) - 2
+      return `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`
+    })
+    .join(' ')
+  return (
+    <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} fill="none" aria-hidden="true">
+      <path d={d} stroke={TONE_STROKE[tone]} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+/** A small bar histogram. Empty bars render as a faint track; null with no data. */
+export function MiniBars({
+  points,
+  width = 84,
+  height = 28,
+  tone = 'accent',
+  gap = 2
+}: {
+  points: number[]
+  width?: number
+  height?: number
+  tone?: Tone
+  gap?: number
+}): JSX.Element | null {
+  if (points.length === 0) return null
+  const max = Math.max(...points, 1)
+  const barW = (width - gap * (points.length - 1)) / points.length
+  return (
+    <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} aria-hidden="true">
+      {points.map((v, i) => {
+        const barH = Math.max(2, (v / max) * (height - 2))
+        return (
+          <rect
+            key={i}
+            x={(barW + gap) * i}
+            y={height - barH}
+            width={Math.max(1, barW)}
+            height={barH}
+            rx={1.5}
+            fill={v === 0 ? 'var(--edge-soft)' : TONE_STROKE[tone]}
+            opacity={v === 0 ? 0.5 : 0.85}
+          />
+        )
+      })}
+    </svg>
+  )
+}
+
+/** A progress ring. At 0% it shows a full track and an empty arc, an honest zero. */
+export function Ring({
+  pct,
+  size = 56,
+  stroke = 6,
+  tone = 'accent',
+  label
+}: {
+  pct: number
+  size?: number
+  stroke?: number
+  tone?: Tone
+  label?: string
+}): JSX.Element {
+  const r = (size - stroke) / 2
+  const c = 2 * Math.PI * r
+  const dash = Math.max(0, Math.min(1, pct / 100)) * c
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} aria-hidden="true">
+      <g style={{ transform: 'rotate(-90deg)', transformOrigin: `${size / 2}px ${size / 2}px` }}>
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--edge-soft)" strokeWidth={stroke} />
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={r}
+          fill="none"
+          stroke={TONE_STROKE[tone]}
+          strokeWidth={stroke}
+          strokeLinecap="round"
+          strokeDasharray={c}
+          strokeDashoffset={c - dash}
+          style={{ transition: 'stroke-dashoffset 420ms ease' }}
+        />
+      </g>
+      {label && (
+        <text
+          x={size / 2}
+          y={size / 2}
+          textAnchor="middle"
+          dominantBaseline="central"
+          style={{ fontSize: size * 0.24, fill: 'var(--ink-90)', fontVariantNumeric: 'tabular-nums', fontWeight: 600 }}
+        >
+          {label}
+        </text>
+      )}
+    </svg>
   )
 }
