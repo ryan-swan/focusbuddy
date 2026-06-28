@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import Icon from '../Icon'
 import { DashboardHeader, StatusPill, PLEXI_CARD } from '../plexi'
+import ModuleHome from '../ModuleHome'
 import type { FbTable } from '@shared/fields'
 import {
   blankAction,
@@ -134,13 +135,40 @@ export default function PlexiFlowView(): JSX.Element {
         {selected ? (
           <FlowEditor key={selected.id} flow={selected} tables={tables} onChanged={load} />
         ) : (
-          <div className="h-full flex flex-col items-center justify-center text-center px-6">
-            <Icon name="account_tree" size={30} className="text-[var(--ink-30)]" />
-            <p className="mt-2 text-[13px] text-[var(--ink-70)] max-w-sm leading-relaxed">
-              Select a flow to edit it, or create one. A flow runs a sequence of actions across your workspace, by hand
-              or on a schedule.
-            </p>
-          </div>
+          <ModuleHome
+            moduleKey="flows"
+            title="Flows"
+            subtitle="Automate your workspace, an ordered set of actions that runs by hand or on a schedule"
+            icon="account_tree"
+            accentClass="text-violet-500"
+            stats={[
+              { label: 'Flows', value: flows?.length ?? 0, icon: 'account_tree' },
+              { label: 'On', value: flows?.filter((f) => f.enabled).length ?? 0, icon: 'toggle_on' },
+              { label: 'Failing', value: flows?.filter((f) => f.lastStatus === 'error').length ?? 0, icon: 'error' }
+            ]}
+            items={(flows ?? []).map((f) => ({
+              id: f.id,
+              title: f.title,
+              subtitle: `Runs ${triggerSummary(f.trigger)}, ${f.actions.length} action(s)`,
+              meta: f.lastRunAt ? `Last run ${new Date(f.lastRunAt).toLocaleDateString()}` : 'Not run yet',
+              status:
+                f.lastStatus === 'error'
+                  ? { tone: 'rose' as const, label: 'Last run failed' }
+                  : f.enabled
+                    ? { tone: 'emerald' as const, label: 'On' }
+                    : { tone: 'stone' as const, label: 'Off' },
+              onOpen: () => setSelectedId(f.id)
+            }))}
+            recentLabel="Your flows"
+            onCreate={() => void addFlow()}
+            createLabel="New flow"
+            emptyHint="No flows yet. Create one to run a sequence of actions across your workspace, automatically."
+            tips={[
+              { icon: 'bolt', text: 'Trigger on a schedule, an event in your workspace, an incoming webhook, or by hand.' },
+              { icon: 'auto_awesome', text: 'Chain an AI step into later steps with the token {{ai}}.' },
+              { icon: 'fact_check', text: 'Every run records an honest per-step log, so a failure shows as a failed step, never a fake success.' }
+            ]}
+          />
         )}
       </div>
     </div>

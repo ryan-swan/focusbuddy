@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import Icon from '../Icon'
 import { DashboardHeader, StatusPill } from '../plexi'
+import ModuleHome from '../ModuleHome'
 import type { FbTable } from '@shared/fields'
 import type { ReportDef, ReportSchedule } from '@shared/reports'
 
@@ -119,13 +120,38 @@ export default function PlexiReportsView(): JSX.Element {
         {selected ? (
           <ReportEditor key={selected.id} report={selected} tables={tables} onChanged={load} />
         ) : (
-          <div className="h-full flex flex-col items-center justify-center text-center px-6">
-            <Icon name="summarize" size={30} className="text-[var(--ink-30)]" />
-            <p className="mt-2 text-[13px] text-[var(--ink-70)] max-w-sm leading-relaxed">
-              Select a report to edit it, or create one. A report summarises the tables you choose, on the schedule you
-              set, and can be emailed to your team.
-            </p>
-          </div>
+          <ModuleHome
+            moduleKey="reports"
+            title="Reports"
+            subtitle="Turn the tables you already keep into a written report, on a schedule, emailed to your team"
+            icon="summarize"
+            accentClass="text-sky-500"
+            stats={[
+              { label: 'Reports', value: reports?.length ?? 0, icon: 'summarize' },
+              { label: 'Scheduled', value: reports?.filter((r) => r.schedule !== 'manual').length ?? 0, icon: 'schedule' },
+              { label: 'Tables', value: tables.length, icon: 'table_chart' }
+            ]}
+            items={(reports ?? []).map((r) => ({
+              id: r.id,
+              title: r.title,
+              subtitle: r.recipients.length ? `${r.recipients.length} recipient(s)` : 'No recipients yet',
+              meta: r.lastRunAt ? `Last run ${fmtWhen(r.lastRunAt)}` : 'Not run yet',
+              status:
+                r.schedule !== 'manual'
+                  ? { tone: 'sky' as const, label: SCHEDULES.find((s) => s.value === r.schedule)?.label ?? r.schedule }
+                  : undefined,
+              onOpen: () => setSelectedId(r.id)
+            }))}
+            recentLabel="Your reports"
+            onCreate={() => void addReport()}
+            createLabel="New report"
+            emptyHint="No reports yet. Create one to summarise a table on a schedule and send it to the people who need it."
+            tips={[
+              { icon: 'schedule', text: 'Generate a report daily, weekly or monthly, or run it by hand.' },
+              { icon: 'mail', text: 'Email the finished report to recipients automatically.' },
+              { icon: 'auto_awesome', text: 'With an AI key the narrative is written for you; without one you get an honest data summary, never a fabricated one.' }
+            ]}
+          />
         )}
       </div>
     </div>

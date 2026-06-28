@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import Icon from '../Icon'
 import { PLEXI_CARD } from '../plexi'
+import ModuleHome from '../ModuleHome'
 import FieldEditor from '../fields/FieldEditor'
 import { useFormsStore } from '../../stores/forms'
 import type { PlexiForm } from '@shared/forms'
@@ -101,12 +102,30 @@ export default function PlexiFormsView(): JSX.Element {
             }}
           />
         ) : (
-          <div className="h-full flex flex-col items-center justify-center text-center px-6">
-            <Icon name="dynamic_form" size={30} className="text-[var(--ink-30)]" />
-            <p className="mt-2 text-[13px] text-[var(--ink-70)] max-w-sm leading-relaxed">
-              Select a form to design it, fill it, or read its responses. Every response lands as a row in a real table.
-            </p>
-          </div>
+          <ModuleHome
+            moduleKey="forms"
+            title="Forms"
+            subtitle="Design a form and watch responses land as rows in a real, chartable table"
+            icon="dynamic_form"
+            accentClass="text-fuchsia-500"
+            stats={[{ label: 'Forms', value: forms.length, icon: 'dynamic_form' }]}
+            items={forms.map((f) => ({
+              id: f.id,
+              title: f.title,
+              subtitle: f.description || 'No description yet',
+              meta: `Updated ${new Date(f.updatedAt).toLocaleDateString()}`,
+              onOpen: () => setSelectedId(f.id)
+            }))}
+            recentLabel="Your forms"
+            onCreate={() => void addForm()}
+            createLabel="New form"
+            emptyHint="No forms yet. Create one to capture requests, leads or data, with each response saved as a real row."
+            tips={[
+              { icon: 'view_column', text: "A form's fields are the columns of its backing table, so responses are instantly filterable and chartable." },
+              { icon: 'edit_note', text: 'Design, fill and read responses from the same place.' },
+              { icon: 'verified', text: 'Reads only real responses, a new form is honestly empty.' }
+            ]}
+          />
         )}
       </div>
     </div>
