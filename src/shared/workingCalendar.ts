@@ -74,12 +74,15 @@ export function makeDayToMs(anchorMs: number, cal: WorkingCalendar = DEFAULT_CAL
 }
 
 // Count working days between two timestamps (inclusive of start day, exclusive of
-// end), for deriving a duration from a planned start/finish pair.
+// end). Returns the RAW count, including 0 when the two land in the same working
+// slot, so it can size both a duration and a start offset. Callers that need a
+// minimum of one day (a real task spans at least a day) apply that floor
+// themselves.
 export function workingDaysBetween(startMs: number, endMs: number, cal: WorkingCalendar = DEFAULT_CALENDAR): number {
   if (endMs <= startMs) return 0
   const holidays = holidaySet(cal)
   const anyWorking = cal.workingDays.some(Boolean)
-  if (!anyWorking) return Math.max(1, Math.round((endMs - startMs) / DAY_MS))
+  if (!anyWorking) return Math.round((endMs - startMs) / DAY_MS)
   let count = 0
   let cursor = new Date(startMs)
   cursor.setHours(0, 0, 0, 0)
@@ -88,5 +91,5 @@ export function workingDaysBetween(startMs: number, endMs: number, cal: WorkingC
     if (isWorking(cursor.getTime(), cal, holidays)) count++
     cursor = new Date(cursor.getTime() + DAY_MS)
   }
-  return Math.max(1, count)
+  return count
 }

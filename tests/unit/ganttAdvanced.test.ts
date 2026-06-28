@@ -76,6 +76,24 @@ describe('working-day calendar', () => {
     expect(workingDaysBetween(monday, monNext, cal)).toBe(5) // Mon-Fri
   })
 
+  it('a task planned on the anchor day starts at offset 0, not 1 (overdue stays overdue)', () => {
+    // Regression: workingDaysBetween once floored to 1, so a task planned on the
+    // anchor day got pushed a day (and, across a weekend, its end slid past
+    // "now"), wrongly clearing an overdue flag. A start offset of 0 is valid.
+    const sunday = new Date(2026, 5, 21).getTime() // anchor day (a Sunday)
+    expect(workingDaysBetween(sunday, sunday, cal)).toBe(0)
+    const dayToMs = makeDayToMs(sunday, cal)
+    const r = computeSchedule(
+      [{ id: 'A', durationDays: Math.max(1, workingDaysBetween(sunday, new Date(2026, 5, 25).getTime(), cal)), deps: [], minStartDay: 0 }],
+      sunday,
+      dayToMs
+    )
+    const a = r.tasks.find((t) => t.id === 'A')!
+    // Anchor moves to Mon Jun 22; a ~4-working-day task ends Fri Jun 26, well
+    // before the following Sunday, so an overdue check still fires.
+    expect(a.endMs).toBeLessThan(new Date(2026, 5, 28).getTime())
+  })
+
   it('computeSchedule with a calendar places task timestamps on working days', () => {
     const dayToMs = makeDayToMs(monday, cal)
     const r = computeSchedule(
