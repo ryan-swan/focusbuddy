@@ -36,6 +36,18 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.100',
+    date: '2026-07-16T12:00:00Z',
+    title: 'v2.5.100 — the command palette learns your habits',
+    tag: 'polish',
+    summary:
+      'The finishing touches on a run of usability work. The command palette (Cmd or Ctrl K) now remembers the modules you use most and floats them to the top when you open it, so your common destinations are right there without typing. And empty modules read cleaner: the "nothing here yet" message now appears once, in the module overview, instead of being repeated in the list beside it.',
+    highlights: [
+      'The command palette promotes the modules you visit most, so your everyday destinations are one keystroke away.',
+      'Tidier empty states: the "nothing here yet" message shows once instead of twice.'
+    ]
+  },
+  {
     version: '2.5.99',
     date: '2026-07-15T12:00:00Z',
     title: 'v2.5.99 — modules open to your work, and delete you can take back',
