@@ -47,7 +47,7 @@ import {
   deleteDocument
 } from '../db/documents'
 import { searchAll } from '../db/search'
-import { generateDocument } from '../ai/anthropic'
+import { generateDocument, processMeetingEnd } from '../ai/anthropic'
 import type { DocType, DocumentDraft, DocumentPatch, FbDocument, MailSendInput } from '@shared/types'
 import { sendMail } from '../mail/smtp'
 import { suggestReply, resetToneCache } from '../mail/aiReply'
@@ -1318,6 +1318,11 @@ export function registerIpcHandlers(): void {
     'ai:extractActionsFromTranscript',
     (_e, input: { transcript: string }) =>
       extractActionsFromTranscript(input.transcript)
+  )
+  ipcMain.handle(
+    'ai:processMeetingEnd',
+    (_e, input: { transcript: string; meetingTitle?: string; durationSec?: number | null }) =>
+      processMeetingEnd(input)
   )
 
   // Transcription provider preference — read + write the persisted

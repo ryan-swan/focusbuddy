@@ -16,6 +16,7 @@ import { useFocusSessionStore } from '../stores/focusSession'
 import { useTablesStore } from '../stores/tables'
 import { useLinksStore } from '../stores/links'
 import { useKnowledgeStore } from '../stores/knowledge'
+import { useDocumentsStore } from '../stores/documents'
 import { catalogFor } from './widgetCatalog'
 import { spawnPositionFor } from './spawnPosition'
 
@@ -90,6 +91,8 @@ export async function applyProposal(
       return applyUpdateTask(proposal, ctx)
     case 'create-knowledge-entry':
       return applyCreateKnowledgeEntry(proposal)
+    case 'create-document':
+      return applyCreateDocument(proposal)
     default:
       // Exhaustive switch — TS yells if a new kind is added without a handler.
       return { ok: false, message: 'Unknown action kind.' }
@@ -135,6 +138,21 @@ async function applyCreateKnowledgeEntry(
   })
   if (!entry) return { ok: false, message: 'Could not save to PlexiBrain.' }
   return { ok: true, message: `Added "${p.title}" to PlexiBrain` }
+}
+
+// Create a standalone document (doc / sheet / slides) in the Documents library,
+// carrying the proposal's title. A real fb_documents row, the same as the New
+// button makes, so it opens and edits normally.
+async function applyCreateDocument(
+  p: Extract<ActionProposal, { kind: 'create-document' }>
+): Promise<ApplyResult> {
+  try {
+    const doc = await useDocumentsStore.getState().createBlank(p.docType, p.title)
+    const label = p.docType === 'sheet' ? 'spreadsheet' : p.docType === 'slides' ? 'deck' : 'document'
+    return { ok: true, message: doc ? `Created ${label} "${p.title}"` : `Could not create the ${label}.` }
+  } catch (e) {
+    return { ok: false, message: `Could not create the document: ${e instanceof Error ? e.message : String(e)}` }
+  }
 }
 
 async function applyCreateWidget(
@@ -802,6 +820,11 @@ export function describeProposal(
     }
     case 'create-knowledge-entry':
       return { icon: 'psychology', verb: 'Add to PlexiBrain', subject: p.title }
+    case 'create-document': {
+      const verb = p.docType === 'sheet' ? 'New spreadsheet' : p.docType === 'slides' ? 'New deck' : 'New document'
+      const icon = p.docType === 'sheet' ? 'table_chart' : p.docType === 'slides' ? 'slideshow' : 'description'
+      return { icon, verb, subject: p.title }
+    }
     default:
       return { icon: 'auto_awesome', verb: 'Action', subject: '' }
   }
