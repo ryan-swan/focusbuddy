@@ -36,6 +36,18 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.97',
+    date: '2026-07-13T12:00:00Z',
+    title: 'v2.5.97 — video messages',
+    tag: 'feature',
+    summary:
+      'Video messages are now a first-class attachment in chat. Drop a video file into a conversation and it plays inline rather than downloading as a generic file, and in PlexiMeet the "record a message for a teammate who is away" option now records a short video, like a quick Loom, falling back to a voice note only when there is no camera. The message streams from your own server with nothing sent to a third party.',
+    highlights: [
+      'Send and play video in chat: video files attach as a video message and play inline, alongside the existing photo, voice note, GIF and file attachments.',
+      'PlexiMeet record-a-message is now video: leave a short video for a teammate who is away, with an automatic fall back to a voice note when no camera is available.'
+    ]
+  },
+  {
     version: '2.5.96',
     date: '2026-07-12T12:00:00Z',
     title: 'v2.5.96 — real projects, live meetings, and create anything from anywhere',
