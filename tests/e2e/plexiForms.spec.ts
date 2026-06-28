@@ -28,7 +28,10 @@ test('1 — sidebar PlexiForms opens view with honest empty state', async () => 
 
   const view = window.locator('[data-testid="plexiforms-view"]')
   await expect(view).toBeVisible()
-  await expect(view.locator('text=No forms yet')).toBeVisible({ timeout: 5_000 })
+  // The list rail shows its own "No forms yet" and ModuleHome shows another in the
+  // right pane — both are honest, but Playwright strict mode rejects an unscoped
+  // locator that matches two elements. Use .first() to target the list-rail instance.
+  await expect(view.locator('text=No forms yet').first()).toBeVisible({ timeout: 5_000 })
   expect(await view.locator('[data-testid^="form-row-"]').count(), 'zero form rows in fresh DB').toBe(0)
   await expect(view.locator('[data-testid="form-new"]')).toBeVisible()
 })
@@ -178,7 +181,7 @@ test('5 — form-delete removes the form; list returns to honest empty state', a
 
   await expect(window.locator('[data-testid="form-editor"]')).toHaveCount(0)
   await expect(window.locator('[data-testid^="form-row-"]')).toHaveCount(0)
-  await expect(window.locator('text=No forms yet')).toBeVisible({ timeout: 3_000 })
+  await expect(window.locator('text=No forms yet').first()).toBeVisible({ timeout: 3_000 })
 })
 
 // ── Test 6: PlexiForms READY in launcher ──────────────────────────────────────
