@@ -95,7 +95,11 @@ const PROJECT_CALENDAR = DEFAULT_CALENDAR
 function durationDays(row: TaskRow): number {
   if (row.is_milestone) return 0
   if (row.plan_start != null && row.due_date != null && row.due_date > row.plan_start) {
-    return Math.max(1, workingDaysBetween(row.plan_start, row.due_date, PROJECT_CALENDAR))
+    // Count whole calendar days: floor both ends so a task's duration does not
+    // shift with the time-of-day at which its dates were set.
+    const startDay = Math.floor(row.plan_start / DAY_MS) * DAY_MS
+    const dueDay = Math.floor(row.due_date / DAY_MS) * DAY_MS
+    return Math.max(1, workingDaysBetween(startDay, dueDay, PROJECT_CALENDAR))
   }
   if (row.estimate_minutes && row.estimate_minutes > 0) {
     return Math.max(1, Math.ceil(row.estimate_minutes / (60 * 8)))
@@ -104,8 +108,11 @@ function durationDays(row: TaskRow): number {
 }
 
 // Working-day offset of a timestamp from the anchor (for minStartDay / actuals).
+// Floors ms to its calendar day so a task dated on the anchor day is offset 0
+// regardless of the time-of-day component the date carries.
 function workingOffset(anchor: number, ms: number): number {
-  return ms <= anchor ? 0 : workingDaysBetween(anchor, ms, PROJECT_CALENDAR)
+  const day = Math.floor(ms / DAY_MS) * DAY_MS
+  return day <= anchor ? 0 : workingDaysBetween(anchor, day, PROJECT_CALENDAR)
 }
 
 // Midnight-floored anchor: the earliest planned start across the tasks, or today
