@@ -259,11 +259,12 @@ import {
   getProjectPlan,
   setTaskPlan,
   addDependency,
+  setDependency,
   removeDependency,
   rescheduleProject,
   listProjectSummaries
 } from '../db/projectPlan'
-import type { PlanTaskPatch } from '@shared/projects'
+import type { PlanTaskPatch, DepType } from '@shared/projects'
 import {
   listReports,
   getReport,
@@ -1821,7 +1822,12 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('projects:setTaskPlan', (_e, taskId: string, patch: PlanTaskPatch) =>
     setTaskPlan(taskId, patch)
   )
-  ipcMain.handle('projects:addDep', (_e, predId: string, succId: string) => addDependency(predId, succId))
+  ipcMain.handle('projects:addDep', (_e, predId: string, succId: string, type?: DepType, lag?: number) =>
+    addDependency(predId, succId, type ?? 'FS', lag ?? 0)
+  )
+  ipcMain.handle('projects:setDep', (_e, predId: string, succId: string, type: DepType, lag: number) =>
+    setDependency(predId, succId, type, lag)
+  )
   ipcMain.handle('projects:removeDep', (_e, predId: string, succId: string) =>
     removeDependency(predId, succId)
   )

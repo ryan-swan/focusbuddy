@@ -14,19 +14,42 @@
 
 export const DAY_MS = 24 * 60 * 60 * 1000
 
+// The four MS-Project dependency types. FS (finish-to-start) is the default and
+// what a bare predecessor id means. Lag (in working days, may be negative for a
+// lead) shifts the constraint.
+export type DepType = 'FS' | 'SS' | 'FF' | 'SF'
+
+export interface DepLink {
+  id: string // predecessor task id
+  type: DepType
+  lag: number // working-day lag; negative = lead
+}
+
 export interface GanttInput {
   id: string
   // Whole-day duration. A milestone is 0. Negative is clamped to 0.
   durationDays: number
   // Finish-to-start predecessor task ids. Unknown ids are ignored so a partially
-  // wired plan still schedules rather than throwing.
+  // wired plan still schedules rather than throwing. Kept for backward
+  // compatibility and the simple case; `links` takes precedence when present.
   deps: string[]
+  // Typed predecessor links (FS/SS/FF/SF + lag). When provided, this is the
+  // source of truth for dependencies; `deps` is ignored for that task.
+  links?: DepLink[]
   isMilestone?: boolean
   // Optional "start no earlier than" day offset from the anchor, from a task's
   // explicit planned start. The earliest start is the later of this and the
   // latest predecessor finish, so a user-set date is honoured but a dependency
   // can still push a task out.
   minStartDay?: number
+}
+
+// Normalise a task's dependencies to typed links. Uses `links` when present,
+// otherwise treats each `deps` id as a finish-to-start link with zero lag.
+function linksOf(t: GanttInput | undefined): DepLink[] {
+  if (!t) return []
+  if (t.links && t.links.length) return t.links
+  return t.deps.map((id) => ({ id, type: 'FS' as DepType, lag: 0 }))
 }
 
 export interface ScheduledTask {
@@ -70,7 +93,9 @@ export function topoSort(inputs: GanttInput[]): { order: string[]; hasCycle: boo
   for (const t of inputs) {
     preds.set(
       t.id,
-      t.deps.filter((d) => ids.has(d) && d !== t.id)
+      linksOf(t)
+        .map((l) => l.id)
+        .filter((d) => ids.has(d) && d !== t.id)
     )
   }
   // Kahn's algorithm on the predecessor graph.
@@ -115,50 +140,100 @@ export function topoSort(inputs: GanttInput[]): { order: string[]; hasCycle: boo
 }
 
 // Run the critical-path method and return the full schedule. projectStartMs is
-// the anchor day (offset 0). Deterministic and side-effect free.
-export function computeSchedule(inputs: GanttInput[], projectStartMs: number): ScheduleResult {
+// the anchor day (offset 0). `dayToMs` optionally maps a whole-day offset to an
+// absolute timestamp, so a working-day calendar can skip weekends; without it,
+// offsets are plain calendar days. Deterministic and side-effect free.
+export function computeSchedule(
+  inputs: GanttInput[],
+  projectStartMs: number,
+  dayToMs?: (dayOffset: number) => number
+): ScheduleResult {
   const byId = new Map(inputs.map((t) => [t.id, t]))
   const dur = (id: string): number => {
     const t = byId.get(id)
     if (!t) return 0
     return t.isMilestone ? 0 : clampDuration(t.durationDays)
   }
-  const validPreds = (id: string): string[] => {
+  const validLinks = (id: string): DepLink[] => {
     const t = byId.get(id)
     if (!t) return []
-    return t.deps.filter((d) => byId.has(d) && d !== id)
+    return linksOf(t).filter((l) => byId.has(l.id) && l.id !== id)
   }
+  const validPreds = (id: string): string[] => validLinks(id).map((l) => l.id)
+  const toMs = (dayOffset: number): number => (dayToMs ? dayToMs(dayOffset) : projectStartMs + dayOffset * DAY_MS)
 
   const { order, hasCycle } = topoSort(inputs)
 
-  // Forward pass: earliest start/finish.
+  // Forward pass: earliest start/finish, honouring each link's type and lag.
   const es = new Map<string, number>()
   const ef = new Map<string, number>()
   for (const id of order) {
-    const preds = validPreds(id)
+    const ds = dur(id)
     const floor = byId.get(id)?.minStartDay ?? 0
-    const depStart = preds.length ? Math.max(...preds.map((p) => ef.get(p) ?? 0)) : 0
-    const start = Math.max(depStart, floor)
+    let start = floor
+    for (const link of validLinks(id)) {
+      const pEs = es.get(link.id) ?? 0
+      const pEf = ef.get(link.id) ?? 0
+      let cand: number
+      switch (link.type) {
+        case 'SS':
+          cand = pEs + link.lag
+          break
+        case 'FF':
+          cand = pEf + link.lag - ds
+          break
+        case 'SF':
+          cand = pEs + link.lag - ds
+          break
+        case 'FS':
+        default:
+          cand = pEf + link.lag
+      }
+      if (cand > start) start = cand
+    }
+    if (start < 0) start = 0
     es.set(id, start)
-    ef.set(id, start + dur(id))
+    ef.set(id, start + ds)
   }
 
   const projectDurationDays = order.length ? Math.max(...order.map((id) => ef.get(id) ?? 0)) : 0
 
-  // Successor map for the backward pass.
-  const succs = new Map<string, string[]>()
-  for (const t of inputs) succs.set(t.id, [])
-  for (const t of inputs) for (const p of validPreds(t.id)) succs.get(p)!.push(t.id)
+  // Successor links for the backward pass: for each task, the links that name it
+  // as a predecessor, tagged with the successor's id.
+  const succLinks = new Map<string, Array<{ succ: string; type: DepType; lag: number }>>()
+  for (const t of inputs) succLinks.set(t.id, [])
+  for (const t of inputs) for (const l of validLinks(t.id)) succLinks.get(l.id)!.push({ succ: t.id, type: l.type, lag: l.lag })
 
   // Backward pass: latest start/finish, processed in reverse topo order.
   const lf = new Map<string, number>()
   const ls = new Map<string, number>()
   for (let i = order.length - 1; i >= 0; i--) {
     const id = order[i]
-    const ss = succs.get(id) ?? []
-    const finish = ss.length ? Math.min(...ss.map((s) => ls.get(s) ?? projectDurationDays)) : projectDurationDays
+    const dp = dur(id)
+    const ss = succLinks.get(id) ?? []
+    let finish = projectDurationDays
+    for (const s of ss) {
+      const sLs = ls.get(s.succ) ?? projectDurationDays
+      const sLf = lf.get(s.succ) ?? projectDurationDays
+      let cand: number
+      switch (s.type) {
+        case 'SS':
+          cand = sLs - s.lag + dp
+          break
+        case 'FF':
+          cand = sLf - s.lag
+          break
+        case 'SF':
+          cand = sLf - s.lag + dp
+          break
+        case 'FS':
+        default:
+          cand = sLs - s.lag
+      }
+      if (cand < finish) finish = cand
+    }
     lf.set(id, finish)
-    ls.set(id, finish - dur(id))
+    ls.set(id, finish - dp)
   }
 
   const tasks: ScheduledTask[] = inputs.map((t) => {
@@ -177,8 +252,8 @@ export function computeSchedule(inputs: GanttInput[], projectStartMs: number): S
       latestFinish,
       slackDays,
       critical: slackDays <= 0,
-      startMs: projectStartMs + earliestStart * DAY_MS,
-      endMs: projectStartMs + earliestFinish * DAY_MS
+      startMs: toMs(earliestStart),
+      endMs: toMs(earliestFinish)
     }
   })
 
@@ -267,13 +342,14 @@ export function detectDrift(schedule: ScheduleResult, actualFinishById: Map<stri
 export function rescheduleOnDrift(
   inputs: GanttInput[],
   projectStartMs: number,
-  actualFinishById: Map<string, number>
+  actualFinishById: Map<string, number>,
+  dayToMs?: (dayOffset: number) => number
 ): ScheduleResult {
   // Encode actuals as a minimum earliest-finish floor by inflating duration when
   // a task finished later than its dependency-driven earliest finish. We do this
   // by adding pseudo lead via an augmented forward pass rather than mutating the
   // inputs, so the engine stays pure.
-  const base = computeSchedule(inputs, projectStartMs)
+  const base = computeSchedule(inputs, projectStartMs, dayToMs)
   const byId = new Map(inputs.map((t) => [t.id, t]))
   const efFloor = new Map<string, number>()
   for (const t of base.tasks) {
@@ -284,14 +360,18 @@ export function rescheduleOnDrift(
     efFloor.set(t.id, floor)
   }
   // Recompute a forward pass honoring the actual-finish floor, then derive a new
-  // schedule by expressing the floor as an adjusted duration per task.
+  // schedule by expressing the floor as an adjusted duration per task. The
+  // predecessor start is taken finish-to-start here purely to size the inflation;
+  // the final computeSchedule below re-applies each link's real type and lag.
   const { order } = topoSort(inputs)
   const adjEf = new Map<string, number>()
   const adjEs = new Map<string, number>()
   const adjDurationDays = new Map<string, number>()
   for (const id of order) {
     const t = byId.get(id)
-    const preds = (t?.deps ?? []).filter((d) => byId.has(d) && d !== id)
+    const preds = linksOf(t)
+      .map((l) => l.id)
+      .filter((d) => byId.has(d) && d !== id)
     const minStart = t?.minStartDay ?? 0
     const start = Math.max(preds.length ? Math.max(...preds.map((p) => adjEf.get(p) ?? 0)) : 0, minStart)
     const naturalDur = t?.isMilestone ? 0 : clampDuration(t?.durationDays ?? 0)
@@ -309,7 +389,8 @@ export function rescheduleOnDrift(
     // dependencies, it never becomes a bar. Its recorded flag is preserved.
     durationDays: t.isMilestone ? 0 : adjDurationDays.get(t.id) ?? clampDuration(t.durationDays),
     deps: t.deps,
+    links: t.links,
     isMilestone: t.isMilestone
   }))
-  return computeSchedule(adjusted, projectStartMs)
+  return computeSchedule(adjusted, projectStartMs, dayToMs)
 }

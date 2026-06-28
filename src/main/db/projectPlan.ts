@@ -5,15 +5,18 @@ import {
   detectDrift,
   rescheduleOnDrift,
   DAY_MS,
-  type GanttInput
+  type GanttInput,
+  type DepLink
 } from '@shared/gantt'
+import { makeDayToMs, workingDaysBetween, DEFAULT_CALENDAR } from '@shared/workingCalendar'
 import type {
   ProjectPlan,
   PlanTask,
   PlanDep,
   ProjectSummary,
   PlanTaskPatch,
-  AddDepResult
+  AddDepResult,
+  DepType
 } from '@shared/projects'
 
 // The PlexiProjects plan store. A project is an existing folder node; its plan is
@@ -34,6 +37,8 @@ interface TaskRow {
   estimate_minutes: number | null
   started_at: number | null
   completed_at: number | null
+  assignee: string | null
+  progress_pct: number | null
 }
 
 // All non-trashed, non-archived task descendants of a project folder, at any
@@ -48,7 +53,7 @@ function projectTaskRows(projectId: string): TaskRow[] {
          SELECT n.id FROM nodes n JOIN sub ON n.parent_id = sub.id
        )
        SELECT n.id, n.title, n.status, n.is_milestone, n.plan_start, n.due_date,
-              n.estimate_minutes, n.started_at, n.completed_at
+              n.estimate_minutes, n.started_at, n.completed_at, n.assignee, n.progress_pct
        FROM nodes n JOIN sub ON n.id = sub.id
        WHERE n.kind = 'task' AND n.trashed_at IS NULL AND n.archived = 0`
     )
@@ -56,33 +61,51 @@ function projectTaskRows(projectId: string): TaskRow[] {
   return rows
 }
 
-// Dependencies whose endpoints are both inside the given task-id set.
+// Dependencies whose endpoints are both inside the given task-id set, carrying
+// their type (FS/SS/FF/SF) and working-day lag.
 function projectDeps(taskIds: Set<string>): PlanDep[] {
   if (taskIds.size === 0) return []
   const db = getDb()
-  const rows = db.prepare('SELECT id, pred_id, succ_id, created_at FROM fb_task_deps').all() as Array<{
+  const rows = db.prepare('SELECT id, pred_id, succ_id, dep_type, lag_days FROM fb_task_deps').all() as Array<{
     id: string
     pred_id: string
     succ_id: string
-    created_at: number
+    dep_type: string | null
+    lag_days: number | null
   }>
+  const VALID: DepType[] = ['FS', 'SS', 'FF', 'SF']
   return rows
     .filter((r) => taskIds.has(r.pred_id) && taskIds.has(r.succ_id))
-    .map((r) => ({ id: r.id, predId: r.pred_id, succId: r.succ_id }))
+    .map((r) => ({
+      id: r.id,
+      predId: r.pred_id,
+      succId: r.succ_id,
+      type: VALID.includes((r.dep_type ?? 'FS') as DepType) ? ((r.dep_type ?? 'FS') as DepType) : 'FS',
+      lag: r.lag_days ?? 0
+    }))
 }
 
-// Whole-day duration for a task: from explicit start/due when both are set,
-// otherwise from the estimate at an 8 hour working day, otherwise one day. A
-// milestone is always zero.
+// The working calendar applied to scheduling. A Monday-to-Friday week by default
+// so the timeline skips weekends the way Microsoft Project does.
+const PROJECT_CALENDAR = DEFAULT_CALENDAR
+
+// Whole-day duration for a task in WORKING days: from explicit start/due when
+// both are set, otherwise from the estimate at an 8 hour working day, otherwise
+// one day. A milestone is always zero.
 function durationDays(row: TaskRow): number {
   if (row.is_milestone) return 0
   if (row.plan_start != null && row.due_date != null && row.due_date > row.plan_start) {
-    return Math.max(1, Math.round((row.due_date - row.plan_start) / DAY_MS))
+    return workingDaysBetween(row.plan_start, row.due_date, PROJECT_CALENDAR)
   }
   if (row.estimate_minutes && row.estimate_minutes > 0) {
     return Math.max(1, Math.ceil(row.estimate_minutes / (60 * 8)))
   }
   return 1
+}
+
+// Working-day offset of a timestamp from the anchor (for minStartDay / actuals).
+function workingOffset(anchor: number, ms: number): number {
+  return ms <= anchor ? 0 : workingDaysBetween(anchor, ms, PROJECT_CALENDAR)
 }
 
 // Midnight-floored anchor: the earliest planned start across the tasks, or today
@@ -102,32 +125,37 @@ export function getProjectPlan(projectId: string, nowMs = Date.now()): ProjectPl
   const ids = new Set(rows.map((r) => r.id))
   const deps = projectDeps(ids)
   const anchor = planAnchor(rows, nowMs)
+  const dayToMs = makeDayToMs(anchor, PROJECT_CALENDAR)
 
   const predsByTask = new Map<string, string[]>()
+  const linksByTask = new Map<string, DepLink[]>()
   for (const d of deps) {
     predsByTask.set(d.succId, [...(predsByTask.get(d.succId) ?? []), d.predId])
+    linksByTask.set(d.succId, [...(linksByTask.get(d.succId) ?? []), { id: d.predId, type: d.type, lag: d.lag }])
   }
 
   const inputs: GanttInput[] = rows.map((r) => ({
     id: r.id,
     durationDays: durationDays(r),
     deps: predsByTask.get(r.id) ?? [],
+    links: linksByTask.get(r.id),
     isMilestone: !!r.is_milestone,
-    minStartDay: r.plan_start != null ? Math.round((r.plan_start - anchor) / DAY_MS) : undefined
+    minStartDay: r.plan_start != null ? workingOffset(anchor, r.plan_start) : undefined
   }))
 
-  const schedule = computeSchedule(inputs, anchor)
+  const schedule = computeSchedule(inputs, anchor, dayToMs)
   const schedById = new Map(schedule.tasks.map((s) => [s.id, s]))
 
-  // Actual finishes (completed_at) as day offsets, for drift detection.
+  // Actual finishes (completed_at) as working-day offsets, for drift detection.
   const actualFinish = new Map<string, number>()
   for (const r of rows) {
-    if (r.completed_at != null) actualFinish.set(r.id, Math.max(0, Math.round((r.completed_at - anchor) / DAY_MS)))
+    if (r.completed_at != null) actualFinish.set(r.id, workingOffset(anchor, r.completed_at))
   }
   const drift = detectDrift(schedule, actualFinish)
 
   const tasks: PlanTask[] = rows.map((r) => {
     const s = schedById.get(r.id)!
+    const done = r.status === 'done' || r.completed_at != null
     return {
       id: r.id,
       title: r.title,
@@ -136,6 +164,8 @@ export function getProjectPlan(projectId: string, nowMs = Date.now()): ProjectPl
       planStart: r.plan_start,
       planDue: r.due_date,
       estimateMinutes: r.estimate_minutes,
+      assignee: r.assignee ?? null,
+      progressPct: done ? 100 : Math.max(0, Math.min(100, Math.round(r.progress_pct ?? 0))),
       startedAt: r.started_at,
       completedAt: r.completed_at,
       scheduledStartMs: s.startMs,
@@ -182,6 +212,15 @@ export function setTaskPlan(taskId: string, patch: PlanTaskPatch): boolean {
     sets.push('is_milestone = ?')
     vals.push(patch.isMilestone ? 1 : 0)
   }
+  if ('assignee' in patch) {
+    const a = (patch.assignee ?? '').toString().trim()
+    sets.push('assignee = ?')
+    vals.push(a ? a.slice(0, 200) : null)
+  }
+  if ('progressPct' in patch) {
+    sets.push('progress_pct = ?')
+    vals.push(Math.max(0, Math.min(100, Math.round(patch.progressPct ?? 0))))
+  }
   if (sets.length === 0) return false
   sets.push('updated_at = ?')
   vals.push(Date.now())
@@ -213,7 +252,7 @@ function wouldCycle(predId: string, succId: string): boolean {
   return false
 }
 
-export function addDependency(predId: string, succId: string): AddDepResult {
+export function addDependency(predId: string, succId: string, type: DepType = 'FS', lag = 0): AddDepResult {
   const db = getDb()
   if (predId === succId) return { ok: false, reason: 'self' }
   const exists = (id: string): boolean =>
@@ -224,14 +263,29 @@ export function addDependency(predId: string, succId: string): AddDepResult {
     .get(predId, succId)
   if (dup) return { ok: false, reason: 'duplicate' }
   if (wouldCycle(predId, succId)) return { ok: false, reason: 'cycle' }
+  const safeType: DepType = (['FS', 'SS', 'FF', 'SF'] as DepType[]).includes(type) ? type : 'FS'
+  const safeLag = Number.isFinite(lag) ? Math.trunc(lag) : 0
   const id = randomUUID()
-  db.prepare('INSERT INTO fb_task_deps (id, pred_id, succ_id, created_at) VALUES (?, ?, ?, ?)').run(
+  db.prepare('INSERT INTO fb_task_deps (id, pred_id, succ_id, dep_type, lag_days, created_at) VALUES (?, ?, ?, ?, ?, ?)').run(
     id,
     predId,
     succId,
+    safeType,
+    safeLag,
     Date.now()
   )
-  return { ok: true, dep: { id, predId, succId } }
+  return { ok: true, dep: { id, predId, succId, type: safeType, lag: safeLag } }
+}
+
+// Update an existing dependency's type and/or lag.
+export function setDependency(predId: string, succId: string, type: DepType, lag: number): boolean {
+  const db = getDb()
+  const safeType: DepType = (['FS', 'SS', 'FF', 'SF'] as DepType[]).includes(type) ? type : 'FS'
+  const safeLag = Number.isFinite(lag) ? Math.trunc(lag) : 0
+  const res = db
+    .prepare('UPDATE fb_task_deps SET dep_type = ?, lag_days = ? WHERE pred_id = ? AND succ_id = ?')
+    .run(safeType, safeLag, predId, succId)
+  return res.changes > 0
 }
 
 export function removeDependency(predId: string, succId: string): boolean {
@@ -250,22 +304,28 @@ export function rescheduleProject(projectId: string, nowMs = Date.now()): Projec
   const ids = new Set(rows.map((r) => r.id))
   const deps = projectDeps(ids)
   const anchor = planAnchor(rows, nowMs)
+  const dayToMs = makeDayToMs(anchor, PROJECT_CALENDAR)
   const predsByTask = new Map<string, string[]>()
-  for (const d of deps) predsByTask.set(d.succId, [...(predsByTask.get(d.succId) ?? []), d.predId])
+  const linksByTask = new Map<string, DepLink[]>()
+  for (const d of deps) {
+    predsByTask.set(d.succId, [...(predsByTask.get(d.succId) ?? []), d.predId])
+    linksByTask.set(d.succId, [...(linksByTask.get(d.succId) ?? []), { id: d.predId, type: d.type, lag: d.lag }])
+  }
 
   const inputs: GanttInput[] = rows.map((r) => ({
     id: r.id,
     durationDays: durationDays(r),
     deps: predsByTask.get(r.id) ?? [],
+    links: linksByTask.get(r.id),
     isMilestone: !!r.is_milestone,
-    minStartDay: r.plan_start != null ? Math.round((r.plan_start - anchor) / DAY_MS) : undefined
+    minStartDay: r.plan_start != null ? workingOffset(anchor, r.plan_start) : undefined
   }))
   const actualFinish = new Map<string, number>()
   for (const r of rows) {
-    if (r.completed_at != null) actualFinish.set(r.id, Math.max(0, Math.round((r.completed_at - anchor) / DAY_MS)))
+    if (r.completed_at != null) actualFinish.set(r.id, workingOffset(anchor, r.completed_at))
   }
 
-  const rescheduled = rescheduleOnDrift(inputs, anchor, actualFinish)
+  const rescheduled = rescheduleOnDrift(inputs, anchor, actualFinish, dayToMs)
   const upd = db.prepare('UPDATE nodes SET plan_start = ?, due_date = ?, updated_at = ? WHERE id = ?')
   const now = Date.now()
   const writeAll = db.transaction((tasks: typeof rescheduled.tasks) => {

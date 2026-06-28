@@ -256,6 +256,8 @@ CREATE TABLE IF NOT EXISTS fb_task_deps (
   id TEXT PRIMARY KEY,
   pred_id TEXT NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
   succ_id TEXT NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
+  dep_type TEXT NOT NULL DEFAULT 'FS',
+  lag_days INTEGER NOT NULL DEFAULT 0,
   created_at INTEGER NOT NULL,
   UNIQUE (pred_id, succ_id)
 );
@@ -469,6 +471,12 @@ export function getDb(): Database.Database {
   // is reused as the planned finish); is_milestone marks a zero-duration marker.
   ensureColumn(db, 'nodes', 'plan_start', 'INTEGER')
   ensureColumn(db, 'nodes', 'is_milestone', 'INTEGER NOT NULL DEFAULT 0')
+  // PlexiProjects 2.0: who owns a task (free text) and manual progress 0-100.
+  ensureColumn(db, 'nodes', 'assignee', 'TEXT')
+  ensureColumn(db, 'nodes', 'progress_pct', 'REAL NOT NULL DEFAULT 0')
+  // Typed dependencies (FS/SS/FF/SF) + working-day lag on existing deps tables.
+  ensureColumn(db, 'fb_task_deps', 'dep_type', "TEXT NOT NULL DEFAULT 'FS'")
+  ensureColumn(db, 'fb_task_deps', 'lag_days', 'INTEGER NOT NULL DEFAULT 0')
   // Set on nodes reconstructed from a share someone sent you. Drives the
   // "Shared by <handle>" badge + avatar in the sidebar. Null = your own node.
   ensureColumn(db, 'nodes', 'shared_from_handle', 'TEXT')
