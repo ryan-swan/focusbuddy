@@ -134,12 +134,19 @@ test('3. drift marker: completed-late task shows amber glyph; on-time task does 
       [driftTaskId, pastStart, pastDue] as [string, number, number]
     )
 
-    // Also add an on-time task (no dates, not completed) for contrast
+    // Also add an on-time task with a clearly FUTURE plan window for contrast. It
+    // must be dated in the future, because the project anchor is pulled back to
+    // the late task's start (7 days ago), so an undated task would itself schedule
+    // in the past and read as overdue.
     const okTask = await window.evaluate(
       async (pid) => window.api.nodes.create({ parentId: pid, kind: 'task', title: 'On-Time Task' }),
       folderId
     )
     const okTaskId: string = (okTask as { id: string }).id
+    await window.evaluate(
+      async ([tid, start, due]) => window.api.projects.setTaskPlan(tid, { planStart: start, planDue: due }),
+      [okTaskId, now + 5 * DAY_MS, now + 9 * DAY_MS] as [string, number, number]
+    )
 
     // Mark driftTask done — this sets completed_at = now, which is 4 days after plan_due
     await window.evaluate(
@@ -175,47 +182,24 @@ test('3. drift marker: completed-late task shows amber glyph; on-time task does 
     // That means: completed_at is set but status is not 'done'. We can't do that
     // cleanly via nodes:update (setting status='done' also sets completed_at).
     //
-    // Instead, verify the no-drift case: the on-time task's bar has no warning icon.
+    // The future, on-time task is not overdue, so it carries no late marker.
     await expect(window.locator(`[data-testid="gantt-bar-${okTaskId}"]`)).toBeVisible({ timeout: 5_000 })
+    await expect(window.locator(`[data-testid="gantt-late-${okTaskId}"]`)).not.toBeVisible()
 
-    // The on-time bar should NOT contain a warning icon (no amber glyph)
-    const okBarHtml = await window.locator(`[data-testid="gantt-bar-${okTaskId}"]`).innerHTML()
-    // The amber warning icon renders as an svg or span with "warning"; confirm absent
-    expect(okBarHtml).not.toContain('amber')
-
-    // Confirm drift is in the plan (data layer verified above) even though the bar
-    // glyph is suppressed because the task is done.
-    // This is correct product behaviour: a completed task's bar shows done (green),
-    // not the drift warning, because the slip is historical.
+    // The completed task's bar shows done (green), not a late marker, because the
+    // slip is historical — correct product behaviour. The drift data is still in
+    // the plan (verified via IPC above).
+    await expect(window.locator(`[data-testid="gantt-late-${driftTaskId}"]`)).not.toBeVisible()
   } finally {
     await dispose()
   }
 })
 
-test('3b. drift marker: NOT-done task that slipped shows amber glyph', async () => {
-  // Seed a task with plan_due in the past and completed_at set (but status kept as
-  // non-done via direct IPC patch) so drifted && !done is true.
-  // Since nodes:update auto-sets completed_at only when transitioning to 'done',
-  // we use projects.setTaskPlan to set the date window, then simulate the node
-  // having a past completed_at by using nodes:update with the specific approach.
-  //
-  // Actually the only way completed_at gets set is via nodes:update({status:'done'}).
-  // The `done` branch in TaskBar hides the amber glyph. So the amber glyph path
-  // requires completed_at != null (which marks it as done in the TaskBar) — which
-  // means `done = true` in the component.
-  //
-  // Re-reading the source:
-  //   const done = task.status === 'done' || task.completedAt != null
-  //   {drifted && !done && <Icon name="warning" ... />}
-  //
-  // detectDrift uses actualFinish = completed_at. So for the glyph to show:
-  //   - task.completedAt must be set (to compute slip) but also make done=false
-  //   - That is impossible via the standard node lifecycle.
-  //
-  // Conclusion: the amber glyph is structurally unreachable via the test harness
-  // because the only way to record a finish (completed_at) marks the task as done,
-  // which suppresses the glyph. This is reported as a harness limitation, not a
-  // product bug. The drift data path IS verified via IPC in test 3.
+test('3b. late marker: an overdue, not-done task shows the late marker', async () => {
+  // A task whose scheduled finish is already in the past and that is NOT done is
+  // "running late" — the actionable case — and the bar shows the late marker
+  // (gantt-late-<id>). lateSet unions plan.drift with not-done tasks whose
+  // scheduledEndMs < now, so a merely-overdue undone task is flagged.
   const { window, dispose } = await launchApp()
   try {
     await waitForReady(window)
@@ -230,34 +214,19 @@ test('3b. drift marker: NOT-done task that slipped shows amber glyph', async () 
     )
     const taskId: string = (task as { id: string }).id
 
-    // Give a past due date — the task is NOT done, so completed_at stays null.
-    // detectDrift requires actualFinish to compute slip; with no completed_at,
-    // this task does NOT appear in drift (no actual finish to compare against).
-    // So the amber glyph won't show for a merely-overdue undone task either.
+    // A plan window fully in the past; the task is left open (not done).
     const now = Date.now()
     await window.evaluate(
       async ([tid, start, due]) => window.api.projects.setTaskPlan(tid, { planStart: start, planDue: due }),
       [taskId, now - 7 * DAY_MS, now - 4 * DAY_MS] as [string, number, number]
     )
 
-    // Confirm: plan.drift is empty for a not-done task (no actualFinish)
-    const plan = await window.evaluate(
-      async (pid) => window.api.projects.plan(pid),
-      folderId
-    )
-    const planTyped = plan as { drift: Array<{ id: string }> }
-    // No actual finish => detectDrift sees no entries for this task
-    const driftForTask = planTyped.drift.find((d) => d.id === taskId)
-    expect(driftForTask).toBeUndefined()
-
-    // Open Gantt to confirm the bar has no amber glyph
+    // Open Gantt; the overdue open task carries the late marker.
     await window.getByRole('button', { name: 'PlexiProjects' }).first().click()
     await expect(window.locator(`[data-testid="project-card-${folderId}"]`)).toBeVisible({ timeout: 8_000 })
     await window.locator(`[data-testid="project-card-${folderId}"]`).click()
     await expect(window.locator(`[data-testid="gantt-bar-${taskId}"]`)).toBeVisible({ timeout: 8_000 })
-
-    const barHtml = await window.locator(`[data-testid="gantt-bar-${taskId}"]`).innerHTML()
-    expect(barHtml).not.toContain('amber')
+    await expect(window.locator(`[data-testid="gantt-late-${taskId}"]`)).toBeVisible({ timeout: 5_000 })
   } finally {
     await dispose()
   }
