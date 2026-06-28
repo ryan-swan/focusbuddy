@@ -1358,9 +1358,17 @@ const api = {
     ): Promise<boolean> => ipcRenderer.invoke('projects:setTaskPlan', taskId, patch),
     addDep: (
       predId: string,
-      succId: string
+      succId: string,
+      type?: import('@shared/projects').DepType,
+      lag?: number
     ): Promise<import('@shared/projects').AddDepResult> =>
-      ipcRenderer.invoke('projects:addDep', predId, succId),
+      ipcRenderer.invoke('projects:addDep', predId, succId, type ?? 'FS', lag ?? 0),
+    setDep: (
+      predId: string,
+      succId: string,
+      type: import('@shared/projects').DepType,
+      lag: number
+    ): Promise<boolean> => ipcRenderer.invoke('projects:setDep', predId, succId, type, lag),
     removeDep: (predId: string, succId: string): Promise<boolean> =>
       ipcRenderer.invoke('projects:removeDep', predId, succId),
     reschedule: (projectId: string): Promise<import('@shared/projects').ProjectPlan> =>

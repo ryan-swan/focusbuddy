@@ -2,6 +2,8 @@
 // preload bridge and the renderer Gantt. The scheduling math lives in gantt.ts;
 // these are the data-transfer types that carry a computed plan to the UI.
 
+export type DepType = 'FS' | 'SS' | 'FF' | 'SF'
+
 export interface PlanTask {
   id: string
   title: string
@@ -11,6 +13,10 @@ export interface PlanTask {
   planStart: number | null
   planDue: number | null
   estimateMinutes: number | null
+  // Person responsible (free text: a name or email), or null when unassigned.
+  assignee: string | null
+  // Manual progress 0-100. A completed task always reads 100.
+  progressPct: number
   // Actuals from the node lifecycle.
   startedAt: number | null
   completedAt: number | null
@@ -28,6 +34,9 @@ export interface PlanDep {
   id: string
   predId: string
   succId: string
+  // Dependency type + working-day lag (negative = lead). Default FS, lag 0.
+  type: DepType
+  lag: number
 }
 
 export interface PlanDrift {
@@ -65,6 +74,8 @@ export interface PlanTaskPatch {
   planDue?: number | null
   isMilestone?: boolean
   estimateMinutes?: number | null
+  assignee?: string | null
+  progressPct?: number
 }
 
 export type AddDepResult =
