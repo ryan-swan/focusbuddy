@@ -36,6 +36,20 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.104',
+    date: '2026-07-20T12:00:00Z',
+    title: 'v2.5.104 — PlexiProjects: baselines, calendars, and two new views',
+    tag: 'feature',
+    summary:
+      'PlexiProjects gains the planning depth you expect from a serious tool. Set a baseline to freeze the current plan, and from then on the timeline shows a dashed baseline under each task and the editor tells you how many days ahead of or behind it you are. Give each project its own working calendar, choose the working weekdays and add holidays, and the schedule plans around them. There are two more ways to see the plan: a month Calendar that lays tasks out on their dates, and a Workload view that shows each person, what is on their plate and how loaded they are. And assigning work now suggests your teammates instead of relying on memory.',
+    highlights: [
+      'Baselines and variance: freeze a plan, then see a dashed baseline on the timeline and a days-ahead/behind readout per task.',
+      'Per-project working calendar: pick working weekdays and add holidays, and the schedule plans around them.',
+      'Two new views: a month Calendar of your tasks, and a Workload view of each person’s load.',
+      'Assigning work suggests teammates who are online (and anyone already assigned), with free text still allowed.'
+    ]
+  },
+  {
     version: '2.5.103',
     date: '2026-07-19T12:00:00Z',
     title: 'v2.5.103 — PlexiProjects comes alive',
