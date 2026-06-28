@@ -36,6 +36,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.98',
+    date: '2026-07-14T12:00:00Z',
+    title: 'v2.5.98 — every meeting ends with a summary and the things to make next',
+    tag: 'feature',
+    summary:
+      'When a meeting or call ends, PlexiDesk now offers you a summary of the conversation and the deliverables that came out of it, ready to create with one click. It records the call, writes a grounded summary, and proposes the tasks, documents, spreadsheets, decks and research notes that the conversation actually called for, so the work that was agreed turns into real things in your workspace instead of slipping away. The summary and every suggestion are drawn only from what was said, never invented, and if there is no AI key set it tells you plainly rather than guessing.',
+    highlights: [
+      'A summary at the end of every meeting and call, written from the actual conversation.',
+      'One-click deliverables: turn what was agreed into tasks, documents, spreadsheets, slide decks and research notes without retyping it.',
+      'Honest by design: nothing is summarised or proposed that was not said, and a missing key or empty call shows a clear message instead of a made-up result.'
+    ]
+  },
+  {
     version: '2.5.97',
     date: '2026-07-13T12:00:00Z',
     title: 'v2.5.97 — video messages',
