@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Icon from '../Icon'
 import { DashboardHeader, StatusPill, PLEXI_CARD } from '../plexi'
 import { useViewStore } from '../../stores/view'
+import { useNodeStore } from '../../stores/nodes'
 import { useQuickCreate } from '../../stores/quickCreate'
 import type { ProjectPlan, ProjectSummary, PlanTask } from '@shared/projects'
 
@@ -672,7 +673,9 @@ function TaskEditor({
   async function removeTask(): Promise<void> {
     setError(null)
     try {
-      await window.api.nodes.delete(task.id)
+      // Go through the node store so the delete records a visible "Undo" toast,
+      // the same forgiveness the sidebar tree gives.
+      await useNodeStore.getState().remove(task.id)
       onClose()
       onChanged()
     } catch (e) {

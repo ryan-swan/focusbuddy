@@ -33,7 +33,9 @@ test('1 — sidebar PlexiBuild opens [data-testid="plexibuild-view"] with honest
   await expect(view).toBeVisible()
 
   // Honest empty state — no fabricated apps.
-  await expect(view.locator('text=No apps yet')).toBeVisible({ timeout: 5_000 })
+  // Both the list rail and ModuleHome show "No apps yet" when items=0; use .first()
+  // to target the list-rail instance and satisfy Playwright strict mode.
+  await expect(view.locator('text=No apps yet').first()).toBeVisible({ timeout: 5_000 })
   const rows = await view.locator('[data-testid^="build-app-"]').count()
   expect(rows, 'zero app rows in fresh DB').toBe(0)
 
@@ -287,7 +289,7 @@ test('7 — app-delete removes the app; list returns to honest empty state', asy
   // Builder gone, row gone, empty state returns.
   await expect(window.locator('[data-testid="app-builder"]')).toHaveCount(0)
   await expect(window.locator('[data-testid^="build-app-"]')).toHaveCount(0)
-  await expect(window.locator('text=No apps yet')).toBeVisible({ timeout: 3_000 })
+  await expect(window.locator('text=No apps yet').first()).toBeVisible({ timeout: 3_000 })
 })
 
 // ── Test 8: PlexiBuild READY in the launcher ───────────────────────────────────

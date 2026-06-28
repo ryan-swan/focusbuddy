@@ -3,6 +3,7 @@ import Icon from '../Icon'
 import { DashboardHeader, StatusPill } from '../plexi'
 import ModuleHome from '../ModuleHome'
 import { useQuickCreate } from '../../stores/quickCreate'
+import { useLandOnContent } from '../../hooks/useLandOnContent'
 import type { FbTable } from '@shared/fields'
 import type { ReportDef, ReportSchedule } from '@shared/reports'
 
@@ -70,6 +71,7 @@ export default function PlexiReportsView(): JSX.Element {
   }, [quickPending])
 
   const selected = reports?.find((r) => r.id === selectedId) ?? null
+  const { showOverview } = useLandOnContent(reports !== null, reports ?? [], selectedId, setSelectedId)
 
   return (
     <div className="h-full w-full flex bg-[var(--surface-base)] text-[var(--ink-100)]" data-testid="plexireports-view">
@@ -83,13 +85,26 @@ export default function PlexiReportsView(): JSX.Element {
           <p className="mt-0.5 text-[11.5px] text-[var(--ink-70)]">Reports from your tables, on a schedule.</p>
         </div>
         <div className="px-3 py-2.5">
-          <button
-            onClick={() => void addReport()}
-            data-testid="report-new"
-            className="w-full inline-flex items-center justify-center gap-1.5 h-8 rounded-md bg-[rgb(var(--accent))] text-white text-[12.5px] font-medium hover:bg-[rgb(var(--accent-hover))]"
-          >
-            <Icon name="add" size={15} /> New report
-          </button>
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => void addReport()}
+              data-testid="report-new"
+              className="flex-1 inline-flex items-center justify-center gap-1.5 h-8 rounded-md bg-[rgb(var(--accent))] text-white text-[12.5px] font-medium hover:bg-[rgb(var(--accent-hover))]"
+            >
+              <Icon name="add" size={15} /> New report
+            </button>
+            {reports && reports.length > 0 && (
+              <button
+                onClick={showOverview}
+                data-testid="report-overview"
+                title="Module overview"
+                aria-label="Module overview"
+                className={`inline-flex items-center justify-center h-8 w-8 rounded-md border text-[var(--ink-70)] hover:bg-[var(--surface-sunken)] ${selectedId ? 'border-[var(--edge-soft)]' : 'border-[rgb(var(--accent)/0.40)] text-[rgb(var(--accent))]'}`}
+              >
+                <Icon name="dashboard" size={15} />
+              </button>
+            )}
+          </div>
           {error && <p className="mt-2 text-rose-500 text-[12px]" data-testid="reports-error">{error}</p>}
         </div>
         <div className="flex-1 overflow-auto px-2 pb-2">
