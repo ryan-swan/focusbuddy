@@ -8,7 +8,7 @@ import {
   type GanttInput,
   type DepLink
 } from '@shared/gantt'
-import { makeDayToMs, workingDaysBetween, DEFAULT_CALENDAR } from '@shared/workingCalendar'
+import { makeDayToMs, workingDaysBetween, DEFAULT_CALENDAR, type WorkingCalendar } from '@shared/workingCalendar'
 import type {
   ProjectPlan,
   PlanTask,
@@ -85,21 +85,46 @@ function projectDeps(taskIds: Set<string>): PlanDep[] {
     }))
 }
 
-// The working calendar applied to scheduling. A Monday-to-Friday week by default
-// so the timeline skips weekends the way Microsoft Project does.
-const PROJECT_CALENDAR = DEFAULT_CALENDAR
+// Load a project's working calendar; the Mon-Fri default when no row exists.
+export function loadProjectCalendar(projectId: string): WorkingCalendar {
+  const db = getDb()
+  const row = db
+    .prepare('SELECT working_days, holidays_json FROM fb_project_calendars WHERE project_id = ?')
+    .get(projectId) as { working_days: string; holidays_json: string } | undefined
+  if (!row) return DEFAULT_CALENDAR
+  try {
+    const workingDays = JSON.parse(row.working_days) as boolean[]
+    const holidays = JSON.parse(row.holidays_json) as number[]
+    if (!Array.isArray(workingDays) || workingDays.length !== 7) return DEFAULT_CALENDAR
+    return { workingDays, holidays: Array.isArray(holidays) ? holidays : [] }
+  } catch {
+    return DEFAULT_CALENDAR
+  }
+}
 
-// Whole-day duration for a task in WORKING days: from explicit start/due when
-// both are set, otherwise from the estimate at an 8 hour working day, otherwise
-// one day. A milestone is always zero.
-function durationDays(row: TaskRow): number {
+export function saveProjectCalendar(projectId: string, cal: WorkingCalendar): boolean {
+  const db = getDb()
+  const workingDays = Array.isArray(cal.workingDays) && cal.workingDays.length === 7 ? cal.workingDays.map(Boolean) : DEFAULT_CALENDAR.workingDays
+  const holidays = Array.isArray(cal.holidays) ? cal.holidays.filter((h) => typeof h === 'number') : []
+  db.prepare(
+    `INSERT INTO fb_project_calendars (project_id, working_days, holidays_json, updated_at)
+     VALUES (?, ?, ?, ?)
+     ON CONFLICT(project_id) DO UPDATE SET working_days = excluded.working_days, holidays_json = excluded.holidays_json, updated_at = excluded.updated_at`
+  ).run(projectId, JSON.stringify(workingDays), JSON.stringify(holidays), Date.now())
+  return true
+}
+
+// Whole-day duration for a task in WORKING days under the given calendar: from
+// explicit start/due when both are set, otherwise from the estimate at an 8 hour
+// working day, otherwise one day. A milestone is always zero.
+function durationDays(row: TaskRow, cal: WorkingCalendar): number {
   if (row.is_milestone) return 0
   if (row.plan_start != null && row.due_date != null && row.due_date > row.plan_start) {
     // Count whole calendar days: floor both ends so a task's duration does not
     // shift with the time-of-day at which its dates were set.
     const startDay = Math.floor(row.plan_start / DAY_MS) * DAY_MS
     const dueDay = Math.floor(row.due_date / DAY_MS) * DAY_MS
-    return Math.max(1, workingDaysBetween(startDay, dueDay, PROJECT_CALENDAR))
+    return Math.max(1, workingDaysBetween(startDay, dueDay, cal))
   }
   if (row.estimate_minutes && row.estimate_minutes > 0) {
     return Math.max(1, Math.ceil(row.estimate_minutes / (60 * 8)))
@@ -110,9 +135,57 @@ function durationDays(row: TaskRow): number {
 // Working-day offset of a timestamp from the anchor (for minStartDay / actuals).
 // Floors ms to its calendar day so a task dated on the anchor day is offset 0
 // regardless of the time-of-day component the date carries.
-function workingOffset(anchor: number, ms: number): number {
+function workingOffset(anchor: number, ms: number, cal: WorkingCalendar): number {
   const day = Math.floor(ms / DAY_MS) * DAY_MS
-  return day <= anchor ? 0 : workingDaysBetween(anchor, day, PROJECT_CALENDAR)
+  return day <= anchor ? 0 : workingDaysBetween(anchor, day, cal)
+}
+
+// ── Baselines ────────────────────────────────────────────────────────────────
+interface BaselineTasks {
+  [taskId: string]: { startMs: number; endMs: number }
+}
+
+// Snapshot the current scheduled start/end of every task as a named baseline.
+export function captureBaseline(projectId: string, name: string, nowMs = Date.now()): { id: string; name: string; createdAt: number } {
+  const db = getDb()
+  const plan = getProjectPlan(projectId, nowMs)
+  const tasks: BaselineTasks = {}
+  for (const t of plan.tasks) tasks[t.id] = { startMs: t.scheduledStartMs, endMs: t.scheduledEndMs }
+  const id = randomUUID()
+  const created = Date.now()
+  const cleanName = (name || 'Baseline').toString().trim().slice(0, 120) || 'Baseline'
+  db.prepare('INSERT INTO fb_project_baselines (id, project_id, name, tasks_json, created_at) VALUES (?, ?, ?, ?, ?)').run(
+    id,
+    projectId,
+    cleanName,
+    JSON.stringify(tasks),
+    created
+  )
+  return { id, name: cleanName, createdAt: created }
+}
+
+export function listBaselines(projectId: string): Array<{ id: string; name: string; createdAt: number }> {
+  const db = getDb()
+  return db
+    .prepare('SELECT id, name, created_at FROM fb_project_baselines WHERE project_id = ? ORDER BY created_at DESC')
+    .all(projectId)
+    .map((r) => {
+      const row = r as { id: string; name: string; created_at: number }
+      return { id: row.id, name: row.name, createdAt: row.created_at }
+    })
+}
+
+function latestBaselineTasks(projectId: string): BaselineTasks | null {
+  const db = getDb()
+  const row = db
+    .prepare('SELECT tasks_json FROM fb_project_baselines WHERE project_id = ? ORDER BY created_at DESC LIMIT 1')
+    .get(projectId) as { tasks_json: string } | undefined
+  if (!row) return null
+  try {
+    return JSON.parse(row.tasks_json) as BaselineTasks
+  } catch {
+    return null
+  }
 }
 
 // Midnight-floored anchor: the earliest planned start across the tasks, or today
@@ -132,7 +205,8 @@ export function getProjectPlan(projectId: string, nowMs = Date.now()): ProjectPl
   const ids = new Set(rows.map((r) => r.id))
   const deps = projectDeps(ids)
   const anchor = planAnchor(rows, nowMs)
-  const dayToMs = makeDayToMs(anchor, PROJECT_CALENDAR)
+  const cal = loadProjectCalendar(projectId)
+  const dayToMs = makeDayToMs(anchor, cal)
 
   const predsByTask = new Map<string, string[]>()
   const linksByTask = new Map<string, DepLink[]>()
@@ -143,11 +217,11 @@ export function getProjectPlan(projectId: string, nowMs = Date.now()): ProjectPl
 
   const inputs: GanttInput[] = rows.map((r) => ({
     id: r.id,
-    durationDays: durationDays(r),
+    durationDays: durationDays(r, cal),
     deps: predsByTask.get(r.id) ?? [],
     links: linksByTask.get(r.id),
     isMilestone: !!r.is_milestone,
-    minStartDay: r.plan_start != null ? workingOffset(anchor, r.plan_start) : undefined
+    minStartDay: r.plan_start != null ? workingOffset(anchor, r.plan_start, cal) : undefined
   }))
 
   const schedule = computeSchedule(inputs, anchor, dayToMs)
@@ -156,13 +230,15 @@ export function getProjectPlan(projectId: string, nowMs = Date.now()): ProjectPl
   // Actual finishes (completed_at) as working-day offsets, for drift detection.
   const actualFinish = new Map<string, number>()
   for (const r of rows) {
-    if (r.completed_at != null) actualFinish.set(r.id, workingOffset(anchor, r.completed_at))
+    if (r.completed_at != null) actualFinish.set(r.id, workingOffset(anchor, r.completed_at, cal))
   }
   const drift = detectDrift(schedule, actualFinish)
+  const baseline = latestBaselineTasks(projectId)
 
   const tasks: PlanTask[] = rows.map((r) => {
     const s = schedById.get(r.id)!
     const done = r.status === 'done' || r.completed_at != null
+    const bl = baseline?.[r.id]
     return {
       id: r.id,
       title: r.title,
@@ -180,7 +256,9 @@ export function getProjectPlan(projectId: string, nowMs = Date.now()): ProjectPl
       durationDays: s.durationDays,
       slackDays: s.slackDays,
       critical: s.critical,
-      deps: predsByTask.get(r.id) ?? []
+      deps: predsByTask.get(r.id) ?? [],
+      baselineStartMs: bl?.startMs ?? null,
+      baselineEndMs: bl?.endMs ?? null
     }
   })
   // Stable order: by scheduled start, then title, so the Gantt reads top-down.
@@ -195,7 +273,8 @@ export function getProjectPlan(projectId: string, nowMs = Date.now()): ProjectPl
     deps,
     criticalPath: schedule.criticalPath,
     hasCycle: schedule.hasCycle,
-    drift
+    drift,
+    hasBaseline: baseline != null
   }
 }
 
@@ -311,7 +390,8 @@ export function rescheduleProject(projectId: string, nowMs = Date.now()): Projec
   const ids = new Set(rows.map((r) => r.id))
   const deps = projectDeps(ids)
   const anchor = planAnchor(rows, nowMs)
-  const dayToMs = makeDayToMs(anchor, PROJECT_CALENDAR)
+  const cal = loadProjectCalendar(projectId)
+  const dayToMs = makeDayToMs(anchor, cal)
   const predsByTask = new Map<string, string[]>()
   const linksByTask = new Map<string, DepLink[]>()
   for (const d of deps) {
@@ -321,15 +401,15 @@ export function rescheduleProject(projectId: string, nowMs = Date.now()): Projec
 
   const inputs: GanttInput[] = rows.map((r) => ({
     id: r.id,
-    durationDays: durationDays(r),
+    durationDays: durationDays(r, cal),
     deps: predsByTask.get(r.id) ?? [],
     links: linksByTask.get(r.id),
     isMilestone: !!r.is_milestone,
-    minStartDay: r.plan_start != null ? workingOffset(anchor, r.plan_start) : undefined
+    minStartDay: r.plan_start != null ? workingOffset(anchor, r.plan_start, cal) : undefined
   }))
   const actualFinish = new Map<string, number>()
   for (const r of rows) {
-    if (r.completed_at != null) actualFinish.set(r.id, workingOffset(anchor, r.completed_at))
+    if (r.completed_at != null) actualFinish.set(r.id, workingOffset(anchor, r.completed_at, cal))
   }
 
   const rescheduled = rescheduleOnDrift(inputs, anchor, actualFinish, dayToMs)

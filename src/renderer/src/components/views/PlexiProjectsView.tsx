@@ -5,6 +5,8 @@ import { useViewStore } from '../../stores/view'
 import { useNodeStore } from '../../stores/nodes'
 import { useQuickCreate } from '../../stores/quickCreate'
 import type { ProjectPlan, ProjectSummary, PlanTask, PlanDep, DepType } from '@shared/projects'
+import type { WorkingCalendar } from '@shared/workingCalendar'
+import { usePresenceStore } from '../../stores/presence'
 
 // PlexiProjects: roll the tasks you already work in up into a scheduled plan. A
 // portfolio lists every project (a folder with tasks) with its progress and end
@@ -19,12 +21,15 @@ const ROW_H = 32 // px per task row
 const HEADER_H = 32
 const NAME_W = 224
 
-// The project workspace can show the same plan as a timeline, a board or a grid.
-type ProjectViewMode = 'gantt' | 'board' | 'grid'
+// The project workspace can show the same plan as a timeline, a board, a grid, a
+// month calendar or a per-person workload.
+type ProjectViewMode = 'gantt' | 'board' | 'grid' | 'calendar' | 'workload'
 const VIEW_MODES: { id: ProjectViewMode; label: string; icon: string }[] = [
   { id: 'gantt', label: 'Timeline', icon: 'timeline' },
   { id: 'board', label: 'Board', icon: 'view_kanban' },
-  { id: 'grid', label: 'Grid', icon: 'table_rows' }
+  { id: 'grid', label: 'Grid', icon: 'table_rows' },
+  { id: 'calendar', label: 'Calendar', icon: 'calendar_month' },
+  { id: 'workload', label: 'Workload', icon: 'groups' }
 ]
 
 // Workflow statuses shown as board columns, in order.
@@ -218,6 +223,20 @@ function ProjectGantt({ projectId, onBack }: { projectId: string; onBack: () => 
   const [adding, setAdding] = useState(false)
   const [newTitle, setNewTitle] = useState('')
   const [viewMode, setViewMode] = useState<ProjectViewMode>('gantt')
+  const [showCalSettings, setShowCalSettings] = useState(false)
+
+  // Capture the current schedule as a baseline, so the timeline can show planned-
+  // vs-actual variance from here on.
+  async function setBaseline(): Promise<void> {
+    setError(null)
+    try {
+      const stamp = new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+      await window.api.projects.captureBaseline(projectId, `Baseline ${stamp}`)
+      load()
+    } catch (e) {
+      setError(`Could not set the baseline: ${e instanceof Error ? e.message : String(e)}`)
+    }
+  }
 
   // Update a task's workflow status (used by the board's drag-between-columns).
   async function setTaskStatus(taskId: string, status: string): Promise<void> {
@@ -384,6 +403,28 @@ function ProjectGantt({ projectId, onBack }: { projectId: string; onBack: () => 
               </button>
             )}
             <button
+              onClick={() => void setBaseline()}
+              data-testid="projects-set-baseline"
+              className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border border-[var(--edge-soft)] text-[12.5px] text-[var(--ink-90)] hover:bg-[var(--surface-sunken)]"
+              title={plan?.hasBaseline ? 'Re-capture the baseline at the current plan' : 'Capture the current plan as a baseline to track variance against'}
+            >
+              <Icon name="flag_circle" size={15} /> {plan?.hasBaseline ? 'Baseline set' : 'Set baseline'}
+            </button>
+            <div className="relative">
+              <button
+                onClick={() => setShowCalSettings((v) => !v)}
+                data-testid="projects-calendar-settings"
+                aria-label="Working calendar"
+                title="Working calendar"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--edge-soft)] text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]"
+              >
+                <Icon name="event_available" size={15} />
+              </button>
+              {showCalSettings && (
+                <CalendarSettings projectId={projectId} onClose={() => setShowCalSettings(false)} onChanged={load} />
+              )}
+            </div>
+            <button
               onClick={() => void reschedule()}
               disabled={busy}
               data-testid="projects-reschedule"
@@ -424,6 +465,10 @@ function ProjectGantt({ projectId, onBack }: { projectId: string; onBack: () => 
             <BoardView plan={plan} selectedId={selectedId} onSelect={setSelectedId} onSetStatus={(id, s) => void setTaskStatus(id, s)} />
           ) : viewMode === 'grid' ? (
             <GridView plan={plan} selectedId={selectedId} onSelect={setSelectedId} critPathSet={critPathSet} lateSet={lateSet} />
+          ) : viewMode === 'calendar' ? (
+            <CalendarView plan={plan} selectedId={selectedId} onSelect={setSelectedId} critPathSet={critPathSet} lateSet={lateSet} />
+          ) : viewMode === 'workload' ? (
+            <WorkloadView plan={plan} selectedId={selectedId} onSelect={setSelectedId} />
           ) : geom ? (
             <div className="flex fb-fade-in-up">
               {/* Sticky task-name column */}
@@ -457,6 +502,24 @@ function ProjectGantt({ projectId, onBack }: { projectId: string; onBack: () => 
                   <GridLines totalDays={geom.totalDays} rows={plan.tasks.length} />
                   <DependencyArrows plan={plan} geom={geom} critPathSet={critPathSet} />
                   <TodayLine x={geom.xOf(geom.now)} height={geom.height} />
+                  {/* Baseline ghost bars: the captured plan window, under each task. */}
+                  {plan.hasBaseline &&
+                    plan.tasks.map((t, i) =>
+                      t.baselineStartMs != null && t.baselineEndMs != null ? (
+                        <div
+                          key={`bl-${t.id}`}
+                          className="absolute rounded-[2px] border border-dashed border-[var(--ink-40)] opacity-60 pointer-events-none"
+                          style={{
+                            left: geom.xOf(t.baselineStartMs),
+                            top: i * ROW_H + ROW_H - 5,
+                            width: Math.max(4, ((t.baselineEndMs - t.baselineStartMs) / DAY_MS) * DAY_W),
+                            height: 3
+                          }}
+                          data-testid={`gantt-baseline-${t.id}`}
+                          title={`Baseline ${fmtDate(t.baselineStartMs)} to ${fmtDate(t.baselineEndMs)}`}
+                        />
+                      ) : null
+                    )}
                   {plan.tasks.map((t, i) => (
                     <TaskBar
                       key={t.id}
@@ -885,6 +948,16 @@ function TaskEditor({
     }
   }
 
+  // Assignee suggestions: teammates currently online (the People presence layer)
+  // plus anyone already assigned in this project. Free text is still allowed.
+  const presencePeers = usePresenceStore((s) => s.peers)
+  const assigneeSuggestions = useMemo(() => {
+    const set = new Set<string>()
+    for (const p of Object.values(presencePeers)) if (p.handle) set.add(p.handle)
+    for (const t of allTasks) if (t.assignee) set.add(t.assignee)
+    return [...set].sort((a, b) => a.localeCompare(b))
+  }, [presencePeers, allTasks])
+
   const candidates = allTasks.filter((t) => t.id !== task.id && !task.deps.includes(t.id))
   const successors = allTasks.filter((t) => t.deps.includes(task.id))
   const succCandidates = allTasks.filter((t) => t.id !== task.id && !t.deps.includes(task.id))
@@ -996,6 +1069,7 @@ function TaskEditor({
           <input
             value={assignee}
             data-testid="task-assignee"
+            list="plexi-assignee-suggestions"
             onChange={(e) => setAssignee(e.target.value)}
             onBlur={() => void saveAssignee()}
             onKeyDown={(e) => {
@@ -1004,9 +1078,14 @@ function TaskEditor({
                 ;(e.target as HTMLInputElement).blur()
               }
             }}
-            placeholder="Name or email"
+            placeholder="Pick a teammate or type a name"
             className="mt-1 w-full rounded-md bg-[var(--surface-base)] border border-[var(--edge-soft)] px-2 py-1.5 text-[12px] text-[var(--ink-100)] focus:outline-none focus:border-[rgb(var(--accent)/0.55)]"
           />
+          <datalist id="plexi-assignee-suggestions">
+            {assigneeSuggestions.map((s) => (
+              <option key={s} value={s} />
+            ))}
+          </datalist>
         </label>
 
         {!task.isMilestone && (
@@ -1155,6 +1234,19 @@ function TaskEditor({
         <div className="pt-1 text-[11px] text-[var(--ink-50)] space-y-0.5">
           <p className="fb-tabular">Scheduled {fmtDate(task.scheduledStartMs)} to {fmtDate(task.scheduledEndMs)}</p>
           <p className="fb-tabular">{task.critical ? 'On the critical path' : `${task.slackDays} day(s) of slack`}</p>
+          {task.baselineEndMs != null &&
+            (() => {
+              const variance = Math.round((task.scheduledEndMs - task.baselineEndMs) / DAY_MS)
+              return (
+                <p className={`fb-tabular ${variance > 0 ? 'text-rose-500' : variance < 0 ? 'text-emerald-500' : ''}`} data-testid="task-variance">
+                  {variance === 0
+                    ? 'On baseline'
+                    : variance > 0
+                      ? `${variance} day(s) behind baseline`
+                      : `${Math.abs(variance)} day(s) ahead of baseline`}
+                </p>
+              )
+            })()}
         </div>
       </div>
     </div>
@@ -1369,5 +1461,293 @@ function GridView({
         </tbody>
       </table>
     </div>
+  )
+}
+
+// ── Calendar view ────────────────────────────────────────────────────────────
+// A month grid showing each task on the days its scheduled window covers. A real
+// calendar of the plan; navigate months with the arrows.
+function CalendarView({
+  plan,
+  selectedId,
+  onSelect,
+  critPathSet,
+  lateSet
+}: {
+  plan: ProjectPlan
+  selectedId: string | null
+  onSelect: (id: string) => void
+  critPathSet: Set<string>
+  lateSet: Set<string>
+}): JSX.Element {
+  const base = new Date(plan.anchorMs)
+  const [month, setMonth] = useState({ y: base.getFullYear(), m: base.getMonth() })
+  const first = new Date(month.y, month.m, 1)
+  const daysInMonth = new Date(month.y, month.m + 1, 0).getDate()
+  const leading = first.getDay() // 0=Sun
+  const cells: Array<{ day: number; date: Date } | null> = []
+  for (let i = 0; i < leading; i++) cells.push(null)
+  for (let d = 1; d <= daysInMonth; d++) cells.push({ day: d, date: new Date(month.y, month.m, d) })
+  while (cells.length % 7 !== 0) cells.push(null)
+
+  const dayCovers = (t: PlanTask, date: Date): boolean => {
+    const ds = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime()
+    const de = ds + DAY_MS - 1
+    const ts = Math.floor(t.scheduledStartMs / DAY_MS) * DAY_MS
+    const te = t.scheduledEndMs
+    return ts <= de && te >= ds
+  }
+  const todayKey = (() => {
+    const n = new Date()
+    return `${n.getFullYear()}-${n.getMonth()}-${n.getDate()}`
+  })()
+  const monthLabel = first.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
+
+  return (
+    <div className="p-4 h-full overflow-auto fb-fade-in-up" data-testid="projects-calendar">
+      <div className="flex items-center gap-2 mb-3">
+        <button
+          onClick={() => setMonth((s) => (s.m === 0 ? { y: s.y - 1, m: 11 } : { y: s.y, m: s.m - 1 }))}
+          data-testid="calendar-prev"
+          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--edge-soft)] text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]"
+        >
+          <Icon name="chevron_left" size={16} />
+        </button>
+        <h3 className="text-[14px] font-semibold text-[var(--ink-100)] fb-tabular w-40 text-center">{monthLabel}</h3>
+        <button
+          onClick={() => setMonth((s) => (s.m === 11 ? { y: s.y + 1, m: 0 } : { y: s.y, m: s.m + 1 }))}
+          data-testid="calendar-next"
+          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--edge-soft)] text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]"
+        >
+          <Icon name="chevron_right" size={16} />
+        </button>
+        <button
+          onClick={() => setMonth({ y: new Date().getFullYear(), m: new Date().getMonth() })}
+          className="ml-1 inline-flex items-center h-8 px-2.5 rounded-lg border border-[var(--edge-soft)] text-[12px] text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]"
+        >
+          Today
+        </button>
+      </div>
+      <div className="grid grid-cols-7 gap-px text-[11px] text-[var(--ink-50)] mb-1">
+        {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => (
+          <div key={d} className="px-2 py-1 font-medium">{d}</div>
+        ))}
+      </div>
+      <div className="grid grid-cols-7 gap-px bg-[var(--edge-soft)] rounded-lg overflow-hidden border border-[var(--edge-soft)]">
+        {cells.map((c, i) => {
+          if (!c) return <div key={i} className="bg-[var(--surface-base)] min-h-[92px]" />
+          const dayTasks = plan.tasks.filter((t) => dayCovers(t, c.date))
+          const isToday = `${c.date.getFullYear()}-${c.date.getMonth()}-${c.date.getDate()}` === todayKey
+          return (
+            <div key={i} className="bg-[var(--surface-raised)] min-h-[92px] p-1.5">
+              <div className={`text-[11px] mb-1 fb-tabular ${isToday ? 'inline-flex h-5 w-5 items-center justify-center rounded-full bg-[rgb(var(--accent))] text-white' : 'text-[var(--ink-50)]'}`}>
+                {c.day}
+              </div>
+              <div className="space-y-1">
+                {dayTasks.slice(0, 3).map((t) => {
+                  const crit = critPathSet.has(t.id) || t.critical
+                  const done = t.status === 'done' || t.completedAt != null
+                  return (
+                    <button
+                      key={t.id}
+                      onClick={() => onSelect(t.id)}
+                      data-testid={`calendar-task-${t.id}`}
+                      title={t.title}
+                      className={`w-full text-left truncate rounded px-1.5 py-0.5 text-[10.5px] ${
+                        done
+                          ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
+                          : crit
+                            ? 'bg-rose-500/15 text-rose-700 dark:text-rose-300'
+                            : 'bg-[rgb(var(--accent)/0.15)] text-[var(--ink-90)]'
+                      } ${t.id === selectedId ? 'ring-1 ring-[rgb(var(--accent)/0.6)]' : ''}`}
+                    >
+                      {t.isMilestone ? '◆ ' : ''}
+                      {lateSet.has(t.id) ? '⚠ ' : ''}
+                      {t.title || 'Untitled'}
+                    </button>
+                  )
+                })}
+                {dayTasks.length > 3 && <div className="text-[10px] text-[var(--ink-50)] px-1">+{dayTasks.length - 3} more</div>}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+// ── Workload view ────────────────────────────────────────────────────────────
+// Each person and what is on their plate: their tasks, total working days, and a
+// load bar relative to the busiest person. "Unassigned" surfaces unowned work.
+function WorkloadView({
+  plan,
+  selectedId,
+  onSelect
+}: {
+  plan: ProjectPlan
+  selectedId: string | null
+  onSelect: (id: string) => void
+}): JSX.Element {
+  const groups = new Map<string, PlanTask[]>()
+  for (const t of plan.tasks) {
+    if (t.isMilestone) continue
+    const key = (t.assignee && t.assignee.trim()) || 'Unassigned'
+    groups.set(key, [...(groups.get(key) ?? []), t])
+  }
+  const rows = [...groups.entries()]
+    .map(([name, tasks]) => ({
+      name,
+      tasks,
+      load: tasks.reduce((n, t) => n + t.durationDays, 0),
+      open: tasks.filter((t) => !(t.status === 'done' || t.completedAt != null)).length
+    }))
+    .sort((a, b) => b.load - a.load)
+  const maxLoad = Math.max(1, ...rows.map((r) => r.load))
+
+  if (rows.length === 0) {
+    return (
+      <div className="p-8 text-center text-[13px] text-[var(--ink-50)]" data-testid="projects-workload">
+        No tasks to schedule across people yet.
+      </div>
+    )
+  }
+
+  return (
+    <div className="p-4 h-full overflow-auto fb-fade-in-up space-y-3" data-testid="projects-workload">
+      {rows.map((r) => (
+        <div key={r.name} className={`${PLEXI_CARD} p-3.5`} data-testid={`workload-row-${r.name === 'Unassigned' ? 'unassigned' : 'person'}`}>
+          <div className="flex items-center gap-2.5">
+            <span className={`inline-flex h-8 w-8 items-center justify-center rounded-full text-[12px] font-semibold ${r.name === 'Unassigned' ? 'bg-[var(--surface-sunken)] text-[var(--ink-50)]' : 'bg-[rgb(var(--accent)/0.15)] text-[rgb(var(--accent))]'}`}>
+              {r.name === 'Unassigned' ? '–' : r.name.replace(/^@/, '').slice(0, 2).toUpperCase()}
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-[13px] font-semibold text-[var(--ink-100)] truncate">{r.name}</p>
+              <p className="text-[11px] text-[var(--ink-50)] fb-tabular">
+                {r.tasks.length} task{r.tasks.length === 1 ? '' : 's'} · {r.open} open · {r.load} working day{r.load === 1 ? '' : 's'}
+              </p>
+            </div>
+          </div>
+          <div className="mt-2 h-1.5 rounded-full bg-[var(--surface-sunken)] overflow-hidden">
+            <div
+              className="h-full rounded-full bg-[rgb(var(--accent))]"
+              style={{ width: `${(r.load / maxLoad) * 100}%`, transition: 'width var(--dur-slow) var(--ease-spring-glide)' }}
+            />
+          </div>
+          <div className="mt-2.5 flex flex-wrap gap-1.5">
+            {r.tasks.map((t) => {
+              const done = t.status === 'done' || t.completedAt != null
+              return (
+                <button
+                  key={t.id}
+                  onClick={() => onSelect(t.id)}
+                  data-testid={`workload-task-${t.id}`}
+                  className={`inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[11.5px] transition-colors ${
+                    t.id === selectedId ? 'border-[rgb(var(--accent)/0.55)]' : 'border-[var(--edge-soft)] hover:border-[rgb(var(--accent)/0.35)]'
+                  } ${done ? 'text-[var(--ink-50)] line-through decoration-1' : 'text-[var(--ink-90)]'}`}
+                >
+                  {t.title || 'Untitled'}
+                  <span className="text-[10px] text-[var(--ink-50)] fb-tabular">{t.durationDays}d</span>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// ── Working-calendar settings ────────────────────────────────────────────────
+// A small popover to set which weekdays are working and add holiday dates, per
+// project. The schedule (weekend-skipping, durations) recomputes against it.
+function CalendarSettings({
+  projectId,
+  onClose,
+  onChanged
+}: {
+  projectId: string
+  onClose: () => void
+  onChanged: () => void
+}): JSX.Element {
+  const [cal, setCal] = useState<WorkingCalendar | null>(null)
+  const [holiday, setHoliday] = useState('')
+  useEffect(() => {
+    void window.api.projects.getCalendar(projectId).then(setCal)
+  }, [projectId])
+
+  async function save(next: WorkingCalendar): Promise<void> {
+    setCal(next)
+    await window.api.projects.setCalendar(projectId, next)
+    onChanged()
+  }
+  const DAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
+  const FULL = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+
+  return (
+    <>
+      <div className="fixed inset-0 z-30" onClick={onClose} />
+      <div className="absolute right-0 mt-1.5 z-40 w-64 rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-lg p-3" data-testid="calendar-settings">
+        <p className="text-[11px] uppercase tracking-[0.12em] text-[var(--ink-50)] font-medium mb-2">Working days</p>
+        {!cal ? (
+          <p className="text-[12px] text-[var(--ink-50)] py-2">Loading…</p>
+        ) : (
+          <>
+            <div className="flex items-center gap-1">
+              {cal.workingDays.map((on, i) => (
+                <button
+                  key={i}
+                  onClick={() => void save({ ...cal, workingDays: cal.workingDays.map((w, j) => (j === i ? !w : w)) })}
+                  data-testid={`calendar-day-${i}`}
+                  title={FULL[i]}
+                  className={`h-8 w-8 rounded-md text-[12px] font-medium ${
+                    on ? 'bg-[rgb(var(--accent))] text-white' : 'bg-[var(--surface-sunken)] text-[var(--ink-50)]'
+                  }`}
+                >
+                  {DAYS[i]}
+                </button>
+              ))}
+            </div>
+            <p className="mt-3 text-[11px] uppercase tracking-[0.12em] text-[var(--ink-50)] font-medium mb-1.5">Holidays</p>
+            <div className="space-y-1 max-h-28 overflow-auto">
+              {(cal.holidays ?? []).length === 0 && <p className="text-[11.5px] text-[var(--ink-50)]">None.</p>}
+              {(cal.holidays ?? [])
+                .slice()
+                .sort((a, b) => a - b)
+                .map((h) => (
+                  <div key={h} className="flex items-center gap-1.5 text-[12px] bg-[var(--surface-sunken)] rounded px-2 py-1">
+                    <span className="flex-1 fb-tabular text-[var(--ink-90)]">{new Date(h).toLocaleDateString()}</span>
+                    <button onClick={() => void save({ ...cal, holidays: (cal.holidays ?? []).filter((x) => x !== h) })} className="text-[var(--ink-50)] hover:text-rose-500">
+                      <Icon name="close" size={12} />
+                    </button>
+                  </div>
+                ))}
+            </div>
+            <div className="mt-1.5 flex items-center gap-1.5">
+              <input
+                type="date"
+                value={holiday}
+                onChange={(e) => setHoliday(e.target.value)}
+                data-testid="calendar-holiday-input"
+                className="flex-1 rounded-md bg-[var(--surface-base)] border border-[var(--edge-soft)] px-2 py-1 text-[12px] text-[var(--ink-100)] focus:outline-none"
+              />
+              <button
+                onClick={() => {
+                  const ms = fromDateInput(holiday)
+                  if (ms != null && cal) {
+                    setHoliday('')
+                    void save({ ...cal, holidays: [...new Set([...(cal.holidays ?? []), ms])] })
+                  }
+                }}
+                disabled={!holiday}
+                className="inline-flex items-center h-7 px-2 rounded-md bg-[rgb(var(--accent))] text-white text-[12px] disabled:opacity-40"
+              >
+                Add
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </>
   )
 }

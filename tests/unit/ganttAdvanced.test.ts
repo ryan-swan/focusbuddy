@@ -76,6 +76,17 @@ describe('working-day calendar', () => {
     expect(workingDaysBetween(monday, monNext, cal)).toBe(5) // Mon-Fri
   })
 
+  it('treats a holiday as a non-working day', () => {
+    const wed = new Date(2024, 0, 3).getTime() // a Wednesday holiday
+    const withHoliday: WorkingCalendar = { workingDays: cal.workingDays, holidays: [wed] }
+    const monNext = new Date(2024, 0, 8).getTime()
+    // Mon-Fri minus the Wednesday holiday = 4 working days.
+    expect(workingDaysBetween(monday, monNext, withHoliday)).toBe(4)
+    // And the day mapping skips the holiday: offset 2 lands on Thursday, not Wed.
+    const dayToMs = makeDayToMs(monday, withHoliday)
+    expect(dayToMs(2)).toBe(new Date(2024, 0, 4).getTime()) // Thu (Mon=0, Tue=1, Wed skipped, Thu=2)
+  })
+
   it('a task planned on the anchor day starts at offset 0, not 1 (overdue stays overdue)', () => {
     // Regression: workingDaysBetween once floored to 1, so a task planned on the
     // anchor day got pushed a day (and, across a weekend, its end slid past
