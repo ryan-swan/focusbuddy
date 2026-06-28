@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { recordViewVisit } from '../lib/viewRecency'
 
 // Current pane view — replaces the assumption that the main area always shows a task canvas.
 // As PlexiDesk grows into a workspace OS, the main pane routes between Home Dashboard,
@@ -97,6 +98,8 @@ function readLastView(): View {
 }
 
 function persistView(view: View): void {
+  // Remember the most-visited modules so the command palette can promote them.
+  recordViewVisit(view.kind)
   if (typeof localStorage === 'undefined') return
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(view))

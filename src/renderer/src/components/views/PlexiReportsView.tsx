@@ -113,7 +113,6 @@ export default function PlexiReportsView(): JSX.Element {
           ) : reports.length === 0 ? (
             <div className="px-3 py-10 text-center" data-testid="reports-empty">
               <Icon name="summarize" size={24} className="text-[var(--ink-30)]" />
-              <p className="mt-2 text-[12px] text-[var(--ink-70)] leading-relaxed">No reports yet. Create one to summarise your tables on a schedule.</p>
             </div>
           ) : (
             reports.map((r) => (
