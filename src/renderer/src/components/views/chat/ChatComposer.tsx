@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import Icon from '../../Icon'
-import { uploadAttachment, type MessageAttachment } from '../../../lib/messagingClient'
+import { uploadAttachment, attachmentKindForMime, type MessageAttachment } from '../../../lib/messagingClient'
 import { EmojiPicker } from './EmojiPicker'
 import { GifPicker } from './GifPicker'
 
@@ -47,13 +47,7 @@ export function ChatComposer({
     setError(null)
     setBusy(true)
     try {
-      const kind = file.type.startsWith('image/')
-        ? file.type === 'image/gif'
-          ? 'gif'
-          : 'image'
-        : file.type.startsWith('video/')
-          ? 'video'
-          : 'file'
+      const kind = attachmentKindForMime(file.type)
       const buf = await file.arrayBuffer()
       const result = await uploadAttachment(token, conversationId, kind, buf, {
         name: file.name,

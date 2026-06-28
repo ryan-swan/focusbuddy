@@ -20,6 +20,18 @@ export type MessageAttachment =
 
 export type MessageBlobKind = 'image' | 'file' | 'voice' | 'video' | 'gif'
 
+// Classify a picked file into an attachment kind from its MIME type. A GIF is its
+// own kind (it animates); other images are 'image'; anything video/* is a video
+// message; everything else is a generic file. Pure so it can be unit-tested
+// without a running renderer.
+export function attachmentKindForMime(mimeType: string): MessageBlobKind {
+  if (mimeType === 'image/gif') return 'gif'
+  if (mimeType.startsWith('image/')) return 'image'
+  if (mimeType.startsWith('video/')) return 'video'
+  if (mimeType.startsWith('audio/')) return 'voice'
+  return 'file'
+}
+
 // The authenticated URL bytes are served from. The token rides as a query param
 // because <img>/<audio> elements can't set an Authorization header.
 export function attachmentUrl(conversationId: string, blobId: string, token: string): string {
