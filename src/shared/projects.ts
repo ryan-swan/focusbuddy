@@ -32,6 +32,13 @@ export interface PlanTask {
   // has been set for the project.
   baselineStartMs: number | null
   baselineEndMs: number | null
+  // Constraints. mustStartMs pins the start (MSO); deadlineMs is a finish-no-
+  // later-than the schedule is checked against (deadlineMiss is set when blown).
+  mustStartMs: number | null
+  deadlineMs: number | null
+  deadlineMiss: boolean
+  // Optional cost for budget rollups (currency-agnostic number).
+  cost: number | null
 }
 
 export interface PlanDep {
@@ -62,6 +69,8 @@ export interface ProjectPlan {
   drift: PlanDrift[]
   // True when a baseline has been captured, so the UI can show variance.
   hasBaseline: boolean
+  // Sum of task costs (0 when none set).
+  totalCost: number
 }
 
 export interface ProjectSummary {
@@ -82,6 +91,9 @@ export interface PlanTaskPatch {
   estimateMinutes?: number | null
   assignee?: string | null
   progressPct?: number
+  mustStartMs?: number | null
+  deadlineMs?: number | null
+  cost?: number | null
 }
 
 export type AddDepResult =

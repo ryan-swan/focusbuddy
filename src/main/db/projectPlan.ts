@@ -39,6 +39,9 @@ interface TaskRow {
   completed_at: number | null
   assignee: string | null
   progress_pct: number | null
+  must_start: number | null
+  deadline: number | null
+  cost: number | null
 }
 
 // All non-trashed, non-archived task descendants of a project folder, at any
@@ -53,7 +56,8 @@ function projectTaskRows(projectId: string): TaskRow[] {
          SELECT n.id FROM nodes n JOIN sub ON n.parent_id = sub.id
        )
        SELECT n.id, n.title, n.status, n.is_milestone, n.plan_start, n.due_date,
-              n.estimate_minutes, n.started_at, n.completed_at, n.assignee, n.progress_pct
+              n.estimate_minutes, n.started_at, n.completed_at, n.assignee, n.progress_pct,
+              n.must_start, n.deadline, n.cost
        FROM nodes n JOIN sub ON n.id = sub.id
        WHERE n.kind = 'task' AND n.trashed_at IS NULL AND n.archived = 0`
     )
@@ -221,7 +225,9 @@ export function getProjectPlan(projectId: string, nowMs = Date.now()): ProjectPl
     deps: predsByTask.get(r.id) ?? [],
     links: linksByTask.get(r.id),
     isMilestone: !!r.is_milestone,
-    minStartDay: r.plan_start != null ? workingOffset(anchor, r.plan_start, cal) : undefined
+    minStartDay: r.plan_start != null ? workingOffset(anchor, r.plan_start, cal) : undefined,
+    mustStartDay: r.must_start != null ? workingOffset(anchor, r.must_start, cal) : undefined,
+    deadlineDay: r.deadline != null ? workingOffset(anchor, r.deadline, cal) : undefined
   }))
 
   const schedule = computeSchedule(inputs, anchor, dayToMs)
@@ -258,11 +264,16 @@ export function getProjectPlan(projectId: string, nowMs = Date.now()): ProjectPl
       critical: s.critical,
       deps: predsByTask.get(r.id) ?? [],
       baselineStartMs: bl?.startMs ?? null,
-      baselineEndMs: bl?.endMs ?? null
+      baselineEndMs: bl?.endMs ?? null,
+      mustStartMs: r.must_start,
+      deadlineMs: r.deadline,
+      deadlineMiss: s.deadlineMiss,
+      cost: r.cost
     }
   })
   // Stable order: by scheduled start, then title, so the Gantt reads top-down.
   tasks.sort((a, b) => a.scheduledStartMs - b.scheduledStartMs || a.title.localeCompare(b.title))
+  const totalCost = rows.reduce((n, r) => n + (typeof r.cost === 'number' ? r.cost : 0), 0)
 
   return {
     projectId,
@@ -274,7 +285,8 @@ export function getProjectPlan(projectId: string, nowMs = Date.now()): ProjectPl
     criticalPath: schedule.criticalPath,
     hasCycle: schedule.hasCycle,
     drift,
-    hasBaseline: baseline != null
+    hasBaseline: baseline != null,
+    totalCost
   }
 }
 
@@ -306,6 +318,18 @@ export function setTaskPlan(taskId: string, patch: PlanTaskPatch): boolean {
   if ('progressPct' in patch) {
     sets.push('progress_pct = ?')
     vals.push(Math.max(0, Math.min(100, Math.round(patch.progressPct ?? 0))))
+  }
+  if ('mustStartMs' in patch) {
+    sets.push('must_start = ?')
+    vals.push(patch.mustStartMs ?? null)
+  }
+  if ('deadlineMs' in patch) {
+    sets.push('deadline = ?')
+    vals.push(patch.deadlineMs ?? null)
+  }
+  if ('cost' in patch) {
+    sets.push('cost = ?')
+    vals.push(typeof patch.cost === 'number' && Number.isFinite(patch.cost) ? patch.cost : null)
   }
   if (sets.length === 0) return false
   sets.push('updated_at = ?')
@@ -405,7 +429,9 @@ export function rescheduleProject(projectId: string, nowMs = Date.now()): Projec
     deps: predsByTask.get(r.id) ?? [],
     links: linksByTask.get(r.id),
     isMilestone: !!r.is_milestone,
-    minStartDay: r.plan_start != null ? workingOffset(anchor, r.plan_start, cal) : undefined
+    minStartDay: r.plan_start != null ? workingOffset(anchor, r.plan_start, cal) : undefined,
+    mustStartDay: r.must_start != null ? workingOffset(anchor, r.must_start, cal) : undefined,
+    deadlineDay: r.deadline != null ? workingOffset(anchor, r.deadline, cal) : undefined
   }))
   const actualFinish = new Map<string, number>()
   for (const r of rows) {
@@ -423,6 +449,44 @@ export function rescheduleProject(projectId: string, nowMs = Date.now()): Projec
     }
   })
   writeAll(rescheduled.tasks)
+  return getProjectPlan(projectId, nowMs)
+}
+
+// Greedy resource leveling: for each assignee, walk their tasks in scheduled-start
+// order and push any that overlap the previous one so a person never works two
+// tasks at once. Pins each shifted task's planned start (so it holds), preserving
+// its duration. This is a simple serial level, not an optimiser: it ignores
+// priority and may extend the finish date. Milestones, done tasks, the
+// unassigned bucket, and tasks already pinned with a must-start are left alone.
+export function levelResources(projectId: string, nowMs = Date.now()): ProjectPlan {
+  const db = getDb()
+  const plan = getProjectPlan(projectId, nowMs)
+  const byAssignee = new Map<string, typeof plan.tasks>()
+  for (const t of plan.tasks) {
+    const done = t.status === 'done' || t.completedAt != null
+    if (t.isMilestone || done || t.mustStartMs != null) continue
+    const who = (t.assignee && t.assignee.trim()) || null
+    if (!who) continue
+    byAssignee.set(who, [...(byAssignee.get(who) ?? []), t])
+  }
+  const upd = db.prepare('UPDATE nodes SET plan_start = ?, due_date = ?, updated_at = ? WHERE id = ?')
+  const now = Date.now()
+  const apply = db.transaction(() => {
+    for (const tasks of byAssignee.values()) {
+      const ordered = [...tasks].sort((a, b) => a.scheduledStartMs - b.scheduledStartMs)
+      let cursor = -Infinity
+      for (const t of ordered) {
+        const durationMs = Math.max(DAY_MS, t.scheduledEndMs - t.scheduledStartMs)
+        const start = Math.max(t.scheduledStartMs, cursor)
+        if (start > t.scheduledStartMs) {
+          // Pin the shifted task so leveling holds against a recompute.
+          upd.run(start, start + durationMs, now, t.id)
+        }
+        cursor = start + durationMs
+      }
+    }
+  })
+  apply()
   return getProjectPlan(projectId, nowMs)
 }
 

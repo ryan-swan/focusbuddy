@@ -65,6 +65,11 @@ function fmtDate(ms: number): string {
   return new Date(ms).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 }
 
+// Currency-agnostic cost formatting: thousands separators, up to 2 decimals.
+function fmtCost(n: number): string {
+  return n.toLocaleString(undefined, { maximumFractionDigits: 2 })
+}
+
 export default function PlexiProjectsView(): JSX.Element {
   const [projects, setProjects] = useState<ProjectSummary[] | null>(null)
   const [openId, setOpenId] = useState<string | null>(null)
@@ -235,6 +240,28 @@ function ProjectGantt({ projectId, onBack }: { projectId: string; onBack: () => 
       load()
     } catch (e) {
       setError(`Could not set the baseline: ${e instanceof Error ? e.message : String(e)}`)
+    }
+  }
+
+  // Greedy resource leveling: serialize each person's overlapping tasks.
+  async function levelResources(): Promise<void> {
+    setError(null)
+    try {
+      await window.api.projects.level(projectId)
+      load()
+    } catch (e) {
+      setError(`Could not level resources: ${e instanceof Error ? e.message : String(e)}`)
+    }
+  }
+
+  // Export the plan to a Microsoft Project XML file via a save dialog.
+  async function exportXml(): Promise<void> {
+    setError(null)
+    try {
+      const r = await window.api.projects.exportXml(projectId)
+      if (!r.ok && !r.canceled) setError(`Export failed: ${r.error ?? 'unknown error'}`)
+    } catch (e) {
+      setError(`Export failed: ${e instanceof Error ? e.message : String(e)}`)
     }
   }
 
@@ -424,6 +451,22 @@ function ProjectGantt({ projectId, onBack }: { projectId: string; onBack: () => 
                 <CalendarSettings projectId={projectId} onClose={() => setShowCalSettings(false)} onChanged={load} />
               )}
             </div>
+            <button
+              onClick={() => void levelResources()}
+              data-testid="projects-level"
+              title="Level resources: push each person's overlapping tasks so they never run at once"
+              className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border border-[var(--edge-soft)] text-[12.5px] text-[var(--ink-90)] hover:bg-[var(--surface-sunken)]"
+            >
+              <Icon name="balance" size={15} /> Level
+            </button>
+            <button
+              onClick={() => void exportXml()}
+              data-testid="projects-export-xml"
+              title="Export to Microsoft Project (XML)"
+              className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border border-[var(--edge-soft)] text-[12.5px] text-[var(--ink-90)] hover:bg-[var(--surface-sunken)]"
+            >
+              <Icon name="ios_share" size={15} /> Export
+            </button>
             <button
               onClick={() => void reschedule()}
               disabled={busy}
@@ -734,8 +777,13 @@ function TaskBar({
       {w > 44 && (
         <span className="relative text-[10px] truncate text-[var(--ink-90)] flex-1">{task.title}</span>
       )}
+      {task.deadlineMiss && (
+        <span className="shrink-0 ml-auto inline-flex" data-testid={`gantt-deadline-miss-${task.id}`} title="Misses its deadline">
+          <Icon name="event_busy" size={11} className="text-rose-500" filled />
+        </span>
+      )}
       {late && (
-        <span className="shrink-0 ml-auto inline-flex" data-testid={`gantt-late-${task.id}`}>
+        <span className={`shrink-0 inline-flex ${task.deadlineMiss ? 'ml-0.5' : 'ml-auto'}`} data-testid={`gantt-late-${task.id}`}>
           <Icon name="warning" size={11} className="text-amber-500" filled />
         </span>
       )}
@@ -1115,6 +1163,57 @@ function TaskEditor({
           </label>
         )}
 
+        <div className="grid grid-cols-2 gap-2">
+          <label className="block">
+            <span className="text-[11px] text-[var(--ink-70)]">Must start on</span>
+            <input
+              type="date"
+              value={toDateInput(task.mustStartMs)}
+              data-testid="task-must-start"
+              onChange={(e) => void patch({ mustStartMs: fromDateInput(e.target.value) })}
+              title="Pin the start to this date, overriding dependencies"
+              className="mt-1 w-full rounded-md bg-[var(--surface-base)] border border-[var(--edge-soft)] px-2 py-1.5 text-[12px] text-[var(--ink-100)] focus:outline-none focus:border-[rgb(var(--accent)/0.55)]"
+            />
+          </label>
+          <label className="block">
+            <span className="text-[11px] text-[var(--ink-70)]">Deadline (finish by)</span>
+            <input
+              type="date"
+              value={toDateInput(task.deadlineMs)}
+              data-testid="task-deadline"
+              onChange={(e) => void patch({ deadlineMs: fromDateInput(e.target.value) })}
+              title="Flag the task if the schedule finishes past this date"
+              className={`mt-1 w-full rounded-md bg-[var(--surface-base)] border px-2 py-1.5 text-[12px] text-[var(--ink-100)] focus:outline-none ${
+                task.deadlineMiss ? 'border-rose-500/60' : 'border-[var(--edge-soft)] focus:border-[rgb(var(--accent)/0.55)]'
+              }`}
+            />
+          </label>
+        </div>
+        {task.deadlineMiss && (
+          <p className="-mt-1 flex items-center gap-1 text-[11px] text-rose-500" data-testid="task-deadline-miss">
+            <Icon name="event_busy" size={12} /> Scheduled to finish past the deadline.
+          </p>
+        )}
+
+        {!task.isMilestone && (
+          <label className="block">
+            <span className="text-[11px] text-[var(--ink-70)]">Cost (for budget rollup)</span>
+            <input
+              type="number"
+              min={0}
+              step="any"
+              value={task.cost ?? ''}
+              placeholder="e.g. 4000"
+              data-testid="task-cost"
+              onChange={(e) => {
+                const raw = e.target.value.trim()
+                void patch({ cost: raw === '' ? null : Number(raw) })
+              }}
+              className="mt-1 w-full rounded-md bg-[var(--surface-base)] border border-[var(--edge-soft)] px-2 py-1.5 text-[12px] text-[var(--ink-100)] focus:outline-none focus:border-[rgb(var(--accent)/0.55)]"
+            />
+          </label>
+        )}
+
         <div>
           <span className="text-[11px] text-[var(--ink-70)]">Depends on (finish first)</span>
           <div className="mt-1.5 space-y-1">
@@ -1418,6 +1517,7 @@ function GridView({
             <Th k="start" label="Start" />
             <Th k="end" label="Finish" />
             <Th k="slack" label="Slack" cls="text-right" />
+            <th className="px-3 py-2 text-right font-medium">Cost</th>
             <Th k="status" label="Status" />
           </tr>
         </thead>
@@ -1436,6 +1536,11 @@ function GridView({
                   {t.isMilestone && <Icon name="flag" size={12} className="text-violet-500 shrink-0" filled />}
                   {(critPathSet.has(t.id) || t.critical) && !t.isMilestone && <span className="h-1.5 w-1.5 rounded-full bg-rose-500 shrink-0" title="Critical" />}
                   <span className="text-[var(--ink-100)]">{t.title || 'Untitled'}</span>
+                  {t.deadlineMiss && (
+                    <span title="Misses its deadline" className="inline-flex shrink-0">
+                      <Icon name="event_busy" size={12} className="text-rose-500" filled />
+                    </span>
+                  )}
                   {lateSet.has(t.id) && <Icon name="warning" size={12} className="text-amber-500 shrink-0" filled />}
                 </span>
               </td>
@@ -1455,10 +1560,22 @@ function GridView({
               <td className="px-3 py-2 fb-tabular text-[var(--ink-70)]">{fmtDate(t.scheduledStartMs)}</td>
               <td className="px-3 py-2 fb-tabular text-[var(--ink-70)]">{fmtDate(t.scheduledEndMs)}</td>
               <td className="px-3 py-2 fb-tabular text-right text-[var(--ink-70)]">{t.critical ? '0' : `${t.slackDays}d`}</td>
+              <td className="px-3 py-2 fb-tabular text-right text-[var(--ink-70)]" data-testid={`grid-cost-${t.id}`}>
+                {t.cost != null ? fmtCost(t.cost) : <span className="text-[var(--ink-40)]">—</span>}
+              </td>
               <td className="px-3 py-2"><StatusPill tone={(STATUS_COLUMNS.find((c) => c.id === statusOf(t))?.tone ?? 'stone') as never} label={statusLabel(t)} /></td>
             </tr>
           ))}
         </tbody>
+        {plan.totalCost > 0 && (
+          <tfoot>
+            <tr className="border-t border-[var(--edge-firm)] text-[var(--ink-90)] font-medium">
+              <td className="px-3 py-2" colSpan={5}>Total</td>
+              <td className="px-3 py-2 fb-tabular text-right" data-testid="grid-total-cost">{fmtCost(plan.totalCost)}</td>
+              <td />
+            </tr>
+          </tfoot>
+        )}
       </table>
     </div>
   )

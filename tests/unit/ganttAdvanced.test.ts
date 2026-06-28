@@ -57,6 +57,32 @@ describe('dependency types', () => {
   })
 })
 
+describe('constraints', () => {
+  it('must-start pins the start, overriding a dependency', () => {
+    // B depends FS on A (would start at 3) but is pinned to day 1.
+    const at = sched([
+      { id: 'A', durationDays: 3, deps: [] },
+      { id: 'B', durationDays: 2, deps: ['A'], mustStartDay: 1 }
+    ])
+    expect(at('B').earliestStart).toBe(1)
+    expect(at('B').earliestFinish).toBe(3)
+  })
+
+  it('flags a deadline miss when the finish lands past the deadline', () => {
+    const at = sched([
+      { id: 'A', durationDays: 3, deps: [] }, // finishes day 3
+      { id: 'B', durationDays: 3, deps: [], deadlineDay: 2 } // due day 2, finishes day 3 -> miss
+    ])
+    expect(at('A').deadlineMiss).toBe(false) // no deadline set
+    expect(at('B').deadlineMiss).toBe(true)
+  })
+
+  it('does not flag a deadline that is met', () => {
+    const at = sched([{ id: 'A', durationDays: 2, deps: [], deadlineDay: 5 }])
+    expect(at('A').deadlineMiss).toBe(false)
+  })
+})
+
 describe('working-day calendar', () => {
   // 2024-01-01 is a Monday in local time.
   const monday = new Date(2024, 0, 1).getTime()

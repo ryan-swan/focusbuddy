@@ -1380,7 +1380,11 @@ const api = {
     getCalendar: (projectId: string): Promise<import('@shared/workingCalendar').WorkingCalendar> =>
       ipcRenderer.invoke('projects:getCalendar', projectId),
     setCalendar: (projectId: string, cal: import('@shared/workingCalendar').WorkingCalendar): Promise<boolean> =>
-      ipcRenderer.invoke('projects:setCalendar', projectId, cal)
+      ipcRenderer.invoke('projects:setCalendar', projectId, cal),
+    level: (projectId: string): Promise<import('@shared/projects').ProjectPlan> =>
+      ipcRenderer.invoke('projects:level', projectId),
+    exportXml: (projectId: string): Promise<{ ok: true; path: string } | { ok: false; canceled?: boolean; error?: string }> =>
+      ipcRenderer.invoke('projects:exportXml', projectId)
   },
   // PlexiReports: scheduled, AI-narrated reports over your tables.
   reports: {

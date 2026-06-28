@@ -494,6 +494,10 @@ export function getDb(): Database.Database {
   // PlexiProjects 2.0: who owns a task (free text) and manual progress 0-100.
   ensureColumn(db, 'nodes', 'assignee', 'TEXT')
   ensureColumn(db, 'nodes', 'progress_pct', 'REAL NOT NULL DEFAULT 0')
+  // Constraints + cost: must-start-on, finish-no-later-than deadline, task cost.
+  ensureColumn(db, 'nodes', 'must_start', 'INTEGER')
+  ensureColumn(db, 'nodes', 'deadline', 'INTEGER')
+  ensureColumn(db, 'nodes', 'cost', 'REAL')
   // Typed dependencies (FS/SS/FF/SF) + working-day lag on existing deps tables.
   ensureColumn(db, 'fb_task_deps', 'dep_type', "TEXT NOT NULL DEFAULT 'FS'")
   ensureColumn(db, 'fb_task_deps', 'lag_days', 'INTEGER NOT NULL DEFAULT 0')
