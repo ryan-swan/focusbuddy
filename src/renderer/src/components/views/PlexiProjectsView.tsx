@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Icon from '../Icon'
 import { DashboardHeader, StatusPill, PLEXI_CARD } from '../plexi'
 import { useViewStore } from '../../stores/view'
+import { useQuickCreate } from '../../stores/quickCreate'
 import type { ProjectPlan, ProjectSummary, PlanTask } from '@shared/projects'
 
 // PlexiProjects: roll the tasks you already work in up into a scheduled plan. A
@@ -53,6 +54,13 @@ export default function PlexiProjectsView(): JSX.Element {
   useEffect(() => {
     loadPortfolio()
   }, [loadPortfolio])
+
+  // Global quick-create (Cmd+K "New project"): create + open straight away.
+  const quickPending = useQuickCreate((s) => s.pending)
+  useEffect(() => {
+    if (quickPending === 'projects' && useQuickCreate.getState().consume('projects')) void newProject()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [quickPending])
 
   // Create a new project (a folder) and open it straight away so the user can add
   // its first task, even before it shows in the portfolio (which lists folders that

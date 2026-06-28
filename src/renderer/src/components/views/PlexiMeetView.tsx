@@ -5,6 +5,7 @@ import { useMeetingsStore } from '../../stores/meetings'
 import { useMeetingRoomStore } from '../../stores/meetingRoom'
 import { usePresenceStore } from '../../stores/presence'
 import { useAccountStore } from '../../stores/account'
+import { useQuickCreate } from '../../stores/quickCreate'
 import { startDm, uploadAttachment, sendMessage } from '../../lib/messagingClient'
 import { useNodeStore } from '../../stores/nodes'
 import type { Meeting } from '@shared/meetings'
@@ -135,6 +136,13 @@ export default function PlexiMeetView(): JSX.Element {
     setError(null)
     void startMeeting('Meeting')
   }
+
+  // Global quick-create (Cmd+K "Start a meeting").
+  const quickPending = useQuickCreate((s) => s.pending)
+  useEffect(() => {
+    if (quickPending === 'meet' && useQuickCreate.getState().consume('meet')) startLive()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [quickPending])
 
   // Record a short audio message and send it to a teammate as a voice DM — the
   // "they're away, leave them something" path. Reuses the real chat attachment

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import Icon from '../Icon'
 import { PLEXI_CARD } from '../plexi'
 import ModuleHome from '../ModuleHome'
+import { useQuickCreate } from '../../stores/quickCreate'
 import FieldEditor from '../fields/FieldEditor'
 import { useFormsStore } from '../../stores/forms'
 import type { PlexiForm } from '@shared/forms'
@@ -43,6 +44,13 @@ export default function PlexiFormsView(): JSX.Element {
     const created = await createForm('New form')
     if (created) setSelectedId(created.id)
   }
+
+  // Global quick-create (Cmd+K "New form").
+  const quickPending = useQuickCreate((s) => s.pending)
+  useEffect(() => {
+    if (quickPending === 'forms' && useQuickCreate.getState().consume('forms')) void addForm()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [quickPending])
 
   return (
     <div className="h-full w-full flex bg-[var(--surface-base)] text-[var(--ink-100)]" data-testid="plexiforms-view">
