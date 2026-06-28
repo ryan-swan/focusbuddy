@@ -149,8 +149,8 @@ export default function PlexiProjectsView(): JSX.Element {
               })()}
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3" data-testid="projects-portfolio">
-              {projects.map((p, i) => (
-                <ProjectCard key={p.id} project={p} index={i} onOpen={() => setOpenId(p.id)} />
+              {projects.map((p) => (
+                <ProjectCard key={p.id} project={p} onOpen={() => setOpenId(p.id)} />
               ))}
             </div>
           </>
@@ -160,13 +160,12 @@ export default function PlexiProjectsView(): JSX.Element {
   )
 }
 
-function ProjectCard({ project, index = 0, onOpen }: { project: ProjectSummary; index?: number; onOpen: () => void }): JSX.Element {
+function ProjectCard({ project, onOpen }: { project: ProjectSummary; onOpen: () => void }): JSX.Element {
   return (
     <button
       onClick={onOpen}
       data-testid={`project-card-${project.id}`}
       className={`${PLEXI_CARD} fb-hover-lift fb-fade-in-up p-4 text-left hover:border-[rgb(var(--accent)/0.40)] transition-colors`}
-      style={{ animationDelay: `${Math.min(index, 10) * 40}ms` }}
     >
       <div className="flex items-start justify-between gap-2">
         <h3 className="text-[14px] font-semibold text-[var(--ink-100)] truncate">{project.title}</h3>
@@ -629,8 +628,8 @@ function TaskBar({
             onClick()
           }
         }}
-        className="fb-fade-in-up absolute cursor-grab active:cursor-grabbing select-none touch-none"
-        style={{ left: x - 7 + dx, top: y + (ROW_H - 12) / 2, animationDelay: `${Math.min(Math.round(y / ROW_H), 12) * 28}ms` }}
+        className="absolute cursor-grab active:cursor-grabbing select-none touch-none"
+        style={{ left: x - 7 + dx, top: y + (ROW_H - 12) / 2 }}
         title={`${task.title}, ${fmtDate(task.scheduledStartMs)} (drag to reschedule)`}
       >
         <div className="h-3 w-3 rotate-45 bg-violet-500 ring-2 ring-[var(--surface-raised)]" />
@@ -658,8 +657,8 @@ function TaskBar({
           onClick()
         }
       }}
-      className={`gantt-bar-grow absolute rounded-[4px] cursor-grab active:cursor-grabbing select-none touch-none transition-colors flex items-center px-1.5 overflow-hidden ${cls} ${critical && !done ? 'gantt-crit-glow' : ''}`}
-      style={{ left: x + dx, top, width: w, height: 16, animationDelay: `${Math.min(Math.round(y / ROW_H), 12) * 28}ms` }}
+      className={`absolute rounded-[4px] cursor-grab active:cursor-grabbing select-none touch-none transition-colors flex items-center px-1.5 overflow-hidden ${cls} ${critical && !done ? 'gantt-crit-glow' : ''}`}
+      style={{ left: x + dx, top, width: w, height: 16 }}
       title={`${task.title}, ${fmtDate(task.scheduledStartMs)} to ${fmtDate(task.scheduledEndMs)}${task.slackDays > 0 ? `, ${task.slackDays}d slack` : ', critical'}${late ? (done ? ', finished late' : ', running late') : ''}${!done ? `, ${task.progressPct}% done` : ''} (drag to reschedule)`}
     >
       {!done && task.progressPct > 0 && (
