@@ -42,6 +42,12 @@ export interface GanttInput {
   // latest predecessor finish, so a user-set date is honoured but a dependency
   // can still push a task out.
   minStartDay?: number
+  // Hard "must start on" constraint: a day offset that pins the start exactly,
+  // overriding dependencies (MS Project MSO). May create negative slack.
+  mustStartDay?: number
+  // "Finish no later than" deadline as a day offset. Does not move the task, but
+  // a schedule that finishes past it is flagged (deadlineMiss).
+  deadlineDay?: number
 }
 
 // Normalise a task's dependencies to typed links. Uses `links` when present,
@@ -63,6 +69,9 @@ export interface ScheduledTask {
   latestFinish: number
   slackDays: number
   critical: boolean
+  // True when the task carries a finish-no-later-than deadline that the schedule
+  // misses (earliest finish lands past it).
+  deadlineMiss: boolean
   // Absolute timestamps, anchor + offset days.
   startMs: number
   endMs: number
@@ -169,27 +178,34 @@ export function computeSchedule(
   const ef = new Map<string, number>()
   for (const id of order) {
     const ds = dur(id)
-    const floor = byId.get(id)?.minStartDay ?? 0
-    let start = floor
-    for (const link of validLinks(id)) {
-      const pEs = es.get(link.id) ?? 0
-      const pEf = ef.get(link.id) ?? 0
-      let cand: number
-      switch (link.type) {
-        case 'SS':
-          cand = pEs + link.lag
-          break
-        case 'FF':
-          cand = pEf + link.lag - ds
-          break
-        case 'SF':
-          cand = pEs + link.lag - ds
-          break
-        case 'FS':
-        default:
-          cand = pEf + link.lag
+    const t = byId.get(id)
+    let start: number
+    if (t?.mustStartDay != null) {
+      // Hard "must start on": pin the start, overriding dependencies.
+      start = t.mustStartDay
+    } else {
+      const floor = t?.minStartDay ?? 0
+      start = floor
+      for (const link of validLinks(id)) {
+        const pEs = es.get(link.id) ?? 0
+        const pEf = ef.get(link.id) ?? 0
+        let cand: number
+        switch (link.type) {
+          case 'SS':
+            cand = pEs + link.lag
+            break
+          case 'FF':
+            cand = pEf + link.lag - ds
+            break
+          case 'SF':
+            cand = pEs + link.lag - ds
+            break
+          case 'FS':
+          default:
+            cand = pEf + link.lag
+        }
+        if (cand > start) start = cand
       }
-      if (cand > start) start = cand
     }
     if (start < 0) start = 0
     es.set(id, start)
@@ -252,6 +268,7 @@ export function computeSchedule(
       latestFinish,
       slackDays,
       critical: slackDays <= 0,
+      deadlineMiss: t.deadlineDay != null && earliestFinish > t.deadlineDay,
       startMs: toMs(earliestStart),
       endMs: toMs(earliestFinish)
     }
@@ -390,7 +407,10 @@ export function rescheduleOnDrift(
     durationDays: t.isMilestone ? 0 : adjDurationDays.get(t.id) ?? clampDuration(t.durationDays),
     deps: t.deps,
     links: t.links,
-    isMilestone: t.isMilestone
+    isMilestone: t.isMilestone,
+    minStartDay: t.minStartDay,
+    mustStartDay: t.mustStartDay,
+    deadlineDay: t.deadlineDay
   }))
   return computeSchedule(adjusted, projectStartMs, dayToMs)
 }

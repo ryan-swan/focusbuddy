@@ -265,11 +265,13 @@ import {
   listBaselines,
   loadProjectCalendar,
   saveProjectCalendar,
+  levelResources,
   rescheduleProject,
   listProjectSummaries
 } from '../db/projectPlan'
 import type { PlanTaskPatch, DepType } from '@shared/projects'
 import type { WorkingCalendar } from '@shared/workingCalendar'
+import { toProjectXml } from '@shared/projectXml'
 import {
   listReports,
   getReport,
@@ -1841,6 +1843,26 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('projects:listBaselines', (_e, projectId: string) => listBaselines(projectId))
   ipcMain.handle('projects:getCalendar', (_e, projectId: string) => loadProjectCalendar(projectId))
   ipcMain.handle('projects:setCalendar', (_e, projectId: string, cal: WorkingCalendar) => saveProjectCalendar(projectId, cal))
+  ipcMain.handle('projects:level', (_e, projectId: string) => levelResources(projectId))
+  ipcMain.handle('projects:exportXml', async (_e, projectId: string) => {
+    const plan = getProjectPlan(projectId)
+    const xml = toProjectXml(plan)
+    const parent = BrowserWindow.getFocusedWindow()
+    const safe = (plan.title || 'project').replace(/[^a-z0-9-_ ]/gi, '').trim() || 'project'
+    const opts = {
+      title: 'Export to Microsoft Project (XML)',
+      defaultPath: `${safe}.xml`,
+      filters: [{ name: 'Microsoft Project XML', extensions: ['xml'] }]
+    }
+    const { canceled, filePath } = parent ? await dialog.showSaveDialog(parent, opts) : await dialog.showSaveDialog(opts)
+    if (canceled || !filePath) return { ok: false as const, canceled: true as const }
+    try {
+      await writeFile(filePath, xml, 'utf8')
+      return { ok: true as const, path: filePath }
+    } catch (e) {
+      return { ok: false as const, error: (e as Error).message }
+    }
+  })
 
   // PlexiReports: scheduled, AI-narrated reports over your tables.
   ipcMain.handle('reports:list', () => listReports())
