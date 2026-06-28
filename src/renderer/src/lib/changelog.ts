@@ -36,6 +36,20 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.96',
+    date: '2026-07-12T12:00:00Z',
+    title: 'v2.5.96 — real projects, live meetings, and create anything from anywhere',
+    tag: 'feature',
+    summary:
+      'A big one for getting work done. Projects is now a proper planner you can run, not just look at: add and manage tasks, drag them on the timeline to reschedule, set what blocks what in both directions, and open a task to its files. PlexiMeet becomes a live meeting tool, start a meeting and invite teammates who are online, with recording kept as one option, including leaving a quick voice message for someone who is away, rather than the whole feature. And every module now opens to a real home with your recent items instead of a blank screen, while a new quick-create lets you make a project, report, flow, form, app or meeting straight from the command palette without hunting for a New button.',
+    highlights: [
+      'Projects you can actually run: add, rename and delete tasks, drag a bar to reschedule it, set predecessors and successors, and jump from a task to its files. Built on the existing critical-path engine.',
+      'PlexiMeet live meetings: start a meeting and invite teammates who are online, like a quick Meet or Zoom call. Recording is now one option, including recording a short message to send to someone who is away.',
+      'Module home dashboards: Reports, Flows, Forms, Build and Meet open to overview tiles and your recent items, with sections you can show or hide, instead of an empty create-only screen.',
+      'Create anything from anywhere: the command palette now has New project, report, flow, form, app and Start a meeting, which create and open the item in one step.'
+    ]
+  },
+  {
     version: '2.5.95',
     date: '2026-07-05T12:00:00Z',
     title: 'v2.5.95 — readable at any size, an honest privacy switch, and help where you can find it',
