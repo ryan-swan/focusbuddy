@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Icon from '../Icon'
-import { DashboardHeader, StatusPill, StatTile, PLEXI_CARD } from '../plexi'
+import { DashboardHeader, StatusPill, StatTile, PLEXI_CARD, spawnSparkBurst } from '../plexi'
 import { useViewStore } from '../../stores/view'
 import { useNodeStore } from '../../stores/nodes'
 import { useQuickCreate } from '../../stores/quickCreate'
@@ -132,7 +132,7 @@ export default function PlexiProjectsView(): JSX.Element {
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4" data-testid="projects-portfolio-stats">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4 fb-fade-in-up" data-testid="projects-portfolio-stats">
               {(() => {
                 const totalTasks = projects.reduce((n, p) => n + p.taskCount, 0)
                 const totalDone = projects.reduce((n, p) => n + p.doneCount, 0)
@@ -149,8 +149,8 @@ export default function PlexiProjectsView(): JSX.Element {
               })()}
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3" data-testid="projects-portfolio">
-              {projects.map((p) => (
-                <ProjectCard key={p.id} project={p} onOpen={() => setOpenId(p.id)} />
+              {projects.map((p, i) => (
+                <ProjectCard key={p.id} project={p} index={i} onOpen={() => setOpenId(p.id)} />
               ))}
             </div>
           </>
@@ -160,12 +160,13 @@ export default function PlexiProjectsView(): JSX.Element {
   )
 }
 
-function ProjectCard({ project, onOpen }: { project: ProjectSummary; onOpen: () => void }): JSX.Element {
+function ProjectCard({ project, index = 0, onOpen }: { project: ProjectSummary; index?: number; onOpen: () => void }): JSX.Element {
   return (
     <button
       onClick={onOpen}
       data-testid={`project-card-${project.id}`}
-      className={`${PLEXI_CARD} p-4 text-left hover:border-[rgb(var(--accent)/0.40)] transition-colors`}
+      className={`${PLEXI_CARD} fb-hover-lift fb-fade-in-up p-4 text-left hover:border-[rgb(var(--accent)/0.40)] transition-colors`}
+      style={{ animationDelay: `${Math.min(index, 10) * 40}ms` }}
     >
       <div className="flex items-start justify-between gap-2">
         <h3 className="text-[14px] font-semibold text-[var(--ink-100)] truncate">{project.title}</h3>
@@ -182,7 +183,11 @@ function ProjectCard({ project, onOpen }: { project: ProjectSummary; onOpen: () 
         <div className="mt-1 h-1.5 rounded-full bg-[var(--surface-sunken)] overflow-hidden">
           <div
             className="h-full rounded-full bg-[rgb(var(--accent))]"
-            style={{ width: `${project.percentComplete}%`, minWidth: project.percentComplete > 0 ? '0.375rem' : '0' }}
+            style={{
+              width: `${project.percentComplete}%`,
+              minWidth: project.percentComplete > 0 ? '0.375rem' : '0',
+              transition: 'width var(--dur-slow) var(--ease-spring-glide)'
+            }}
           />
         </div>
       </div>
@@ -421,7 +426,7 @@ function ProjectGantt({ projectId, onBack }: { projectId: string; onBack: () => 
           ) : viewMode === 'grid' ? (
             <GridView plan={plan} selectedId={selectedId} onSelect={setSelectedId} critPathSet={critPathSet} lateSet={lateSet} />
           ) : geom ? (
-            <div className="flex">
+            <div className="flex fb-fade-in-up">
               {/* Sticky task-name column */}
               <div className="shrink-0 sticky left-0 z-10 bg-[var(--surface-raised)] border-r border-[var(--edge-firm)]" style={{ width: NAME_W }}>
                 <div className="border-b border-[var(--edge-firm)]" style={{ height: HEADER_H }} />
@@ -624,8 +629,8 @@ function TaskBar({
             onClick()
           }
         }}
-        className="absolute cursor-grab active:cursor-grabbing select-none touch-none"
-        style={{ left: x - 7 + dx, top: y + (ROW_H - 12) / 2 }}
+        className="fb-fade-in-up absolute cursor-grab active:cursor-grabbing select-none touch-none"
+        style={{ left: x - 7 + dx, top: y + (ROW_H - 12) / 2, animationDelay: `${Math.min(Math.round(y / ROW_H), 12) * 28}ms` }}
         title={`${task.title}, ${fmtDate(task.scheduledStartMs)} (drag to reschedule)`}
       >
         <div className="h-3 w-3 rotate-45 bg-violet-500 ring-2 ring-[var(--surface-raised)]" />
@@ -653,14 +658,14 @@ function TaskBar({
           onClick()
         }
       }}
-      className={`absolute rounded-[4px] cursor-grab active:cursor-grabbing select-none touch-none transition-colors flex items-center px-1.5 overflow-hidden ${cls}`}
-      style={{ left: x + dx, top, width: w, height: 16 }}
+      className={`gantt-bar-grow absolute rounded-[4px] cursor-grab active:cursor-grabbing select-none touch-none transition-colors flex items-center px-1.5 overflow-hidden ${cls} ${critical && !done ? 'gantt-crit-glow' : ''}`}
+      style={{ left: x + dx, top, width: w, height: 16, animationDelay: `${Math.min(Math.round(y / ROW_H), 12) * 28}ms` }}
       title={`${task.title}, ${fmtDate(task.scheduledStartMs)} to ${fmtDate(task.scheduledEndMs)}${task.slackDays > 0 ? `, ${task.slackDays}d slack` : ', critical'}${late ? (done ? ', finished late' : ', running late') : ''}${!done ? `, ${task.progressPct}% done` : ''} (drag to reschedule)`}
     >
       {!done && task.progressPct > 0 && (
         <span
           className="absolute inset-y-0 left-0 bg-[rgb(var(--accent)/0.45)]"
-          style={{ width: `${Math.min(100, task.progressPct)}%` }}
+          style={{ width: `${Math.min(100, task.progressPct)}%`, transition: 'width var(--dur-slow) var(--ease-spring-glide)' }}
           data-testid={`gantt-progress-${task.id}`}
         />
       )}
@@ -699,10 +704,11 @@ function DependencyArrows({
     const y2 = si * ROW_H + ROW_H / 2
     const dx = Math.max(12, Math.abs(x2 - x1) / 2)
     const onCrit = critPathSet.has(dep.predId) && critPathSet.has(dep.succId)
+    const d = `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`
     paths.push(
       <path
         key={dep.id}
-        d={`M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`}
+        d={d}
         fill="none"
         stroke={onCrit ? 'rgb(var(--accent))' : 'var(--edge-firm)'}
         strokeWidth={onCrit ? 1.5 : 1}
@@ -710,6 +716,21 @@ function DependencyArrows({
         markerEnd="url(#gantt-arrow)"
       />
     )
+    // A flowing "current" of light along each critical-path edge.
+    if (onCrit) {
+      paths.push(
+        <path
+          key={`${dep.id}-flow`}
+          d={d}
+          fill="none"
+          stroke="rgb(var(--accent))"
+          strokeWidth={1.5}
+          strokeOpacity={0.6}
+          strokeDasharray="6 8"
+          style={{ animation: 'gantt-flow 1.2s linear infinite', willChange: 'stroke-dashoffset' }}
+        />
+      )
+    }
   }
   return (
     <svg className="absolute top-0 left-0 pointer-events-none" width={geom.width} height={geom.height}>
@@ -1002,7 +1023,15 @@ function TaskEditor({
               step={5}
               value={task.progressPct}
               data-testid="task-progress"
-              onChange={(e) => void patch({ progressPct: Number(e.target.value) })}
+              onChange={(e) => {
+                const v = Number(e.target.value)
+                // Celebrate crossing the finish line: 100% from below.
+                if (v === 100 && task.progressPct < 100) {
+                  const r = (e.target as HTMLInputElement).getBoundingClientRect()
+                  spawnSparkBurst(r.right - 8, r.top + r.height / 2, 'rgb(16 185 129)')
+                }
+                void patch({ progressPct: v })
+              }}
               className="mt-1.5 w-full accent-[rgb(var(--accent))]"
             />
           </label>
@@ -1155,7 +1184,7 @@ function BoardView({
   for (const t of plan.tasks) byCol.get(statusOf(t))!.push(t)
 
   return (
-    <div className="flex gap-3 p-4 h-full overflow-x-auto" data-testid="projects-board">
+    <div className="flex gap-3 p-4 h-full overflow-x-auto fb-fade-in-up" data-testid="projects-board">
       {STATUS_COLUMNS.map((col) => {
         const tasks = byCol.get(col.id) ?? []
         return (
@@ -1170,12 +1199,17 @@ function BoardView({
             onDrop={(e) => {
               e.preventDefault()
               const id = dragId || e.dataTransfer.getData('text/plain')
-              if (id) onSetStatus(id, col.id)
+              if (id) {
+                const wasDone = statusOf(plan.tasks.find((t) => t.id === id) ?? ({ status: '' } as PlanTask)) === 'done'
+                onSetStatus(id, col.id)
+                // Celebrate a genuine completion: dropping into Done from elsewhere.
+                if (col.id === 'done' && !wasDone) spawnSparkBurst(e.clientX, e.clientY, 'rgb(16 185 129)')
+              }
               setDragId(null)
               setOverCol(null)
             }}
-            className={`w-[260px] shrink-0 flex flex-col rounded-xl border ${
-              overCol === col.id ? 'border-[rgb(var(--accent)/0.55)] bg-[rgb(var(--accent)/0.04)]' : 'border-[var(--edge-soft)] bg-[var(--surface-raised)]'
+            className={`w-[260px] shrink-0 flex flex-col rounded-xl border transition-colors ${
+              overCol === col.id ? 'border-[rgb(var(--accent)/0.55)] bg-[rgb(var(--accent)/0.06)] gantt-crit-glow' : 'border-[var(--edge-soft)] bg-[var(--surface-raised)]'
             }`}
           >
             <div className="flex items-center justify-between px-3 py-2.5 border-b border-[var(--edge-soft)]">
@@ -1200,7 +1234,9 @@ function BoardView({
                     onDragEnd={() => setDragId(null)}
                     onClick={() => onSelect(t.id)}
                     data-testid={`board-card-${t.id}`}
-                    className={`rounded-lg border bg-[var(--surface-base)] px-2.5 py-2 cursor-grab active:cursor-grabbing transition-colors ${
+                    className={`fb-hover-lift rounded-lg border bg-[var(--surface-base)] px-2.5 py-2 cursor-grab active:cursor-grabbing transition-[transform,box-shadow,border-color,opacity] ${
+                      dragId === t.id ? 'opacity-50 scale-[0.98]' : ''
+                    } ${
                       t.id === selectedId ? 'border-[rgb(var(--accent)/0.55)]' : 'border-[var(--edge-soft)] hover:border-[rgb(var(--accent)/0.35)]'
                     }`}
                   >
@@ -1281,7 +1317,7 @@ function GridView({
   )
 
   return (
-    <div className="p-4 overflow-auto h-full" data-testid="projects-grid">
+    <div className="p-4 overflow-auto h-full fb-fade-in-up" data-testid="projects-grid">
       <table className="w-full text-[12.5px] border-collapse">
         <thead className="text-[11px] uppercase tracking-[0.08em] text-[var(--ink-50)] border-b border-[var(--edge-firm)]">
           <tr>

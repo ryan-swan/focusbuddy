@@ -1992,3 +1992,63 @@ body {
     animation: none !important;
   }
 }
+
+/* ── PlexiProjects motion (world-leading polish) ──────────────────────────── */
+/* A flowing "current" along the critical path. stroke-dashoffset is GPU-cheap on
+   SVG; reduced-motion disables it below. */
+@keyframes gantt-flow {
+  to {
+    stroke-dashoffset: -14;
+  }
+}
+/* Gantt bars grow in from their start date, with a gentle spring overshoot. */
+@keyframes gantt-bar-grow {
+  from {
+    transform: scaleX(0);
+    opacity: 0;
+  }
+  to {
+    transform: scaleX(1);
+    opacity: 1;
+  }
+}
+.gantt-bar-grow {
+  animation: gantt-bar-grow var(--dur-base) var(--ease-spring-soft) both;
+  transform-origin: left center;
+}
+/* Cards / tiles rise into place, staggered by index via inline animation-delay. */
+@keyframes fb-fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.fb-fade-in-up {
+  animation: fb-fade-in-up var(--dur-base) var(--ease-spring-soft) both;
+}
+/* A soft accent bloom for the critical-path bars — a glow, not a selection ring. */
+.gantt-crit-glow {
+  box-shadow:
+    0 0 0 1px rgb(var(--accent) / 0.55),
+    0 0 12px -2px rgb(var(--accent) / 0.5);
+}
+/* Smooth the snap of a dragged bar back onto the day grid (toggled briefly). */
+.gantt-bar-snap {
+  transition: left var(--dur-quick) var(--ease-spring-snap);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gantt-bar-grow,
+  .fb-fade-in-up {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+  [style*='gantt-flow'] {
+    animation: none !important;
+  }
+}

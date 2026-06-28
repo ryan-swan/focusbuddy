@@ -293,7 +293,7 @@ export function Ring({
           strokeLinecap="round"
           strokeDasharray={c}
           strokeDashoffset={c - dash}
-          style={{ transition: 'stroke-dashoffset 420ms ease' }}
+          style={{ transition: 'stroke-dashoffset 420ms var(--ease-spring-glide)' }}
         />
       </g>
       {label && (
@@ -309,4 +309,70 @@ export function Ring({
       )}
     </svg>
   )
+}
+
+// ── Spark burst ──────────────────────────────────────────────────────────────
+// A one-shot celebration burst fired imperatively at a screen point — used
+// sparingly, when something is genuinely completed (a task hits done / 100%), so
+// it feels earned, not noisy. Dependency-free canvas, one rAF loop, self-cleaning,
+// and silent under prefers-reduced-motion.
+export function spawnSparkBurst(cx: number, cy: number, color = 'rgb(var(--accent))'): void {
+  if (typeof window === 'undefined') return
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+  const size = 140
+  const canvas = document.createElement('canvas')
+  canvas.width = canvas.height = size
+  Object.assign(canvas.style, {
+    position: 'fixed',
+    left: `${cx - size / 2}px`,
+    top: `${cy - size / 2}px`,
+    pointerEvents: 'none',
+    zIndex: '9999',
+    mixBlendMode: 'screen'
+  })
+  document.body.appendChild(canvas)
+  const ctx = canvas.getContext('2d')
+  if (!ctx) {
+    canvas.remove()
+    return
+  }
+  // Resolve the (possibly CSS-variable) colour to concrete rgb once.
+  const probe = document.createElement('canvas')
+  probe.width = probe.height = 1
+  const pctx = probe.getContext('2d')!
+  pctx.fillStyle = color
+  pctx.fillRect(0, 0, 1, 1)
+  const [r, g, b] = pctx.getImageData(0, 0, 1, 1).data
+
+  type P = { x: number; y: number; vx: number; vy: number; life: number; size: number }
+  const particles: P[] = Array.from({ length: 14 }, () => {
+    const angle = Math.random() * Math.PI * 2
+    const speed = 1.6 + Math.random() * 2.8
+    return { x: size / 2, y: size / 2, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, life: 1, size: 2 + Math.random() * 2.5 }
+  })
+  let raf = 0
+  const tick = (): void => {
+    ctx.clearRect(0, 0, size, size)
+    let alive = 0
+    for (const p of particles) {
+      p.life -= 0.045
+      if (p.life <= 0) continue
+      alive++
+      p.x += p.vx
+      p.y += p.vy
+      p.vy += 0.09
+      ctx.globalAlpha = Math.max(0, p.life)
+      ctx.fillStyle = `rgb(${r} ${g} ${b})`
+      ctx.beginPath()
+      ctx.arc(p.x, p.y, Math.max(0.5, p.size * p.life), 0, Math.PI * 2)
+      ctx.fill()
+    }
+    if (alive > 0) raf = requestAnimationFrame(tick)
+    else canvas.remove()
+  }
+  raf = requestAnimationFrame(tick)
+  window.setTimeout(() => {
+    cancelAnimationFrame(raf)
+    canvas.remove()
+  }, 2200)
 }
