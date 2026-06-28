@@ -127,7 +127,6 @@ export default function PlexiFlowView(): JSX.Element {
           ) : flows.length === 0 ? (
             <div className="px-3 py-10 text-center" data-testid="flows-empty">
               <Icon name="account_tree" size={24} className="text-[var(--ink-30)]" />
-              <p className="mt-2 text-[12px] text-[var(--ink-70)] leading-relaxed">No flows yet. Create one to automate work across your tools.</p>
             </div>
           ) : (
             flows.map((f) => (

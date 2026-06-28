@@ -12,6 +12,7 @@ import { canCreateWidget } from '../lib/gating'
 import { promptUpgrade } from '../stores/upgradePrompt'
 import { useEditorCommandStore } from '../stores/editorCommands'
 import { useQuickCreate } from '../stores/quickCreate'
+import { recencyRank } from '../lib/viewRecency'
 
 interface Props {
   onOpenBodyDouble: () => void
@@ -321,12 +322,19 @@ export default function CommandCenter({
       }
     })
     // Navigation to the other top-level surfaces.
-    const navTargets: Array<{ id: string; label: string; hint: string; icon: string; words: string; go: () => void }> = [
-      { id: 'go-documents', label: 'Documents', hint: 'Docs, sheets, slides', icon: 'article', words: 'documents docs sheets slides', go: goDocuments },
-      { id: 'go-files', label: 'Files', hint: 'File manager', icon: 'folder', words: 'files folders manager', go: goFiles },
-      { id: 'go-mail', label: 'Mail', hint: 'Email inbox', icon: 'mail', words: 'mail email inbox', go: () => goMail() },
-      { id: 'go-inbox', label: 'PlexiInbox', hint: 'Notifications, share invites', icon: 'inbox', words: 'inbox notifications invites plexi', go: goInbox },
-      { id: 'go-messages', label: 'Messages', hint: 'Chats', icon: 'forum', words: 'messages chat dm', go: goMessages }
+    // On an empty query, float the modules the person actually uses to the top.
+    // recencyRank is -1 when a module hasn't been visited, 0 for the most recent.
+    const recBonus = (kind: string): number => {
+      if (q !== '') return 0
+      const r = recencyRank(kind)
+      return r >= 0 ? (8 - r) * 2 : 0
+    }
+    const navTargets: Array<{ id: string; label: string; hint: string; icon: string; words: string; viewKind: string; go: () => void }> = [
+      { id: 'go-documents', label: 'Documents', hint: 'Docs, sheets, slides', icon: 'article', words: 'documents docs sheets slides', viewKind: 'documents', go: goDocuments },
+      { id: 'go-files', label: 'Files', hint: 'File manager', icon: 'folder', words: 'files folders manager', viewKind: 'files', go: goFiles },
+      { id: 'go-mail', label: 'Mail', hint: 'Email inbox', icon: 'mail', words: 'mail email inbox', viewKind: 'mail', go: () => goMail() },
+      { id: 'go-inbox', label: 'PlexiInbox', hint: 'Notifications, share invites', icon: 'inbox', words: 'inbox notifications invites plexi', viewKind: 'inbox', go: goInbox },
+      { id: 'go-messages', label: 'Messages', hint: 'Chats', icon: 'forum', words: 'messages chat dm', viewKind: 'messages', go: goMessages }
     ]
     for (const t of navTargets) {
       items.push({
@@ -335,7 +343,7 @@ export default function CommandCenter({
         hint: t.hint,
         icon: t.icon,
         kind: 'action',
-        score: q === '' ? 55 : matchScore(t.words, q),
+        score: (q === '' ? 55 : matchScore(t.words, q)) + recBonus(t.viewKind),
         run: () => {
           setActive(null)
           t.go()
@@ -358,13 +366,13 @@ export default function CommandCenter({
     // Global quick-create: "New <module item>" from anywhere. Each sets a pending
     // request and navigates; the module creates the item as it opens, so there is
     // no separate "start new" screen to click through.
-    const createTargets: Array<{ id: string; label: string; words: string; icon: string; key: string; go: () => void }> = [
-      { id: 'new-project', label: 'New project', words: 'new project plan gantt create', icon: 'account_tree', key: 'projects', go: goProjects },
-      { id: 'new-report', label: 'New report', words: 'new report summary create', icon: 'summarize', key: 'reports', go: goReports },
-      { id: 'new-flow', label: 'New flow', words: 'new flow automation create', icon: 'bolt', key: 'flows', go: goFlows },
-      { id: 'new-form', label: 'New form', words: 'new form survey create', icon: 'dynamic_form', key: 'forms', go: goForms },
-      { id: 'new-app', label: 'New app', words: 'new app build tool create', icon: 'construction', key: 'build', go: goApps },
-      { id: 'new-meeting', label: 'Start a meeting', words: 'new meeting meet call video start', icon: 'video_call', key: 'meet', go: goMeetings }
+    const createTargets: Array<{ id: string; label: string; words: string; icon: string; key: string; viewKind: string; go: () => void }> = [
+      { id: 'new-project', label: 'New project', words: 'new project plan gantt create', icon: 'account_tree', key: 'projects', viewKind: 'projects', go: goProjects },
+      { id: 'new-report', label: 'New report', words: 'new report summary create', icon: 'summarize', key: 'reports', viewKind: 'reports', go: goReports },
+      { id: 'new-flow', label: 'New flow', words: 'new flow automation create', icon: 'bolt', key: 'flows', viewKind: 'flows', go: goFlows },
+      { id: 'new-form', label: 'New form', words: 'new form survey create', icon: 'dynamic_form', key: 'forms', viewKind: 'forms', go: goForms },
+      { id: 'new-app', label: 'New app', words: 'new app build tool create', icon: 'construction', key: 'build', viewKind: 'apps', go: goApps },
+      { id: 'new-meeting', label: 'Start a meeting', words: 'new meeting meet call video start', icon: 'video_call', key: 'meet', viewKind: 'meetings', go: goMeetings }
     ]
     for (const t of createTargets) {
       items.push({
@@ -373,7 +381,7 @@ export default function CommandCenter({
         hint: 'Create and open it',
         icon: t.icon,
         kind: 'action',
-        score: q === '' ? 57 : matchScore(t.words, q),
+        score: (q === '' ? 57 : matchScore(t.words, q)) + recBonus(t.viewKind),
         run: () => {
           requestCreate(t.key)
           setActive(null)

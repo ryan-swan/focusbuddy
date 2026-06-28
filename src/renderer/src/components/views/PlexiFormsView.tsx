@@ -92,9 +92,8 @@ export default function PlexiFormsView(): JSX.Element {
               <Icon name="progress_activity" size={15} className="text-[rgb(var(--accent))] animate-spin" /> Loading…
             </div>
           ) : forms.length === 0 ? (
-            <div className="px-3 py-10 text-center">
+            <div className="px-3 py-10 text-center" data-testid="forms-empty">
               <Icon name="dynamic_form" size={26} className="text-[var(--ink-30)]" />
-              <p className="mt-2 text-[12px] text-[var(--ink-70)] leading-relaxed">No forms yet. Build one to start collecting.</p>
             </div>
           ) : (
             forms.map((f) => (
