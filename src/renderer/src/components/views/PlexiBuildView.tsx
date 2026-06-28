@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import Icon from '../Icon'
 import { PLEXI_CARD } from '../plexi'
+import ModuleHome from '../ModuleHome'
 import { useAppsStore } from '../../stores/apps'
 import {
   type PlexiApp,
@@ -104,12 +105,33 @@ export default function PlexiBuildView(): JSX.Element {
             }}
           />
         ) : (
-          <div className="h-full flex flex-col items-center justify-center text-center px-6">
-            <Icon name="construction" size={30} className="text-[var(--ink-30)]" />
-            <p className="mt-2 text-[13px] text-[var(--ink-70)] max-w-sm leading-relaxed">
-              Select an app to build it, or create a new one. Drop in components, then hit Preview to run it.
-            </p>
-          </div>
+          <ModuleHome
+            moduleKey="build"
+            title="Build"
+            subtitle="Compose an internal tool from typed components, then run it, no code"
+            icon="construction"
+            accentClass="text-emerald-500"
+            stats={[
+              { label: 'Apps', value: apps.length, icon: 'apps' },
+              { label: 'Components', value: apps.reduce((n, a) => n + a.components.length, 0), icon: 'widgets' }
+            ]}
+            items={apps.map((a) => ({
+              id: a.id,
+              title: a.name,
+              subtitle: `${a.components.length} component(s)`,
+              meta: `Updated ${new Date(a.updatedAt).toLocaleDateString()}`,
+              onOpen: () => setSelectedId(a.id)
+            }))}
+            recentLabel="Your apps"
+            onCreate={() => void addApp()}
+            createLabel="New app"
+            emptyHint="No apps yet. Create one, drop in components, then hit Preview to run it."
+            tips={[
+              { icon: 'widgets', text: 'Compose from headings, text, fields, buttons and dividers in Build mode.' },
+              { icon: 'play_arrow', text: 'Switch to Preview to run the app you built.' },
+              { icon: 'save', text: 'Each app is saved on its own, ready to come back to.' }
+            ]}
+          />
         )}
       </div>
     </div>

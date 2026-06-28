@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Icon from '../Icon'
 import { DashboardHeader, StatusPill, PLEXI_CARD } from '../plexi'
+import { useViewStore } from '../../stores/view'
 import type { ProjectPlan, ProjectSummary, PlanTask } from '@shared/projects'
 
 // PlexiProjects: roll the tasks you already work in up into a scheduled plan. A
@@ -53,6 +54,19 @@ export default function PlexiProjectsView(): JSX.Element {
     loadPortfolio()
   }, [loadPortfolio])
 
+  // Create a new project (a folder) and open it straight away so the user can add
+  // its first task, even before it shows in the portfolio (which lists folders that
+  // already have tasks).
+  async function newProject(): Promise<void> {
+    setError(null)
+    try {
+      const node = await window.api.nodes.create({ parentId: null, kind: 'folder', title: 'New project' })
+      setOpenId(node.id)
+    } catch (e) {
+      setError(`Could not create the project: ${e instanceof Error ? e.message : String(e)}`)
+    }
+  }
+
   if (openId) {
     return <ProjectGantt projectId={openId} onBack={() => { setOpenId(null); loadPortfolio() }} />
   }
@@ -60,7 +74,16 @@ export default function PlexiProjectsView(): JSX.Element {
   return (
     <div className="h-full w-full overflow-auto bg-[var(--surface-base)] text-[var(--ink-100)]" data-testid="plexiprojects-view">
       <div className="max-w-5xl mx-auto px-6 py-6">
-        <DashboardHeader title="Projects" subtitle="Plans, milestones and a timeline built from the tasks you already work in" />
+        <div className="flex items-start justify-between gap-3">
+          <DashboardHeader title="Projects" subtitle="Plans, milestones and a timeline built from the tasks you already work in" />
+          <button
+            onClick={() => void newProject()}
+            data-testid="projects-new"
+            className="shrink-0 inline-flex items-center gap-1.5 h-9 px-3 rounded-lg bg-[rgb(var(--accent))] text-white text-[12.5px] font-medium hover:bg-[rgb(var(--accent-hover))]"
+          >
+            <Icon name="add" size={16} /> New project
+          </button>
+        </div>
 
         {error && <p className="mb-3 text-rose-500 text-[12px]" data-testid="projects-error">{error}</p>}
 
@@ -140,6 +163,9 @@ function ProjectGantt({ projectId, onBack }: { projectId: string; onBack: () => 
     load()
   }, [load])
 
+  const [adding, setAdding] = useState(false)
+  const [newTitle, setNewTitle] = useState('')
+
   async function reschedule(): Promise<void> {
     setBusy(true)
     setError(null)
@@ -150,6 +176,39 @@ function ProjectGantt({ projectId, onBack }: { projectId: string; onBack: () => 
       setError(`Could not reschedule: ${e instanceof Error ? e.message : String(e)}`)
     } finally {
       setBusy(false)
+    }
+  }
+
+  // Add a task to this project (a child of the project folder), then reload so it
+  // appears on the timeline.
+  async function addTask(): Promise<void> {
+    const title = newTitle.trim()
+    if (!title) return
+    setError(null)
+    try {
+      const node = await window.api.nodes.create({ parentId: projectId, kind: 'task', title })
+      setNewTitle('')
+      setAdding(false)
+      load()
+      setSelectedId(node.id)
+    } catch (e) {
+      setError(`Could not add the task: ${e instanceof Error ? e.message : String(e)}`)
+    }
+  }
+
+  // Commit a drag of a task bar: pin its planned start to the dropped day and, if
+  // a finish date was set, shift it by the same number of days to keep the length.
+  async function rescheduleTask(t: PlanTask, newStartMs: number): Promise<void> {
+    setError(null)
+    try {
+      const patch: { planStart: number; planDue?: number | null } = { planStart: newStartMs }
+      if (t.planDue != null && t.planStart != null) {
+        patch.planDue = t.planDue + (newStartMs - t.planStart)
+      }
+      await window.api.projects.setTaskPlan(t.id, patch)
+      load()
+    } catch (e) {
+      setError(`Could not move the task: ${e instanceof Error ? e.message : String(e)}`)
     }
   }
 
@@ -196,6 +255,47 @@ function ProjectGantt({ projectId, onBack }: { projectId: string; onBack: () => 
           <h1 className="fb-display text-[16px] font-bold tracking-tight text-[var(--ink-100)] truncate">{plan?.title ?? 'Project'}</h1>
           <div className="ml-auto flex items-center gap-2">
             <GanttLegend />
+            {adding ? (
+              <div className="flex items-center gap-1.5">
+                <input
+                  autoFocus
+                  value={newTitle}
+                  onChange={(e) => setNewTitle(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') void addTask()
+                    if (e.key === 'Escape') {
+                      setAdding(false)
+                      setNewTitle('')
+                    }
+                  }}
+                  placeholder="New task title…"
+                  data-testid="projects-new-task-input"
+                  className="h-8 w-48 rounded-lg bg-[var(--surface-base)] border border-[var(--edge-soft)] px-2.5 text-[12.5px] text-[var(--ink-100)] focus:outline-none focus:border-[rgb(var(--accent)/0.55)]"
+                />
+                <button
+                  onClick={() => void addTask()}
+                  disabled={!newTitle.trim()}
+                  data-testid="projects-new-task-confirm"
+                  className="inline-flex items-center gap-1 h-8 px-2.5 rounded-lg bg-[rgb(var(--accent))] text-white text-[12.5px] font-medium hover:bg-[rgb(var(--accent-hover))] disabled:opacity-40"
+                >
+                  Add
+                </button>
+                <button
+                  onClick={() => { setAdding(false); setNewTitle('') }}
+                  className="p-1 rounded text-[var(--ink-50)] hover:text-[var(--ink-100)]"
+                >
+                  <Icon name="close" size={15} />
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setAdding(true)}
+                data-testid="projects-add-task"
+                className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border border-[var(--edge-soft)] text-[12.5px] text-[var(--ink-90)] hover:bg-[var(--surface-sunken)]"
+              >
+                <Icon name="add" size={15} /> Add task
+              </button>
+            )}
             <button
               onClick={() => void reschedule()}
               disabled={busy}
@@ -274,7 +374,9 @@ function ProjectGantt({ projectId, onBack }: { projectId: string; onBack: () => 
                       y={i * ROW_H}
                       critical={critPathSet.has(t.id) || t.critical}
                       late={lateSet.has(t.id)}
+                      anchorMs={plan.anchorMs}
                       onClick={() => setSelectedId(t.id)}
+                      onReschedule={(startMs) => void rescheduleTask(t, startMs)}
                     />
                   ))}
                 </div>
@@ -370,18 +472,55 @@ function TaskBar({
   y,
   critical,
   late,
-  onClick
+  anchorMs,
+  onClick,
+  onReschedule
 }: {
   task: PlanTask
   x: number
   y: number
   critical: boolean
   late: boolean
+  anchorMs: number
   onClick: () => void
+  onReschedule: (newStartMs: number) => void
 }): JSX.Element {
   const done = task.status === 'done' || task.completedAt != null
   const w = Math.max(task.durationDays * DAY_W, 8)
   const top = y + (ROW_H - 16) / 2
+
+  // Drag a bar horizontally to change its start date. We track a live pixel
+  // offset while dragging (so the bar follows the cursor), then on release snap
+  // to the nearest day and commit. A drag below the threshold is treated as a
+  // click (open the editor) so selecting still works.
+  const [dx, setDx] = useState(0)
+  const drag = useRef<{ startX: number; moved: boolean } | null>(null)
+
+  const onPointerDown = (e: React.PointerEvent): void => {
+    e.currentTarget.setPointerCapture(e.pointerId)
+    drag.current = { startX: e.clientX, moved: false }
+  }
+  const onPointerMove = (e: React.PointerEvent): void => {
+    if (!drag.current) return
+    const delta = e.clientX - drag.current.startX
+    if (Math.abs(delta) > 3) drag.current.moved = true
+    setDx(delta)
+  }
+  const onPointerUp = (e: React.PointerEvent): void => {
+    const d = drag.current
+    drag.current = null
+    e.currentTarget.releasePointerCapture(e.pointerId)
+    if (!d) return
+    if (!d.moved) {
+      setDx(0)
+      onClick()
+      return
+    }
+    const days = Math.max(0, Math.round((x + dx) / DAY_W))
+    setDx(0)
+    onReschedule(anchorMs + days * DAY_MS)
+  }
+  const dragProps = { onPointerDown, onPointerMove, onPointerUp }
 
   if (task.isMilestone) {
     return (
@@ -390,16 +529,16 @@ function TaskBar({
         role="button"
         tabIndex={0}
         aria-label={`${task.title || 'Untitled'}, ${fmtDate(task.scheduledStartMs)}`}
-        onClick={onClick}
+        {...dragProps}
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === ' ') {
             if (e.key === ' ') e.preventDefault()
             onClick()
           }
         }}
-        className="absolute cursor-pointer"
-        style={{ left: x - 7, top: y + (ROW_H - 12) / 2 }}
-        title={`${task.title}, ${fmtDate(task.scheduledStartMs)}`}
+        className="absolute cursor-grab active:cursor-grabbing select-none touch-none"
+        style={{ left: x - 7 + dx, top: y + (ROW_H - 12) / 2 }}
+        title={`${task.title}, ${fmtDate(task.scheduledStartMs)} (drag to reschedule)`}
       >
         <div className="h-3 w-3 rotate-45 bg-violet-500 ring-2 ring-[var(--surface-raised)]" />
       </div>
@@ -419,16 +558,16 @@ function TaskBar({
       role="button"
       tabIndex={0}
       aria-label={`${task.title || 'Untitled'}, ${fmtDate(task.scheduledStartMs)} to ${fmtDate(task.scheduledEndMs)}`}
-      onClick={onClick}
+      {...dragProps}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
           if (e.key === ' ') e.preventDefault()
           onClick()
         }
       }}
-      className={`absolute rounded-[4px] cursor-pointer transition-colors flex items-center px-1.5 overflow-hidden ${cls}`}
-      style={{ left: x, top, width: w, height: 16 }}
-      title={`${task.title}, ${fmtDate(task.scheduledStartMs)} to ${fmtDate(task.scheduledEndMs)}${task.slackDays > 0 ? `, ${task.slackDays}d slack` : ', critical'}${late ? (done ? ', finished late' : ', running late') : ''}`}
+      className={`absolute rounded-[4px] cursor-grab active:cursor-grabbing select-none touch-none transition-colors flex items-center px-1.5 overflow-hidden ${cls}`}
+      style={{ left: x + dx, top, width: w, height: 16 }}
+      title={`${task.title}, ${fmtDate(task.scheduledStartMs)} to ${fmtDate(task.scheduledEndMs)}${task.slackDays > 0 ? `, ${task.slackDays}d slack` : ', critical'}${late ? (done ? ', finished late' : ', running late') : ''} (drag to reschedule)`}
     >
       {w > 44 && (
         <span className="text-[10px] truncate text-[var(--ink-90)] flex-1">{task.title}</span>
@@ -500,9 +639,38 @@ function TaskEditor({
   onClose: () => void
   onChanged: () => void
 }): JSX.Element {
+  const goTask = useViewStore((s) => s.goTask)
   const [depPick, setDepPick] = useState('')
+  const [succPick, setSuccPick] = useState('')
   const [depError, setDepError] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [title, setTitle] = useState(task.title)
+
+  // Keep the title field in sync when a different task is selected.
+  useEffect(() => setTitle(task.title), [task.id, task.title])
+
+  async function saveTitle(): Promise<void> {
+    const next = title.trim()
+    if (!next || next === task.title) return
+    setError(null)
+    try {
+      await window.api.nodes.update(task.id, { title: next })
+      onChanged()
+    } catch (e) {
+      setError(`Could not rename the task: ${e instanceof Error ? e.message : String(e)}`)
+    }
+  }
+
+  async function removeTask(): Promise<void> {
+    setError(null)
+    try {
+      await window.api.nodes.delete(task.id)
+      onClose()
+      onChanged()
+    } catch (e) {
+      setError(`Could not delete the task: ${e instanceof Error ? e.message : String(e)}`)
+    }
+  }
 
   async function patch(p: Parameters<typeof window.api.projects.setTaskPlan>[1]): Promise<void> {
     setError(null)
@@ -545,16 +713,85 @@ function TaskEditor({
     }
   }
 
+  // Successors are the mirror of dependencies: a task that depends on this one.
+  // Adding one makes this task its predecessor.
+  async function addSucc(succId: string): Promise<void> {
+    setDepError(null)
+    try {
+      const r = await window.api.projects.addDep(task.id, succId)
+      if (!r.ok) {
+        setDepError(
+          r.reason === 'cycle'
+            ? 'That would create a circular dependency.'
+            : r.reason === 'duplicate'
+              ? 'That link already exists.'
+              : 'Could not add that successor.'
+        )
+        return
+      }
+      setSuccPick('')
+      onChanged()
+    } catch (e) {
+      setDepError(`Could not add that successor: ${e instanceof Error ? e.message : String(e)}`)
+    }
+  }
+
+  async function removeSucc(succId: string): Promise<void> {
+    setError(null)
+    try {
+      await window.api.projects.removeDep(task.id, succId)
+      onChanged()
+    } catch (e) {
+      setError(`Could not remove that successor: ${e instanceof Error ? e.message : String(e)}`)
+    }
+  }
+
   const candidates = allTasks.filter((t) => t.id !== task.id && !task.deps.includes(t.id))
+  const successors = allTasks.filter((t) => t.deps.includes(task.id))
+  const succCandidates = allTasks.filter((t) => t.id !== task.id && !t.deps.includes(task.id))
   const titleOf = (id: string): string => allTasks.find((t) => t.id === id)?.title || 'Task'
 
   return (
     <div className="w-[300px] shrink-0 border-l border-[var(--edge-soft)] bg-[var(--surface-raised)] overflow-auto" data-testid="task-editor">
-      <div className="px-4 py-3 border-b border-[var(--edge-soft)] flex items-center justify-between">
-        <h3 className="text-[13px] font-semibold text-[var(--ink-100)] truncate">{task.title || 'Untitled'}</h3>
-        <button onClick={onClose} className="p-1 rounded text-[var(--ink-50)] hover:text-[var(--ink-100)]">
-          <Icon name="close" size={15} />
-        </button>
+      <div className="px-4 py-3 border-b border-[var(--edge-soft)]">
+        <div className="flex items-center gap-1.5">
+          <input
+            value={title}
+            data-testid="task-title"
+            onChange={(e) => setTitle(e.target.value)}
+            onBlur={() => void saveTitle()}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault()
+                void saveTitle()
+                ;(e.target as HTMLInputElement).blur()
+              }
+            }}
+            placeholder="Task title"
+            className="flex-1 min-w-0 rounded-md bg-transparent border border-transparent hover:border-[var(--edge-soft)] focus:border-[rgb(var(--accent)/0.55)] px-1.5 py-1 text-[13px] font-semibold text-[var(--ink-100)] focus:outline-none focus:bg-[var(--surface-base)]"
+          />
+          <button onClick={onClose} className="shrink-0 p-1 rounded text-[var(--ink-50)] hover:text-[var(--ink-100)]" title="Close">
+            <Icon name="close" size={15} />
+          </button>
+        </div>
+        <div className="mt-2 flex items-center gap-2">
+          <button
+            onClick={() => goTask(task.id)}
+            data-testid="task-open"
+            className="inline-flex items-center gap-1 text-[11.5px] text-[var(--ink-70)] hover:text-[rgb(var(--accent))]"
+            title="Open this task, its notes and attachments"
+          >
+            <Icon name="open_in_new" size={13} /> Open task &amp; files
+          </button>
+          <button
+            onClick={() => void removeTask()}
+            data-testid="task-delete"
+            className="inline-flex items-center gap-1 text-[11.5px] text-[var(--ink-70)] hover:text-rose-500 ml-auto"
+            title="Move this task to trash"
+          >
+            <Icon name="delete" size={13} /> Delete
+          </button>
+        </div>
       </div>
 
       <div className="px-4 py-3 space-y-3">
@@ -648,6 +885,40 @@ function TaskEditor({
             </select>
           )}
           {depError && <p className="mt-1 text-[11px] text-rose-500">{depError}</p>}
+        </div>
+
+        <div>
+          <span className="text-[11px] text-[var(--ink-70)]">Blocks (must finish before)</span>
+          <div className="mt-1.5 space-y-1">
+            {successors.length === 0 && <p className="text-[11.5px] text-[var(--ink-50)]">Nothing waits on this.</p>}
+            {successors.map((s) => (
+              <div key={s.id} className="flex items-center gap-1.5 text-[12px] text-[var(--ink-90)] bg-[var(--surface-sunken)] rounded px-2 py-1">
+                <Icon name="arrow_back" size={12} className="text-[var(--ink-50)]" />
+                <span className="truncate flex-1">{s.title || 'Untitled'}</span>
+                <button onClick={() => void removeSucc(s.id)} className="text-[var(--ink-50)] hover:text-rose-500">
+                  <Icon name="close" size={12} />
+                </button>
+              </div>
+            ))}
+          </div>
+          {succCandidates.length > 0 && (
+            <select
+              value={succPick}
+              data-testid="task-add-succ"
+              onChange={(e) => {
+                setSuccPick(e.target.value)
+                if (e.target.value) void addSucc(e.target.value)
+              }}
+              className="mt-1.5 w-full rounded-md bg-[var(--surface-base)] border border-[var(--edge-soft)] px-2 py-1.5 text-[12px] text-[var(--ink-100)] focus:outline-none"
+            >
+              <option value="">Add a successor…</option>
+              {succCandidates.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.title || 'Untitled'}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
 
         {error && <p className="text-rose-500 text-[12px]" data-testid="task-editor-error">{error}</p>}

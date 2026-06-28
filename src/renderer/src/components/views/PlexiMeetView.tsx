@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Icon from '../Icon'
+import ModuleHome from '../ModuleHome'
 import { useMeetingsStore } from '../../stores/meetings'
 import { useNodeStore } from '../../stores/nodes'
 import type { Meeting } from '@shared/meetings'
@@ -234,12 +235,35 @@ export default function PlexiMeetView(): JSX.Element {
             }}
           />
         ) : (
-          <div className="h-full flex flex-col items-center justify-center text-center px-6">
-            <Icon name="groups" size={30} className="text-[var(--ink-30)]" />
-            <p className="mt-2 text-[13px] text-[var(--ink-70)] max-w-sm leading-relaxed">
-              Select a meeting to read its summary, transcript and action items, or record a new one.
-            </p>
-          </div>
+          <ModuleHome
+            moduleKey="meet"
+            title="Meetings"
+            subtitle="Record a meeting and it becomes a summary, a transcript and real action items"
+            icon="groups"
+            accentClass="text-rose-500"
+            stats={[
+              { label: 'Meetings', value: meetings.length, icon: 'groups' },
+              { label: 'Action items', value: meetings.reduce((n, m) => n + m.actionItems.length, 0), icon: 'task_alt' },
+              { label: 'Transcribed', value: meetings.filter((m) => m.transcript.trim().length > 0).length, icon: 'description' }
+            ]}
+            items={meetings.map((m) => ({
+              id: m.id,
+              title: m.title,
+              subtitle: m.summary ? m.summary.slice(0, 90) : m.actionItems.length ? `${m.actionItems.length} action item(s)` : 'No summary yet',
+              meta: fmtDate(m.createdAt),
+              status: m.actionItems.length ? { tone: 'accent' as const, label: `${m.actionItems.length} actions` } : undefined,
+              onOpen: () => setSelectedId(m.id)
+            }))}
+            recentLabel="Recent meetings"
+            onCreate={() => void addManual()}
+            createLabel="New meeting"
+            emptyHint="No meetings yet. Record one or capture notes by hand, and its action items become real tasks."
+            tips={[
+              { icon: 'mic', text: 'Record a meeting and it is transcribed and summarised, with a key set; surfaced plainly when one is missing.' },
+              { icon: 'edit_note', text: 'Or capture notes by hand, no recording needed.' },
+              { icon: 'task_alt', text: 'Action items become real tasks beside the rest of your work.' }
+            ]}
+          />
         )}
       </div>
     </div>
