@@ -36,6 +36,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.103',
+    date: '2026-07-19T12:00:00Z',
+    title: 'v2.5.103 — PlexiProjects comes alive',
+    tag: 'design',
+    summary:
+      'A motion and polish pass that makes PlexiProjects feel alive. The critical path now glows and a current of light flows along it, so the chain that drives your finish date draws the eye. Progress fills animate, switching between the timeline, board and grid fades smoothly, cards lift as you hover and dim as you drag, and finishing something is celebrated with a quick spark, when a card lands in Done or a task crosses 100%. It is restrained on purpose, and it all respects your system reduce-motion setting.',
+    highlights: [
+      'A living critical path: a soft glow on its bars and a flowing current of light along its dependency links.',
+      'Smooth everywhere: animated progress fills, fading view switches, and cards that lift on hover and dim while dragging.',
+      'A small spark of celebration when work is genuinely finished, and full respect for reduce-motion.'
+    ]
+  },
+  {
     version: '2.5.102',
     date: '2026-07-18T12:00:00Z',
     title: 'v2.5.102 — PlexiProjects, rebuilt to take on Microsoft Project',
