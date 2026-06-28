@@ -36,6 +36,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.101',
+    date: '2026-07-17T12:00:00Z',
+    title: 'v2.5.101 — every module opens to a real dashboard',
+    tag: 'feature',
+    summary:
+      'Reports, Flows, Forms, Build and Meet now open to a genuine, information-rich dashboard instead of a thin landing screen. Each shows live overview tiles with trends and sparklines, a chart of activity over time, a breakdown of what you have by type, and your recent items, with sections you can show or hide. Every figure is drawn from your real data, so an empty module honestly says there is nothing yet rather than drawing a fake chart.',
+    highlights: [
+      'A real dashboard for each module: overview tiles with trend arrows and sparklines, an activity-over-time chart, a by-type breakdown, and recent items.',
+      'Consistent across the suite and built on the design system, so every module home reads as one product.',
+      'Honest by design: every number and chart point comes from real data; an empty module shows a clear empty state, never an invented trend.'
+    ]
+  },
+  {
     version: '2.5.100',
     date: '2026-07-16T12:00:00Z',
     title: 'v2.5.100 — the command palette learns your habits',
