@@ -36,6 +36,20 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.102',
+    date: '2026-07-18T12:00:00Z',
+    title: 'v2.5.102 — PlexiProjects, rebuilt to take on Microsoft Project',
+    tag: 'feature',
+    summary:
+      'A serious project planner. The same plan is now three views you switch between: a timeline (Gantt) with a critical path, a board you drag tasks across by status, and a sortable grid. Dependencies are proper now, finish-to-start, start-to-start, finish-to-finish and start-to-finish, each with a lead or lag in working days, and the schedule skips weekends like a real working calendar. Every task can have an owner and a percent-complete that shows as a fill on its bar, and the portfolio home opens with live totals across all your projects. It is all computed from your real plan, with nothing invented.',
+    highlights: [
+      'Three views of one plan: Timeline (Gantt with critical path), Board (drag tasks across status columns), and a sortable Grid.',
+      'Real dependencies: finish-to-start, start-to-start, finish-to-finish and start-to-finish, each with a working-day lead or lag.',
+      'A working-day calendar that skips weekends, plus an owner and a percent-complete on every task, shown as a progress fill on the timeline.',
+      'A portfolio home with live totals: projects, tasks done, average completion and how many are at risk.'
+    ]
+  },
+  {
     version: '2.5.101',
     date: '2026-07-17T12:00:00Z',
     title: 'v2.5.101 — every module opens to a real dashboard',
