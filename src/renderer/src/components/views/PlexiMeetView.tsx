@@ -2,6 +2,10 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import Icon from '../Icon'
 import ModuleHome from '../ModuleHome'
 import { useMeetingsStore } from '../../stores/meetings'
+import { useMeetingRoomStore } from '../../stores/meetingRoom'
+import { usePresenceStore } from '../../stores/presence'
+import { useAccountStore } from '../../stores/account'
+import { startDm, uploadAttachment, sendMessage } from '../../lib/messagingClient'
 import { useNodeStore } from '../../stores/nodes'
 import type { Meeting } from '@shared/meetings'
 import type { ActionProposal } from '@shared/types'
@@ -117,6 +121,83 @@ export default function PlexiMeetView(): JSX.Element {
     if (created) setSelectedId(created.id)
   }
 
+  // Live meeting + record-a-message wiring.
+  const startMeeting = useMeetingRoomStore((s) => s.start)
+  const presencePeers = usePresenceStore((s) => s.peers)
+  const token = useAccountStore((s) => s.sessionToken)
+  const [showMsg, setShowMsg] = useState(false)
+  const [msgTo, setMsgTo] = useState<{ accountId: string; handle: string } | null>(null)
+  const [msgRecording, setMsgRecording] = useState(false)
+  const [msgNote, setMsgNote] = useState<string | null>(null)
+  const msgRecRef = useRef<MediaRecorder | null>(null)
+
+  function startLive(): void {
+    setError(null)
+    void startMeeting('Meeting')
+  }
+
+  // Record a short audio message and send it to a teammate as a voice DM — the
+  // "they're away, leave them something" path. Reuses the real chat attachment
+  // pipeline, so a failure surfaces honestly rather than pretending it sent.
+  async function recordMessageTo(peer: { accountId: string; handle: string }): Promise<void> {
+    setMsgNote(null)
+    setError(null)
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const rec = new MediaRecorder(stream)
+      const chunks: Blob[] = []
+      const startedAt = Date.now()
+      rec.ondataavailable = (e) => e.data.size > 0 && chunks.push(e.data)
+      rec.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop())
+        setMsgRecording(false)
+        if (!token) {
+          setError('Sign in to send a message.')
+          return
+        }
+        const blob = new Blob(chunks, { type: rec.mimeType || 'audio/webm' })
+        setMsgNote(`Sending to ${peer.handle}…`)
+        const conversationId = await startDm(token, peer.handle)
+        if (!conversationId) {
+          setMsgNote(null)
+          setError(`Could not open a conversation with ${peer.handle}.`)
+          return
+        }
+        const att = await uploadAttachment(token, conversationId, 'voice', await blob.arrayBuffer(), {
+          name: 'message.webm',
+          mime: rec.mimeType || 'audio/webm',
+          ext: 'webm'
+        })
+        if (!att) {
+          setMsgNote(null)
+          setError('Could not upload the message.')
+          return
+        }
+        const sent = await sendMessage(token, conversationId, '', {
+          kind: 'voice',
+          id: att.id,
+          name: 'message.webm',
+          mimeType: rec.mimeType || 'audio/webm',
+          sizeBytes: att.sizeBytes,
+          durationMs: Date.now() - startedAt
+        })
+        setMsgNote(sent ? `Sent to ${peer.handle}.` : null)
+        if (!sent) setError('Could not send the message.')
+        setMsgTo(null)
+      }
+      msgRecRef.current = rec
+      rec.start()
+      setMsgTo(peer)
+      setMsgRecording(true)
+    } catch {
+      setError('Could not access the microphone. Check your system permissions.')
+    }
+  }
+
+  function stopMessage(): void {
+    msgRecRef.current?.stop()
+  }
+
   return (
     <div className="h-full w-full flex bg-[var(--surface-base)] text-[var(--ink-100)]" data-testid="pleximeet-view">
       {/* List */}
@@ -129,34 +210,94 @@ export default function PlexiMeetView(): JSX.Element {
           <p className="mt-0.5 text-[11.5px] text-[var(--ink-70)]">Meetings that turn into actions.</p>
         </div>
 
-        <div className="px-3 py-2.5 flex items-center gap-2">
-          {recording ? (
-            <button
-              onClick={stopRecording}
-              data-testid="meet-stop"
-              className="flex-1 inline-flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-md bg-red-500 text-white text-[12px] font-medium animate-pulse"
-            >
-              <Icon name="stop_circle" size={15} /> Stop recording
-            </button>
-          ) : (
-            <button
-              onClick={() => void startRecording()}
-              data-testid="meet-record"
-              disabled={!!busy}
-              className="flex-1 inline-flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-md bg-[rgb(var(--accent))] text-white text-[12px] font-medium hover:bg-[rgb(var(--accent-hover))] disabled:opacity-50"
-            >
-              <Icon name="mic" size={15} /> Record
-            </button>
-          )}
+        <div className="px-3 py-2.5 space-y-2">
+          {/* Primary: a live, multi-party meeting (connect to teammates). */}
           <button
-            onClick={() => void addManual()}
-            data-testid="meet-add"
-            disabled={!!busy}
-            className="inline-flex items-center gap-1 px-2 py-1.5 rounded-md border border-[var(--edge-soft)] text-[var(--ink-90)] text-[12px] hover:bg-[var(--surface-sunken)]"
-            title="Add a meeting from notes" aria-label="Add a meeting from notes"
+            onClick={startLive}
+            data-testid="meet-start-live"
+            className="w-full inline-flex items-center justify-center gap-1.5 px-2 py-2 rounded-md bg-rose-500 text-white text-[12.5px] font-semibold hover:bg-rose-600"
           >
-            <Icon name="edit_note" size={15} /> Notes
+            <Icon name="video_call" size={17} /> Start a meeting
           </button>
+
+          {/* Secondary: recording is one option, not the whole feature. */}
+          <div className="flex items-center gap-2">
+            {recording ? (
+              <button
+                onClick={stopRecording}
+                data-testid="meet-stop"
+                className="flex-1 inline-flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-md bg-red-500 text-white text-[12px] font-medium animate-pulse"
+              >
+                <Icon name="stop_circle" size={15} /> Stop recording
+              </button>
+            ) : (
+              <button
+                onClick={() => void startRecording()}
+                data-testid="meet-record"
+                disabled={!!busy}
+                className="flex-1 inline-flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-md border border-[var(--edge-soft)] text-[var(--ink-90)] text-[12px] hover:bg-[var(--surface-sunken)] disabled:opacity-50"
+                title="Record audio, transcribe it and extract action items"
+              >
+                <Icon name="mic" size={15} /> Record notes
+              </button>
+            )}
+            <button
+              onClick={() => setShowMsg((v) => !v)}
+              data-testid="meet-message"
+              className="flex-1 inline-flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-md border border-[var(--edge-soft)] text-[var(--ink-90)] text-[12px] hover:bg-[var(--surface-sunken)]"
+              title="Record a quick message and send it to a teammate who is away"
+            >
+              <Icon name="voicemail" size={15} /> Message
+            </button>
+            <button
+              onClick={() => void addManual()}
+              data-testid="meet-add"
+              disabled={!!busy}
+              className="inline-flex items-center gap-1 px-2 py-1.5 rounded-md border border-[var(--edge-soft)] text-[var(--ink-90)] text-[12px] hover:bg-[var(--surface-sunken)]"
+              title="Add a meeting from notes" aria-label="Add a meeting from notes"
+            >
+              <Icon name="edit_note" size={15} />
+            </button>
+          </div>
+
+          {/* Record-a-message picker: choose a teammate (away ones flagged) and leave them a voice note. */}
+          {showMsg && (
+            <div className="rounded-md border border-[var(--edge-soft)] bg-[var(--surface-raised)] p-2" data-testid="meet-message-picker">
+              {msgRecording && msgTo ? (
+                <button
+                  onClick={stopMessage}
+                  data-testid="meet-message-stop"
+                  className="w-full inline-flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-md bg-red-500 text-white text-[12px] font-medium animate-pulse"
+                >
+                  <Icon name="stop_circle" size={15} /> Stop &amp; send to {msgTo.handle}
+                </button>
+              ) : (
+                <>
+                  <p className="px-1 pb-1 text-[11px] text-[var(--ink-50)]">Record and send to a teammate</p>
+                  {Object.values(presencePeers).length === 0 ? (
+                    <p className="px-1 py-2 text-[11.5px] text-[var(--ink-50)]">No teammates online right now.</p>
+                  ) : (
+                    Object.values(presencePeers).map((p) => (
+                      <button
+                        key={p.accountId}
+                        onClick={() => void recordMessageTo({ accountId: p.accountId, handle: p.handle })}
+                        data-testid={`meet-message-to-${p.accountId}`}
+                        className="w-full flex items-center gap-2 px-1.5 py-1.5 rounded-md hover:bg-[var(--surface-sunken)] text-left"
+                      >
+                        <Icon name="account_circle" size={16} className="text-[var(--ink-50)]" />
+                        <span className="flex-1 text-[12px] text-[var(--ink-90)] truncate">{p.handle}</span>
+                        {(p.status === 'away' || p.status === 'busy' || p.status === 'focus') && (
+                          <span className="text-[10px] text-amber-600 dark:text-amber-400">{p.status}</span>
+                        )}
+                        <Icon name="mic" size={14} className="text-[var(--ink-50)]" />
+                      </button>
+                    ))
+                  )}
+                </>
+              )}
+              {msgNote && <p className="mt-1.5 px-1 text-[11px] text-emerald-600 dark:text-emerald-400" data-testid="meet-message-note">{msgNote}</p>}
+            </div>
+          )}
         </div>
 
         {busy && (
@@ -255,12 +396,13 @@ export default function PlexiMeetView(): JSX.Element {
               onOpen: () => setSelectedId(m.id)
             }))}
             recentLabel="Recent meetings"
-            onCreate={() => void addManual()}
-            createLabel="New meeting"
-            emptyHint="No meetings yet. Record one or capture notes by hand, and its action items become real tasks."
+            onCreate={startLive}
+            createLabel="Start a meeting"
+            emptyHint="Start a live meeting and invite your teammates, or record notes and a message to send. Action items become real tasks."
             tips={[
-              { icon: 'mic', text: 'Record a meeting and it is transcribed and summarised, with a key set; surfaced plainly when one is missing.' },
-              { icon: 'edit_note', text: 'Or capture notes by hand, no recording needed.' },
+              { icon: 'video_call', text: 'Start a live meeting and invite teammates who are online, like a quick Meet or Zoom call.' },
+              { icon: 'voicemail', text: 'Someone away? Record a short message and send it to them instead.' },
+              { icon: 'mic', text: 'Record notes and they are transcribed and summarised, with a key set; surfaced plainly when one is missing.' },
               { icon: 'task_alt', text: 'Action items become real tasks beside the rest of your work.' }
             ]}
           />
