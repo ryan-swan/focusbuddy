@@ -264,6 +264,26 @@ CREATE TABLE IF NOT EXISTS fb_task_deps (
 CREATE INDEX IF NOT EXISTS idx_fb_task_deps_succ ON fb_task_deps(succ_id);
 CREATE INDEX IF NOT EXISTS idx_fb_task_deps_pred ON fb_task_deps(pred_id);
 
+-- PlexiProjects 2.0: a per-project working calendar (which weekdays are working,
+-- plus holiday dates). Absent row = the Mon-Fri default.
+CREATE TABLE IF NOT EXISTS fb_project_calendars (
+  project_id TEXT PRIMARY KEY REFERENCES nodes(id) ON DELETE CASCADE,
+  working_days TEXT NOT NULL DEFAULT '[false,true,true,true,true,true,false]',
+  holidays_json TEXT NOT NULL DEFAULT '[]',
+  updated_at INTEGER NOT NULL
+);
+
+-- PlexiProjects 2.0: baseline snapshots of a plan, for planned-vs-actual variance.
+-- tasks_json is a map of taskId -> { startMs, endMs } captured at the time.
+CREATE TABLE IF NOT EXISTS fb_project_baselines (
+  id TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  tasks_json TEXT NOT NULL,
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_fb_baselines_project ON fb_project_baselines(project_id, created_at DESC);
+
 -- ── PlexiReports ─────────────────────────────────────────────────────────────
 -- A report is a saved selection of tables plus a schedule and recipients. Its
 -- last generated output (Markdown) is cached with a flag recording whether it was

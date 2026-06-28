@@ -28,6 +28,10 @@ export interface PlanTask {
   critical: boolean
   // Predecessor task ids, for drawing dependency arrows.
   deps: string[]
+  // Captured baseline window (planned-vs-actual variance), null until a baseline
+  // has been set for the project.
+  baselineStartMs: number | null
+  baselineEndMs: number | null
 }
 
 export interface PlanDep {
@@ -56,6 +60,8 @@ export interface ProjectPlan {
   criticalPath: string[]
   hasCycle: boolean
   drift: PlanDrift[]
+  // True when a baseline has been captured, so the UI can show variance.
+  hasBaseline: boolean
 }
 
 export interface ProjectSummary {

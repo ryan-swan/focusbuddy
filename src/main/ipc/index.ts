@@ -261,10 +261,15 @@ import {
   addDependency,
   setDependency,
   removeDependency,
+  captureBaseline,
+  listBaselines,
+  loadProjectCalendar,
+  saveProjectCalendar,
   rescheduleProject,
   listProjectSummaries
 } from '../db/projectPlan'
 import type { PlanTaskPatch, DepType } from '@shared/projects'
+import type { WorkingCalendar } from '@shared/workingCalendar'
 import {
   listReports,
   getReport,
@@ -1832,6 +1837,10 @@ export function registerIpcHandlers(): void {
     removeDependency(predId, succId)
   )
   ipcMain.handle('projects:reschedule', (_e, projectId: string) => rescheduleProject(projectId))
+  ipcMain.handle('projects:captureBaseline', (_e, projectId: string, name: string) => captureBaseline(projectId, name))
+  ipcMain.handle('projects:listBaselines', (_e, projectId: string) => listBaselines(projectId))
+  ipcMain.handle('projects:getCalendar', (_e, projectId: string) => loadProjectCalendar(projectId))
+  ipcMain.handle('projects:setCalendar', (_e, projectId: string, cal: WorkingCalendar) => saveProjectCalendar(projectId, cal))
 
   // PlexiReports: scheduled, AI-narrated reports over your tables.
   ipcMain.handle('reports:list', () => listReports())

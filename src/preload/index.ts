@@ -1372,7 +1372,15 @@ const api = {
     removeDep: (predId: string, succId: string): Promise<boolean> =>
       ipcRenderer.invoke('projects:removeDep', predId, succId),
     reschedule: (projectId: string): Promise<import('@shared/projects').ProjectPlan> =>
-      ipcRenderer.invoke('projects:reschedule', projectId)
+      ipcRenderer.invoke('projects:reschedule', projectId),
+    captureBaseline: (projectId: string, name: string): Promise<{ id: string; name: string; createdAt: number }> =>
+      ipcRenderer.invoke('projects:captureBaseline', projectId, name),
+    listBaselines: (projectId: string): Promise<Array<{ id: string; name: string; createdAt: number }>> =>
+      ipcRenderer.invoke('projects:listBaselines', projectId),
+    getCalendar: (projectId: string): Promise<import('@shared/workingCalendar').WorkingCalendar> =>
+      ipcRenderer.invoke('projects:getCalendar', projectId),
+    setCalendar: (projectId: string, cal: import('@shared/workingCalendar').WorkingCalendar): Promise<boolean> =>
+      ipcRenderer.invoke('projects:setCalendar', projectId, cal)
   },
   // PlexiReports: scheduled, AI-narrated reports over your tables.
   reports: {
