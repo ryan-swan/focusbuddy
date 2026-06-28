@@ -144,17 +144,34 @@ export default function PlexiMeetView(): JSX.Element {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [quickPending])
 
-  // Record a short audio message and send it to a teammate as a voice DM — the
-  // "they're away, leave them something" path. Reuses the real chat attachment
-  // pipeline, so a failure surfaces honestly rather than pretending it sent.
+  // Record a short video message and send it to a teammate as a DM — the
+  // "they're away, leave them something" path, like a quick Loom. Reuses the real
+  // chat attachment pipeline (video kind), so a failure surfaces honestly rather
+  // than pretending it sent. Falls back to audio only if there is no camera.
   async function recordMessageTo(peer: { accountId: string; handle: string }): Promise<void> {
     setMsgNote(null)
     setError(null)
+    let stream: MediaStream
+    let isVideo = true
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true })
+    } catch {
+      // No camera (or denied): leave a voice message instead, still honest.
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+        isVideo = false
+      } catch {
+        setError('Could not access your camera or microphone. Check your system permissions.')
+        return
+      }
+    }
+    try {
       const rec = new MediaRecorder(stream)
       const chunks: Blob[] = []
       const startedAt = Date.now()
+      const mime = rec.mimeType || (isVideo ? 'video/webm' : 'audio/webm')
+      const kind = isVideo ? ('video' as const) : ('voice' as const)
+      const name = isVideo ? 'message-video.webm' : 'message.webm'
       rec.ondataavailable = (e) => e.data.size > 0 && chunks.push(e.data)
       rec.onstop = async () => {
         stream.getTracks().forEach((t) => t.stop())
@@ -163,7 +180,7 @@ export default function PlexiMeetView(): JSX.Element {
           setError('Sign in to send a message.')
           return
         }
-        const blob = new Blob(chunks, { type: rec.mimeType || 'audio/webm' })
+        const blob = new Blob(chunks, { type: mime })
         setMsgNote(`Sending to ${peer.handle}…`)
         const conversationId = await startDm(token, peer.handle)
         if (!conversationId) {
@@ -171,21 +188,17 @@ export default function PlexiMeetView(): JSX.Element {
           setError(`Could not open a conversation with ${peer.handle}.`)
           return
         }
-        const att = await uploadAttachment(token, conversationId, 'voice', await blob.arrayBuffer(), {
-          name: 'message.webm',
-          mime: rec.mimeType || 'audio/webm',
-          ext: 'webm'
-        })
+        const att = await uploadAttachment(token, conversationId, kind, await blob.arrayBuffer(), { name, mime, ext: 'webm' })
         if (!att) {
           setMsgNote(null)
           setError('Could not upload the message.')
           return
         }
         const sent = await sendMessage(token, conversationId, '', {
-          kind: 'voice',
+          kind,
           id: att.id,
-          name: 'message.webm',
-          mimeType: rec.mimeType || 'audio/webm',
+          name,
+          mimeType: mime,
           sizeBytes: att.sizeBytes,
           durationMs: Date.now() - startedAt
         })
@@ -198,7 +211,8 @@ export default function PlexiMeetView(): JSX.Element {
       setMsgTo(peer)
       setMsgRecording(true)
     } catch {
-      setError('Could not access the microphone. Check your system permissions.')
+      stream.getTracks().forEach((t) => t.stop())
+      setError('Could not start recording. Check your system permissions.')
     }
   }
 
@@ -281,7 +295,7 @@ export default function PlexiMeetView(): JSX.Element {
                 </button>
               ) : (
                 <>
-                  <p className="px-1 pb-1 text-[11px] text-[var(--ink-50)]">Record and send to a teammate</p>
+                  <p className="px-1 pb-1 text-[11px] text-[var(--ink-50)]">Record a video message and send it to a teammate</p>
                   {Object.values(presencePeers).length === 0 ? (
                     <p className="px-1 py-2 text-[11.5px] text-[var(--ink-50)]">No teammates online right now.</p>
                   ) : (
@@ -297,7 +311,7 @@ export default function PlexiMeetView(): JSX.Element {
                         {(p.status === 'away' || p.status === 'busy' || p.status === 'focus') && (
                           <span className="text-[10px] text-amber-600 dark:text-amber-400">{p.status}</span>
                         )}
-                        <Icon name="mic" size={14} className="text-[var(--ink-50)]" />
+                        <Icon name="videocam" size={14} className="text-[var(--ink-50)]" />
                       </button>
                     ))
                   )}

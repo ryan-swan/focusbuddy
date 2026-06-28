@@ -10,7 +10,7 @@ import { signalConfig } from './signalConfig'
 export type MessageAttachment =
   | { kind: 'share'; token: string; entityKind: string; label: string }
   | {
-      kind: 'image' | 'file' | 'voice' | 'gif'
+      kind: 'image' | 'file' | 'voice' | 'video' | 'gif'
       id: string
       name: string
       mimeType: string
@@ -18,7 +18,7 @@ export type MessageAttachment =
       durationMs?: number
     }
 
-export type MessageBlobKind = 'image' | 'file' | 'voice' | 'gif'
+export type MessageBlobKind = 'image' | 'file' | 'voice' | 'video' | 'gif'
 
 // The authenticated URL bytes are served from. The token rides as a query param
 // because <img>/<audio> elements can't set an Authorization header.

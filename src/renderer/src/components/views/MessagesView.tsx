@@ -58,6 +58,7 @@ function attachmentPreviewLabel(att: ChatMessage['attachment']): string {
   if (!att) return ''
   if (att.kind === 'share') return att.label
   if (att.kind === 'voice') return 'Voice note'
+  if (att.kind === 'video') return 'Video message'
   if (att.kind === 'gif') return 'GIF'
   if (att.kind === 'image') return 'Photo'
   return att.name
@@ -101,6 +102,17 @@ function AttachmentView({ m, mine }: { m: ChatMessage; mine: boolean }): JSX.Ele
   }
   if (att.kind === 'voice') {
     return <audio controls src={url} className="mt-1 max-w-[240px] h-9" data-testid={`attachment-voice-${m.id}`} />
+  }
+  if (att.kind === 'video') {
+    return (
+      <video
+        controls
+        playsInline
+        src={url}
+        className="mt-1 max-w-[280px] max-h-[280px] rounded-lg bg-black"
+        data-testid={`attachment-video-${m.id}`}
+      />
+    )
   }
   // file
   return (

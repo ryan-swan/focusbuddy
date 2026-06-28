@@ -11,7 +11,7 @@ import { GifPicker } from './GifPicker'
 // silently dropping the file.
 
 interface PendingAttachment {
-  attachment: Extract<MessageAttachment, { kind: 'image' | 'file' | 'voice' | 'gif' }>
+  attachment: Extract<MessageAttachment, { kind: 'image' | 'file' | 'voice' | 'video' | 'gif' }>
   previewUrl?: string // object URL for local image/gif preview before send
 }
 
@@ -47,7 +47,13 @@ export function ChatComposer({
     setError(null)
     setBusy(true)
     try {
-      const kind = file.type.startsWith('image/') ? (file.type === 'image/gif' ? 'gif' : 'image') : 'file'
+      const kind = file.type.startsWith('image/')
+        ? file.type === 'image/gif'
+          ? 'gif'
+          : 'image'
+        : file.type.startsWith('video/')
+          ? 'video'
+          : 'file'
       const buf = await file.arrayBuffer()
       const result = await uploadAttachment(token, conversationId, kind, buf, {
         name: file.name,
@@ -188,10 +194,12 @@ export function ChatComposer({
           className="mb-2 inline-flex items-center gap-2 rounded-lg bg-[var(--surface-sunken)] border border-[var(--edge-soft)] px-2 py-1.5"
           data-testid="composer-pending"
         >
-          {pending.previewUrl && pending.attachment.kind !== 'voice' ? (
+          {pending.previewUrl && pending.attachment.kind === 'video' ? (
+            <video src={pending.previewUrl} className="h-9 w-9 rounded object-cover bg-black" muted />
+          ) : pending.previewUrl && pending.attachment.kind !== 'voice' ? (
             <img src={pending.previewUrl} alt="" className="h-9 w-9 rounded object-cover" />
           ) : (
-            <Icon name={pending.attachment.kind === 'voice' ? 'mic' : 'description'} size={16} />
+            <Icon name={pending.attachment.kind === 'voice' ? 'mic' : pending.attachment.kind === 'video' ? 'movie' : 'description'} size={16} />
           )}
           <span className="text-[12px] text-[var(--ink-90)] truncate max-w-[200px]">{pending.attachment.name}</span>
           <button onClick={clearPending} aria-label="Remove attachment" className="text-[var(--ink-50)] hover:text-[var(--ink-90)]">
