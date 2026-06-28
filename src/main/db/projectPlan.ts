@@ -95,7 +95,7 @@ const PROJECT_CALENDAR = DEFAULT_CALENDAR
 function durationDays(row: TaskRow): number {
   if (row.is_milestone) return 0
   if (row.plan_start != null && row.due_date != null && row.due_date > row.plan_start) {
-    return workingDaysBetween(row.plan_start, row.due_date, PROJECT_CALENDAR)
+    return Math.max(1, workingDaysBetween(row.plan_start, row.due_date, PROJECT_CALENDAR))
   }
   if (row.estimate_minutes && row.estimate_minutes > 0) {
     return Math.max(1, Math.ceil(row.estimate_minutes / (60 * 8)))
