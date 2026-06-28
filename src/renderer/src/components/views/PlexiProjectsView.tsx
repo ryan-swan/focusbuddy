@@ -292,10 +292,17 @@ function ProjectGantt({ projectId, onBack }: { projectId: string; onBack: () => 
   const lateSet = useMemo(() => {
     if (!plan) return new Set<string>()
     const now = Date.now()
-    const late = new Set(plan.drift.map((d) => d.id))
+    const byId = new Map(plan.tasks.map((t) => [t.id, t]))
+    const isDone = (id: string): boolean => {
+      const t = byId.get(id)
+      return !!t && (t.status === 'done' || t.completedAt != null)
+    }
+    // The late marker flags actionable, in-flight slippage. A completed task that
+    // finished late is historical (the drift banner records it), so it does not
+    // keep wearing a "running late" badge: seed only from not-done drifted tasks.
+    const late = new Set(plan.drift.map((d) => d.id).filter((id) => !isDone(id)))
     for (const t of plan.tasks) {
-      const done = t.status === 'done' || t.completedAt != null
-      if (!done && !t.isMilestone && t.scheduledEndMs < now) late.add(t.id)
+      if (!isDone(t.id) && !t.isMilestone && t.scheduledEndMs < now) late.add(t.id)
     }
     return late
   }, [plan])
