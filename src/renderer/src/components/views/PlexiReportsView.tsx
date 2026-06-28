@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import Icon from '../Icon'
 import { DashboardHeader, StatusPill } from '../plexi'
 import ModuleHome from '../ModuleHome'
+import { useQuickCreate } from '../../stores/quickCreate'
 import type { FbTable } from '@shared/fields'
 import type { ReportDef, ReportSchedule } from '@shared/reports'
 
@@ -60,6 +61,13 @@ export default function PlexiReportsView(): JSX.Element {
       setError(`Could not create a report: ${e instanceof Error ? e.message : String(e)}`)
     }
   }
+
+  // Global quick-create (Cmd+K "New report").
+  const quickPending = useQuickCreate((s) => s.pending)
+  useEffect(() => {
+    if (quickPending === 'reports' && useQuickCreate.getState().consume('reports')) void addReport()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [quickPending])
 
   const selected = reports?.find((r) => r.id === selectedId) ?? null
 

@@ -11,6 +11,7 @@ import { useCapabilityEnabled, useCapabilityStore } from '../stores/capabilities
 import { canCreateWidget } from '../lib/gating'
 import { promptUpgrade } from '../stores/upgradePrompt'
 import { useEditorCommandStore } from '../stores/editorCommands'
+import { useQuickCreate } from '../stores/quickCreate'
 
 interface Props {
   onOpenBodyDouble: () => void
@@ -86,6 +87,13 @@ export default function CommandCenter({
   const goKnowledge = useViewStore((s) => s.goKnowledge)
   const goMessages = useViewStore((s) => s.goMessages)
   const goInbox = useViewStore((s) => s.goInbox)
+  const goProjects = useViewStore((s) => s.goProjects)
+  const goReports = useViewStore((s) => s.goReports)
+  const goFlows = useViewStore((s) => s.goFlows)
+  const goForms = useViewStore((s) => s.goForms)
+  const goApps = useViewStore((s) => s.goApps)
+  const goMeetings = useViewStore((s) => s.goMeetings)
+  const requestCreate = useQuickCreate((s) => s.request)
   const view = useViewStore((s) => s.view)
   const activeTaskId = useNodeStore((s) => s.activeTaskId)
   const setZoom = useWidgetStore((s) => s.setZoom)
@@ -347,6 +355,33 @@ export default function CommandCenter({
         closePalette()
       }
     })
+    // Global quick-create: "New <module item>" from anywhere. Each sets a pending
+    // request and navigates; the module creates the item as it opens, so there is
+    // no separate "start new" screen to click through.
+    const createTargets: Array<{ id: string; label: string; words: string; icon: string; key: string; go: () => void }> = [
+      { id: 'new-project', label: 'New project', words: 'new project plan gantt create', icon: 'account_tree', key: 'projects', go: goProjects },
+      { id: 'new-report', label: 'New report', words: 'new report summary create', icon: 'summarize', key: 'reports', go: goReports },
+      { id: 'new-flow', label: 'New flow', words: 'new flow automation create', icon: 'bolt', key: 'flows', go: goFlows },
+      { id: 'new-form', label: 'New form', words: 'new form survey create', icon: 'dynamic_form', key: 'forms', go: goForms },
+      { id: 'new-app', label: 'New app', words: 'new app build tool create', icon: 'construction', key: 'build', go: goApps },
+      { id: 'new-meeting', label: 'Start a meeting', words: 'new meeting meet call video start', icon: 'video_call', key: 'meet', go: goMeetings }
+    ]
+    for (const t of createTargets) {
+      items.push({
+        id: t.id,
+        label: t.label,
+        hint: 'Create and open it',
+        icon: t.icon,
+        kind: 'action',
+        score: q === '' ? 57 : matchScore(t.words, q),
+        run: () => {
+          requestCreate(t.key)
+          setActive(null)
+          t.go()
+          closePalette()
+        }
+      })
+    }
     items.push({
       id: 'body-double',
       label: 'Find a body double',
@@ -500,6 +535,13 @@ export default function CommandCenter({
     goKnowledge,
     goMessages,
     goInbox,
+    goProjects,
+    goReports,
+    goFlows,
+    goForms,
+    goApps,
+    goMeetings,
+    requestCreate,
     spawnWidget,
     deepHits,
     setZoom,

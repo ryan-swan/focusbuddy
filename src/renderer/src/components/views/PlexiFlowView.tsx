@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import Icon from '../Icon'
 import { DashboardHeader, StatusPill, PLEXI_CARD } from '../plexi'
 import ModuleHome from '../ModuleHome'
+import { useQuickCreate } from '../../stores/quickCreate'
 import type { FbTable } from '@shared/fields'
 import {
   blankAction,
@@ -75,6 +76,13 @@ export default function PlexiFlowView(): JSX.Element {
       setError(`Could not create a flow: ${e instanceof Error ? e.message : String(e)}`)
     }
   }
+
+  // Global quick-create (Cmd+K "New flow").
+  const quickPending = useQuickCreate((s) => s.pending)
+  useEffect(() => {
+    if (quickPending === 'flows' && useQuickCreate.getState().consume('flows')) void addFlow()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [quickPending])
 
   const selected = flows?.find((f) => f.id === selectedId) ?? null
 

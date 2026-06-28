@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import Icon from '../Icon'
 import { PLEXI_CARD } from '../plexi'
 import ModuleHome from '../ModuleHome'
+import { useQuickCreate } from '../../stores/quickCreate'
 import { useAppsStore } from '../../stores/apps'
 import {
   type PlexiApp,
@@ -40,6 +41,13 @@ export default function PlexiBuildView(): JSX.Element {
     const created = await createApp({ name: 'New app', components: [] })
     if (created) setSelectedId(created.id)
   }
+
+  // Global quick-create (Cmd+K "New app").
+  const quickPending = useQuickCreate((s) => s.pending)
+  useEffect(() => {
+    if (quickPending === 'build' && useQuickCreate.getState().consume('build')) void addApp()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [quickPending])
 
   return (
     <div className="h-full w-full flex bg-[var(--surface-base)] text-[var(--ink-100)]" data-testid="plexibuild-view">
