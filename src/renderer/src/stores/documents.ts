@@ -17,7 +17,7 @@ interface DocumentsStore {
   refresh: () => Promise<void>
   open: (id: string) => Promise<void>
   close: () => void
-  createBlank: (docType: DocType) => Promise<FbDocument>
+  createBlank: (docType: DocType, title?: string) => Promise<FbDocument>
   createWithAI: (input: {
     docType: DocType
     prompt: string
@@ -59,15 +59,16 @@ export const useDocumentsStore = create<DocumentsStore>((set, get) => ({
     set({ active: null })
   },
 
-  createBlank: async (docType) => {
+  createBlank: async (docType, customTitle) => {
     const title =
-      docType === 'doc'
+      customTitle?.trim() ||
+      (docType === 'doc'
         ? 'Untitled document'
         : docType === 'sheet'
           ? 'Untitled sheet'
           : docType === 'slides'
             ? 'Untitled deck'
-            : 'Untitled map'
+            : 'Untitled map')
     const doc = await window.api.documents.create({ docType, title })
     void pushCloudDoc(doc).catch(() => {})
     await get().refresh()

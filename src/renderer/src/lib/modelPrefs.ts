@@ -58,7 +58,8 @@ export const AUTO_ROUTING_DISPLAY: Record<AIPurpose, { model: string; cost: stri
   doc_rewrite: { model: 'Sonnet', cost: '$$' },
   tone_profile: { model: 'Haiku', cost: '$' },
   email_reply_draft: { model: 'Sonnet', cost: '$$' },
-  file_tag: { model: 'Haiku', cost: '$' }
+  file_tag: { model: 'Haiku', cost: '$' },
+  meeting_end: { model: 'Sonnet', cost: '$$' }
 }
 
 function readFromStorage(): ModelMode {

@@ -802,6 +802,17 @@ const api = {
       | { ok: true; proposals: ActionProposal[] }
       | { ok: false; error: string; reason?: 'no_key' | 'api' | 'parse' }
     > => ipcRenderer.invoke('ai:extractActionsFromTranscript', input),
+    // End-of-meeting wrap-up: one call returns a grounded summary plus the
+    // deliverables (tasks, todos, tables, knowledge, documents) the conversation
+    // produced, as applyable ActionProposals.
+    processMeetingEnd: (input: {
+      transcript: string
+      meetingTitle?: string
+      durationSec?: number | null
+    }): Promise<
+      | { ok: true; summary?: string; proposals?: ActionProposal[] }
+      | { ok: false; error: string; needsApiKey?: boolean; reason?: 'no_key' | 'api' | 'parse' }
+    > => ipcRenderer.invoke('ai:processMeetingEnd', input),
     // Provider preference — 'cloud' = OpenAI Whisper API,
     // 'local' = on-device ONNX Whisper tiny (downloads ~80MB on first
     // selection). Calling setProvider('local') preloads the model so

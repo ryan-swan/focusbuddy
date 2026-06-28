@@ -1,6 +1,8 @@
 import { create } from 'zustand'
 import { sendSocketMessage, setMeetingSocketHandler, type MeetingSocketEvent } from '../lib/messagingSocket'
 import { notifyExternal } from '../lib/notify'
+import { ConversationRecorder } from '../lib/conversationRecorder'
+import { useWrapupStore } from './wrapup'
 
 // PlexiMeet live rooms: a multi-party meeting built as a WebRTC mesh. Each member
 // holds one peer connection to every other member; the signal server only relays
@@ -58,6 +60,8 @@ interface PeerConn {
   pending: RTCIceCandidateInit[]
 }
 let peers = new Map<string, PeerConn>()
+// Records the mixed audio of the meeting so it can be summarised on leave.
+let recorder: ConversationRecorder | null = null
 
 function genRoomId(): string {
   return `meet-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`
@@ -84,6 +88,8 @@ export const useMeetingRoomStore = create<MeetingRoomStore>((set, get) => {
     }
     pc.ontrack = (e) => {
       for (const track of e.streams[0]?.getTracks() ?? [e.track]) remote.addTrack(track)
+      // Mix this peer's audio into the conversation recording.
+      recorder?.addStream(remote)
       const p = get().participants[accountId]
       if (p) set({ participants: { ...get().participants, [accountId]: { ...p, stream: remote } } })
     }
@@ -249,6 +255,9 @@ export const useMeetingRoomStore = create<MeetingRoomStore>((set, get) => {
       set({ status: 'joining', error: null, roomId, title: title ?? null, participants: {} })
       try {
         const local = await navigator.mediaDevices.getUserMedia({ audio: true, video: true })
+        // Start recording the conversation (own mic now, peers as they connect).
+        recorder = new ConversationRecorder()
+        recorder.addStream(local)
         set({ localStream: local, status: 'in', incomingInvite: null })
         // Announce; the server replies with the roster and we offer to each member.
         sendSocketMessage({ type: 'meetingJoin', payload: { roomId, title: title ?? undefined } })
@@ -265,7 +274,19 @@ export const useMeetingRoomStore = create<MeetingRoomStore>((set, get) => {
 
     leave: () => {
       const roomId = get().roomId
+      const title = get().title || 'Meeting'
       if (roomId) sendSocketMessage({ type: 'meetingLeave', payload: { roomId } })
+      // Stop the recording and, if the meeting was more than a moment, hand the
+      // mixed audio to the wrap-up flow for a summary + deliverables.
+      const rec = recorder
+      recorder = null
+      if (rec) {
+        void rec.stop().then((res) => {
+          if (res && res.durationSec >= 2) {
+            void useWrapupStore.getState().begin({ title, buffer: res.buffer, mimeType: res.mimeType, durationSec: res.durationSec })
+          }
+        })
+      }
       teardown()
     },
 

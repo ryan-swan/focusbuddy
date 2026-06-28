@@ -51,7 +51,11 @@ const AUTO_ROUTING: Record<AIPurpose, string> = {
   // Auto-filing tag suggestions: a cheap, frequent classification returning a
   // small JSON list of tags. Haiku is fast and plenty, and this can fire as
   // files arrive, so cheap matters.
-  file_tag: HAIKU
+  file_tag: HAIKU,
+  // End-of-meeting wrap-up: summarise a whole conversation AND propose the
+  // deliverables that came out of it. Both halves are quality-sensitive and the
+  // user reads them back, so Sonnet is the right default. Runs once per meeting.
+  meeting_end: SONNET
 }
 
 let currentMode: ModelMode = 'auto'

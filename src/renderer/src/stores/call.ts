@@ -1,6 +1,8 @@
 import { create } from 'zustand'
 import { sendSocketMessage, setCallSocketHandler, type CallSocketEvent } from '../lib/messagingSocket'
 import { notifyExternal } from '../lib/notify'
+import { ConversationRecorder } from '../lib/conversationRecorder'
+import { useWrapupStore } from './wrapup'
 
 // PlexiCam: peer-to-peer live audio/video calls. The signal server only relays
 // the SDP offer/answer and ICE candidates between two accounts in the same
@@ -49,6 +51,8 @@ interface CallStore {
 let pc: RTCPeerConnection | null = null
 // ICE candidates that arrive before the remote description is set are buffered.
 let pendingCandidates: RTCIceCandidateInit[] = []
+// Records the mixed call audio once connected, for an end-of-call summary.
+let recorder: ConversationRecorder | null = null
 
 function genCallId(): string {
   return `call-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`
@@ -61,6 +65,22 @@ function signal(to: string, callId: string, data: unknown): void {
 export const useCallStore = create<CallStore>((set, get) => {
   // Tear down the peer connection and local media, returning to idle.
   function cleanup(nextStatus: CallStatus): void {
+    // Wrap up the call: stop the recording and, when the call actually ended
+    // (not a decline), hand the audio to the summary + deliverables flow.
+    if (recorder) {
+      const rec = recorder
+      recorder = null
+      if (nextStatus === 'ended') {
+        const title = `Call with ${get().peer?.handle ?? 'someone'}`
+        void rec.stop().then((res) => {
+          if (res && res.durationSec >= 2) {
+            void useWrapupStore.getState().begin({ title, buffer: res.buffer, mimeType: res.mimeType, durationSec: res.durationSec })
+          }
+        })
+      } else {
+        void rec.stop()
+      }
+    }
     if (pc) {
       pc.onicecandidate = null
       pc.ontrack = null
@@ -104,11 +124,21 @@ export const useCallStore = create<CallStore>((set, get) => {
     const remote = new MediaStream()
     conn.ontrack = (e) => {
       for (const track of e.streams[0]?.getTracks() ?? [e.track]) remote.addTrack(track)
+      // Tap the peer's audio into the recording (no-op until tracks arrive).
+      recorder?.addStream(remote)
       set({ remoteStream: remote })
     }
     conn.onconnectionstatechange = () => {
       const st = conn.connectionState
-      if (st === 'connected') set({ status: 'connected' })
+      if (st === 'connected') {
+        set({ status: 'connected' })
+        // Start recording the call audio (both sides) for the end-of-call summary.
+        if (!recorder) {
+          recorder = new ConversationRecorder()
+          recorder.addStream(local)
+          recorder.addStream(remote)
+        }
+      }
       else if (st === 'failed') {
         set({ error: 'The connection failed. Your network may need a TURN server.' })
         cleanup('ended')

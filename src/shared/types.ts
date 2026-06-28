@@ -551,6 +551,16 @@ export type ActionProposal =
       pinned?: boolean
       reason?: string
     }
+  | {
+      // Create a standalone document in the Documents library: a written doc, a
+      // spreadsheet, or a slide deck. Used when a conversation produces a real
+      // deliverable that belongs as its own file rather than a canvas widget.
+      id: string
+      kind: 'create-document'
+      docType: 'doc' | 'sheet' | 'slides'
+      title: string
+      reason?: string
+    }
 
 // ── AI model routing ─────────────────────────────────────────────────────────
 // The user picks a mode (Auto / Haiku / Sonnet / Opus). In Auto mode, each AI
@@ -575,6 +585,7 @@ export type AIPurpose =
   | 'tone_profile'
   | 'email_reply_draft'
   | 'file_tag'
+  | 'meeting_end'
 
 // Result of asking AI to draft a reply to an open email in the user's voice.
 // `skip` is the expected, non-error outcome for newsletters / no-reply senders /

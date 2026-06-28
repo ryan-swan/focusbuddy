@@ -3386,3 +3386,129 @@ export async function generateSlideElements(input: {
     return { ok: false, error: (e as Error).message }
   }
 }
+
+// ── End-of-meeting wrap-up ───────────────────────────────────────────────────
+// After a PlexiMeet meeting or a PlexiCam call ends, take the transcript and in a
+// single AI call produce (a) a concise summary and (b) the deliverables the
+// conversation produced, as ActionProposals the user can apply with one click.
+// Honesty is the whole point here: the summary and every deliverable must be
+// grounded in the transcript, never invented, and a missing key or empty
+// transcript returns an honest result rather than a fabricated meeting.
+
+export interface MeetingEndResult {
+  ok: boolean
+  summary?: string
+  proposals?: ActionProposal[]
+  needsApiKey?: boolean
+  error?: string
+  reason?: 'no_key' | 'api' | 'parse'
+}
+
+const MEETING_END_SYSTEM = `You process the transcript of a meeting or call and return a JSON object with a summary and the concrete deliverables that came out of the conversation.
+
+Return ONLY a single JSON object. No prose, no markdown fences. The first character must be { and the last must be }.
+
+Shape:
+{
+  "summary": "4 to 8 plain-text sentences summarising what was discussed and decided",
+  "deliverables": [ /* 0 to 10 deliverable objects, see kinds below */ ]
+}
+
+Each deliverable is exactly one of:
+  { "kind": "create-task", "title": "short task title", "notes": "optional detail", "reason": "what in the transcript calls for this" }
+  { "kind": "create-knowledge-entry", "title": "fact or decision title", "body": "the real content from the conversation", "tags": ["optional"], "reason": "..." }
+  { "kind": "create-document", "docType": "doc", "title": "document title", "reason": "..." }   // docType is one of doc (a written document), sheet (a spreadsheet), slides (a deck)
+
+HARD RULES:
+- The summary and every deliverable MUST be grounded in the transcript. Never invent facts, names, numbers, owners, dates, or decisions that were not stated.
+- Each deliverable's "reason" must cite something specific that was actually said.
+- Use create-task for an action item someone needs to do (each task opens its own workspace). Use create-document for a written deliverable (doc), structured or tabular data like an action register or budget (sheet), or a presentation (slides). Use create-knowledge-entry for a decision, fact, or research finding worth keeping.
+- If the conversation produced no clear deliverables, return "deliverables": [].
+- Never exceed 10 deliverables.`
+
+// Validate the model's deliverables array into real ActionProposals, dropping
+// anything malformed. Mirrors the per-kind discipline of parseChatJson but reads
+// the meeting envelope and only admits the kinds the applier can create here.
+function parseMeetingDeliverables(arr: unknown[]): ActionProposal[] {
+  const out: ActionProposal[] = []
+  for (let i = 0; i < arr.length && out.length < 10; i++) {
+    const d = arr[i] as Record<string, unknown>
+    if (!d || typeof d !== 'object') continue
+    const id = `md-${i}`
+    const reason = typeof d.reason === 'string' ? d.reason : undefined
+    const title = typeof d.title === 'string' ? d.title.trim() : ''
+    switch (d.kind) {
+      case 'create-task':
+        if (title) out.push({ id, kind: 'create-task', title, notes: typeof d.notes === 'string' ? d.notes : undefined, reason })
+        break
+      case 'create-knowledge-entry': {
+        const body = typeof d.body === 'string' ? d.body.trim() : ''
+        if (title && body)
+          out.push({ id, kind: 'create-knowledge-entry', title, body, tags: Array.isArray(d.tags) ? d.tags.map((t) => String(t)) : undefined, reason })
+        break
+      }
+      case 'create-document': {
+        const docType = String(d.docType)
+        if (title && (docType === 'doc' || docType === 'sheet' || docType === 'slides'))
+          out.push({ id, kind: 'create-document', docType, title, reason })
+        break
+      }
+      default:
+        break
+    }
+  }
+  return out
+}
+
+export async function processMeetingEnd(input: {
+  transcript: string
+  meetingTitle?: string
+  durationSec?: number | null
+}): Promise<MeetingEndResult> {
+  // Empty transcript: an honest empty result, never a fabricated meeting.
+  if (!input.transcript || input.transcript.trim().length === 0) {
+    return { ok: true, summary: '', proposals: [] }
+  }
+  const c = getClient()
+  if (!c) {
+    return {
+      ok: false,
+      needsApiKey: true,
+      reason: 'no_key',
+      error: 'No Anthropic API key set. Open Settings → AI → API keys to paste one.'
+    }
+  }
+  try {
+    const header = input.meetingTitle ? `Meeting title: ${input.meetingTitle}\n\n` : ''
+    const resp = await c.messages.create({
+      model: resolveModel('meeting_end'),
+      max_tokens: 4096,
+      system: MEETING_END_SYSTEM,
+      messages: [{ role: 'user', content: `${header}Transcript:\n${input.transcript}` }]
+    })
+    if ((resp.stop_reason as string) === 'refusal') {
+      return { ok: false, reason: 'api', error: 'Claude declined to process this transcript.' }
+    }
+    if ((resp.stop_reason as string) === 'model_context_window_exceeded') {
+      return { ok: false, reason: 'api', error: 'The transcript was too long for one pass. Try a shorter meeting.' }
+    }
+    const text = resp.content
+      .filter((b) => b.type === 'text')
+      .map((b) => ('text' in b ? b.text : ''))
+      .join('\n')
+      .trim()
+    const json = extractJson(text)
+    if (!json) return { ok: false, reason: 'parse', error: 'Could not read the AI response.' }
+    let parsed: { summary?: unknown; deliverables?: unknown }
+    try {
+      parsed = JSON.parse(json)
+    } catch {
+      return { ok: false, reason: 'parse', error: 'Could not read the AI response.' }
+    }
+    const summary = typeof parsed.summary === 'string' ? parsed.summary.trim() : ''
+    const proposals = Array.isArray(parsed.deliverables) ? parseMeetingDeliverables(parsed.deliverables) : []
+    return { ok: true, summary, proposals }
+  } catch (e) {
+    return { ok: false, reason: 'api', error: `Could not process the meeting: ${e instanceof Error ? e.message : String(e)}` }
+  }
+}
