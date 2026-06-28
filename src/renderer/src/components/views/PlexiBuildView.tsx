@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
 import Icon from '../Icon'
 import { PLEXI_CARD } from '../plexi'
-import ModuleHome from '../ModuleHome'
+import ModuleDashboard from '../ModuleDashboard'
 import { useQuickCreate } from '../../stores/quickCreate'
 import { useLandOnContent } from '../../hooks/useLandOnContent'
+import { bucketByWeek, periodDelta, countByKey } from '../../lib/dashboardMetrics'
 import { useAppsStore } from '../../stores/apps'
 import {
   type PlexiApp,
@@ -38,6 +39,7 @@ export default function PlexiBuildView(): JSX.Element {
 
   const selected = apps.find((a) => a.id === selectedId) ?? null
   const { showOverview } = useLandOnContent(loaded, apps, selectedId, setSelectedId)
+  const now = Date.now()
 
   async function addApp(): Promise<void> {
     const created = await createApp({ name: 'New app', components: [] })
@@ -125,32 +127,60 @@ export default function PlexiBuildView(): JSX.Element {
             }}
           />
         ) : (
-          <ModuleHome
+          <ModuleDashboard
             moduleKey="build"
             title="Build"
             subtitle="Compose an internal tool from typed components, then run it, no code"
             icon="construction"
             accentClass="text-emerald-500"
             stats={[
-              { label: 'Apps', value: apps.length, icon: 'apps' },
-              { label: 'Components', value: apps.reduce((n, a) => n + a.components.length, 0), icon: 'widgets' }
+              {
+                icon: 'apps',
+                label: 'Apps',
+                value: apps.length,
+                tone: 'emerald',
+                delta: periodDelta(apps.map((a) => a.createdAt), 7 * 86400000, now),
+                sparkline: bucketByWeek(apps.map((a) => a.createdAt), 8, now)
+              },
+              { icon: 'widgets', label: 'Components', value: apps.reduce((n, a) => n + a.components.length, 0), tone: 'accent' },
+              {
+                icon: 'view_module',
+                label: 'Avg per app',
+                value: apps.length ? Math.round(apps.reduce((n, a) => n + a.components.length, 0) / apps.length) : 0,
+                tone: 'sky'
+              }
             ]}
-            items={apps.map((a) => ({
-              id: a.id,
-              title: a.name,
-              subtitle: `${a.components.length} component(s)`,
-              meta: `Updated ${new Date(a.updatedAt).toLocaleDateString()}`,
-              onOpen: () => setSelectedId(a.id)
-            }))}
-            recentLabel="Your apps"
-            onCreate={() => void addApp()}
-            createLabel="New app"
-            emptyHint="No apps yet. Create one, drop in components, then hit Preview to run it."
-            tips={[
-              { icon: 'widgets', text: 'Compose from headings, text, fields, buttons and dividers in Build mode.' },
-              { icon: 'play_arrow', text: 'Switch to Preview to run the app you built.' },
-              { icon: 'save', text: 'Each app is saved on its own, ready to come back to.' }
-            ]}
+            timeline={{
+              title: 'Apps created',
+              points: bucketByWeek(apps.map((a) => a.createdAt), 8, now),
+              bucketLabel: 'last 8 weeks',
+              unit: 'apps',
+              tone: 'emerald',
+              emptyHint: 'Build your first app to see it appear here.'
+            }}
+            breakdown={{
+              title: 'Components by type',
+              icon: 'category',
+              items: countByKey(apps.flatMap((a) => a.components), (c) => c.type).map((b) => ({
+                label: b.label.charAt(0).toUpperCase() + b.label.slice(1),
+                value: b.value,
+                tone: 'emerald' as const
+              })),
+              emptyHint: 'No components yet.'
+            }}
+            recentItems={{
+              label: 'Your apps',
+              items: apps.slice(0, 6).map((a) => ({
+                id: a.id,
+                title: a.name,
+                subtitle: `${a.components.length} component(s)`,
+                meta: `Updated ${new Date(a.updatedAt).toLocaleDateString()}`,
+                onOpen: () => setSelectedId(a.id)
+              })),
+              onCreate: () => void addApp(),
+              createLabel: 'New app',
+              emptyHint: 'No apps yet. Create one, drop in components, then hit Preview to run it.'
+            }}
           />
         )}
       </div>

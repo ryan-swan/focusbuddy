@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
 import Icon from '../Icon'
 import { PLEXI_CARD } from '../plexi'
-import ModuleHome from '../ModuleHome'
+import ModuleDashboard from '../ModuleDashboard'
 import { useQuickCreate } from '../../stores/quickCreate'
 import { useLandOnContent } from '../../hooks/useLandOnContent'
+import { bucketByWeek, periodDelta } from '../../lib/dashboardMetrics'
 import FieldEditor from '../fields/FieldEditor'
 import { useFormsStore } from '../../stores/forms'
 import type { PlexiForm } from '@shared/forms'
@@ -41,6 +42,7 @@ export default function PlexiFormsView(): JSX.Element {
 
   const selected = forms.find((f) => f.id === selectedId) ?? null
   const { showOverview } = useLandOnContent(loaded, forms, selectedId, setSelectedId)
+  const now = Date.now()
 
   async function addForm(): Promise<void> {
     const created = await createForm('New form')
@@ -124,29 +126,44 @@ export default function PlexiFormsView(): JSX.Element {
             }}
           />
         ) : (
-          <ModuleHome
+          <ModuleDashboard
             moduleKey="forms"
             title="Forms"
             subtitle="Design a form and watch responses land as rows in a real, chartable table"
             icon="dynamic_form"
             accentClass="text-fuchsia-500"
-            stats={[{ label: 'Forms', value: forms.length, icon: 'dynamic_form' }]}
-            items={forms.map((f) => ({
-              id: f.id,
-              title: f.title,
-              subtitle: f.description || 'No description yet',
-              meta: `Updated ${new Date(f.updatedAt).toLocaleDateString()}`,
-              onOpen: () => setSelectedId(f.id)
-            }))}
-            recentLabel="Your forms"
-            onCreate={() => void addForm()}
-            createLabel="New form"
-            emptyHint="No forms yet. Create one to capture requests, leads or data, with each response saved as a real row."
-            tips={[
-              { icon: 'view_column', text: "A form's fields are the columns of its backing table, so responses are instantly filterable and chartable." },
-              { icon: 'edit_note', text: 'Design, fill and read responses from the same place.' },
-              { icon: 'verified', text: 'Reads only real responses, a new form is honestly empty.' }
+            stats={[
+              {
+                icon: 'dynamic_form',
+                label: 'Forms',
+                value: forms.length,
+                tone: 'violet',
+                delta: periodDelta(forms.map((f) => f.createdAt), 7 * 86400000, now),
+                sparkline: bucketByWeek(forms.map((f) => f.createdAt), 8, now)
+              },
+              { icon: 'edit_note', label: 'Described', value: forms.filter((f) => f.description.trim().length > 0).length, tone: 'accent' }
             ]}
+            timeline={{
+              title: 'Forms created',
+              points: bucketByWeek(forms.map((f) => f.createdAt), 8, now),
+              bucketLabel: 'last 8 weeks',
+              unit: 'forms',
+              tone: 'violet',
+              emptyHint: 'Create your first form to start collecting responses.'
+            }}
+            recentItems={{
+              label: 'Your forms',
+              items: forms.slice(0, 6).map((f) => ({
+                id: f.id,
+                title: f.title,
+                subtitle: f.description || 'No description yet',
+                meta: `Updated ${new Date(f.updatedAt).toLocaleDateString()}`,
+                onOpen: () => setSelectedId(f.id)
+              })),
+              onCreate: () => void addForm(),
+              createLabel: 'New form',
+              emptyHint: 'No forms yet. Create one to capture requests, leads or data, with each response saved as a real row.'
+            }}
           />
         )}
       </div>

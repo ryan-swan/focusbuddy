@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import Icon from '../Icon'
 import { DashboardHeader, StatusPill } from '../plexi'
-import ModuleHome from '../ModuleHome'
+import ModuleDashboard from '../ModuleDashboard'
 import { useQuickCreate } from '../../stores/quickCreate'
 import { useLandOnContent } from '../../hooks/useLandOnContent'
+import { bucketByWeek, periodDelta, countByKey } from '../../lib/dashboardMetrics'
 import type { FbTable } from '@shared/fields'
 import type { ReportDef, ReportSchedule } from '@shared/reports'
 
@@ -72,6 +73,8 @@ export default function PlexiReportsView(): JSX.Element {
 
   const selected = reports?.find((r) => r.id === selectedId) ?? null
   const { showOverview } = useLandOnContent(reports !== null, reports ?? [], selectedId, setSelectedId)
+  const reportList = reports ?? []
+  const now = Date.now()
 
   return (
     <div className="h-full w-full flex bg-[var(--surface-base)] text-[var(--ink-100)]" data-testid="plexireports-view">
@@ -142,37 +145,60 @@ export default function PlexiReportsView(): JSX.Element {
         {selected ? (
           <ReportEditor key={selected.id} report={selected} tables={tables} onChanged={load} />
         ) : (
-          <ModuleHome
+          <ModuleDashboard
             moduleKey="reports"
             title="Reports"
             subtitle="Turn the tables you already keep into a written report, on a schedule, emailed to your team"
             icon="summarize"
             accentClass="text-sky-500"
             stats={[
-              { label: 'Reports', value: reports?.length ?? 0, icon: 'summarize' },
-              { label: 'Scheduled', value: reports?.filter((r) => r.schedule !== 'manual').length ?? 0, icon: 'schedule' },
-              { label: 'Tables', value: tables.length, icon: 'table_chart' }
+              {
+                icon: 'summarize',
+                label: 'Reports',
+                value: reportList.length,
+                tone: 'sky',
+                delta: periodDelta(reportList.map((r) => r.createdAt), 7 * 86400000, now),
+                sparkline: bucketByWeek(reportList.map((r) => r.createdAt), 8, now)
+              },
+              { icon: 'schedule', label: 'Scheduled', value: reportList.filter((r) => r.schedule !== 'manual').length, tone: 'accent' },
+              { icon: 'pending_actions', label: 'Never run', value: reportList.filter((r) => !r.lastRunAt).length, tone: 'amber' },
+              { icon: 'auto_awesome', label: 'AI-written', value: reportList.filter((r) => r.lastOutputIsAi).length, tone: 'violet' }
             ]}
-            items={(reports ?? []).map((r) => ({
-              id: r.id,
-              title: r.title,
-              subtitle: r.recipients.length ? `${r.recipients.length} recipient(s)` : 'No recipients yet',
-              meta: r.lastRunAt ? `Last run ${fmtWhen(r.lastRunAt)}` : 'Not run yet',
-              status:
-                r.schedule !== 'manual'
-                  ? { tone: 'sky' as const, label: SCHEDULES.find((s) => s.value === r.schedule)?.label ?? r.schedule }
-                  : undefined,
-              onOpen: () => setSelectedId(r.id)
-            }))}
-            recentLabel="Your reports"
-            onCreate={() => void addReport()}
-            createLabel="New report"
-            emptyHint="No reports yet. Create one to summarise a table on a schedule and send it to the people who need it."
-            tips={[
-              { icon: 'schedule', text: 'Generate a report daily, weekly or monthly, or run it by hand.' },
-              { icon: 'mail', text: 'Email the finished report to recipients automatically.' },
-              { icon: 'auto_awesome', text: 'With an AI key the narrative is written for you; without one you get an honest data summary, never a fabricated one.' }
-            ]}
+            timeline={{
+              title: 'Reports created',
+              points: bucketByWeek(reportList.map((r) => r.createdAt), 8, now),
+              bucketLabel: 'last 8 weeks',
+              unit: 'reports',
+              tone: 'sky',
+              emptyHint: 'Create your first report to see your cadence here.'
+            }}
+            breakdown={{
+              title: 'By schedule',
+              icon: 'event_repeat',
+              items: countByKey(reportList, (r) => SCHEDULES.find((s) => s.value === r.schedule)?.label ?? r.schedule).map((b) => ({
+                label: b.label,
+                value: b.value,
+                tone: b.label === 'Manual' ? ('stone' as const) : ('sky' as const)
+              })),
+              emptyHint: 'No reports yet.'
+            }}
+            recentItems={{
+              label: 'Your reports',
+              items: reportList.slice(0, 6).map((r) => ({
+                id: r.id,
+                title: r.title,
+                subtitle: r.recipients.length ? `${r.recipients.length} recipient(s)` : 'No recipients yet',
+                meta: r.lastRunAt ? `Last run ${fmtWhen(r.lastRunAt)}` : 'Not run yet',
+                status:
+                  r.schedule !== 'manual'
+                    ? { tone: 'sky' as const, label: SCHEDULES.find((s) => s.value === r.schedule)?.label ?? r.schedule }
+                    : undefined,
+                onOpen: () => setSelectedId(r.id)
+              })),
+              onCreate: () => void addReport(),
+              createLabel: 'New report',
+              emptyHint: 'No reports yet. Create one to summarise a table on a schedule and send it to the people who need it.'
+            }}
           />
         )}
       </div>

@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import Icon from '../Icon'
 import { DashboardHeader, StatusPill, PLEXI_CARD } from '../plexi'
-import ModuleHome from '../ModuleHome'
+import ModuleDashboard from '../ModuleDashboard'
 import { useQuickCreate } from '../../stores/quickCreate'
 import { useLandOnContent } from '../../hooks/useLandOnContent'
+import { bucketByWeek, periodDelta, countByKey } from '../../lib/dashboardMetrics'
 import type { FbTable } from '@shared/fields'
 import {
   blankAction,
@@ -87,6 +88,8 @@ export default function PlexiFlowView(): JSX.Element {
 
   const selected = flows?.find((f) => f.id === selectedId) ?? null
   const { showOverview } = useLandOnContent(flows !== null, flows ?? [], selectedId, setSelectedId)
+  const flowList = flows ?? []
+  const now = Date.now()
 
   return (
     <div className="h-full w-full flex bg-[var(--surface-base)] text-[var(--ink-100)]" data-testid="plexiflow-view">
@@ -157,39 +160,62 @@ export default function PlexiFlowView(): JSX.Element {
         {selected ? (
           <FlowEditor key={selected.id} flow={selected} tables={tables} onChanged={load} />
         ) : (
-          <ModuleHome
+          <ModuleDashboard
             moduleKey="flows"
             title="Flows"
             subtitle="Automate your workspace, an ordered set of actions that runs by hand or on a schedule"
             icon="account_tree"
             accentClass="text-violet-500"
             stats={[
-              { label: 'Flows', value: flows?.length ?? 0, icon: 'account_tree' },
-              { label: 'On', value: flows?.filter((f) => f.enabled).length ?? 0, icon: 'toggle_on' },
-              { label: 'Failing', value: flows?.filter((f) => f.lastStatus === 'error').length ?? 0, icon: 'error' }
+              {
+                icon: 'account_tree',
+                label: 'Flows',
+                value: flowList.length,
+                tone: 'violet',
+                delta: periodDelta(flowList.map((f) => f.createdAt), 7 * 86400000, now),
+                sparkline: bucketByWeek(flowList.map((f) => f.createdAt), 8, now)
+              },
+              { icon: 'toggle_on', label: 'On', value: flowList.filter((f) => f.enabled).length, tone: 'emerald' },
+              { icon: 'error', label: 'Failing', value: flowList.filter((f) => f.lastStatus === 'error').length, tone: 'rose' },
+              { icon: 'pending_actions', label: 'Never run', value: flowList.filter((f) => !f.lastRunAt).length, tone: 'amber' }
             ]}
-            items={(flows ?? []).map((f) => ({
-              id: f.id,
-              title: f.title,
-              subtitle: `Runs ${triggerSummary(f.trigger)}, ${f.actions.length} action(s)`,
-              meta: f.lastRunAt ? `Last run ${new Date(f.lastRunAt).toLocaleDateString()}` : 'Not run yet',
-              status:
-                f.lastStatus === 'error'
-                  ? { tone: 'rose' as const, label: 'Last run failed' }
-                  : f.enabled
-                    ? { tone: 'emerald' as const, label: 'On' }
-                    : { tone: 'stone' as const, label: 'Off' },
-              onOpen: () => setSelectedId(f.id)
-            }))}
-            recentLabel="Your flows"
-            onCreate={() => void addFlow()}
-            createLabel="New flow"
-            emptyHint="No flows yet. Create one to run a sequence of actions across your workspace, automatically."
-            tips={[
-              { icon: 'bolt', text: 'Trigger on a schedule, an event in your workspace, an incoming webhook, or by hand.' },
-              { icon: 'auto_awesome', text: 'Chain an AI step into later steps with the token {{ai}}.' },
-              { icon: 'fact_check', text: 'Every run records an honest per-step log, so a failure shows as a failed step, never a fake success.' }
-            ]}
+            timeline={{
+              title: 'Flows created',
+              points: bucketByWeek(flowList.map((f) => f.createdAt), 8, now),
+              bucketLabel: 'last 8 weeks',
+              unit: 'flows',
+              tone: 'violet',
+              emptyHint: 'Build your first flow to see your automation grow here.'
+            }}
+            breakdown={{
+              title: 'By trigger',
+              icon: 'bolt',
+              items: countByKey(flowList, (f) => f.trigger.kind).map((b) => ({
+                label: b.label.charAt(0).toUpperCase() + b.label.slice(1),
+                value: b.value,
+                tone: b.label === 'schedule' ? ('accent' as const) : b.label === 'event' ? ('violet' as const) : b.label === 'webhook' ? ('sky' as const) : ('stone' as const)
+              })),
+              emptyHint: 'No flows yet.'
+            }}
+            recentItems={{
+              label: 'Your flows',
+              items: flowList.slice(0, 6).map((f) => ({
+                id: f.id,
+                title: f.title,
+                subtitle: `Runs ${triggerSummary(f.trigger)}, ${f.actions.length} action(s)`,
+                meta: f.lastRunAt ? `Last run ${new Date(f.lastRunAt).toLocaleDateString()}` : 'Not run yet',
+                status:
+                  f.lastStatus === 'error'
+                    ? { tone: 'rose' as const, label: 'Last run failed' }
+                    : f.enabled
+                      ? { tone: 'emerald' as const, label: 'On' }
+                      : { tone: 'stone' as const, label: 'Off' },
+                onOpen: () => setSelectedId(f.id)
+              })),
+              onCreate: () => void addFlow(),
+              createLabel: 'New flow',
+              emptyHint: 'No flows yet. Create one to run a sequence of actions across your workspace, automatically.'
+            }}
           />
         )}
       </div>

@@ -35,7 +35,9 @@ test('1 — sidebar PlexiMeet opens [data-testid="pleximeet-view"] with honest e
   await expect(view).toBeVisible()
 
   // Honest empty state message, no sample rows.
-  await expect(view.locator('text=No meetings yet')).toBeVisible({ timeout: 5_000 })
+  // ModuleDashboard adds a second "No meetings yet." in the recent-items pane,
+  // so use .first() to avoid strict-mode on the two matching elements.
+  await expect(view.locator('text=No meetings yet').first()).toBeVisible({ timeout: 5_000 })
   const rows = await view.locator('[data-testid^="meet-row-"]').count()
   expect(rows, 'zero rows in fresh DB').toBe(0)
 
@@ -219,8 +221,9 @@ test('4 — meet-search filters list; meet-delete removes meeting and shows empt
   await window.locator('[data-testid="meet-delete"]').click()
   await window.waitForTimeout(300)
 
-  // Honest empty state returns.
-  await expect(window.locator('text=No meetings yet')).toBeVisible({ timeout: 3_000 })
+  // Honest empty state returns. Use .first() — ModuleDashboard adds a second
+  // "No meetings yet." in its recent-items pane alongside the rail instance.
+  await expect(window.locator('text=No meetings yet').first()).toBeVisible({ timeout: 3_000 })
   await expect(window.locator('[data-testid^="meet-row-"]')).toHaveCount(0)
 })
 

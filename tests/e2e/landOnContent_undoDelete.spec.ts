@@ -3,8 +3,8 @@
 // FEATURE 1 — "Land on content, not the empty dashboard"
 //   useLandOnContent hook wires PlexiReports, PlexiFlow, PlexiForms, PlexiBuild
 //   so that opening a module with existing items auto-selects the most-recently
-//   updated item rather than parking on ModuleHome. ModuleHome is still reachable
-//   via the Overview button.
+//   updated item rather than parking on ModuleDashboard. ModuleDashboard is still
+//   reachable via the Overview button.
 //
 // FEATURE 2 — Visible undo on task delete in PlexiProjects
 //   Task deletion in the ProjectGantt now routes through useNodeStore.remove(),
@@ -15,7 +15,7 @@ import { launchApp, waitForReady } from './_helpers'
 
 // ─── FEATURE 1: land-on-content ────────────────────────────────────────────
 
-test('F1-a: PlexiReports empty state still shows module-home-reports + create button', async () => {
+test('F1-a: PlexiReports empty state still shows module-dashboard-reports + create button', async () => {
   const { window, dispose } = await launchApp()
   try {
     await waitForReady(window)
@@ -23,10 +23,10 @@ test('F1-a: PlexiReports empty state still shows module-home-reports + create bu
     await window.getByRole('button', { name: 'PlexiReports' }).first().click()
     await expect(window.locator('[data-testid="plexireports-view"]')).toBeVisible({ timeout: 8_000 })
 
-    // With ZERO items: ModuleHome must be showing, not an editor.
-    await expect(window.locator('[data-testid="module-home-reports"]')).toBeVisible({ timeout: 5_000 })
+    // With ZERO items: ModuleDashboard must be showing, not an editor.
+    await expect(window.locator('[data-testid="module-dashboard-reports"]')).toBeVisible({ timeout: 5_000 })
 
-    // Create button must be visible (from within ModuleHome)
+    // Create button must be visible (from within ModuleDashboard)
     await expect(window.locator('[data-testid="report-new"]')).toBeVisible()
 
     // No Overview button yet (items.length === 0)
@@ -56,9 +56,9 @@ test('F1-b: PlexiReports with seeded item auto-selects it on fresh mount (land-o
     await expect(window.locator(`[data-testid="report-card-${reportId}"]`)).toBeVisible({ timeout: 6_000 })
 
     // Core land-on-content assertion: editor is visible (selectedId !== null).
-    // The editor shows report-title input; ModuleHome must NOT be showing.
+    // The editor shows report-title input; ModuleDashboard must NOT be showing.
     await expect(window.locator('[data-testid="report-title"]')).toBeVisible({ timeout: 6_000 })
-    await expect(window.locator('[data-testid="module-home-reports"]')).not.toBeVisible()
+    await expect(window.locator('[data-testid="module-dashboard-reports"]')).not.toBeVisible()
 
     // Overview button must now be present (items.length > 0).
     await expect(window.locator('[data-testid="report-overview"]')).toBeVisible({ timeout: 5_000 })
@@ -83,16 +83,16 @@ test('F1-c: PlexiReports Overview button deselects and shows ModuleHome', async 
     // Wait for auto-select to land us in the editor.
     await expect(window.locator('[data-testid="report-title"]')).toBeVisible({ timeout: 6_000 })
 
-    // Click Overview → should deselect and show ModuleHome.
+    // Click Overview → should deselect and show ModuleDashboard.
     await window.locator('[data-testid="report-overview"]').click()
-    await expect(window.locator('[data-testid="module-home-reports"]')).toBeVisible({ timeout: 5_000 })
+    await expect(window.locator('[data-testid="module-dashboard-reports"]')).toBeVisible({ timeout: 5_000 })
     await expect(window.locator('[data-testid="report-title"]')).not.toBeVisible()
   } finally {
     await dispose()
   }
 })
 
-test('F1-d: PlexiFlow empty state shows module-home-flows + create button, no Overview', async () => {
+test('F1-d: PlexiFlow empty state shows module-dashboard-flows + create button, no Overview', async () => {
   const { window, dispose } = await launchApp()
   try {
     await waitForReady(window)
@@ -100,7 +100,7 @@ test('F1-d: PlexiFlow empty state shows module-home-flows + create button, no Ov
     await window.getByRole('button', { name: 'PlexiFlow' }).first().click()
     await expect(window.locator('[data-testid="plexiflow-view"]')).toBeVisible({ timeout: 8_000 })
 
-    await expect(window.locator('[data-testid="module-home-flows"]')).toBeVisible({ timeout: 5_000 })
+    await expect(window.locator('[data-testid="module-dashboard-flows"]')).toBeVisible({ timeout: 5_000 })
     await expect(window.locator('[data-testid="flow-new"]')).toBeVisible()
     await expect(window.locator('[data-testid="flow-overview"]')).not.toBeVisible()
   } finally {
@@ -123,9 +123,9 @@ test('F1-e: PlexiFlow with seeded item auto-selects on fresh mount', async () =>
 
     await expect(window.locator(`[data-testid="flow-card-${flowId}"]`)).toBeVisible({ timeout: 6_000 })
 
-    // Editor visible (flow-title input), ModuleHome not visible.
+    // Editor visible (flow-title input), ModuleDashboard not visible.
     await expect(window.locator('[data-testid="flow-title"]')).toBeVisible({ timeout: 6_000 })
-    await expect(window.locator('[data-testid="module-home-flows"]')).not.toBeVisible()
+    await expect(window.locator('[data-testid="module-dashboard-flows"]')).not.toBeVisible()
 
     // Overview button present.
     await expect(window.locator('[data-testid="flow-overview"]')).toBeVisible({ timeout: 5_000 })
@@ -148,14 +148,14 @@ test('F1-f: PlexiFlow Overview button deselects and shows ModuleHome', async () 
     await expect(window.locator('[data-testid="flow-title"]')).toBeVisible({ timeout: 6_000 })
 
     await window.locator('[data-testid="flow-overview"]').click()
-    await expect(window.locator('[data-testid="module-home-flows"]')).toBeVisible({ timeout: 5_000 })
+    await expect(window.locator('[data-testid="module-dashboard-flows"]')).toBeVisible({ timeout: 5_000 })
     await expect(window.locator('[data-testid="flow-title"]')).not.toBeVisible()
   } finally {
     await dispose()
   }
 })
 
-test('F1-g: PlexiForms empty state shows module-home-forms + create button, no Overview', async () => {
+test('F1-g: PlexiForms empty state shows module-dashboard-forms + create button, no Overview', async () => {
   const { window, dispose } = await launchApp()
   try {
     await waitForReady(window)
@@ -163,7 +163,7 @@ test('F1-g: PlexiForms empty state shows module-home-forms + create button, no O
     await window.locator('button').filter({ hasText: 'PlexiForms' }).first().click()
     await expect(window.locator('[data-testid="plexiforms-view"]')).toBeVisible({ timeout: 8_000 })
 
-    await expect(window.locator('[data-testid="module-home-forms"]')).toBeVisible({ timeout: 5_000 })
+    await expect(window.locator('[data-testid="module-dashboard-forms"]')).toBeVisible({ timeout: 5_000 })
     await expect(window.locator('[data-testid="form-new"]')).toBeVisible()
     await expect(window.locator('[data-testid="form-overview"]')).not.toBeVisible()
   } finally {
@@ -193,9 +193,9 @@ test('F1-h: PlexiForms with seeded item auto-selects on fresh mount', async () =
 
     await expect(window.locator(`[data-testid="form-row-${formId}"]`)).toBeVisible({ timeout: 6_000 })
 
-    // Editor open (form-title input), ModuleHome not visible.
+    // Editor open (form-title input), ModuleDashboard not visible.
     await expect(window.locator('[data-testid="form-title"]')).toBeVisible({ timeout: 6_000 })
-    await expect(window.locator('[data-testid="module-home-forms"]')).not.toBeVisible()
+    await expect(window.locator('[data-testid="module-dashboard-forms"]')).not.toBeVisible()
 
     await expect(window.locator('[data-testid="form-overview"]')).toBeVisible({ timeout: 5_000 })
   } finally {
@@ -203,7 +203,7 @@ test('F1-h: PlexiForms with seeded item auto-selects on fresh mount', async () =
   }
 })
 
-test('F1-i: PlexiBuild empty state shows module-home-build + create button, no Overview', async () => {
+test('F1-i: PlexiBuild empty state shows module-dashboard-build + create button, no Overview', async () => {
   const { window, dispose } = await launchApp()
   try {
     await waitForReady(window)
@@ -211,7 +211,7 @@ test('F1-i: PlexiBuild empty state shows module-home-build + create button, no O
     await window.locator('button').filter({ hasText: 'PlexiBuild' }).first().click()
     await expect(window.locator('[data-testid="plexibuild-view"]')).toBeVisible({ timeout: 8_000 })
 
-    await expect(window.locator('[data-testid="module-home-build"]')).toBeVisible({ timeout: 5_000 })
+    await expect(window.locator('[data-testid="module-dashboard-build"]')).toBeVisible({ timeout: 5_000 })
     await expect(window.locator('[data-testid="build-new-app"]')).toBeVisible()
     await expect(window.locator('[data-testid="build-overview"]')).not.toBeVisible()
   } finally {
@@ -235,9 +235,9 @@ test('F1-j: PlexiBuild with seeded item auto-selects on fresh mount', async () =
 
     await expect(window.locator(`[data-testid="build-app-${appId}"]`)).toBeVisible({ timeout: 6_000 })
 
-    // Editor open (app-name input per PlexiBuildView line ~206), ModuleHome not visible.
+    // Editor open (app-name input per PlexiBuildView line ~206), ModuleDashboard not visible.
     await expect(window.locator('[data-testid="app-name"]')).toBeVisible({ timeout: 6_000 })
-    await expect(window.locator('[data-testid="module-home-build"]')).not.toBeVisible()
+    await expect(window.locator('[data-testid="module-dashboard-build"]')).not.toBeVisible()
 
     await expect(window.locator('[data-testid="build-overview"]')).toBeVisible({ timeout: 5_000 })
   } finally {
