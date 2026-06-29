@@ -36,6 +36,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.111',
+    date: '2026-07-01T10:00:00Z',
+    title: 'v2.5.111 — PlexiDesign AI template generator',
+    tag: 'feature',
+    summary:
+      'Describe what you want and PlexiDesign generates a set of finished, on-brand designs to choose from. The AI writes six genuinely different concepts from one prompt, varying the angle, the wording, the mood and the layout, and lays each one out in your brand colors and fonts. You see them as a grid of real previews and click the one you like to drop it on the canvas. It is the answer to "I need a starting point" without hunting through a giant template gallery, the options are generated for your brief, every time.',
+    highlights: [
+      'Generate six distinct, on-brand design options from a single prompt.',
+      'Six layout styles (left, centered, band, bold, split, minimal) keep the set genuinely varied.',
+      'Pick from a grid of real previews; the single-design option is still there too.'
+    ]
+  },
+  {
     version: '2.5.110',
     date: '2026-06-30T20:00:00Z',
     title: 'v2.5.110 — PlexiDesign: fonts, stock photos, background removal, magic resize',
