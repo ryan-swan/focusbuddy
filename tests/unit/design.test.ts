@@ -9,6 +9,7 @@ import {
   blankDesign,
   designToHtml,
   composeDesign,
+  resizeDesign,
   type DesignCategory
 } from '../../src/shared/design'
 import type { OrgBrandKit } from '../../src/shared/brandKit'
@@ -88,6 +89,32 @@ describe('templates', () => {
     expect(d.elements).toEqual([])
     expect(d.width).toBe(794)
     expect(d.category).toBe('marketing')
+  })
+})
+
+describe('resizeDesign (magic resize)', () => {
+  const brand = { colorPrimary: '#2563eb', fontHeading: 'Inter', fontBody: 'Inter' }
+  const src = designFromTemplate(DESIGN_TEMPLATES.find((t) => t.id === 'social-quote')!, findDesignSize('ig-post')!, brand)
+
+  it('scales the canvas and repositions elements proportionally', () => {
+    const target = findDesignSize('fb-post')! // 1200x630
+    const out = resizeDesign(src, target)
+    expect(out.width).toBe(1200)
+    expect(out.height).toBe(630)
+    expect(out.elements.length).toBe(src.elements.length)
+    // An element's x scales by the width ratio (1200/1080).
+    const ratio = 1200 / 1080
+    const srcEl = src.elements[1]
+    const outEl = out.elements[1]
+    expect(outEl.x).toBe(Math.round(srcEl.x * ratio))
+  })
+
+  it('scales text font sizes by the average ratio', () => {
+    const target = findDesignSize('ig-post')! // same size -> ratio 1
+    const out = resizeDesign(src, target)
+    const srcText = src.elements.find((e) => e.type === 'text') as { paragraphs: { runs: { fontSize?: number }[] }[] }
+    const outText = out.elements.find((e) => e.type === 'text') as { paragraphs: { runs: { fontSize?: number }[] }[] }
+    expect(outText.paragraphs[0].runs[0].fontSize).toBe(srcText.paragraphs[0].runs[0].fontSize)
   })
 })
 

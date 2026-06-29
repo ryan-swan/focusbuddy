@@ -136,6 +136,53 @@ export default function ApiKeysSection({ onKeySaved }: Props): JSX.Element {
         onKeySaved={onKeySaved}
       />
 
+      <ApiKeyRow
+        config={{
+          label: 'Pexels API key',
+          purpose: 'Stock photo search in PlexiDesign. Optional — without it the stock picker prompts to add a key.',
+          placeholder: '563492…',
+          helpUrl: 'https://www.pexels.com/api/',
+          helpLabel: 'Get a free key from Pexels →',
+          removeWarning: 'Remove the Pexels API key? Stock photo search will stop working until you add it back.',
+          api: {
+            hint: () => window.api.settings.hintPexels(),
+            save: (p) => window.api.settings.savePexelsKey(p),
+            clear: () => window.api.settings.clearPexelsKey(),
+            test: async () => {
+              const r = await window.api.design.searchPhotos({ query: 'sky', perPage: 1 })
+              if (r.ok) return { ok: true }
+              return { ok: false, error: r.needsKey ? 'No key set yet.' : r.error }
+            }
+          }
+        }}
+        encryption={encryption}
+        onKeySaved={onKeySaved}
+      />
+
+      <ApiKeyRow
+        config={{
+          label: 'remove.bg API key',
+          purpose: 'One-click background removal on images in PlexiDesign. Optional.',
+          placeholder: 'abc123…',
+          helpUrl: 'https://www.remove.bg/api',
+          helpLabel: 'Get a key from remove.bg →',
+          removeWarning: 'Remove the remove.bg API key? Background removal will stop working until you add it back.',
+          api: {
+            hint: () => window.api.settings.hintRemoveBg(),
+            save: (p) => window.api.settings.saveRemoveBgKey(p),
+            clear: () => window.api.settings.clearRemoveBgKey(),
+            // remove.bg charges per call, so "test" confirms a key is stored
+            // rather than spending a credit; the first real use validates it.
+            test: async () => {
+              const h = await window.api.settings.hintRemoveBg()
+              return h.hasKey ? { ok: true } : { ok: false, error: 'No key set yet.' }
+            }
+          }
+        }}
+        encryption={encryption}
+        onKeySaved={onKeySaved}
+      />
+
       <div className="text-[10px] text-stone-500 dark:text-stone-400 leading-relaxed">
         Each key is encrypted with the macOS Keychain and stored locally only.
         When you use your own key, prompts go direct from this Mac to Anthropic /

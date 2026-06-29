@@ -142,4 +142,35 @@ test.describe('PlexiDesign studio', () => {
     await window.locator('[data-testid="design-duplicate"]').click()
     await expect(window.locator('[data-testid="slide-element"]')).toHaveCount(before + 1)
   })
+
+  test('DS-10 add triangle, rounded rect and a line', async () => {
+    const before = await window.locator('[data-testid="slide-element"]').count()
+    await window.locator('[data-testid="design-add-triangle"]').click()
+    await window.locator('[data-testid="design-add-roundrect"]').click()
+    await window.locator('[data-testid="design-add-line"]').click()
+    await expect(window.locator('[data-testid="slide-element"]')).toHaveCount(before + 3)
+  })
+
+  test('DS-11 font picker changes the selected text font', async () => {
+    await window.locator('[data-testid="design-add-text"]').click()
+    await expect(window.locator('[data-testid="design-font-family"]')).toBeVisible()
+    await window.locator('[data-testid="design-font-family"]').selectOption('Poppins')
+    await expect(window.locator('[data-testid="design-font-family"]')).toHaveValue('Poppins')
+  })
+
+  test('DS-12 stock photo search is honest without a key', async () => {
+    await window.locator('[data-testid="design-stock-btn"]').click()
+    await window.locator('[data-testid="design-stock-query"]').fill('mountains')
+    const before = await window.locator('[data-testid="slide-element"]').count()
+    await window.locator('[data-testid="design-stock-go"]').click()
+    await window.waitForTimeout(1500)
+    // Search never silently inserts onto the canvas; results appear in the panel,
+    // or (no key) an honest status. Either way the canvas element count is unchanged.
+    expect(await window.locator('[data-testid="slide-element"]').count()).toBe(before)
+    const hasResults = await window.locator('[data-testid="design-stock-results"]').isVisible().catch(() => false)
+    if (!hasResults) {
+      await expect(window.locator('[data-testid="design-status"]')).toBeVisible()
+      expect((await window.locator('[data-testid="design-status"]').textContent())?.toLowerCase()).toMatch(/key|fail|could not|reach|no photos/)
+    }
+  })
 })

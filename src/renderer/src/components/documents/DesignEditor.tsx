@@ -23,6 +23,7 @@ import {
   designFromTemplate,
   findDesignSize,
   normalizeDesignBody,
+  resizeDesign,
   templatesForCategory,
   type DesignBody,
   type DesignCategory,
@@ -31,6 +32,7 @@ import {
 import Icon from '../Icon'
 import { useBrandStore } from '../../stores/brand'
 import BrandKitModal from './BrandKitModal'
+import { GOOGLE_FONTS, loadGoogleFont, fontFamilyValue, familyLabel } from '../../lib/googleFonts'
 
 // PlexiDesign — the on-platform design studio. A design is a single arbitrary-size
 // canvas of the same elements a slide uses, so this editor reuses the proven slide
@@ -49,20 +51,6 @@ const EXPORT_FORMATS: { id: 'png' | 'pdf'; label: string }[] = [
   { id: 'pdf', label: 'PDF' }
 ]
 
-// Font choices for text elements. System-safe stacks plus a few common web
-// families, so a design reads well without a stock font library.
-const TEXT_FONTS: { label: string; value: string }[] = [
-  { label: 'Inter', value: 'Inter, system-ui, sans-serif' },
-  { label: 'Helvetica / Arial', value: '"Helvetica Neue", Arial, sans-serif' },
-  { label: 'Georgia', value: 'Georgia, "Times New Roman", serif' },
-  { label: 'Times', value: '"Times New Roman", Times, serif' },
-  { label: 'Courier', value: '"Courier New", Courier, monospace' },
-  { label: 'JetBrains Mono', value: '"JetBrains Mono", ui-monospace, monospace' },
-  { label: 'Trebuchet', value: '"Trebuchet MS", sans-serif' },
-  { label: 'Verdana', value: 'Verdana, Geneva, sans-serif' },
-  { label: 'Palatino', value: '"Palatino Linotype", "Book Antiqua", serif' },
-  { label: 'Impact', value: 'Impact, Haettenschweiler, sans-serif' }
-]
 
 const CATEGORIES: { id: DesignCategory; label: string }[] = [
   { id: 'social', label: 'Social' },
@@ -89,11 +77,13 @@ export default function DesignEditor({ content, title, onChange }: Props): JSX.E
   const [design, setDesign] = useState<DesignBody>(() => normalizeDesignBody(content))
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [exportOpen, setExportOpen] = useState(false)
-  const [panel, setPanel] = useState<'none' | 'templates' | 'size' | 'ai'>(
+  const [panel, setPanel] = useState<'none' | 'templates' | 'size' | 'ai' | 'stock'>(
     () => (normalizeDesignBody(content).elements.length === 0 ? 'templates' : 'none')
   )
   const [aiPrompt, setAiPrompt] = useState('')
   const [imgPrompt, setImgPrompt] = useState('')
+  const [stockQuery, setStockQuery] = useState('')
+  const [stockResults, setStockResults] = useState<Array<{ id: string; thumb: string; full: string; alt: string; photographer: string }>>([])
   const [busy, setBusy] = useState<string | null>(null)
   const [status, setStatus] = useState<string | null>(null)
   const [canvasW, setCanvasW] = useState(640)
@@ -120,6 +110,16 @@ export default function DesignEditor({ content, title, onChange }: Props): JSX.E
   useEffect(() => {
     void loadBrand()
   }, [loadBrand])
+
+  // Ensure every Google font the design (and the brand) uses is loaded, so the
+  // canvas renders in the right typeface rather than a fallback.
+  useEffect(() => {
+    loadGoogleFont(familyLabel(brand.fontHeading))
+    loadGoogleFont(familyLabel(brand.fontBody))
+    for (const el of design.elements) {
+      if (el.type === 'text' && el.fontFamily) loadGoogleFont(familyLabel(el.fontFamily))
+    }
+  }, [design.elements, brand.fontHeading, brand.fontBody])
 
   // Fit the canvas to the available width, capped so a wide design doesn't sprawl.
   useEffect(() => {
@@ -274,7 +274,7 @@ export default function DesignEditor({ content, title, onChange }: Props): JSX.E
     setSelectedIds([el.id])
   }
 
-  function addShape(shape: 'rect' | 'ellipse'): void {
+  function addShape(shape: 'rect' | 'ellipse' | 'roundRect' | 'triangle'): void {
     const el: SlideElement = {
       id: elementId(),
       type: 'shape',
@@ -285,6 +285,24 @@ export default function DesignEditor({ content, title, onChange }: Props): JSX.E
       h: Math.round(design.width * 0.3),
       z: topZ + 1,
       fill: { type: 'solid', color: brand.colorPrimary }
+    }
+    mutate((s) => addElement(s, el))
+    setSelectedIds([el.id])
+  }
+
+  function addLine(): void {
+    const el: SlideElement = {
+      id: elementId(),
+      type: 'line',
+      x: Math.round(design.width * 0.2),
+      y: Math.round(design.height * 0.5),
+      w: Math.round(design.width * 0.6),
+      h: 0,
+      z: topZ + 1,
+      x2: Math.round(design.width * 0.8),
+      y2: Math.round(design.height * 0.5),
+      stroke: brand.colorPrimary,
+      strokeWidth: Math.max(2, Math.round(design.width * 0.004))
     }
     mutate((s) => addElement(s, el))
     setSelectedIds([el.id])
@@ -354,6 +372,57 @@ export default function DesignEditor({ content, title, onChange }: Props): JSX.E
     }
   }
 
+  async function searchStock(): Promise<void> {
+    const q = stockQuery.trim()
+    if (!q) return
+    setBusy('Searching photos…')
+    setStatus(null)
+    try {
+      const res = await window.api.design.searchPhotos({ query: q })
+      if (res.ok && res.photos) {
+        setStockResults(res.photos)
+        if (!res.photos.length) setStatus('No photos found for that search.')
+      } else if (res.needsKey) {
+        setStockResults([])
+        setStatus(res.error ?? 'Add a free Pexels API key in Settings → API Keys to search stock photos.')
+      } else {
+        setStatus(res.error ?? 'Stock search failed.')
+      }
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  async function insertStock(photo: { full: string }): Promise<void> {
+    setBusy('Adding photo…')
+    try {
+      const res = await window.api.design.fetchImage({ url: photo.full })
+      if (res.ok && res.dataUrl) placeImage(res.dataUrl)
+      else setStatus(res.error ?? 'Could not add that photo.')
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  async function removeBgSelected(): Promise<void> {
+    if (!selected || selected.type !== 'image') return
+    setBusy('Removing background…')
+    setStatus(null)
+    try {
+      const res = await window.api.design.removeBackground({ dataUrl: selected.src })
+      if (res.ok && res.dataUrl) {
+        const id = selected.id
+        mutate((s) => updateElement(s, id, { src: res.dataUrl }))
+      } else if (res.needsKey) {
+        setStatus(res.error ?? 'Add a remove.bg API key in Settings → API Keys to remove backgrounds.')
+      } else {
+        setStatus(res.error ?? 'Background removal failed.')
+      }
+    } finally {
+      setBusy(null)
+    }
+  }
+
   async function generateDesign(): Promise<void> {
     const prompt = aiPrompt.trim()
     if (!prompt) return
@@ -388,7 +457,9 @@ export default function DesignEditor({ content, title, onChange }: Props): JSX.E
   }
 
   function changeSize(s: DesignSize): void {
-    update({ width: s.w, height: s.h, category: s.category })
+    // Magic resize: reflow the existing layout into the new size rather than just
+    // changing the canvas under fixed elements. A blank canvas just takes the size.
+    commit(design.elements.length ? resizeDesign(designRef.current, s) : { ...designRef.current, width: s.w, height: s.h, category: s.category })
     setPanel('none')
   }
 
@@ -452,9 +523,13 @@ export default function DesignEditor({ content, title, onChange }: Props): JSX.E
         <ToolBtn icon="title" label="Text" onClick={addText} testid="design-add-text" />
         <ToolBtn icon="rectangle" label="Rect" onClick={() => addShape('rect')} testid="design-add-rect" />
         <ToolBtn icon="circle" label="Ellipse" onClick={() => addShape('ellipse')} testid="design-add-ellipse" />
+        <ToolBtn icon="change_history" label="Triangle" onClick={() => addShape('triangle')} testid="design-add-triangle" />
+        <ToolBtn icon="rounded_corner" label="Round" onClick={() => addShape('roundRect')} testid="design-add-roundrect" />
+        <ToolBtn icon="horizontal_rule" label="Line" onClick={addLine} testid="design-add-line" />
         <ToolBtn icon="image" label="Image" onClick={() => void addImageFromFile()} testid="design-add-image" />
         <span className="w-px h-5 bg-stone-200 dark:bg-stone-700 mx-1" />
         <ToolBtn icon="auto_awesome" label="AI design" active={panel === 'ai'} onClick={() => setPanel((p) => (p === 'ai' ? 'none' : 'ai'))} testid="design-ai-btn" />
+        <ToolBtn icon="photo_library" label="Stock" active={panel === 'stock'} onClick={() => setPanel((p) => (p === 'stock' ? 'none' : 'stock'))} testid="design-stock-btn" />
         <ToolBtn icon="badge" label="Logo" onClick={placeLogo} testid="design-add-logo" />
         <ToolBtn icon="palette" label="Brandify" onClick={brandify} testid="design-brandify" />
         <ToolBtn icon="tune" label="Brand kit" onClick={() => setBrandOpen(true)} testid="design-brand-kit-btn" />
@@ -562,6 +637,38 @@ export default function DesignEditor({ content, title, onChange }: Props): JSX.E
           </div>
         </Panel>
       )}
+      {panel === 'stock' && (
+        <Panel title="Stock photos">
+          <div className="flex gap-1.5 mb-2">
+            <input
+              value={stockQuery}
+              onChange={(e) => setStockQuery(e.target.value)}
+              placeholder="Search free photos (e.g. mountains, office, coffee)"
+              data-testid="design-stock-query"
+              onKeyDown={(e) => e.key === 'Enter' && void searchStock()}
+              className="flex-1 rounded-lg border border-stone-300 dark:border-stone-600 bg-transparent px-2.5 py-1.5 text-[12px] focus:outline-none focus:border-accent"
+            />
+            <button onClick={() => void searchStock()} disabled={!!busy} data-testid="design-stock-go" className="btn-primary text-[12px] px-3 py-1.5 disabled:opacity-50">
+              Search
+            </button>
+          </div>
+          {stockResults.length > 0 && (
+            <div className="grid grid-cols-4 gap-1.5 max-h-48 overflow-auto" data-testid="design-stock-results">
+              {stockResults.map((p) => (
+                <button
+                  key={p.id}
+                  onClick={() => void insertStock(p)}
+                  title={p.alt || `Photo by ${p.photographer}`}
+                  className="aspect-square rounded-md overflow-hidden border border-stone-200 dark:border-stone-700 hover:border-accent"
+                >
+                  <img src={p.thumb} alt={p.alt} className="w-full h-full object-cover" />
+                </button>
+              ))}
+            </div>
+          )}
+          <p className="text-[10px] text-stone-400 mt-1.5">Photos from Pexels. A free Pexels API key (Settings → API Keys) enables search.</p>
+        </Panel>
+      )}
 
       {(busy || status) && (
         <div className="px-3 py-1.5 text-[12px] text-stone-500 dark:text-stone-400 flex items-center gap-1.5" data-testid="design-status">
@@ -614,20 +721,24 @@ export default function DesignEditor({ content, title, onChange }: Props): JSX.E
               <>
                 <Field label="Font">
                   <select
-                    value={selected.fontFamily ?? 'Inter, system-ui, sans-serif'}
+                    value={familyLabel(selected.fontFamily)}
                     data-testid="design-font-family"
-                    onChange={(e) => mutate((s) => updateElement(s, selected.id, { fontFamily: e.target.value }))}
+                    onChange={(e) => {
+                      const fam = e.target.value
+                      loadGoogleFont(fam)
+                      mutate((s) => updateElement(s, selected.id, { fontFamily: fontFamilyValue(fam) }))
+                    }}
                     className="w-full rounded border border-stone-300 dark:border-stone-600 bg-transparent px-1.5 py-1"
                     style={{ fontFamily: selected.fontFamily }}
                   >
-                    {TEXT_FONTS.map((f) => (
-                      <option key={f.value} value={f.value} style={{ fontFamily: f.value }}>
-                        {f.label}
+                    {!GOOGLE_FONTS.includes(familyLabel(selected.fontFamily)) && familyLabel(selected.fontFamily) !== 'Default' && (
+                      <option value={familyLabel(selected.fontFamily)}>{familyLabel(selected.fontFamily)}</option>
+                    )}
+                    {GOOGLE_FONTS.map((fam) => (
+                      <option key={fam} value={fam} style={{ fontFamily: `"${fam}", sans-serif` }}>
+                        {fam}
                       </option>
                     ))}
-                    {!TEXT_FONTS.some((f) => f.value === selected.fontFamily) && selected.fontFamily && (
-                      <option value={selected.fontFamily}>{selected.fontFamily}</option>
-                    )}
                   </select>
                 </Field>
                 <Field label="Text color">
@@ -696,6 +807,16 @@ export default function DesignEditor({ content, title, onChange }: Props): JSX.E
                   />
                 </Field>
               </>
+            )}
+            {selected.type === 'image' && (
+              <button
+                onClick={() => void removeBgSelected()}
+                disabled={!!busy}
+                data-testid="design-remove-bg"
+                className="w-full mb-2 px-2 py-1.5 rounded-lg border border-stone-300 dark:border-stone-600 text-[12px] hover:border-accent disabled:opacity-50 inline-flex items-center justify-center gap-1.5"
+              >
+                <Icon name="auto_fix_high" size={14} /> Remove background
+              </button>
             )}
             <Field label={`Opacity ${Math.round((selected.opacity ?? 1) * 100)}%`}>
               <input

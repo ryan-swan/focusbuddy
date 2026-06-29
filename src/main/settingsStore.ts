@@ -33,7 +33,7 @@ import { join } from 'node:path'
 // API). Adding a new secret = adding it here + a row in the API Keys
 // settings panel. Existing envelopes are forward-compatible (missing
 // keys just resolve to null).
-export type SecretName = 'anthropic' | 'openai' | 'tenor'
+export type SecretName = 'anthropic' | 'openai' | 'tenor' | 'pexels' | 'removebg'
 
 // How the app sources AI: 'auto' prefers PlexiDesk credits when the user is
 // signed in and has balance, falling back to their own key; 'credits' forces
@@ -203,5 +203,29 @@ export function resolveTenorKey(): string | null {
   const fromStore = getSecret('tenor')
   if (fromStore) return fromStore
   const fromEnv = process.env.TENOR_API_KEY
+  return fromEnv && fromEnv.trim() ? fromEnv.trim() : null
+}
+
+/**
+ * Resolve the Pexels (stock photo) key — same precedence rules. Stock photo
+ * search needs a free Pexels API key; without one the picker shows an honest
+ * "add a key" state rather than fabricating results.
+ */
+export function resolvePexelsKey(): string | null {
+  const fromStore = getSecret('pexels')
+  if (fromStore) return fromStore
+  const fromEnv = process.env.PEXELS_API_KEY
+  return fromEnv && fromEnv.trim() ? fromEnv.trim() : null
+}
+
+/**
+ * Resolve the remove.bg (background removal) key — same precedence rules.
+ * Background removal calls the remove.bg API; without a key the action reports an
+ * honest "add a key" state and changes nothing.
+ */
+export function resolveRemoveBgKey(): string | null {
+  const fromStore = getSecret('removebg')
+  if (fromStore) return fromStore
+  const fromEnv = process.env.REMOVEBG_API_KEY
   return fromEnv && fromEnv.trim() ? fromEnv.trim() : null
 }
