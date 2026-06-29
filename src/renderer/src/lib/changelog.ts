@@ -36,6 +36,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.106',
+    date: '2026-06-29T18:00:00Z',
+    title: 'v2.5.106 — Documents: real pages and margins',
+    tag: 'feature',
+    summary:
+      'The document editor now treats pages and margins the way a real word processor does. Page size, orientation and margins belong to the document, not to your app, so two people opening the same file see the same pages, and a choice you make in one document never leaks into the next. Margins are properly configurable from a Margins menu, with the familiar Normal, Narrow, Moderate and Wide presets plus a custom setting for each of the four sides in inches. Best of all it is faithful on the way out: the .docx and PDF you export carry the same paper size, orientation and margins you set on screen, so what you see is what you hand over.',
+    highlights: [
+      'Page size, orientation and margins are saved with the document, not as a global app preference.',
+      'A Margins menu with Word-style presets (Normal, Narrow, Moderate, Wide) and a custom per-side editor in inches.',
+      'Exports are WYSIWYG: .docx and PDF use the document’s own paper size, orientation and margins.'
+    ]
+  },
+  {
     version: '2.5.105',
     date: '2026-06-29T12:00:00Z',
     title: 'v2.5.105 — PlexiProjects: constraints, budgets, leveling, and Microsoft Project export',
