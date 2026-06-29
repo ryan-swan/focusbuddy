@@ -36,6 +36,20 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.107',
+    date: '2026-06-29T22:00:00Z',
+    title: 'v2.5.107 — PlexiDesign, the on-platform design studio',
+    tag: 'feature',
+    summary:
+      'PlexiDesign is a full design studio built right into PlexiDesk. Create a design at any size, from an Instagram post or story to a poster, a flyer, a business card, a presentation cover, a logo or a custom canvas, and lay it out on a real editing surface with drag, resize and snap guides. Start from a brand-aware template, then let AI do the heavy lifting: describe what you want and it writes the copy and composes a finished, on-brand layout in seconds, and it can generate images to drop straight onto the canvas. Add text, shapes and images yourself, restyle anything in the inspector, and snap a stray design back to your colors with one Brandify click. This is the first release of a studio that will keep growing.',
+    highlights: [
+      'Design at any size with presets for social, marketing, presentations and logos, plus custom dimensions.',
+      'A real editing canvas with drag, resize and Figma-style snap guides, shared with the slides engine.',
+      'AI writes on-brand copy and lays out a finished design from a prompt, and generates images for the canvas.',
+      'Brand-aware templates and a one-click Brandify to standardize an existing design on your colors and fonts.'
+    ]
+  },
+  {
     version: '2.5.106',
     date: '2026-06-29T18:00:00Z',
     title: 'v2.5.106 — Documents: real pages and margins',
