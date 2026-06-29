@@ -1545,6 +1545,26 @@ const api = {
     pickImage: (): Promise<{ ok: boolean; dataUrl?: string; error?: string }> =>
       ipcRenderer.invoke('office:pickImage')
   },
+  // PlexiDesign: AI image generation (OpenAI gpt-image-1) and AI design copy
+  // (Anthropic). Both return honest needsKey/needsApiKey states when unconfigured.
+  design: {
+    generateImage: (input: {
+      prompt: string
+      width?: number
+      height?: number
+    }): Promise<{ ok: boolean; dataUrl?: string; error?: string; needsKey?: boolean }> =>
+      ipcRenderer.invoke('design:generateImage', input),
+    generateContent: (input: {
+      prompt: string
+      designKind: string
+      audience?: string
+    }): Promise<{
+      ok: boolean
+      content?: { eyebrow?: string; headline?: string; subhead?: string; body?: string; cta?: string; background?: 'brand' | 'light' | 'dark' }
+      error?: string
+      needsApiKey?: boolean
+    }> => ipcRenderer.invoke('design:generateContent', input)
+  },
   // Spreadsheet Office interop (.xlsx/.csv) + AI fill.
   sheet: {
     import: (): Promise<{

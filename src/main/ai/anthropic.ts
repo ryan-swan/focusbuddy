@@ -1896,6 +1896,76 @@ export async function generateDocument(input: {
   }
 }
 
+// ── PlexiDesign: AI design content ───────────────────────────────────────────
+//
+// Generates the COPY for a design (eyebrow, headline, subhead, body, cta) plus a
+// background treatment, from a prompt and the design's purpose. The renderer
+// composes this into an on-brand layout via composeDesign(), so this function
+// owns the words and the mood, the brand owns the look. Returns honest states:
+// needsApiKey when no key, an error when the model declines or returns nothing.
+
+export interface DesignContentResult {
+  ok: boolean
+  content?: {
+    eyebrow?: string
+    headline?: string
+    subhead?: string
+    body?: string
+    cta?: string
+    background?: 'brand' | 'light' | 'dark'
+  }
+  error?: string
+  needsApiKey?: boolean
+}
+
+export async function generateDesignContent(input: {
+  prompt: string
+  designKind: string // e.g. "Instagram post", "Event flyer", "Logo"
+  audience?: string
+}): Promise<DesignContentResult> {
+  const c = getClient()
+  if (!c)
+    return { ok: false, needsApiKey: true, error: 'No Anthropic API key set. Open Settings → AI · API keys to paste one.' }
+  const topic = input.prompt.trim()
+  if (!topic) return { ok: false, error: 'Describe the design you want.' }
+  const audienceLine = input.audience?.trim() ? ` The audience is ${input.audience.trim()}.` : ''
+  const system =
+    `You write the copy for a ${input.designKind} design.` +
+    audienceLine +
+    ' Reply with ONLY a JSON object of the form {"eyebrow"?: string, "headline": string, "subhead"?: string, "body"?: string, "cta"?: string, "background": "brand"|"light"|"dark"}. ' +
+    'The headline is the single most important line, short and punchy (under 8 words). The eyebrow is a tiny kicker above it (1-3 words) and is optional. subhead is one supporting sentence. body is at most two short sentences and is optional for very visual pieces. cta is a short call to action when one fits. Choose "background": "brand" for bold social posts, "light" for clean professional pieces, "dark" for premium or tech moods. ' +
+    'Write in plain, confident, human words. No em dashes, no emoji, no markdown, no code fences, no prose outside the JSON.'
+  try {
+    const resp = await c.messages.create({
+      model: resolveModel('document'),
+      max_tokens: 700,
+      system,
+      messages: [{ role: 'user', content: `${input.designKind}: ${topic}` }]
+    })
+    if ((resp.stop_reason as string) === 'refusal')
+      return { ok: false, error: 'Claude declined this request. Try rephrasing it.' }
+    const text = resp.content
+      .filter((b) => b.type === 'text')
+      .map((b) => ('text' in b ? b.text : ''))
+      .join('\n')
+    const parsed = extractJsonObject(text) as Record<string, unknown>
+    const str = (v: unknown): string | undefined => (typeof v === 'string' && v.trim() ? v.trim() : undefined)
+    const bg = parsed.background
+    const content = {
+      eyebrow: str(parsed.eyebrow),
+      headline: str(parsed.headline),
+      subhead: str(parsed.subhead),
+      body: str(parsed.body),
+      cta: str(parsed.cta),
+      background: (bg === 'brand' || bg === 'dark' ? bg : 'light') as 'brand' | 'light' | 'dark'
+    }
+    if (!content.headline) return { ok: false, error: 'The design copy came back empty. Try a more specific prompt.' }
+    return { ok: true, content }
+  } catch (e) {
+    return { ok: false, error: (e as Error).message }
+  }
+}
+
 // ── In-widget AI: Table row suggestion ───────────────────────────────────────
 //
 // Loads the target table's schema, asks the model for rows fitting that
