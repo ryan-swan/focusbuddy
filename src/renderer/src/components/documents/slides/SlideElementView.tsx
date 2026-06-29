@@ -73,6 +73,7 @@ export default function SlideElementView({ el }: { el: SlideElement }): JSX.Elem
     width: el.w,
     height: el.h,
     transform: el.rotation ? `rotate(${el.rotation}deg)` : undefined,
+    opacity: el.opacity != null ? el.opacity : undefined,
     overflow: 'hidden'
   }
 

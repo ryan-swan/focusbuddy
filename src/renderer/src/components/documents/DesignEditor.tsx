@@ -1,7 +1,21 @@
 import { useEffect, useRef, useState } from 'react'
 import type { DeckTheme, Slide, SlideElement } from '@shared/types'
 import SlideCanvas from './slides/SlideCanvas'
-import { addElement, deleteElement, elementId, moveElementsBy, reorderZ, setElementText, updateElement } from './slides/slideOps'
+import {
+  addElement,
+  alignElements,
+  deleteElement,
+  distributeElements,
+  duplicateElement,
+  elementId,
+  groupElements,
+  moveElementsBy,
+  reorderZ,
+  setElementText,
+  ungroupElements,
+  updateElement,
+  type AlignEdge
+} from './slides/slideOps'
 import {
   DESIGN_SIZES,
   DESIGN_TEMPLATES,
@@ -33,6 +47,21 @@ interface Props {
 const EXPORT_FORMATS: { id: 'png' | 'pdf'; label: string }[] = [
   { id: 'png', label: 'PNG image' },
   { id: 'pdf', label: 'PDF' }
+]
+
+// Font choices for text elements. System-safe stacks plus a few common web
+// families, so a design reads well without a stock font library.
+const TEXT_FONTS: { label: string; value: string }[] = [
+  { label: 'Inter', value: 'Inter, system-ui, sans-serif' },
+  { label: 'Helvetica / Arial', value: '"Helvetica Neue", Arial, sans-serif' },
+  { label: 'Georgia', value: 'Georgia, "Times New Roman", serif' },
+  { label: 'Times', value: '"Times New Roman", Times, serif' },
+  { label: 'Courier', value: '"Courier New", Courier, monospace' },
+  { label: 'JetBrains Mono', value: '"JetBrains Mono", ui-monospace, monospace' },
+  { label: 'Trebuchet', value: '"Trebuchet MS", sans-serif' },
+  { label: 'Verdana', value: 'Verdana, Geneva, sans-serif' },
+  { label: 'Palatino', value: '"Palatino Linotype", "Book Antiqua", serif' },
+  { label: 'Impact', value: 'Impact, Haettenschweiler, sans-serif' }
 ]
 
 const CATEGORIES: { id: DesignCategory; label: string }[] = [
@@ -70,6 +99,18 @@ export default function DesignEditor({ content, title, onChange }: Props): JSX.E
   const [canvasW, setCanvasW] = useState(640)
   const [brandOpen, setBrandOpen] = useState(false)
   const wrapRef = useRef<HTMLDivElement | null>(null)
+  // Undo / redo history. designRef always holds the current body so a commit can
+  // record the prior state without a stale closure.
+  const designRef = useRef<DesignBody>(design)
+  designRef.current = design
+  const [past, setPast] = useState<DesignBody[]>([])
+  const [future, setFuture] = useState<DesignBody[]>([])
+  // Mirror history to refs so the handlers (and the keyboard shortcuts, whose
+  // effect closure would otherwise be stale) always read the current stacks.
+  const pastRef = useRef<DesignBody[]>(past)
+  pastRef.current = past
+  const futureRef = useRef<DesignBody[]>(future)
+  futureRef.current = future
 
   // The org brand kit, read live from the brand store. Until a brand is saved it
   // is the default brand, exactly like a fresh Canva account, so every action is
@@ -100,22 +141,122 @@ export default function DesignEditor({ content, title, onChange }: Props): JSX.E
     h: design.height
   }
 
+  // The single writer: records the prior body on the undo stack, clears redo, and
+  // persists. Every change to the design flows through here.
+  function commit(next: DesignBody): void {
+    setPast([...pastRef.current.slice(-59), designRef.current])
+    setFuture([])
+    designRef.current = next
+    setDesign(next)
+    onChange(next)
+  }
+
   function update(patch: Partial<DesignBody>): void {
-    setDesign((d) => {
-      const next = { ...d, ...patch }
-      onChange(next)
-      return next
-    })
+    commit({ ...designRef.current, ...patch })
   }
 
   // Run a slide-op against the design's elements/background and persist the result.
   function mutate(fn: (s: Slide) => Slide): void {
-    const slide: Slide = { id: 'design', notes: '', elements: design.elements, background: design.background, schemaVersion: 2 }
+    const d = designRef.current
+    const slide: Slide = { id: 'design', notes: '', elements: d.elements, background: d.background, schemaVersion: 2 }
     const next = fn(slide)
     update({ elements: next.elements ?? [], background: next.background })
   }
 
+  function undo(): void {
+    const p = pastRef.current
+    if (!p.length) return
+    const prev = p[p.length - 1]
+    setPast(p.slice(0, -1))
+    setFuture([designRef.current, ...futureRef.current.slice(0, 59)])
+    designRef.current = prev
+    setDesign(prev)
+    onChange(prev)
+  }
+  function redo(): void {
+    const f = futureRef.current
+    if (!f.length) return
+    const next = f[0]
+    setFuture(f.slice(1))
+    setPast([...pastRef.current.slice(-59), designRef.current])
+    designRef.current = next
+    setDesign(next)
+    onChange(next)
+  }
+
   const topZ = design.elements.reduce((m, e) => Math.max(m, e.z), 0)
+
+  // ── Selection operations ───────────────────────────────────────────────────
+  function deleteSelected(): void {
+    if (!selectedIds.length) return
+    mutate((s) => selectedIds.reduce((acc, id) => deleteElement(acc, id), s))
+    setSelectedIds([])
+  }
+  function duplicateSelected(): void {
+    if (!selectedIds.length) return
+    const newIds: string[] = []
+    mutate((s) =>
+      selectedIds.reduce((acc, id) => {
+        const d = duplicateElement(acc, id)
+        newIds.push(d.newId)
+        return d.slide
+      }, s)
+    )
+    setSelectedIds(newIds)
+  }
+  function align(edge: AlignEdge): void {
+    if (selectedIds.length < 1) return
+    mutate((s) => alignElements(s, selectedIds, edge))
+  }
+  function distribute(axis: 'h' | 'v'): void {
+    if (selectedIds.length < 3) return
+    mutate((s) => distributeElements(s, selectedIds, axis))
+  }
+  function group(): void {
+    if (selectedIds.length < 2) return
+    mutate((s) => groupElements(s, selectedIds))
+  }
+  function ungroup(): void {
+    if (!selectedIds.length) return
+    mutate((s) => ungroupElements(s, selectedIds))
+  }
+
+  // Keyboard: undo/redo, duplicate, delete. Inert while typing in a field or
+  // editing text on the canvas, so it never eats a keystroke meant for content.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent): void {
+      const mod = e.metaKey || e.ctrlKey
+      const t = e.target as HTMLElement | null
+      const editing = !!t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)
+      const key = e.key.toLowerCase()
+      if (mod && key === 'z') {
+        if (editing) return
+        e.preventDefault()
+        if (e.shiftKey) redo()
+        else undo()
+        return
+      }
+      if (mod && key === 'y') {
+        if (editing) return
+        e.preventDefault()
+        redo()
+        return
+      }
+      if (editing) return
+      if (mod && key === 'd') {
+        e.preventDefault()
+        duplicateSelected()
+        return
+      }
+      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedIds.length) {
+        e.preventDefault()
+        deleteSelected()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedIds])
 
   function addText(): void {
     const el: SlideElement = {
@@ -222,8 +363,7 @@ export default function DesignEditor({ content, title, onChange }: Props): JSX.E
       const res = await window.api.design.generateContent({ prompt, designKind: size.label })
       if (res.ok && res.content) {
         const body = composeDesign(size, brand, res.content)
-        setDesign(body)
-        onChange(body)
+        commit(body)
         setSelectedIds([])
         setPanel('none')
         setAiPrompt('')
@@ -242,8 +382,7 @@ export default function DesignEditor({ content, title, onChange }: Props): JSX.E
     if (!tpl) return
     const tsize = findDesignSize(tpl.sizeId) ?? size
     const body = designFromTemplate(tpl, tsize, brand)
-    setDesign(body)
-    onChange(body)
+    commit(body)
     setSelectedIds([])
     setPanel('none')
   }
@@ -288,6 +427,25 @@ export default function DesignEditor({ content, title, onChange }: Props): JSX.E
     <div className="flex flex-col h-full" data-testid="design-editor">
       {/* Toolbar */}
       <div className="flex items-center gap-1.5 px-3 py-2 border-b border-stone-200 dark:border-stone-700 flex-wrap text-[12px]">
+        <button
+          onClick={undo}
+          disabled={past.length === 0}
+          data-testid="design-undo"
+          title="Undo (Cmd/Ctrl+Z)"
+          className="inline-flex items-center px-2 py-1.5 rounded-lg hover:bg-stone-100 dark:hover:bg-stone-800 disabled:opacity-30"
+        >
+          <Icon name="undo" size={15} />
+        </button>
+        <button
+          onClick={redo}
+          disabled={future.length === 0}
+          data-testid="design-redo"
+          title="Redo (Cmd/Ctrl+Shift+Z)"
+          className="inline-flex items-center px-2 py-1.5 rounded-lg hover:bg-stone-100 dark:hover:bg-stone-800 disabled:opacity-30"
+        >
+          <Icon name="redo" size={15} />
+        </button>
+        <span className="w-px h-5 bg-stone-200 dark:bg-stone-700 mx-1" />
         <ToolBtn icon="dashboard" label="Templates" active={panel === 'templates'} onClick={() => setPanel((p) => (p === 'templates' ? 'none' : 'templates'))} testid="design-templates-btn" />
         <ToolBtn icon="aspect_ratio" label={size.label} active={panel === 'size'} onClick={() => setPanel((p) => (p === 'size' ? 'none' : 'size'))} testid="design-size-btn" />
         <span className="w-px h-5 bg-stone-200 dark:bg-stone-700 mx-1" />
@@ -454,6 +612,24 @@ export default function DesignEditor({ content, title, onChange }: Props): JSX.E
             )}
             {selected.type === 'text' && (
               <>
+                <Field label="Font">
+                  <select
+                    value={selected.fontFamily ?? 'Inter, system-ui, sans-serif'}
+                    data-testid="design-font-family"
+                    onChange={(e) => mutate((s) => updateElement(s, selected.id, { fontFamily: e.target.value }))}
+                    className="w-full rounded border border-stone-300 dark:border-stone-600 bg-transparent px-1.5 py-1"
+                    style={{ fontFamily: selected.fontFamily }}
+                  >
+                    {TEXT_FONTS.map((f) => (
+                      <option key={f.value} value={f.value} style={{ fontFamily: f.value }}>
+                        {f.label}
+                      </option>
+                    ))}
+                    {!TEXT_FONTS.some((f) => f.value === selected.fontFamily) && selected.fontFamily && (
+                      <option value={selected.fontFamily}>{selected.fontFamily}</option>
+                    )}
+                  </select>
+                </Field>
                 <Field label="Text color">
                   <ColorInput
                     value={selected.paragraphs[0]?.runs[0]?.color ?? '#1c1917'}
@@ -464,6 +640,45 @@ export default function DesignEditor({ content, title, onChange }: Props): JSX.E
                     }
                     testid="design-text-color"
                   />
+                </Field>
+                <Field label="Alignment">
+                  <div className="flex gap-1">
+                    {(['left', 'center', 'right'] as const).map((a) => (
+                      <button
+                        key={a}
+                        onClick={() => mutate((s) => updateElement(s, selected.id, { paragraphs: selected.paragraphs.map((p) => ({ ...p, align: a })) }))}
+                        data-testid={`design-align-text-${a}`}
+                        className={`flex-1 px-2 py-1 rounded border text-[11px] ${
+                          (selected.paragraphs[0]?.align ?? 'left') === a ? 'border-accent text-accent' : 'border-stone-300 dark:border-stone-600 hover:bg-stone-100 dark:hover:bg-stone-800'
+                        }`}
+                      >
+                        <Icon name={`format_align_${a}`} size={13} />
+                      </button>
+                    ))}
+                  </div>
+                </Field>
+                <Field label="Style">
+                  <div className="flex gap-1">
+                    <button
+                      onClick={() => mutate((s) => updateElement(s, selected.id, { paragraphs: selected.paragraphs.map((p) => ({ ...p, runs: p.runs.map((r) => ({ ...r, bold: !r.bold })) })) }))}
+                      data-testid="design-bold"
+                      className={`flex-1 px-2 py-1 rounded border text-[12px] font-bold ${selected.paragraphs[0]?.runs[0]?.bold ? 'border-accent text-accent' : 'border-stone-300 dark:border-stone-600'}`}
+                    >
+                      B
+                    </button>
+                    <button
+                      onClick={() => mutate((s) => updateElement(s, selected.id, { paragraphs: selected.paragraphs.map((p) => ({ ...p, runs: p.runs.map((r) => ({ ...r, italic: !r.italic })) })) }))}
+                      className={`flex-1 px-2 py-1 rounded border text-[12px] italic ${selected.paragraphs[0]?.runs[0]?.italic ? 'border-accent text-accent' : 'border-stone-300 dark:border-stone-600'}`}
+                    >
+                      I
+                    </button>
+                    <button
+                      onClick={() => mutate((s) => updateElement(s, selected.id, { paragraphs: selected.paragraphs.map((p) => ({ ...p, runs: p.runs.map((r) => ({ ...r, underline: !r.underline })) })) }))}
+                      className={`flex-1 px-2 py-1 rounded border text-[12px] underline ${selected.paragraphs[0]?.runs[0]?.underline ? 'border-accent text-accent' : 'border-stone-300 dark:border-stone-600'}`}
+                    >
+                      U
+                    </button>
+                  </div>
                 </Field>
                 <Field label="Font size">
                   <input
@@ -482,6 +697,63 @@ export default function DesignEditor({ content, title, onChange }: Props): JSX.E
                 </Field>
               </>
             )}
+            <Field label={`Opacity ${Math.round((selected.opacity ?? 1) * 100)}%`}>
+              <input
+                type="range"
+                min={0}
+                max={100}
+                value={Math.round((selected.opacity ?? 1) * 100)}
+                data-testid="design-opacity"
+                onChange={(e) => mutate((s) => updateElement(s, selected.id, { opacity: Math.max(0, Math.min(1, Number(e.target.value) / 100)) }))}
+                className="w-full accent-accent"
+              />
+            </Field>
+            <Field label="Rotation (deg)">
+              <input
+                type="number"
+                value={Math.round(selected.rotation ?? 0)}
+                data-testid="design-rotation"
+                onChange={(e) => mutate((s) => updateElement(s, selected.id, { rotation: Math.round(Number(e.target.value) || 0) }))}
+                className="w-full rounded border border-stone-300 dark:border-stone-600 bg-transparent px-1.5 py-1"
+              />
+            </Field>
+
+            {selectedIds.length > 1 && (
+              <div className="mt-2 pt-2 border-t border-stone-200 dark:border-stone-700" data-testid="design-arrange">
+                <div className="text-[10px] uppercase tracking-wide text-stone-400 mb-1.5">Arrange {selectedIds.length}</div>
+                <div className="grid grid-cols-6 gap-1">
+                  {([
+                    ['left', 'align_horizontal_left'],
+                    ['hcenter', 'align_horizontal_center'],
+                    ['right', 'align_horizontal_right'],
+                    ['top', 'align_vertical_top'],
+                    ['vcenter', 'align_vertical_center'],
+                    ['bottom', 'align_vertical_bottom']
+                  ] as [AlignEdge, string][]).map(([edge, icon]) => (
+                    <button key={edge} onClick={() => align(edge)} data-testid={`design-align-${edge}`} title={`Align ${edge}`} className="px-1.5 py-1 rounded border border-stone-300 dark:border-stone-600 hover:bg-stone-100 dark:hover:bg-stone-800">
+                      <Icon name={icon} size={13} />
+                    </button>
+                  ))}
+                </div>
+                <div className="flex gap-1 mt-1.5">
+                  <button onClick={() => distribute('h')} disabled={selectedIds.length < 3} className="flex-1 px-2 py-1 rounded border border-stone-300 dark:border-stone-600 text-[11px] hover:bg-stone-100 dark:hover:bg-stone-800 disabled:opacity-40">
+                    Distribute H
+                  </button>
+                  <button onClick={() => distribute('v')} disabled={selectedIds.length < 3} className="flex-1 px-2 py-1 rounded border border-stone-300 dark:border-stone-600 text-[11px] hover:bg-stone-100 dark:hover:bg-stone-800 disabled:opacity-40">
+                    Distribute V
+                  </button>
+                </div>
+                <div className="flex gap-1 mt-1.5">
+                  <button onClick={group} data-testid="design-group" className="flex-1 px-2 py-1 rounded border border-stone-300 dark:border-stone-600 text-[11px] hover:bg-stone-100 dark:hover:bg-stone-800">
+                    Group
+                  </button>
+                  <button onClick={ungroup} className="flex-1 px-2 py-1 rounded border border-stone-300 dark:border-stone-600 text-[11px] hover:bg-stone-100 dark:hover:bg-stone-800">
+                    Ungroup
+                  </button>
+                </div>
+              </div>
+            )}
+
             <div className="flex gap-1 mt-3">
               <button onClick={() => mutate((s) => reorderZ(s, selected.id, 'forward'))} className="flex-1 px-2 py-1 rounded border border-stone-300 dark:border-stone-600 hover:bg-stone-100 dark:hover:bg-stone-800" title="Bring forward">
                 <Icon name="flip_to_front" size={14} />
@@ -489,18 +761,32 @@ export default function DesignEditor({ content, title, onChange }: Props): JSX.E
               <button onClick={() => mutate((s) => reorderZ(s, selected.id, 'back'))} className="flex-1 px-2 py-1 rounded border border-stone-300 dark:border-stone-600 hover:bg-stone-100 dark:hover:bg-stone-800" title="Send back">
                 <Icon name="flip_to_back" size={14} />
               </button>
+              <button onClick={duplicateSelected} data-testid="design-duplicate" className="flex-1 px-2 py-1 rounded border border-stone-300 dark:border-stone-600 hover:bg-stone-100 dark:hover:bg-stone-800" title="Duplicate (Cmd/Ctrl+D)">
+                <Icon name="content_copy" size={14} />
+              </button>
               <button
-                onClick={() => {
-                  mutate((s) => deleteElement(s, selected.id))
-                  setSelectedIds([])
-                }}
+                onClick={deleteSelected}
                 data-testid="design-delete-element"
                 className="flex-1 px-2 py-1 rounded border border-red-300 dark:border-red-700 text-red-500 hover:bg-red-50 dark:hover:bg-red-950"
-                title="Delete"
+                title="Delete (Del)"
               >
                 <Icon name="delete" size={14} />
               </button>
             </div>
+          </div>
+        )}
+
+        {!selected && (
+          <div className="w-56 shrink-0 border-l border-stone-200 dark:border-stone-700 p-3 text-[12px]" data-testid="design-canvas-inspector">
+            <div className="text-[10px] uppercase tracking-wide text-stone-400 mb-2">Canvas</div>
+            <Field label="Background">
+              <ColorInput
+                value={design.background?.type === 'solid' ? design.background.color ?? '#ffffff' : '#ffffff'}
+                onChange={(c) => update({ background: { type: 'solid', color: c } })}
+                testid="design-bg-color"
+              />
+            </Field>
+            <p className="text-[11px] text-stone-400 mt-2">Select an element to edit it, or use the toolbar to add one.</p>
           </div>
         )}
       </div>

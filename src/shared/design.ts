@@ -271,6 +271,127 @@ export const DESIGN_TEMPLATES: DesignTemplate[] = [
         })
       ]
     })
+  },
+  {
+    id: 'social-stat',
+    category: 'social',
+    label: 'Big stat',
+    sizeId: 'ig-post',
+    build: (w, h, brand) => {
+      const onP = readableTextOn(brand.colorPrimary)
+      return {
+        background: { type: 'solid', color: brand.colorPrimary },
+        elements: [
+          text('stat', w * 0.08, h * 0.26, w * 0.84, h * 0.3, 2, '92%', { size: Math.round(w * 0.22), color: onP, bold: true, align: 'center', font: brand.fontHeading }),
+          text('label', w * 0.1, h * 0.58, w * 0.8, h * 0.12, 3, 'of customers would recommend us', { size: Math.round(w * 0.04), color: onP, align: 'center', font: brand.fontBody })
+        ]
+      }
+    }
+  },
+  {
+    id: 'social-cover',
+    category: 'social',
+    label: 'Story cover',
+    sizeId: 'ig-story',
+    build: (w, h, brand) => ({
+      background: { type: 'solid', color: '#0f172a' },
+      elements: [
+        band('bar', w * 0.1, h * 0.34, w * 0.16, 10, 1, brand.colorPrimary),
+        text('title', w * 0.1, h * 0.37, w * 0.8, h * 0.22, 2, 'Swipe up for the full story', { size: Math.round(w * 0.085), color: '#ffffff', bold: true, font: brand.fontHeading }),
+        text('sub', w * 0.1, h * 0.6, w * 0.8, h * 0.1, 3, 'A short supporting line goes here.', { size: Math.round(w * 0.04), color: '#cbd5e1', font: brand.fontBody })
+      ]
+    })
+  },
+  {
+    id: 'marketing-promo',
+    category: 'marketing',
+    label: 'Sale promo',
+    sizeId: 'poster-a4',
+    build: (w, h, brand) => {
+      const onP = readableTextOn(brand.colorPrimary)
+      return {
+        background: { type: 'solid', color: brand.colorPrimary },
+        elements: [
+          text('kicker', w * 0.1, h * 0.16, w * 0.8, h * 0.06, 1, 'LIMITED TIME', { size: Math.round(w * 0.04), color: onP, bold: true, align: 'center', font: brand.fontHeading }),
+          text('big', w * 0.06, h * 0.3, w * 0.88, h * 0.2, 2, '25% OFF', { size: Math.round(w * 0.2), color: onP, bold: true, align: 'center', font: brand.fontHeading }),
+          text('detail', w * 0.1, h * 0.56, w * 0.8, h * 0.2, 3, 'Everything in store, this week only. Use code SAVE25 at checkout.', { size: Math.round(w * 0.05), color: onP, align: 'center', font: brand.fontBody })
+        ]
+      }
+    }
+  },
+  {
+    id: 'marketing-card',
+    category: 'marketing',
+    label: 'Business card',
+    sizeId: 'business-card',
+    build: (w, h, brand) => ({
+      background: { type: 'solid', color: '#ffffff' },
+      elements: [
+        band('side', 0, 0, w * 0.06, h, 1, brand.colorPrimary),
+        text('name', w * 0.12, h * 0.22, w * 0.8, h * 0.18, 2, 'Your Name', { size: Math.round(h * 0.16), color: '#1c1917', bold: true, font: brand.fontHeading }),
+        text('role', w * 0.12, h * 0.44, w * 0.8, h * 0.12, 3, 'Title, Company', { size: Math.round(h * 0.09), color: brand.colorPrimary, font: brand.fontBody }),
+        text('contact', w * 0.12, h * 0.66, w * 0.8, h * 0.24, 4, 'you@company.com\n+1 555 0123\ncompany.com', { size: Math.round(h * 0.07), color: '#44403c', font: brand.fontBody })
+      ]
+    })
+  },
+  {
+    id: 'presentation-section',
+    category: 'presentation',
+    label: 'Section divider',
+    sizeId: 'slide-169',
+    build: (w, h, brand) => {
+      const onP = readableTextOn(brand.colorPrimary)
+      return {
+        background: { type: 'solid', color: brand.colorPrimary },
+        elements: [
+          text('num', w * 0.1, h * 0.3, w * 0.3, h * 0.2, 1, '01', { size: Math.round(h * 0.16), color: onP, bold: true, font: brand.fontHeading }),
+          text('section', w * 0.1, h * 0.52, w * 0.8, h * 0.18, 2, 'Section title', { size: Math.round(h * 0.1), color: onP, bold: true, font: brand.fontHeading })
+        ]
+      }
+    }
+  },
+  {
+    id: 'presentation-quote',
+    category: 'presentation',
+    label: 'Pull quote',
+    sizeId: 'slide-169',
+    build: (w, h, brand) => ({
+      background: { type: 'solid', color: '#ffffff' },
+      elements: [
+        text('mark', w * 0.08, h * 0.14, w * 0.2, h * 0.2, 1, '“', { size: Math.round(h * 0.28), color: brand.colorPrimary, bold: true, font: brand.fontHeading }),
+        text('quote', w * 0.1, h * 0.32, w * 0.8, h * 0.32, 2, 'A short, memorable quote that carries the slide.', { size: Math.round(h * 0.06), color: '#1c1917', font: brand.fontHeading }),
+        text('attr', w * 0.1, h * 0.72, w * 0.8, h * 0.08, 3, 'Name, Title', { size: Math.round(h * 0.035), color: brand.colorPrimary, font: brand.fontBody })
+      ]
+    })
+  },
+  {
+    id: 'logo-badge',
+    category: 'logo',
+    label: 'Badge mark',
+    sizeId: 'logo',
+    build: (w, h, brand) => ({
+      background: { type: 'solid', color: '#ffffff' },
+      elements: [
+        { id: 'ring', type: 'shape', shape: 'ellipse', x: w * 0.18, y: h * 0.18, w: w * 0.64, h: h * 0.64, z: 1, fill: { type: 'solid', color: brand.colorPrimary } },
+        text('mono', w * 0.18, h * 0.18, w * 0.64, h * 0.64, 2, 'AB', { size: Math.round(w * 0.2), color: readableTextOn(brand.colorPrimary), bold: true, align: 'center', vAlign: 'middle', font: brand.fontHeading })
+      ]
+    })
+  },
+  {
+    id: 'logo-banner',
+    category: 'logo',
+    label: 'LinkedIn banner',
+    sizeId: 'li-banner',
+    build: (w, h, brand) => {
+      const onP = readableTextOn(brand.colorPrimary)
+      return {
+        background: { type: 'solid', color: brand.colorPrimary },
+        elements: [
+          text('tag', w * 0.05, h * 0.3, w * 0.6, h * 0.24, 1, 'We build better workdays', { size: Math.round(h * 0.16), color: onP, bold: true, font: brand.fontHeading }),
+          text('url', w * 0.05, h * 0.6, w * 0.6, h * 0.12, 2, 'company.com', { size: Math.round(h * 0.08), color: onP, font: brand.fontBody })
+        ]
+      }
+    }
   }
 ]
 
@@ -430,7 +551,9 @@ function styleStr(props: Record<string, string | number | undefined>): string {
 function elementHtml(el: SlideElement): string {
   const base = `position:absolute;left:${el.x}px;top:${el.y}px;width:${el.w}px;height:${el.h}px;overflow:hidden;${
     el.rotation ? `transform:rotate(${el.rotation}deg);` : ''
-  }${el.cornerRadius ? `border-radius:${el.cornerRadius}px;` : ''}${el.shadow ? `box-shadow:${SHADOW[el.shadow]};` : ''}`
+  }${el.opacity != null ? `opacity:${el.opacity};` : ''}${el.cornerRadius ? `border-radius:${el.cornerRadius}px;` : ''}${
+    el.shadow ? `box-shadow:${SHADOW[el.shadow]};` : ''
+  }`
   const border = (b?: { width: number; style?: string; color: string }): string =>
     b ? `border:${b.width}px ${b.style ?? 'solid'} ${b.color};` : ''
 

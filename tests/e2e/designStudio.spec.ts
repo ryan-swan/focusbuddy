@@ -118,7 +118,28 @@ test.describe('PlexiDesign studio', () => {
     // Re-open: the brand persisted through the store (IPC brand:get).
     await window.locator('[data-testid="design-brand-kit-btn"]').click()
     await expect(window.locator('[data-testid="brand-primary"]')).toHaveValue('#ff0066')
-    await window.mouse.click(5, 5) // close the modal via its overlay
+    // Close via the modal's own Cancel button (a stray canvas click could navigate).
+    await window.locator('[data-testid="brand-kit-modal"]').getByRole('button', { name: 'Cancel' }).click()
     await expect(window.locator('[data-testid="brand-kit-modal"]')).toBeHidden()
+    await expect(window.locator('[data-testid="design-editor"]')).toBeVisible()
+  })
+
+  test('DS-8 undo and redo a change', async () => {
+    const before = await window.locator('[data-testid="slide-element"]').count()
+    await window.locator('[data-testid="design-add-text"]').click()
+    await expect(window.locator('[data-testid="slide-element"]')).toHaveCount(before + 1)
+    await window.locator('[data-testid="design-undo"]').click()
+    await expect(window.locator('[data-testid="slide-element"]')).toHaveCount(before)
+    await window.locator('[data-testid="design-redo"]').click()
+    await expect(window.locator('[data-testid="slide-element"]')).toHaveCount(before + 1)
+  })
+
+  test('DS-9 duplicate the selected element', async () => {
+    // Adding a rectangle selects it; the inspector + duplicate become available.
+    await window.locator('[data-testid="design-add-rect"]').click()
+    await expect(window.locator('[data-testid="design-inspector"]')).toBeVisible()
+    const before = await window.locator('[data-testid="slide-element"]').count()
+    await window.locator('[data-testid="design-duplicate"]').click()
+    await expect(window.locator('[data-testid="slide-element"]')).toHaveCount(before + 1)
   })
 })
