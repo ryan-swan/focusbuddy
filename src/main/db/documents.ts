@@ -13,6 +13,7 @@ import type {
 } from '@shared/types'
 import { migrateSlidesBody } from '@shared/slidesMigrate'
 import { normalizeMapBody, starterMapBody } from '@shared/mapGraph'
+import { normalizeDesignBody, blankDesign, findDesignSize, type DesignBody } from '@shared/design'
 
 // Office documents store — CRUD for standalone doc / sheet / slides files. The
 // body is persisted as a JSON string; the shape depends on doc_type and is
@@ -32,7 +33,7 @@ interface DocumentRow {
 function parseBody(
   type: FbDocument['docType'],
   raw: string
-): DocBody | SheetBody | SlidesBody | MapBody {
+): DocBody | SheetBody | SlidesBody | MapBody | DesignBody {
   try {
     const parsed = JSON.parse(raw)
     // Slides bodies are migrated to the v2 element model on read, so a legacy
@@ -40,6 +41,8 @@ function parseBody(
     if (type === 'slides') return migrateSlidesBody(parsed as SlidesBody)
     // Maps are normalised on read so a malformed graph still opens cleanly.
     if (type === 'map') return normalizeMapBody(parsed)
+    // Designs are normalised so a bad size or missing elements still opens.
+    if (type === 'design') return normalizeDesignBody(parsed)
     return parsed
   } catch {
     // Corrupt or empty — hand back a valid empty body for the type so the
@@ -48,7 +51,7 @@ function parseBody(
   }
 }
 
-export function emptyBody(type: FbDocument['docType']): DocBody | SheetBody | SlidesBody | MapBody {
+export function emptyBody(type: FbDocument['docType']): DocBody | SheetBody | SlidesBody | MapBody | DesignBody {
   if (type === 'sheet') {
     return { columns: ['A', 'B', 'C'], rows: Array.from({ length: 8 }, () => ['', '', '']) }
   }
@@ -61,6 +64,10 @@ export function emptyBody(type: FbDocument['docType']): DocBody | SheetBody | Sl
   if (type === 'map') {
     // A fresh map opens with a single Start node to build out from.
     return starterMapBody()
+  }
+  if (type === 'design') {
+    // A fresh design opens as a blank square social canvas, the most common size.
+    return blankDesign(findDesignSize('ig-post')!)
   }
   return { type: 'doc', content: [{ type: 'paragraph' }] }
 }
@@ -157,7 +164,7 @@ export function upsertDocument(input: {
   id: string
   docType: FbDocument['docType']
   title: string
-  body: DocBody | SheetBody | SlidesBody | MapBody
+  body: DocBody | SheetBody | SlidesBody | MapBody | DesignBody
   archived?: boolean
   updatedAt?: number
 }): FbDocument {

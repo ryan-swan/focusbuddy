@@ -27,7 +27,8 @@ const TYPE_META: Record<DocType, { label: string; accent: string }> = {
   doc: { label: 'Document', accent: 'bg-sky-300/60' },
   sheet: { label: 'Spreadsheet', accent: 'bg-emerald-300/60' },
   slides: { label: 'Slides', accent: 'bg-orange-300/60' },
-  map: { label: 'Map', accent: 'bg-violet-300/60' }
+  map: { label: 'Map', accent: 'bg-violet-300/60' },
+  design: { label: 'Design', accent: 'bg-pink-300/60' }
 }
 
 export default function OfficeDocWidget({ widget, inline = false }: Props): JSX.Element {

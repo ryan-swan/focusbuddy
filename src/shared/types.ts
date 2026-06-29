@@ -1,3 +1,7 @@
+// Type-only import (erased at build, no runtime cycle) so a document body can be
+// a PlexiDesign canvas. DesignBody is owned by ./design alongside its helpers.
+import type { DesignBody } from './design'
+
 export type AxisValue = 1 | 2 | 3 | 4 | 5
 export type NodeKind = 'folder' | 'task'
 export type TaskStatus = 'open' | 'in_progress' | 'done' | 'parked'
@@ -1195,7 +1199,7 @@ export type MailSendResult = { ok: true } | { ok: false; error: string }
 // Standalone files created and edited as first-class artifacts. One table, one
 // list, one AI-create flow; the body shape switches on docType.
 
-export type DocType = 'doc' | 'sheet' | 'slides' | 'map'
+export type DocType = 'doc' | 'sheet' | 'slides' | 'map' | 'design'
 
 // A single global-search result. `type` decides how the renderer routes a click;
 // `taskId` is the canvas to open for widget / table-row hits, `docType` the
@@ -1537,7 +1541,7 @@ export interface FbDocument {
   id: string
   docType: DocType
   title: string
-  body: DocBody | SheetBody | SlidesBody | MapBody
+  body: DocBody | SheetBody | SlidesBody | MapBody | DesignBody
   archived: boolean
   createdAt: number
   updatedAt: number
@@ -1556,11 +1560,11 @@ export interface DocumentMeta {
 export interface DocumentDraft {
   docType: DocType
   title: string
-  body?: DocBody | SheetBody | SlidesBody | MapBody
+  body?: DocBody | SheetBody | SlidesBody | MapBody | DesignBody
 }
 
 export interface DocumentPatch {
   title?: string
-  body?: DocBody | SheetBody | SlidesBody | MapBody
+  body?: DocBody | SheetBody | SlidesBody | MapBody | DesignBody
   archived?: boolean
 }

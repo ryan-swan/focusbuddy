@@ -53,6 +53,11 @@ interface Props {
   onUpdateElement: (id: string, patch: Partial<SlideElement>) => void
   onMoveMany: (ids: string[], dx: number, dy: number) => void
   onSetText: (id: string, text: string) => void
+  // The logical canvas size. Defaults to the 16:9 slide space so existing decks
+  // are unaffected; PlexiDesign passes the design's own width/height so the same
+  // interactive canvas (drag, resize, snap guides, marquee) works at any size.
+  logicalW?: number
+  logicalH?: number
 }
 
 // Visible square handles on the selected element's corners and edge midpoints,
@@ -85,10 +90,14 @@ export default function SlideCanvas({
   onSelectMany,
   onUpdateElement,
   onMoveMany,
-  onSetText
+  onSetText,
+  logicalW = SLIDE_W,
+  logicalH = SLIDE_H
 }: Props): JSX.Element {
-  const scale = width / SLIDE_W
-  const height = width * (SLIDE_H / SLIDE_W)
+  const lw = logicalW
+  const lh = logicalH
+  const scale = width / lw
+  const height = width * (lh / lw)
   const bg = slide.background?.type === 'solid' ? slide.background.color : theme.background
   const elements = (slide.elements ?? []).slice().sort((a, b) => a.z - b.z)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -109,8 +118,8 @@ export default function SlideCanvas({
     exclude: Set<string>
   ): { x: number; y: number; guides: Guide[] } {
     const others = elements.filter((o) => !exclude.has(o.id))
-    const xs: number[] = [0, SLIDE_W / 2, SLIDE_W]
-    const ys: number[] = [0, SLIDE_H / 2, SLIDE_H]
+    const xs: number[] = [0, lw / 2, lw]
+    const ys: number[] = [0, lh / 2, lh]
     for (const o of others) {
       xs.push(o.x, o.x + o.w / 2, o.x + o.w)
       ys.push(o.y, o.y + o.h / 2, o.y + o.h)
@@ -186,7 +195,7 @@ export default function SlideCanvas({
       <div
         ref={stageRef}
         onMouseDown={beginMarquee}
-        style={{ width: SLIDE_W, height: SLIDE_H, position: 'absolute', top: 0, left: 0, transform: `scale(${scale})`, transformOrigin: 'top left', color: theme.textColor }}
+        style={{ width: lw, height: lh, position: "absolute", top: 0, left: 0, transform: `scale(${scale})`, transformOrigin: 'top left', color: theme.textColor }}
       >
         {elements.map((el) => {
           const selected = selectedIds.includes(el.id)
@@ -295,8 +304,8 @@ export default function SlideCanvas({
               pointerEvents: 'none',
               zIndex: 9999,
               ...(g.o === 'v'
-                ? { left: g.pos - 1, top: 0, width: 2, height: SLIDE_H }
-                : { top: g.pos - 1, left: 0, height: 2, width: SLIDE_W })
+                ? { left: g.pos - 1, top: 0, width: 2, height: lh }
+                : { top: g.pos - 1, left: 0, height: 2, width: lw })
             }}
           />
         ))}

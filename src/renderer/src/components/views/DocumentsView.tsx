@@ -16,7 +16,8 @@ const TYPES: { type: DocType; label: string; icon: string; blurb: string }[] = [
   { type: 'doc', label: 'Document', icon: 'description', blurb: 'Writeups, briefs, proposals' },
   { type: 'sheet', label: 'Spreadsheet', icon: 'table_chart', blurb: 'Plans, budgets, trackers' },
   { type: 'slides', label: 'Slides', icon: 'slideshow', blurb: 'Decks and presentations' },
-  { type: 'map', label: 'Map', icon: 'account_tree', blurb: 'Flowcharts and workflow maps' }
+  { type: 'map', label: 'Map', icon: 'account_tree', blurb: 'Flowcharts and workflow maps' },
+  { type: 'design', label: 'Design', icon: 'palette', blurb: 'Social, posters, logos, any size' }
 ]
 
 function typeIcon(t: DocType): string {
@@ -81,6 +82,14 @@ export default function DocumentsView(): JSX.Element {
   }
 
   async function create(): Promise<void> {
+    // Designs are generated inside the studio (templates + AI copy + AI images),
+    // so creating one just opens a blank canvas with the studio's tools.
+    if (docType === 'design') {
+      setBusy(true)
+      await blank('design')
+      setBusy(false)
+      return
+    }
     if (!prompt.trim()) return
     setBusy(true)
     setError(null)
@@ -104,7 +113,8 @@ export default function DocumentsView(): JSX.Element {
     goDocument(doc.id)
   }
 
-  const verb = docType === 'doc' ? 'document' : docType === 'sheet' ? 'spreadsheet' : 'deck'
+  const verb =
+    docType === 'doc' ? 'document' : docType === 'sheet' ? 'spreadsheet' : docType === 'design' ? 'design' : 'deck'
 
   return (
     <div className="h-full overflow-auto desk-paper no-tod">
@@ -137,29 +147,43 @@ export default function DocumentsView(): JSX.Element {
             ))}
           </div>
 
-          <textarea
-            value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) void create()
-            }}
-            placeholder={`Describe the ${verb} you want. For example: a one-page launch plan for our new pricing, with goals, timeline and risks.`}
-            rows={3}
-            className="w-full bg-white dark:bg-stone-800 border border-stone-300 dark:border-stone-600 rounded-xl px-3.5 py-2.5 text-[14px] focus:outline-none focus:border-accent resize-none"
-          />
-          <div className="flex items-center gap-2 mt-3">
-            <input
-              value={audience}
-              onChange={(e) => setAudience(e.target.value)}
-              placeholder="Who is it for? (optional)"
-              className="flex-1 bg-white dark:bg-stone-800 border border-stone-300 dark:border-stone-600 rounded-lg px-3 py-2 text-[13px] focus:outline-none focus:border-accent"
-            />
-            <button onClick={() => void create()} disabled={busy || !prompt.trim()} className="btn-primary shrink-0">
-              <Icon name="auto_awesome" size={15} />
-              {busy ? 'Creating…' : 'Create with AI'}
-            </button>
-          </div>
-          {error && <div className="text-[12px] text-red-600 dark:text-red-400 mt-2">{error}</div>}
+          {docType === 'design' ? (
+            <div className="rounded-xl border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 px-4 py-3.5" data-testid="design-create-note">
+              <p className="text-[13px] text-stone-600 dark:text-stone-300">
+                The design studio opens with templates and sizes for social, marketing, presentations and logos. Inside, AI writes on-brand copy and lays it out, and can generate images, taking a design from blank to finished in seconds.
+              </p>
+              <button onClick={() => void create()} disabled={busy} className="btn-primary mt-3" data-testid="design-open-studio">
+                <Icon name="palette" size={15} />
+                {busy ? 'Opening…' : 'Open the design studio'}
+              </button>
+            </div>
+          ) : (
+            <>
+              <textarea
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) void create()
+                }}
+                placeholder={`Describe the ${verb} you want. For example: a one-page launch plan for our new pricing, with goals, timeline and risks.`}
+                rows={3}
+                className="w-full bg-white dark:bg-stone-800 border border-stone-300 dark:border-stone-600 rounded-xl px-3.5 py-2.5 text-[14px] focus:outline-none focus:border-accent resize-none"
+              />
+              <div className="flex items-center gap-2 mt-3">
+                <input
+                  value={audience}
+                  onChange={(e) => setAudience(e.target.value)}
+                  placeholder="Who is it for? (optional)"
+                  className="flex-1 bg-white dark:bg-stone-800 border border-stone-300 dark:border-stone-600 rounded-lg px-3 py-2 text-[13px] focus:outline-none focus:border-accent"
+                />
+                <button onClick={() => void create()} disabled={busy || !prompt.trim()} className="btn-primary shrink-0">
+                  <Icon name="auto_awesome" size={15} />
+                  {busy ? 'Creating…' : 'Create with AI'}
+                </button>
+              </div>
+              {error && <div className="text-[12px] text-red-600 dark:text-red-400 mt-2">{error}</div>}
+            </>
+          )}
 
           <div className="mt-3 pt-3 border-t border-stone-100 dark:border-stone-800 flex items-center gap-3 text-[12px] text-stone-500 dark:text-stone-400">
             <span>Or start blank:</span>

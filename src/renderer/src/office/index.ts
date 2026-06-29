@@ -12,6 +12,7 @@ export { default as DocEditor } from '../components/documents/DocEditor'
 export { default as SheetEditor } from '../components/documents/SheetEditor'
 export { default as SlidesEditor } from '../components/documents/SlidesEditor'
 export { default as MapEditor } from '../components/documents/MapEditor'
+export { default as DesignEditor } from '../components/documents/DesignEditor'
 
 // Doc helpers used across the boundary (importing a Word file into a doc body,
 // building the shared Tiptap extension set).

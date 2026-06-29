@@ -651,9 +651,12 @@ export function getDb(): Database.Database {
     -- 'doc', a { columns, rows } grid for 'sheet', a { slides[] } deck for
     -- 'slides'. Keeping one table for all three keeps the Documents list,
     -- sharing and AI-create flow uniform.
+    -- doc_type carries no CHECK: the DocType TS union is the guard, so a new
+    -- document kind (map, design, …) never needs a table rebuild. See
+    -- migrateDocumentsDocTypeCheck, which drops the legacy CHECK on older DBs.
     CREATE TABLE IF NOT EXISTS documents (
       id TEXT PRIMARY KEY,
-      doc_type TEXT NOT NULL CHECK (doc_type IN ('doc', 'sheet', 'slides', 'map')),
+      doc_type TEXT NOT NULL,
       title TEXT NOT NULL DEFAULT '',
       body TEXT NOT NULL DEFAULT '{}',
       archived INTEGER NOT NULL DEFAULT 0,
@@ -695,22 +698,23 @@ export function getDb(): Database.Database {
   return db
 }
 
-// The documents table shipped with a CHECK constraint listing only the original
-// doc types. SQLite can't ALTER a CHECK in place, so when PlexiMaps added the
-// 'map' type, existing databases reject `INSERT ... doc_type='map'`. This rebuilds
-// the table (copying every row) whenever the live CHECK predates 'map'. Idempotent
-// and a no-op once migrated or on a fresh DB created with the updated schema above.
+// The documents table shipped with a CHECK constraint listing the known doc
+// types, and SQLite can't ALTER a CHECK in place. Rather than migrate it every
+// time a new kind lands (map, design, …), this drops the doc_type CHECK entirely
+// the same way the share tables drop their kind CHECK: the DocType TS union is the
+// guard. Rebuilds the table (copying every row) only while its live schema still
+// carries a CHECK. Idempotent; a no-op once migrated or on a fresh DB.
 function migrateDocumentsDocTypeCheck(d: Database.Database): void {
   const row = d
     .prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='documents'")
     .get() as { sql?: string } | undefined
-  if (!row?.sql || !row.sql.includes('CHECK') || row.sql.includes("'map'")) return
+  if (!row?.sql || !row.sql.includes('CHECK')) return
   d.exec(`
     PRAGMA foreign_keys=off;
     BEGIN;
     CREATE TABLE documents_new (
       id TEXT PRIMARY KEY,
-      doc_type TEXT NOT NULL CHECK (doc_type IN ('doc', 'sheet', 'slides', 'map')),
+      doc_type TEXT NOT NULL,
       title TEXT NOT NULL DEFAULT '',
       body TEXT NOT NULL DEFAULT '{}',
       archived INTEGER NOT NULL DEFAULT 0,
