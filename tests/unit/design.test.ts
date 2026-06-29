@@ -7,6 +7,8 @@ import {
   templatesForCategory,
   designFromTemplate,
   blankDesign,
+  designToHtml,
+  composeDesign,
   type DesignCategory
 } from '../../src/shared/design'
 import type { OrgBrandKit } from '../../src/shared/brandKit'
@@ -86,5 +88,33 @@ describe('templates', () => {
     expect(d.elements).toEqual([])
     expect(d.width).toBe(794)
     expect(d.category).toBe('marketing')
+  })
+})
+
+describe('designToHtml export render', () => {
+  const d = designFromTemplate(
+    DESIGN_TEMPLATES.find((t) => t.id === 'social-quote')!,
+    findDesignSize('ig-post')!,
+    { colorPrimary: '#2563eb', fontHeading: 'Inter', fontBody: 'Inter' }
+  )
+
+  it('renders a sized canvas with the background color', () => {
+    const html = designToHtml(d)
+    expect(html).toContain('width:1080px')
+    expect(html).toContain('height:1080px')
+    expect(html).toContain('background:#2563eb')
+  })
+  it('renders each element', () => {
+    const html = designToHtml(d)
+    // Every element is an absolutely-positioned node in the export.
+    expect((html.match(/position:absolute/g) ?? []).length).toBeGreaterThanOrEqual(d.elements.length)
+  })
+  it('escapes user text in the export', () => {
+    const body = composeDesign(findDesignSize('ig-post')!, { colorPrimary: '#000', fontHeading: 'Inter', fontBody: 'Inter' }, {
+      headline: 'A & B <script>'
+    })
+    const html = designToHtml(body)
+    expect(html).toContain('A &amp; B &lt;script&gt;')
+    expect(html).not.toContain('<script>')
   })
 })

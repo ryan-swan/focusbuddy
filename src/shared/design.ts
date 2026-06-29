@@ -407,6 +407,95 @@ export function composeDesign(size: DesignSize, brand: OrgBrandKit, content: Des
   }
 }
 
+// ── Static HTML render (for export) ──────────────────────────────────────────
+
+const SHADOW: Record<string, string> = {
+  sm: '0 1px 3px rgba(0,0,0,0.18)',
+  md: '0 6px 16px rgba(0,0,0,0.22)',
+  lg: '0 14px 38px rgba(0,0,0,0.28)'
+}
+
+function escHtml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+}
+function styleStr(props: Record<string, string | number | undefined>): string {
+  return Object.entries(props)
+    .filter(([, v]) => v !== undefined && v !== '')
+    .map(([k, v]) => `${k.replace(/[A-Z]/g, (m) => '-' + m.toLowerCase())}:${v}`)
+    .join(';')
+}
+
+// Render one element to absolutely-positioned HTML, mirroring SlideElementView so
+// the export matches the on-canvas appearance pixel for pixel.
+function elementHtml(el: SlideElement): string {
+  const base = `position:absolute;left:${el.x}px;top:${el.y}px;width:${el.w}px;height:${el.h}px;overflow:hidden;${
+    el.rotation ? `transform:rotate(${el.rotation}deg);` : ''
+  }${el.cornerRadius ? `border-radius:${el.cornerRadius}px;` : ''}${el.shadow ? `box-shadow:${SHADOW[el.shadow]};` : ''}`
+  const border = (b?: { width: number; style?: string; color: string }): string =>
+    b ? `border:${b.width}px ${b.style ?? 'solid'} ${b.color};` : ''
+
+  if (el.type === 'text') {
+    const justify = el.vAlign === 'middle' ? 'center' : el.vAlign === 'bottom' ? 'flex-end' : 'flex-start'
+    const paras = el.paragraphs
+      .map((p) => {
+        const align = p.align ?? 'left'
+        const jc = align === 'center' ? 'center' : align === 'right' ? 'flex-end' : 'flex-start'
+        const runs = p.runs
+          .map(
+            (r) =>
+              `<span style="${styleStr({
+                fontWeight: r.bold ? 700 : undefined,
+                fontStyle: r.italic ? 'italic' : undefined,
+                textDecoration: r.underline ? 'underline' : undefined,
+                color: r.color,
+                fontSize: r.fontSize ? `${r.fontSize}px` : undefined
+              })}">${escHtml(r.text || '​')}</span>`
+          )
+          .join('')
+        return `<div style="text-align:${align};display:flex;gap:8px;justify-content:${jc}"><span>${runs}</span></div>`
+      })
+      .join('')
+    const fill = el.fill?.type === 'solid' ? `background-color:${el.fill.color};` : ''
+    return `<div style="${base}${fill}${border(el.border)}"><div style="display:flex;flex-direction:column;justify-content:${justify};height:100%;${
+      el.fontFamily ? `font-family:${el.fontFamily};` : ''
+    }">${paras}</div></div>`
+  }
+  if (el.type === 'image') {
+    return `<div style="${base}${border(el.border)}"><img src="${el.src}" style="width:100%;height:100%;object-fit:${el.fit ?? 'contain'}"/></div>`
+  }
+  if (el.type === 'shape') {
+    if (el.shape === 'triangle') {
+      return `<div style="${base}${el.shadow ? `filter:drop-shadow(${SHADOW[el.shadow]});` : ''}"><div style="width:100%;height:100%;clip-path:polygon(50% 0%,0% 100%,100% 100%);background-color:${
+        el.fill?.type === 'solid' ? el.fill.color : 'transparent'
+      }"></div></div>`
+    }
+    const radius = el.shape === 'ellipse' ? '50%' : el.cornerRadius ?? (el.shape === 'roundRect' ? '16px' : '0')
+    return `<div style="${base}background-color:${el.fill?.type === 'solid' ? el.fill.color : 'transparent'};border-radius:${
+      typeof radius === 'number' ? radius + 'px' : radius
+    };${border(el.border)}"></div>`
+  }
+  // line
+  return `<div style="${base}"><svg width="100%" height="100%" viewBox="0 0 ${el.w} ${el.h}" preserveAspectRatio="none">${
+    el.arrowEnd
+      ? `<defs><marker id="arrow-${el.id}" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="${el.stroke}"/></marker></defs>`
+      : ''
+  }<line x1="0" y1="0" x2="${el.w}" y2="${el.h}" stroke="${el.stroke}" stroke-width="${el.strokeWidth}" ${
+    el.arrowEnd ? `marker-end="url(#arrow-${el.id})"` : ''
+  }/></svg></div>`
+}
+
+// A full standalone HTML document rendering the design at its exact pixel size,
+// for the export pipeline (offscreen capture to PNG / print to PDF).
+export function designToHtml(design: DesignBody): string {
+  const bg = design.background?.type === 'solid' ? design.background.color : '#ffffff'
+  const els = design.elements
+    .slice()
+    .sort((a, b) => a.z - b.z)
+    .map(elementHtml)
+    .join('')
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>*{margin:0;padding:0;box-sizing:border-box}html,body{width:${design.width}px;height:${design.height}px}</style></head><body><div style="position:relative;width:${design.width}px;height:${design.height}px;background:${bg};overflow:hidden">${els}</div></body></html>`
+}
+
 // A blank design at a given size.
 export function blankDesign(size: DesignSize): DesignBody {
   return {

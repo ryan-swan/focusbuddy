@@ -689,6 +689,16 @@ export function getDb(): Database.Database {
       search TEXT NOT NULL DEFAULT '',
       created_at INTEGER NOT NULL
     );
+
+    -- The organization Brand Kit: one brand (logo, colors, fonts) the whole
+    -- workspace inherits, so Docs, Sheets, Slides, Projects and PlexiDesign all
+    -- present consistently. Stored local-first as a single row; the JSON is the
+    -- OrgBrandKit shape. Server sync across devices is a later additive layer.
+    CREATE TABLE IF NOT EXISTS fb_brand_kit (
+      id TEXT PRIMARY KEY,
+      kit_json TEXT NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
   `)
   // A smart folder can also carry a free-text search alongside its tags. Added
   // after the table shipped tags-only, so back-fill the column on existing DBs.

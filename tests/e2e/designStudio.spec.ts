@@ -97,4 +97,28 @@ test.describe('PlexiDesign studio', () => {
       expect(after).toBe(before + 1)
     }
   })
+
+  test('DS-6 the export menu offers PNG and PDF', async () => {
+    await window.locator('[data-testid="design-export-btn"]').click()
+    await expect(window.locator('[data-testid="design-export-menu"]')).toBeVisible()
+    await expect(window.locator('[data-testid="design-export-png"]')).toBeVisible()
+    await expect(window.locator('[data-testid="design-export-pdf"]')).toBeVisible()
+    // Dismiss the menu via its backdrop (top-left), not the native save dialog.
+    await window.mouse.click(5, 5)
+    await expect(window.locator('[data-testid="design-export-menu"]')).toBeHidden()
+  })
+
+  test('DS-7 brand kit editor saves a brand the design reads back', async () => {
+    await window.locator('[data-testid="design-brand-kit-btn"]').click()
+    await expect(window.locator('[data-testid="brand-kit-modal"]')).toBeVisible()
+    // Set a distinctive primary color and save (IPC brand:set -> local store).
+    await window.locator('[data-testid="brand-primary"]').fill('#ff0066')
+    await window.locator('[data-testid="brand-save"]').click()
+    await expect(window.locator('[data-testid="brand-kit-modal"]')).toBeHidden()
+    // Re-open: the brand persisted through the store (IPC brand:get).
+    await window.locator('[data-testid="design-brand-kit-btn"]').click()
+    await expect(window.locator('[data-testid="brand-primary"]')).toHaveValue('#ff0066')
+    await window.mouse.click(5, 5) // close the modal via its overlay
+    await expect(window.locator('[data-testid="brand-kit-modal"]')).toBeHidden()
+  })
 })

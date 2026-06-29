@@ -1563,7 +1563,18 @@ const api = {
       content?: { eyebrow?: string; headline?: string; subhead?: string; body?: string; cta?: string; background?: 'brand' | 'light' | 'dark' }
       error?: string
       needsApiKey?: boolean
-    }> => ipcRenderer.invoke('design:generateContent', input)
+    }> => ipcRenderer.invoke('design:generateContent', input),
+    export: (input: {
+      design: import('@shared/design').DesignBody
+      title: string
+      format: 'png' | 'pdf'
+    }): Promise<{ ok: boolean; path?: string; error?: string }> => ipcRenderer.invoke('design:export', input)
+  },
+  // The organization Brand Kit — one brand the whole workspace reads.
+  brand: {
+    get: (): Promise<{ kit: import('@shared/brandKit').OrgBrandKit; isSet: boolean }> => ipcRenderer.invoke('brand:get'),
+    set: (kit: import('@shared/brandKit').OrgBrandKit): Promise<import('@shared/brandKit').OrgBrandKit> =>
+      ipcRenderer.invoke('brand:set', kit)
   },
   // Spreadsheet Office interop (.xlsx/.csv) + AI fill.
   sheet: {

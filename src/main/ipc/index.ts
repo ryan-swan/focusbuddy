@@ -49,6 +49,10 @@ import {
 import { searchAll } from '../db/search'
 import { generateDocument, processMeetingEnd, generateDesignContent } from '../ai/anthropic'
 import { generateImage } from '../imageGen'
+import { exportDesign } from '../designExport'
+import type { DesignBody } from '@shared/design'
+import { getBrandKit, saveBrandKit, hasBrandKit } from '../db/brandKit'
+import type { OrgBrandKit } from '@shared/brandKit'
 import type { DocType, DocumentDraft, DocumentPatch, FbDocument, MailSendInput } from '@shared/types'
 import { sendMail } from '../mail/smtp'
 import { suggestReply, resetToneCache } from '../mail/aiReply'
@@ -809,6 +813,9 @@ export function registerIpcHandlers(): void {
   // ── Office interop for the document editor (.docx / PDF / image) ───────────
   ipcMain.handle('office:importDocx', () => importDocx())
   ipcMain.handle('design:generateImage', (_e, input: { prompt: string; width?: number; height?: number }) => generateImage(input))
+  ipcMain.handle('design:export', (_e, input: { design: DesignBody; title: string; format: 'png' | 'pdf' }) => exportDesign(input))
+  ipcMain.handle('brand:get', () => ({ kit: getBrandKit(), isSet: hasBrandKit() }))
+  ipcMain.handle('brand:set', (_e, kit: OrgBrandKit) => saveBrandKit(kit))
   ipcMain.handle('design:generateContent', (_e, input: { prompt: string; designKind: string; audience?: string }) =>
     generateDesignContent(input)
   )
