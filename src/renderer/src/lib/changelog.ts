@@ -36,6 +36,20 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.105',
+    date: '2026-06-29T12:00:00Z',
+    title: 'v2.5.105 — PlexiProjects: constraints, budgets, leveling, and Microsoft Project export',
+    tag: 'feature',
+    summary:
+      'PlexiProjects gains the planning depth that separates a real tool from a task list. A task can now be pinned to a date with must-start-on, or given a finish-by deadline, and anything the schedule pushes past its deadline is flagged on the timeline and in the grid. Add a cost to tasks and the grid totals your budget. When one person ends up double-booked, the new Level action spreads their overlapping work out so nobody is on two things at once. And when you need to hand a plan to someone who lives in Microsoft Project, Export writes a Project XML file they can open directly, dependencies, resources and all.',
+    highlights: [
+      'Task constraints: must-start-on (pins the start) and a finish-by deadline, with a clear flag when the schedule blows past it.',
+      'Cost and budget: give tasks a cost and the grid shows a per-task column and a project total.',
+      'Resource leveling: one click spreads a person’s overlapping tasks so they are never scheduled on two at once.',
+      'Export to Microsoft Project: save a standard Project XML with tasks, durations, dependencies and resources.'
+    ]
+  },
+  {
     version: '2.5.104',
     date: '2026-07-20T12:00:00Z',
     title: 'v2.5.104 — PlexiProjects: baselines, calendars, and two new views',
