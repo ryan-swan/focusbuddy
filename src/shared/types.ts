@@ -1408,6 +1408,8 @@ interface SlideElementBase {
   // drop-shadow preset. Absent means square corners and no shadow.
   cornerRadius?: number
   shadow?: 'sm' | 'md' | 'lg'
+  // Element opacity 0..1. Absent means fully opaque.
+  opacity?: number
 }
 export interface SlideTextElement extends SlideElementBase {
   type: 'text'
