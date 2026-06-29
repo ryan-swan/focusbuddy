@@ -182,7 +182,7 @@ export default function HomeDashboardRegion(): JSX.Element {
               )}
             </RailCard>
 
-            <RailCard title="Recent documents" icon="description" tone="stone" action={{ label: 'Documents', onClick: () => v.goDocuments() }}>
+            <RailCard title="Recent documents" icon="description" tone="stone" action={{ label: 'All documents', onClick: () => v.goDocuments() }}>
               {recentDocs.length === 0 ? (
                 <EmptyCard text="No documents yet." />
               ) : (
