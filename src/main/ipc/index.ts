@@ -47,7 +47,8 @@ import {
   deleteDocument
 } from '../db/documents'
 import { searchAll } from '../db/search'
-import { generateDocument, processMeetingEnd } from '../ai/anthropic'
+import { generateDocument, processMeetingEnd, generateDesignContent } from '../ai/anthropic'
+import { generateImage } from '../imageGen'
 import type { DocType, DocumentDraft, DocumentPatch, FbDocument, MailSendInput } from '@shared/types'
 import { sendMail } from '../mail/smtp'
 import { suggestReply, resetToneCache } from '../mail/aiReply'
@@ -807,6 +808,10 @@ export function registerIpcHandlers(): void {
 
   // ── Office interop for the document editor (.docx / PDF / image) ───────────
   ipcMain.handle('office:importDocx', () => importDocx())
+  ipcMain.handle('design:generateImage', (_e, input: { prompt: string; width?: number; height?: number }) => generateImage(input))
+  ipcMain.handle('design:generateContent', (_e, input: { prompt: string; designKind: string; audience?: string }) =>
+    generateDesignContent(input)
+  )
   ipcMain.handle('office:exportDocx', (_e, input: { html: string; title: string; page?: PageSetupInput }) => exportDocx(input))
   ipcMain.handle('office:exportPdf', (_e, input: { html: string; title: string; page?: PageSetupInput }) => exportPdf(input))
   ipcMain.handle('office:pickImage', () => pickImage())
