@@ -426,6 +426,9 @@ export interface DesignContent {
   cta?: string
   // Background treatment the AI chose for the piece.
   background?: 'brand' | 'light' | 'dark'
+  // Optional layout style the AI picked for this concept; otherwise the variations
+  // builder rotates through the styles.
+  layout?: DesignLayoutId
 }
 
 // Compose a finished, on-brand layout from AI copy at a given size. This is the
@@ -617,6 +620,173 @@ export function designToHtml(design: DesignBody): string {
     .map(elementHtml)
     .join('')
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>*{margin:0;padding:0;box-sizing:border-box}html,body{width:${design.width}px;height:${design.height}px}</style></head><body><div style="position:relative;width:${design.width}px;height:${design.height}px;background:${bg};overflow:hidden">${els}</div></body></html>`
+}
+
+// ── AI template generator: layout variants ───────────────────────────────────
+
+export type DesignLayoutId = 'left' | 'centered' | 'band' | 'bold' | 'split' | 'minimal'
+export const DESIGN_LAYOUT_IDS: DesignLayoutId[] = ['left', 'centered', 'band', 'bold', 'split', 'minimal']
+
+interface Palette {
+  bg: string
+  onBg: string
+  accent: string
+  bodyColor: string
+}
+function paletteFor(brand: OrgBrandKit, mode: 'brand' | 'light' | 'dark'): Palette {
+  const bg = mode === 'brand' ? brand.colorPrimary : mode === 'dark' ? '#0f172a' : '#ffffff'
+  const onBg = readableTextOn(bg)
+  const accent =
+    mode === 'brand'
+      ? brand.colorSecondary && contrastRatio(brand.colorSecondary, bg) >= 2
+        ? brand.colorSecondary
+        : onBg
+      : brand.colorPrimary
+  const bodyColor = mode === 'light' ? '#44403c' : onBg
+  return { bg, onBg, accent, bodyColor }
+}
+
+// A centered or minimal stacked layout. Distinct from composeDesign (the 'left'
+// variant) so a set of variations reads as genuinely different designs.
+function composeStack(
+  size: DesignSize,
+  brand: OrgBrandKit,
+  content: DesignContent,
+  align: 'left' | 'center',
+  opts: { mode?: 'brand' | 'light' | 'dark'; scale?: number; minimal?: boolean } = {}
+): DesignBody {
+  const { w, h } = size
+  const mode = opts.mode ?? content.background ?? 'light'
+  const p = paletteFor(brand, mode)
+  const scale = opts.scale ?? 1
+  const mx = Math.round(w * 0.08)
+  const cw = w - mx * 2
+  const els: SlideElement[] = []
+  let z = 1
+  let y = Math.round(h * (opts.minimal ? 0.12 : 0.18))
+  const ax = align === 'center' ? Math.round(w / 2 - w * 0.05) : mx
+  els.push(band('accent', ax, y, Math.round(w * 0.1), Math.max(6, Math.round(h * 0.012)), z++, p.accent))
+  y += Math.round(h * 0.035)
+  if (content.eyebrow && !opts.minimal) {
+    els.push(text('eyebrow', mx, y, cw, Math.round(h * 0.05), z++, content.eyebrow.toUpperCase(), { size: Math.round(w * 0.026), color: p.accent, bold: true, align, font: brand.fontHeading }))
+    y += Math.round(h * 0.06)
+  }
+  if (content.headline) {
+    const lines = Math.max(1, Math.ceil(content.headline.length / (opts.minimal ? 16 : 20)))
+    const hh = Math.round(h * 0.12 * lines * scale)
+    els.push(text('headline', mx, y, cw, hh, z++, content.headline, { size: Math.round(w * 0.072 * scale), color: p.onBg, bold: true, align, vAlign: 'top', font: brand.fontHeading }))
+    y += hh + Math.round(h * 0.02)
+  }
+  if (content.subhead && !opts.minimal) {
+    els.push(text('subhead', mx, y, cw, Math.round(h * 0.1), z++, content.subhead, { size: Math.round(w * 0.038), color: p.bodyColor, align, font: brand.fontBody }))
+    y += Math.round(h * 0.11)
+  }
+  if (content.body) {
+    els.push(text('body', mx, y, cw, Math.round(h * 0.22), z++, content.body, { size: Math.round(w * 0.03), color: p.bodyColor, align, font: brand.fontBody }))
+  }
+  if (content.cta) {
+    const ch = Math.round(h * 0.08)
+    const cwid = Math.round(w * 0.46)
+    const cx = align === 'center' ? Math.round((w - cwid) / 2) : mx
+    const cyy = h - Math.round(h * 0.13)
+    els.push(band('ctabg', cx, cyy, cwid, ch, z++, p.accent === p.onBg ? brand.colorPrimary : p.accent))
+    els.push(text('cta', cx, cyy, cwid, ch, z++, content.cta, { size: Math.round(w * 0.032), color: readableTextOn(p.accent === p.onBg ? brand.colorPrimary : p.accent), bold: true, align: 'center', vAlign: 'middle', font: brand.fontHeading }))
+  }
+  return { schemaVersion: 1, width: w, height: h, background: { type: 'solid', color: p.bg }, elements: els, category: size.category, brandApplied: true }
+}
+
+// A top color band carrying the eyebrow + headline, body on a clean field below.
+function composeBand(size: DesignSize, brand: OrgBrandKit, content: DesignContent): DesignBody {
+  const { w, h } = size
+  const p = paletteFor(brand, 'brand')
+  const mx = Math.round(w * 0.08)
+  const cw = w - mx * 2
+  const bandH = Math.round(h * 0.46)
+  const els: SlideElement[] = []
+  let z = 1
+  els.push(band('hero', 0, 0, w, bandH, z++, brand.colorPrimary))
+  let y = Math.round(h * 0.1)
+  if (content.eyebrow) {
+    els.push(text('eyebrow', mx, y, cw, Math.round(h * 0.05), z++, content.eyebrow.toUpperCase(), { size: Math.round(w * 0.028), color: p.onBg, bold: true, font: brand.fontHeading }))
+    y += Math.round(h * 0.06)
+  }
+  if (content.headline) {
+    els.push(text('headline', mx, y, cw, Math.round(h * 0.24), z++, content.headline, { size: Math.round(w * 0.072), color: p.onBg, bold: true, font: brand.fontHeading }))
+  }
+  let by = bandH + Math.round(h * 0.06)
+  if (content.subhead) {
+    els.push(text('subhead', mx, by, cw, Math.round(h * 0.12), z++, content.subhead, { size: Math.round(w * 0.04), color: '#1c1917', bold: true, font: brand.fontBody }))
+    by += Math.round(h * 0.12)
+  }
+  if (content.body) {
+    els.push(text('body', mx, by, cw, Math.round(h * 0.22), z++, content.body, { size: Math.round(w * 0.032), color: '#44403c', font: brand.fontBody }))
+  }
+  if (content.cta) {
+    els.push(text('cta', mx, h - Math.round(h * 0.1), cw, Math.round(h * 0.07), z++, content.cta, { size: Math.round(w * 0.034), color: brand.colorPrimary, bold: true, font: brand.fontHeading }))
+  }
+  return { schemaVersion: 1, width: w, height: h, background: { type: 'solid', color: '#ffffff' }, elements: els, category: size.category, brandApplied: true }
+}
+
+// A split: a brand color block on one side, text on the other. Splits along the
+// long edge (side block for wide canvases, top block for tall ones).
+function composeSplit(size: DesignSize, brand: OrgBrandKit, content: DesignContent): DesignBody {
+  const { w, h } = size
+  const wide = w >= h
+  const p = paletteFor(brand, 'brand')
+  const els: SlideElement[] = []
+  let z = 1
+  if (wide) {
+    const bw = Math.round(w * 0.42)
+    els.push(band('block', 0, 0, bw, h, z++, brand.colorPrimary))
+    els.push(text('headline', Math.round(w * 0.05), Math.round(h * 0.3), Math.round(bw - w * 0.1), Math.round(h * 0.4), z++, content.headline ?? '', { size: Math.round(w * 0.05), color: p.onBg, bold: true, vAlign: 'middle', font: brand.fontHeading }))
+    const tx = bw + Math.round(w * 0.05)
+    const tw = w - tx - Math.round(w * 0.05)
+    let y = Math.round(h * 0.28)
+    if (content.subhead) {
+      els.push(text('subhead', tx, y, tw, Math.round(h * 0.14), z++, content.subhead, { size: Math.round(w * 0.03), color: '#1c1917', bold: true, font: brand.fontBody }))
+      y += Math.round(h * 0.16)
+    }
+    if (content.body) els.push(text('body', tx, y, tw, Math.round(h * 0.3), z++, content.body, { size: Math.round(w * 0.024), color: '#44403c', font: brand.fontBody }))
+    if (content.cta) els.push(text('cta', tx, h - Math.round(h * 0.16), tw, Math.round(h * 0.08), z++, content.cta, { size: Math.round(w * 0.026), color: brand.colorPrimary, bold: true, font: brand.fontHeading }))
+  } else {
+    const bh = Math.round(h * 0.42)
+    els.push(band('block', 0, 0, w, bh, z++, brand.colorPrimary))
+    els.push(text('headline', Math.round(w * 0.08), Math.round(h * 0.1), Math.round(w * 0.84), Math.round(bh - h * 0.12), z++, content.headline ?? '', { size: Math.round(w * 0.08), color: p.onBg, bold: true, vAlign: 'middle', font: brand.fontHeading }))
+    let y = bh + Math.round(h * 0.06)
+    if (content.subhead) {
+      els.push(text('subhead', Math.round(w * 0.08), y, Math.round(w * 0.84), Math.round(h * 0.1), z++, content.subhead, { size: Math.round(w * 0.04), color: '#1c1917', bold: true, font: brand.fontBody }))
+      y += Math.round(h * 0.11)
+    }
+    if (content.body) els.push(text('body', Math.round(w * 0.08), y, Math.round(w * 0.84), Math.round(h * 0.24), z++, content.body, { size: Math.round(w * 0.032), color: '#44403c', font: brand.fontBody }))
+    if (content.cta) els.push(text('cta', Math.round(w * 0.08), h - Math.round(h * 0.1), Math.round(w * 0.84), Math.round(h * 0.07), z++, content.cta, { size: Math.round(w * 0.034), color: brand.colorPrimary, bold: true, font: brand.fontHeading }))
+  }
+  return { schemaVersion: 1, width: w, height: h, background: { type: 'solid', color: '#ffffff' }, elements: els, category: size.category, brandApplied: true }
+}
+
+// Compose one design in a named layout style.
+export function composeVariant(size: DesignSize, brand: OrgBrandKit, content: DesignContent, layout: DesignLayoutId): DesignBody {
+  switch (layout) {
+    case 'centered':
+      return composeStack(size, brand, content, 'center')
+    case 'bold':
+      return composeStack(size, brand, { ...content, background: 'brand' }, 'center', { mode: 'brand', scale: 1.15 })
+    case 'band':
+      return composeBand(size, brand, content)
+    case 'split':
+      return composeSplit(size, brand, content)
+    case 'minimal':
+      return composeStack(size, brand, content, 'left', { minimal: true })
+    case 'left':
+    default:
+      return composeDesign(size, brand, content)
+  }
+}
+
+// Turn a set of AI copy concepts into a set of distinct on-brand designs, cycling
+// through the layout styles so the variations look genuinely different. An AI may
+// also pin a layout per concept via content.layout; otherwise the style rotates.
+export function buildDesignVariations(size: DesignSize, brand: OrgBrandKit, contents: DesignContent[]): DesignBody[] {
+  return contents.map((c, i) => composeVariant(size, brand, c, c.layout ?? DESIGN_LAYOUT_IDS[i % DESIGN_LAYOUT_IDS.length]))
 }
 
 // Magic resize: scale a whole design to a new size, repositioning and resizing

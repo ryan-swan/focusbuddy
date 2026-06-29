@@ -1966,6 +1966,88 @@ export async function generateDesignContent(input: {
   }
 }
 
+// ── PlexiDesign: AI template generator ───────────────────────────────────────
+//
+// Generates SEVERAL distinct copy concepts for a design from one prompt, each
+// with its own angle, tone, background mood and a suggested layout style. The
+// renderer composes each into a finished on-brand design so the user picks from a
+// grid of variations, the way a real design tool turns a brief into options.
+
+export interface DesignVariationsResult {
+  ok: boolean
+  concepts?: Array<{
+    eyebrow?: string
+    headline?: string
+    subhead?: string
+    body?: string
+    cta?: string
+    background?: 'brand' | 'light' | 'dark'
+    layout?: 'left' | 'centered' | 'band' | 'bold' | 'split' | 'minimal'
+  }>
+  error?: string
+  needsApiKey?: boolean
+}
+
+export async function generateDesignVariations(input: {
+  prompt: string
+  designKind: string
+  count?: number
+  audience?: string
+}): Promise<DesignVariationsResult> {
+  const c = getClient()
+  if (!c) return { ok: false, needsApiKey: true, error: 'No Anthropic API key set. Open Settings → AI · API keys to paste one.' }
+  const topic = input.prompt.trim()
+  if (!topic) return { ok: false, error: 'Describe the design you want.' }
+  const n = Math.max(2, Math.min(input.count ?? 6, 8))
+  const audienceLine = input.audience?.trim() ? ` The audience is ${input.audience.trim()}.` : ''
+  const system =
+    `You generate ${n} DISTINCT design concepts for a ${input.designKind}.` +
+    audienceLine +
+    ` Reply with ONLY a JSON object {"concepts": [ ... ]} containing exactly ${n} concepts. Each concept is {"eyebrow"?: string, "headline": string, "subhead"?: string, "body"?: string, "cta"?: string, "background": "brand"|"light"|"dark", "layout": "left"|"centered"|"band"|"bold"|"split"|"minimal"}. ` +
+    'Make the concepts genuinely different from each other: vary the angle and wording of the headline, the tone, the background mood, and the layout style across the set so the user has real choices, not minor rewrites. The headline is short and punchy (under 8 words). eyebrow is a 1-3 word kicker. subhead is one sentence. body is at most two short sentences and optional. cta is short when one fits. ' +
+    'Write in plain, confident, human words. No em dashes, no emoji, no markdown, no code fences, no prose outside the JSON.'
+  try {
+    const resp = await c.messages.create({
+      model: resolveModel('document'),
+      max_tokens: 1800,
+      system,
+      messages: [{ role: 'user', content: `${input.designKind}: ${topic}` }]
+    })
+    if ((resp.stop_reason as string) === 'refusal') return { ok: false, error: 'Claude declined this request. Try rephrasing it.' }
+    const text = resp.content
+      .filter((b) => b.type === 'text')
+      .map((b) => ('text' in b ? b.text : ''))
+      .join('\n')
+    const parsed = extractJsonObject(text) as { concepts?: unknown }
+    const arr = Array.isArray(parsed.concepts) ? parsed.concepts : []
+    const str = (v: unknown): string | undefined => (typeof v === 'string' && v.trim() ? v.trim() : undefined)
+    const LAYOUTS = ['left', 'centered', 'band', 'bold', 'split', 'minimal']
+    const concepts = arr
+      .map((raw) => {
+        const o = (raw ?? {}) as Record<string, unknown>
+        const bg = o.background
+        const lay =
+          typeof o.layout === 'string' && LAYOUTS.includes(o.layout)
+            ? (o.layout as 'left' | 'centered' | 'band' | 'bold' | 'split' | 'minimal')
+            : undefined
+        return {
+          eyebrow: str(o.eyebrow),
+          headline: str(o.headline),
+          subhead: str(o.subhead),
+          body: str(o.body),
+          cta: str(o.cta),
+          background: (bg === 'brand' || bg === 'dark' ? bg : 'light') as 'brand' | 'light' | 'dark',
+          layout: lay
+        }
+      })
+      .filter((c) => c.headline)
+    if (!concepts.length) return { ok: false, error: 'The variations came back empty. Try a more specific prompt.' }
+    return { ok: true, concepts }
+  } catch (e) {
+    return { ok: false, error: (e as Error).message }
+  }
+}
+
 // ── In-widget AI: Table row suggestion ───────────────────────────────────────
 //
 // Loads the target table's schema, asks the model for rows fitting that

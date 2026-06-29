@@ -1573,6 +1573,25 @@ const api = {
       error?: string
       needsApiKey?: boolean
     }> => ipcRenderer.invoke('design:generateContent', input),
+    generateVariations: (input: {
+      prompt: string
+      designKind: string
+      count?: number
+      audience?: string
+    }): Promise<{
+      ok: boolean
+      concepts?: Array<{
+        eyebrow?: string
+        headline?: string
+        subhead?: string
+        body?: string
+        cta?: string
+        background?: 'brand' | 'light' | 'dark'
+        layout?: 'left' | 'centered' | 'band' | 'bold' | 'split' | 'minimal'
+      }>
+      error?: string
+      needsApiKey?: boolean
+    }> => ipcRenderer.invoke('design:generateVariations', input),
     export: (input: {
       design: import('@shared/design').DesignBody
       title: string
