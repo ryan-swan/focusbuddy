@@ -6,7 +6,8 @@
 // org brand kit) into a finished, on-brand layout.
 
 import type { SlideElement, SlideFill, SlideTextElement, SlideShapeElement } from './types'
-import { type OrgBrandKit, DEFAULT_BRAND_KIT, readableTextOn, contrastRatio } from './brandKit'
+import { type OrgBrandKit, DEFAULT_BRAND_KIT, readableTextOn, contrastRatio, hexToRgb } from './brandKit'
+import { fillToCss, gradient } from './fills'
 
 export interface DesignBody {
   schemaVersion: 1
@@ -137,7 +138,7 @@ export const DESIGN_TEMPLATES: DesignTemplate[] = [
     build: (w, h, brand) => {
       const text2 = readableTextOn(brand.colorPrimary)
       return {
-        background: { type: 'solid', color: brand.colorPrimary },
+        background: gradient(shade(brand.colorPrimary, 0.06), shade(brand.colorPrimary, -0.3), 145),
         elements: [
           band('accent', w * 0.08, h * 0.28, w * 0.12, 8, 1, brand.colorSecondary ?? text2),
           text('quote', w * 0.08, h * 0.32, w * 0.84, h * 0.36, 2, 'Your bold statement goes here.', {
@@ -280,7 +281,7 @@ export const DESIGN_TEMPLATES: DesignTemplate[] = [
     build: (w, h, brand) => {
       const onP = readableTextOn(brand.colorPrimary)
       return {
-        background: { type: 'solid', color: brand.colorPrimary },
+        background: gradient(shade(brand.colorPrimary, 0.06), shade(brand.colorPrimary, -0.3), 145),
         elements: [
           text('stat', w * 0.08, h * 0.26, w * 0.84, h * 0.3, 2, '92%', { size: Math.round(w * 0.22), color: onP, bold: true, align: 'center', font: brand.fontHeading }),
           text('label', w * 0.1, h * 0.58, w * 0.8, h * 0.12, 3, 'of customers would recommend us', { size: Math.round(w * 0.04), color: onP, align: 'center', font: brand.fontBody })
@@ -310,7 +311,7 @@ export const DESIGN_TEMPLATES: DesignTemplate[] = [
     build: (w, h, brand) => {
       const onP = readableTextOn(brand.colorPrimary)
       return {
-        background: { type: 'solid', color: brand.colorPrimary },
+        background: gradient(shade(brand.colorPrimary, 0.06), shade(brand.colorPrimary, -0.3), 145),
         elements: [
           text('kicker', w * 0.1, h * 0.16, w * 0.8, h * 0.06, 1, 'LIMITED TIME', { size: Math.round(w * 0.04), color: onP, bold: true, align: 'center', font: brand.fontHeading }),
           text('big', w * 0.06, h * 0.3, w * 0.88, h * 0.2, 2, '25% OFF', { size: Math.round(w * 0.2), color: onP, bold: true, align: 'center', font: brand.fontHeading }),
@@ -342,7 +343,7 @@ export const DESIGN_TEMPLATES: DesignTemplate[] = [
     build: (w, h, brand) => {
       const onP = readableTextOn(brand.colorPrimary)
       return {
-        background: { type: 'solid', color: brand.colorPrimary },
+        background: gradient(shade(brand.colorPrimary, 0.06), shade(brand.colorPrimary, -0.3), 145),
         elements: [
           text('num', w * 0.1, h * 0.3, w * 0.3, h * 0.2, 1, '01', { size: Math.round(h * 0.16), color: onP, bold: true, font: brand.fontHeading }),
           text('section', w * 0.1, h * 0.52, w * 0.8, h * 0.18, 2, 'Section title', { size: Math.round(h * 0.1), color: onP, bold: true, font: brand.fontHeading })
@@ -385,7 +386,7 @@ export const DESIGN_TEMPLATES: DesignTemplate[] = [
     build: (w, h, brand) => {
       const onP = readableTextOn(brand.colorPrimary)
       return {
-        background: { type: 'solid', color: brand.colorPrimary },
+        background: gradient(shade(brand.colorPrimary, 0.06), shade(brand.colorPrimary, -0.3), 145),
         elements: [
           text('tag', w * 0.05, h * 0.3, w * 0.6, h * 0.24, 1, 'We build better workdays', { size: Math.round(h * 0.16), color: onP, bold: true, font: brand.fontHeading }),
           text('url', w * 0.05, h * 0.6, w * 0.6, h * 0.12, 2, 'company.com', { size: Math.round(h * 0.08), color: onP, font: brand.fontBody })
@@ -432,103 +433,11 @@ export interface DesignContent {
 }
 
 // Compose a finished, on-brand layout from AI copy at a given size. This is the
-// "10 seconds" path: structured copy in, a clean branded design out. Colors are
-// chosen for readable contrast against the background treatment; the brand fonts
-// and primary color carry the identity.
+// "10 seconds" path: structured copy in, a designed branded piece out, with a
+// gradient background, decorative depth, a strong type hierarchy and a real CTA
+// pill. It is the left-aligned variant of the premium stack layout.
 export function composeDesign(size: DesignSize, brand: OrgBrandKit, content: DesignContent): DesignBody {
-  const { w, h } = size
-  const mode = content.background ?? 'light'
-  const bgColor = mode === 'brand' ? brand.colorPrimary : mode === 'dark' ? '#0f172a' : '#ffffff'
-  const onBg = readableTextOn(bgColor)
-  // On a brand-colored background, the accent must read against the brand color:
-  // prefer the secondary when it contrasts, else fall back to the readable tone.
-  const accent =
-    mode === 'brand'
-      ? brand.colorSecondary && contrastRatio(brand.colorSecondary, bgColor) >= 2
-        ? brand.colorSecondary
-        : onBg
-      : brand.colorPrimary
-  const bodyColor = mode === 'light' ? '#44403c' : onBg
-
-  const mx = Math.round(w * 0.08)
-  const cw = w - mx * 2
-  let y = Math.round(h * 0.16)
-  const els: SlideElement[] = []
-  let z = 1
-
-  // A short accent band sets the composition off and carries the brand color even
-  // on a brand-colored background (where it uses a readable contrast tone).
-  els.push(band('accent', mx, y, Math.round(w * 0.1), Math.max(6, Math.round(h * 0.01)), z++, accent))
-  y += Math.round(h * 0.03)
-
-  if (content.eyebrow) {
-    els.push(
-      text('eyebrow', mx, y, cw, Math.round(h * 0.05), z++, content.eyebrow.toUpperCase(), {
-        size: Math.round(w * 0.026),
-        color: accent,
-        bold: true,
-        font: brand.fontHeading
-      })
-    )
-    y += Math.round(h * 0.06)
-  }
-  if (content.headline) {
-    const lines = Math.max(1, Math.ceil(content.headline.length / 22))
-    const hh = Math.round(h * 0.12 * lines)
-    els.push(
-      text('headline', mx, y, cw, hh, z++, content.headline, {
-        size: Math.round(w * 0.07),
-        color: onBg,
-        bold: true,
-        font: brand.fontHeading
-      })
-    )
-    y += hh + Math.round(h * 0.02)
-  }
-  if (content.subhead) {
-    els.push(
-      text('subhead', mx, y, cw, Math.round(h * 0.1), z++, content.subhead, {
-        size: Math.round(w * 0.038),
-        color: bodyColor,
-        font: brand.fontBody
-      })
-    )
-    y += Math.round(h * 0.11)
-  }
-  if (content.body) {
-    els.push(
-      text('body', mx, y, cw, Math.round(h * 0.24), z++, content.body, {
-        size: Math.round(w * 0.03),
-        color: bodyColor,
-        font: brand.fontBody
-      })
-    )
-  }
-  if (content.cta) {
-    const ch = Math.round(h * 0.08)
-    const cy = h - Math.round(h * 0.12)
-    els.push(band('ctabg', mx, cy, Math.round(w * 0.42), ch, z++, accent === onBg ? brand.colorPrimary : accent))
-    els.push(
-      text('cta', mx, cy, Math.round(w * 0.42), ch, z++, content.cta, {
-        size: Math.round(w * 0.032),
-        color: readableTextOn(accent === onBg ? brand.colorPrimary : accent),
-        bold: true,
-        align: 'center',
-        vAlign: 'middle',
-        font: brand.fontHeading
-      })
-    )
-  }
-
-  return {
-    schemaVersion: 1,
-    width: w,
-    height: h,
-    background: { type: 'solid', color: bgColor },
-    elements: els,
-    category: size.category,
-    brandApplied: true
-  }
+  return composeStack(size, brand, content, 'left')
 }
 
 // ── Static HTML render (for export) ──────────────────────────────────────────
@@ -581,7 +490,8 @@ function elementHtml(el: SlideElement): string {
         return `<div style="text-align:${align};display:flex;gap:8px;justify-content:${jc}"><span>${runs}</span></div>`
       })
       .join('')
-    const fill = el.fill?.type === 'solid' ? `background-color:${el.fill.color};` : ''
+    const fillCss = fillToCss(el.fill)
+    const fill = fillCss ? `background:${fillCss};` : ''
     return `<div style="${base}${fill}${border(el.border)}"><div style="display:flex;flex-direction:column;justify-content:${justify};height:100%;${
       el.fontFamily ? `font-family:${el.fontFamily};` : ''
     }">${paras}</div></div>`
@@ -591,12 +501,12 @@ function elementHtml(el: SlideElement): string {
   }
   if (el.type === 'shape') {
     if (el.shape === 'triangle') {
-      return `<div style="${base}${el.shadow ? `filter:drop-shadow(${SHADOW[el.shadow]});` : ''}"><div style="width:100%;height:100%;clip-path:polygon(50% 0%,0% 100%,100% 100%);background-color:${
-        el.fill?.type === 'solid' ? el.fill.color : 'transparent'
+      return `<div style="${base}${el.shadow ? `filter:drop-shadow(${SHADOW[el.shadow]});` : ''}"><div style="width:100%;height:100%;clip-path:polygon(50% 0%,0% 100%,100% 100%);background:${
+        fillToCss(el.fill) ?? 'transparent'
       }"></div></div>`
     }
     const radius = el.shape === 'ellipse' ? '50%' : el.cornerRadius ?? (el.shape === 'roundRect' ? '16px' : '0')
-    return `<div style="${base}background-color:${el.fill?.type === 'solid' ? el.fill.color : 'transparent'};border-radius:${
+    return `<div style="${base}background:${fillToCss(el.fill) ?? 'transparent'};border-radius:${
       typeof radius === 'number' ? radius + 'px' : radius
     };${border(el.border)}"></div>`
   }
@@ -613,7 +523,7 @@ function elementHtml(el: SlideElement): string {
 // A full standalone HTML document rendering the design at its exact pixel size,
 // for the export pipeline (offscreen capture to PNG / print to PDF).
 export function designToHtml(design: DesignBody): string {
-  const bg = design.background?.type === 'solid' ? design.background.color : '#ffffff'
+  const bg = fillToCss(design.background) ?? '#ffffff'
   const els = design.elements
     .slice()
     .sort((a, b) => a.z - b.z)
@@ -627,23 +537,68 @@ export function designToHtml(design: DesignBody): string {
 export type DesignLayoutId = 'left' | 'centered' | 'band' | 'bold' | 'split' | 'minimal'
 export const DESIGN_LAYOUT_IDS: DesignLayoutId[] = ['left', 'centered', 'band', 'bold', 'split', 'minimal']
 
+// Lighten (pct > 0) or darken (pct < 0) a hex color, for gradient stops and tints.
+function shade(hex: string, pct: number): string {
+  const rgb = hexToRgb(hex)
+  if (!rgb) return hex
+  const f = (c: number): number => Math.round(pct >= 0 ? c + (255 - c) * pct : c * (1 + pct))
+  const h = (n: number): string => Math.max(0, Math.min(255, n)).toString(16).padStart(2, '0')
+  return `#${h(f(rgb.r))}${h(f(rgb.g))}${h(f(rgb.b))}`
+}
+function withAlpha(hex: string, a: number): string {
+  const rgb = hexToRgb(hex)
+  if (!rgb) return hex
+  return `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${a})`
+}
+
+// A soft, large decorative circle (low-opacity brand tint) for depth and texture,
+// the kind of background ornament a designed piece has and a flat color block does
+// not. Positioned by its center; clipped by the canvas.
+function blob(id: string, cx: number, cy: number, d: number, z: number, color: string): SlideShapeElement {
+  return { id, type: 'shape', shape: 'ellipse', x: Math.round(cx - d / 2), y: Math.round(cy - d / 2), w: d, h: d, z, fill: { type: 'solid', color } }
+}
+
 interface Palette {
-  bg: string
+  bg: SlideFill
   onBg: string
   accent: string
+  accentSolid: string
   bodyColor: string
+  decor: string
+  mode: 'brand' | 'light' | 'dark'
 }
+// The full color treatment for a composition: a real gradient background (not a
+// flat fill), readable text, an accent that contrasts the background, and a soft
+// decorative tint.
 function paletteFor(brand: OrgBrandKit, mode: 'brand' | 'light' | 'dark'): Palette {
-  const bg = mode === 'brand' ? brand.colorPrimary : mode === 'dark' ? '#0f172a' : '#ffffff'
-  const onBg = readableTextOn(bg)
-  const accent =
+  const primary = brand.colorPrimary
+  const secondary = brand.colorSecondary
+  let bg: SlideFill
+  let baseColor: string
+  if (mode === 'brand') {
+    // A rich diagonal in the brand color, deepening toward the corner.
+    const end = secondary && contrastRatio(secondary, primary) < 3 ? secondary : shade(primary, -0.32)
+    bg = gradient(shade(primary, 0.06), end, 145)
+    baseColor = primary
+  } else if (mode === 'dark') {
+    bg = gradient('#0b1220', shade(primary, -0.55), 145)
+    baseColor = '#0b1220'
+  } else {
+    // Light: a near-white field with the faintest brand tint, so it still reads as
+    // designed rather than a blank page.
+    bg = gradient('#ffffff', shade(primary, 0.9), 160)
+    baseColor = '#ffffff'
+  }
+  const onBg = readableTextOn(baseColor)
+  const accentSolid =
     mode === 'brand'
-      ? brand.colorSecondary && contrastRatio(brand.colorSecondary, bg) >= 2
-        ? brand.colorSecondary
+      ? secondary && contrastRatio(secondary, baseColor) >= 2.2
+        ? secondary
         : onBg
-      : brand.colorPrimary
-  const bodyColor = mode === 'light' ? '#44403c' : onBg
-  return { bg, onBg, accent, bodyColor }
+      : primary
+  const bodyColor = mode === 'light' ? '#44403c' : withAlpha(onBg, 0.85)
+  const decor = mode === 'light' ? withAlpha(primary, 0.08) : withAlpha(onBg, 0.08)
+  return { bg, onBg, accent: accentSolid, accentSolid, bodyColor, decor, mode }
 }
 
 // A centered or minimal stacked layout. Distinct from composeDesign (the 'left'
@@ -659,108 +614,125 @@ function composeStack(
   const mode = opts.mode ?? content.background ?? 'light'
   const p = paletteFor(brand, mode)
   const scale = opts.scale ?? 1
-  const mx = Math.round(w * 0.08)
+  const mx = Math.round(w * 0.09)
   const cw = w - mx * 2
   const els: SlideElement[] = []
   let z = 1
-  let y = Math.round(h * (opts.minimal ? 0.12 : 0.18))
+  // Decorative blobs for depth, behind the content.
+  els.push(blob('decor1', w * 0.92, h * 0.12, Math.round(w * 0.5), z++, p.decor))
+  els.push(blob('decor2', w * 0.08, h * 0.95, Math.round(w * 0.42), z++, p.decor))
+  let y = Math.round(h * (opts.minimal ? 0.14 : 0.17))
   const ax = align === 'center' ? Math.round(w / 2 - w * 0.05) : mx
-  els.push(band('accent', ax, y, Math.round(w * 0.1), Math.max(6, Math.round(h * 0.012)), z++, p.accent))
-  y += Math.round(h * 0.035)
+  // A bold, rounded accent bar sets the composition off.
+  els.push({ id: 'accent', type: 'shape', shape: 'roundRect', x: ax, y, w: Math.round(w * 0.1), h: Math.max(8, Math.round(h * 0.014)), z: z++, cornerRadius: 999, fill: { type: 'solid', color: p.accent } })
+  y += Math.round(h * 0.04)
   if (content.eyebrow && !opts.minimal) {
     els.push(text('eyebrow', mx, y, cw, Math.round(h * 0.05), z++, content.eyebrow.toUpperCase(), { size: Math.round(w * 0.026), color: p.accent, bold: true, align, font: brand.fontHeading }))
-    y += Math.round(h * 0.06)
+    y += Math.round(h * 0.065)
   }
   if (content.headline) {
-    const lines = Math.max(1, Math.ceil(content.headline.length / (opts.minimal ? 16 : 20)))
-    const hh = Math.round(h * 0.12 * lines * scale)
-    els.push(text('headline', mx, y, cw, hh, z++, content.headline, { size: Math.round(w * 0.072 * scale), color: p.onBg, bold: true, align, vAlign: 'top', font: brand.fontHeading }))
-    y += hh + Math.round(h * 0.02)
+    const lines = Math.max(1, Math.ceil(content.headline.length / (opts.minimal ? 14 : 18)))
+    const hh = Math.round(h * 0.135 * lines * scale)
+    els.push(text('headline', mx, y, cw, hh, z++, content.headline, { size: Math.round(w * (opts.minimal ? 0.095 : 0.082) * scale), color: p.onBg, bold: true, align, vAlign: 'top', font: brand.fontHeading }))
+    y += hh + Math.round(h * 0.025)
   }
   if (content.subhead && !opts.minimal) {
-    els.push(text('subhead', mx, y, cw, Math.round(h * 0.1), z++, content.subhead, { size: Math.round(w * 0.038), color: p.bodyColor, align, font: brand.fontBody }))
-    y += Math.round(h * 0.11)
+    els.push(text('subhead', mx, y, cw, Math.round(h * 0.1), z++, content.subhead, { size: Math.round(w * 0.04), color: p.bodyColor, align, font: brand.fontBody }))
+    y += Math.round(h * 0.115)
   }
   if (content.body) {
-    els.push(text('body', mx, y, cw, Math.round(h * 0.22), z++, content.body, { size: Math.round(w * 0.03), color: p.bodyColor, align, font: brand.fontBody }))
+    els.push(text('body', mx, y, cw, Math.round(h * 0.22), z++, content.body, { size: Math.round(w * 0.031), color: p.bodyColor, align, font: brand.fontBody }))
   }
   if (content.cta) {
-    const ch = Math.round(h * 0.08)
+    const ch = Math.round(h * 0.085)
     const cwid = Math.round(w * 0.46)
     const cx = align === 'center' ? Math.round((w - cwid) / 2) : mx
-    const cyy = h - Math.round(h * 0.13)
-    els.push(band('ctabg', cx, cyy, cwid, ch, z++, p.accent === p.onBg ? brand.colorPrimary : p.accent))
-    els.push(text('cta', cx, cyy, cwid, ch, z++, content.cta, { size: Math.round(w * 0.032), color: readableTextOn(p.accent === p.onBg ? brand.colorPrimary : p.accent), bold: true, align: 'center', vAlign: 'middle', font: brand.fontHeading }))
+    const cyy = h - Math.round(h * 0.14)
+    const pill = p.accent === p.onBg ? brand.colorPrimary : p.accent
+    // A real pill button with rounded corners and a soft shadow.
+    els.push({ id: 'ctabg', type: 'shape', shape: 'roundRect', x: cx, y: cyy, w: cwid, h: ch, z: z++, cornerRadius: Math.round(ch / 2), shadow: 'md', fill: { type: 'solid', color: pill } })
+    els.push(text('cta', cx, cyy, cwid, ch, z++, content.cta, { size: Math.round(w * 0.032), color: readableTextOn(pill), bold: true, align: 'center', vAlign: 'middle', font: brand.fontHeading }))
   }
-  return { schemaVersion: 1, width: w, height: h, background: { type: 'solid', color: p.bg }, elements: els, category: size.category, brandApplied: true }
+  return { schemaVersion: 1, width: w, height: h, background: p.bg, elements: els, category: size.category, brandApplied: true }
 }
 
-// A top color band carrying the eyebrow + headline, body on a clean field below.
+// A gradient hero band carrying the eyebrow + headline, body on a clean field
+// below, with a soft decorative blob and a rounded bottom edge for depth.
 function composeBand(size: DesignSize, brand: OrgBrandKit, content: DesignContent): DesignBody {
   const { w, h } = size
   const p = paletteFor(brand, 'brand')
-  const mx = Math.round(w * 0.08)
+  const onHero = readableTextOn(brand.colorPrimary)
+  const mx = Math.round(w * 0.09)
   const cw = w - mx * 2
   const bandH = Math.round(h * 0.46)
   const els: SlideElement[] = []
   let z = 1
-  els.push(band('hero', 0, 0, w, bandH, z++, brand.colorPrimary))
+  // Gradient hero with a rounded bottom and a faint blob inside it.
+  els.push({ id: 'hero', type: 'shape', shape: 'roundRect', x: -Math.round(w * 0.06), y: -Math.round(h * 0.1), w: w + Math.round(w * 0.12), h: bandH + Math.round(h * 0.1), z: z++, cornerRadius: Math.round(w * 0.06), shadow: 'md', fill: p.bg })
+  els.push(blob('heroblob', w * 0.86, h * 0.06, Math.round(w * 0.4), z++, withAlpha(onHero, 0.1)))
   let y = Math.round(h * 0.1)
   if (content.eyebrow) {
-    els.push(text('eyebrow', mx, y, cw, Math.round(h * 0.05), z++, content.eyebrow.toUpperCase(), { size: Math.round(w * 0.028), color: p.onBg, bold: true, font: brand.fontHeading }))
-    y += Math.round(h * 0.06)
+    els.push(text('eyebrow', mx, y, cw, Math.round(h * 0.05), z++, content.eyebrow.toUpperCase(), { size: Math.round(w * 0.028), color: onHero, bold: true, font: brand.fontHeading }))
+    y += Math.round(h * 0.065)
   }
   if (content.headline) {
-    els.push(text('headline', mx, y, cw, Math.round(h * 0.24), z++, content.headline, { size: Math.round(w * 0.072), color: p.onBg, bold: true, font: brand.fontHeading }))
+    els.push(text('headline', mx, y, cw, Math.round(h * 0.26), z++, content.headline, { size: Math.round(w * 0.08), color: onHero, bold: true, font: brand.fontHeading }))
   }
-  let by = bandH + Math.round(h * 0.06)
+  let by = bandH + Math.round(h * 0.08)
   if (content.subhead) {
-    els.push(text('subhead', mx, by, cw, Math.round(h * 0.12), z++, content.subhead, { size: Math.round(w * 0.04), color: '#1c1917', bold: true, font: brand.fontBody }))
+    els.push(text('subhead', mx, by, cw, Math.round(h * 0.12), z++, content.subhead, { size: Math.round(w * 0.042), color: '#1c1917', bold: true, font: brand.fontBody }))
     by += Math.round(h * 0.12)
   }
   if (content.body) {
     els.push(text('body', mx, by, cw, Math.round(h * 0.22), z++, content.body, { size: Math.round(w * 0.032), color: '#44403c', font: brand.fontBody }))
   }
   if (content.cta) {
-    els.push(text('cta', mx, h - Math.round(h * 0.1), cw, Math.round(h * 0.07), z++, content.cta, { size: Math.round(w * 0.034), color: brand.colorPrimary, bold: true, font: brand.fontHeading }))
+    const ch = Math.round(h * 0.085)
+    const cwid = Math.round(w * 0.46)
+    els.push({ id: 'ctabg', type: 'shape', shape: 'roundRect', x: mx, y: h - Math.round(h * 0.14), w: cwid, h: ch, z: z++, cornerRadius: Math.round(ch / 2), shadow: 'md', fill: { type: 'solid', color: brand.colorPrimary } })
+    els.push(text('cta', mx, h - Math.round(h * 0.14), cwid, ch, z++, content.cta, { size: Math.round(w * 0.032), color: onHero, bold: true, align: 'center', vAlign: 'middle', font: brand.fontHeading }))
   }
-  return { schemaVersion: 1, width: w, height: h, background: { type: 'solid', color: '#ffffff' }, elements: els, category: size.category, brandApplied: true }
+  return { schemaVersion: 1, width: w, height: h, background: gradient('#ffffff', shade(brand.colorPrimary, 0.92), 160), elements: els, category: size.category, brandApplied: true }
 }
 
-// A split: a brand color block on one side, text on the other. Splits along the
+// A split: a gradient brand block on one side, text on the other. Splits along the
 // long edge (side block for wide canvases, top block for tall ones).
 function composeSplit(size: DesignSize, brand: OrgBrandKit, content: DesignContent): DesignBody {
   const { w, h } = size
   const wide = w >= h
   const p = paletteFor(brand, 'brand')
+  const onHero = readableTextOn(brand.colorPrimary)
   const els: SlideElement[] = []
   let z = 1
   if (wide) {
-    const bw = Math.round(w * 0.42)
-    els.push(band('block', 0, 0, bw, h, z++, brand.colorPrimary))
-    els.push(text('headline', Math.round(w * 0.05), Math.round(h * 0.3), Math.round(bw - w * 0.1), Math.round(h * 0.4), z++, content.headline ?? '', { size: Math.round(w * 0.05), color: p.onBg, bold: true, vAlign: 'middle', font: brand.fontHeading }))
-    const tx = bw + Math.round(w * 0.05)
-    const tw = w - tx - Math.round(w * 0.05)
-    let y = Math.round(h * 0.28)
+    const bw = Math.round(w * 0.44)
+    els.push({ id: 'block', type: 'shape', shape: 'rect', x: 0, y: 0, w: bw, h, z: z++, fill: p.bg })
+    els.push(blob('bblob', bw * 0.5, h * 0.85, Math.round(w * 0.3), z++, withAlpha(onHero, 0.1)))
+    els.push(text('headline', Math.round(w * 0.05), Math.round(h * 0.28), Math.round(bw - w * 0.1), Math.round(h * 0.44), z++, content.headline ?? '', { size: Math.round(w * 0.055), color: onHero, bold: true, vAlign: 'middle', font: brand.fontHeading }))
+    const tx = bw + Math.round(w * 0.06)
+    const tw = w - tx - Math.round(w * 0.06)
+    let y = Math.round(h * 0.26)
+    els.push({ id: 'taccent', type: 'shape', shape: 'roundRect', x: tx, y: y - Math.round(h * 0.06), w: Math.round(w * 0.07), h: Math.max(8, Math.round(h * 0.012)), z: z++, cornerRadius: 999, fill: { type: 'solid', color: brand.colorPrimary } })
     if (content.subhead) {
-      els.push(text('subhead', tx, y, tw, Math.round(h * 0.14), z++, content.subhead, { size: Math.round(w * 0.03), color: '#1c1917', bold: true, font: brand.fontBody }))
+      els.push(text('subhead', tx, y, tw, Math.round(h * 0.14), z++, content.subhead, { size: Math.round(w * 0.032), color: '#1c1917', bold: true, font: brand.fontBody }))
       y += Math.round(h * 0.16)
     }
-    if (content.body) els.push(text('body', tx, y, tw, Math.round(h * 0.3), z++, content.body, { size: Math.round(w * 0.024), color: '#44403c', font: brand.fontBody }))
-    if (content.cta) els.push(text('cta', tx, h - Math.round(h * 0.16), tw, Math.round(h * 0.08), z++, content.cta, { size: Math.round(w * 0.026), color: brand.colorPrimary, bold: true, font: brand.fontHeading }))
+    if (content.body) els.push(text('body', tx, y, tw, Math.round(h * 0.3), z++, content.body, { size: Math.round(w * 0.025), color: '#44403c', font: brand.fontBody }))
+    if (content.cta) els.push(text('cta', tx, h - Math.round(h * 0.16), tw, Math.round(h * 0.08), z++, content.cta, { size: Math.round(w * 0.027), color: brand.colorPrimary, bold: true, font: brand.fontHeading }))
   } else {
-    const bh = Math.round(h * 0.42)
-    els.push(band('block', 0, 0, w, bh, z++, brand.colorPrimary))
-    els.push(text('headline', Math.round(w * 0.08), Math.round(h * 0.1), Math.round(w * 0.84), Math.round(bh - h * 0.12), z++, content.headline ?? '', { size: Math.round(w * 0.08), color: p.onBg, bold: true, vAlign: 'middle', font: brand.fontHeading }))
-    let y = bh + Math.round(h * 0.06)
+    const bh = Math.round(h * 0.44)
+    els.push({ id: 'block', type: 'shape', shape: 'rect', x: 0, y: 0, w, h: bh, z: z++, fill: p.bg })
+    els.push(blob('bblob', w * 0.88, bh * 0.4, Math.round(w * 0.36), z++, withAlpha(onHero, 0.1)))
+    els.push(text('headline', Math.round(w * 0.09), Math.round(h * 0.09), Math.round(w * 0.82), Math.round(bh - h * 0.12), z++, content.headline ?? '', { size: Math.round(w * 0.085), color: onHero, bold: true, vAlign: 'middle', font: brand.fontHeading }))
+    let y = bh + Math.round(h * 0.07)
     if (content.subhead) {
-      els.push(text('subhead', Math.round(w * 0.08), y, Math.round(w * 0.84), Math.round(h * 0.1), z++, content.subhead, { size: Math.round(w * 0.04), color: '#1c1917', bold: true, font: brand.fontBody }))
+      els.push(text('subhead', Math.round(w * 0.09), y, Math.round(w * 0.82), Math.round(h * 0.1), z++, content.subhead, { size: Math.round(w * 0.042), color: '#1c1917', bold: true, font: brand.fontBody }))
       y += Math.round(h * 0.11)
     }
-    if (content.body) els.push(text('body', Math.round(w * 0.08), y, Math.round(w * 0.84), Math.round(h * 0.24), z++, content.body, { size: Math.round(w * 0.032), color: '#44403c', font: brand.fontBody }))
-    if (content.cta) els.push(text('cta', Math.round(w * 0.08), h - Math.round(h * 0.1), Math.round(w * 0.84), Math.round(h * 0.07), z++, content.cta, { size: Math.round(w * 0.034), color: brand.colorPrimary, bold: true, font: brand.fontHeading }))
+    if (content.body) els.push(text('body', Math.round(w * 0.09), y, Math.round(w * 0.82), Math.round(h * 0.24), z++, content.body, { size: Math.round(w * 0.032), color: '#44403c', font: brand.fontBody }))
+    if (content.cta) els.push(text('cta', Math.round(w * 0.09), h - Math.round(h * 0.1), Math.round(w * 0.82), Math.round(h * 0.07), z++, content.cta, { size: Math.round(w * 0.034), color: brand.colorPrimary, bold: true, font: brand.fontHeading }))
   }
-  return { schemaVersion: 1, width: w, height: h, background: { type: 'solid', color: '#ffffff' }, elements: els, category: size.category, brandApplied: true }
+  return { schemaVersion: 1, width: w, height: h, background: gradient('#ffffff', shade(brand.colorPrimary, 0.93), 160), elements: els, category: size.category, brandApplied: true }
 }
 
 // Compose one design in a named layout style.

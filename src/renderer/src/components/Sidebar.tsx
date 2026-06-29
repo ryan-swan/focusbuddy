@@ -150,6 +150,7 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
   const goInbox = useViewStore((s) => s.goInbox)
   const goMail = useViewStore((s) => s.goMail)
   const goDocuments = useViewStore((s) => s.goDocuments)
+  const goDesign = useViewStore((s) => s.goDesign)
   const goFiles = useViewStore((s) => s.goFiles)
   const goCollaborations = useViewStore((s) => s.goCollaborations)
   const goOrg = useViewStore((s) => s.goOrg)
@@ -835,6 +836,15 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
               onClick={() => {
                 setActive(null)
                 goDocuments()
+              }}
+            />
+            <NavRow
+              icon="palette"
+              label="PlexiDesign"
+              active={viewIsActive({ kind: 'design' })}
+              onClick={() => {
+                setActive(null)
+                goDesign()
               }}
             />
             <NavRow

@@ -84,6 +84,7 @@ export default function CommandCenter({
   const goFiles = useViewStore((s) => s.goFiles)
   const goMail = useViewStore((s) => s.goMail)
   const goDocuments = useViewStore((s) => s.goDocuments)
+  const goDesign = useViewStore((s) => s.goDesign)
   const goDocument = useViewStore((s) => s.goDocument)
   const goKnowledge = useViewStore((s) => s.goKnowledge)
   const goMessages = useViewStore((s) => s.goMessages)
@@ -331,6 +332,7 @@ export default function CommandCenter({
     }
     const navTargets: Array<{ id: string; label: string; hint: string; icon: string; words: string; viewKind: string; go: () => void }> = [
       { id: 'go-documents', label: 'Documents', hint: 'Docs, sheets, slides', icon: 'article', words: 'documents docs sheets slides', viewKind: 'documents', go: goDocuments },
+      { id: 'go-design', label: 'PlexiDesign', hint: 'Designs — social, posters, logos', icon: 'palette', words: 'design plexidesign canva graphic poster social logo flyer banner', viewKind: 'design', go: goDesign },
       { id: 'go-files', label: 'Files', hint: 'File manager', icon: 'folder', words: 'files folders manager', viewKind: 'files', go: goFiles },
       { id: 'go-mail', label: 'Mail', hint: 'Email inbox', icon: 'mail', words: 'mail email inbox', viewKind: 'mail', go: () => goMail() },
       { id: 'go-inbox', label: 'PlexiInbox', hint: 'Notifications, share invites', icon: 'inbox', words: 'inbox notifications invites plexi', viewKind: 'inbox', go: goInbox },
@@ -360,6 +362,20 @@ export default function CommandCenter({
       score: q === '' ? 58 : matchScore('new folder task desk create', q),
       run: () => {
         window.dispatchEvent(new CustomEvent('fb:command-new-task'))
+        closePalette()
+      }
+    })
+    // New design: open the PlexiDesign hub to pick a size or template.
+    items.push({
+      id: 'new-design',
+      label: 'New design',
+      hint: 'PlexiDesign — social, poster, logo, any size',
+      icon: 'palette',
+      kind: 'action',
+      score: q === '' ? 56 : matchScore('new design plexidesign canva poster social logo flyer graphic create', q),
+      run: () => {
+        setActive(null)
+        goDesign()
         closePalette()
       }
     })
@@ -539,6 +555,7 @@ export default function CommandCenter({
     goFiles,
     goMail,
     goDocuments,
+    goDesign,
     goDocument,
     goKnowledge,
     goMessages,
