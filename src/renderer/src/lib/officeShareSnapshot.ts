@@ -78,7 +78,10 @@ export function documentHtml(docType: DocType, body: unknown): string {
     if (docType === 'doc') return docToHtml(body as Parameters<typeof docToHtml>[0])
     if (docType === 'sheet') return sheetHtml(body as SheetBody)
     if (docType === 'slides') return slidesHtml(body as SlidesBody)
-    return mapHtml(body as MapBody)
+    if (docType === 'map') return mapHtml(body as MapBody)
+    // Designs are visual canvases; a faithful read-only HTML render is out of
+    // scope for the share viewer in v1, so show an honest placeholder.
+    return '<p>(design preview is not available in the shared viewer yet)</p>'
   } catch {
     return '<p>(preview unavailable)</p>'
   }

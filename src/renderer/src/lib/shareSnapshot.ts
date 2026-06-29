@@ -1,4 +1,4 @@
-import type { FbNode, SectionLayout, Widget } from '@shared/types'
+import type { FbNode, SectionLayout, Widget, DocType } from '@shared/types'
 
 // Snapshot shapes — the on-the-wire contract between desktop, signal
 // server, and public viewer. Versioned via `_version` so we can evolve
@@ -49,7 +49,7 @@ export interface WidgetSnapshot extends ShareSnapshotBase {
 export interface DocumentSnapshot extends ShareSnapshotBase {
   kind: 'document'
   title: string
-  docType: 'doc' | 'sheet' | 'slides' | 'map'
+  docType: DocType
   html: string
 }
 
@@ -59,7 +59,7 @@ export interface DocumentSnapshot extends ShareSnapshotBase {
 export interface DocFolderEntry {
   type: 'folder' | 'document'
   name: string
-  docType?: 'doc' | 'sheet' | 'slides' | 'map'
+  docType?: DocType
   html?: string
   body?: unknown
   items?: DocFolderEntry[]

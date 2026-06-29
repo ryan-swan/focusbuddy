@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import type { MapBody, SheetBody, SlidesBody } from '@shared/types'
 import { useDocumentsStore } from '../../stores/documents'
 import { useViewStore } from '../../stores/view'
-import { DocEditor, SheetEditor, SlidesEditor, MapEditor } from '@office'
+import { DocEditor, SheetEditor, SlidesEditor, MapEditor, DesignEditor } from '@office'
 import Icon from '../Icon'
 
 // Document editor — loads the active document and hands its body to the right
@@ -44,7 +44,9 @@ export default function DocumentEditorView({ documentId }: Props): JSX.Element {
         ? 'Spreadsheet'
         : active.docType === 'slides'
           ? 'Slides'
-          : 'Map'
+          : active.docType === 'design'
+            ? 'Design'
+            : 'Map'
   const typeIcon =
     active.docType === 'doc'
       ? 'description'
@@ -52,7 +54,9 @@ export default function DocumentEditorView({ documentId }: Props): JSX.Element {
         ? 'table_chart'
         : active.docType === 'slides'
           ? 'slideshow'
-          : 'account_tree'
+          : active.docType === 'design'
+            ? 'palette'
+            : 'account_tree'
 
   return (
     <div className="h-full flex flex-col desk-paper no-tod">
@@ -94,6 +98,9 @@ export default function DocumentEditorView({ documentId }: Props): JSX.Element {
         )}
         {active.docType === 'map' && (
           <MapEditor key={active.id} body={active.body as MapBody} title={active.title} onChange={(b) => saveBody(b)} />
+        )}
+        {active.docType === 'design' && (
+          <DesignEditor key={active.id} content={active.body} title={active.title} onChange={(b) => saveBody(b)} />
         )}
       </div>
     </div>

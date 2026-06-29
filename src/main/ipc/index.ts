@@ -1953,8 +1953,14 @@ export function registerIpcHandlers(): void {
   )
   ipcMain.handle(
     'documents:generate',
-    (_e, input: { docType: DocType; prompt: string; audience?: string }) =>
-      generateDocument(input)
+    (_e, input: { docType: DocType; prompt: string; audience?: string }) => {
+      // Designs have their own AI path (design:generateContent); this handler
+      // covers the text-document kinds only.
+      if (input.docType === 'design') {
+        return Promise.resolve({ ok: false, error: 'Designs are generated through the design tools.' })
+      }
+      return generateDocument({ ...input, docType: input.docType })
+    }
   )
 
   ipcMain.handle('settings:hintAnthropic', () => hint('anthropic'))

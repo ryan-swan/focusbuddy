@@ -41,3 +41,7 @@ release-office/
 # marketing-only tool, so it's excluded too.
 marketing/
 tests/e2e/captureMarketingShots.spec.ts
+
+# Stray Windows release-artifact download dirs (installers exceed GitHub 100MB)
+win-artifact/
+win[0-9]*/

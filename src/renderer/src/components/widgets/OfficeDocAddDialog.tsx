@@ -20,7 +20,9 @@ const META: Record<DocType, { label: string; importLabel: string }> = {
   sheet: { label: 'Spreadsheet', importLabel: 'Import an Excel .xlsx / .csv' },
   slides: { label: 'Slides', importLabel: 'Import a PowerPoint .pptx' },
   // Maps have no external import format yet — the create-new path is the only one.
-  map: { label: 'Map', importLabel: '' }
+  map: { label: 'Map', importLabel: '' },
+  // Designs are created in the design studio, not imported here.
+  design: { label: 'Design', importLabel: '' }
 }
 
 export default function OfficeDocAddDialog({ docType, onPicked, onClose }: Props): JSX.Element {
