@@ -36,6 +36,20 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.110',
+    date: '2026-06-30T20:00:00Z',
+    title: 'v2.5.110 — PlexiDesign: fonts, stock photos, background removal, magic resize',
+    tag: 'feature',
+    summary:
+      'PlexiDesign closes the distance to a full design tool. There is a real font library now, around a hundred Google Fonts in the text picker and the brand kit, not a handful of system stacks. Search free stock photos right inside the studio and drop one onto the canvas, and remove the background from any image in a click. Resize a design to a different format and the whole layout reflows to fit instead of leaving everything stranded. And there are more building blocks, triangles, rounded rectangles and lines. Stock photos use a free Pexels key and background removal uses a remove.bg key, both added in Settings; without them those tools tell you what they need rather than pretending.',
+    highlights: [
+      'A real font library: around 100 Google Fonts in the text picker and the brand kit.',
+      'Search and insert free stock photos (Pexels) without leaving the studio.',
+      'One-click background removal on any image (remove.bg).',
+      'Magic resize reflows a whole design to a new size; plus triangle, rounded-rectangle and line tools.'
+    ]
+  },
+  {
     version: '2.5.109',
     date: '2026-06-30T16:00:00Z',
     title: 'v2.5.109 — PlexiDesign editor depth',
