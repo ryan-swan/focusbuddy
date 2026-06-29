@@ -78,6 +78,13 @@ import type { PlexiSignRequest, PlexiSignDraft, PlexiSignPatch, SignAction } fro
 
 type VaultResult = { ok: true } | { ok: false; error: string }
 
+// Mirror of the document page setup carried to the .docx/PDF exporters.
+interface PageSetupInput {
+  size: 'letter' | 'a4'
+  orientation: 'portrait' | 'landscape'
+  margin: { top: number; right: number; bottom: number; left: number }
+}
+
 const api = {
   // The host OS, so the renderer can tailor flows that differ by platform
   // (e.g. macOS updates are download-to-replace rather than in-place install).
@@ -1526,11 +1533,13 @@ const api = {
     exportDocx: (input: {
       html: string
       title: string
+      page?: PageSetupInput
     }): Promise<{ ok: boolean; path?: string; error?: string }> =>
       ipcRenderer.invoke('office:exportDocx', input),
     exportPdf: (input: {
       html: string
       title: string
+      page?: PageSetupInput
     }): Promise<{ ok: boolean; path?: string; error?: string }> =>
       ipcRenderer.invoke('office:exportPdf', input),
     pickImage: (): Promise<{ ok: boolean; dataUrl?: string; error?: string }> =>

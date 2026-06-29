@@ -394,7 +394,7 @@ import {
   fillSheetRange,
   generateSlideElements
 } from '../ai/anthropic'
-import { importDocx, exportDocx, exportPdf, pickImage } from '../officeDocx'
+import { importDocx, exportDocx, exportPdf, pickImage, type PageSetupInput } from '../officeDocx'
 import { importSheet, exportSheet } from '../sheetIo'
 import { exportSlides, importPptx } from '../slidesIo'
 import { getModelMode, setModelMode } from '../ai/modelRouting'
@@ -807,8 +807,8 @@ export function registerIpcHandlers(): void {
 
   // ── Office interop for the document editor (.docx / PDF / image) ───────────
   ipcMain.handle('office:importDocx', () => importDocx())
-  ipcMain.handle('office:exportDocx', (_e, input: { html: string; title: string }) => exportDocx(input))
-  ipcMain.handle('office:exportPdf', (_e, input: { html: string; title: string }) => exportPdf(input))
+  ipcMain.handle('office:exportDocx', (_e, input: { html: string; title: string; page?: PageSetupInput }) => exportDocx(input))
+  ipcMain.handle('office:exportPdf', (_e, input: { html: string; title: string; page?: PageSetupInput }) => exportPdf(input))
   ipcMain.handle('office:pickImage', () => pickImage())
 
   // ── Spreadsheet interop + AI fill ─────────────────────────────────────────

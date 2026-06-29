@@ -29,6 +29,22 @@ export interface OfficePickImageResult {
   error?: string
 }
 
+// The document's page setup, mirrored from the renderer's PageSetup. Margins are
+// in inches; size and orientation drive the .docx/PDF page geometry so the export
+// matches the on-screen sheet.
+export interface PageSetupInput {
+  size: 'letter' | 'a4'
+  orientation: 'portrait' | 'landscape'
+  margin: { top: number; right: number; bottom: number; left: number }
+}
+
+const DEFAULT_PAGE: PageSetupInput = { size: 'letter', orientation: 'portrait', margin: { top: 1, right: 1, bottom: 1, left: 1 } }
+
+// Paper dimensions in twips (1 inch = 1440 twips), portrait orientation.
+function paperTwips(size: 'letter' | 'a4'): { width: number; height: number } {
+  return size === 'a4' ? { width: 11906, height: 16838 } : { width: 12240, height: 15840 }
+}
+
 function focusedWindow(): BrowserWindow | undefined {
   return BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0]
 }
@@ -57,8 +73,10 @@ export async function importDocx(): Promise<OfficeImportResult> {
   }
 }
 
-// Save the editor's HTML as a .docx via html-to-docx.
-export async function exportDocx(input: { html: string; title: string }): Promise<OfficeExportResult> {
+// Save the editor's HTML as a .docx via html-to-docx, honouring the document's
+// own page setup (size, orientation, per-side margins) so Word opens the file
+// with the same pages the writer set on screen.
+export async function exportDocx(input: { html: string; title: string; page?: PageSetupInput }): Promise<OfficeExportResult> {
   const win = focusedWindow()
   const safe = (input.title || 'document').replace(/[/\\?%*:|"<>]/g, '-')
   const res = await dialog.showSaveDialog(win!, {
@@ -69,6 +87,10 @@ export async function exportDocx(input: { html: string; title: string }): Promis
   if (res.canceled || !res.filePath) return { ok: false }
   try {
     const HTMLtoDOCX = (await import('@turbodocx/html-to-docx')).default
+    const page = input.page ?? DEFAULT_PAGE
+    const inch = (n: number): number => Math.round(n * 1440)
+    const paper = paperTwips(page.size)
+    const landscape = page.orientation === 'landscape'
     // Give tables a visible default border so a Plexi table doesn't arrive in Word
     // as an invisible grid, and wrap the body with a base font so the document
     // reads like a real Word file rather than browser default.
@@ -78,7 +100,14 @@ export async function exportDocx(input: { html: string; title: string }): Promis
       title: safe,
       font: 'Calibri',
       fontSize: 22, // half-points = 11pt
-      margins: { top: 1440, right: 1440, bottom: 1440, left: 1440 }, // 1 inch (twips)
+      orientation: page.orientation,
+      pageSize: landscape ? { width: paper.height, height: paper.width } : paper,
+      margins: {
+        top: inch(page.margin.top),
+        right: inch(page.margin.right),
+        bottom: inch(page.margin.bottom),
+        left: inch(page.margin.left)
+      },
       table: { row: { cantSplit: true } },
       footer: true,
       pageNumber: true
@@ -93,7 +122,7 @@ export async function exportDocx(input: { html: string; title: string }): Promis
 
 // Render the editor's HTML to a PDF using an offscreen window and Chromium's
 // print engine, so the PDF matches what the user sees.
-export async function exportPdf(input: { html: string; title: string }): Promise<OfficeExportResult> {
+export async function exportPdf(input: { html: string; title: string; page?: PageSetupInput }): Promise<OfficeExportResult> {
   const win = focusedWindow()
   const safe = (input.title || 'document').replace(/[/\\?%*:|"<>]/g, '-')
   const res = await dialog.showSaveDialog(win!, {
@@ -103,11 +132,15 @@ export async function exportPdf(input: { html: string; title: string }): Promise
   })
   if (res.canceled || !res.filePath) return { ok: false }
 
-  // A print stylesheet that gives the PDF Word-like Letter geometry and reuses
-  // basic prose typography. Kept self-contained so it needs no app CSS.
-  const page = `<!DOCTYPE html><html><head><meta charset="utf-8">
+  const setup = input.page ?? DEFAULT_PAGE
+  const landscape = setup.orientation === 'landscape'
+  const sizeName = setup.size === 'a4' ? 'A4' : 'Letter'
+  const m = setup.margin
+  // A print stylesheet that gives the PDF the document's own page geometry and
+  // reuses basic prose typography. Kept self-contained so it needs no app CSS.
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
   <style>
-    @page { size: Letter; margin: 1in; }
+    @page { size: ${sizeName} ${setup.orientation}; margin: ${m.top}in ${m.right}in ${m.bottom}in ${m.left}in; }
     body { font-family: Georgia, "Times New Roman", serif; font-size: 12pt; line-height: 1.5; color: #1c1917; }
     h1 { font-size: 22pt; } h2 { font-size: 17pt; } h3 { font-size: 14pt; }
     table { border-collapse: collapse; width: 100%; }
@@ -119,8 +152,13 @@ export async function exportPdf(input: { html: string; title: string }): Promise
 
   const offscreen = new BrowserWindow({ show: false, webPreferences: { offscreen: true } })
   try {
-    await offscreen.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(page)}`)
-    const pdf = await offscreen.webContents.printToPDF({ printBackground: true, pageSize: 'Letter' })
+    await offscreen.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`)
+    const pdf = await offscreen.webContents.printToPDF({
+      printBackground: true,
+      pageSize: sizeName,
+      landscape,
+      margins: { marginType: 'custom', top: m.top, right: m.right, bottom: m.bottom, left: m.left }
+    })
     await writeFile(res.filePath, pdf)
     return { ok: true, path: res.filePath }
   } catch (e) {

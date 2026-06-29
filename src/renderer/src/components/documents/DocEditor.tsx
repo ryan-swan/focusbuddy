@@ -3,7 +3,16 @@ import { EditorContent, useEditor, type Editor } from '@tiptap/react'
 import { buildDocExtensions } from './editor/extensions'
 import { htmlToDocContent } from '../../lib/docHtml'
 import { sanitizeHtml } from '../../lib/htmlSanitize'
-import { parseDocBody, wrapDocBody, headingCss, type HeadingStyle, type HeadingStyles } from './editor/headingStyles'
+import {
+  parseDocBody,
+  wrapDocBody,
+  headingCss,
+  MARGIN_PRESETS,
+  type HeadingStyle,
+  type HeadingStyles,
+  type PageSetup,
+  type PageMargins
+} from './editor/headingStyles'
 import Toolbar from './editor/Toolbar'
 import DocBubbleMenu from './editor/DocBubbleMenu'
 import FindReplace from './editor/FindReplace'
@@ -29,22 +38,30 @@ const COMMENT_CSS = `
 .ProseMirror .fb-comment:hover { background: rgba(250, 204, 21, .38); }
 `
 
-type Paper = 'letter' | 'a4'
-type Orientation = 'portrait' | 'landscape'
-
 // Page geometry at 96dpi (the CSS reference), so a Letter portrait sheet is the
-// familiar 816x1056 with a 1-inch margin, A4 is 794x1123, and landscape swaps the
-// long and short edges. This is what makes the page-view sheet look like real
-// paper and gives portrait/landscape a true effect rather than a cosmetic one.
-function pageGeometry(paper: Paper, orientation: Orientation): { w: number; h: number; margin: number } {
+// familiar 816x1056, A4 is 794x1123, and landscape swaps the long and short
+// edges. Margins come from the document's own page setup (per side, in inches),
+// so what the writer sets is what the sheet and the exports show. This is what
+// makes the page-view sheet look like real paper and gives portrait/landscape a
+// true effect rather than a cosmetic one.
+function pageGeometry(page: PageSetup): {
+  w: number
+  h: number
+  mTop: number
+  mRight: number
+  mBottom: number
+  mLeft: number
+} {
   const DPI = 96
-  const base = paper === 'a4' ? { w: 8.27 * DPI, h: 11.69 * DPI } : { w: 8.5 * DPI, h: 11 * DPI }
-  const margin = DPI // a 1-inch margin, Word's default
-  const portrait = orientation === 'portrait'
+  const base = page.size === 'a4' ? { w: 8.27 * DPI, h: 11.69 * DPI } : { w: 8.5 * DPI, h: 11 * DPI }
+  const portrait = page.orientation === 'portrait'
   return {
     w: Math.round(portrait ? base.w : base.h),
     h: Math.round(portrait ? base.h : base.w),
-    margin
+    mTop: Math.round(page.margin.top * DPI),
+    mRight: Math.round(page.margin.right * DPI),
+    mBottom: Math.round(page.margin.bottom * DPI),
+    mLeft: Math.round(page.margin.left * DPI)
   }
 }
 
@@ -94,20 +111,28 @@ export default function DocEditor({ content, title, onChange, ydoc, awareness, u
   const [findOpen, setFindOpen] = useState(false)
   const [focusMode, setFocusMode] = useState(false)
   const [outlineOpen, setOutlineOpen] = useState(false)
-  // Page vs continuous layout, paper size and orientation — remembered across
-  // sessions so the writer's preferred surface is how the document opens.
+  // Page vs continuous layout is a personal viewing preference (remembered across
+  // sessions). Paper size, orientation and margins are part of the document and
+  // travel with it, so they live on the body, not in localStorage.
   const [pageView, setPageView] = useState<boolean>(() => readPref('fb.doc.pageView', ['0', '1'] as const, '0') === '1')
-  const [orientation, setOrientation] = useState<Orientation>(() => readPref('fb.doc.orientation', ['portrait', 'landscape'] as const, 'portrait'))
-  const [paper, setPaper] = useState<Paper>(() => readPref('fb.doc.paper', ['letter', 'a4'] as const, 'letter'))
+  const [showMargins, setShowMargins] = useState(false)
   const [aiInstruction, setAiInstruction] = useState('')
   const [busyOffice, setBusyOffice] = useState<string | null>(null)
   const [officeMsg, setOfficeMsg] = useState<string | null>(null)
 
   // Parse the (possibly legacy) body once into the Tiptap doc + named heading
-  // styles. The body is persisted wrapped as { doc, headingStyles } so heading
-  // styles survive save/reopen; legacy raw-Tiptap bodies still open.
+  // styles + page setup. The body is persisted wrapped as { doc, headingStyles,
+  // page } so all three survive save/reopen; legacy raw-Tiptap bodies still open.
   const initial = parseDocBody(content)
   const [headingStyles, setHeadingStyles] = useState<HeadingStyles>(initial.headingStyles)
+  const [page, setPage] = useState<PageSetup>(initial.page)
+  // The editor's onUpdate closure is created once at mount, so reading state
+  // there would save stale heading styles / page setup over a fresh edit. This
+  // ref always holds the current values; every save reads from it.
+  const metaRef = useRef<{ headingStyles: HeadingStyles; page: PageSetup }>({
+    headingStyles: initial.headingStyles,
+    page: initial.page
+  })
   // Stable class to scope the injected heading CSS to this editor instance.
   const scopeClass = 'doc-hs-' + useId().replace(/[:]/g, '')
 
@@ -119,8 +144,9 @@ export default function DocEditor({ content, title, onChange, ydoc, awareness, u
     onUpdate({ editor }) {
       // Non-collab: this IS the save. Collab: peers sync through the Yjs doc, but
       // we still emit the body so the parent can snapshot it to storage (exports
-      // and non-live views read that), debounced on its side.
-      onChange(wrapDocBody(editor.getJSON(), headingStyles))
+      // and non-live views read that), debounced on its side. Read meta from the
+      // ref so a save never reverts a just-changed heading style or page setup.
+      onChange(wrapDocBody(editor.getJSON(), metaRef.current.headingStyles, metaRef.current.page))
     },
     editorProps: {
       attributes: {
@@ -167,11 +193,11 @@ export default function DocEditor({ content, title, onChange, ydoc, awareness, u
         toggleOutline: () => setOutlineOpen((v) => !v),
         togglePageView: () => setPageView((v) => !v),
         setPortrait: () => {
-          setOrientation('portrait')
+          updatePageSetup({ orientation: 'portrait' })
           setPageView(true)
         },
         setLandscape: () => {
-          setOrientation('landscape')
+          updatePageSetup({ orientation: 'landscape' })
           setPageView(true)
         },
         openFind: () => setFindOpen(true),
@@ -187,16 +213,14 @@ export default function DocEditor({ content, title, onChange, ydoc, awareness, u
     [editor]
   )
 
-  // Remember the layout preferences.
+  // Remember the page-vs-continuous viewing preference (a personal one).
   useEffect(() => {
     try {
       localStorage.setItem('fb.doc.pageView', pageView ? '1' : '0')
-      localStorage.setItem('fb.doc.orientation', orientation)
-      localStorage.setItem('fb.doc.paper', paper)
     } catch {
       /* ignore quota */
     }
-  }, [pageView, orientation, paper])
+  }, [pageView])
 
   // In focus mode, Escape leaves it (mirrors the palette's own Esc-to-close).
   useEffect(() => {
@@ -213,7 +237,19 @@ export default function DocEditor({ content, title, onChange, ydoc, awareness, u
   function updateHeadingStyle(level: number, patch: Partial<HeadingStyle>): void {
     setHeadingStyles((prev) => {
       const next: HeadingStyles = { ...prev, [level]: { ...prev[level], ...patch } }
-      onChange(wrapDocBody(editor?.getJSON() ?? initial.doc, next))
+      metaRef.current.headingStyles = next
+      onChange(wrapDocBody(editor?.getJSON() ?? initial.doc, next, metaRef.current.page))
+      return next
+    })
+  }
+
+  // Update the page setup (size, orientation, margins) and persist it on the body
+  // so the sheet and the exports both follow it.
+  function updatePageSetup(patch: Partial<PageSetup>): void {
+    setPage((prev) => {
+      const next: PageSetup = { ...prev, ...patch, margin: { ...prev.margin, ...(patch.margin ?? {}) } }
+      metaRef.current.page = next
+      onChange(wrapDocBody(editor?.getJSON() ?? initial.doc, metaRef.current.headingStyles, next))
       return next
     })
   }
@@ -265,7 +301,7 @@ export default function DocEditor({ content, title, onChange, ydoc, awareness, u
     setBusyOffice('Exporting…')
     setOfficeMsg(null)
     try {
-      const res = await window.api.office.exportDocx({ html: editor.getHTML(), title })
+      const res = await window.api.office.exportDocx({ html: editor.getHTML(), title, page })
       setOfficeMsg(res.ok ? `Saved ${res.path}` : res.error ?? null)
     } finally {
       setBusyOffice(null)
@@ -277,7 +313,7 @@ export default function DocEditor({ content, title, onChange, ydoc, awareness, u
     setBusyOffice('Exporting…')
     setOfficeMsg(null)
     try {
-      const res = await window.api.office.exportPdf({ html: editor.getHTML(), title })
+      const res = await window.api.office.exportPdf({ html: editor.getHTML(), title, page })
       setOfficeMsg(res.ok ? `Saved ${res.path}` : res.error ?? null)
     } finally {
       setBusyOffice(null)
@@ -336,22 +372,36 @@ export default function DocEditor({ content, title, onChange, ydoc, awareness, u
             {pageView && (
               <>
                 <button
-                  onClick={() => setOrientation((o) => (o === 'portrait' ? 'landscape' : 'portrait'))}
+                  onClick={() => updatePageSetup({ orientation: page.orientation === 'portrait' ? 'landscape' : 'portrait' })}
                   className="inline-flex items-center gap-1 px-2 py-1 rounded-full hover:bg-stone-100/70 dark:hover:bg-stone-800/50 fb-spring-soft"
                   title="Toggle portrait / landscape"
                   data-testid="doc-orientation-btn"
                 >
-                  <Icon name={orientation === 'portrait' ? 'crop_portrait' : 'crop_landscape'} size={13} />
-                  <span>{orientation === 'portrait' ? 'Portrait' : 'Landscape'}</span>
+                  <Icon name={page.orientation === 'portrait' ? 'crop_portrait' : 'crop_landscape'} size={13} />
+                  <span>{page.orientation === 'portrait' ? 'Portrait' : 'Landscape'}</span>
                 </button>
                 <button
-                  onClick={() => setPaper((p) => (p === 'letter' ? 'a4' : 'letter'))}
+                  onClick={() => updatePageSetup({ size: page.size === 'letter' ? 'a4' : 'letter' })}
                   className="px-2 py-1 rounded-full hover:bg-stone-100/70 dark:hover:bg-stone-800/50 fb-spring-soft"
                   title="Paper size"
                   data-testid="doc-paper-btn"
                 >
-                  {paper === 'a4' ? 'A4' : 'Letter'}
+                  {page.size === 'a4' ? 'A4' : 'Letter'}
                 </button>
+                <div className="relative">
+                  <button
+                    onClick={() => setShowMargins((v) => !v)}
+                    className="inline-flex items-center gap-1 px-2 py-1 rounded-full hover:bg-stone-100/70 dark:hover:bg-stone-800/50 fb-spring-soft"
+                    title="Page margins"
+                    data-testid="doc-margins-btn"
+                  >
+                    <Icon name="margin" size={13} />
+                    <span>Margins</span>
+                  </button>
+                  {showMargins && (
+                    <MarginMenu margin={page.margin} onPick={(m) => updatePageSetup({ margin: m })} onClose={() => setShowMargins(false)} />
+                  )}
+                </div>
               </>
             )}
 
@@ -508,7 +558,7 @@ export default function DocEditor({ content, title, onChange, ydoc, awareness, u
       </div>
 
       {showPage ? (
-        <PageSheet editor={editor} paper={paper} orientation={orientation} />
+        <PageSheet editor={editor} page={page} />
       ) : (
         <div className="max-w-3xl mx-auto px-8 pb-16">
           <EditorContent editor={editor} />
@@ -518,21 +568,80 @@ export default function DocEditor({ content, title, onChange, ydoc, awareness, u
   )
 }
 
-// The page-view surface: the editor body rendered onto a paper-sized sheet with
-// real margins and a drop shadow on a soft canvas, with dashed page-break guides
-// drawn at each page boundary as the content grows. Portrait/landscape and paper
-// size flow straight from the chosen geometry. The breaks are honest guides — the
-// text stays one continuous flow underneath rather than being silently split.
-function PageSheet({
-  editor,
-  paper,
-  orientation
+// The page-margins menu: the named presets Word offers plus a custom editor for
+// the four sides (in inches). Picking a preset or editing a side updates the
+// document's page setup, so the sheet and the exports follow immediately.
+function MarginMenu({
+  margin,
+  onPick,
+  onClose
 }: {
-  editor: Editor
-  paper: Paper
-  orientation: Orientation
+  margin: PageMargins
+  onPick: (m: PageMargins) => void
+  onClose: () => void
 }): JSX.Element {
-  const geom = pageGeometry(paper, orientation)
+  const sides: { key: keyof PageMargins; label: string }[] = [
+    { key: 'top', label: 'Top' },
+    { key: 'right', label: 'Right' },
+    { key: 'bottom', label: 'Bottom' },
+    { key: 'left', label: 'Left' }
+  ]
+  return (
+    <>
+      <div className="fixed inset-0 z-30" onClick={onClose} />
+      <div
+        className="absolute left-0 mt-1.5 z-40 w-56 rounded-xl border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 shadow-lg p-2 text-stone-700 dark:text-stone-200"
+        data-testid="doc-margins-menu"
+      >
+        {MARGIN_PRESETS.map((p) => {
+          const active = p.margin.top === margin.top && p.margin.right === margin.right && p.margin.bottom === margin.bottom && p.margin.left === margin.left
+          return (
+            <button
+              key={p.id}
+              onClick={() => onPick({ ...p.margin })}
+              data-testid={`doc-margin-preset-${p.id}`}
+              className={`w-full text-left px-2 py-1.5 rounded-md text-[12px] ${active ? 'bg-accent/10 text-accent' : 'hover:bg-stone-100 dark:hover:bg-stone-800'}`}
+            >
+              {p.label}
+            </button>
+          )
+        })}
+        <div className="mt-1.5 pt-1.5 border-t border-stone-200 dark:border-stone-700">
+          <p className="px-2 text-[10px] uppercase tracking-[0.1em] text-stone-400 mb-1">Custom (inches)</p>
+          <div className="grid grid-cols-2 gap-1.5 px-1">
+            {sides.map((s) => (
+              <label key={s.key} className="flex items-center gap-1 text-[11px]">
+                <span className="w-12 text-stone-500">{s.label}</span>
+                <input
+                  type="number"
+                  min={0}
+                  max={4}
+                  step={0.05}
+                  value={margin[s.key]}
+                  data-testid={`doc-margin-${s.key}`}
+                  onChange={(e) => {
+                    const v = Number(e.target.value)
+                    if (Number.isFinite(v)) onPick({ ...margin, [s.key]: Math.max(0, Math.min(4, v)) })
+                  }}
+                  className="w-full rounded border border-stone-300 dark:border-stone-600 bg-transparent px-1.5 py-0.5"
+                />
+              </label>
+            ))}
+          </div>
+        </div>
+      </div>
+    </>
+  )
+}
+
+// The page-view surface: the editor body rendered onto a paper-sized sheet with
+// real per-side margins and a drop shadow on a soft canvas, with dashed page-break
+// guides drawn at each page boundary as the content grows. Paper size, orientation
+// and margins flow straight from the document's own page setup. The breaks are
+// honest guides — the text stays one continuous flow underneath rather than being
+// silently split.
+function PageSheet({ editor, page }: { editor: Editor; page: PageSetup }): JSX.Element {
+  const geom = pageGeometry(page)
   const contentRef = useRef<HTMLDivElement | null>(null)
   const [contentH, setContentH] = useState(0)
 
@@ -543,9 +652,9 @@ function PageSheet({
     ro.observe(el)
     setContentH(el.scrollHeight)
     return () => ro.disconnect()
-  }, [paper, orientation])
+  }, [page])
 
-  const usable = geom.h - geom.margin * 2
+  const usable = geom.h - geom.mTop - geom.mBottom
   const breaks: number[] = []
   for (let y = usable; y < contentH && breaks.length < 400; y += usable) breaks.push(y)
 
@@ -557,14 +666,14 @@ function PageSheet({
       <div
         className="relative bg-white dark:bg-stone-900 shadow-xl rounded-[2px]"
         data-testid="doc-page"
-        data-orientation={orientation}
+        data-orientation={page.orientation}
         style={{
           width: geom.w,
           minHeight: geom.h,
-          paddingTop: geom.margin,
-          paddingBottom: geom.margin,
-          paddingLeft: geom.margin,
-          paddingRight: geom.margin
+          paddingTop: geom.mTop,
+          paddingBottom: geom.mBottom,
+          paddingLeft: geom.mLeft,
+          paddingRight: geom.mRight
         }}
       >
         <div ref={contentRef}>
@@ -574,7 +683,7 @@ function PageSheet({
           <div
             key={i}
             data-testid="doc-page-break"
-            style={{ position: 'absolute', left: 0, right: 0, top: geom.margin + y, pointerEvents: 'none' }}
+            style={{ position: 'absolute', left: 0, right: 0, top: geom.mTop + y, pointerEvents: 'none' }}
           >
             <div style={{ borderTop: '1px dashed rgba(120,120,120,0.45)' }} />
             <span
