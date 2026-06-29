@@ -36,6 +36,20 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.109',
+    date: '2026-06-30T16:00:00Z',
+    title: 'v2.5.109 — PlexiDesign editor depth',
+    tag: 'feature',
+    summary:
+      'PlexiDesign grows the editing fundamentals that make it feel like a real design tool. There is full undo and redo now, with keyboard shortcuts, plus duplicate and delete for whatever you have selected. Select more than one element and you can align, distribute and group them. Every element has opacity and rotation, text gets a proper font picker with alignment and bold, italic and underline, and you can set the canvas background. The template library more than doubled, with quote posts, big-stat posts, story covers, sale promos, business cards, section dividers, pull quotes and logo lockups across social, marketing, presentations and brand assets.',
+    highlights: [
+      'Undo and redo with keyboard shortcuts, plus duplicate (Cmd/Ctrl+D) and delete.',
+      'Multi-select align, distribute and group; per-element opacity and rotation.',
+      'A font picker, text alignment and bold/italic/underline, and a canvas background color.',
+      'The template library expanded from 5 to 13 across every design family.'
+    ]
+  },
+  {
     version: '2.5.108',
     date: '2026-06-30T10:00:00Z',
     title: 'v2.5.108 — Design export and a brand kit for the whole workspace',
