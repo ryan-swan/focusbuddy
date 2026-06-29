@@ -36,6 +36,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.112',
+    date: '2026-07-01T16:00:00Z',
+    title: 'v2.5.112 — PlexiDesign is its own studio, with a much better look',
+    tag: 'feature',
+    summary:
+      'PlexiDesign is now its own place in the app, not a tab tucked inside Documents. There is a PlexiDesign entry in the sidebar and the command palette, and a proper home where you start a design at any size, begin from an on-brand template, or open one you already made. The designs themselves look far better too. Backgrounds are real gradients in your brand color, with soft depth, rounded pill buttons, a cleaner type hierarchy and a more considered layout, the kind of finish you expect from a design tool rather than a flat colored box with text on it.',
+    highlights: [
+      'PlexiDesign is its own module: a sidebar entry, a command-palette command, and its own start screen.',
+      'Documents goes back to being the document surface; design lives on its own.',
+      'Generated designs now use gradient backgrounds, depth, rounded buttons and a stronger type hierarchy.'
+    ]
+  },
+  {
     version: '2.5.111',
     date: '2026-07-01T10:00:00Z',
     title: 'v2.5.111 — PlexiDesign AI template generator',
