@@ -17,6 +17,7 @@ export type View =
   | { kind: 'inbox' }
   | { kind: 'mail'; openUid?: number }
   | { kind: 'documents' }
+  | { kind: 'design' }
   | { kind: 'document'; documentId: string }
   | { kind: 'livedoc'; liveDocId: string }
   | { kind: 'livecanvas'; liveCanvasId: string }
@@ -54,6 +55,7 @@ interface ViewStore {
   goInbox: () => void
   goMail: (openUid?: number) => void
   goDocuments: () => void
+  goDesign: () => void
   goDocument: (documentId: string) => void
   goLiveDoc: (liveDocId: string) => void
   goLiveCanvas: (liveCanvasId: string) => void
@@ -166,6 +168,11 @@ export const useViewStore = create<ViewStore>((set) => ({
   },
   goDocuments: () => {
     const v: View = { kind: 'documents' }
+    persistView(v)
+    set({ view: v })
+  },
+  goDesign: () => {
+    const v: View = { kind: 'design' }
     persistView(v)
     set({ view: v })
   },

@@ -22,6 +22,7 @@ export default function DocumentEditorView({ documentId }: Props): JSX.Element {
   const saveBody = useDocumentsStore((s) => s.saveBody)
   const rename = useDocumentsStore((s) => s.rename)
   const goDocuments = useViewStore((s) => s.goDocuments)
+  const goDesign = useViewStore((s) => s.goDesign)
 
   useEffect(() => {
     void open(documentId)
@@ -65,10 +66,11 @@ export default function DocumentEditorView({ documentId }: Props): JSX.Element {
         <button
           onClick={() => {
             close()
-            goDocuments()
+            if (active.docType === 'design') goDesign()
+            else goDocuments()
           }}
           className="icon-btn"
-          title="Back to Documents"
+          title={active.docType === 'design' ? 'Back to PlexiDesign' : 'Back to Documents'}
         >
           <Icon name="arrow_back" size={17} />
         </button>

@@ -84,7 +84,9 @@ describe('templates', () => {
     const size = findDesignSize('ig-post')!
     const d = designFromTemplate(tpl, size, brand)
     expect(d.width).toBe(1080)
-    expect(d.background).toEqual({ type: 'solid', color: '#7c3aed' })
+    // Premium backgrounds are brand-derived gradients, not flat fills.
+    expect(d.background?.type).toBe('gradient')
+    expect(d.background?.color).toBeTruthy()
     expect(d.brandApplied).toBe(true)
   })
   it('blankDesign is an empty white canvas at the size', () => {
@@ -160,11 +162,11 @@ describe('designToHtml export render', () => {
     { colorPrimary: '#2563eb', fontHeading: 'Inter', fontBody: 'Inter' }
   )
 
-  it('renders a sized canvas with the background color', () => {
+  it('renders a sized canvas with a gradient background', () => {
     const html = designToHtml(d)
     expect(html).toContain('width:1080px')
     expect(html).toContain('height:1080px')
-    expect(html).toContain('background:#2563eb')
+    expect(html).toContain('background:linear-gradient(')
   })
   it('renders each element', () => {
     const html = designToHtml(d)

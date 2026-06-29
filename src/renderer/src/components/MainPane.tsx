@@ -10,6 +10,7 @@ import MessagesView from './views/MessagesView'
 import InboxView from './views/InboxView'
 import MailView from './views/MailView'
 import DocumentsView from './views/DocumentsView'
+import DesignsView from './views/DesignsView'
 import DocumentEditorView from './views/DocumentEditorView'
 import LiveDocEditorView from './views/LiveDocEditorView'
 import LiveCanvasView from './views/LiveCanvasView'
@@ -61,6 +62,8 @@ export default function MainPane(): JSX.Element {
       return <MailView />
     case 'documents':
       return <DocumentsView />
+    case 'design':
+      return <DesignsView />
     case 'document':
       return <DocumentEditorView documentId={view.documentId} />
     case 'livedoc':

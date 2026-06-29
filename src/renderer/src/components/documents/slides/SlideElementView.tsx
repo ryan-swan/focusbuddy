@@ -4,6 +4,7 @@
 // editor, present and export sizes.
 
 import type { SlideElement, SlideTextElement } from '@shared/types'
+import { fillToCss } from '@shared/fills'
 import { cropStyle } from './slideOps'
 
 // Drop-shadow presets, soft enough to read as depth rather than a hard edge.
@@ -83,7 +84,7 @@ export default function SlideElementView({ el }: { el: SlideElement }): JSX.Elem
         style={{
           ...base,
           ...frame(el),
-          backgroundColor: el.fill?.type === 'solid' ? el.fill.color : undefined,
+          background: fillToCss(el.fill),
           border: borderCss(el.border)
         }}
       >
@@ -129,7 +130,7 @@ export default function SlideElementView({ el }: { el: SlideElement }): JSX.Elem
               width: '100%',
               height: '100%',
               clipPath: 'polygon(50% 0%, 0% 100%, 100% 100%)',
-              backgroundColor: el.fill?.type === 'solid' ? el.fill.color : 'transparent'
+              background: fillToCss(el.fill) ?? 'transparent'
             }}
           />
         </div>
@@ -139,7 +140,7 @@ export default function SlideElementView({ el }: { el: SlideElement }): JSX.Elem
       <div
         style={{
           ...base,
-          backgroundColor: el.fill?.type === 'solid' ? el.fill.color : 'transparent',
+          background: fillToCss(el.fill) ?? 'transparent',
           borderRadius: radius,
           boxShadow: el.shadow ? SHADOW[el.shadow] : undefined,
           border: borderCss(el.border)

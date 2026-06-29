@@ -10,6 +10,7 @@ import { Rnd } from 'react-rnd'
 import type { DeckTheme, Slide, SlideElement } from '@shared/types'
 import { SLIDE_W, SLIDE_H } from '@shared/slideThemes'
 import SlideElementView from './SlideElementView'
+import { fillToCss } from '@shared/fills'
 import { elementText } from './slideOps'
 
 // Smart-guide snapping. While dragging, an element's left / centre / right (and
@@ -98,7 +99,7 @@ export default function SlideCanvas({
   const lh = logicalH
   const scale = width / lw
   const height = width * (lh / lw)
-  const bg = slide.background?.type === 'solid' ? slide.background.color : theme.background
+  const bg = fillToCss(slide.background) ?? theme.background
   const elements = (slide.elements ?? []).slice().sort((a, b) => a.z - b.z)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [draft, setDraft] = useState('')

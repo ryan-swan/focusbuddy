@@ -10,16 +10,16 @@
 import { test, expect, type Page } from '@playwright/test'
 import { launchApp, type LaunchedApp, waitForReady } from './_helpers'
 
-async function openDocumentsHub(window: Page): Promise<void> {
-  await window.getByRole('button', { name: /^Documents$/i }).click()
-  await expect(window.getByRole('heading', { name: 'Documents', level: 1 })).toBeVisible({ timeout: 8_000 })
+async function openDesignHub(window: Page): Promise<void> {
+  // PlexiDesign is its own module — open it from the sidebar nav.
+  await window.getByRole('button', { name: 'PlexiDesign' }).first().click()
+  await expect(window.locator('[data-testid="designs-size-ig-post"]')).toBeVisible({ timeout: 8_000 })
 }
 
 async function openDesignStudio(window: Page): Promise<void> {
-  // Select the Design type tile, then open the studio.
-  await window.locator('button', { hasText: 'Design' }).first().click()
-  await expect(window.locator('[data-testid="design-create-note"]')).toBeVisible({ timeout: 8_000 })
-  await window.locator('[data-testid="design-open-studio"]').click()
+  await openDesignHub(window)
+  // Start a square social design; the studio opens on the new canvas.
+  await window.locator('[data-testid="designs-size-ig-post"]').click()
   await expect(window.locator('[data-testid="design-editor"]')).toBeVisible({ timeout: 10_000 })
 }
 
@@ -48,7 +48,6 @@ test.describe('PlexiDesign studio', () => {
   })
 
   test('DS-1 create a design and the studio opens with templates + tools', async () => {
-    await openDocumentsHub(window)
     await openDesignStudio(window)
     // Toolbar tools present.
     for (const t of ['design-templates-btn', 'design-size-btn', 'design-add-text', 'design-add-rect', 'design-ai-btn', 'design-brandify']) {

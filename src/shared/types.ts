@@ -1365,8 +1365,12 @@ export type SlideLayout =
 export type SlideTransition = 'none' | 'fade' | 'slide'
 
 export interface SlideFill {
-  type: 'solid' | 'none'
+  type: 'solid' | 'none' | 'gradient'
   color?: string
+  // Gradient end color and angle (degrees). Used when type === 'gradient';
+  // `color` is the start. Absent angle defaults to 135deg.
+  color2?: string
+  angle?: number
 }
 export interface SlideBorder {
   color: string
