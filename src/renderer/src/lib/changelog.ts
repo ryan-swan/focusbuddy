@@ -36,6 +36,20 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.108',
+    date: '2026-06-30T10:00:00Z',
+    title: 'v2.5.108 — Design export and a brand kit for the whole workspace',
+    tag: 'feature',
+    summary:
+      'PlexiDesign can now get your work out: export any design to a high-resolution PNG or a PDF at its exact size, ready to post or print. And there is a proper Brand Kit. Set your logo, your colors and your fonts once and the studio uses them everywhere, in templates, in the AI layouts, when you Brandify a design, and with a one-click Logo drop. The brand editor checks contrast as you go so your text stays readable, and new documents now open already on-brand once a kit is set. This is the start of one brand running across everything you make in PlexiDesk.',
+    highlights: [
+      'Export a design to PNG or PDF at its exact pixel size.',
+      'A Brand Kit: set your logo, colors and fonts once and PlexiDesign uses them throughout.',
+      'Live contrast checks in the brand editor so brand colors never produce unreadable text.',
+      'New documents open on-brand when a brand kit is set; existing documents are untouched.'
+    ]
+  },
+  {
     version: '2.5.107',
     date: '2026-06-29T22:00:00Z',
     title: 'v2.5.107 — PlexiDesign, the on-platform design studio',
