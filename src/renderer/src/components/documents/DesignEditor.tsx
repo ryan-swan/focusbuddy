@@ -14,8 +14,9 @@ import {
   type DesignCategory,
   type DesignSize
 } from '@shared/design'
-import { DEFAULT_BRAND_KIT, type OrgBrandKit } from '@shared/brandKit'
 import Icon from '../Icon'
+import { useBrandStore } from '../../stores/brand'
+import BrandKitModal from './BrandKitModal'
 
 // PlexiDesign — the on-platform design studio. A design is a single arbitrary-size
 // canvas of the same elements a slide uses, so this editor reuses the proven slide
@@ -28,6 +29,11 @@ interface Props {
   title: string
   onChange: (body: unknown) => void
 }
+
+const EXPORT_FORMATS: { id: 'png' | 'pdf'; label: string }[] = [
+  { id: 'png', label: 'PNG image' },
+  { id: 'pdf', label: 'PDF' }
+]
 
 const CATEGORIES: { id: DesignCategory; label: string }[] = [
   { id: 'social', label: 'Social' },
@@ -50,9 +56,10 @@ const NEUTRAL_THEME: DeckTheme = {
   bodyStyle: { fontSize: 24, color: '#44403c' }
 }
 
-export default function DesignEditor({ content, onChange }: Props): JSX.Element {
+export default function DesignEditor({ content, title, onChange }: Props): JSX.Element {
   const [design, setDesign] = useState<DesignBody>(() => normalizeDesignBody(content))
   const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [exportOpen, setExportOpen] = useState(false)
   const [panel, setPanel] = useState<'none' | 'templates' | 'size' | 'ai'>(
     () => (normalizeDesignBody(content).elements.length === 0 ? 'templates' : 'none')
   )
@@ -61,11 +68,17 @@ export default function DesignEditor({ content, onChange }: Props): JSX.Element 
   const [busy, setBusy] = useState<string | null>(null)
   const [status, setStatus] = useState<string | null>(null)
   const [canvasW, setCanvasW] = useState(640)
+  const [brandOpen, setBrandOpen] = useState(false)
   const wrapRef = useRef<HTMLDivElement | null>(null)
 
-  // The org brand kit. The brand store lands with the Brand Kit editor; until a
-  // brand is set this is the default brand, exactly like a fresh Canva account.
-  const brand: OrgBrandKit = DEFAULT_BRAND_KIT
+  // The org brand kit, read live from the brand store. Until a brand is saved it
+  // is the default brand, exactly like a fresh Canva account, so every action is
+  // always on a usable brand.
+  const brand = useBrandStore((s) => s.kit)
+  const loadBrand = useBrandStore((s) => s.load)
+  useEffect(() => {
+    void loadBrand()
+  }, [loadBrand])
 
   // Fit the canvas to the available width, capped so a wide design doesn't sprawl.
   useEffect(() => {
@@ -139,6 +152,29 @@ export default function DesignEditor({ content, onChange }: Props): JSX.Element 
   async function addImageFromFile(): Promise<void> {
     const res = await window.api.office.pickImage()
     if (res.ok && res.dataUrl) placeImage(res.dataUrl)
+  }
+
+  // Drop the brand logo onto the canvas. If no brand logo is set, open the brand
+  // editor so the user can add one rather than doing nothing.
+  function placeLogo(): void {
+    if (!brand.logoUrl) {
+      setBrandOpen(true)
+      return
+    }
+    const sizeW = Math.round(design.width * 0.22)
+    const el: SlideElement = {
+      id: elementId(),
+      type: 'image',
+      src: brand.logoUrl,
+      x: Math.round(design.width * 0.06),
+      y: Math.round(design.height * 0.06),
+      w: sizeW,
+      h: sizeW,
+      z: topZ + 1,
+      fit: 'contain'
+    }
+    mutate((s) => addElement(s, el))
+    setSelectedIds([el.id])
   }
 
   function placeImage(src: string): void {
@@ -233,6 +269,19 @@ export default function DesignEditor({ content, onChange }: Props): JSX.Element 
     update({ elements: els, brandApplied: true })
   }
 
+  async function exportAs(format: 'png' | 'pdf'): Promise<void> {
+    setExportOpen(false)
+    setBusy(`Exporting ${format.toUpperCase()}…`)
+    setStatus(null)
+    try {
+      const res = await window.api.design.export({ design, title: title || 'design', format })
+      if (res.ok) setStatus(`Saved ${res.path}`)
+      else if (res.error) setStatus(res.error)
+    } finally {
+      setBusy(null)
+    }
+  }
+
   const selected = design.elements.find((e) => e.id === selectedIds[0]) ?? null
 
   return (
@@ -248,7 +297,30 @@ export default function DesignEditor({ content, onChange }: Props): JSX.Element 
         <ToolBtn icon="image" label="Image" onClick={() => void addImageFromFile()} testid="design-add-image" />
         <span className="w-px h-5 bg-stone-200 dark:bg-stone-700 mx-1" />
         <ToolBtn icon="auto_awesome" label="AI design" active={panel === 'ai'} onClick={() => setPanel((p) => (p === 'ai' ? 'none' : 'ai'))} testid="design-ai-btn" />
+        <ToolBtn icon="badge" label="Logo" onClick={placeLogo} testid="design-add-logo" />
         <ToolBtn icon="palette" label="Brandify" onClick={brandify} testid="design-brandify" />
+        <ToolBtn icon="tune" label="Brand kit" onClick={() => setBrandOpen(true)} testid="design-brand-kit-btn" />
+        <span className="w-px h-5 bg-stone-200 dark:bg-stone-700 mx-1" />
+        <div className="relative">
+          <ToolBtn icon="download" label="Export" active={exportOpen} onClick={() => setExportOpen((v) => !v)} testid="design-export-btn" />
+          {exportOpen && (
+            <>
+              <div className="fixed inset-0 z-30" onClick={() => setExportOpen(false)} />
+              <div className="absolute left-0 mt-1 z-40 w-36 rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 shadow-lg p-1" data-testid="design-export-menu">
+                {EXPORT_FORMATS.map((f) => (
+                  <button
+                    key={f.id}
+                    onClick={() => void exportAs(f.id)}
+                    data-testid={`design-export-${f.id}`}
+                    className="w-full text-left px-2.5 py-1.5 rounded-md text-[12px] hover:bg-stone-100 dark:hover:bg-stone-800"
+                  >
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Panels */}
@@ -432,6 +504,8 @@ export default function DesignEditor({ content, onChange }: Props): JSX.Element 
           </div>
         )}
       </div>
+
+      {brandOpen && <BrandKitModal onClose={() => setBrandOpen(false)} />}
     </div>
   )
 }

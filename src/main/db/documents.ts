@@ -14,6 +14,8 @@ import type {
 import { migrateSlidesBody } from '@shared/slidesMigrate'
 import { normalizeMapBody, starterMapBody } from '@shared/mapGraph'
 import { normalizeDesignBody, blankDesign, findDesignSize, type DesignBody } from '@shared/design'
+import { brandHeadingStyles } from '@shared/brandKit'
+import { getBrandKit, hasBrandKit } from './brandKit'
 
 // Office documents store — CRUD for standalone doc / sheet / slides files. The
 // body is persisted as a JSON string; the shape depends on doc_type and is
@@ -69,7 +71,14 @@ export function emptyBody(type: FbDocument['docType']): DocBody | SheetBody | Sl
     // A fresh design opens as a blank square social canvas, the most common size.
     return blankDesign(findDesignSize('ig-post')!)
   }
-  return { type: 'doc', content: [{ type: 'paragraph' }] }
+  const emptyDoc = { type: 'doc', content: [{ type: 'paragraph' }] }
+  // When the org has a brand kit, a new document opens already on-brand: its
+  // heading styles are seeded from the brand. Without a brand set, a plain
+  // document, so default-brand users are unaffected. Existing docs never change.
+  if (hasBrandKit()) {
+    return { doc: emptyDoc, headingStyles: brandHeadingStyles(getBrandKit()) }
+  }
+  return emptyDoc
 }
 
 function rowToDoc(row: DocumentRow): FbDocument {
