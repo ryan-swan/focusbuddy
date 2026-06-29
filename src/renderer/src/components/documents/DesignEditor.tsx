@@ -20,6 +20,7 @@ import {
   DESIGN_SIZES,
   DESIGN_TEMPLATES,
   composeDesign,
+  buildDesignVariations,
   designFromTemplate,
   findDesignSize,
   normalizeDesignBody,
@@ -30,6 +31,7 @@ import {
   type DesignSize
 } from '@shared/design'
 import Icon from '../Icon'
+import SlideElementView from './slides/SlideElementView'
 import { useBrandStore } from '../../stores/brand'
 import BrandKitModal from './BrandKitModal'
 import { GOOGLE_FONTS, loadGoogleFont, fontFamilyValue, familyLabel } from '../../lib/googleFonts'
@@ -84,6 +86,7 @@ export default function DesignEditor({ content, title, onChange }: Props): JSX.E
   const [imgPrompt, setImgPrompt] = useState('')
   const [stockQuery, setStockQuery] = useState('')
   const [stockResults, setStockResults] = useState<Array<{ id: string; thumb: string; full: string; alt: string; photographer: string }>>([])
+  const [variations, setVariations] = useState<DesignBody[]>([])
   const [busy, setBusy] = useState<string | null>(null)
   const [status, setStatus] = useState<string | null>(null)
   const [canvasW, setCanvasW] = useState(640)
@@ -423,6 +426,33 @@ export default function DesignEditor({ content, title, onChange }: Props): JSX.E
     }
   }
 
+  async function generateVariations(): Promise<void> {
+    const prompt = aiPrompt.trim()
+    if (!prompt) return
+    setBusy('Generating variations…')
+    setStatus(null)
+    try {
+      const res = await window.api.design.generateVariations({ prompt, designKind: size.label, count: 6 })
+      if (res.ok && res.concepts) {
+        setVariations(buildDesignVariations(size, brand, res.concepts))
+      } else if (res.needsApiKey) {
+        setStatus(res.error ?? 'Add your Anthropic API key in Settings to generate designs.')
+      } else {
+        setStatus(res.error ?? 'Could not generate variations.')
+      }
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  function applyVariation(v: DesignBody): void {
+    commit(v)
+    setVariations([])
+    setSelectedIds([])
+    setPanel('none')
+    setAiPrompt('')
+  }
+
   async function generateDesign(): Promise<void> {
     const prompt = aiPrompt.trim()
     if (!prompt) return
@@ -603,18 +633,21 @@ export default function DesignEditor({ content, title, onChange }: Props): JSX.E
         <Panel title="Generate with AI">
           <div className="space-y-2">
             <div>
-              <div className="text-[11px] text-stone-500 mb-1">Describe the design — AI writes on-brand copy and lays it out.</div>
+              <div className="text-[11px] text-stone-500 mb-1">Describe the design — AI writes on-brand copy and lays it out. Generate variations to pick from a set of on-brand options.</div>
               <div className="flex gap-1.5">
                 <input
                   value={aiPrompt}
                   onChange={(e) => setAiPrompt(e.target.value)}
                   placeholder="e.g. a launch announcement for our new pricing"
                   data-testid="design-ai-prompt"
-                  onKeyDown={(e) => e.key === 'Enter' && void generateDesign()}
+                  onKeyDown={(e) => e.key === 'Enter' && void generateVariations()}
                   className="flex-1 rounded-lg border border-stone-300 dark:border-stone-600 bg-transparent px-2.5 py-1.5 text-[12px] focus:outline-none focus:border-accent"
                 />
-                <button onClick={() => void generateDesign()} disabled={!!busy} data-testid="design-ai-go" className="btn-primary text-[12px] px-3 py-1.5 disabled:opacity-50">
-                  Generate
+                <button onClick={() => void generateVariations()} disabled={!!busy} data-testid="design-ai-variations" className="btn-primary text-[12px] px-3 py-1.5 disabled:opacity-50">
+                  Variations
+                </button>
+                <button onClick={() => void generateDesign()} disabled={!!busy} data-testid="design-ai-go" className="text-[12px] px-3 py-1.5 rounded-lg border border-stone-300 dark:border-stone-600 hover:border-accent disabled:opacity-50">
+                  One
                 </button>
               </div>
             </div>
@@ -913,6 +946,54 @@ export default function DesignEditor({ content, title, onChange }: Props): JSX.E
       </div>
 
       {brandOpen && <BrandKitModal onClose={() => setBrandOpen(false)} />}
+
+      {variations.length > 0 && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 p-6" onClick={() => setVariations([])} data-testid="design-variations-modal">
+          <div className="w-full max-w-4xl max-h-[88vh] overflow-auto rounded-2xl bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-700 shadow-2xl p-5" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center gap-2 mb-3">
+              <Icon name="auto_awesome" size={18} className="text-accent" />
+              <h2 className="text-[15px] font-semibold text-stone-900 dark:text-stone-100">Pick a design</h2>
+              <span className="text-[12px] text-stone-400">{variations.length} on-brand options</span>
+              <button onClick={() => setVariations([])} className="ml-auto text-stone-400 hover:text-stone-600">
+                <Icon name="close" size={16} />
+              </button>
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              {variations.map((v, i) => (
+                <button
+                  key={i}
+                  onClick={() => applyVariation(v)}
+                  data-testid={`design-variation-${i}`}
+                  className="rounded-lg overflow-hidden border border-stone-200 dark:border-stone-700 hover:border-accent hover:ring-2 hover:ring-accent/30 transition"
+                  title="Use this design"
+                >
+                  <DesignThumb design={v} width={232} />
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// A small, faithful, non-interactive render of a design, used in the variations
+// picker. Reuses SlideElementView (the same renderer as the canvas) scaled down.
+function DesignThumb({ design, width }: { design: DesignBody; width: number }): JSX.Element {
+  const scale = width / design.width
+  const height = width * (design.height / design.width)
+  const bg = design.background?.type === 'solid' ? design.background.color ?? '#ffffff' : '#ffffff'
+  return (
+    <div style={{ width, height, position: 'relative', overflow: 'hidden', background: bg }}>
+      <div style={{ width: design.width, height: design.height, transform: `scale(${scale})`, transformOrigin: 'top left', position: 'absolute', top: 0, left: 0 }}>
+        {design.elements
+          .slice()
+          .sort((a, b) => a.z - b.z)
+          .map((el) => (
+            <SlideElementView key={el.id} el={el} />
+          ))}
+      </div>
     </div>
   )
 }

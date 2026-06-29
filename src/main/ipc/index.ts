@@ -47,7 +47,7 @@ import {
   deleteDocument
 } from '../db/documents'
 import { searchAll } from '../db/search'
-import { generateDocument, processMeetingEnd, generateDesignContent } from '../ai/anthropic'
+import { generateDocument, processMeetingEnd, generateDesignContent, generateDesignVariations } from '../ai/anthropic'
 import { generateImage } from '../imageGen'
 import { exportDesign } from '../designExport'
 import { searchStockPhotos, fetchImageDataUrl, removeBackground } from '../stockMedia'
@@ -822,6 +822,9 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('brand:set', (_e, kit: OrgBrandKit) => saveBrandKit(kit))
   ipcMain.handle('design:generateContent', (_e, input: { prompt: string; designKind: string; audience?: string }) =>
     generateDesignContent(input)
+  )
+  ipcMain.handle('design:generateVariations', (_e, input: { prompt: string; designKind: string; count?: number; audience?: string }) =>
+    generateDesignVariations(input)
   )
   ipcMain.handle('office:exportDocx', (_e, input: { html: string; title: string; page?: PageSetupInput }) => exportDocx(input))
   ipcMain.handle('office:exportPdf', (_e, input: { html: string; title: string; page?: PageSetupInput }) => exportPdf(input))

@@ -173,4 +173,35 @@ test.describe('PlexiDesign studio', () => {
       expect((await window.locator('[data-testid="design-status"]').textContent())?.toLowerCase()).toMatch(/key|fail|could not|reach|no photos/)
     }
   })
+
+  test('DS-13 generate variations shows a pick grid and applies one', async () => {
+    // Stub the AI variations IPC so the flow is exercised without a live key.
+    await app.app.evaluate(({ ipcMain }) => {
+      ipcMain.removeHandler('design:generateVariations')
+      ipcMain.handle('design:generateVariations', () => ({
+        ok: true,
+        concepts: [
+          { headline: 'Alpha launch', background: 'brand' },
+          { headline: 'Beta news', background: 'light' },
+          { headline: 'Gamma update', background: 'dark' },
+          { headline: 'Delta release', layout: 'split' },
+          { headline: 'Epsilon drop', background: 'light' },
+          { headline: 'Zeta reveal', background: 'brand' }
+        ]
+      }))
+    })
+    // Open the AI panel only if it is not already open (DS-5 may have opened it).
+    if (!(await window.locator('[data-testid="design-ai-prompt"]').isVisible().catch(() => false))) {
+      await window.locator('[data-testid="design-ai-btn"]').click()
+    }
+    await window.locator('[data-testid="design-ai-prompt"]').fill('a launch post')
+    await window.locator('[data-testid="design-ai-variations"]').click()
+    await expect(window.locator('[data-testid="design-variations-modal"]')).toBeVisible()
+    await expect(window.locator('[data-testid="design-variation-0"]')).toBeVisible()
+    await expect(window.locator('[data-testid="design-variation-5"]')).toBeVisible()
+    // Pick one; the modal closes and the canvas becomes that design.
+    await window.locator('[data-testid="design-variation-1"]').click()
+    await expect(window.locator('[data-testid="design-variations-modal"]')).toBeHidden()
+    expect(await window.locator('[data-testid="slide-element"]').count()).toBeGreaterThan(0)
+  })
 })

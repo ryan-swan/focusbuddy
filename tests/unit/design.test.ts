@@ -10,6 +10,9 @@ import {
   designToHtml,
   composeDesign,
   resizeDesign,
+  composeVariant,
+  buildDesignVariations,
+  DESIGN_LAYOUT_IDS,
   type DesignCategory
 } from '../../src/shared/design'
 import type { OrgBrandKit } from '../../src/shared/brandKit'
@@ -115,6 +118,38 @@ describe('resizeDesign (magic resize)', () => {
     const srcText = src.elements.find((e) => e.type === 'text') as { paragraphs: { runs: { fontSize?: number }[] }[] }
     const outText = out.elements.find((e) => e.type === 'text') as { paragraphs: { runs: { fontSize?: number }[] }[] }
     expect(outText.paragraphs[0].runs[0].fontSize).toBe(srcText.paragraphs[0].runs[0].fontSize)
+  })
+})
+
+describe('AI template generator (variations)', () => {
+  const brand = { colorPrimary: '#7c3aed', colorSecondary: '#0d9488', fontHeading: 'Inter', fontBody: 'Inter' }
+  const size = findDesignSize('ig-post')!
+  const content = { eyebrow: 'New', headline: 'Big bold headline', subhead: 'A supporting line.', body: 'Body copy here.', cta: 'Get started', background: 'light' as const }
+
+  it('every layout produces a valid on-brand design with elements', () => {
+    for (const layout of DESIGN_LAYOUT_IDS) {
+      const d = composeVariant(size, brand, content, layout)
+      expect(d.width).toBe(size.w)
+      expect(d.elements.length).toBeGreaterThan(0)
+      expect(d.brandApplied).toBe(true)
+      // The headline copy is present somewhere in the composed text.
+      const text = JSON.stringify(d.elements)
+      expect(text).toContain('Big bold headline')
+    }
+  })
+
+  it('builds one distinct design per concept, cycling layouts', () => {
+    const concepts = [
+      { headline: 'Concept one', background: 'brand' as const },
+      { headline: 'Concept two', background: 'light' as const },
+      { headline: 'Concept three', background: 'dark' as const },
+      { headline: 'Concept four', layout: 'split' as const }
+    ]
+    const designs = buildDesignVariations(size, brand, concepts)
+    expect(designs).toHaveLength(4)
+    // A pinned layout is honoured; others rotate, so the set is not all identical.
+    const backgrounds = designs.map((d) => d.background?.color)
+    expect(new Set(backgrounds).size).toBeGreaterThan(1)
   })
 })
 
