@@ -619,6 +619,38 @@ export function designToHtml(design: DesignBody): string {
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>*{margin:0;padding:0;box-sizing:border-box}html,body{width:${design.width}px;height:${design.height}px}</style></head><body><div style="position:relative;width:${design.width}px;height:${design.height}px;background:${bg};overflow:hidden">${els}</div></body></html>`
 }
 
+// Magic resize: scale a whole design to a new size, repositioning and resizing
+// every element proportionally (and scaling text by the average ratio) so the
+// layout is preserved rather than the canvas just changing under fixed elements.
+export function resizeDesign(design: DesignBody, target: DesignSize): DesignBody {
+  const sx = design.width ? target.w / design.width : 1
+  const sy = design.height ? target.h / design.height : 1
+  const fs = (sx + sy) / 2
+  const elements: SlideElement[] = design.elements.map((el) => {
+    const moved = {
+      ...el,
+      x: Math.round(el.x * sx),
+      y: Math.round(el.y * sy),
+      w: Math.round(el.w * sx),
+      h: Math.round(el.h * sy)
+    }
+    if (moved.type === 'text') {
+      return {
+        ...moved,
+        paragraphs: moved.paragraphs.map((p) => ({
+          ...p,
+          runs: p.runs.map((r) => ({ ...r, fontSize: r.fontSize ? Math.max(6, Math.round(r.fontSize * fs)) : r.fontSize }))
+        }))
+      }
+    }
+    if (moved.type === 'line') {
+      return { ...moved, x2: Math.round(moved.x2 * sx), y2: Math.round(moved.y2 * sy) }
+    }
+    return moved
+  })
+  return { ...design, width: target.w, height: target.h, category: target.category, elements }
+}
+
 // A blank design at a given size.
 export function blankDesign(size: DesignSize): DesignBody {
   return {

@@ -1244,7 +1244,16 @@ const api = {
     ): Promise<{ ok: boolean; hasKey?: boolean; last4?: string | null; error?: string }> =>
       ipcRenderer.invoke('settings:saveTenorKey', plaintext),
     clearTenorKey: (): Promise<{ ok: boolean; error?: string }> =>
-      ipcRenderer.invoke('settings:clearTenorKey')
+      ipcRenderer.invoke('settings:clearTenorKey'),
+    // PlexiDesign provider keys: Pexels (stock photos), remove.bg (cutouts).
+    hintPexels: (): Promise<{ hasKey: boolean; last4: string | null }> => ipcRenderer.invoke('settings:hintPexels'),
+    savePexelsKey: (plaintext: string): Promise<{ ok: boolean; hasKey?: boolean; last4?: string | null; error?: string }> =>
+      ipcRenderer.invoke('settings:savePexelsKey', plaintext),
+    clearPexelsKey: (): Promise<{ ok: boolean; error?: string }> => ipcRenderer.invoke('settings:clearPexelsKey'),
+    hintRemoveBg: (): Promise<{ hasKey: boolean; last4: string | null }> => ipcRenderer.invoke('settings:hintRemoveBg'),
+    saveRemoveBgKey: (plaintext: string): Promise<{ ok: boolean; hasKey?: boolean; last4?: string | null; error?: string }> =>
+      ipcRenderer.invoke('settings:saveRemoveBgKey', plaintext),
+    clearRemoveBgKey: (): Promise<{ ok: boolean; error?: string }> => ipcRenderer.invoke('settings:clearRemoveBgKey')
   },
   // GIF search (Tenor) — runs in main so the key stays out of the renderer.
   gif: {
@@ -1568,7 +1577,20 @@ const api = {
       design: import('@shared/design').DesignBody
       title: string
       format: 'png' | 'pdf'
-    }): Promise<{ ok: boolean; path?: string; error?: string }> => ipcRenderer.invoke('design:export', input)
+    }): Promise<{ ok: boolean; path?: string; error?: string }> => ipcRenderer.invoke('design:export', input),
+    searchPhotos: (input: {
+      query: string
+      perPage?: number
+    }): Promise<{
+      ok: boolean
+      photos?: Array<{ id: string; thumb: string; full: string; alt: string; photographer: string }>
+      error?: string
+      needsKey?: boolean
+    }> => ipcRenderer.invoke('design:searchPhotos', input),
+    fetchImage: (input: { url: string }): Promise<{ ok: boolean; dataUrl?: string; error?: string }> =>
+      ipcRenderer.invoke('design:fetchImage', input),
+    removeBackground: (input: { dataUrl: string }): Promise<{ ok: boolean; dataUrl?: string; error?: string; needsKey?: boolean }> =>
+      ipcRenderer.invoke('design:removeBackground', input)
   },
   // The organization Brand Kit — one brand the whole workspace reads.
   brand: {

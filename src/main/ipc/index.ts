@@ -50,6 +50,7 @@ import { searchAll } from '../db/search'
 import { generateDocument, processMeetingEnd, generateDesignContent } from '../ai/anthropic'
 import { generateImage } from '../imageGen'
 import { exportDesign } from '../designExport'
+import { searchStockPhotos, fetchImageDataUrl, removeBackground } from '../stockMedia'
 import type { DesignBody } from '@shared/design'
 import { getBrandKit, saveBrandKit, hasBrandKit } from '../db/brandKit'
 import type { OrgBrandKit } from '@shared/brandKit'
@@ -814,6 +815,9 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('office:importDocx', () => importDocx())
   ipcMain.handle('design:generateImage', (_e, input: { prompt: string; width?: number; height?: number }) => generateImage(input))
   ipcMain.handle('design:export', (_e, input: { design: DesignBody; title: string; format: 'png' | 'pdf' }) => exportDesign(input))
+  ipcMain.handle('design:searchPhotos', (_e, input: { query: string; perPage?: number }) => searchStockPhotos(input))
+  ipcMain.handle('design:fetchImage', (_e, input: { url: string }) => fetchImageDataUrl(input))
+  ipcMain.handle('design:removeBackground', (_e, input: { dataUrl: string }) => removeBackground(input))
   ipcMain.handle('brand:get', () => ({ kit: getBrandKit(), isSet: hasBrandKit() }))
   ipcMain.handle('brand:set', (_e, kit: OrgBrandKit) => saveBrandKit(kit))
   ipcMain.handle('design:generateContent', (_e, input: { prompt: string; designKind: string; audience?: string }) =>
@@ -2027,6 +2031,43 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('settings:clearTenorKey', () => {
     try {
       clearSecret('tenor')
+      return { ok: true }
+    } catch (err) {
+      return { ok: false, error: (err as Error).message }
+    }
+  })
+
+  // PlexiDesign provider keys: Pexels (stock photos) and remove.bg (background
+  // removal). Same hint/save/clear pattern as the others.
+  ipcMain.handle('settings:hintPexels', () => hint('pexels'))
+  ipcMain.handle('settings:savePexelsKey', (_e, plaintext: string) => {
+    try {
+      setSecret('pexels', plaintext)
+      return { ok: true, ...hint('pexels') }
+    } catch (err) {
+      return { ok: false, error: (err as Error).message }
+    }
+  })
+  ipcMain.handle('settings:clearPexelsKey', () => {
+    try {
+      clearSecret('pexels')
+      return { ok: true }
+    } catch (err) {
+      return { ok: false, error: (err as Error).message }
+    }
+  })
+  ipcMain.handle('settings:hintRemoveBg', () => hint('removebg'))
+  ipcMain.handle('settings:saveRemoveBgKey', (_e, plaintext: string) => {
+    try {
+      setSecret('removebg', plaintext)
+      return { ok: true, ...hint('removebg') }
+    } catch (err) {
+      return { ok: false, error: (err as Error).message }
+    }
+  })
+  ipcMain.handle('settings:clearRemoveBgKey', () => {
+    try {
+      clearSecret('removebg')
       return { ok: true }
     } catch (err) {
       return { ok: false, error: (err as Error).message }

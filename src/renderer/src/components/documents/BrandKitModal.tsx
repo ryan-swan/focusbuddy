@@ -1,18 +1,12 @@
 import { useState } from 'react'
 import { useBrandStore } from '../../stores/brand'
 import { brandContrastWarnings, type OrgBrandKit } from '@shared/brandKit'
+import { GOOGLE_FONTS, loadGoogleFont, fontFamilyValue, familyLabel } from '../../lib/googleFonts'
 import Icon from '../Icon'
 
 // The Brand Kit editor — set the organization's logo, colors and fonts once and
 // every surface that reads the brand store presents consistently. Contrast is
 // checked live so a brand can't quietly produce unreadable text.
-
-const FONTS: { label: string; value: string }[] = [
-  { label: 'Inter (sans)', value: 'Inter, system-ui, sans-serif' },
-  { label: 'Helvetica / Arial', value: '"Helvetica Neue", Arial, sans-serif' },
-  { label: 'Georgia (serif)', value: 'Georgia, "Times New Roman", serif' },
-  { label: 'JetBrains Mono', value: '"JetBrains Mono", ui-monospace, monospace' }
-]
 
 export default function BrandKitModal({ onClose }: { onClose: () => void }): JSX.Element {
   const kit = useBrandStore((s) => s.kit)
@@ -129,16 +123,26 @@ function ColorField({ label, value, onChange, testid }: { label: string; value: 
 }
 
 function FontField({ label, value, onChange, testid }: { label: string; value: string; onChange: (f: string) => void; testid: string }): JSX.Element {
+  const current = familyLabel(value)
   return (
     <label className="block">
       <span className="text-[11px] text-stone-500">{label}</span>
-      <select value={value} data-testid={testid} onChange={(e) => onChange(e.target.value)} className="mt-1 w-full rounded border border-stone-300 dark:border-stone-600 bg-transparent px-2 py-1.5 text-[12px]" style={{ fontFamily: value }}>
-        {FONTS.map((f) => (
-          <option key={f.value} value={f.value} style={{ fontFamily: f.value }}>
-            {f.label}
+      <select
+        value={current}
+        data-testid={testid}
+        onChange={(e) => {
+          loadGoogleFont(e.target.value)
+          onChange(fontFamilyValue(e.target.value))
+        }}
+        className="mt-1 w-full rounded border border-stone-300 dark:border-stone-600 bg-transparent px-2 py-1.5 text-[12px]"
+        style={{ fontFamily: value }}
+      >
+        {!GOOGLE_FONTS.includes(current) && current !== 'Default' && <option value={current}>{current}</option>}
+        {GOOGLE_FONTS.map((fam) => (
+          <option key={fam} value={fam} style={{ fontFamily: `"${fam}", sans-serif` }}>
+            {fam}
           </option>
         ))}
-        {!FONTS.some((f) => f.value === value) && <option value={value}>{value}</option>}
       </select>
     </label>
   )
