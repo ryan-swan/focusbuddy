@@ -36,6 +36,20 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.121',
+    date: '2026-07-01T07:00:00Z',
+    title: 'v2.5.121 — a real Home, and PlexiPeople',
+    tag: 'feature',
+    summary:
+      'Two big steps toward the new PlexiDesk. The Home screen is rebuilt into a proper command centre. It greets you by name, shows what you can continue where you left off, lays out your desks, lists what is actually on your calendar for today and what has actually happened in your workspace recently, and gives you quick ways to create, plan, collaborate or automate, with an Ask PlexiBrain bar right there. Everything on it is real. Where a number is not yet measured, like a productivity score, it says so plainly rather than inventing one. Alongside it, PlexiPeople arrives as a new place in the sidebar, a home for your team with live presence, a searchable directory of the real people in your workspace and your organisation map. It shows the people who are genuinely there, and stays honest about what it does not yet track.',
+    highlights: [
+      'A rebuilt Home command centre: greeting, continue where you left off, your desks, today’s agenda, recent activity and quick actions, all from real data.',
+      'Ask PlexiBrain and Focus Mode are right on the Home screen.',
+      'New PlexiPeople segment: live team presence, a real member directory and your organisation map.',
+      'Honest throughout: uninstrumented metrics and untracked details are omitted, not faked.'
+    ]
+  },
+  {
     version: '2.5.120',
     date: '2026-07-01T05:30:00Z',
     title: 'v2.5.120 — every agent in one place',
