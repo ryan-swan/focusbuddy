@@ -36,6 +36,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.123',
+    date: '2026-07-01T10:00:00Z',
+    title: 'v2.5.123 — the whole workspace in your sidebar',
+    tag: 'feature',
+    summary:
+      'The sidebar now lays the whole workspace out the way the new design intends. Each of the four areas, PlexiDesk, PlexiOffice, PlexiPeople and PlexiBrain, is its own labelled, collapsible section, and every app inside it is right there as a row you can click. PlexiDesk holds Home, your Desk, Workspaces, Plans, Tasks, Calendar, Files and Recent. PlexiOffice holds Docs, Sheets, Slides, Draw, Mail, Inbox, Chat, Meet and Sign. PlexiPeople holds your people home, the directory and the organisation map. PlexiBrain holds Ask Brain, Search, Brain Map, Flows, Agents, Connect, APIs and Insights. Click any one and you land straight on it, no hunting through menus.',
+    highlights: [
+      'Four expandable sidebar sections, one per area, with every app listed as a direct link.',
+      'Click an app to deep-link straight to it; click a section header to open that area.',
+      'The same object-based structure across the whole app, now reflected in the navigation.'
+    ]
+  },
+  {
     version: '2.5.122',
     date: '2026-07-01T08:30:00Z',
     title: 'v2.5.122 — a fuller PlexiOffice Home',
