@@ -18,9 +18,12 @@ export type View =
   | { kind: 'mail'; openUid?: number }
   | { kind: 'documents' }
   | { kind: 'office' }
-  | { kind: 'plexiwork' }
-  | { kind: 'plexiconnect' }
-  | { kind: 'plexiflow' }
+  // The segment views carry an optional `app` so entry points elsewhere (the
+  // suite launcher, the command palette, the home dashboard) can deep-link to a
+  // specific app inside the segment rather than just its home.
+  | { kind: 'plexiwork'; app?: string }
+  | { kind: 'plexiconnect'; app?: string }
+  | { kind: 'plexiflow'; app?: string }
   | { kind: 'design' }
   | { kind: 'document'; documentId: string }
   | { kind: 'livedoc'; liveDocId: string }
@@ -60,9 +63,9 @@ interface ViewStore {
   goMail: (openUid?: number) => void
   goDocuments: () => void
   goOffice: () => void
-  goPlexiWork: () => void
-  goPlexiConnect: () => void
-  goPlexiFlow: () => void
+  goPlexiWork: (app?: string) => void
+  goPlexiConnect: (app?: string) => void
+  goPlexiFlow: (app?: string) => void
   goDesign: () => void
   goDocument: (documentId: string) => void
   goLiveDoc: (liveDocId: string) => void
@@ -184,18 +187,18 @@ export const useViewStore = create<ViewStore>((set) => ({
     persistView(v)
     set({ view: v })
   },
-  goPlexiWork: () => {
-    const v: View = { kind: 'plexiwork' }
+  goPlexiWork: (app) => {
+    const v: View = { kind: 'plexiwork', app }
     persistView(v)
     set({ view: v })
   },
-  goPlexiConnect: () => {
-    const v: View = { kind: 'plexiconnect' }
+  goPlexiConnect: (app) => {
+    const v: View = { kind: 'plexiconnect', app }
     persistView(v)
     set({ view: v })
   },
-  goPlexiFlow: () => {
-    const v: View = { kind: 'plexiflow' }
+  goPlexiFlow: (app) => {
+    const v: View = { kind: 'plexiflow', app }
     persistView(v)
     set({ view: v })
   },
