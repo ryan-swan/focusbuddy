@@ -8,7 +8,7 @@ import {
 import Sidebar from './components/Sidebar'
 import MainPane from './components/MainPane'
 import PlexiOfficeShell from './components/office/PlexiOfficeShell'
-import { PlexiDeskShell, PlexiBrainShell } from './components/segment/segments'
+import { PlexiDeskShell, PlexiPeopleShell, PlexiBrainShell } from './components/segment/segments'
 import ChatPanel from './components/ChatPanel'
 import TelemetryReporter from './components/TelemetryReporter'
 import ReleaseModal from './components/ReleaseModal'
@@ -84,6 +84,7 @@ export default function App(): JSX.Element {
   const segmentTakeover =
     currentView.kind === 'office' ||
     currentView.kind === 'plexidesk' ||
+    currentView.kind === 'plexipeople' ||
     currentView.kind === 'plexibrain'
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [chatCollapsed, setChatCollapsed] = useState(false)
@@ -511,6 +512,8 @@ export default function App(): JSX.Element {
             <PlexiOfficeShell initialApp={currentView.app} />
           ) : currentView.kind === 'plexidesk' ? (
             <PlexiDeskShell initialApp={currentView.app} />
+          ) : currentView.kind === 'plexipeople' ? (
+            <PlexiPeopleShell initialApp={currentView.app ?? 'home'} />
           ) : (
             <PlexiBrainShell initialApp={currentView.app} />
           )

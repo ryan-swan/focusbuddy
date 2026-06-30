@@ -15,8 +15,10 @@ import AgentsView from '../views/AgentsView'
 import ConnectedAppsHubView from '../views/ConnectedAppsHubView'
 import PlexiApiView from '../views/PlexiApiView'
 import InsightsView from '../views/InsightsView'
+import PeopleHomeView from '../views/PeopleHomeView'
+import PeopleMapView from '../views/PeopleMapView'
 
-// The three top-level segments. Each is a focused area with its own side menu
+// The four top-level segments. Each is a focused area with its own side menu
 // and a home of app tiles, reusing the existing views inline (so the segment
 // menu stays put as you move between its apps). PlexiOffice is the third segment
 // and keeps its own richer shell (PlexiOfficeShell) because of its document
@@ -40,6 +42,26 @@ export function PlexiDeskShell({ initialApp }: { initialApp?: string } = {}): JS
           { key: 'calendar', label: 'Calendar', blurb: 'Your work by date', icon: 'calendar_month', tint: 'bg-amber-500', render: () => <CalendarView /> },
           { key: 'files', label: 'Files', blurb: 'Every file in your workspace', icon: 'folder', tint: 'bg-orange-500', render: () => <FilesView /> },
           { key: 'recent', label: 'Recent', blurb: 'Documents you last opened', icon: 'schedule', tint: 'bg-rose-500', render: () => <RecentView /> }
+        ]
+      }}
+    />
+  )
+}
+
+export function PlexiPeopleShell({ initialApp }: { initialApp?: string } = {}): JSX.Element {
+  return (
+    <SegmentShell
+      initialApp={initialApp}
+      def={{
+        wordmark: 'PLEXIPEOPLE',
+        title: 'PlexiPeople',
+        subtitle: 'Your team. Who is here, the people directory and your organisation map.',
+        icon: 'groups',
+        apps: [
+          { key: 'home', label: 'People Home', blurb: 'Team status and who is around', icon: 'groups', tint: 'bg-indigo-500', render: () => <PeopleHomeView /> },
+          { key: 'directory', label: 'Directory', blurb: 'Everyone in your workspace', icon: 'badge', tint: 'bg-sky-500', render: () => <PeopleHomeView /> },
+          { key: 'workspaces', label: 'Organisation', blurb: 'Members, roles, offices and profiles', icon: 'apartment', tint: 'bg-teal-500', render: () => <OrgAdminView /> },
+          { key: 'map', label: 'Organisation Map', blurb: 'Everyone by office and reporting line', icon: 'account_tree', tint: 'bg-violet-500', render: () => <PeopleMapView /> }
         ]
       }}
     />

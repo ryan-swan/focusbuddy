@@ -85,6 +85,7 @@ export default function CommandCenter({
   const goDesign = useViewStore((s) => s.goDesign)
   const goOffice = useViewStore((s) => s.goOffice)
   const goPlexiDesk = useViewStore((s) => s.goPlexiDesk)
+  const goPlexiPeople = useViewStore((s) => s.goPlexiPeople)
   const goPlexiBrain = useViewStore((s) => s.goPlexiBrain)
   const goDocument = useViewStore((s) => s.goDocument)
   const goKnowledge = useViewStore((s) => s.goKnowledge)
@@ -326,6 +327,7 @@ export default function CommandCenter({
     const navTargets: Array<{ id: string; label: string; hint: string; icon: string; words: string; viewKind: string; go: () => void }> = [
       { id: 'go-plexidesk', label: 'PlexiDesk', hint: 'Home, desk, plans, tasks, calendar, files', icon: 'desktop_windows', words: 'plexidesk desk home plans projects tasks calendar files workspaces recent gantt', viewKind: 'plexidesk', go: goPlexiDesk },
       { id: 'go-office', label: 'PlexiOffice', hint: 'Docs, sheets, slides, mail, chat, meet, sign', icon: 'grid_view', words: 'plexioffice office docs sheets slides drawings designs sign documents mail inbox chat meet', viewKind: 'office', go: goOffice },
+      { id: 'go-plexipeople', label: 'PlexiPeople', hint: 'Team status, directory, organisation map', icon: 'groups', words: 'plexipeople people team directory members organisation organization org map presence', viewKind: 'plexipeople', go: goPlexiPeople },
       { id: 'go-plexibrain', label: 'PlexiBrain', hint: 'Knowledge, search, flows, insights', icon: 'neurology', words: 'plexibrain brain knowledge search map flows agents connect api insights automation', viewKind: 'plexibrain', go: goPlexiBrain },
       { id: 'go-documents', label: 'Documents', hint: 'Docs, sheets, slides', icon: 'article', words: 'documents docs sheets slides', viewKind: 'office', go: goOffice },
       { id: 'go-design', label: 'PlexiDesign', hint: 'Designs — social, posters, logos', icon: 'palette', words: 'design plexidesign canva graphic poster social logo flyer banner', viewKind: 'design', go: goDesign },
@@ -549,6 +551,7 @@ export default function CommandCenter({
     goDesign,
     goOffice,
     goPlexiDesk,
+    goPlexiPeople,
     goPlexiBrain,
     goDocument,
     goKnowledge,
