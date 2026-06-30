@@ -36,6 +36,20 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.115',
+    date: '2026-07-02T20:00:00Z',
+    title: 'v2.5.115 — tidier navigation, bigger sheets, and a column-heading fix',
+    tag: 'feature',
+    summary:
+      'The navigation is properly tidied now. The individual product entries that used to be scattered down the sidebar have been folded into their segments, so PlexiWork, PlexiConnect and PlexiFlow own Projects, Tasks, Reports, Chat, Meet, Flow, API, Build and Form, and the duplicate entries are gone. PlexiSheets also opens larger, a fresh spreadsheet now starts at 48 columns by 100 rows like a real one rather than a tiny starter grid. And a frustrating bug is fixed: you can rename a column heading again. Typing in a header used to get captured by the grid and start a cell edit instead.',
+    highlights: [
+      'The scattered product entries are folded into the PlexiWork / PlexiConnect / PlexiFlow segments; the duplicates are gone.',
+      'A new spreadsheet opens at 48 columns by 100 rows.',
+      'Fixed: renaming a column heading works again (keystrokes are no longer hijacked by the grid).',
+      'PlexiConnect shows PlexiChat above PlexiMeet.'
+    ]
+  },
+  {
     version: '2.5.114',
     date: '2026-07-02T16:00:00Z',
     title: 'v2.5.114 — PlexiWork, PlexiConnect and PlexiFlow, organised like PlexiOffice',
