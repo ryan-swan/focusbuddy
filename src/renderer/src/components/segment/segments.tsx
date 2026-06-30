@@ -13,9 +13,10 @@ import PlexiApiView from '../views/PlexiApiView'
 // home, reusing the existing views inline (so the segment menu stays put as you
 // move between its apps).
 
-export function PlexiWorkShell(): JSX.Element {
+export function PlexiWorkShell({ initialApp }: { initialApp?: string } = {}): JSX.Element {
   return (
     <SegmentShell
+      initialApp={initialApp}
       def={{
         wordmark: 'PLEXIWORK',
         title: 'PlexiWork',
@@ -31,9 +32,10 @@ export function PlexiWorkShell(): JSX.Element {
   )
 }
 
-export function PlexiConnectShell(): JSX.Element {
+export function PlexiConnectShell({ initialApp }: { initialApp?: string } = {}): JSX.Element {
   return (
     <SegmentShell
+      initialApp={initialApp}
       def={{
         wordmark: 'PLEXICONNECT',
         title: 'PlexiConnect',
@@ -48,9 +50,10 @@ export function PlexiConnectShell(): JSX.Element {
   )
 }
 
-export function PlexiFlowShell(): JSX.Element {
+export function PlexiFlowShell({ initialApp }: { initialApp?: string } = {}): JSX.Element {
   return (
     <SegmentShell
+      initialApp={initialApp}
       def={{
         wordmark: 'PLEXIFLOW',
         title: 'PlexiFlow',

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useViewStore } from '../../stores/view'
 import { promptUpgrade } from '../../stores/upgradePrompt'
 import Icon from '../Icon'
@@ -29,9 +29,14 @@ export interface SegmentDef {
   proLabel?: string
 }
 
-export default function SegmentShell({ def }: { def: SegmentDef }): JSX.Element {
+export default function SegmentShell({ def, initialApp }: { def: SegmentDef; initialApp?: string }): JSX.Element {
   const goHome = useViewStore((s) => s.goHome)
-  const [activeKey, setActiveKey] = useState<string | null>(null)
+  const [activeKey, setActiveKey] = useState<string | null>(initialApp ?? null)
+  // Deep-link: when an entry point opens this segment with a specific app, switch
+  // to it (the view object changes identity on each navigation).
+  useEffect(() => {
+    if (initialApp) setActiveKey(initialApp)
+  }, [initialApp])
   const active = def.apps.find((a) => a.key === activeKey) ?? null
 
   return (

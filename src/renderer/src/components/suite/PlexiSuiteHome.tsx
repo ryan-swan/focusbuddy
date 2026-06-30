@@ -24,14 +24,17 @@ import HomeDashboardRegion from './HomeDashboardRegion'
 export function launchProduct(product: PlexiProduct): void {
   const v = useViewStore.getState()
   switch (product.launch) {
+    // Office products open the PlexiOffice segment; work/connect/flow products
+    // open their segment with the app pre-selected, so the launcher matches the
+    // new menu structure rather than the old standalone views.
     case 'documents':
-      return v.goDocuments()
+      return v.goOffice()
     case 'tasks':
-      return v.goAllTasks()
+      return v.goPlexiWork('tasks')
     case 'calendar':
       return v.goCalendar()
     case 'messages':
-      return v.goMessages()
+      return v.goPlexiConnect('chat')
     case 'mail':
       return v.goMail()
     case 'files':
@@ -41,23 +44,23 @@ export function launchProduct(product: PlexiProduct): void {
     case 'knowledge':
       return v.goKnowledge()
     case 'meetings':
-      return v.goMeetings()
+      return v.goPlexiConnect('meet')
     case 'apps':
-      return v.goApps()
+      return v.goPlexiFlow('build')
     case 'forms':
-      return v.goForms()
+      return v.goPlexiFlow('form')
     case 'sign':
       return v.goSign()
     case 'search':
       return v.goSearch()
     case 'projects':
-      return v.goProjects()
+      return v.goPlexiWork('projects')
     case 'reports':
-      return v.goReports()
+      return v.goPlexiWork('reports')
     case 'flows':
-      return v.goFlows()
+      return v.goPlexiFlow('flow')
     case 'api':
-      return v.goApi()
+      return v.goPlexiFlow('api')
     case 'marketplace':
       return v.goMarketplace()
     case 'canvas':

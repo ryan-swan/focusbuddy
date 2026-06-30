@@ -339,12 +339,12 @@ export default function CommandCenter({
       { id: 'go-plexiwork', label: 'PlexiWork', hint: 'Projects, tasks, reports', icon: 'work', words: 'plexiwork work projects tasks reports gantt plan', viewKind: 'plexiwork', go: goPlexiWork },
       { id: 'go-plexiconnect', label: 'PlexiConnect', hint: 'Chat and video meetings', icon: 'diversity_3', words: 'plexiconnect connect chat messages meet video call meeting', viewKind: 'plexiconnect', go: goPlexiConnect },
       { id: 'go-plexiflow', label: 'PlexiFlow', hint: 'Flows, API, build, forms', icon: 'bolt', words: 'plexiflow flow automation api build apps forms', viewKind: 'plexiflow', go: goPlexiFlow },
-      { id: 'go-documents', label: 'Documents', hint: 'Docs, sheets, slides', icon: 'article', words: 'documents docs sheets slides', viewKind: 'documents', go: goDocuments },
+      { id: 'go-documents', label: 'Documents', hint: 'Docs, sheets, slides', icon: 'article', words: 'documents docs sheets slides', viewKind: 'office', go: goOffice },
       { id: 'go-design', label: 'PlexiDesign', hint: 'Designs — social, posters, logos', icon: 'palette', words: 'design plexidesign canva graphic poster social logo flyer banner', viewKind: 'design', go: goDesign },
       { id: 'go-files', label: 'Files', hint: 'File manager', icon: 'folder', words: 'files folders manager', viewKind: 'files', go: goFiles },
       { id: 'go-mail', label: 'Mail', hint: 'Email inbox', icon: 'mail', words: 'mail email inbox', viewKind: 'mail', go: () => goMail() },
       { id: 'go-inbox', label: 'PlexiInbox', hint: 'Notifications, share invites', icon: 'inbox', words: 'inbox notifications invites plexi', viewKind: 'inbox', go: goInbox },
-      { id: 'go-messages', label: 'Messages', hint: 'Chats', icon: 'forum', words: 'messages chat dm', viewKind: 'messages', go: goMessages }
+      { id: 'go-messages', label: 'Messages', hint: 'Chats', icon: 'forum', words: 'messages chat dm', viewKind: 'plexiconnect', go: () => goPlexiConnect('chat') }
     ]
     for (const t of navTargets) {
       items.push({
@@ -391,12 +391,12 @@ export default function CommandCenter({
     // request and navigates; the module creates the item as it opens, so there is
     // no separate "start new" screen to click through.
     const createTargets: Array<{ id: string; label: string; words: string; icon: string; key: string; viewKind: string; go: () => void }> = [
-      { id: 'new-project', label: 'New project', words: 'new project plan gantt create', icon: 'account_tree', key: 'projects', viewKind: 'projects', go: goProjects },
-      { id: 'new-report', label: 'New report', words: 'new report summary create', icon: 'summarize', key: 'reports', viewKind: 'reports', go: goReports },
-      { id: 'new-flow', label: 'New flow', words: 'new flow automation create', icon: 'bolt', key: 'flows', viewKind: 'flows', go: goFlows },
-      { id: 'new-form', label: 'New form', words: 'new form survey create', icon: 'dynamic_form', key: 'forms', viewKind: 'forms', go: goForms },
-      { id: 'new-app', label: 'New app', words: 'new app build tool create', icon: 'construction', key: 'build', viewKind: 'apps', go: goApps },
-      { id: 'new-meeting', label: 'Start a meeting', words: 'new meeting meet call video start', icon: 'video_call', key: 'meet', viewKind: 'meetings', go: goMeetings }
+      { id: 'new-project', label: 'New project', words: 'new project plan gantt create', icon: 'account_tree', key: 'projects', viewKind: 'plexiwork', go: () => goPlexiWork('projects') },
+      { id: 'new-report', label: 'New report', words: 'new report summary create', icon: 'summarize', key: 'reports', viewKind: 'plexiwork', go: () => goPlexiWork('reports') },
+      { id: 'new-flow', label: 'New flow', words: 'new flow automation create', icon: 'bolt', key: 'flows', viewKind: 'plexiflow', go: () => goPlexiFlow('flow') },
+      { id: 'new-form', label: 'New form', words: 'new form survey create', icon: 'dynamic_form', key: 'forms', viewKind: 'plexiflow', go: () => goPlexiFlow('form') },
+      { id: 'new-app', label: 'New app', words: 'new app build tool create', icon: 'construction', key: 'build', viewKind: 'plexiflow', go: () => goPlexiFlow('build') },
+      { id: 'new-meeting', label: 'Start a meeting', words: 'new meeting meet call video start', icon: 'video_call', key: 'meet', viewKind: 'plexiconnect', go: () => goPlexiConnect('meet') }
     ]
     for (const t of createTargets) {
       items.push({

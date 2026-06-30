@@ -511,11 +511,11 @@ export default function App(): JSX.Element {
           currentView.kind === 'office' ? (
             <PlexiOfficeShell />
           ) : currentView.kind === 'plexiwork' ? (
-            <PlexiWorkShell />
+            <PlexiWorkShell initialApp={currentView.app} />
           ) : currentView.kind === 'plexiconnect' ? (
-            <PlexiConnectShell />
+            <PlexiConnectShell initialApp={currentView.app} />
           ) : (
-            <PlexiFlowShell />
+            <PlexiFlowShell initialApp={currentView.app} />
           )
         ) : (
         <PanelGroup direction="horizontal" autoSaveId="focusbuddy-main-v2">

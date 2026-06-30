@@ -104,12 +104,12 @@ test('C2. setting a deadline via IPC that falls before scheduled finish → plan
       (pid: string) => window.api.projects.plan(pid),
       folderId
     )
-    const task0 = (plan0 as { tasks: Array<{ id: string; scheduledEndMs: number }> }).tasks.find((t) => t.id === taskId)!
-    const schedEnd = task0.scheduledEndMs
+    const task0 = (plan0 as { tasks: Array<{ id: string; scheduledStartMs: number; scheduledEndMs: number }> }).tasks.find((t) => t.id === taskId)!
 
-    // Set a deadline EARLIER than scheduled end (yesterday relative to its finish)
-    const dayMs = 86_400_000
-    const earlyDeadline = schedEnd - dayMs
+    // A deadline at the task's own (working-day) start is robustly before its
+    // finish, regardless of which weekday the test runs on — avoids the weekend
+    // edge where "finish minus one calendar day" maps back to the same workday.
+    const earlyDeadline = task0.scheduledStartMs
     await window.evaluate(
       ([tid, dl]) => window.api.projects.setTaskPlan(tid as string, { deadlineMs: dl as number }),
       [taskId, earlyDeadline] as [string, number]
@@ -153,10 +153,11 @@ test('C3. deadline miss shows event_busy marker in Grid view row', async () => {
       (pid: string) => window.api.projects.plan(pid),
       folderId
     )
-    const schedEnd = (plan0 as { tasks: Array<{ id: string; scheduledEndMs: number }> }).tasks.find((t) => t.id === taskId)!.scheduledEndMs
+    // A deadline at the task's own (working-day) start is robustly before its finish.
+    const schedStart = (plan0 as { tasks: Array<{ id: string; scheduledStartMs: number }> }).tasks.find((t) => t.id === taskId)!.scheduledStartMs
     await window.evaluate(
       ([tid, dl]) => window.api.projects.setTaskPlan(tid as string, { deadlineMs: dl as number }),
-      [taskId, schedEnd - 86_400_000] as [string, number]
+      [taskId, schedStart] as [string, number]
     )
 
     // Reload into grid view
@@ -198,10 +199,13 @@ test('C4. mustStartMs set via IPC pins the scheduled start, overriding a depende
       (pid: string) => window.api.projects.plan(pid),
       folderId
     )
-    const aEnd = (plan0 as { tasks: Array<{ id: string; scheduledEndMs: number }> }).tasks.find((t) => t.id === aId)!.scheduledEndMs
+    const aTask = (plan0 as { tasks: Array<{ id: string; scheduledStartMs: number; scheduledEndMs: number }> }).tasks.find((t) => t.id === aId)!
+    const aEnd = aTask.scheduledEndMs
 
-    // Pin B to start TWO days before A finishes (forces the engine to override the dep)
-    const mustStart = aEnd - 2 * 86_400_000
+    // Pin B to A's own (working-day) start: it is before A's finish, so honouring it
+    // overrides the dependency, and because it is already a working day the pin maps
+    // back exactly (no weekend rounding) on any run date.
+    const mustStart = aTask.scheduledStartMs
     await window.evaluate(
       ([tid, ms]) => window.api.projects.setTaskPlan(tid as string, { mustStartMs: ms as number }),
       [bId, mustStart] as [string, number]
