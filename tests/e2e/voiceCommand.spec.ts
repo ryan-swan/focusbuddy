@@ -118,10 +118,11 @@ test('FAB tooltip reflects the current trigger mode', async () => {
   const { window } = launched
   // Default mode is press-hold.
   const fab = window.locator('[data-testid="voice-command-fab"]')
-  await fab.hover()
-  // Title attribute switches based on mode — assert directly rather than
-  // wait for the absolute-positioned tooltip element which depends on
-  // hover style timing.
+  // The tooltip text lives in the FAB's title attribute, which is set regardless
+  // of hover, so we assert it directly. We do not hover: the FAB carries a
+  // continuous idle animation that never settles to Playwright's actionability
+  // check, so hover hangs.
+  await expect(fab).toBeVisible()
   await expect(fab).toHaveAttribute('title', 'Hold to speak')
 
   // Switch to click-toggle and reload — fab should now read "Click to speak".
@@ -139,7 +140,7 @@ test('FAB tooltip reflects the current trigger mode', async () => {
   })
   if (await skip.isVisible().catch(() => false)) await skip.click().catch(() => {})
   const fab2 = window.locator('[data-testid="voice-command-fab"]')
-  await fab2.hover()
+  await expect(fab2).toBeVisible()
   await expect(fab2).toHaveAttribute('title', 'Click to speak')
 
   // Restore default.

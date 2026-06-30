@@ -87,48 +87,23 @@ test('3 — ready products render full-colour; coming-soon products get badge + 
   await expect(formsTile.locator('text=Planned')).toHaveCount(0)
   await expect(formsTile.locator('[data-testid="upvote-plexiforms"]')).toHaveCount(0)
 
-  // A planned product (PlexiBrain, status=planned — actually PlexiBrain is 'soon').
-  // Use PlexiProjects which is 'planned'.
-  const projectsTile = window.locator('[data-testid="product-tile-plexiprojects"]')
-  await expect(projectsTile).toBeVisible()
-  await expect(projectsTile.locator('text=Planned')).toBeVisible()
-  await expect(projectsTile.locator('[data-testid="upvote-plexiprojects"]')).toBeVisible()
-
-  // PlexiBrain is now 'ready' (knowledge base shipped). Confirm it is full-colour,
-  // has no badge and no upvote, i.e. it behaves exactly like PlexiDash above.
-  const brainTile = window.locator('[data-testid="product-tile-plexibrain"]')
-  await expect(brainTile).toBeVisible()
-  await expect(brainTile.locator('text=Coming soon')).toHaveCount(0)
-  await expect(brainTile.locator('text=Planned')).toHaveCount(0)
-  await expect(brainTile.locator('[data-testid="upvote-plexibrain"]')).toHaveCount(0)
-
-  // PlexiMeet is now 'ready' (meetings shipped). Confirm it has no badge and no upvote.
-  const meetTile = window.locator('[data-testid="product-tile-pleximeet"]')
-  await expect(meetTile).toBeVisible()
-  await expect(meetTile.locator('text=Coming soon')).toHaveCount(0)
-  await expect(meetTile.locator('text=Planned')).toHaveCount(0)
-  await expect(meetTile.locator('[data-testid="upvote-pleximeet"]')).toHaveCount(0)
-
-  // PlexiSign is 'soon' — use it as the 'soon' representative.
-  const signTile2 = window.locator('[data-testid="product-tile-plexisign"]')
-  await expect(signTile2).toBeVisible()
-  await expect(signTile2.locator('text=Coming soon')).toBeVisible()
-
-  // PlexiOps is 'planned'.
+  // The one remaining planned product is PlexiOps; it must show the Planned badge
+  // and an upvote control. Projects, Flow, Forms, Reports, Sign, Meet and Brain
+  // have all shipped and are now full-colour ready tiles.
   const opsTile = window.locator('[data-testid="product-tile-plexiops"]')
   await expect(opsTile).toBeVisible()
   await expect(opsTile.locator('text=Planned')).toBeVisible()
   await expect(opsTile.locator('[data-testid="upvote-plexiops"]')).toBeVisible()
 
-  // PlexiSign is 'soon'.
-  const signTile = window.locator('[data-testid="product-tile-plexisign"]')
-  await expect(signTile).toBeVisible()
-  await expect(signTile.locator('text=Coming soon')).toBeVisible()
-
-  // PlexiFlow is 'planned'.
-  const flowTile = window.locator('[data-testid="product-tile-plexiflow"]')
-  await expect(flowTile).toBeVisible()
-  await expect(flowTile.locator('text=Planned')).toBeVisible()
+  // These have all shipped, so like PlexiDash they are full-colour with no badge
+  // and no upvote.
+  for (const key of ['plexibrain', 'pleximeet', 'plexisign', 'plexiflow']) {
+    const tile = window.locator(`[data-testid="product-tile-${key}"]`)
+    await expect(tile).toBeVisible()
+    await expect(tile.locator('text=Coming soon')).toHaveCount(0)
+    await expect(tile.locator('text=Planned')).toHaveCount(0)
+    await expect(tile.locator(`[data-testid="upvote-${key}"]`)).toHaveCount(0)
+  }
 })
 
 // ── Test 4: Product tile navigation ────────────────────────────────────────────
@@ -153,14 +128,14 @@ test('4b — clicking a coming-soon product tile opens product home with upvote 
   await waitForReady(window)
   await openSuite(window)
 
-  // Click PlexiFlow tile (planned).
-  await window.locator('[data-testid="product-tile-plexiflow"]').click()
-  await window.waitForSelector('[data-testid="product-home-plexiflow"]', { timeout: 6_000 })
-  await expect(window.locator('[data-testid="product-home-plexiflow"]')).toBeVisible()
+  // Click the PlexiOps tile (the remaining planned product).
+  await window.locator('[data-testid="product-tile-plexiops"]').click()
+  await window.waitForSelector('[data-testid="product-home-plexiops"]', { timeout: 6_000 })
+  await expect(window.locator('[data-testid="product-home-plexiops"]')).toBeVisible()
   // Planned product must NOT have an Open button.
-  await expect(window.locator('[data-testid="open-plexiflow"]')).toHaveCount(0)
+  await expect(window.locator('[data-testid="open-plexiops"]')).toHaveCount(0)
   // Must have an upvote control.
-  await expect(window.locator('[data-testid="upvote-plexiflow"]')).toBeVisible()
+  await expect(window.locator('[data-testid="upvote-plexiops"]')).toBeVisible()
   // Must show the "What we are building" list.
   await expect(window.locator('text=What we are building')).toBeVisible()
 })
