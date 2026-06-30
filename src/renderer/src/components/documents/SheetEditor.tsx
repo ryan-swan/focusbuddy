@@ -703,6 +703,24 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
   function removeChart(id: string): void {
     mutateTab((t) => ({ ...t, charts: (t.charts ?? []).filter((ch) => ch.id !== id) }))
   }
+  // Write =SPARKLINE(<selected range>) into a cell so the selected values draw as
+  // a mini chart. A single-row selection lands the formula in the cell just to its
+  // right (the "Trend" column pattern); otherwise it lands just below. The grid is
+  // grown if the target sits past the current extent, and the new cell is selected.
+  function insertSparkline(): void {
+    const ref = `${colLabel(selection.c0)}${selection.r0 + 1}:${colLabel(selection.c1)}${selection.r1 + 1}`
+    const singleRow = selection.r0 === selection.r1
+    const target = singleRow
+      ? { r: selection.r0, c: selection.c1 + 1 }
+      : { r: selection.r1 + 1, c: selection.c0 }
+    mutateTab((t) => {
+      let next = t
+      while (next.columns.length <= target.c) next = addColumn(next)
+      while (next.rows.length <= target.r) next = addRow(next)
+      return setCell(next, target.r, target.c, `=SPARKLINE(${ref})`)
+    })
+    selectCell(target.r, target.c)
+  }
   function insertPivot(spec: SheetPivotSpec): void {
     mutateTab((t) => ({ ...t, pivots: [...(t.pivots ?? []), spec] }))
   }
@@ -866,6 +884,7 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
         onConditionalFormat={() => setCondOpen(true)}
         onDataValidation={() => setValidationOpen(true)}
         onInsertPivot={() => setPivotOpen(true)}
+        onInsertSparkline={insertSparkline}
         filterActive={!!tab.filterActive}
         onToggleFilter={() =>
           mutateTab((t) => ({

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { DeckTheme, Slide, SlideElement, SlideLayout, SlidesBody, SlideTransition } from '@shared/types'
-import { resolveTheme, layoutElements, applyThemeToDeck } from '@shared/slideThemes'
+import { resolveTheme, layoutElements, applyThemeToDeck, BUILTIN_THEMES } from '@shared/slideThemes'
 import { SLIDE_TEMPLATES } from '@shared/slideTemplates'
 import { migrateSlidesBody } from '@shared/slidesMigrate'
 import SlideFace from './slides/SlideFace'
@@ -10,6 +10,8 @@ import SlidesToolbar from './slides/SlidesToolbar'
 import SlideTemplateGallery from './slides/SlideTemplateGallery'
 import PresentOverlay from './slides/PresentOverlay'
 import AiSlidePanel from './slides/AiSlidePanel'
+import SlidesSidePanel, { type SlidesPanelTab } from './slides/SlidesSidePanel'
+import { useSlideAi } from './slides/useSlideAi'
 import CropDialog from './slides/CropDialog'
 import {
   addElement,
@@ -61,6 +63,7 @@ export default function SlidesEditor({ body: rawBody, title, onChange }: Props):
   const [galleryOpen, setGalleryOpen] = useState(false)
   const [status, setStatus] = useState<string | null>(null)
   const [canvasW, setCanvasW] = useState(720)
+  const [panelTab, setPanelTab] = useState<SlidesPanelTab>('slide')
 
   const undo = useRef<SlidesBody[]>([])
   const redo = useRef<SlidesBody[]>([])
@@ -81,6 +84,12 @@ export default function SlidesEditor({ body: rawBody, title, onChange }: Props):
     )
     .filter(Boolean)
     .join('\n')
+
+  // Keep the current slide's text in a ref so the per-slide AI hook always reads
+  // the slide the writer is looking at right now (the hook holds a stable getter).
+  const slideTextRef = useRef(slideSummary)
+  slideTextRef.current = slideSummary
+  const ai = useSlideAi(() => slideTextRef.current)
 
   // Select an element. additive (Shift/Cmd-click) toggles it in the selection;
   // a plain click replaces. Either way the selection expands to whole groups so
@@ -265,6 +274,35 @@ export default function SlidesEditor({ body: rawBody, title, onChange }: Props):
   }
   function applyTheme(t: DeckTheme): void {
     commit(applyThemeToDeck(body, t))
+  }
+
+  // Apply the per-slide AI result to the real deck, routed by the action kind:
+  //   notes     -> write the drafted notes into the slide's notes field
+  //   design    -> match the recommended theme name to a real theme and apply it
+  //   transform -> replace the slide's body text element with the rewritten text
+  // Each path uses an existing real mutation; nothing here invents content.
+  function applyAiResult(): void {
+    const result = ai.result
+    if (!result) return
+    if (ai.kind === 'notes') {
+      mutateSlide((s) => ({ ...s, notes: result }))
+    } else if (ai.kind === 'design') {
+      // The recommendation's first line names a theme; match it to a real theme.
+      const firstLine = result.split('\n')[0].toLowerCase()
+      const match = BUILTIN_THEMES.find((t) => firstLine.includes(t.name.toLowerCase()))
+      if (match) applyTheme(match)
+      else { setStatus('The design suggestion did not name a theme we have. Pick one from the Layout tab.'); ai.clearResult(); return }
+    } else {
+      // Replace the body text element (or the first text element) with the rewrite.
+      const els = slide.elements ?? []
+      const target = els.find((e) => e.type === 'text' && e.styleRole === 'body') ?? els.find((e) => e.type === 'text')
+      if (!target) { setStatus('This slide has no text element to apply the rewrite to.'); ai.clearResult(); return }
+      mutateSlide((s) => updateElement(s, target.id, (() => {
+        const e = (s.elements ?? []).find((x) => x.id === target.id)
+        return e && e.type === 'text' ? setElementText(e, result) : {}
+      })()))
+    }
+    ai.clearResult()
   }
 
   // ── AI ────────────────────────────────────────────────────────────────────
@@ -615,6 +653,20 @@ export default function SlidesEditor({ body: rawBody, title, onChange }: Props):
           onSetBackground={(color) => mutateSlide((s) => ({ ...s, background: { type: 'solid', color } }))}
           onApplyTheme={applyTheme}
           onCrop={(id) => setCropId(id)}
+        />
+
+        {/* Persistent AI + properties panel */}
+        <SlidesSidePanel
+          slide={slide}
+          theme={theme}
+          ai={ai}
+          tab={panelTab}
+          onTab={setPanelTab}
+          onApplyLayout={applyLayout}
+          onApplyTheme={applyTheme}
+          onChangeNotes={(notes) => mutateSlide((s) => ({ ...s, notes }))}
+          onApplyAi={applyAiResult}
+          onDeckGenerate={() => setAiOpen(true)}
         />
       </div>
 

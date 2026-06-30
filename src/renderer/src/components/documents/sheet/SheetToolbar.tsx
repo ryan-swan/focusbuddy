@@ -22,6 +22,7 @@ interface Props {
   filterActive: boolean
   onToggleFilter: () => void
   onInsertPivot: () => void
+  onInsertSparkline: () => void
   onInsertChart: (type: 'bar' | 'line' | 'pie') => void
   onImport: () => void
   onExport: (format: 'xlsx' | 'csv') => void
@@ -167,6 +168,14 @@ export default function SheetToolbar(props: Props): JSX.Element {
         onClick={props.onInsertPivot}
       >
         <Icon name="pivot_table_chart" size={15} />
+      </button>
+      <button
+        className={btn}
+        title="Insert a sparkline of the selection into the next cell"
+        data-testid="sheet-insert-sparkline"
+        onClick={props.onInsertSparkline}
+      >
+        <Icon name="show_chart" size={15} />
       </button>
       <Divider />
 

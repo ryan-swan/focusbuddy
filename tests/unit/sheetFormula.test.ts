@@ -496,3 +496,45 @@ describe('named ranges', () => {
     expect(() => evaluateFormula(g, 'Tax*2')).toThrow()
   })
 })
+
+import { sparklineForCell } from '@renderer/lib/sheetFormula'
+
+describe('SPARKLINE — in-cell mini chart', () => {
+  it('reads the real referenced values for a line by default', () => {
+    const g = grid([['1', '5', '3', '8', '2', '=SPARKLINE(A1:E1)']])
+    const sp = sparklineForCell(g, 0, 5)
+    expect(sp).not.toBeNull()
+    expect(sp?.type).toBe('line')
+    expect(sp?.values).toEqual([1, 5, 3, 8, 2])
+  })
+
+  it('honours the bar variant option', () => {
+    const g = grid([['4', '9', '=SPARKLINE(A1:B1,"bar")']])
+    const sp = sparklineForCell(g, 0, 2)
+    expect(sp?.type).toBe('bar')
+    expect(sp?.values).toEqual([4, 9])
+  })
+
+  it('skips non-numeric cells rather than inventing values', () => {
+    const g = grid([['10', 'oops', '20', '=SPARKLINE(A1:C1)']])
+    const sp = sparklineForCell(g, 0, 3)
+    expect(sp?.values).toEqual([10, 20])
+  })
+
+  it('an empty range yields no values (faint placeholder, never fake data)', () => {
+    const g = grid([['', '', '=SPARKLINE(A1:B1)']])
+    const sp = sparklineForCell(g, 0, 2)
+    expect(sp?.values).toEqual([])
+  })
+
+  it('a non-SPARKLINE cell is not treated as a sparkline', () => {
+    const g = grid([['1', '2', '=SUM(A1:B1)']])
+    expect(sparklineForCell(g, 0, 2)).toBeNull()
+    expect(sparklineForCell(g, 0, 0)).toBeNull()
+  })
+
+  it('displayCell renders a SPARKLINE cell as its joined values, not #ERR', () => {
+    const g = grid([['3', '6', '9', '=SPARKLINE(A1:C1)']])
+    expect(displayCell(g, 0, 3)).toBe('3 6 9')
+  })
+})
