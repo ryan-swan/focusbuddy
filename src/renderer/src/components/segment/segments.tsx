@@ -1,69 +1,69 @@
 import SegmentShell from './SegmentShell'
+import Canvas from '../Canvas'
+import HomeDashboard from '../views/HomeDashboard'
 import AllTasksView from '../views/AllTasksView'
-import MessagesView from '../views/MessagesView'
-import PlexiMeetView from '../views/PlexiMeetView'
-import PlexiBuildView from '../views/PlexiBuildView'
-import PlexiFormsView from '../views/PlexiFormsView'
+import CalendarView from '../views/CalendarView'
+import FilesView from '../views/FilesView'
+import OrgAdminView from '../views/OrgAdminView'
 import PlexiProjectsView from '../views/PlexiProjectsView'
-import PlexiReportsView from '../views/PlexiReportsView'
+import RecentView from '../views/RecentView'
+import KnowledgeView from '../views/KnowledgeView'
+import PlexiSearchView from '../views/PlexiSearchView'
+import BrainMapView from '../views/BrainMapView'
 import PlexiFlowView from '../views/PlexiFlowView'
+import AgentsView from '../views/AgentsView'
+import ConnectedAppsHubView from '../views/ConnectedAppsHubView'
 import PlexiApiView from '../views/PlexiApiView'
+import InsightsView from '../views/InsightsView'
 
-// The three remaining segments, each a focused area with its own side menu and
-// home, reusing the existing views inline (so the segment menu stays put as you
-// move between its apps).
+// The three top-level segments. Each is a focused area with its own side menu
+// and a home of app tiles, reusing the existing views inline (so the segment
+// menu stays put as you move between its apps). PlexiOffice is the third segment
+// and keeps its own richer shell (PlexiOfficeShell) because of its document
+// create/open affordances.
 
-export function PlexiWorkShell({ initialApp }: { initialApp?: string } = {}): JSX.Element {
+export function PlexiDeskShell({ initialApp }: { initialApp?: string } = {}): JSX.Element {
   return (
     <SegmentShell
       initialApp={initialApp}
       def={{
-        wordmark: 'PLEXIWORK',
-        title: 'PlexiWork',
-        subtitle: 'Plan and run your work, from projects and tasks to reports.',
-        icon: 'work',
+        wordmark: 'PLEXIDESK',
+        title: 'PlexiDesk',
+        subtitle: 'Your workspace. Your desk, plans, tasks, calendar and files in one place.',
+        icon: 'desktop_windows',
         apps: [
-          { key: 'projects', label: 'Projects', blurb: 'Plans, timelines and Gantt charts', icon: 'account_tree', tint: 'bg-indigo-500', render: () => <PlexiProjectsView /> },
+          { key: 'home', label: 'Home', blurb: 'Your dashboard and what is next', icon: 'dashboard', tint: 'bg-indigo-500', render: () => <HomeDashboard /> },
+          { key: 'desk', label: 'My Desk', blurb: 'The working canvas you build on', icon: 'space_dashboard', tint: 'bg-sky-500', render: () => <Canvas /> },
+          { key: 'workspaces', label: 'Workspaces', blurb: 'Organisations and sub-workspaces', icon: 'apartment', tint: 'bg-teal-500', render: () => <OrgAdminView /> },
+          { key: 'plans', label: 'Plans', blurb: 'Timelines, milestones and Gantt charts', icon: 'account_tree', tint: 'bg-violet-500', render: () => <PlexiProjectsView /> },
           { key: 'tasks', label: 'Tasks', blurb: 'Everything on your plate, in one list', icon: 'checklist', tint: 'bg-emerald-500', render: () => <AllTasksView /> },
-          { key: 'reports', label: 'Reports', blurb: 'Summaries and insights from your work', icon: 'summarize', tint: 'bg-amber-500', render: () => <PlexiReportsView /> }
+          { key: 'calendar', label: 'Calendar', blurb: 'Your work by date', icon: 'calendar_month', tint: 'bg-amber-500', render: () => <CalendarView /> },
+          { key: 'files', label: 'Files', blurb: 'Every file in your workspace', icon: 'folder', tint: 'bg-orange-500', render: () => <FilesView /> },
+          { key: 'recent', label: 'Recent', blurb: 'Documents you last opened', icon: 'schedule', tint: 'bg-rose-500', render: () => <RecentView /> }
         ]
       }}
     />
   )
 }
 
-export function PlexiConnectShell({ initialApp }: { initialApp?: string } = {}): JSX.Element {
+export function PlexiBrainShell({ initialApp }: { initialApp?: string } = {}): JSX.Element {
   return (
     <SegmentShell
       initialApp={initialApp}
       def={{
-        wordmark: 'PLEXICONNECT',
-        title: 'PlexiConnect',
-        subtitle: 'Talk and meet with your team, in chat and on video.',
-        icon: 'diversity_3',
+        wordmark: 'PLEXIBRAIN',
+        title: 'PlexiBrain',
+        subtitle: 'Your knowledge, search, automation and insights, with AI woven through.',
+        icon: 'neurology',
         apps: [
-          { key: 'chat', label: 'PlexiChat', blurb: 'Channels and direct messages', icon: 'forum', tint: 'bg-sky-500', render: () => <MessagesView /> },
-          { key: 'meet', label: 'PlexiMeet', blurb: 'Video calls and meetings', icon: 'video_call', tint: 'bg-rose-500', render: () => <PlexiMeetView /> }
-        ]
-      }}
-    />
-  )
-}
-
-export function PlexiFlowShell({ initialApp }: { initialApp?: string } = {}): JSX.Element {
-  return (
-    <SegmentShell
-      initialApp={initialApp}
-      def={{
-        wordmark: 'PLEXIFLOW',
-        title: 'PlexiFlow',
-        subtitle: 'Automate, build and collect, with flows, APIs, apps and forms.',
-        icon: 'bolt',
-        apps: [
-          { key: 'flow', label: 'Flow', blurb: 'Automations that run your work', icon: 'bolt', tint: 'bg-violet-500', render: () => <PlexiFlowView /> },
-          { key: 'api', label: 'API', blurb: 'Connect and call external services', icon: 'api', tint: 'bg-cyan-500', render: () => <PlexiApiView /> },
-          { key: 'build', label: 'Build', blurb: 'Compose custom tools and apps', icon: 'construction', tint: 'bg-orange-500', render: () => <PlexiBuildView /> },
-          { key: 'form', label: 'Form', blurb: 'Forms and surveys', icon: 'dynamic_form', tint: 'bg-pink-500', render: () => <PlexiFormsView /> }
+          { key: 'ask', label: 'Ask Brain', blurb: 'Your knowledge base, ask anything', icon: 'neurology', tint: 'bg-indigo-500', render: () => <KnowledgeView /> },
+          { key: 'search', label: 'Search', blurb: 'Find anything across your workspace', icon: 'search', tint: 'bg-sky-500', render: () => <PlexiSearchView /> },
+          { key: 'map', label: 'Brain Map', blurb: 'Your knowledge as a linked graph', icon: 'bubble_chart', tint: 'bg-fuchsia-500', render: () => <BrainMapView /> },
+          { key: 'flows', label: 'Flows', blurb: 'Automations that run your work', icon: 'bolt', tint: 'bg-violet-500', render: () => <PlexiFlowView /> },
+          { key: 'agents', label: 'Agents', blurb: 'Standing AI workers on your desks', icon: 'smart_toy', tint: 'bg-emerald-500', render: () => <AgentsView /> },
+          { key: 'connect', label: 'Connect', blurb: 'Your connected apps and integrations', icon: 'hub', tint: 'bg-cyan-500', render: () => <ConnectedAppsHubView /> },
+          { key: 'api', label: 'APIs', blurb: 'Connect and call external services', icon: 'api', tint: 'bg-amber-500', render: () => <PlexiApiView /> },
+          { key: 'insights', label: 'Insights', blurb: 'Dashboards and reporting', icon: 'insights', tint: 'bg-rose-500', render: () => <InsightsView /> }
         ]
       }}
     />

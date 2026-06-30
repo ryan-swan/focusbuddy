@@ -80,7 +80,7 @@ export default function PlexiProjectsView(): JSX.Element {
     window.api.projects
       .list()
       .then(setProjects)
-      .catch((e) => setError(`Could not load projects: ${e instanceof Error ? e.message : String(e)}`))
+      .catch((e) => setError(`Could not load plans: ${e instanceof Error ? e.message : String(e)}`))
   }, [])
 
   useEffect(() => {
@@ -100,10 +100,10 @@ export default function PlexiProjectsView(): JSX.Element {
   async function newProject(): Promise<void> {
     setError(null)
     try {
-      const node = await window.api.nodes.create({ parentId: null, kind: 'folder', title: 'New project' })
+      const node = await window.api.nodes.create({ parentId: null, kind: 'folder', title: 'New plan' })
       setOpenId(node.id)
     } catch (e) {
-      setError(`Could not create the project: ${e instanceof Error ? e.message : String(e)}`)
+      setError(`Could not create the plan: ${e instanceof Error ? e.message : String(e)}`)
     }
   }
 
@@ -115,13 +115,13 @@ export default function PlexiProjectsView(): JSX.Element {
     <div className="h-full w-full overflow-auto bg-[var(--surface-base)] text-[var(--ink-100)]" data-testid="plexiprojects-view">
       <div className="max-w-5xl mx-auto px-6 py-6">
         <div className="flex items-start justify-between gap-3">
-          <DashboardHeader title="Projects" subtitle="Plans, milestones and a timeline built from the tasks you already work in" />
+          <DashboardHeader title="Plans" subtitle="Milestones and a timeline built from the tasks you already work in" />
           <button
             onClick={() => void newProject()}
             data-testid="projects-new"
             className="shrink-0 inline-flex items-center gap-1.5 h-9 px-3 rounded-lg bg-[rgb(var(--accent))] text-white text-[12.5px] font-medium hover:bg-[rgb(var(--accent-hover))]"
           >
-            <Icon name="add" size={16} /> New project
+            <Icon name="add" size={16} /> New plan
           </button>
         </div>
 
@@ -130,13 +130,13 @@ export default function PlexiProjectsView(): JSX.Element {
         {projects === null ? (
           <div className="flex items-center gap-2 px-3 py-10 text-[13px] text-[var(--ink-70)]">
             <Icon name="progress_activity" size={16} className="text-[rgb(var(--accent))] animate-spin" />
-            Loading projects…
+            Loading plans…
           </div>
         ) : projects.length === 0 ? (
           <div className="px-3 py-16 text-center" data-testid="projects-empty">
             <Icon name="account_tree" size={30} className="text-[var(--ink-30)]" />
             <p className="mt-3 text-[14px] text-[var(--ink-70)] max-w-md mx-auto leading-relaxed">
-              No projects yet. A project is any folder that contains tasks. Create a folder, add tasks under it, and it
+              No plans yet. A plan is any folder that contains tasks. Create a folder, add tasks under it, and it
               shows up here with a timeline.
             </p>
           </div>
@@ -150,7 +150,7 @@ export default function PlexiProjectsView(): JSX.Element {
                 const atRisk = projects.filter((p) => p.hasDrift || p.hasCycle).length
                 return (
                   <>
-                    <StatTile icon="account_tree" label="Projects" value={projects.length} tone="violet" />
+                    <StatTile icon="account_tree" label="Plans" value={projects.length} tone="violet" />
                     <StatTile icon="task_alt" label="Tasks done" value={`${totalDone}/${totalTasks}`} tone="emerald" />
                     <StatTile icon="donut_large" label="Avg complete" value={`${avg}%`} tone="accent" />
                     <StatTile icon="warning" label="At risk" value={atRisk} tone={atRisk ? 'amber' : 'stone'} />
@@ -366,12 +366,12 @@ function ProjectGantt({ projectId, onBack }: { projectId: string; onBack: () => 
             data-testid="projects-back"
             className="inline-flex items-center gap-1 text-[12.5px] text-[var(--ink-70)] hover:text-[var(--ink-100)]"
           >
-            <Icon name="arrow_back" size={16} /> Projects
+            <Icon name="arrow_back" size={16} /> Plans
           </button>
           <span className="text-[var(--ink-30)]">/</span>
-          <h1 className="fb-display text-[16px] font-bold tracking-tight text-[var(--ink-100)] truncate">{plan?.title ?? 'Project'}</h1>
+          <h1 className="fb-display text-[16px] font-bold tracking-tight text-[var(--ink-100)] truncate">{plan?.title ?? 'Plan'}</h1>
           <div className="ml-auto flex items-center gap-2">
-            <div className="inline-flex items-center rounded-lg border border-[var(--edge-soft)] p-0.5" role="tablist" aria-label="Project view">
+            <div className="inline-flex items-center rounded-lg border border-[var(--edge-soft)] p-0.5" role="tablist" aria-label="Plan view">
               {VIEW_MODES.map((m) => (
                 <button
                   key={m.id}
@@ -502,7 +502,7 @@ function ProjectGantt({ projectId, onBack }: { projectId: string; onBack: () => 
           ) : plan.tasks.length === 0 ? (
             <div className="px-6 py-16 text-center">
               <Icon name="account_tree" size={28} className="text-[var(--ink-30)]" />
-              <p className="mt-2 text-[13px] text-[var(--ink-70)]">This project has no tasks yet. Add tasks to the folder to build a plan.</p>
+              <p className="mt-2 text-[13px] text-[var(--ink-70)]">This plan has no tasks yet. Add tasks to the folder to build a timeline.</p>
             </div>
           ) : viewMode === 'board' ? (
             <BoardView plan={plan} selectedId={selectedId} onSelect={setSelectedId} onSetStatus={(id, s) => void setTaskStatus(id, s)} />

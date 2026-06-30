@@ -225,7 +225,7 @@ test('5. email path: with no mail account, shows honest error (not fake "sent")'
   }
 })
 
-test('6. suite launcher: PlexiReports tile opens the reports view', async () => {
+test('6. suite launcher: PlexiReports tile opens Insights (reporting home)', async () => {
   const { window, dispose } = await launchApp()
   try {
     await waitForReady(window)
@@ -238,9 +238,11 @@ test('6. suite launcher: PlexiReports tile opens the reports view', async () => 
     await window.locator('[data-testid="product-tile-plexireports"]').click()
     await expect(window.locator('[data-testid="product-home-plexireports"]')).toBeVisible({ timeout: 8_000 })
 
-    // Click the Open button — calls launchProduct → goReports()
+    // Click the Open button. In the three-segment IA, reporting lives in
+    // PlexiBrain > Insights ("Insights is dashboards and reporting"), so the
+    // Reports tile now opens the Insights view.
     await window.locator('[data-testid="open-plexireports"]').click()
-    await expect(window.locator('[data-testid="plexireports-view"]')).toBeVisible({ timeout: 8_000 })
+    await expect(window.locator('[data-testid="insights-view"]')).toBeVisible({ timeout: 8_000 })
   } finally {
     await dispose()
   }

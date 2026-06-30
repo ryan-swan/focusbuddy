@@ -150,9 +150,8 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
   const goInbox = useViewStore((s) => s.goInbox)
   const goMail = useViewStore((s) => s.goMail)
   const goOffice = useViewStore((s) => s.goOffice)
-  const goPlexiWork = useViewStore((s) => s.goPlexiWork)
-  const goPlexiConnect = useViewStore((s) => s.goPlexiConnect)
-  const goPlexiFlow = useViewStore((s) => s.goPlexiFlow)
+  const goPlexiDesk = useViewStore((s) => s.goPlexiDesk)
+  const goPlexiBrain = useViewStore((s) => s.goPlexiBrain)
   const goDocuments = useViewStore((s) => s.goDocuments)
   const goFiles = useViewStore((s) => s.goFiles)
   const goCollaborations = useViewStore((s) => s.goCollaborations)
@@ -160,8 +159,6 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
   const goPeopleMap = useViewStore((s) => s.goPeopleMap)
   const goSign = useViewStore((s) => s.goSign)
   const goSuite = useViewStore((s) => s.goSuite)
-  const goKnowledge = useViewStore((s) => s.goKnowledge)
-  const goSearch = useViewStore((s) => s.goSearch)
   const goMarketplace = useViewStore((s) => s.goMarketplace)
   const goInsights = useViewStore((s) => s.goInsights)
   const unreadMessages = useMessagingStore((s) => s.unreadTotal)
@@ -701,25 +698,37 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
             />
           </div>
         )}
-        <SectionHeader label="Knowledge" open={knowledgeOpen} onToggle={() => setKnowledgeOpen((v) => !v)} />
+        <SectionHeader label="Segments" open={knowledgeOpen} onToggle={() => setKnowledgeOpen((v) => !v)} />
         {knowledgeOpen && (
           <div className="mb-2">
             <NavRow
-              icon="neurology"
-              label="PlexiBrain"
-              active={viewIsActive({ kind: 'knowledge' })}
+              icon="desktop_windows"
+              label="PlexiDesk"
+              testid="nav-plexidesk"
+              active={viewIsActive({ kind: 'plexidesk' })}
               onClick={() => {
                 setActive(null)
-                goKnowledge()
+                goPlexiDesk()
               }}
             />
             <NavRow
-              icon="search"
-              label="PlexiSearch"
-              active={viewIsActive({ kind: 'search' })}
+              icon="grid_view"
+              label="PlexiOffice"
+              testid="nav-plexioffice"
+              active={viewIsActive({ kind: 'office' }) || view.kind === 'document' || viewIsActive({ kind: 'design' })}
               onClick={() => {
                 setActive(null)
-                goSearch()
+                goOffice()
+              }}
+            />
+            <NavRow
+              icon="neurology"
+              label="PlexiBrain"
+              testid="nav-plexibrain"
+              active={viewIsActive({ kind: 'plexibrain' })}
+              onClick={() => {
+                setActive(null)
+                goPlexiBrain()
               }}
             />
           </div>
@@ -753,45 +762,6 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
         <SectionHeader label="Files" open={filesOpen} onToggle={() => setFilesOpen((v) => !v)} />
         {filesOpen && (
           <div className="mb-2">
-            <NavRow
-              icon="grid_view"
-              label="PlexiOffice"
-              active={viewIsActive({ kind: 'office' }) || view.kind === 'document' || viewIsActive({ kind: 'design' })}
-              onClick={() => {
-                setActive(null)
-                goOffice()
-              }}
-            />
-            <NavRow
-              icon="work"
-              label="PlexiWork"
-              testid="nav-plexiwork"
-              active={viewIsActive({ kind: 'plexiwork' })}
-              onClick={() => {
-                setActive(null)
-                goPlexiWork()
-              }}
-            />
-            <NavRow
-              icon="diversity_3"
-              label="PlexiConnect"
-              testid="nav-plexiconnect"
-              active={viewIsActive({ kind: 'plexiconnect' })}
-              onClick={() => {
-                setActive(null)
-                goPlexiConnect()
-              }}
-            />
-            <NavRow
-              icon="bolt"
-              label="PlexiFlow"
-              testid="nav-plexiflow"
-              active={viewIsActive({ kind: 'plexiflow' })}
-              onClick={() => {
-                setActive(null)
-                goPlexiFlow()
-              }}
-            />
             <NavRow
               icon="folder_open"
               label="Documents"
