@@ -979,8 +979,9 @@ test('SE-18 — formula assistant: stub suggestFormula; preview, Apply writes fo
 
     // A1 holds =B1+C1; B1 and C1 are empty so it computes to 0.
     expect(await cellText(window, 0, 0), 'A1 computed').toBe('0')
-    // A new "Total" column was created (columns were A,B,C -> index 3 is Total).
-    expect(await columnName(window, 3), 'new Total column').toBe('Total')
+    // A new "Total" column was appended as the last column.
+    const lastCol = (await window.locator('[data-testid="sheet-grid"] thead th').count()) - 2
+    expect(await columnName(window, lastCol), 'new Total column').toBe('Total')
   } finally {
     await dispose()
   }

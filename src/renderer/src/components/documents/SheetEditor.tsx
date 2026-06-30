@@ -398,6 +398,11 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
   // ── Keyboard ──────────────────────────────────────────────────────────────
   async function onGridKeyDown(e: React.KeyboardEvent): Promise<void> {
     if (editing) return
+    // Don't hijack keystrokes meant for a focused field (e.g. the column-header
+    // rename input or the name-box) — otherwise typing there would move the
+    // selection or start a cell edit instead of editing the header.
+    const tgt = e.target as HTMLElement | null
+    if (tgt && (tgt.tagName === 'INPUT' || tgt.tagName === 'TEXTAREA' || tgt.isContentEditable)) return
     const { r, c } = focus
     const maxR = tab.rows.length - 1
     const maxC = tab.columns.length - 1
