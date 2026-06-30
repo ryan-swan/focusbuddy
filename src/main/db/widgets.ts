@@ -88,6 +88,17 @@ export function listWidgetsByTask(taskId: string): Widget[] {
   return rows.map(rowToWidget)
 }
 
+// Every live widget of a given kind across the whole workspace, newest-touched
+// first. Used by the PlexiBrain Agents view to list desk agents wherever they
+// live, since agents are widgets that otherwise only load per desk.
+export function listWidgetsByKind(kind: Widget['kind']): Widget[] {
+  const db = getDb()
+  const rows = db
+    .prepare('SELECT * FROM widgets WHERE kind = ? AND trashed_at IS NULL ORDER BY updated_at DESC, created_at DESC')
+    .all(kind) as WidgetRow[]
+  return rows.map(rowToWidget)
+}
+
 function nextZ(taskId: string): number {
   const db = getDb()
   const row = db
