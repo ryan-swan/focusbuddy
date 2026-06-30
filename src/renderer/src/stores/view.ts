@@ -21,9 +21,11 @@ export type View =
   // The segment views carry an optional `app` so entry points elsewhere (the
   // suite launcher, the command palette, the home dashboard) can deep-link to a
   // specific app inside the segment rather than just its home. The top-level
-  // structure is three segments: PlexiDesk (the workspace), PlexiOffice (the
-  // 'office' kind below) and PlexiBrain (knowledge, automation, insights).
+  // structure is four segments: PlexiDesk (the workspace), PlexiOffice (the
+  // 'office' kind below), PlexiPeople (the team area) and PlexiBrain (knowledge,
+  // automation, insights).
   | { kind: 'plexidesk'; app?: string }
+  | { kind: 'plexipeople'; app?: string }
   | { kind: 'plexibrain'; app?: string }
   | { kind: 'design' }
   | { kind: 'document'; documentId: string }
@@ -65,6 +67,7 @@ interface ViewStore {
   goDocuments: () => void
   goOffice: (app?: string) => void
   goPlexiDesk: (app?: string) => void
+  goPlexiPeople: (app?: string) => void
   goPlexiBrain: (app?: string) => void
   goDesign: () => void
   goDocument: (documentId: string) => void
@@ -208,6 +211,11 @@ export const useViewStore = create<ViewStore>((set) => ({
   },
   goPlexiDesk: (app) => {
     const v: View = { kind: 'plexidesk', app }
+    persistView(v)
+    set({ view: v })
+  },
+  goPlexiPeople: (app) => {
+    const v: View = { kind: 'plexipeople', app }
     persistView(v)
     set({ view: v })
   },
