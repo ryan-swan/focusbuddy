@@ -12,9 +12,13 @@ import Icon from '../Icon'
 
 interface Props {
   documentId: string
+  // When provided (e.g. embedded inside the PlexiOffice shell), the back button
+  // calls this instead of navigating to the global Documents/Design hub, so the
+  // surrounding segment keeps its own chrome.
+  onBack?: () => void
 }
 
-export default function DocumentEditorView({ documentId }: Props): JSX.Element {
+export default function DocumentEditorView({ documentId, onBack }: Props): JSX.Element {
   const active = useDocumentsStore((s) => s.active)
   const saving = useDocumentsStore((s) => s.saving)
   const open = useDocumentsStore((s) => s.open)
@@ -66,11 +70,12 @@ export default function DocumentEditorView({ documentId }: Props): JSX.Element {
         <button
           onClick={() => {
             close()
-            if (active.docType === 'design') goDesign()
+            if (onBack) onBack()
+            else if (active.docType === 'design') goDesign()
             else goDocuments()
           }}
           className="icon-btn"
-          title={active.docType === 'design' ? 'Back to PlexiDesign' : 'Back to Documents'}
+          title={onBack ? 'Back to PlexiOffice' : active.docType === 'design' ? 'Back to PlexiDesign' : 'Back to Documents'}
         >
           <Icon name="arrow_back" size={17} />
         </button>

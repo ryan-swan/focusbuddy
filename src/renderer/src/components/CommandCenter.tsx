@@ -85,6 +85,7 @@ export default function CommandCenter({
   const goMail = useViewStore((s) => s.goMail)
   const goDocuments = useViewStore((s) => s.goDocuments)
   const goDesign = useViewStore((s) => s.goDesign)
+  const goOffice = useViewStore((s) => s.goOffice)
   const goDocument = useViewStore((s) => s.goDocument)
   const goKnowledge = useViewStore((s) => s.goKnowledge)
   const goMessages = useViewStore((s) => s.goMessages)
@@ -331,6 +332,7 @@ export default function CommandCenter({
       return r >= 0 ? (8 - r) * 2 : 0
     }
     const navTargets: Array<{ id: string; label: string; hint: string; icon: string; words: string; viewKind: string; go: () => void }> = [
+      { id: 'go-office', label: 'PlexiOffice', hint: 'Docs, sheets, slides, drawings, designs, sign', icon: 'grid_view', words: 'plexioffice office docs sheets slides drawings designs sign documents', viewKind: 'office', go: goOffice },
       { id: 'go-documents', label: 'Documents', hint: 'Docs, sheets, slides', icon: 'article', words: 'documents docs sheets slides', viewKind: 'documents', go: goDocuments },
       { id: 'go-design', label: 'PlexiDesign', hint: 'Designs — social, posters, logos', icon: 'palette', words: 'design plexidesign canva graphic poster social logo flyer banner', viewKind: 'design', go: goDesign },
       { id: 'go-files', label: 'Files', hint: 'File manager', icon: 'folder', words: 'files folders manager', viewKind: 'files', go: goFiles },
@@ -556,6 +558,7 @@ export default function CommandCenter({
     goMail,
     goDocuments,
     goDesign,
+    goOffice,
     goDocument,
     goKnowledge,
     goMessages,
