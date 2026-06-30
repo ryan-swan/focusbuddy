@@ -10,16 +10,11 @@
 import { test, expect, type Page } from '@playwright/test'
 import { launchApp, type LaunchedApp, waitForReady } from './_helpers'
 
-async function openDesignHub(window: Page): Promise<void> {
-  // PlexiDesign is its own module — open it from the sidebar nav.
-  await window.getByRole('button', { name: 'PlexiDesign' }).first().click()
-  await expect(window.locator('[data-testid="designs-size-ig-post"]')).toBeVisible({ timeout: 8_000 })
-}
-
 async function openDesignStudio(window: Page): Promise<void> {
-  await openDesignHub(window)
-  // Start a square social design; the studio opens on the new canvas.
-  await window.locator('[data-testid="designs-size-ig-post"]').click()
+  // PlexiDesign lives inside the PlexiOffice segment now.
+  await window.getByRole('button', { name: 'PlexiOffice' }).first().click()
+  await expect(window.locator('[data-testid="office-app-design"]')).toBeVisible({ timeout: 8_000 })
+  await window.locator('[data-testid="office-app-design"]').click()
   await expect(window.locator('[data-testid="design-editor"]')).toBeVisible({ timeout: 10_000 })
 }
 

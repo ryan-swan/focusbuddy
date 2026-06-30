@@ -7,6 +7,7 @@ import {
 } from 'react-resizable-panels'
 import Sidebar from './components/Sidebar'
 import MainPane from './components/MainPane'
+import PlexiOfficeShell from './components/office/PlexiOfficeShell'
 import ChatPanel from './components/ChatPanel'
 import TelemetryReporter from './components/TelemetryReporter'
 import ReleaseModal from './components/ReleaseModal'
@@ -76,6 +77,10 @@ export default function App(): JSX.Element {
   const refreshTemplates = useTemplateStore((s) => s.refresh)
   const sidebarRef = useRef<ImperativePanelHandle>(null)
   const chatRef = useRef<ImperativePanelHandle>(null)
+  // PlexiOffice is a full-bleed segment with its own chrome: when active it takes
+  // over the main area, replacing the global sidebar / desk panels.
+  const currentView = useViewStore((s) => s.view)
+  const officeSegment = currentView.kind === 'office'
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [chatCollapsed, setChatCollapsed] = useState(false)
   // On macOS the window uses hiddenInset, so the traffic lights sit at the top
@@ -97,6 +102,13 @@ export default function App(): JSX.Element {
   const aiBarOpen = useAiCommandBar((s) => s.open)
   const setAiBarOpen = useAiCommandBar((s) => s.setOpen)
   const toggleAiBar = useAiCommandBar((s) => s.toggle)
+  // Surfaces like the PlexiOffice AI bar open the global AI command bar via a
+  // window event, so they don't need to thread the setter down.
+  useEffect(() => {
+    const open = (): void => setAiBarOpen(true)
+    window.addEventListener('fb:open-ai-bar', open)
+    return () => window.removeEventListener('fb:open-ai-bar', open)
+  }, [setAiBarOpen])
   // Peer body double — controlled HERE rather than inside its own
   // component so the dialog can be summoned from anywhere (button in
   // chrome, future keyboard shortcut, future "you've been stuck for 20
@@ -490,6 +502,9 @@ export default function App(): JSX.Element {
         </div>
       </header>
       <main className="flex-1 min-h-0">
+        {officeSegment ? (
+          <PlexiOfficeShell />
+        ) : (
         <PanelGroup direction="horizontal" autoSaveId="focusbuddy-main-v2">
           <Panel
             ref={sidebarRef}
@@ -521,6 +536,7 @@ export default function App(): JSX.Element {
             <ChatPanel onCollapse={collapseChat} />
           </Panel>
         </PanelGroup>
+        )}
       </main>
       <Footer />
 

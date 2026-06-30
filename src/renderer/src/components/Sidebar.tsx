@@ -149,8 +149,8 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
   const goMessages = useViewStore((s) => s.goMessages)
   const goInbox = useViewStore((s) => s.goInbox)
   const goMail = useViewStore((s) => s.goMail)
+  const goOffice = useViewStore((s) => s.goOffice)
   const goDocuments = useViewStore((s) => s.goDocuments)
-  const goDesign = useViewStore((s) => s.goDesign)
   const goFiles = useViewStore((s) => s.goFiles)
   const goCollaborations = useViewStore((s) => s.goCollaborations)
   const goOrg = useViewStore((s) => s.goOrg)
@@ -830,21 +830,21 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
         {filesOpen && (
           <div className="mb-2">
             <NavRow
-              icon="folder_open"
-              label="Documents"
-              active={viewIsActive({ kind: 'documents' }) || view.kind === 'document'}
+              icon="grid_view"
+              label="PlexiOffice"
+              active={viewIsActive({ kind: 'office' }) || view.kind === 'document' || viewIsActive({ kind: 'design' })}
               onClick={() => {
                 setActive(null)
-                goDocuments()
+                goOffice()
               }}
             />
             <NavRow
-              icon="palette"
-              label="PlexiDesign"
-              active={viewIsActive({ kind: 'design' })}
+              icon="folder_open"
+              label="Documents"
+              active={viewIsActive({ kind: 'documents' })}
               onClick={() => {
                 setActive(null)
-                goDesign()
+                goDocuments()
               }}
             />
             <NavRow
