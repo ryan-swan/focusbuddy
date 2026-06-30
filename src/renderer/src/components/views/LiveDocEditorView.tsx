@@ -296,6 +296,31 @@ export default function LiveDocEditorView({ liveDocId, onBack }: Props): JSX.Ele
   // Resolve an author id to a handle for the panel (members cover comment authors).
   const handleOf = (id: string): string => people.find((p) => p.accountId === id)?.handle ?? id
 
+  // Shape the real server comment threads for the in-editor side panel. Roots are
+  // threads; replies nest under their root. Nothing here is fabricated, it is the
+  // exact server data the floating CommentsPanel also reads.
+  const panelThreads = comments
+    .filter((c) => !c.parentId)
+    .sort((a, b) => a.createdAt - b.createdAt)
+    .map((root) => ({
+      id: root.id,
+      author: handleOf(root.authorAccountId),
+      createdAt: root.createdAt,
+      body: root.body,
+      resolved: !!root.resolved,
+      you: root.authorAccountId === myId,
+      replies: comments
+        .filter((c) => c.parentId === root.id)
+        .sort((a, b) => a.createdAt - b.createdAt)
+        .map((r) => ({
+          id: r.id,
+          author: handleOf(r.authorAccountId),
+          createdAt: r.createdAt,
+          body: r.body,
+          you: r.authorAccountId === myId
+        }))
+    }))
+
   // Start a comment on the current selection: capture the range and open the
   // composer. Applying the mark waits until the body is typed and saved.
   function startComment(): void {
@@ -576,7 +601,13 @@ export default function LiveDocEditorView({ liveDocId, onBack }: Props): JSX.Ele
               ydoc={collabRef.current.ydoc}
               awareness={collabRef.current.sync.awareness}
               user={meUser}
+              userName={me?.handle ?? null}
               onEditorReady={setEditor}
+              comments={panelThreads}
+              canComment={canComment}
+              onAddComment={startComment}
+              onReplyComment={(rootId, body) => void replyToComment(rootId, body)}
+              onJumpComment={jumpToComment}
               onCommentClick={(id) => {
                 setCommentsOpen(true)
                 setFocusComment(id)

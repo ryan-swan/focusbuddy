@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import type { MapBody, SheetBody, SlidesBody } from '@shared/types'
 import { useDocumentsStore } from '../../stores/documents'
 import { useViewStore } from '../../stores/view'
+import { useAccountStore } from '../../stores/account'
 import { DocEditor, SheetEditor, SlidesEditor, MapEditor, DesignEditor } from '@office'
 import Icon from '../Icon'
 
@@ -27,6 +28,10 @@ export default function DocumentEditorView({ documentId, onBack }: Props): JSX.E
   const rename = useDocumentsStore((s) => s.rename)
   const goDocuments = useViewStore((s) => s.goDocuments)
   const goDesign = useViewStore((s) => s.goDesign)
+  // The signed-in user's name greets them in the AI Assistant panel. Omitted when
+  // signed out, so the panel falls back to a neutral greeting (no fabricated name).
+  const account = useAccountStore((s) => s.account)
+  const userName = account?.handle ?? null
 
   useEffect(() => {
     void open(documentId)
@@ -95,7 +100,18 @@ export default function DocumentEditorView({ documentId, onBack }: Props): JSX.E
       {/* Surface */}
       <div className="flex-1 overflow-auto min-h-0">
         {active.docType === 'doc' && (
-          <DocEditor key={active.id} content={active.body} title={active.title} onChange={(json) => saveBody(json)} />
+          // This non-live editor has no comment backend (comments are a shared
+          // live-document feature), so it passes an empty thread list and the
+          // panel shows an honest empty state rather than any fabricated threads.
+          <DocEditor
+            key={active.id}
+            content={active.body}
+            title={active.title}
+            onChange={(json) => saveBody(json)}
+            userName={userName}
+            comments={[]}
+            canComment={false}
+          />
         )}
         {active.docType === 'sheet' && (
           <SheetEditor key={active.id} body={active.body as SheetBody} title={active.title} onChange={(b) => saveBody(b)} />

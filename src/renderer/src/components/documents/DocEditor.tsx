@@ -16,7 +16,7 @@ import {
 import Toolbar from './editor/Toolbar'
 import DocBubbleMenu from './editor/DocBubbleMenu'
 import FindReplace from './editor/FindReplace'
-import DocOutline from './editor/DocOutline'
+import DocSidePanel, { type DocSidePanelTab, type PanelCommentThread } from './editor/DocSidePanel'
 import { useDocAi } from './editor/useDocAi'
 import { useRegisterEditorCommands, type EditorCommand } from '../../stores/editorCommands'
 import type { Doc as YDoc } from 'yjs'
@@ -96,6 +96,18 @@ interface Props {
   onEditorReady?: (editor: Editor | null) => void
   // Clicking commented (highlighted) text opens its thread.
   onCommentClick?: (commentId: string) => void
+  // The real comment threads for the Comments tab of the side panel. The parent
+  // owns the data and the handlers; when it has no comment backend it passes an
+  // empty list and leaves the handlers off, and the panel shows an honest empty
+  // state. Never fabricate threads here.
+  comments?: PanelCommentThread[]
+  canComment?: boolean
+  onAddComment?: () => void
+  onReplyComment?: (threadId: string, body: string) => void
+  onJumpComment?: (threadId: string) => void
+  // The name to greet the writer with in the AI Assistant tab. Omit when the user
+  // is not signed in; the panel falls back to a neutral greeting.
+  userName?: string | null
 }
 
 const REWRITE_ACTIONS = [
@@ -107,10 +119,28 @@ const REWRITE_ACTIONS = [
   'Turn this into a table'
 ]
 
-export default function DocEditor({ content, title, onChange, ydoc, awareness, user, onEditorReady, onCommentClick }: Props): JSX.Element {
+export default function DocEditor({
+  content,
+  title,
+  onChange,
+  ydoc,
+  awareness,
+  user,
+  onEditorReady,
+  onCommentClick,
+  comments = [],
+  canComment = false,
+  onAddComment,
+  onReplyComment,
+  onJumpComment,
+  userName
+}: Props): JSX.Element {
   const [findOpen, setFindOpen] = useState(false)
   const [focusMode, setFocusMode] = useState(false)
-  const [outlineOpen, setOutlineOpen] = useState(false)
+  // The persistent right-side panel: open/collapsed plus the active tab. The old
+  // floating-outline toggle now drives this panel's Outline tab instead.
+  const [panelOpen, setPanelOpen] = useState(true)
+  const [panelTab, setPanelTab] = useState<DocSidePanelTab>('ai')
   // Page vs continuous layout is a personal viewing preference (remembered across
   // sessions). Paper size, orientation and margins are part of the document and
   // travel with it, so they live on the body, not in localStorage.
@@ -190,7 +220,10 @@ export default function DocEditor({ content, title, onChange, ydoc, awareness, u
     () =>
       buildDocCommands(editor, {
         toggleFocus: () => setFocusMode((v) => !v),
-        toggleOutline: () => setOutlineOpen((v) => !v),
+        toggleOutline: () => {
+          setPanelTab('outline')
+          setPanelOpen(true)
+        },
         togglePageView: () => setPageView((v) => !v),
         setPortrait: () => {
           updatePageSetup({ orientation: 'portrait' })
@@ -327,13 +360,18 @@ export default function DocEditor({ content, title, onChange, ydoc, awareness, u
   // container is active. Focus mode always uses the calm continuous flow.
   const showPage = pageView && !focusMode
 
+  // The persistent right panel sits next to the writing column in a flex row. It
+  // is never shown in focus mode, which keeps its calm single-column feel.
+  const showPanel = panelOpen && !focusMode
+
   return (
-    <div className={`relative ${scopeClass} ${focusMode ? 'fb-focus-mode' : ''}`}>
+    <div className={`relative flex h-full ${scopeClass} ${focusMode ? 'fb-focus-mode' : ''}`}>
       {/* Named heading styles: one rule per configured level, scoped to this editor. */}
       <style dangerouslySetInnerHTML={{ __html: headingCss(scopeClass, headingStyles) }} />
       <style dangerouslySetInnerHTML={{ __html: FOCUS_CSS }} />
       <style dangerouslySetInnerHTML={{ __html: COMMENT_CSS }} />
 
+      <div className="relative flex-1 min-w-0 overflow-auto">
       {!focusMode && (
         <div className="max-w-3xl mx-auto px-8 pt-6">
           <Toolbar
@@ -407,17 +445,63 @@ export default function DocEditor({ content, title, onChange, ydoc, awareness, u
 
             <span className="ml-auto flex items-center gap-1">
               <button
-                onClick={() => setOutlineOpen((v) => !v)}
+                onClick={() => {
+                  // Toggle: collapse the panel if its Outline tab is already
+                  // showing, otherwise open the panel on that tab.
+                  if (panelOpen && panelTab === 'outline') setPanelOpen(false)
+                  else {
+                    setPanelTab('outline')
+                    setPanelOpen(true)
+                  }
+                }}
                 className={`inline-flex items-center gap-1 px-2 py-1 rounded-full fb-spring-soft ${
-                  outlineOpen
+                  panelOpen && panelTab === 'outline'
                     ? 'text-accent bg-accent/10'
                     : 'hover:bg-stone-100/70 dark:hover:bg-stone-800/50'
                 }`}
-                title="Toggle document outline"
+                title="Show the document outline"
                 data-testid="doc-outline-toggle"
               >
                 <Icon name="format_list_bulleted" size={13} />
                 <span>Outline</span>
+              </button>
+              <button
+                onClick={() => {
+                  if (panelOpen && panelTab === 'comments') setPanelOpen(false)
+                  else {
+                    setPanelTab('comments')
+                    setPanelOpen(true)
+                  }
+                }}
+                className={`inline-flex items-center gap-1 px-2 py-1 rounded-full fb-spring-soft ${
+                  panelOpen && panelTab === 'comments'
+                    ? 'text-accent bg-accent/10'
+                    : 'hover:bg-stone-100/70 dark:hover:bg-stone-800/50'
+                }`}
+                title="Show comments"
+                data-testid="doc-comments-toggle"
+              >
+                <Icon name="comment" size={13} />
+                <span>Comments</span>
+              </button>
+              <button
+                onClick={() => {
+                  if (panelOpen && panelTab === 'ai') setPanelOpen(false)
+                  else {
+                    setPanelTab('ai')
+                    setPanelOpen(true)
+                  }
+                }}
+                className={`inline-flex items-center gap-1 px-2 py-1 rounded-full fb-spring-soft ${
+                  panelOpen && panelTab === 'ai'
+                    ? 'text-accent bg-accent/10'
+                    : 'hover:bg-stone-100/70 dark:hover:bg-stone-800/50'
+                }`}
+                title="Show the AI assistant"
+                data-testid="doc-assistant-toggle"
+              >
+                <Icon name="auto_awesome" size={13} />
+                <span>Assistant</span>
               </button>
               <button
                 onClick={() => setFocusMode(true)}
@@ -432,8 +516,6 @@ export default function DocEditor({ content, title, onChange, ydoc, awareness, u
           </div>
         </div>
       )}
-
-      {outlineOpen && !focusMode && <DocOutline editor={editor} onClose={() => setOutlineOpen(false)} />}
 
       {focusMode && (
         <div
@@ -563,6 +645,36 @@ export default function DocEditor({ content, title, onChange, ydoc, awareness, u
         <div className="max-w-3xl mx-auto px-8 pb-16">
           <EditorContent editor={editor} />
         </div>
+      )}
+
+      {/* Collapsed: a slim tab on the right edge to bring the panel back. */}
+      {!showPanel && !focusMode && (
+        <button
+          onClick={() => setPanelOpen(true)}
+          className="absolute top-3 right-3 z-[55] inline-flex items-center gap-1 rounded-full border border-[var(--edge-soft)] bg-[var(--surface-raised)] px-2.5 py-1 text-[11px] text-[var(--ink-70)] hover:text-[rgb(var(--accent))] hover:border-[rgb(var(--accent)/0.5)] shadow-sm"
+          title="Show the assistant panel"
+          data-testid="doc-side-panel-expand"
+        >
+          <Icon name="chevron_left" size={14} />
+          <span>Assistant</span>
+        </button>
+      )}
+      </div>
+
+      {showPanel && (
+        <DocSidePanel
+          editor={editor}
+          ai={ai}
+          userName={userName}
+          tab={panelTab}
+          onTab={setPanelTab}
+          onCollapse={() => setPanelOpen(false)}
+          comments={comments}
+          canComment={canComment}
+          onAddComment={onAddComment}
+          onReply={onReplyComment}
+          onJumpComment={onJumpComment}
+        />
       )}
     </div>
   )
