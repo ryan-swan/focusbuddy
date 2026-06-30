@@ -7,7 +7,9 @@ import { test, expect, type Page } from '@playwright/test'
 import { launchApp, type LaunchedApp, waitForReady } from './_helpers'
 
 async function openOffice(window: Page): Promise<void> {
-  await window.getByRole('button', { name: 'PlexiOffice' }).first().click()
+  // The PlexiOffice segment opens from its sidebar section header, which carries
+  // the stable nav-plexioffice testid.
+  await window.locator('[data-testid="nav-plexioffice"]').click()
   await expect(window.locator('[data-testid="office-sidebar"]')).toBeVisible({ timeout: 8_000 })
 }
 
