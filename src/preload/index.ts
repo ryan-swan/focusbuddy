@@ -108,6 +108,8 @@ const api = {
   widgets: {
     listByTask: (taskId: string): Promise<Widget[]> =>
       ipcRenderer.invoke('widgets:listByTask', taskId),
+    listByKind: (kind: Widget['kind']): Promise<Widget[]> =>
+      ipcRenderer.invoke('widgets:listByKind', kind),
     create: (draft: WidgetDraft): Promise<Widget> => ipcRenderer.invoke('widgets:create', draft),
     update: (id: string, patch: WidgetPatch): Promise<Widget | null> =>
       ipcRenderer.invoke('widgets:update', id, patch),

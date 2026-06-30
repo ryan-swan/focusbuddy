@@ -74,6 +74,7 @@ import {
   restoreWidget,
   getWidget,
   listWidgetsByTask,
+  listWidgetsByKind,
   updateWidget
 } from '../db/widgets'
 import { collectTelemetry, recordAiCall } from '../db/telemetry'
@@ -421,6 +422,7 @@ import type {
   NodePatch,
   VaultEntryDraft,
   VaultEntryPatch,
+  Widget,
   WidgetDraft,
   WidgetPatch,
   WireType
@@ -493,6 +495,7 @@ export function registerIpcHandlers(): void {
   )
 
   ipcMain.handle('widgets:listByTask', (_e, taskId: string) => listWidgetsByTask(taskId))
+  ipcMain.handle('widgets:listByKind', (_e, kind: Widget['kind']) => listWidgetsByKind(kind))
   ipcMain.handle('widgets:create', (_e, draft: WidgetDraft) => createWidget(draft))
   ipcMain.handle('widgets:update', (_e, id: string, patch: WidgetPatch) => updateWidget(id, patch))
   ipcMain.handle('widgets:delete', (_e, id: string) => deleteWidget(id))
