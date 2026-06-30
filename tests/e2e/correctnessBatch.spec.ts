@@ -13,21 +13,24 @@ import type { Page } from '@playwright/test'
 // Navigation helpers
 // ---------------------------------------------------------------------------
 
-// Products folded into the PlexiWork / PlexiConnect / PlexiFlow segments; others
-// (e.g. PlexiSign) still have a top-level sidebar entry.
-const SEGMENT_ROUTE: Record<string, { nav: string; app: string }> = {
-  PlexiForms: { nav: 'nav-plexiflow', app: 'form' },
-  PlexiMeet: { nav: 'nav-plexiconnect', app: 'meet' },
-  PlexiBuild: { nav: 'nav-plexiflow', app: 'build' }
-}
-
+// Under the three-segment IA: Meet lives in the PlexiOffice Communicate menu;
+// Forms and Build no longer have a segment home and are driven through the view
+// store; PlexiSign still has a top-level sidebar entry.
 async function openProduct(window: Page, name: string, key: string): Promise<void> {
-  const route = SEGMENT_ROUTE[name]
-  if (route) {
-    const exit = window.locator('[data-testid="segment-exit"]')
-    if (await exit.isVisible().catch(() => false)) await exit.click()
-    await window.locator(`[data-testid="${route.nav}"]`).click()
-    await window.locator(`[data-testid="segment-app-${route.app}"]`).click()
+  const exit = window.locator('[data-testid="segment-exit"]')
+  if (await exit.isVisible().catch(() => false)) await exit.click()
+  const officeExit = window.locator('[data-testid="office-exit"]')
+  if (await officeExit.isVisible().catch(() => false)) await officeExit.click()
+
+  if (name === 'PlexiMeet') {
+    await window.locator('[data-testid="nav-plexioffice"]').click()
+    await window.locator('[data-testid="office-comms-app-meet"]').click()
+  } else if (name === 'PlexiForms' || name === 'PlexiBuild') {
+    const go = name === 'PlexiForms' ? 'goForms' : 'goApps'
+    await window.evaluate((g) => {
+      const w = window as unknown as { __fbView?: { getState: () => Record<string, () => void> } }
+      w.__fbView?.getState()[g]?.()
+    }, go)
   } else {
     await window.getByRole('button', { name: new RegExp(name, 'i') }).first().click()
   }

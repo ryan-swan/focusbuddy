@@ -5,6 +5,11 @@ import { useAccountStore } from '../../stores/account'
 import { CHANGELOG } from '../../lib/changelog'
 import { promptUpgrade } from '../../stores/upgradePrompt'
 import DocumentEditorView from '../views/DocumentEditorView'
+import MailView from '../views/MailView'
+import InboxView from '../views/InboxView'
+import MessagesView from '../views/MessagesView'
+import PlexiMeetView from '../views/PlexiMeetView'
+import PlexiSignView from '../views/PlexiSignView'
 import Icon from '../Icon'
 import type { DocType, DocumentMeta } from '@shared/types'
 
@@ -32,8 +37,27 @@ const APPS: OfficeApp[] = [
   { key: 'sheets', label: 'PlexiSheets', blurb: 'Create spreadsheets', icon: 'table_chart', tint: 'bg-emerald-500', docType: 'sheet' },
   { key: 'slides', label: 'PlexiSlides', blurb: 'Create presentations', icon: 'slideshow', tint: 'bg-orange-500', docType: 'slides' },
   { key: 'draw', label: 'PlexiDraw', blurb: 'Create drawings', icon: 'gesture', tint: 'bg-violet-500', docType: 'map' },
-  { key: 'design', label: 'PlexiDesign', blurb: 'Designs, any size', icon: 'palette', tint: 'bg-fuchsia-500', docType: 'design' },
-  { key: 'sign', label: 'PlexiSign', blurb: 'Send & sign documents', icon: 'draw', tint: 'bg-teal-500', docType: null }
+  { key: 'design', label: 'PlexiDesign', blurb: 'Designs, any size', icon: 'palette', tint: 'bg-fuchsia-500', docType: 'design' }
+]
+
+// The communication apps that now live inside PlexiOffice. Each renders its
+// existing view inline so the office side menu stays put. These are distinct
+// from the document-type apps above: they don't create a doc, they take over the
+// content area with their own surface.
+interface CommsApp {
+  key: string
+  label: string
+  blurb: string
+  icon: string
+  tint: string
+  render: () => JSX.Element
+}
+const COMMS_APPS: CommsApp[] = [
+  { key: 'mail', label: 'Mail', blurb: 'Your email inbox', icon: 'mail', tint: 'bg-rose-500', render: () => <MailView /> },
+  { key: 'inbox', label: 'Inbox', blurb: 'Notifications and share invites', icon: 'inbox', tint: 'bg-amber-500', render: () => <InboxView /> },
+  { key: 'chat', label: 'Chat', blurb: 'Channels and direct messages', icon: 'forum', tint: 'bg-sky-500', render: () => <MessagesView /> },
+  { key: 'meet', label: 'Meet', blurb: 'Video calls and meetings', icon: 'video_call', tint: 'bg-violet-500', render: () => <PlexiMeetView /> },
+  { key: 'sign', label: 'Sign', blurb: 'Send and sign documents', icon: 'draw', tint: 'bg-teal-500', render: () => <PlexiSignView /> }
 ]
 
 const TYPE_ICON: Record<string, { icon: string; tint: string }> = {
@@ -60,17 +84,27 @@ function relTime(ms: number): string {
   return new Date(ms).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 }
 
-export default function PlexiOfficeShell(): JSX.Element {
+export default function PlexiOfficeShell({ initialApp }: { initialApp?: string } = {}): JSX.Element {
   const list = useDocumentsStore((s) => s.list)
   const refresh = useDocumentsStore((s) => s.refresh)
   const createBlank = useDocumentsStore((s) => s.createBlank)
   const remove = useDocumentsStore((s) => s.remove)
   const goHome = useViewStore((s) => s.goHome)
-  const goSign = useViewStore((s) => s.goSign)
   const account = useAccountStore((s) => s.account)
 
   const [page, setPage] = useState<OfficePage>('home')
   const [openDocId, setOpenDocId] = useState<string | null>(null)
+  // The active communication app (Mail / Inbox / Chat / Meet / Sign), or null
+  // when the document hub is showing. Deep-linked via initialApp.
+  const [activeComms, setActiveComms] = useState<string | null>(
+    initialApp && COMMS_APPS.some((a) => a.key === initialApp) ? initialApp : null
+  )
+  useEffect(() => {
+    if (initialApp && COMMS_APPS.some((a) => a.key === initialApp)) {
+      setActiveComms(initialApp)
+      setOpenDocId(null)
+    }
+  }, [initialApp])
   const [tab, setTab] = useState<'all' | DocType>('all')
   const [busy, setBusy] = useState(false)
   const [starred, setStarred] = useState<Set<string>>(() => {
@@ -106,19 +140,23 @@ export default function PlexiOfficeShell(): JSX.Element {
   }
 
   async function launch(app: OfficeApp): Promise<void> {
-    if (app.docType === null) {
-      if (app.key === 'sign') goSign()
-      return
-    }
+    if (app.docType === null) return
     if (busy) return
     setBusy(true)
     try {
       const doc = await createBlank(app.docType, app.label.replace('Plexi', '') + ' draft')
       await refresh()
+      setActiveComms(null)
       setOpenDocId(doc.id)
     } finally {
       setBusy(false)
     }
+  }
+
+  // Open a communication app inline (Mail / Inbox / Chat / Meet / Sign).
+  function openComms(key: string): void {
+    setOpenDocId(null)
+    setActiveComms(key)
   }
 
   async function createType(docType: DocType, title: string): Promise<void> {
@@ -137,7 +175,7 @@ export default function PlexiOfficeShell(): JSX.Element {
   if (openDocId) {
     return (
       <div className="h-full flex bg-[var(--surface-base)]">
-        <OfficeSidebar page={page} onPage={(p) => { setOpenDocId(null); setPage(p) }} onLaunch={(a) => void launch(a)} onExit={goHome} starredCount={starred.size} />
+        <OfficeSidebar page={page} onPage={(p) => { setOpenDocId(null); setActiveComms(null); setPage(p) }} onLaunch={(a) => void launch(a)} onComms={openComms} activeComms={null} onExit={goHome} starredCount={starred.size} />
         <div className="flex-1 min-w-0">
           <DocumentEditorView documentId={openDocId} onBack={() => { setOpenDocId(null); void refresh() }} />
         </div>
@@ -145,9 +183,21 @@ export default function PlexiOfficeShell(): JSX.Element {
     )
   }
 
+  // A communication app (Mail / Inbox / Chat / Meet / Sign) takes over the
+  // content area inline; the office side menu stays put.
+  const comms = activeComms ? COMMS_APPS.find((a) => a.key === activeComms) ?? null : null
+  if (comms) {
+    return (
+      <div className="h-full flex bg-[var(--surface-base)]">
+        <OfficeSidebar page={page} onPage={(p) => { setActiveComms(null); setPage(p) }} onLaunch={(a) => void launch(a)} onComms={openComms} activeComms={activeComms} onExit={goHome} starredCount={starred.size} />
+        <div className="flex-1 min-w-0 overflow-auto" data-testid={`office-comms-${comms.key}`}>{comms.render()}</div>
+      </div>
+    )
+  }
+
   return (
     <div className="h-full flex bg-[var(--surface-base)] text-[var(--ink-100)]">
-      <OfficeSidebar page={page} onPage={setPage} onLaunch={(a) => void launch(a)} onExit={goHome} starredCount={starred.size} />
+      <OfficeSidebar page={page} onPage={setPage} onLaunch={(a) => void launch(a)} onComms={openComms} activeComms={null} onExit={goHome} starredCount={starred.size} />
 
       <div className="flex-1 min-w-0 overflow-auto">
         <div className="max-w-[1400px] mx-auto px-6 py-6">
@@ -383,12 +433,16 @@ function OfficeSidebar({
   page,
   onPage,
   onLaunch,
+  onComms,
+  activeComms,
   onExit,
   starredCount
 }: {
   page: OfficePage
   onPage: (p: OfficePage) => void
   onLaunch: (a: OfficeApp) => void
+  onComms: (key: string) => void
+  activeComms: string | null
   onExit: () => void
   starredCount: number
 }): JSX.Element {
@@ -435,6 +489,25 @@ function OfficeSidebar({
             onClick={() => onLaunch(a)}
             data-testid={`office-sideapp-${a.key}`}
             className="flex items-center gap-2.5 w-full px-3 py-1.5 rounded-lg text-[13px] mb-0.5 text-[var(--ink-80)] hover:bg-[var(--surface-sunken)]"
+          >
+            <span className={`inline-flex items-center justify-center w-6 h-6 rounded-md text-white ${a.tint}`}>
+              <Icon name={a.icon} size={14} />
+            </span>
+            <span>{a.label}</span>
+          </button>
+        ))}
+      </div>
+
+      <div className="px-4 pt-3 pb-1.5 text-[10px] uppercase tracking-[0.12em] text-[var(--ink-40)] font-semibold">Communicate</div>
+      <div className="px-2">
+        {COMMS_APPS.map((a) => (
+          <button
+            key={a.key}
+            onClick={() => onComms(a.key)}
+            data-testid={`office-comms-app-${a.key}`}
+            className={`flex items-center gap-2.5 w-full px-3 py-1.5 rounded-lg text-[13px] mb-0.5 ${
+              activeComms === a.key ? 'bg-[rgb(var(--accent)/0.12)] text-[rgb(var(--accent))] font-medium' : 'text-[var(--ink-80)] hover:bg-[var(--surface-sunken)]'
+            }`}
           >
             <span className={`inline-flex items-center justify-center w-6 h-6 rounded-md text-white ${a.tint}`}>
               <Icon name={a.icon} size={14} />

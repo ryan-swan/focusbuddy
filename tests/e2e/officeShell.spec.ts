@@ -29,8 +29,13 @@ test.describe('PlexiOffice segment', () => {
     for (const t of ['office-nav-home', 'office-nav-recent', 'office-nav-starred', 'office-nav-templates', 'office-nav-trash']) {
       await expect(window.locator(`[data-testid="${t}"]`)).toBeVisible()
     }
-    for (const a of ['docs', 'sheets', 'slides', 'draw', 'design', 'sign']) {
+    for (const a of ['docs', 'sheets', 'slides', 'draw', 'design']) {
       await expect(window.locator(`[data-testid="office-app-${a}"]`)).toBeVisible()
+    }
+    // Sign, Mail, Chat, Meet and Inbox are now communication apps in the office
+    // side menu rather than document tiles.
+    for (const a of ['mail', 'inbox', 'chat', 'meet', 'sign']) {
+      await expect(window.locator(`[data-testid="office-comms-app-${a}"]`)).toBeVisible()
     }
     // The Ask-AI bar and upgrade affordance are present.
     await expect(window.locator('[data-testid="office-ask-ai"]')).toBeVisible()

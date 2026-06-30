@@ -24,47 +24,47 @@ import HomeDashboardRegion from './HomeDashboardRegion'
 export function launchProduct(product: PlexiProduct): void {
   const v = useViewStore.getState()
   switch (product.launch) {
-    // Office products open the PlexiOffice segment; work/connect/flow products
-    // open their segment with the app pre-selected, so the launcher matches the
-    // new menu structure rather than the old standalone views.
+    // The launcher maps each product to its home inside the three-segment
+    // structure: PlexiDesk (workspace), PlexiOffice (documents + comms) and
+    // PlexiBrain (knowledge, automation, insights).
     case 'documents':
       return v.goOffice()
     case 'tasks':
-      return v.goPlexiWork('tasks')
+      return v.goPlexiDesk('tasks')
     case 'calendar':
-      return v.goCalendar()
+      return v.goPlexiDesk('calendar')
     case 'messages':
-      return v.goPlexiConnect('chat')
+      return v.goOffice('chat')
     case 'mail':
-      return v.goMail()
+      return v.goOffice('mail')
     case 'files':
-      return v.goFiles()
+      return v.goPlexiDesk('files')
     case 'vault':
       return v.goVault()
     case 'knowledge':
-      return v.goKnowledge()
+      return v.goPlexiBrain('ask')
     case 'meetings':
-      return v.goPlexiConnect('meet')
+      return v.goOffice('meet')
     case 'apps':
-      return v.goPlexiFlow('build')
+      return v.goPlexiBrain('connect')
     case 'forms':
-      return v.goPlexiFlow('form')
+      return v.goProduct(product.key)
     case 'sign':
-      return v.goSign()
+      return v.goOffice('sign')
     case 'search':
-      return v.goSearch()
+      return v.goPlexiBrain('search')
     case 'projects':
-      return v.goPlexiWork('projects')
+      return v.goPlexiDesk('plans')
     case 'reports':
-      return v.goPlexiWork('reports')
+      return v.goPlexiBrain('insights')
     case 'flows':
-      return v.goPlexiFlow('flow')
+      return v.goPlexiBrain('flows')
     case 'api':
-      return v.goPlexiFlow('api')
+      return v.goPlexiBrain('api')
     case 'marketplace':
       return v.goMarketplace()
     case 'canvas':
-      return v.goHome()
+      return v.goPlexiDesk('desk')
     default:
       return v.goProduct(product.key)
   }

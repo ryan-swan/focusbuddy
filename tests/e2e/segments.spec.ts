@@ -1,7 +1,8 @@
 /**
- * E2E for the PlexiWork / PlexiConnect / PlexiFlow segments — each a full-bleed
- * area with its own dedicated side menu and a home of app tiles, with the
- * existing views rendered inline so the segment menu stays put.
+ * E2E for the PlexiDesk / PlexiBrain segments — each a full-bleed area with its
+ * own dedicated side menu and a home of app tiles, with the existing views
+ * rendered inline so the segment menu stays put. PlexiOffice is the third
+ * segment and has its own shell, covered by officeShell.spec.ts.
  */
 
 import { test, expect, type Page } from '@playwright/test'
@@ -13,6 +14,8 @@ async function openSegment(window: Page, navTestid: string): Promise<void> {
   // dedicated sidebar entry (testid, since some product labels still repeat).
   const exit = window.locator('[data-testid="segment-exit"]')
   if (await exit.isVisible().catch(() => false)) await exit.click()
+  const officeExit = window.locator('[data-testid="office-exit"]')
+  if (await officeExit.isVisible().catch(() => false)) await officeExit.click()
   await expect(window.locator(`[data-testid="${navTestid}"]`)).toBeVisible({ timeout: 8_000 })
   await window.locator(`[data-testid="${navTestid}"]`).click()
   await expect(window.locator('[data-testid="segment-sidebar"]')).toBeVisible({ timeout: 8_000 })
@@ -32,9 +35,8 @@ test.describe('segments', () => {
   })
 
   const SEGMENTS: { name: string; nav: string; apps: string[] }[] = [
-    { name: 'PlexiWork', nav: 'nav-plexiwork', apps: ['projects', 'tasks', 'reports'] },
-    { name: 'PlexiConnect', nav: 'nav-plexiconnect', apps: ['chat', 'meet'] },
-    { name: 'PlexiFlow', nav: 'nav-plexiflow', apps: ['flow', 'api', 'build', 'form'] }
+    { name: 'PlexiDesk', nav: 'nav-plexidesk', apps: ['home', 'desk', 'workspaces', 'plans', 'tasks', 'calendar', 'files', 'recent'] },
+    { name: 'PlexiBrain', nav: 'nav-plexibrain', apps: ['ask', 'search', 'map', 'flows', 'agents', 'connect', 'api', 'insights'] }
   ]
 
   for (const seg of SEGMENTS) {
