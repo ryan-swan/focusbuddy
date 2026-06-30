@@ -36,6 +36,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.124',
+    date: '2026-07-01T11:30:00Z',
+    title: 'v2.5.124 — a Plan is more than a timeline',
+    tag: 'feature',
+    summary:
+      'Opening a plan now starts on a real Overview rather than dropping you straight into the Gantt. The Overview reads the plan you actually have: how far along it is, how many tasks are done, when it starts and finishes, your milestones and the next one coming up, anything that is running late or about to miss a deadline, and the length of the critical path. A brand-new plan simply shows zeros and invites you to add tasks. There is also a new Files view that gathers the documents and files you have filed under the plan, so the things that belong to a piece of work live with it. The timeline, board, grid, calendar and workload views are all still there, now sitting beside Overview and Files as different lenses on the same plan.',
+    highlights: [
+      'Plans open on a real Overview: progress, dates, milestones, late and at-risk counts, critical path.',
+      'A new Files view shows the documents and files filed under the plan.',
+      'Overview and Files join Timeline, Board, Grid, Calendar and Workload as views of one plan.'
+    ]
+  },
+  {
     version: '2.5.123',
     date: '2026-07-01T10:00:00Z',
     title: 'v2.5.123 — the whole workspace in your sidebar',
