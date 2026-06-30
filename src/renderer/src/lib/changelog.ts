@@ -36,6 +36,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.117',
+    date: '2026-06-30T23:00:00Z',
+    title: 'v2.5.117 — an AI Assistant for PlexiSheets',
+    tag: 'feature',
+    summary:
+      'PlexiSheets gains the same kind of side panel PlexiDocs just got, an AI Assistant on the right of the grid. It reads the data actually in your sheet and surfaces insights from it, and you can ask it a question about your data in plain language and get an answer grounded in the real numbers. It is honest by design. A sheet with no data simply invites you to add some rather than inventing a result, and any real error, such as a missing API key, is shown plainly. The panel also has space for recent activity and data connections, which show a truthful empty state until those are wired to a real source rather than displaying anything made up. The toolbar, grid, charts, conditional formatting and tabs are all unchanged.',
+    highlights: [
+      'A collapsible AI Assistant panel on the right of the PlexiSheets grid.',
+      'Insights and answers are generated from the real data in your sheet, never hardcoded.',
+      'Honest states throughout: an empty sheet asks for data, errors show plainly, and activity and connections stay empty until real sources exist.'
+    ]
+  },
+  {
     version: '2.5.116',
     date: '2026-06-30T21:00:00Z',
     title: 'v2.5.116 — a proper side panel for PlexiDocs',
