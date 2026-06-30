@@ -36,6 +36,20 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.114',
+    date: '2026-07-02T16:00:00Z',
+    title: 'v2.5.114 — PlexiWork, PlexiConnect and PlexiFlow, organised like PlexiOffice',
+    tag: 'feature',
+    summary:
+      'The rest of the system now has the same calm, organised feel as PlexiOffice. PlexiWork brings your Projects, Tasks and Reports together; PlexiConnect holds Chat and Meet; and PlexiFlow gathers Flow, API, Build and Form. Open any of them and the space becomes a focused area with its own side menu and a clear home of app tiles, and you move between the apps inside it without losing the menu. Same tools as before, in a much tidier home.',
+    highlights: [
+      'PlexiWork: Projects, Tasks and Reports in one focused area.',
+      'PlexiConnect: Chat and Meet together.',
+      'PlexiFlow: Flow, API, Build and Form together.',
+      'Each is its own segment with a dedicated side menu and a home, matching PlexiOffice.'
+    ]
+  },
+  {
     version: '2.5.113',
     date: '2026-07-02T10:00:00Z',
     title: 'v2.5.113 — PlexiOffice, organised into its own place',
