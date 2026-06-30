@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { useDocumentsStore } from '../../stores/documents'
 import { useViewStore } from '../../stores/view'
 import { useAccountStore } from '../../stores/account'
+import { useMailStore, selectMailUnread } from '../../stores/mail'
+import { useMessagingStore } from '../../stores/messaging'
 import { CHANGELOG } from '../../lib/changelog'
 import { promptUpgrade } from '../../stores/upgradePrompt'
 import DocumentEditorView from '../views/DocumentEditorView'
@@ -11,7 +13,7 @@ import MessagesView from '../views/MessagesView'
 import PlexiMeetView from '../views/PlexiMeetView'
 import PlexiSignView from '../views/PlexiSignView'
 import Icon from '../Icon'
-import type { DocType, DocumentMeta } from '@shared/types'
+import type { DocType, DocumentMeta, TimeBlock } from '@shared/types'
 
 // PlexiOffice — the office segment of the system. Its own full-bleed shell with a
 // dedicated sidemenu: the place to create Docs, Sheets, Slides, Drawings and
@@ -84,6 +86,30 @@ function relTime(ms: number): string {
   return new Date(ms).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 }
 
+function clockTime(ms: number): string {
+  return new Date(ms).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
+}
+
+function startOfDay(now: number): number {
+  const d = new Date(now)
+  d.setHours(0, 0, 0, 0)
+  return d.getTime()
+}
+
+// The Recent table's type tabs. Document types map to real document records;
+// 'mail' and 'meet' are honest categories with no document of their own, so
+// those tabs show an honest empty state rather than fabricated rows.
+type RecentTab = 'all' | DocType | 'mail' | 'meet'
+const RECENT_TABS: { id: RecentTab; label: string }[] = [
+  { id: 'all', label: 'All' },
+  { id: 'doc', label: 'Docs' },
+  { id: 'sheet', label: 'Sheets' },
+  { id: 'slides', label: 'Slides' },
+  { id: 'map', label: 'Draw' },
+  { id: 'mail', label: 'Mail' },
+  { id: 'meet', label: 'Meet' }
+]
+
 export default function PlexiOfficeShell({ initialApp }: { initialApp?: string } = {}): JSX.Element {
   const list = useDocumentsStore((s) => s.list)
   const refresh = useDocumentsStore((s) => s.refresh)
@@ -91,6 +117,23 @@ export default function PlexiOfficeShell({ initialApp }: { initialApp?: string }
   const remove = useDocumentsStore((s) => s.remove)
   const goHome = useViewStore((s) => s.goHome)
   const account = useAccountStore((s) => s.account)
+
+  // Real unread sources. Mail unread is derived from the loaded IMAP envelope
+  // list; the messaging store carries both the internal-inbox items and the
+  // chat conversation unread total. Nothing here is invented: if a mailbox or
+  // account is not connected the underlying lists are empty and the count is 0.
+  const mailUnread = useMailStore(selectMailUnread)
+  const refreshMail = useMailStore((s) => s.refresh)
+  const loadMailAccount = useMailStore((s) => s.loadAccount)
+  const startCompose = useMailStore((s) => s.startCompose)
+  const inboxItems = useMessagingStore((s) => s.inboxItems)
+  const chatUnread = useMessagingStore((s) => s.unreadTotal)
+  const refreshInbox = useMessagingStore((s) => s.refreshInbox)
+  const refreshConversations = useMessagingStore((s) => s.refreshConversations)
+  const inboxUnread = useMemo(
+    () => inboxItems.reduce((sum, it) => sum + (it.unread || 0), 0),
+    [inboxItems]
+  )
 
   const [page, setPage] = useState<OfficePage>('home')
   const [openDocId, setOpenDocId] = useState<string | null>(null)
@@ -106,6 +149,10 @@ export default function PlexiOfficeShell({ initialApp }: { initialApp?: string }
     }
   }, [initialApp])
   const [tab, setTab] = useState<'all' | DocType>('all')
+  const [recentTab, setRecentTab] = useState<RecentTab>('all')
+  // Today's real time blocks. null = still loading; [] = loaded and genuinely
+  // empty. We never seed a meeting.
+  const [agenda, setAgenda] = useState<TimeBlock[] | null>(null)
   const [busy, setBusy] = useState(false)
   const [starred, setStarred] = useState<Set<string>>(() => {
     try {
@@ -119,11 +166,57 @@ export default function PlexiOfficeShell({ initialApp }: { initialApp?: string }
     void refresh()
   }, [refresh])
 
+  // Load the real sources behind the home rail: today's time blocks, the mail
+  // unread count, and the internal inbox + chat unread totals. Each guards
+  // against failure by falling back to an honest empty/zero, never a fake row.
+  useEffect(() => {
+    const dayStart = startOfDay(Date.now())
+    const dayEnd = dayStart + 86_400_000
+    window.api.timeBlocks
+      .list(dayStart, dayEnd)
+      .then(setAgenda)
+      .catch(() => setAgenda([]))
+    void loadMailAccount().then(() => refreshMail().catch(() => {}))
+    if (account) {
+      void refreshInbox().catch(() => {})
+      void refreshConversations().catch(() => {})
+    }
+  }, [account, loadMailAccount, refreshMail, refreshInbox, refreshConversations])
+
   const officeDocs = useMemo(
     () => list.filter((d) => ['doc', 'sheet', 'slides', 'map', 'design'].includes(d.docType)).sort((a, b) => b.updatedAt - a.updatedAt),
     [list]
   )
   const ownerName = account?.handle || 'You'
+
+  // The Recent table reads the same real documents, filtered by the selected
+  // type tab. The Mail and Meet tabs have no document records, so they resolve
+  // to an empty list and the table shows its honest empty state.
+  const recentRows = useMemo<DocumentMeta[]>(() => {
+    if (recentTab === 'mail' || recentTab === 'meet') return []
+    const filtered = recentTab === 'all' ? officeDocs : officeDocs.filter((d) => d.docType === recentTab)
+    return filtered.slice(0, 12)
+  }, [officeDocs, recentTab])
+
+  // Today's real events in time order. Empty array stays empty; we never invent.
+  const todayEvents = useMemo<TimeBlock[]>(() => {
+    if (!agenda) return []
+    return [...agenda].sort((a, b) => a.startMs - b.startMs).slice(0, 6)
+  }, [agenda])
+
+  // Open Mail and start a compose window. Routes into the office's inline Mail
+  // surface, then opens the real composer.
+  function composeMail(): void {
+    setOpenDocId(null)
+    setActiveComms('mail')
+    startCompose()
+  }
+
+  // Open the real Meet surface inline.
+  function openMeet(): void {
+    setOpenDocId(null)
+    setActiveComms('meet')
+  }
 
   function toggleStar(id: string): void {
     setStarred((prev) => {
@@ -218,7 +311,8 @@ export default function PlexiOfficeShell({ initialApp }: { initialApp?: string }
             </div>
           </div>
 
-          {/* App tiles */}
+          {/* App tiles — the document apps plus Meet, which opens the real
+              meeting surface rather than creating a document. */}
           <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-7 gap-2.5 mb-6">
             {APPS.map((a) => (
               <button
@@ -234,6 +328,17 @@ export default function PlexiOfficeShell({ initialApp }: { initialApp?: string }
                 <span className="text-[10.5px] text-[var(--ink-50)] text-center leading-tight">{a.blurb}</span>
               </button>
             ))}
+            <button
+              onClick={openMeet}
+              data-testid="office-app-meet"
+              className="flex flex-col items-center gap-2 rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-raised)] p-3.5 hover:border-[rgb(var(--accent)/0.5)] hover:shadow-sm transition"
+            >
+              <span className="inline-flex items-center justify-center w-11 h-11 rounded-xl text-white bg-violet-500">
+                <Icon name="video_call" size={22} />
+              </span>
+              <span className="text-[12.5px] font-medium">PlexiMeet</span>
+              <span className="text-[10.5px] text-[var(--ink-50)] text-center leading-tight">Start a meeting</span>
+            </button>
           </div>
 
           <div className="flex gap-5">
@@ -275,54 +380,178 @@ export default function PlexiOfficeShell({ initialApp }: { initialApp?: string }
                 </div>
               </section>
 
-              {/* Recent files — real documents, honest empty state. */}
-              <section className="rounded-2xl border border-[var(--edge-soft)] bg-[var(--surface-raised)] p-4">
-                <h2 className="text-[15px] font-semibold mb-3">{page === 'trash' ? 'Trash' : page === 'starred' ? 'Starred' : 'Recent files'}</h2>
-                {visibleDocs(officeDocs, page, starred).length === 0 ? (
-                  <p className="text-[12.5px] text-[var(--ink-50)] py-6 text-center">
-                    {page === 'starred' ? 'Star a file to keep it here.' : page === 'shared' ? 'Files shared with you will appear here.' : 'No files yet. Create one above to get started.'}
-                  </p>
-                ) : (
-                  <div className="text-[12.5px]">
-                    <div className="grid grid-cols-[1fr_auto_auto_auto] gap-3 px-2 pb-1.5 text-[11px] uppercase tracking-wide text-[var(--ink-50)] border-b border-[var(--edge-soft)]">
-                      <span>Name</span>
-                      <span>Owner</span>
-                      <span>Last opened</span>
-                      <span />
-                    </div>
-                    {visibleDocs(officeDocs, page, starred).map((d) => {
-                      const ti = TYPE_ICON[d.docType] ?? { icon: 'description', tint: 'text-stone-400' }
-                      return (
-                        <div
-                          key={d.id}
-                          onClick={() => setOpenDocId(d.id)}
-                          data-testid={`office-file-${d.id}`}
-                          className="grid grid-cols-[1fr_auto_auto_auto] gap-3 px-2 py-2 items-center border-b border-[var(--edge-soft)]/60 cursor-pointer hover:bg-[var(--surface-sunken)] rounded"
-                        >
-                          <span className="flex items-center gap-2 min-w-0">
-                            <Icon name={ti.icon} size={16} className={ti.tint} />
-                            <span className="truncate">{d.title || 'Untitled'}</span>
-                          </span>
-                          <span className="text-[var(--ink-60)] whitespace-nowrap">{ownerName}</span>
-                          <span className="text-[var(--ink-60)] whitespace-nowrap fb-tabular">{relTime(d.updatedAt)}</span>
-                          <span className="flex items-center gap-1">
-                            <button onClick={(e) => { e.stopPropagation(); toggleStar(d.id) }} className={starred.has(d.id) ? 'text-amber-400' : 'text-[var(--ink-40)] hover:text-amber-400'} title="Star">
-                              <Icon name="star" size={15} filled={starred.has(d.id)} />
-                            </button>
-                            <button onClick={(e) => { e.stopPropagation(); void remove(d.id) }} className="text-[var(--ink-40)] hover:text-rose-500" title="Delete">
-                              <Icon name="delete" size={15} />
-                            </button>
-                          </span>
-                        </div>
-                      )
-                    })}
+              {/* Recent — real documents only, sorted by their real updatedAt and
+                  filtered by the selected type tab. The Mail and Meet tabs have no
+                  document records, so they show an honest empty state. We do not
+                  add a Location column or collaborator avatars: those are not real
+                  fields on a document, so they are omitted rather than invented. */}
+              {page === 'home' ? (
+                <section className="rounded-2xl border border-[var(--edge-soft)] bg-[var(--surface-raised)] p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <h2 className="text-[15px] font-semibold">Recent</h2>
                   </div>
-                )}
-              </section>
+                  <div className="flex flex-wrap gap-1.5 mb-3">
+                    {RECENT_TABS.map((t) => (
+                      <button
+                        key={t.id}
+                        onClick={() => setRecentTab(t.id)}
+                        data-testid={`office-recent-tab-${t.id}`}
+                        className={`px-2.5 py-1 rounded-full text-[12px] ${recentTab === t.id ? 'bg-[rgb(var(--accent))] text-white' : 'border border-[var(--edge-soft)] text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]'}`}
+                      >
+                        {t.label}
+                      </button>
+                    ))}
+                  </div>
+                  {recentRows.length === 0 ? (
+                    <p className="text-[12.5px] text-[var(--ink-50)] py-6 text-center" data-testid="office-recent-empty">
+                      Nothing here yet.
+                    </p>
+                  ) : (
+                    <div className="text-[12.5px]" data-testid="office-home-recent-table">
+                      <div className="grid grid-cols-[1fr_auto_auto_auto] gap-3 px-2 pb-1.5 text-[11px] uppercase tracking-wide text-[var(--ink-50)] border-b border-[var(--edge-soft)]">
+                        <span>Name</span>
+                        <span>Type</span>
+                        <span>Last opened</span>
+                        <span />
+                      </div>
+                      {recentRows.map((d) => {
+                        const ti = TYPE_ICON[d.docType] ?? { icon: 'description', tint: 'text-stone-400' }
+                        return (
+                          <div
+                            key={d.id}
+                            onClick={() => setOpenDocId(d.id)}
+                            data-testid={`office-recent-row-${d.id}`}
+                            className="grid grid-cols-[1fr_auto_auto_auto] gap-3 px-2 py-2 items-center border-b border-[var(--edge-soft)]/60 cursor-pointer hover:bg-[var(--surface-sunken)] rounded"
+                          >
+                            <span className="flex items-center gap-2 min-w-0">
+                              <Icon name={ti.icon} size={16} className={ti.tint} />
+                              <span className="truncate">{d.title || 'Untitled'}</span>
+                            </span>
+                            <span className="text-[var(--ink-60)] whitespace-nowrap">{appLabel(d.docType).replace('Plexi', '')}</span>
+                            <span className="text-[var(--ink-60)] whitespace-nowrap fb-tabular">{relTime(d.updatedAt)}</span>
+                            <span className="flex items-center gap-1">
+                              <button onClick={(e) => { e.stopPropagation(); toggleStar(d.id) }} className={starred.has(d.id) ? 'text-amber-400' : 'text-[var(--ink-40)] hover:text-amber-400'} title="Star">
+                                <Icon name="star" size={15} filled={starred.has(d.id)} />
+                              </button>
+                              <button onClick={(e) => { e.stopPropagation(); void remove(d.id) }} className="text-[var(--ink-40)] hover:text-rose-500" title="Delete">
+                                <Icon name="delete" size={15} />
+                              </button>
+                            </span>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </section>
+              ) : (
+                <section className="rounded-2xl border border-[var(--edge-soft)] bg-[var(--surface-raised)] p-4">
+                  <h2 className="text-[15px] font-semibold mb-3">{page === 'trash' ? 'Trash' : page === 'starred' ? 'Starred' : 'Recent files'}</h2>
+                  {visibleDocs(officeDocs, page, starred).length === 0 ? (
+                    <p className="text-[12.5px] text-[var(--ink-50)] py-6 text-center">
+                      {page === 'starred' ? 'Star a file to keep it here.' : page === 'shared' ? 'Files shared with you will appear here.' : 'No files yet. Create one above to get started.'}
+                    </p>
+                  ) : (
+                    <div className="text-[12.5px]">
+                      <div className="grid grid-cols-[1fr_auto_auto_auto] gap-3 px-2 pb-1.5 text-[11px] uppercase tracking-wide text-[var(--ink-50)] border-b border-[var(--edge-soft)]">
+                        <span>Name</span>
+                        <span>Owner</span>
+                        <span>Last opened</span>
+                        <span />
+                      </div>
+                      {visibleDocs(officeDocs, page, starred).map((d) => {
+                        const ti = TYPE_ICON[d.docType] ?? { icon: 'description', tint: 'text-stone-400' }
+                        return (
+                          <div
+                            key={d.id}
+                            onClick={() => setOpenDocId(d.id)}
+                            data-testid={`office-file-${d.id}`}
+                            className="grid grid-cols-[1fr_auto_auto_auto] gap-3 px-2 py-2 items-center border-b border-[var(--edge-soft)]/60 cursor-pointer hover:bg-[var(--surface-sunken)] rounded"
+                          >
+                            <span className="flex items-center gap-2 min-w-0">
+                              <Icon name={ti.icon} size={16} className={ti.tint} />
+                              <span className="truncate">{d.title || 'Untitled'}</span>
+                            </span>
+                            <span className="text-[var(--ink-60)] whitespace-nowrap">{ownerName}</span>
+                            <span className="text-[var(--ink-60)] whitespace-nowrap fb-tabular">{relTime(d.updatedAt)}</span>
+                            <span className="flex items-center gap-1">
+                              <button onClick={(e) => { e.stopPropagation(); toggleStar(d.id) }} className={starred.has(d.id) ? 'text-amber-400' : 'text-[var(--ink-40)] hover:text-amber-400'} title="Star">
+                                <Icon name="star" size={15} filled={starred.has(d.id)} />
+                              </button>
+                              <button onClick={(e) => { e.stopPropagation(); void remove(d.id) }} className="text-[var(--ink-40)] hover:text-rose-500" title="Delete">
+                                <Icon name="delete" size={15} />
+                              </button>
+                            </span>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </section>
+              )}
             </div>
 
             {/* Right rail */}
             <div className="w-[260px] shrink-0 space-y-4 hidden lg:block">
+              {page === 'home' && (
+                <>
+                  {/* Your day — real time blocks for today. No invented meetings;
+                      an empty day shows an honest empty state. A Join control is
+                      not shown because a time block carries no real join target. */}
+                  <RailCard title="Your day in PlexiOffice">
+                    <div data-testid="office-home-day">
+                      {agenda === null ? (
+                        <p className="text-[11.5px] text-[var(--ink-50)]">Loading your day…</p>
+                      ) : todayEvents.length === 0 ? (
+                        <p className="text-[11.5px] text-[var(--ink-50)]" data-testid="office-home-day-empty">
+                          Nothing scheduled today.
+                        </p>
+                      ) : (
+                        <ul className="space-y-1.5">
+                          {todayEvents.map((b) => (
+                            <li key={b.id} className="flex items-center gap-2.5" data-testid={`office-home-day-item-${b.id}`}>
+                              <span className="shrink-0 text-[11px] text-[var(--ink-50)] fb-tabular w-12">{clockTime(b.startMs)}</span>
+                              <span className="flex-1 truncate text-[12px] text-[var(--ink-90)]">{b.title || 'Time block'}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  </RailCard>
+
+                  {/* Quick actions — every action goes to a real destination. */}
+                  <RailCard title="Quick actions">
+                    <div className="space-y-0.5" data-testid="office-home-quickactions">
+                      <QuickActionRow testid="office-qa-compose" icon="mail" label="Compose email" onClick={composeMail} />
+                      <QuickActionRow testid="office-qa-doc" icon="description" label="New document" onClick={() => void createType('doc', 'Untitled document')} />
+                      <QuickActionRow testid="office-qa-sheet" icon="table_chart" label="New spreadsheet" onClick={() => void createType('sheet', 'Untitled spreadsheet')} />
+                      <QuickActionRow testid="office-qa-slides" icon="slideshow" label="New presentation" onClick={() => void createType('slides', 'Untitled presentation')} />
+                      <QuickActionRow testid="office-qa-meet" icon="video_call" label="Start a meeting" onClick={openMeet} />
+                    </div>
+                  </RailCard>
+
+                  {/* Unread — real counts only. Mail comes from the loaded IMAP
+                      envelope list, Inbox and Chat from the messaging store.
+                      Mentions are not instrumented, so that row is omitted rather
+                      than faked. When every real source is zero, the card shows an
+                      honest caught-up state. */}
+                  <RailCard title="Unread">
+                    <div data-testid="office-home-unread">
+                      {inboxUnread + chatUnread + mailUnread === 0 ? (
+                        <p className="text-[11.5px] text-[var(--ink-50)]" data-testid="office-home-unread-empty">
+                          You are all caught up.
+                        </p>
+                      ) : (
+                        <div className="space-y-1">
+                          <UnreadRow icon="inbox" label="Inbox" count={inboxUnread} onClick={() => openComms('inbox')} />
+                          <UnreadRow icon="forum" label="Chat messages" count={chatUnread} onClick={() => openComms('chat')} />
+                          <UnreadRow icon="mail" label="Mail" count={mailUnread} onClick={() => openComms('mail')} />
+                        </div>
+                      )}
+                    </div>
+                  </RailCard>
+                </>
+              )}
+
               <RailCard title="Pinned">
                 {[...officeDocs].filter((d) => starred.has(d.id)).slice(0, 5).length === 0 ? (
                   <p className="text-[11.5px] text-[var(--ink-50)]">Star files to pin them here.</p>
@@ -425,6 +654,36 @@ function RailCard({ title, children }: { title: string; children: React.ReactNod
       <h3 className="text-[12px] font-semibold mb-2">{title}</h3>
       {children}
     </div>
+  )
+}
+
+function QuickActionRow({ testid, icon, label, onClick }: { testid: string; icon: string; label: string; onClick: () => void }): JSX.Element {
+  return (
+    <button
+      onClick={onClick}
+      data-testid={testid}
+      className="flex items-center gap-2.5 w-full px-2 py-1.5 rounded-lg text-[12.5px] text-[var(--ink-80)] hover:bg-[var(--surface-sunken)]"
+    >
+      <Icon name={icon} size={15} className="text-[var(--ink-50)]" />
+      <span className="truncate">{label}</span>
+    </button>
+  )
+}
+
+function UnreadRow({ icon, label, count, onClick }: { icon: string; label: string; count: number; onClick: () => void }): JSX.Element {
+  return (
+    <button
+      onClick={onClick}
+      className="flex items-center gap-2.5 w-full px-2 py-1.5 rounded-lg text-[12.5px] text-[var(--ink-80)] hover:bg-[var(--surface-sunken)]"
+    >
+      <Icon name={icon} size={15} className="text-[var(--ink-50)]" />
+      <span className="flex-1 truncate text-left">{label}</span>
+      {count > 0 && (
+        <span className="shrink-0 min-w-[18px] text-center text-[10.5px] font-semibold rounded-full px-1.5 py-0.5 bg-[rgb(var(--accent)/0.15)] text-[rgb(var(--accent))] fb-tabular">
+          {count}
+        </span>
+      )}
+    </button>
   )
 }
 
