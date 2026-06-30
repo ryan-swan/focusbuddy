@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { launchApp, waitForReady } from './_helpers'
+import { openProduct, launchApp, waitForReady } from './_helpers'
 
 // New-feature E2E coverage for the five PlexiProjects additions:
 //   1. View switcher: Calendar + Workload (total 5 modes)
@@ -38,7 +38,7 @@ async function setup(
   }
 
   // Navigate into the project Gantt
-  await window.getByRole('button', { name: 'PlexiProjects' }).first().click()
+  await openProduct(window, 'projects')
   await expect(window.locator('[data-testid="plexiprojects-view"]')).toBeVisible({ timeout: 8_000 })
   await window.locator(`[data-testid="project-card-${folderId}"]`).click()
   await expect(window.locator('[data-testid="projects-view-gantt"]')).toBeVisible({ timeout: 8_000 })

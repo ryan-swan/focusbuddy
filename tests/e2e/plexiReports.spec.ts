@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { launchApp, waitForReady } from './_helpers'
+import { openProduct, launchApp, waitForReady } from './_helpers'
 
 // PlexiReports verification.
 // Node-create API used: window.api.tables.create({ taskId: null, title }) +
@@ -11,7 +11,7 @@ test('1. empty state: no reports shows reports-empty (no fake report)', async ()
   try {
     await waitForReady(window)
 
-    await window.getByRole('button', { name: 'PlexiReports' }).first().click()
+    await openProduct(window, 'reports')
     await expect(window.locator('[data-testid="plexireports-view"]')).toBeVisible({ timeout: 8_000 })
     await expect(window.locator('[data-testid="reports-empty"]')).toBeVisible({ timeout: 5_000 })
 
@@ -36,7 +36,7 @@ test('2. create report + select table: card appears, editor shows table checkbox
     const tableId: string = (table as { id: string }).id
 
     // Open PlexiReports
-    await window.getByRole('button', { name: 'PlexiReports' }).first().click()
+    await openProduct(window, 'reports')
     await expect(window.locator('[data-testid="plexireports-view"]')).toBeVisible({ timeout: 8_000 })
 
     // Create a report
@@ -96,7 +96,7 @@ test('3 + 4. generate: output is real data, label matches actual path (no-fakery
     const reportId: string = (report as { id: string }).id
 
     // Open PlexiReports and select the report card
-    await window.getByRole('button', { name: 'PlexiReports' }).first().click()
+    await openProduct(window, 'reports')
     await expect(window.locator('[data-testid="plexireports-view"]')).toBeVisible({ timeout: 8_000 })
     await window.locator(`[data-testid="report-card-${reportId}"]`).click()
     await expect(window.locator('[data-testid="report-generate"]')).toBeVisible({ timeout: 5_000 })
@@ -168,7 +168,7 @@ test('5. email path: with no mail account, shows honest error (not fake "sent")'
     await window.evaluate(async (id) => window.api.reports.generate(id), reportId)
 
     // Open PlexiReports and select the report
-    await window.getByRole('button', { name: 'PlexiReports' }).first().click()
+    await openProduct(window, 'reports')
     await expect(window.locator('[data-testid="plexireports-view"]')).toBeVisible({ timeout: 8_000 })
     await window.locator(`[data-testid="report-card-${reportId}"]`).click()
     await expect(window.locator('[data-testid="report-generate"]')).toBeVisible({ timeout: 5_000 })

@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { launchApp, waitForReady } from './_helpers'
+import { openProduct, launchApp, waitForReady } from './_helpers'
 
 // Polish-pass verification for three changes:
 // 1. Knowledge deep-link: clicking a PlexiBrain hit in PlexiSearch opens KnowledgeView
@@ -67,7 +67,7 @@ test('2. duration input: setting task-estimate-days=3 drives durationDays===3 in
     const taskId: string = (task as { id: string }).id
 
     // Open Gantt
-    await window.getByRole('button', { name: 'PlexiProjects' }).first().click()
+    await openProduct(window, 'projects')
     await expect(window.locator(`[data-testid="project-card-${folderId}"]`)).toBeVisible({ timeout: 8_000 })
     await window.locator(`[data-testid="project-card-${folderId}"]`).click()
     await expect(window.locator(`[data-testid="gantt-row-${taskId}"]`)).toBeVisible({ timeout: 8_000 })
@@ -167,7 +167,7 @@ test('3. drift marker: completed-late task shows amber glyph; on-time task does 
     expect(driftEntry!.slipDays).toBeGreaterThan(0)
 
     // Open Gantt
-    await window.getByRole('button', { name: 'PlexiProjects' }).first().click()
+    await openProduct(window, 'projects')
     await expect(window.locator(`[data-testid="project-card-${folderId}"]`)).toBeVisible({ timeout: 8_000 })
     await window.locator(`[data-testid="project-card-${folderId}"]`).click()
     await expect(window.locator(`[data-testid="gantt-bar-${driftTaskId}"]`)).toBeVisible({ timeout: 8_000 })
@@ -222,7 +222,7 @@ test('3b. late marker: an overdue, not-done task shows the late marker', async (
     )
 
     // Open Gantt; the overdue open task carries the late marker.
-    await window.getByRole('button', { name: 'PlexiProjects' }).first().click()
+    await openProduct(window, 'projects')
     await expect(window.locator(`[data-testid="project-card-${folderId}"]`)).toBeVisible({ timeout: 8_000 })
     await window.locator(`[data-testid="project-card-${folderId}"]`).click()
     await expect(window.locator(`[data-testid="gantt-bar-${taskId}"]`)).toBeVisible({ timeout: 8_000 })

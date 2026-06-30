@@ -8,7 +8,7 @@
  * 413 is still delivered and the server is healthy for subsequent requests.
  */
 import { test, expect } from '@playwright/test'
-import { launchApp, waitForReady } from './_helpers'
+import { openProduct, launchApp, waitForReady } from './_helpers'
 
 // ---------------------------------------------------------------------------
 // FIX 1 — delete-while-editing data-corruption guard
@@ -20,7 +20,7 @@ test('FIX1a: delete-while-editing does not corrupt surviving actions', async () 
     await waitForReady(window)
 
     // Navigate to PlexiFlow
-    await window.getByRole('button', { name: 'PlexiFlow' }).first().click()
+    await openProduct(window, 'flow')
     const openBtn = window.locator('[data-testid="open-plexiflow"]')
     if (await openBtn.isVisible({ timeout: 2000 }).catch(() => false)) await openBtn.click()
     await expect(window.locator('[data-testid="plexiflow-view"]')).toBeVisible({ timeout: 8000 })
@@ -112,7 +112,7 @@ test('FIX1b: normal action edit and blur still persists (regression sanity)', as
   try {
     await waitForReady(window)
 
-    await window.getByRole('button', { name: 'PlexiFlow' }).first().click()
+    await openProduct(window, 'flow')
     const openBtn = window.locator('[data-testid="open-plexiflow"]')
     if (await openBtn.isVisible({ timeout: 2000 }).catch(() => false)) await openBtn.click()
     await expect(window.locator('[data-testid="plexiflow-view"]')).toBeVisible({ timeout: 8000 })
@@ -169,7 +169,7 @@ test('FIX2: oversize POST returns 413, server healthy for subsequent POST', asyn
     await waitForReady(window)
 
     // Open PlexiAPI and enable the server
-    await window.getByRole('button', { name: 'PlexiAPI' }).first().click()
+    await openProduct(window, 'api')
     const openBtn = window.locator('[data-testid="open-plexiapi"]')
     if (await openBtn.isVisible({ timeout: 2000 }).catch(() => false)) await openBtn.click()
     await expect(window.locator('[data-testid="plexiapi-view"]')).toBeVisible({ timeout: 8000 })

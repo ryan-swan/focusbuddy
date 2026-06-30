@@ -5,7 +5,7 @@
 // and is handled separately below.
 
 import { test, expect } from '@playwright/test'
-import { launchApp, waitForReady, type LaunchedApp } from './_helpers'
+import { openProduct, launchApp, waitForReady, type LaunchedApp } from './_helpers'
 
 let launched: LaunchedApp | null = null
 
@@ -17,8 +17,7 @@ test.afterEach(async () => {
 })
 
 async function openMeet(window: LaunchedApp['window']): Promise<void> {
-  const btn = window.locator('button').filter({ hasText: 'PlexiMeet' }).first()
-  await btn.click()
+  await openProduct(window, 'meet')
   await window.waitForSelector('[data-testid="pleximeet-view"]', { timeout: 8_000 })
 }
 
@@ -133,9 +132,9 @@ test('3 — action items from a created meeting turn into real task nodes', asyn
   })
 
   // Navigate away and back to reload the view's store.
-  await window.locator('button').filter({ hasText: 'PlexiBrain' }).first().click()
-  await window.waitForSelector('[data-testid="plexibrain-view"]', { timeout: 5_000 })
-  await openMeet(window)
+  await window.locator('[data-testid="segment-nav-home"]').click()
+  await window.locator('[data-testid="segment-app-meet"]').click()
+  await window.waitForSelector('[data-testid="pleximeet-view"]', { timeout: 8_000 })
 
   // Click the Standup meeting row.
   await window.locator(`[data-testid="meet-row-${meetId}"]`).click()

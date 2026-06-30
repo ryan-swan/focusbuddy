@@ -11,7 +11,7 @@
  * PART 3  — regression sweep of all six views (checks 10-15)
  */
 import { test, expect } from '@playwright/test'
-import { launchApp, waitForReady } from './_helpers'
+import { openProduct, launchApp, waitForReady } from './_helpers'
 import type { Page } from '@playwright/test'
 
 // ---------------------------------------------------------------------------
@@ -45,7 +45,7 @@ async function httpReq(
 // Enable the API server via UI, return port + write token secret
 async function setupApiServer(window: Page): Promise<{ port: number; writeSecret: string }> {
   // Navigate to PlexiAPI
-  await window.getByRole('button', { name: 'PlexiAPI' }).first().click()
+  await openProduct(window, 'api')
   const openBtn = window.locator('[data-testid="open-plexiapi"]')
   if (await openBtn.isVisible({ timeout: 2000 }).catch(() => false)) await openBtn.click()
   await expect(window.locator('[data-testid="plexiapi-view"]')).toBeVisible({ timeout: 8000 })
@@ -175,7 +175,7 @@ test('5. Port validation: port 80 (privileged) shows error; 70000 (out-of-range)
   try {
     await waitForReady(window)
 
-    await window.getByRole('button', { name: 'PlexiAPI' }).first().click()
+    await openProduct(window, 'api')
     const openBtn = window.locator('[data-testid="open-plexiapi"]')
     if (await openBtn.isVisible({ timeout: 2000 }).catch(() => false)) await openBtn.click()
     await expect(window.locator('[data-testid="plexiapi-view"]')).toBeVisible({ timeout: 8000 })
@@ -254,7 +254,7 @@ test('7. Double-create guard: source confirms disabled={creating}; sequential cl
   try {
     await waitForReady(window)
 
-    await window.getByRole('button', { name: 'PlexiAPI' }).first().click()
+    await openProduct(window, 'api')
     const openBtn = window.locator('[data-testid="open-plexiapi"]')
     if (await openBtn.isVisible({ timeout: 2000 }).catch(() => false)) await openBtn.click()
     await expect(window.locator('[data-testid="plexiapi-view"]')).toBeVisible({ timeout: 8000 })
@@ -287,7 +287,7 @@ test('8. ActionCard blur-flush: type title → blur → persisted + run creates 
   try {
     await waitForReady(window)
 
-    await window.getByRole('button', { name: 'PlexiFlow' }).first().click()
+    await openProduct(window, 'flow')
     const openBtn = window.locator('[data-testid="open-plexiflow"]')
     if (await openBtn.isVisible({ timeout: 2000 }).catch(() => false)) await openBtn.click()
     await expect(window.locator('[data-testid="plexiflow-view"]')).toBeVisible({ timeout: 8000 })
@@ -335,7 +335,7 @@ test('9. ActionCard unmount-flush: switch flow before blur, typed value persists
   try {
     await waitForReady(window)
 
-    await window.getByRole('button', { name: 'PlexiFlow' }).first().click()
+    await openProduct(window, 'flow')
     const openBtn = window.locator('[data-testid="open-plexiflow"]')
     if (await openBtn.isVisible({ timeout: 2000 }).catch(() => false)) await openBtn.click()
     await expect(window.locator('[data-testid="plexiflow-view"]')).toBeVisible({ timeout: 8000 })
@@ -443,7 +443,7 @@ test('11. PlexiProjects: Gantt bar renders, TaskBar has role=button + tabindex=0
       { taskId: task.id, planStart, planDue }
     )
 
-    await window.getByRole('button', { name: 'PlexiProjects' }).first().click()
+    await openProduct(window, 'projects')
     const openBtn = window.locator('[data-testid="open-plexiprojects"]')
     if (await openBtn.isVisible({ timeout: 2000 }).catch(() => false)) await openBtn.click()
     await expect(window.locator('[data-testid="plexiprojects-view"]')).toBeVisible({ timeout: 8000 })
@@ -495,7 +495,7 @@ test('12. PlexiReports: create report, generate produces non-empty output', asyn
       table.id
     )
 
-    await window.getByRole('button', { name: 'PlexiReports' }).first().click()
+    await openProduct(window, 'reports')
     const openBtn = window.locator('[data-testid="open-plexireports"]')
     if (await openBtn.isVisible({ timeout: 2000 }).catch(() => false)) await openBtn.click()
     await expect(window.locator('[data-testid="plexireports-view"]')).toBeVisible({ timeout: 8000 })
@@ -519,7 +519,7 @@ test('13. PlexiFlow: view renders, create + run creates real task (covered by ch
   const { window, dispose } = await launchApp()
   try {
     await waitForReady(window)
-    await window.getByRole('button', { name: 'PlexiFlow' }).first().click()
+    await openProduct(window, 'flow')
     const openBtn = window.locator('[data-testid="open-plexiflow"]')
     if (await openBtn.isVisible({ timeout: 2000 }).catch(() => false)) await openBtn.click()
     await expect(window.locator('[data-testid="plexiflow-view"]')).toBeVisible({ timeout: 8000 })
@@ -532,7 +532,7 @@ test('14. PlexiAPI: view renders, security checks covered by checks 1-7', async 
   const { window, dispose } = await launchApp()
   try {
     await waitForReady(window)
-    await window.getByRole('button', { name: 'PlexiAPI' }).first().click()
+    await openProduct(window, 'api')
     const openBtn = window.locator('[data-testid="open-plexiapi"]')
     if (await openBtn.isVisible({ timeout: 2000 }).catch(() => false)) await openBtn.click()
     await expect(window.locator('[data-testid="plexiapi-view"]')).toBeVisible({ timeout: 8000 })

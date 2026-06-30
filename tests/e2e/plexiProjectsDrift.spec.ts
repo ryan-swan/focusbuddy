@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { launchApp, waitForReady } from './_helpers'
+import { openProduct, launchApp, waitForReady } from './_helpers'
 
 const DAY_MS = 24 * 60 * 60 * 1000
 
@@ -44,7 +44,7 @@ test('drift marker: overdue open task shows gantt-late-<id>, future/undated task
     )
 
     // Open Gantt
-    await window.getByRole('button', { name: 'PlexiProjects' }).first().click()
+    await openProduct(window, 'projects')
     await expect(window.locator(`[data-testid="project-card-${folderId}"]`)).toBeVisible({ timeout: 8_000 })
     await window.locator(`[data-testid="project-card-${folderId}"]`).click()
     await expect(window.locator(`[data-testid="gantt-bar-${taskAId}"]`)).toBeVisible({ timeout: 8_000 })

@@ -27,7 +27,7 @@
 //   - The round-trip server store of the 'video' kind (covered by signal-repo tests).
 
 import { test, expect } from '@playwright/test'
-import { launchApp, waitForReady, type LaunchedApp } from './_helpers'
+import { launchApp, waitForReady, openProduct, type LaunchedApp } from './_helpers'
 
 let launched: LaunchedApp | null = null
 
@@ -350,8 +350,7 @@ test('3 — PlexiMeet meet-message-picker still shows honest empty state after v
   await waitForReady(window)
 
   // Open PlexiMeet.
-  const meetBtn = window.locator('button').filter({ hasText: 'PlexiMeet' }).first()
-  await meetBtn.click()
+  await openProduct(window, 'meet')
   await window.waitForSelector('[data-testid="pleximeet-view"]', { timeout: 8_000 })
 
   // Open the message picker.

@@ -11,7 +11,7 @@
 //   which records a toast+action entry. Undo restores the task.
 
 import { test, expect } from '@playwright/test'
-import { launchApp, waitForReady } from './_helpers'
+import { openProduct, launchApp, waitForReady } from './_helpers'
 
 // ─── FEATURE 1: land-on-content ────────────────────────────────────────────
 
@@ -20,7 +20,7 @@ test('F1-a: PlexiReports empty state still shows module-dashboard-reports + crea
   try {
     await waitForReady(window)
 
-    await window.getByRole('button', { name: 'PlexiReports' }).first().click()
+    await openProduct(window, 'reports')
     await expect(window.locator('[data-testid="plexireports-view"]')).toBeVisible({ timeout: 8_000 })
 
     // With ZERO items: ModuleDashboard must be showing, not an editor.
@@ -49,7 +49,7 @@ test('F1-b: PlexiReports with seeded item auto-selects it on fresh mount (land-o
     const reportId: string = (report as { id: string }).id
 
     // Now navigate to PlexiReports — the hook fires on mount with items already loaded.
-    await window.getByRole('button', { name: 'PlexiReports' }).first().click()
+    await openProduct(window, 'reports')
     await expect(window.locator('[data-testid="plexireports-view"]')).toBeVisible({ timeout: 8_000 })
 
     // The report card must exist in the list.
@@ -77,7 +77,7 @@ test('F1-c: PlexiReports Overview button deselects and shows ModuleHome', async 
       window.api.reports.create({ title: 'Overview Test Report' })
     )
 
-    await window.getByRole('button', { name: 'PlexiReports' }).first().click()
+    await openProduct(window, 'reports')
     await expect(window.locator('[data-testid="plexireports-view"]')).toBeVisible({ timeout: 8_000 })
 
     // Wait for auto-select to land us in the editor.
@@ -97,7 +97,7 @@ test('F1-d: PlexiFlow empty state shows module-dashboard-flows + create button, 
   try {
     await waitForReady(window)
 
-    await window.getByRole('button', { name: 'PlexiFlow' }).first().click()
+    await openProduct(window, 'flow')
     await expect(window.locator('[data-testid="plexiflow-view"]')).toBeVisible({ timeout: 8_000 })
 
     await expect(window.locator('[data-testid="module-dashboard-flows"]')).toBeVisible({ timeout: 5_000 })
@@ -118,7 +118,7 @@ test('F1-e: PlexiFlow with seeded item auto-selects on fresh mount', async () =>
     )
     const flowId: string = (flow as { id: string }).id
 
-    await window.getByRole('button', { name: 'PlexiFlow' }).first().click()
+    await openProduct(window, 'flow')
     await expect(window.locator('[data-testid="plexiflow-view"]')).toBeVisible({ timeout: 8_000 })
 
     await expect(window.locator(`[data-testid="flow-card-${flowId}"]`)).toBeVisible({ timeout: 6_000 })
@@ -143,7 +143,7 @@ test('F1-f: PlexiFlow Overview button deselects and shows ModuleHome', async () 
       window.api.flows.create({ title: 'Overview Flow' })
     )
 
-    await window.getByRole('button', { name: 'PlexiFlow' }).first().click()
+    await openProduct(window, 'flow')
     await expect(window.locator('[data-testid="plexiflow-view"]')).toBeVisible({ timeout: 8_000 })
     await expect(window.locator('[data-testid="flow-title"]')).toBeVisible({ timeout: 6_000 })
 
@@ -160,7 +160,7 @@ test('F1-g: PlexiForms empty state shows module-dashboard-forms + create button,
   try {
     await waitForReady(window)
 
-    await window.locator('button').filter({ hasText: 'PlexiForms' }).first().click()
+    await openProduct(window, 'form')
     await expect(window.locator('[data-testid="plexiforms-view"]')).toBeVisible({ timeout: 8_000 })
 
     await expect(window.locator('[data-testid="module-dashboard-forms"]')).toBeVisible({ timeout: 5_000 })
@@ -188,7 +188,7 @@ test('F1-h: PlexiForms with seeded item auto-selects on fresh mount', async () =
     )
     const formId: string = (form as { id: string }).id
 
-    await window.locator('button').filter({ hasText: 'PlexiForms' }).first().click()
+    await openProduct(window, 'form')
     await expect(window.locator('[data-testid="plexiforms-view"]')).toBeVisible({ timeout: 8_000 })
 
     await expect(window.locator(`[data-testid="form-row-${formId}"]`)).toBeVisible({ timeout: 6_000 })
@@ -208,7 +208,7 @@ test('F1-i: PlexiBuild empty state shows module-dashboard-build + create button,
   try {
     await waitForReady(window)
 
-    await window.locator('button').filter({ hasText: 'PlexiBuild' }).first().click()
+    await openProduct(window, 'build')
     await expect(window.locator('[data-testid="plexibuild-view"]')).toBeVisible({ timeout: 8_000 })
 
     await expect(window.locator('[data-testid="module-dashboard-build"]')).toBeVisible({ timeout: 5_000 })
@@ -230,7 +230,7 @@ test('F1-j: PlexiBuild with seeded item auto-selects on fresh mount', async () =
     )
     const appId: string = (app as { id: string }).id
 
-    await window.locator('button').filter({ hasText: 'PlexiBuild' }).first().click()
+    await openProduct(window, 'build')
     await expect(window.locator('[data-testid="plexibuild-view"]')).toBeVisible({ timeout: 8_000 })
 
     await expect(window.locator(`[data-testid="build-app-${appId}"]`)).toBeVisible({ timeout: 6_000 })
@@ -265,7 +265,7 @@ test('F2-a: PlexiProjects task delete shows undo toast, clicking Undo restores t
     const taskId: string = (task as { id: string }).id
 
     // Navigate to PlexiProjects and open the project.
-    await window.getByRole('button', { name: 'PlexiProjects' }).first().click()
+    await openProduct(window, 'projects')
     await expect(window.locator(`[data-testid="project-card-${folderId}"]`)).toBeVisible({ timeout: 8_000 })
     await window.locator(`[data-testid="project-card-${folderId}"]`).click()
 
@@ -330,7 +330,7 @@ test('F2-b: undo toast disappears after timeout and task stays deleted if not un
     )
     const taskId: string = (task as { id: string }).id
 
-    await window.getByRole('button', { name: 'PlexiProjects' }).first().click()
+    await openProduct(window, 'projects')
     await expect(window.locator(`[data-testid="project-card-${folderId}"]`)).toBeVisible({ timeout: 8_000 })
     await window.locator(`[data-testid="project-card-${folderId}"]`).click()
 
