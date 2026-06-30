@@ -46,6 +46,8 @@ import CondFormatDialog from './sheet/CondFormatDialog'
 import ValidationDialog from './sheet/ValidationDialog'
 import { validationForCell, valueIsValid, isRowHidden } from '../../lib/sheetCond'
 import type { SheetCondRule, SheetValidation } from '@shared/types'
+import SheetAiPanel from './sheet/SheetAiPanel'
+import { useSheetAi } from './sheet/useSheetAi'
 import Icon from '../Icon'
 
 // Excel-class spreadsheet editor. The body is held locally as v2 (legacy v1
@@ -120,6 +122,8 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
   const [condOpen, setCondOpen] = useState(false)
   const [validationOpen, setValidationOpen] = useState(false)
   const [pivotOpen, setPivotOpen] = useState(false)
+  // The right-side AI Assistant panel is shown by default and is collapsible.
+  const [aiPanelOpen, setAiPanelOpen] = useState(true)
   const [liveWidth, setLiveWidth] = useState<{ c: number; w: number } | null>(null)
   const [status, setStatus] = useState<string | null>(null)
   const [colMenu, setColMenu] = useState<{ c: number; x: number; y: number } | null>(null)
@@ -160,6 +164,11 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
   const idx = body.activeSheet ?? 0
   const tab = activeTab(body)
   const selection: CellRange = normalizeRange(anchor, focus)
+  // The AI Assistant reads the live active sheet on each run. We keep the latest
+  // tab in a ref so the hook's getter never closes over a stale snapshot.
+  const tabRef = useRef(tab)
+  tabRef.current = tab
+  const sheetAi = useSheetAi(() => tabRef.current)
   // Workbook view for cross-sheet references (Sheet2!A1). Rebuilt when any tab's
   // name or data changes so a formula reading another tab stays current.
   const workbook = useMemo(() => makeWorkbook(body.sheets), [body.sheets])
@@ -876,6 +885,7 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
         canRedo={redoStack.current.length > 0}
       />
 
+      <div className="flex-1 flex flex-row min-h-0">
       <div className="flex-1 flex flex-col min-h-0 px-3 py-2">
         {/* Formula bar */}
         <div className="flex items-center gap-2 mb-2 shrink-0">
@@ -910,6 +920,20 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
           >
             <Icon name="label" size={13} />
             Names
+          </button>
+          <button
+            onClick={() => setAiPanelOpen((v) => !v)}
+            data-testid="sheet-ai-toggle"
+            title={aiPanelOpen ? 'Hide the AI Assistant' : 'Show the AI Assistant'}
+            aria-pressed={aiPanelOpen}
+            className={`shrink-0 inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-[12px] ${
+              aiPanelOpen
+                ? 'border-accent bg-accent/[0.12] text-accent'
+                : 'border-stone-300 dark:border-stone-600 text-stone-600 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800'
+            }`}
+          >
+            <Icon name="auto_awesome" size={13} />
+            Assistant
           </button>
         </div>
 
@@ -1144,6 +1168,9 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
             onClose={() => setPivotOpen(false)}
           />
         )}
+      </div>
+
+        {aiPanelOpen && <SheetAiPanel ai={sheetAi} onCollapse={() => setAiPanelOpen(false)} />}
       </div>
 
       <SheetTabStrip body={body} onSwitch={switchTab} onAdd={addTab} onRename={renameTab} onDelete={deleteTab} />
