@@ -32,6 +32,18 @@ interface DocumentRow {
   updated_at: number
 }
 
+// Spreadsheet-style column label for a zero-based index: 0->A, 25->Z, 26->AA, …
+function spreadsheetColumnLabel(index: number): string {
+  let s = ''
+  let i = index + 1
+  while (i > 0) {
+    const r = (i - 1) % 26
+    s = String.fromCharCode(65 + r) + s
+    i = Math.floor((i - 1) / 26)
+  }
+  return s
+}
+
 function parseBody(
   type: FbDocument['docType'],
   raw: string
@@ -55,7 +67,11 @@ function parseBody(
 
 export function emptyBody(type: FbDocument['docType']): DocBody | SheetBody | SlidesBody | MapBody | DesignBody {
   if (type === 'sheet') {
-    return { columns: ['A', 'B', 'C'], rows: Array.from({ length: 8 }, () => ['', '', '']) }
+    // A fresh spreadsheet opens at a generous 48 columns by 100 rows, like a real
+    // spreadsheet, rather than a tiny starter grid.
+    const columns = Array.from({ length: 48 }, (_, i) => spreadsheetColumnLabel(i))
+    const rows = Array.from({ length: 100 }, () => columns.map(() => ''))
+    return { columns, rows }
   }
   if (type === 'slides') {
     // Build a v1 starter slide and migrate it, so a fresh deck is already v2.

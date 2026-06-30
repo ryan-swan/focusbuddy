@@ -40,8 +40,8 @@ export function PlexiConnectShell(): JSX.Element {
         subtitle: 'Talk and meet with your team, in chat and on video.',
         icon: 'diversity_3',
         apps: [
-          { key: 'chat', label: 'Chat', blurb: 'Channels and direct messages', icon: 'forum', tint: 'bg-sky-500', render: () => <MessagesView /> },
-          { key: 'meet', label: 'Meet', blurb: 'Video calls and meetings', icon: 'video_call', tint: 'bg-rose-500', render: () => <PlexiMeetView /> }
+          { key: 'chat', label: 'PlexiChat', blurb: 'Channels and direct messages', icon: 'forum', tint: 'bg-sky-500', render: () => <MessagesView /> },
+          { key: 'meet', label: 'PlexiMeet', blurb: 'Video calls and meetings', icon: 'video_call', tint: 'bg-rose-500', render: () => <PlexiMeetView /> }
         ]
       }}
     />
