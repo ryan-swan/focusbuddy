@@ -62,6 +62,9 @@ async function setupProject(
   await expect(window.locator('[data-testid="plexiprojects-view"]')).toBeVisible({ timeout: 8_000 })
   await window.locator(`[data-testid="project-card-${folderId}"]`).click()
   await expect(window.locator('[data-testid="projects-view-gantt"]')).toBeVisible({ timeout: 8_000 })
+  // The plan now lands on the Overview tab; switch to Timeline so the gantt rows
+  // and bars these tests drive are rendered.
+  await window.locator('[data-testid="projects-view-gantt"]').click()
 
   return { folderId, taskIds }
 }
@@ -128,6 +131,9 @@ test('C2. setting a deadline via IPC that falls before scheduled finish → plan
     await expect(window.locator('[data-testid="projects-portfolio"]')).toBeVisible({ timeout: 6_000 })
     await window.locator(`[data-testid="project-card-${folderId}"]`).click()
     await expect(window.locator('[data-testid="projects-view-gantt"]')).toBeVisible({ timeout: 8_000 })
+  // The plan now lands on the Overview tab; switch to Timeline so the gantt rows
+  // and bars these tests drive are rendered.
+  await window.locator('[data-testid="projects-view-gantt"]').click()
 
     // Gantt row should show the gantt-deadline-miss-<id> marker
     await expect(window.locator(`[data-testid="gantt-deadline-miss-${taskId}"]`)).toBeVisible({ timeout: 5_000 })
@@ -165,6 +171,9 @@ test('C3. deadline miss shows event_busy marker in Grid view row', async () => {
     await expect(window.locator('[data-testid="projects-portfolio"]')).toBeVisible({ timeout: 6_000 })
     await window.locator(`[data-testid="project-card-${folderId}"]`).click()
     await expect(window.locator('[data-testid="projects-view-gantt"]')).toBeVisible({ timeout: 8_000 })
+  // The plan now lands on the Overview tab; switch to Timeline so the gantt rows
+  // and bars these tests drive are rendered.
+  await window.locator('[data-testid="projects-view-gantt"]').click()
 
     // Switch to Grid view
     await window.locator('[data-testid="projects-view-grid"]').click()
@@ -315,6 +324,9 @@ test('B2. costs entered via IPC appear in grid-cost-<id> cells and grid-total-co
     await expect(window.locator('[data-testid="plexiprojects-view"]')).toBeVisible({ timeout: 8_000 })
     await window.locator(`[data-testid="project-card-${folderId}"]`).click()
     await expect(window.locator('[data-testid="projects-view-gantt"]')).toBeVisible({ timeout: 8_000 })
+  // The plan now lands on the Overview tab; switch to Timeline so the gantt rows
+  // and bars these tests drive are rendered.
+  await window.locator('[data-testid="projects-view-gantt"]').click()
 
     // Switch to Grid view
     await window.locator('[data-testid="projects-view-grid"]').click()
@@ -465,6 +477,9 @@ test('L2. leveling resolves overlapping tasks for the same assignee; unassigned 
     await expect(window.locator('[data-testid="plexiprojects-view"]')).toBeVisible({ timeout: 8_000 })
     await window.locator(`[data-testid="project-card-${folderId}"]`).click()
     await expect(window.locator('[data-testid="projects-view-gantt"]')).toBeVisible({ timeout: 8_000 })
+  // The plan now lands on the Overview tab; switch to Timeline so the gantt rows
+  // and bars these tests drive are rendered.
+  await window.locator('[data-testid="projects-view-gantt"]').click()
 
     // Click Level button
     await window.locator('[data-testid="projects-level"]').click()
@@ -550,6 +565,9 @@ test('L3. milestones are untouched by leveling', async () => {
     await expect(window.locator('[data-testid="plexiprojects-view"]')).toBeVisible({ timeout: 8_000 })
     await window.locator(`[data-testid="project-card-${folderId}"]`).click()
     await expect(window.locator('[data-testid="projects-view-gantt"]')).toBeVisible({ timeout: 8_000 })
+  // The plan now lands on the Overview tab; switch to Timeline so the gantt rows
+  // and bars these tests drive are rendered.
+  await window.locator('[data-testid="projects-view-gantt"]').click()
     await window.locator('[data-testid="projects-level"]').click()
     await window.waitForTimeout(800)
 

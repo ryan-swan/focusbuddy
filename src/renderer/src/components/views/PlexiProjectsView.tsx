@@ -6,6 +6,7 @@ import { useNodeStore } from '../../stores/nodes'
 import { useQuickCreate } from '../../stores/quickCreate'
 import type { ProjectPlan, ProjectSummary, PlanTask, PlanDep, DepType } from '@shared/projects'
 import type { WorkingCalendar } from '@shared/workingCalendar'
+import type { FileEntry } from '@shared/fields'
 import { usePresenceStore } from '../../stores/presence'
 
 // PlexiProjects: roll the tasks you already work in up into a scheduled plan. A
@@ -21,15 +22,20 @@ const ROW_H = 32 // px per task row
 const HEADER_H = 32
 const NAME_W = 224
 
-// The project workspace can show the same plan as a timeline, a board, a grid, a
-// month calendar or a per-person workload.
-type ProjectViewMode = 'gantt' | 'board' | 'grid' | 'calendar' | 'workload'
+// A plan is one container read through several contextual views of its real
+// universal objects. Overview summarises the plan, Files lists the documents and
+// files filed under it, and the rest (timeline, board, grid, calendar, workload)
+// are views of the plan's tasks. A file in a plan is still just a file; a task in
+// a plan is still just a task. These are views, not duplicated modules.
+type ProjectViewMode = 'overview' | 'gantt' | 'board' | 'grid' | 'calendar' | 'workload' | 'files'
 const VIEW_MODES: { id: ProjectViewMode; label: string; icon: string }[] = [
+  { id: 'overview', label: 'Overview', icon: 'dashboard' },
   { id: 'gantt', label: 'Timeline', icon: 'timeline' },
   { id: 'board', label: 'Board', icon: 'view_kanban' },
   { id: 'grid', label: 'Grid', icon: 'table_rows' },
   { id: 'calendar', label: 'Calendar', icon: 'calendar_month' },
-  { id: 'workload', label: 'Workload', icon: 'groups' }
+  { id: 'workload', label: 'Workload', icon: 'groups' },
+  { id: 'files', label: 'Files', icon: 'folder' }
 ]
 
 // Workflow statuses shown as board columns, in order.
@@ -227,7 +233,7 @@ function ProjectGantt({ projectId, onBack }: { projectId: string; onBack: () => 
 
   const [adding, setAdding] = useState(false)
   const [newTitle, setNewTitle] = useState('')
-  const [viewMode, setViewMode] = useState<ProjectViewMode>('gantt')
+  const [viewMode, setViewMode] = useState<ProjectViewMode>('overview')
   const [showCalSettings, setShowCalSettings] = useState(false)
 
   // Capture the current schedule as a baseline, so the timeline can show planned-
@@ -499,6 +505,10 @@ function ProjectGantt({ projectId, onBack }: { projectId: string; onBack: () => 
             <div className="flex items-center gap-2 px-6 py-10 text-[13px] text-[var(--ink-70)]">
               <Icon name="progress_activity" size={16} className="text-[rgb(var(--accent))] animate-spin" /> Loading plan…
             </div>
+          ) : viewMode === 'overview' ? (
+            <OverviewView plan={plan} critPathSet={critPathSet} lateSet={lateSet} />
+          ) : viewMode === 'files' ? (
+            <PlanFilesView projectId={projectId} />
           ) : plan.tasks.length === 0 ? (
             <div className="px-6 py-16 text-center">
               <Icon name="account_tree" size={28} className="text-[var(--ink-30)]" />
@@ -1771,6 +1781,264 @@ function WorkloadView({
           </div>
         </div>
       ))}
+    </div>
+  )
+}
+
+// ── Overview view ────────────────────────────────────────────────────────────
+// A plain summary of the plan, built entirely from the ProjectPlan the parent
+// already loaded. Every number is real: progress and task counts come from the
+// tasks, the dates from the schedule, the milestone count from the isMilestone
+// flag, the missed-deadline count from the engine's deadlineMiss, and the
+// critical-path length from plan.criticalPath. Nothing is invented. A brand-new
+// plan with no tasks shows honest zeros and a gentle prompt to add tasks.
+function OverviewView({
+  plan,
+  critPathSet,
+  lateSet
+}: {
+  plan: ProjectPlan
+  critPathSet: Set<string>
+  lateSet: Set<string>
+}): JSX.Element {
+  const total = plan.tasks.length
+  const isDone = (t: PlanTask): boolean => t.status === 'done' || t.completedAt != null
+  const done = plan.tasks.filter(isDone).length
+  // Percent complete from the real task tally, rounded. Zero tasks reads 0%, not
+  // a fabricated figure.
+  const percent = total === 0 ? 0 : Math.round((done / total) * 100)
+
+  // Milestones are the tasks flagged as such. The next upcoming one is the
+  // earliest-scheduled milestone that has not finished and is not in the past.
+  const milestones = plan.tasks.filter((t) => t.isMilestone)
+  const now = Date.now()
+  const nextMilestone =
+    milestones
+      .filter((m) => !isDone(m) && m.scheduledStartMs >= now - DAY_MS)
+      .sort((a, b) => a.scheduledStartMs - b.scheduledStartMs)[0] ?? null
+
+  // Tasks that miss their deadline, straight from the engine's deadlineMiss flag.
+  const deadlineMisses = plan.tasks.filter((t) => t.deadlineMiss).length
+  // In-flight slippage the parent already computed (running-late, not done).
+  const lateCount = plan.tasks.filter((t) => lateSet.has(t.id) && !isDone(t)).length
+  // Critical-path length: number of tasks on it (criticalPath holds task ids).
+  const critLength = critPathSet.size
+
+  // The plan's real window: the earliest scheduled start to the project end.
+  const startMs = total === 0 ? null : Math.min(...plan.tasks.map((t) => t.scheduledStartMs))
+  const finishMs = total === 0 ? null : plan.projectEndMs
+
+  if (total === 0) {
+    return (
+      <div className="p-6 max-w-3xl mx-auto fb-fade-in-up" data-testid="plan-overview">
+        <div className={`${PLEXI_CARD} p-6 text-center`}>
+          <Icon name="dashboard" size={28} className="text-[var(--ink-30)]" />
+          <p className="mt-2 text-[14px] font-semibold text-[var(--ink-100)]">Nothing planned yet</p>
+          <p className="mt-1 text-[13px] text-[var(--ink-60)]" data-testid="plan-overview-empty">
+            Add tasks to start planning. As soon as this plan has tasks, the overview fills in with real progress,
+            dates and milestones.
+          </p>
+          <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-3" data-testid="plan-overview-progress">
+            <StatTile icon="donut_large" label="Complete" value="0%" tone="stone" />
+            <StatTile icon="task_alt" label="Tasks done" value="0/0" tone="stone" />
+            <StatTile icon="flag" label="Milestones" value={0} tone="stone" />
+            <StatTile icon="event_busy" label="Missed deadlines" value={0} tone="stone" />
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="p-6 max-w-3xl mx-auto fb-fade-in-up space-y-4" data-testid="plan-overview">
+      <div className={`${PLEXI_CARD} p-5`} data-testid="plan-overview-progress">
+        <div className="flex items-center justify-between">
+          <span className="text-[13px] font-semibold text-[var(--ink-90)]">Progress</span>
+          <span className="text-[13px] fb-tabular text-[var(--ink-70)]">
+            {done} of {total} task{total === 1 ? '' : 's'} done · {percent}%
+          </span>
+        </div>
+        <div className="mt-2.5 h-2 rounded-full bg-[var(--surface-sunken)] overflow-hidden">
+          <div
+            className="h-full rounded-full bg-[rgb(var(--accent))]"
+            style={{
+              width: `${percent}%`,
+              minWidth: percent > 0 ? '0.375rem' : '0',
+              transition: 'width var(--dur-slow) var(--ease-spring-glide)'
+            }}
+          />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3" data-testid="plan-overview-stats">
+        <StatTile icon="task_alt" label="Tasks done" value={`${done}/${total}`} tone="emerald" />
+        <StatTile icon="flag" label="Milestones" value={milestones.length} tone="violet" />
+        <StatTile
+          icon="event_busy"
+          label="Missed deadlines"
+          value={deadlineMisses}
+          tone={deadlineMisses ? 'rose' : 'stone'}
+        />
+        <StatTile icon="warning" label="Running late" value={lateCount} tone={lateCount ? 'amber' : 'stone'} />
+      </div>
+
+      <div className={`${PLEXI_CARD} p-5 space-y-2.5`}>
+        <div className="flex items-center justify-between text-[12.5px]">
+          <span className="text-[var(--ink-60)]">Starts</span>
+          <span className="fb-tabular text-[var(--ink-90)]">{startMs != null ? fmtDate(startMs) : '—'}</span>
+        </div>
+        <div className="flex items-center justify-between text-[12.5px]">
+          <span className="text-[var(--ink-60)]">Finishes</span>
+          <span className="fb-tabular text-[var(--ink-90)]">{finishMs != null ? fmtDate(finishMs) : '—'}</span>
+        </div>
+        <div className="flex items-center justify-between text-[12.5px]">
+          <span className="text-[var(--ink-60)]">Critical path</span>
+          <span className="fb-tabular text-[var(--ink-90)]">
+            {critLength > 0 ? `${critLength} task${critLength === 1 ? '' : 's'}` : 'None'}
+          </span>
+        </div>
+      </div>
+
+      {nextMilestone ? (
+        <div className={`${PLEXI_CARD} p-5`} data-testid="plan-overview-milestone">
+          <div className="flex items-center gap-2">
+            <Icon name="flag" size={16} className="text-violet-500" filled />
+            <span className="text-[13px] font-semibold text-[var(--ink-100)] truncate">
+              {nextMilestone.title || 'Untitled milestone'}
+            </span>
+          </div>
+          <p className="mt-1 text-[12px] text-[var(--ink-60)] fb-tabular">
+            Next milestone, scheduled {fmtDate(nextMilestone.scheduledStartMs)}
+          </p>
+        </div>
+      ) : (
+        <div className={`${PLEXI_CARD} p-5`} data-testid="plan-overview-nomilestone">
+          <p className="text-[12.5px] text-[var(--ink-60)]">
+            {milestones.length === 0
+              ? 'No milestones in this plan yet. Mark a task as a milestone to track it here.'
+              : 'No upcoming milestones. Every milestone in this plan is already in the past or done.'}
+          </p>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Files view ───────────────────────────────────────────────────────────────
+// The real documents and files filed under this plan node, read scoped to the
+// plan via window.api.fileManager.list(projectId). A file in a plan is still
+// just a file: clicking a document opens it, a file entry opens/reveals it, the
+// same idiom FilesView uses. The plan node itself can hold child folders (sub-
+// plans); those are listed too but open inside the file manager rather than
+// here. An honest empty state shows when nothing is filed yet.
+function planFileIcon(entry: FileEntry): string {
+  if (entry.kind === 'folder') return 'folder'
+  if (entry.kind === 'doc') return entry.docType === 'sheet' ? 'table_chart' : entry.docType === 'slides' ? 'slideshow' : 'description'
+  const m = entry.mimeType ?? ''
+  const ext = (entry.ext ?? '').replace(/^\./, '')
+  if (m.startsWith('image/')) return 'image'
+  if (m.startsWith('video/')) return 'movie'
+  if (m.startsWith('audio/')) return 'music_note'
+  if (m === 'application/pdf') return 'picture_as_pdf'
+  if (['doc', 'docx', 'rtf', 'odt'].includes(ext)) return 'description'
+  if (['xls', 'xlsx', 'csv', 'ods'].includes(ext)) return 'table_chart'
+  if (['ppt', 'pptx', 'key'].includes(ext)) return 'slideshow'
+  return 'draft'
+}
+function planFileType(entry: FileEntry): string {
+  if (entry.kind === 'folder') return 'Folder'
+  if (entry.kind === 'doc') return entry.docType === 'sheet' ? 'Spreadsheet' : entry.docType === 'slides' ? 'Slides' : 'Document'
+  const ext = (entry.ext ?? '').replace(/^\./, '').toUpperCase()
+  return ext ? `${ext} file` : 'File'
+}
+function fmtFileDate(ms: number): string {
+  try {
+    return new Date(ms).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+  } catch {
+    return ''
+  }
+}
+
+function PlanFilesView({ projectId }: { projectId: string }): JSX.Element {
+  const goDocument = useViewStore((s) => s.goDocument)
+  const [entries, setEntries] = useState<FileEntry[] | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  const load = useCallback(() => {
+    setError(null)
+    window.api.fileManager
+      .list(projectId)
+      .then(setEntries)
+      .catch((e) => setError(`Could not load files: ${e instanceof Error ? e.message : String(e)}`))
+  }, [projectId])
+
+  useEffect(() => {
+    load()
+  }, [load])
+
+  function openEntry(entry: FileEntry): void {
+    if (entry.kind === 'doc' && entry.docId) goDocument(entry.docId)
+    else if (entry.kind === 'file') void window.api.files.open(entry.id)
+    else if (entry.kind === 'folder') void window.api.fileManager.reveal(entry.id)
+  }
+
+  if (entries === null) {
+    return (
+      <div className="flex items-center gap-2 px-6 py-10 text-[13px] text-[var(--ink-70)]" data-testid="plan-files">
+        <Icon name="progress_activity" size={16} className="text-[rgb(var(--accent))] animate-spin" /> Loading files…
+      </div>
+    )
+  }
+
+  // Sort newest-modified first so the most recently touched plan material is on
+  // top, the same instinct RecentView follows.
+  const sorted = [...entries].sort((a, b) => b.updatedAt - a.updatedAt)
+
+  return (
+    <div className="p-4 h-full overflow-auto fb-fade-in-up" data-testid="plan-files">
+      {error && <p className="mb-3 text-rose-500 text-[12px]" data-testid="plan-files-error">{error}</p>}
+      {sorted.length === 0 ? (
+        <div className="px-3 py-16 text-center" data-testid="plan-files-empty">
+          <Icon name="folder_open" size={28} className="text-[var(--ink-30)]" />
+          <p className="mt-2 text-[13px] text-[var(--ink-70)] max-w-md mx-auto leading-relaxed">
+            No files in this plan yet. File a document or drop a file here to keep it with the plan.
+          </p>
+        </div>
+      ) : (
+        <table className="w-full text-[12.5px] border-collapse" data-testid="plan-files-table">
+          <thead className="text-[11px] uppercase tracking-[0.08em] text-[var(--ink-50)] border-b border-[var(--edge-firm)]">
+            <tr>
+              <th className="px-3 py-2 text-left font-medium">Name</th>
+              <th className="px-3 py-2 text-left font-medium">Type</th>
+              <th className="px-3 py-2 text-left font-medium">Modified</th>
+            </tr>
+          </thead>
+          <tbody>
+            {sorted.map((entry) => (
+              <tr
+                key={entry.id}
+                onClick={() => openEntry(entry)}
+                data-testid={`plan-files-row-${entry.id}`}
+                data-kind={entry.kind}
+                className="border-b border-[var(--edge-soft)] cursor-pointer transition-colors hover:bg-[var(--surface-sunken)]"
+              >
+                <td className="px-3 py-2">
+                  <span className="flex items-center gap-2 min-w-0">
+                    <Icon
+                      name={planFileIcon(entry)}
+                      size={16}
+                      className={entry.kind === 'folder' ? 'text-[rgb(var(--accent))] shrink-0' : 'text-[var(--ink-50)] shrink-0'}
+                    />
+                    <span className="truncate text-[var(--ink-100)]">{entry.name}</span>
+                  </span>
+                </td>
+                <td className="px-3 py-2 text-[var(--ink-70)]">{planFileType(entry)}</td>
+                <td className="px-3 py-2 fb-tabular text-[var(--ink-70)]">{fmtFileDate(entry.updatedAt)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
     </div>
   )
 }

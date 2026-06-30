@@ -66,6 +66,9 @@ test('2. portfolio: folder + 3 tasks shows project card with real task count, Ga
     const view = window.locator('[data-testid="plexiprojects-view"]')
     await expect(view).toContainText('Alpha Project')
 
+    // The plan lands on Overview; switch to Timeline so the gantt rows render.
+    await window.locator('[data-testid="projects-view-gantt"]').click()
+
     // All 3 tasks have gantt-row and gantt-bar entries
     for (const id of taskIds) {
       await expect(window.locator(`[data-testid="gantt-row-${id}"]`)).toBeVisible()
@@ -96,6 +99,10 @@ test('3. date editing: set plan-start and plan-due, bar repositions on reload', 
     await openProduct(window, 'projects')
     await expect(window.locator(`[data-testid="project-card-${folderId}"]`)).toBeVisible({ timeout: 8_000 })
     await window.locator(`[data-testid="project-card-${folderId}"]`).click()
+    // The plan lands on the Overview tab; switch to Timeline so the gantt rows
+    // and bars these tests drive are rendered.
+    await expect(window.locator('[data-testid="projects-view-gantt"]')).toBeVisible({ timeout: 8_000 })
+    await window.locator('[data-testid="projects-view-gantt"]').click()
     await expect(window.locator(`[data-testid="gantt-row-${taskId}"]`)).toBeVisible({ timeout: 8_000 })
 
     // Select the task to open editor
@@ -183,6 +190,10 @@ test('4. dependency: add dep persists, successor bar starts at/after predecessor
     await openProduct(window, 'projects')
     await expect(window.locator(`[data-testid="project-card-${folderId}"]`)).toBeVisible({ timeout: 8_000 })
     await window.locator(`[data-testid="project-card-${folderId}"]`).click()
+    // The plan lands on the Overview tab; switch to Timeline so the gantt rows
+    // and bars these tests drive are rendered.
+    await expect(window.locator('[data-testid="projects-view-gantt"]')).toBeVisible({ timeout: 8_000 })
+    await window.locator('[data-testid="projects-view-gantt"]').click()
     await expect(window.locator(`[data-testid="gantt-row-${taskBId}"]`)).toBeVisible({ timeout: 8_000 })
 
     // Select Task B and add A as predecessor
@@ -238,6 +249,10 @@ test('5. milestone toggle: toggled task renders diamond bar, not a rect bar', as
     await openProduct(window, 'projects')
     await expect(window.locator(`[data-testid="project-card-${folderId}"]`)).toBeVisible({ timeout: 8_000 })
     await window.locator(`[data-testid="project-card-${folderId}"]`).click()
+    // The plan lands on the Overview tab; switch to Timeline so the gantt rows
+    // and bars these tests drive are rendered.
+    await expect(window.locator('[data-testid="projects-view-gantt"]')).toBeVisible({ timeout: 8_000 })
+    await window.locator('[data-testid="projects-view-gantt"]').click()
     await expect(window.locator(`[data-testid="gantt-row-${taskId}"]`)).toBeVisible({ timeout: 8_000 })
 
     // Before toggle: bar has width > 8px (normal task bar)
@@ -294,6 +309,10 @@ test('6. reschedule button: returns without error and plan reloads', async () =>
     await openProduct(window, 'projects')
     await expect(window.locator(`[data-testid="project-card-${folderId}"]`)).toBeVisible({ timeout: 8_000 })
     await window.locator(`[data-testid="project-card-${folderId}"]`).click()
+    // The plan lands on the Overview tab; switch to Timeline so the gantt rows
+    // and bars these tests drive are rendered.
+    await expect(window.locator('[data-testid="projects-view-gantt"]')).toBeVisible({ timeout: 8_000 })
+    await window.locator('[data-testid="projects-view-gantt"]').click()
 
     const reschedBtn = window.locator('[data-testid="projects-reschedule"]')
     await expect(reschedBtn).toBeVisible({ timeout: 8_000 })
