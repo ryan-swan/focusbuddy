@@ -36,6 +36,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.122',
+    date: '2026-07-01T08:30:00Z',
+    title: 'v2.5.122 — a fuller PlexiOffice Home',
+    tag: 'feature',
+    summary:
+      'The PlexiOffice home is now a proper starting point for your day. The app cards gain Meet alongside Docs, Sheets, Slides and Draw. Below them a recent table lets you flick between all your files or just docs, sheets, slides, drawings, mail or meetings, each row showing when you last opened it. A side rail brings together what is on your calendar today, quick actions to compose an email or start a new doc, sheet, deck or meeting, and a count of what is unread across your inbox, chat and mail. As always it is built on your real content, so it shows what is genuinely there and stays quiet and honest when something is empty.',
+    highlights: [
+      'PlexiOffice home gains a Meet card and a recent table you can filter by type.',
+      'A side rail with today’s schedule, quick create actions, and real unread counts.',
+      'Everything reads your real files, calendar and messages, with honest empty states.'
+    ]
+  },
+  {
     version: '2.5.121',
     date: '2026-07-01T07:00:00Z',
     title: 'v2.5.121 — a real Home, and PlexiPeople',
