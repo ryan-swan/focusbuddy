@@ -8,6 +8,7 @@ import {
   distributeElements,
   duplicateElement,
   elementId,
+  elementText,
   groupElements,
   moveElementsBy,
   reorderZ,
@@ -35,6 +36,8 @@ import SlideElementView from './slides/SlideElementView'
 import { useBrandStore } from '../../stores/brand'
 import BrandKitModal from './BrandKitModal'
 import { GOOGLE_FONTS, loadGoogleFont, fontFamilyValue, familyLabel } from '../../lib/googleFonts'
+import DesignAiPanel from './DesignAiPanel'
+import { useAccountStore } from '../../stores/account'
 
 // PlexiDesign — the on-platform design studio. A design is a single arbitrary-size
 // canvas of the same elements a slide uses, so this editor reuses the proven slide
@@ -91,6 +94,13 @@ export default function DesignEditor({ content, title, onChange }: Props): JSX.E
   const [status, setStatus] = useState<string | null>(null)
   const [canvasW, setCanvasW] = useState(640)
   const [brandOpen, setBrandOpen] = useState(false)
+  // The right-side AI Assistant panel, persistent and collapsible to match the
+  // other Office editors. Open by default so the assistant is discoverable.
+  const [aiPanelOpen, setAiPanelOpen] = useState(true)
+  // The signed-in user's name for the assistant greeting. Falls back to a neutral
+  // greeting when signed out (no fabricated name).
+  const account = useAccountStore((s) => s.account)
+  const userName = account?.handle ?? account?.email ?? null
   const wrapRef = useRef<HTMLDivElement | null>(null)
   // Undo / redo history. designRef always holds the current body so a commit can
   // record the prior state without a stale closure.
@@ -524,6 +534,41 @@ export default function DesignEditor({ content, title, onChange }: Props): JSX.E
 
   const selected = design.elements.find((e) => e.id === selectedIds[0]) ?? null
 
+  // ── AI Assistant panel helpers ──────────────────────────────────────────────
+  // The plain text of the selected element when it is a text element, so the panel
+  // can rewrite the real content. Null for any non-text selection.
+  const selectedTextValue = selected && selected.type === 'text' ? elementText(selected) : null
+
+  // Replace the selected text element's text with the AI result, going through the
+  // same setElementText writer the canvas uses so styling is preserved.
+  function applyAiText(text: string): void {
+    if (!selected || selected.type !== 'text') return
+    const id = selected.id
+    mutate((s) => {
+      const e = (s.elements ?? []).find((x) => x.id === id)
+      return e && e.type === 'text' ? updateElement(s, id, setElementText(e, text)) : s
+    })
+  }
+
+  // Insert the AI result as a new text element on the canvas, then select it.
+  function insertAiText(text: string): void {
+    const el: SlideElement = {
+      id: elementId(),
+      type: 'text',
+      x: Math.round(design.width * 0.1),
+      y: Math.round(design.height * 0.1),
+      w: Math.round(design.width * 0.8),
+      h: Math.round(design.height * 0.18),
+      z: topZ + 1,
+      fontFamily: brand.fontBody,
+      paragraphs: text.split('\n').map((line) => ({
+        runs: [{ text: line, fontSize: Math.round(design.width * 0.05), color: '#1c1917' }]
+      }))
+    }
+    mutate((s) => addElement(s, el))
+    setSelectedIds([el.id])
+  }
+
   return (
     <div className="flex flex-col h-full" data-testid="design-editor">
       {/* Toolbar */}
@@ -564,6 +609,13 @@ export default function DesignEditor({ content, title, onChange }: Props): JSX.E
         <ToolBtn icon="palette" label="Brandify" onClick={brandify} testid="design-brandify" />
         <ToolBtn icon="tune" label="Brand kit" onClick={() => setBrandOpen(true)} testid="design-brand-kit-btn" />
         <span className="w-px h-5 bg-stone-200 dark:bg-stone-700 mx-1" />
+        <ToolBtn
+          icon="auto_awesome"
+          label="Assistant"
+          active={aiPanelOpen}
+          onClick={() => setAiPanelOpen((v) => !v)}
+          testid="design-ai-toggle"
+        />
         <div className="relative">
           <ToolBtn icon="download" label="Export" active={exportOpen} onClick={() => setExportOpen((v) => !v)} testid="design-export-btn" />
           {exportOpen && (
@@ -942,6 +994,16 @@ export default function DesignEditor({ content, title, onChange }: Props): JSX.E
             </Field>
             <p className="text-[11px] text-stone-400 mt-2">Select an element to edit it, or use the toolbar to add one.</p>
           </div>
+        )}
+
+        {aiPanelOpen && (
+          <DesignAiPanel
+            selectedText={selectedTextValue}
+            onApplyText={applyAiText}
+            onInsertText={insertAiText}
+            userName={userName}
+            onCollapse={() => setAiPanelOpen(false)}
+          />
         )}
       </div>
 

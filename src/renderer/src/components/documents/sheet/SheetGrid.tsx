@@ -6,7 +6,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { SheetTab } from '@shared/types'
-import { displayCell, buildSpillMap, type Grid, type Workbook } from '../../../lib/sheetFormula'
+import { displayCell, buildSpillMap, sparklineForCell, type Grid, type Workbook } from '../../../lib/sheetFormula'
 import { formatValue } from '../../../lib/sheetFormat'
 import { cellFormat, colLabel } from '../../../lib/sheetBody'
 import {
@@ -191,6 +191,11 @@ export default function SheetGrid(props: Props): JSX.Element {
                   r === selection.r1 &&
                   c === selection.c1
                 const computed = displayCell(grid, r, c, props.workbook, spill, props.names)
+                // A =SPARKLINE(...) cell is drawn as a mini chart instead of text.
+                // Only a cell that holds the formula qualifies (sparklineForCell
+                // returns null for empty/spilled cells), so nothing else can be
+                // mistaken for a sparkline.
+                const sparkline = sparklineForCell(grid, r, c, props.workbook, props.names)
                 // A spilled cell shows a value an array formula produced in a
                 // neighbour, while its own raw is empty — rendered muted so it
                 // reads as computed, not typed.
@@ -321,6 +326,19 @@ export default function SheetGrid(props: Props): JSX.Element {
                         onBlur={() => props.onCommitEdit('none')}
                         className="w-full px-2 py-1.5 bg-white dark:bg-stone-900 outline-none text-stone-900 dark:text-stone-100 font-mono"
                       />
+                    ) : sparkline ? (
+                      <div
+                        className="px-2 py-1.5 select-none text-accent"
+                        title={`Sparkline of ${sparkline.values.length} value${sparkline.values.length === 1 ? '' : 's'}`}
+                      >
+                        <SparklineCell
+                          r={r}
+                          c={c}
+                          values={sparkline.values}
+                          type={sparkline.type}
+                          width={props.colWidthOf(c) - 16}
+                        />
+                      </div>
                     ) : (
                       <div
                         style={style}
@@ -339,6 +357,103 @@ export default function SheetGrid(props: Props): JSX.Element {
         </tbody>
       </table>
     </div>
+  )
+}
+
+// A mini in-cell chart for a =SPARKLINE(...) cell. Draws a polyline (line) or
+// thin bars (bar) across the cell width, normalised to the value range. The SVG
+// uses currentColor so it inherits the accent set on the wrapper and stays crisp
+// in dark mode. With fewer than the points a chart needs, or no numeric values at
+// all, it renders a faint baseline placeholder rather than inventing data.
+function SparklineCell({
+  r,
+  c,
+  values,
+  type,
+  width
+}: {
+  r: number
+  c: number
+  values: number[]
+  type: 'line' | 'bar'
+  width: number
+}): JSX.Element {
+  const w = Math.max(24, Math.round(width))
+  const h = 18
+  const testid = `sparkline-${r}-${c}`
+  // A line needs two points; a single value or none has nothing to plot. Show a
+  // faint baseline so the cell reads as an empty chart, never a fabricated trend.
+  const drawable = type === 'bar' ? values.length >= 1 : values.length >= 2
+  if (!drawable) {
+    return (
+      <svg
+        data-testid={testid}
+        data-sparkline-empty="1"
+        width={w}
+        height={h}
+        viewBox={`0 0 ${w} ${h}`}
+        className="text-stone-300 dark:text-stone-600"
+        aria-hidden="true"
+      >
+        <line x1={0} y1={h - 2} x2={w} y2={h - 2} stroke="currentColor" strokeWidth={1} strokeDasharray="2 2" />
+      </svg>
+    )
+  }
+  const min = Math.min(...values)
+  const max = Math.max(...values)
+  const range = max - min || 1
+  const pad = 2
+  if (type === 'bar') {
+    const gap = values.length > 20 ? 0.5 : 1
+    const barW = (w - gap * (values.length - 1)) / values.length
+    const baseMax = max <= 0 ? 1 : max
+    return (
+      <svg
+        data-testid={testid}
+        data-sparkline-type="bar"
+        data-sparkline-count={values.length}
+        width={w}
+        height={h}
+        viewBox={`0 0 ${w} ${h}`}
+        aria-hidden="true"
+      >
+        {values.map((v, i) => {
+          const barH = Math.max(1, (Math.max(0, v) / baseMax) * (h - pad))
+          return (
+            <rect
+              key={i}
+              x={(barW + gap) * i}
+              y={h - barH}
+              width={Math.max(0.5, barW)}
+              height={barH}
+              rx={0.5}
+              fill="currentColor"
+            />
+          )
+        })}
+      </svg>
+    )
+  }
+  const d = values
+    .map((v, i) => {
+      const x = pad + (i / (values.length - 1)) * (w - pad * 2)
+      const y = h - pad - ((v - min) / range) * (h - pad * 2)
+      return `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`
+    })
+    .join(' ')
+  return (
+    <svg
+      data-testid={testid}
+      data-sparkline-type="line"
+      data-sparkline-count={values.length}
+      width={w}
+      height={h}
+      viewBox={`0 0 ${w} ${h}`}
+      fill="none"
+      aria-hidden="true"
+    >
+      <path d={d} stroke="currentColor" strokeWidth={1.25} strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
   )
 }
 

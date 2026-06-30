@@ -429,7 +429,9 @@ test('SL-7 — apply a theme from the inspector (no element selected); body.them
     await window.waitForTimeout(200)
 
     // The slide-level inspector should be showing (no element-inspector testid).
-    await expect(window.locator('text=Theme')).toBeVisible({ timeout: 4_000 })
+    // Scope to the inspector's exact "Theme" label so the side panel's
+    // "Theme colors" property heading does not make this an ambiguous match.
+    await expect(window.getByText('Theme', { exact: true })).toBeVisible({ timeout: 4_000 })
 
     // Read the current theme from the body.
     const bodyBefore = (await readBodyFromStore(window)) as {

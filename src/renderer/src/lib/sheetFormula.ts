@@ -168,7 +168,8 @@ export const SHEET_FUNCTIONS: Array<{ name: string; hint: string }> = [
   { name: 'DAY', hint: 'DAY(date)' },
   { name: 'WEEKDAY', hint: 'WEEKDAY(date) — 1=Sunday' },
   { name: 'TODAY', hint: 'TODAY() — current date' },
-  { name: 'NOW', hint: 'NOW() — current date and time' }
+  { name: 'NOW', hint: 'NOW() — current date and time' },
+  { name: 'SPARKLINE', hint: 'SPARKLINE(range, ["line"|"bar"]) — a mini chart inside the cell' }
 ]
 
 // ── References ────────────────────────────────────────────────────────────────
@@ -1371,6 +1372,19 @@ function evalCall(node: Extract<Node, { k: 'call' }>, grid: Grid, seen: Set<stri
       }
       throw new Error('DATEDIF: unit must be D, M or Y')
     }
+    // ── Sparkline ─────────────────────────────────────────────────────────────
+    // In the grid a SPARKLINE cell is drawn as a chart (see sparklineForCell). In
+    // any text context (CSV export, a formula that references this cell) it
+    // resolves to its real values joined by spaces, never a fabricated number.
+    case 'SPARKLINE': {
+      const last = args[args.length - 1]
+      let valueArgs = args
+      if (last && last.k !== 'range') {
+        const t = toStr(evalNode(last, grid, seen)).trim().toLowerCase()
+        if (t === 'bar' || t === 'line') valueArgs = args.slice(0, -1)
+      }
+      return sparklineValues(valueArgs, grid, seen).map(fmtCell).join(' ')
+    }
     default:
       throw new Error(`unknown function ${name}`)
   }
@@ -1481,6 +1495,79 @@ export function displayCell(
     return v
   } catch {
     return '#ERR'
+  } finally {
+    WB = null
+    NAMES = null
+  }
+}
+
+// ── Sparklines ───────────────────────────────────────────────────────────────
+// =SPARKLINE(range) draws a tiny line chart of the range's numeric values inside
+// the cell; =SPARKLINE(range,"bar") draws bars. The cell still holds the formula;
+// the grid asks sparklineForCell whether to render a chart instead of text. Only a
+// top-level SPARKLINE call qualifies, so a cell like =SUM(...) is untouched. The
+// values are the real referenced cells — an empty or all-non-numeric range yields
+// an empty values array, which the grid renders as a faint placeholder rather than
+// inventing a line.
+
+export interface SparklineValue {
+  values: number[]
+  type: 'line' | 'bar'
+}
+
+// Pull the numeric values a SPARKLINE call references, in order. A range expands
+// to its cells (row by row); a non-numeric or empty cell is skipped, matching the
+// aggregate-function contract. A bare scalar argument coerces to a number.
+function sparklineValues(args: Node[], grid: Grid, seen: Set<string>): number[] {
+  const out: number[] = []
+  for (const arg of args) {
+    if (arg.k === 'range') {
+      const g = pickGrid(grid, arg.sheet)
+      for (const { r, c } of rangeCoords(arg)) {
+        const n = cellNumeric(g, r, c, seen)
+        if (n !== null) out.push(n)
+      }
+    } else {
+      const v = evalNode(arg, grid, seen)
+      const n = typeof v === 'number' ? v : Number(toStr(v))
+      if (Number.isFinite(n)) out.push(n)
+    }
+  }
+  return out
+}
+
+// If the cell at (r,c) is a top-level =SPARKLINE(...) formula, return its values +
+// type for the grid to draw; otherwise null. Parse/eval failures resolve to null
+// so the grid falls back to its normal text path (which shows #ERR).
+export function sparklineForCell(
+  grid: Grid,
+  r: number,
+  c: number,
+  wb?: Workbook,
+  names?: Map<string, string>
+): SparklineValue | null {
+  const raw = cellRaw(grid, r, c).trim()
+  if (!raw.startsWith('=')) return null
+  WB = wb ?? null
+  NAMES = names ?? null
+  try {
+    const node = parse(raw.slice(1))
+    if (node.k !== 'call' || node.name !== 'SPARKLINE') return null
+    const seen = new Set([`${gridId(grid)}:${r},${c}`])
+    const last = node.args[node.args.length - 1]
+    // A trailing string argument selects the variant; default is a line.
+    let type: 'line' | 'bar' = 'line'
+    let valueArgs = node.args
+    if (last && last.k !== 'range') {
+      const t = toStr(evalNode(last, grid, seen)).trim().toLowerCase()
+      if (t === 'bar' || t === 'line') {
+        type = t
+        valueArgs = node.args.slice(0, -1)
+      }
+    }
+    return { values: sparklineValues(valueArgs, grid, seen), type }
+  } catch {
+    return null
   } finally {
     WB = null
     NAMES = null
