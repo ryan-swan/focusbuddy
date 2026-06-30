@@ -150,6 +150,9 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
   const goInbox = useViewStore((s) => s.goInbox)
   const goMail = useViewStore((s) => s.goMail)
   const goOffice = useViewStore((s) => s.goOffice)
+  const goPlexiWork = useViewStore((s) => s.goPlexiWork)
+  const goPlexiConnect = useViewStore((s) => s.goPlexiConnect)
+  const goPlexiFlow = useViewStore((s) => s.goPlexiFlow)
   const goDocuments = useViewStore((s) => s.goDocuments)
   const goFiles = useViewStore((s) => s.goFiles)
   const goCollaborations = useViewStore((s) => s.goCollaborations)
@@ -836,6 +839,36 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
               onClick={() => {
                 setActive(null)
                 goOffice()
+              }}
+            />
+            <NavRow
+              icon="work"
+              label="PlexiWork"
+              testid="nav-plexiwork"
+              active={viewIsActive({ kind: 'plexiwork' })}
+              onClick={() => {
+                setActive(null)
+                goPlexiWork()
+              }}
+            />
+            <NavRow
+              icon="diversity_3"
+              label="PlexiConnect"
+              testid="nav-plexiconnect"
+              active={viewIsActive({ kind: 'plexiconnect' })}
+              onClick={() => {
+                setActive(null)
+                goPlexiConnect()
+              }}
+            />
+            <NavRow
+              icon="bolt"
+              label="PlexiFlow"
+              testid="nav-plexiflow"
+              active={viewIsActive({ kind: 'plexiflow' })}
+              onClick={() => {
+                setActive(null)
+                goPlexiFlow()
               }}
             />
             <NavRow
@@ -1604,12 +1637,14 @@ interface NavRowProps {
   active: boolean
   onClick: () => void
   badge?: string
+  testid?: string
 }
 
-function NavRow({ icon, label, active, onClick, badge }: NavRowProps): JSX.Element {
+function NavRow({ icon, label, active, onClick, badge, testid }: NavRowProps): JSX.Element {
   return (
     <button
       onClick={onClick}
+      data-testid={testid}
       className={`w-full flex items-center gap-2 px-2.5 py-1 text-left transition-colors ${
         active
           ? 'bg-stone-100/80 dark:bg-stone-800/60 text-stone-900 dark:text-stone-100'

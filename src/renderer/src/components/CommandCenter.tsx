@@ -86,6 +86,9 @@ export default function CommandCenter({
   const goDocuments = useViewStore((s) => s.goDocuments)
   const goDesign = useViewStore((s) => s.goDesign)
   const goOffice = useViewStore((s) => s.goOffice)
+  const goPlexiWork = useViewStore((s) => s.goPlexiWork)
+  const goPlexiConnect = useViewStore((s) => s.goPlexiConnect)
+  const goPlexiFlow = useViewStore((s) => s.goPlexiFlow)
   const goDocument = useViewStore((s) => s.goDocument)
   const goKnowledge = useViewStore((s) => s.goKnowledge)
   const goMessages = useViewStore((s) => s.goMessages)
@@ -333,6 +336,9 @@ export default function CommandCenter({
     }
     const navTargets: Array<{ id: string; label: string; hint: string; icon: string; words: string; viewKind: string; go: () => void }> = [
       { id: 'go-office', label: 'PlexiOffice', hint: 'Docs, sheets, slides, drawings, designs, sign', icon: 'grid_view', words: 'plexioffice office docs sheets slides drawings designs sign documents', viewKind: 'office', go: goOffice },
+      { id: 'go-plexiwork', label: 'PlexiWork', hint: 'Projects, tasks, reports', icon: 'work', words: 'plexiwork work projects tasks reports gantt plan', viewKind: 'plexiwork', go: goPlexiWork },
+      { id: 'go-plexiconnect', label: 'PlexiConnect', hint: 'Chat and video meetings', icon: 'diversity_3', words: 'plexiconnect connect chat messages meet video call meeting', viewKind: 'plexiconnect', go: goPlexiConnect },
+      { id: 'go-plexiflow', label: 'PlexiFlow', hint: 'Flows, API, build, forms', icon: 'bolt', words: 'plexiflow flow automation api build apps forms', viewKind: 'plexiflow', go: goPlexiFlow },
       { id: 'go-documents', label: 'Documents', hint: 'Docs, sheets, slides', icon: 'article', words: 'documents docs sheets slides', viewKind: 'documents', go: goDocuments },
       { id: 'go-design', label: 'PlexiDesign', hint: 'Designs — social, posters, logos', icon: 'palette', words: 'design plexidesign canva graphic poster social logo flyer banner', viewKind: 'design', go: goDesign },
       { id: 'go-files', label: 'Files', hint: 'File manager', icon: 'folder', words: 'files folders manager', viewKind: 'files', go: goFiles },
@@ -559,6 +565,9 @@ export default function CommandCenter({
     goDocuments,
     goDesign,
     goOffice,
+    goPlexiWork,
+    goPlexiConnect,
+    goPlexiFlow,
     goDocument,
     goKnowledge,
     goMessages,

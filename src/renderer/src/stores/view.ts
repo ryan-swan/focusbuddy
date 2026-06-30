@@ -18,6 +18,9 @@ export type View =
   | { kind: 'mail'; openUid?: number }
   | { kind: 'documents' }
   | { kind: 'office' }
+  | { kind: 'plexiwork' }
+  | { kind: 'plexiconnect' }
+  | { kind: 'plexiflow' }
   | { kind: 'design' }
   | { kind: 'document'; documentId: string }
   | { kind: 'livedoc'; liveDocId: string }
@@ -57,6 +60,9 @@ interface ViewStore {
   goMail: (openUid?: number) => void
   goDocuments: () => void
   goOffice: () => void
+  goPlexiWork: () => void
+  goPlexiConnect: () => void
+  goPlexiFlow: () => void
   goDesign: () => void
   goDocument: (documentId: string) => void
   goLiveDoc: (liveDocId: string) => void
@@ -175,6 +181,21 @@ export const useViewStore = create<ViewStore>((set) => ({
   },
   goOffice: () => {
     const v: View = { kind: 'office' }
+    persistView(v)
+    set({ view: v })
+  },
+  goPlexiWork: () => {
+    const v: View = { kind: 'plexiwork' }
+    persistView(v)
+    set({ view: v })
+  },
+  goPlexiConnect: () => {
+    const v: View = { kind: 'plexiconnect' }
+    persistView(v)
+    set({ view: v })
+  },
+  goPlexiFlow: () => {
+    const v: View = { kind: 'plexiflow' }
     persistView(v)
     set({ view: v })
   },
