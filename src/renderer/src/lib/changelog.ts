@@ -36,6 +36,20 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.119',
+    date: '2026-07-01T04:00:00Z',
+    title: 'v2.5.119 — a simpler, object-based PlexiDesk',
+    tag: 'feature',
+    summary:
+      'PlexiDesk is reorganised around the work itself rather than a maze of modules. The top of the app is now three clear places. PlexiDesk is where you organise and navigate, with Home, your Desk, Workspaces, Plans, Tasks, Calendar, Files and Recent. PlexiOffice is where you create and discuss, with Docs, Sheets, Slides, Draw and Design alongside Mail, Inbox, Chat, Meet and Sign. PlexiBrain is where you find, understand and automate, with Ask Brain, Search, the new Brain Map, Flows, Agents, Connect, APIs and Insights. Everything you make is one universal object, a file is just a file and a task is just a task, that you can group by a workspace or a plan without the app inventing separate copies. The biggest change in language is that Projects are now Plans. A plan can be a project plan, a launch, a campaign, a hiring plan or a personal one, with all the same timeline and milestone power, so you get serious planning without being forced into project-management jargon.',
+    highlights: [
+      'Three top-level segments: PlexiDesk to organise, PlexiOffice to create, PlexiBrain to find and automate.',
+      'Single-source objects with contextual views, no more duplicated Project Files or Project Tasks.',
+      'Projects are now Plans, the same planning power for any kind of plan.',
+      'New Brain Map shows your PlexiBrain knowledge as a linked graph.'
+    ]
+  },
+  {
     version: '2.5.118',
     date: '2026-07-01T01:00:00Z',
     title: 'v2.5.118 — sparklines, a richer Slides editor, and AI for Design',
