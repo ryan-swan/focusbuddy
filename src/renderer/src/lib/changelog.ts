@@ -36,6 +36,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.120',
+    date: '2026-07-01T05:30:00Z',
+    title: 'v2.5.120 — every agent in one place',
+    tag: 'feature',
+    summary:
+      'The Agents page in PlexiBrain is now real. Desk agents are the standing AI workers you place on a desk and wire your widgets into, and until now you could only see them one desk at a time. PlexiBrain now lists every agent across your whole workspace, each with its name and role, the desk it runs on, whether it is active and how it is triggered, and when it last ran. Click any agent to jump straight to its desk. If you have not placed an agent yet, the page says so honestly and points you to your desk to add one.',
+    highlights: [
+      'PlexiBrain Agents lists every desk agent across the workspace, not one desk at a time.',
+      'Each agent shows its role, its desk, its active or paused status, and when it last ran.',
+      'Click an agent to open the desk it lives on.'
+    ]
+  },
+  {
     version: '2.5.119',
     date: '2026-07-01T04:00:00Z',
     title: 'v2.5.119 — a simpler, object-based PlexiDesk',
