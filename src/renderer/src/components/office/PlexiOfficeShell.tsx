@@ -33,7 +33,6 @@ const APPS: OfficeApp[] = [
   { key: 'slides', label: 'PlexiSlides', blurb: 'Create presentations', icon: 'slideshow', tint: 'bg-orange-500', docType: 'slides' },
   { key: 'draw', label: 'PlexiDraw', blurb: 'Create drawings', icon: 'gesture', tint: 'bg-violet-500', docType: 'map' },
   { key: 'design', label: 'PlexiDesign', blurb: 'Designs, any size', icon: 'palette', tint: 'bg-fuchsia-500', docType: 'design' },
-  { key: 'forms', label: 'PlexiForms', blurb: 'Forms & surveys', icon: 'dynamic_form', tint: 'bg-pink-500', docType: null },
   { key: 'sign', label: 'PlexiSign', blurb: 'Send & sign documents', icon: 'draw', tint: 'bg-teal-500', docType: null }
 ]
 
@@ -67,7 +66,6 @@ export default function PlexiOfficeShell(): JSX.Element {
   const createBlank = useDocumentsStore((s) => s.createBlank)
   const remove = useDocumentsStore((s) => s.remove)
   const goHome = useViewStore((s) => s.goHome)
-  const goForms = useViewStore((s) => s.goForms)
   const goSign = useViewStore((s) => s.goSign)
   const account = useAccountStore((s) => s.account)
 
@@ -109,8 +107,7 @@ export default function PlexiOfficeShell(): JSX.Element {
 
   async function launch(app: OfficeApp): Promise<void> {
     if (app.docType === null) {
-      if (app.key === 'forms') goForms()
-      else if (app.key === 'sign') goSign()
+      if (app.key === 'sign') goSign()
       return
     }
     if (busy) return

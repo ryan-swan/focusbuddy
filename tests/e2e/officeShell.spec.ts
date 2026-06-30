@@ -29,7 +29,7 @@ test.describe('PlexiOffice segment', () => {
     for (const t of ['office-nav-home', 'office-nav-recent', 'office-nav-starred', 'office-nav-templates', 'office-nav-trash']) {
       await expect(window.locator(`[data-testid="${t}"]`)).toBeVisible()
     }
-    for (const a of ['docs', 'sheets', 'slides', 'draw', 'design', 'forms', 'sign']) {
+    for (const a of ['docs', 'sheets', 'slides', 'draw', 'design', 'sign']) {
       await expect(window.locator(`[data-testid="office-app-${a}"]`)).toBeVisible()
     }
     // The Ask-AI bar and upgrade affordance are present.

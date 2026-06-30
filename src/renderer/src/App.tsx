@@ -8,6 +8,7 @@ import {
 import Sidebar from './components/Sidebar'
 import MainPane from './components/MainPane'
 import PlexiOfficeShell from './components/office/PlexiOfficeShell'
+import { PlexiWorkShell, PlexiConnectShell, PlexiFlowShell } from './components/segment/segments'
 import ChatPanel from './components/ChatPanel'
 import TelemetryReporter from './components/TelemetryReporter'
 import ReleaseModal from './components/ReleaseModal'
@@ -80,7 +81,11 @@ export default function App(): JSX.Element {
   // PlexiOffice is a full-bleed segment with its own chrome: when active it takes
   // over the main area, replacing the global sidebar / desk panels.
   const currentView = useViewStore((s) => s.view)
-  const officeSegment = currentView.kind === 'office'
+  const segmentTakeover =
+    currentView.kind === 'office' ||
+    currentView.kind === 'plexiwork' ||
+    currentView.kind === 'plexiconnect' ||
+    currentView.kind === 'plexiflow'
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [chatCollapsed, setChatCollapsed] = useState(false)
   // On macOS the window uses hiddenInset, so the traffic lights sit at the top
@@ -502,8 +507,16 @@ export default function App(): JSX.Element {
         </div>
       </header>
       <main className="flex-1 min-h-0">
-        {officeSegment ? (
-          <PlexiOfficeShell />
+        {segmentTakeover ? (
+          currentView.kind === 'office' ? (
+            <PlexiOfficeShell />
+          ) : currentView.kind === 'plexiwork' ? (
+            <PlexiWorkShell />
+          ) : currentView.kind === 'plexiconnect' ? (
+            <PlexiConnectShell />
+          ) : (
+            <PlexiFlowShell />
+          )
         ) : (
         <PanelGroup direction="horizontal" autoSaveId="focusbuddy-main-v2">
           <Panel
