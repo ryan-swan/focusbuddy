@@ -36,6 +36,20 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.116',
+    date: '2026-06-30T21:00:00Z',
+    title: 'v2.5.116 — a proper side panel for PlexiDocs',
+    tag: 'feature',
+    summary:
+      'PlexiDocs gains a persistent side panel on the right, the way a modern document editor should. It has three tabs. The AI Assistant greets you and offers quick actions, summarise the document, improve the writing, make it shorter, fix grammar, or translate it, alongside a free prompt box, and every action runs the real assistant and shows its result with Insert and Copy. The Comments tab lists the real comment threads on a shared document with a reply box on each, and shows a plain "no comments yet" state when there are none rather than inventing any. The Outline tab gives you the heading map of the document. The panel collapses when you want the page to yourself and stays out of the way in focus mode.',
+    highlights: [
+      'A persistent right-hand panel in PlexiDocs with AI Assistant, Comments and Outline tabs.',
+      'AI quick actions: summarise, improve writing, make shorter, fix grammar, translate, plus a free prompt, each with Insert and Copy.',
+      'Comments tab shows the real threads on a shared document, with replies, and an honest empty state otherwise.',
+      'The panel collapses and stays hidden in focus mode.'
+    ]
+  },
+  {
     version: '2.5.115',
     date: '2026-07-02T20:00:00Z',
     title: 'v2.5.115 — tidier navigation, bigger sheets, and a column-heading fix',
