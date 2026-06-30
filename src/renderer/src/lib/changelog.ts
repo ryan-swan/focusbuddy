@@ -36,6 +36,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.113',
+    date: '2026-07-02T10:00:00Z',
+    title: 'v2.5.113 — PlexiOffice, organised into its own place',
+    tag: 'feature',
+    summary:
+      'PlexiOffice is now its own segment of the app, the home for everything you create and sign. Open it and the whole space changes to a dedicated office layout with its own side menu: Home, Recent, Starred, Shared, Templates and Trash up top, then your apps, PlexiDocs, PlexiSheets, PlexiSlides, PlexiDraw, PlexiDesign, PlexiForms and PlexiSign, and your workspaces below. The home gives you the app tiles, a template gallery, your recent files and a side rail with what is pinned and what is new. Opening a document keeps you inside PlexiOffice, with the side menu right there, and a clear way back. It is a calmer, more organised way to work than everything living in one long list.',
+    highlights: [
+      'PlexiOffice is its own segment with a dedicated side menu (Home, Recent, Starred, Templates, Trash + your apps + workspaces).',
+      'A real office home: app tiles, a template gallery, recent files, and a Pinned / Storage / What’s-new rail.',
+      'Docs, Sheets, Slides, Drawings and Designs open inside PlexiOffice so the side menu stays put; PlexiSign is right there for signing.'
+    ]
+  },
+  {
     version: '2.5.112',
     date: '2026-07-01T16:00:00Z',
     title: 'v2.5.112 — PlexiDesign is its own studio, with a much better look',
