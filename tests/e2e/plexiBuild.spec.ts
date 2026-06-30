@@ -3,7 +3,7 @@
 // reorder/remove, delete, and launcher status.
 
 import { test, expect } from '@playwright/test'
-import { launchApp, waitForReady, type LaunchedApp } from './_helpers'
+import { openProduct, launchApp, waitForReady, type LaunchedApp } from './_helpers'
 
 let launched: LaunchedApp | null = null
 
@@ -15,8 +15,7 @@ test.afterEach(async () => {
 })
 
 async function openBuild(window: LaunchedApp['window']): Promise<void> {
-  const btn = window.locator('button').filter({ hasText: 'PlexiBuild' }).first()
-  await btn.click()
+  await openProduct(window, 'build')
   await window.waitForSelector('[data-testid="plexibuild-view"]', { timeout: 8_000 })
 }
 

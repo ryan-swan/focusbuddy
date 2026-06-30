@@ -161,14 +161,7 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
   const goSign = useViewStore((s) => s.goSign)
   const goSuite = useViewStore((s) => s.goSuite)
   const goKnowledge = useViewStore((s) => s.goKnowledge)
-  const goMeetings = useViewStore((s) => s.goMeetings)
-  const goApps = useViewStore((s) => s.goApps)
-  const goForms = useViewStore((s) => s.goForms)
   const goSearch = useViewStore((s) => s.goSearch)
-  const goProjects = useViewStore((s) => s.goProjects)
-  const goReports = useViewStore((s) => s.goReports)
-  const goFlows = useViewStore((s) => s.goFlows)
-  const goApi = useViewStore((s) => s.goApi)
   const goMarketplace = useViewStore((s) => s.goMarketplace)
   const goInsights = useViewStore((s) => s.goInsights)
   const unreadMessages = useMessagingStore((s) => s.unreadTotal)
@@ -304,8 +297,6 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
   // Product nav is grouped into labelled, collapsible sections so the long list
   // is scannable instead of one undifferentiated run.
   const [knowledgeOpen, setKnowledgeOpen] = useState(true)
-  const [toolsOpen, setToolsOpen] = useState(true)
-  const [planOpen, setPlanOpen] = useState(true)
   const [discoverOpen, setDiscoverOpen] = useState(true)
   const [filesOpen, setFilesOpen] = useState(true)
   const [teamOpen, setTeamOpen] = useState(true)
@@ -733,77 +724,12 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
             />
           </div>
         )}
-        <SectionHeader label="Create and meet" open={toolsOpen} onToggle={() => setToolsOpen((v) => !v)} />
-        {toolsOpen && (
+        {/* PlexiMeet, PlexiBuild, PlexiForms, PlexiProjects, PlexiReports,
+            PlexiFlow and PlexiAPI moved into the PlexiWork / PlexiConnect /
+            PlexiFlow segments (see the Files section below). */}
+        <SectionHeader label="Add-ons" open={discoverOpen} onToggle={() => setDiscoverOpen((v) => !v)} />
+        {discoverOpen && (
           <div className="mb-2">
-            <NavRow
-              icon="groups"
-              label="PlexiMeet"
-              active={viewIsActive({ kind: 'meetings' })}
-              onClick={() => {
-                setActive(null)
-                goMeetings()
-              }}
-            />
-            <NavRow
-              icon="construction"
-              label="PlexiBuild"
-              active={viewIsActive({ kind: 'apps' })}
-              onClick={() => {
-                setActive(null)
-                goApps()
-              }}
-            />
-            <NavRow
-              icon="dynamic_form"
-              label="PlexiForms"
-              active={viewIsActive({ kind: 'forms' })}
-              onClick={() => {
-                setActive(null)
-                goForms()
-              }}
-            />
-          </div>
-        )}
-        <SectionHeader label="Work" open={planOpen} onToggle={() => setPlanOpen((v) => !v)} />
-        {planOpen && (
-          <div className="mb-2">
-            <NavRow
-              icon="account_tree"
-              label="PlexiProjects"
-              active={viewIsActive({ kind: 'projects' })}
-              onClick={() => {
-                setActive(null)
-                goProjects()
-              }}
-            />
-            <NavRow
-              icon="summarize"
-              label="PlexiReports"
-              active={viewIsActive({ kind: 'reports' })}
-              onClick={() => {
-                setActive(null)
-                goReports()
-              }}
-            />
-            <NavRow
-              icon="bolt"
-              label="PlexiFlow"
-              active={viewIsActive({ kind: 'flows' })}
-              onClick={() => {
-                setActive(null)
-                goFlows()
-              }}
-            />
-            <NavRow
-              icon="api"
-              label="PlexiAPI"
-              active={viewIsActive({ kind: 'api' })}
-              onClick={() => {
-                setActive(null)
-                goApi()
-              }}
-            />
             <NavRow
               icon="insights"
               label="Insights"
@@ -813,11 +739,6 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
                 goInsights()
               }}
             />
-          </div>
-        )}
-        <SectionHeader label="Add-ons" open={discoverOpen} onToggle={() => setDiscoverOpen((v) => !v)} />
-        {discoverOpen && (
-          <div className="mb-2">
             <NavRow
               icon="storefront"
               label="Marketplace"

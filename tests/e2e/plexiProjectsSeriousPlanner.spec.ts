@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { launchApp, waitForReady } from './_helpers'
+import { openProduct, launchApp, waitForReady } from './_helpers'
 
 // Verifies four "serious planner" features added to PlexiProjects:
 //
@@ -58,7 +58,7 @@ async function setupProject(
   }
 
   // Navigate into the project Gantt
-  await window.getByRole('button', { name: 'PlexiProjects' }).first().click()
+  await openProduct(window, 'projects')
   await expect(window.locator('[data-testid="plexiprojects-view"]')).toBeVisible({ timeout: 8_000 })
   await window.locator(`[data-testid="project-card-${folderId}"]`).click()
   await expect(window.locator('[data-testid="projects-view-gantt"]')).toBeVisible({ timeout: 8_000 })
@@ -307,7 +307,7 @@ test('B2. costs entered via IPC appear in grid-cost-<id> cells and grid-total-co
     expect(planTyped.tasks.find((t) => t.id === yId)?.cost).toBe(costY)
 
     // Now open the Gantt — the component mounts with up-to-date data
-    await window.getByRole('button', { name: 'PlexiProjects' }).first().click()
+    await openProduct(window, 'projects')
     await expect(window.locator('[data-testid="plexiprojects-view"]')).toBeVisible({ timeout: 8_000 })
     await window.locator(`[data-testid="project-card-${folderId}"]`).click()
     await expect(window.locator('[data-testid="projects-view-gantt"]')).toBeVisible({ timeout: 8_000 })
@@ -457,7 +457,7 @@ test('L2. leveling resolves overlapping tasks for the same assignee; unassigned 
       .tasks.find((t) => t.id === t3Id)!
 
     // Open the project Gantt
-    await window.getByRole('button', { name: 'PlexiProjects' }).first().click()
+    await openProduct(window, 'projects')
     await expect(window.locator('[data-testid="plexiprojects-view"]')).toBeVisible({ timeout: 8_000 })
     await window.locator(`[data-testid="project-card-${folderId}"]`).click()
     await expect(window.locator('[data-testid="projects-view-gantt"]')).toBeVisible({ timeout: 8_000 })
@@ -542,7 +542,7 @@ test('L3. milestones are untouched by leveling', async () => {
     expect(msBefore.isMilestone).toBe(true)
 
     // Open the project and level
-    await window.getByRole('button', { name: 'PlexiProjects' }).first().click()
+    await openProduct(window, 'projects')
     await expect(window.locator('[data-testid="plexiprojects-view"]')).toBeVisible({ timeout: 8_000 })
     await window.locator(`[data-testid="project-card-${folderId}"]`).click()
     await expect(window.locator('[data-testid="projects-view-gantt"]')).toBeVisible({ timeout: 8_000 })

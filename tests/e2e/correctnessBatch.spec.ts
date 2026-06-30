@@ -13,8 +13,24 @@ import type { Page } from '@playwright/test'
 // Navigation helpers
 // ---------------------------------------------------------------------------
 
+// Products folded into the PlexiWork / PlexiConnect / PlexiFlow segments; others
+// (e.g. PlexiSign) still have a top-level sidebar entry.
+const SEGMENT_ROUTE: Record<string, { nav: string; app: string }> = {
+  PlexiForms: { nav: 'nav-plexiflow', app: 'form' },
+  PlexiMeet: { nav: 'nav-plexiconnect', app: 'meet' },
+  PlexiBuild: { nav: 'nav-plexiflow', app: 'build' }
+}
+
 async function openProduct(window: Page, name: string, key: string): Promise<void> {
-  await window.getByRole('button', { name: new RegExp(name, 'i') }).first().click()
+  const route = SEGMENT_ROUTE[name]
+  if (route) {
+    const exit = window.locator('[data-testid="segment-exit"]')
+    if (await exit.isVisible().catch(() => false)) await exit.click()
+    await window.locator(`[data-testid="${route.nav}"]`).click()
+    await window.locator(`[data-testid="segment-app-${route.app}"]`).click()
+  } else {
+    await window.getByRole('button', { name: new RegExp(name, 'i') }).first().click()
+  }
   const openBtn = window.locator(`[data-testid="open-${key}"]`)
   if (await openBtn.isVisible({ timeout: 2000 }).catch(() => false)) await openBtn.click()
 }

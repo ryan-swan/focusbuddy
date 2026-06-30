@@ -16,7 +16,7 @@
 // Data seeding is done via IPC (window.api.*) so it is deterministic.
 
 import { test, expect } from '@playwright/test'
-import { launchApp, waitForReady, type LaunchedApp } from './_helpers'
+import { openProduct, launchApp, waitForReady, type LaunchedApp } from './_helpers'
 
 let launched: LaunchedApp | null = null
 
@@ -34,7 +34,7 @@ test('Reports/zero — module-dashboard-reports renders; chart shows "No activit
   const { window } = launched
   await waitForReady(window)
 
-  await window.getByRole('button', { name: 'PlexiReports' }).first().click()
+  await openProduct(window, 'reports')
   await expect(window.locator('[data-testid="plexireports-view"]')).toBeVisible({ timeout: 8_000 })
 
   // Root dashboard renders (zero items → no auto-select, no editor)
@@ -83,7 +83,7 @@ test('Reports/seeded — stat tiles show real counts; chart renders bars; breakd
 
   // Navigate to PlexiReports — land-on-content auto-selects the most recent
   // report so the editor opens and the dashboard is not yet visible.
-  await window.getByRole('button', { name: 'PlexiReports' }).first().click()
+  await openProduct(window, 'reports')
   await expect(window.locator('[data-testid="plexireports-view"]')).toBeVisible({ timeout: 8_000 })
 
   // Wait for the editor to confirm auto-select happened
@@ -122,7 +122,7 @@ test('Flows/zero — module-dashboard-flows renders; chart honest empty; create 
   const { window } = launched
   await waitForReady(window)
 
-  await window.getByRole('button', { name: 'PlexiFlow' }).first().click()
+  await openProduct(window, 'flow')
   await expect(window.locator('[data-testid="plexiflow-view"]')).toBeVisible({ timeout: 8_000 })
 
   const dash = window.locator('[data-testid="module-dashboard-flows"]')
@@ -161,7 +161,7 @@ test('Flows/seeded — stat tiles real counts; bars render; breakdown and recent
   })
 
   // Navigate — land-on-content auto-selects, editor opens
-  await window.getByRole('button', { name: 'PlexiFlow' }).first().click()
+  await openProduct(window, 'flow')
   await expect(window.locator('[data-testid="plexiflow-view"]')).toBeVisible({ timeout: 8_000 })
 
   // Wait for editor to confirm auto-select
@@ -199,7 +199,7 @@ test('Meet/zero — module-dashboard-meet renders; chart honest empty; create bu
   const { window } = launched
   await waitForReady(window)
 
-  await window.locator('button').filter({ hasText: 'PlexiMeet' }).first().click()
+  await openProduct(window, 'meet')
   await expect(window.locator('[data-testid="pleximeet-view"]')).toBeVisible({ timeout: 8_000 })
 
   const dash = window.locator('[data-testid="module-dashboard-meet"]')
@@ -228,7 +228,7 @@ test('Customize — toggling "Overview tiles" checkbox hides/shows the stats gri
   const { window } = launched
   await waitForReady(window)
 
-  await window.getByRole('button', { name: 'PlexiReports' }).first().click()
+  await openProduct(window, 'reports')
   await expect(window.locator('[data-testid="plexireports-view"]')).toBeVisible({ timeout: 8_000 })
 
   const dash = window.locator('[data-testid="module-dashboard-reports"]')

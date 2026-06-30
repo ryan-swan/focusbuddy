@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { launchApp, waitForReady } from './_helpers'
+import { openProduct, launchApp, waitForReady } from './_helpers'
 
 // PlexiProjects: Gantt/critical-path planner.
 // A "project" is a folder node; its plan is the task nodes under it.
@@ -13,7 +13,7 @@ test('1. empty state: no folders shows projects-empty, not invented data', async
 
     // Navigate to PlexiProjects via the sidebar NavRow
     // Use .first() because the suite home tile with the same text is also in the DOM
-    await window.getByRole('button', { name: 'PlexiProjects' }).first().click()
+    await openProduct(window, 'projects')
     await expect(window.locator('[data-testid="plexiprojects-view"]')).toBeVisible({ timeout: 8_000 })
 
     // Empty workspace: no folders with tasks => honest empty state
@@ -48,7 +48,7 @@ test('2. portfolio: folder + 3 tasks shows project card with real task count, Ga
 
     // Open PlexiProjects
     // Use .first() because the suite home tile with the same text is also in the DOM
-    await window.getByRole('button', { name: 'PlexiProjects' }).first().click()
+    await openProduct(window, 'projects')
     await expect(window.locator('[data-testid="plexiprojects-view"]')).toBeVisible({ timeout: 8_000 })
 
     // Portfolio card with real folder id
@@ -93,7 +93,7 @@ test('3. date editing: set plan-start and plan-due, bar repositions on reload', 
 
     // Open Gantt
     // Use .first() because the suite home tile with the same text is also in the DOM
-    await window.getByRole('button', { name: 'PlexiProjects' }).first().click()
+    await openProduct(window, 'projects')
     await expect(window.locator(`[data-testid="project-card-${folderId}"]`)).toBeVisible({ timeout: 8_000 })
     await window.locator(`[data-testid="project-card-${folderId}"]`).click()
     await expect(window.locator(`[data-testid="gantt-row-${taskId}"]`)).toBeVisible({ timeout: 8_000 })
@@ -180,7 +180,7 @@ test('4. dependency: add dep persists, successor bar starts at/after predecessor
 
     // Open Gantt
     // Use .first() because the suite home tile with the same text is also in the DOM
-    await window.getByRole('button', { name: 'PlexiProjects' }).first().click()
+    await openProduct(window, 'projects')
     await expect(window.locator(`[data-testid="project-card-${folderId}"]`)).toBeVisible({ timeout: 8_000 })
     await window.locator(`[data-testid="project-card-${folderId}"]`).click()
     await expect(window.locator(`[data-testid="gantt-row-${taskBId}"]`)).toBeVisible({ timeout: 8_000 })
@@ -235,7 +235,7 @@ test('5. milestone toggle: toggled task renders diamond bar, not a rect bar', as
 
     // Open Gantt
     // Use .first() because the suite home tile with the same text is also in the DOM
-    await window.getByRole('button', { name: 'PlexiProjects' }).first().click()
+    await openProduct(window, 'projects')
     await expect(window.locator(`[data-testid="project-card-${folderId}"]`)).toBeVisible({ timeout: 8_000 })
     await window.locator(`[data-testid="project-card-${folderId}"]`).click()
     await expect(window.locator(`[data-testid="gantt-row-${taskId}"]`)).toBeVisible({ timeout: 8_000 })
@@ -291,7 +291,7 @@ test('6. reschedule button: returns without error and plan reloads', async () =>
     )
 
     // Use .first() because the suite home tile with the same text is also in the DOM
-    await window.getByRole('button', { name: 'PlexiProjects' }).first().click()
+    await openProduct(window, 'projects')
     await expect(window.locator(`[data-testid="project-card-${folderId}"]`)).toBeVisible({ timeout: 8_000 })
     await window.locator(`[data-testid="project-card-${folderId}"]`).click()
 
@@ -328,10 +328,11 @@ test('7. suite launcher tile opens PlexiProjects view', async () => {
     // The default view is PlexiSuite home — navigate away first so we can
     // come back to it as a clean test of the tile flow.
     // Use sidebar to go somewhere else
-    await window.getByRole('button', { name: 'PlexiProjects' }).first().click()
+    await openProduct(window, 'projects')
     await expect(window.locator('[data-testid="plexiprojects-view"]')).toBeVisible({ timeout: 8_000 })
 
-    // Now go to the suite home
+    // Exit the segment back to the global app, then open the suite home.
+    await window.locator('[data-testid="segment-exit"]').click()
     await window.getByRole('button', { name: 'PlexiSuite' }).first().click()
     await expect(window.locator('[data-testid="plexisuite-home"]')).toBeVisible({ timeout: 8_000 })
 
@@ -367,7 +368,7 @@ test('8. no-fakery: percentComplete and task count are real; empty workspace sho
 
     // Navigate to confirm UI matches
     // Use .first() because the suite home tile with the same text is also in the DOM
-    await window.getByRole('button', { name: 'PlexiProjects' }).first().click()
+    await openProduct(window, 'projects')
     await expect(window.locator('[data-testid="projects-empty"]')).toBeVisible({ timeout: 8_000 })
 
     // Now seed 1 folder with 2 tasks, 1 done

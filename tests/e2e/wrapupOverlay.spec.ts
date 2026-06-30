@@ -31,7 +31,7 @@
 //   These are documented as ENVIRONMENT-LIMITED, not product failures.
 
 import { test, expect } from '@playwright/test'
-import { launchApp, waitForReady, type LaunchedApp } from './_helpers'
+import { launchApp, waitForReady, openProduct, type LaunchedApp } from './_helpers'
 
 let launched: LaunchedApp | null = null
 
@@ -43,8 +43,7 @@ test.afterEach(async () => {
 })
 
 async function openMeet(window: LaunchedApp['window']): Promise<void> {
-  const btn = window.locator('button').filter({ hasText: 'PlexiMeet' }).first()
-  await btn.click()
+  await openProduct(window, 'meet')
   await window.waitForSelector('[data-testid="pleximeet-view"]', { timeout: 8_000 })
 }
 

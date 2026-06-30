@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { launchApp, waitForReady } from './_helpers'
+import { openProduct, launchApp, waitForReady } from './_helpers'
 
 // PlexiProjects 2.0 — view switcher, Board, Grid, TaskEditor new controls,
 // portfolio stats, and dependency editor.
@@ -31,7 +31,7 @@ async function setupProjectInGantt(
   }
 
   // Navigate to PlexiProjects
-  await window.getByRole('button', { name: 'PlexiProjects' }).first().click()
+  await openProduct(window, 'projects')
   await expect(window.locator('[data-testid="plexiprojects-view"]')).toBeVisible({ timeout: 8_000 })
 
   // Click the project card to enter the Gantt
@@ -406,7 +406,7 @@ test('P1. portfolio stats tile visible when projects exist', async () => {
     )
 
     // Navigate to PlexiProjects portfolio
-    await window.getByRole('button', { name: 'PlexiProjects' }).first().click()
+    await openProduct(window, 'projects')
     await expect(window.locator('[data-testid="plexiprojects-view"]')).toBeVisible({ timeout: 8_000 })
 
     // Portfolio stats block
@@ -430,7 +430,7 @@ test('P2. portfolio stats absent when no projects exist', async () => {
   const { window, dispose } = await launchApp()
   try {
     await waitForReady(window)
-    await window.getByRole('button', { name: 'PlexiProjects' }).first().click()
+    await openProduct(window, 'projects')
     await expect(window.locator('[data-testid="plexiprojects-view"]')).toBeVisible({ timeout: 8_000 })
 
     // No projects: empty state shown, stats grid absent

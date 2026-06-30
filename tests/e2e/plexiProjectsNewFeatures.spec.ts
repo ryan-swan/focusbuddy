@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { launchApp, waitForReady } from './_helpers'
+import { openProduct, launchApp, waitForReady } from './_helpers'
 
 // Verifies two new features shipped together:
 //
@@ -30,7 +30,7 @@ test('F1-1. projects-new button creates a folder and opens its Gantt', async () 
   try {
     await waitForReady(window)
 
-    await window.getByRole('button', { name: 'PlexiProjects' }).first().click()
+    await openProduct(window, 'projects')
     await expect(window.locator('[data-testid="plexiprojects-view"]')).toBeVisible({ timeout: 8_000 })
 
     // Fresh DB — empty state shown
@@ -61,7 +61,7 @@ test('F1-2. projects-add-task reveals input + confirm; confirming adds task to G
     // A bare folder (no tasks) does not appear in the portfolio card grid.
     // Use projects-new to create a folder and enter its Gantt in one step —
     // the same path a real user would take.
-    await window.getByRole('button', { name: 'PlexiProjects' }).first().click()
+    await openProduct(window, 'projects')
     await expect(window.locator('[data-testid="plexiprojects-view"]')).toBeVisible({ timeout: 8_000 })
     await window.locator('[data-testid="projects-new"]').click()
     await expect(window.locator('[data-testid="projects-add-task"]')).toBeVisible({ timeout: 8_000 })
@@ -125,7 +125,7 @@ test('F1-3. task-editor has all required controls including new task-add-succ pi
       folderId
     )
 
-    await window.getByRole('button', { name: 'PlexiProjects' }).first().click()
+    await openProduct(window, 'projects')
     await expect(window.locator(`[data-testid="project-card-${folderId}"]`)).toBeVisible({ timeout: 8_000 })
     await window.locator(`[data-testid="project-card-${folderId}"]`).click()
     await expect(window.locator(`[data-testid="gantt-row-${taskAId}"]`)).toBeVisible({ timeout: 8_000 })
@@ -162,7 +162,7 @@ test('F1-4. task-title rename via Enter persists to IPC', async () => {
     )
     const taskId: string = (task as { id: string }).id
 
-    await window.getByRole('button', { name: 'PlexiProjects' }).first().click()
+    await openProduct(window, 'projects')
     await expect(window.locator(`[data-testid="project-card-${folderId}"]`)).toBeVisible({ timeout: 8_000 })
     await window.locator(`[data-testid="project-card-${folderId}"]`).click()
     await window.locator(`[data-testid="gantt-row-${taskId}"]`).click()
@@ -214,7 +214,7 @@ test('F1-5. task-add-succ (successor picker) creates a link and engine honours i
       [taskAId, now, now + 3 * dayMs] as [string, number, number]
     )
 
-    await window.getByRole('button', { name: 'PlexiProjects' }).first().click()
+    await openProduct(window, 'projects')
     await expect(window.locator(`[data-testid="project-card-${folderId}"]`)).toBeVisible({ timeout: 8_000 })
     await window.locator(`[data-testid="project-card-${folderId}"]`).click()
     await expect(window.locator(`[data-testid="gantt-row-${taskAId}"]`)).toBeVisible({ timeout: 8_000 })
@@ -274,7 +274,7 @@ test('F1-6. gantt-bar drag commits new planStart; click (no-drag) opens editor',
       [taskId, now] as [string, number]
     )
 
-    await window.getByRole('button', { name: 'PlexiProjects' }).first().click()
+    await openProduct(window, 'projects')
     await expect(window.locator(`[data-testid="project-card-${folderId}"]`)).toBeVisible({ timeout: 8_000 })
     await window.locator(`[data-testid="project-card-${folderId}"]`).click()
     await expect(window.locator(`[data-testid="gantt-bar-${taskId}"]`)).toBeVisible({ timeout: 8_000 })
@@ -359,7 +359,7 @@ test('F1-7. task-delete removes the task from the Gantt', async () => {
     )
     const taskId: string = (task as { id: string }).id
 
-    await window.getByRole('button', { name: 'PlexiProjects' }).first().click()
+    await openProduct(window, 'projects')
     await expect(window.locator(`[data-testid="project-card-${folderId}"]`)).toBeVisible({ timeout: 8_000 })
     await window.locator(`[data-testid="project-card-${folderId}"]`).click()
     await window.locator(`[data-testid="gantt-row-${taskId}"]`).click()
@@ -394,7 +394,7 @@ test('F2-1. PlexiFlow: module-dashboard-flows renders with create + customize bu
   try {
     await waitForReady(window)
 
-    await window.getByRole('button', { name: 'PlexiFlow' }).first().click()
+    await openProduct(window, 'flow')
     await expect(window.locator('[data-testid="plexiflow-view"]')).toBeVisible({ timeout: 8_000 })
 
     // Nothing selected → ModuleDashboard renders in the right panel
@@ -425,7 +425,7 @@ test('F2-2. PlexiFlow module-dashboard create button creates a flow (smoke)', as
   try {
     await waitForReady(window)
 
-    await window.getByRole('button', { name: 'PlexiFlow' }).first().click()
+    await openProduct(window, 'flow')
     await expect(window.locator('[data-testid="module-dashboard-flows"]')).toBeVisible({ timeout: 8_000 })
 
     // Click the create button in ModuleDashboard empty recent-items state
@@ -448,7 +448,7 @@ test('F2-3. PlexiForms: module-dashboard-forms renders with create + customize b
   try {
     await waitForReady(window)
 
-    await window.getByRole('button', { name: 'PlexiForms' }).first().click()
+    await openProduct(window, 'form')
     await expect(window.locator('[data-testid="plexiforms-view"]')).toBeVisible({ timeout: 8_000 })
 
     // Nothing selected → ModuleDashboard
@@ -471,7 +471,7 @@ test('F2-4. PlexiBuild: module-dashboard-build renders with create + customize b
   try {
     await waitForReady(window)
 
-    await window.getByRole('button', { name: 'PlexiBuild' }).first().click()
+    await openProduct(window, 'build')
     await expect(window.locator('[data-testid="plexibuild-view"]')).toBeVisible({ timeout: 8_000 })
 
     // Nothing selected → ModuleDashboard
@@ -488,7 +488,7 @@ test('F2-5. PlexiMeet: module-dashboard-meet renders with create + customize but
   try {
     await waitForReady(window)
 
-    await window.getByRole('button', { name: 'PlexiMeet' }).first().click()
+    await openProduct(window, 'meet')
     await expect(window.locator('[data-testid="pleximeet-view"]')).toBeVisible({ timeout: 8_000 })
 
     // Nothing selected → ModuleDashboard
@@ -506,7 +506,7 @@ test('F2-6. PlexiReports: module-dashboard-reports renders; existing empty state
   try {
     await waitForReady(window)
 
-    await window.getByRole('button', { name: 'PlexiReports' }).first().click()
+    await openProduct(window, 'reports')
     await expect(window.locator('[data-testid="plexireports-view"]')).toBeVisible({ timeout: 8_000 })
 
     // ModuleDashboard renders in the right pane when nothing is selected
@@ -535,7 +535,7 @@ test('F2-7. Customize popover: toggling a section checkbox hides/shows that sect
   try {
     await waitForReady(window)
 
-    await window.getByRole('button', { name: 'PlexiFlow' }).first().click()
+    await openProduct(window, 'flow')
     await expect(window.locator('[data-testid="module-dashboard-flows"]')).toBeVisible({ timeout: 8_000 })
 
     const dashEl = window.locator('[data-testid="module-dashboard-flows"]')

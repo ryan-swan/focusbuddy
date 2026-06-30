@@ -143,3 +143,29 @@ export async function waitForReady(
     await skip.click().catch(() => {})
   }
 }
+
+// Where each former top-level product now lives: its segment nav entry and the
+// app key inside that segment. The individual sidebar entries were folded into
+// the PlexiWork / PlexiConnect / PlexiFlow segments.
+const SEGMENT_OF: Record<string, { nav: string; app: string }> = {
+  projects: { nav: 'nav-plexiwork', app: 'projects' },
+  tasks: { nav: 'nav-plexiwork', app: 'tasks' },
+  reports: { nav: 'nav-plexiwork', app: 'reports' },
+  chat: { nav: 'nav-plexiconnect', app: 'chat' },
+  meet: { nav: 'nav-plexiconnect', app: 'meet' },
+  flow: { nav: 'nav-plexiflow', app: 'flow' },
+  api: { nav: 'nav-plexiflow', app: 'api' },
+  build: { nav: 'nav-plexiflow', app: 'build' },
+  form: { nav: 'nav-plexiflow', app: 'form' }
+}
+
+// Navigate to a product that now lives inside a segment: exit any active segment
+// back to the global app, open the segment, then select the app inside it. The
+// product's own view (and its testids) renders inline, unchanged.
+export async function openProduct(window: Page, product: keyof typeof SEGMENT_OF): Promise<void> {
+  const route = SEGMENT_OF[product]
+  const exit = window.locator('[data-testid="segment-exit"]')
+  if (await exit.isVisible().catch(() => false)) await exit.click()
+  await window.locator(`[data-testid="${route.nav}"]`).click()
+  await window.locator(`[data-testid="segment-app-${route.app}"]`).click()
+}

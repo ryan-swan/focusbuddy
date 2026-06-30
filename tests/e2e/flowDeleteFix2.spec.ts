@@ -10,10 +10,10 @@
  * Sanity 3: add-table-row select commits immediately on change.
  */
 import { test, expect } from '@playwright/test'
-import { launchApp, waitForReady } from './_helpers'
+import { openProduct, launchApp, waitForReady } from './_helpers'
 
 async function openFlow(window: import('@playwright/test').Page): Promise<void> {
-  await window.getByRole('button', { name: 'PlexiFlow' }).first().click()
+  await openProduct(window, 'flow')
   const openBtn = window.locator('[data-testid="open-plexiflow"]')
   if (await openBtn.isVisible({ timeout: 2000 }).catch(() => false)) await openBtn.click()
   await expect(window.locator('[data-testid="plexiflow-view"]')).toBeVisible({ timeout: 8000 })

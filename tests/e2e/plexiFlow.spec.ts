@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { launchApp, waitForReady } from './_helpers'
+import { openProduct, launchApp, waitForReady } from './_helpers'
 
 // PlexiFlow verification.
 // IPC APIs used for seeding: window.api.flows.{list,create,update,run,get}
@@ -11,7 +11,7 @@ test('1. empty state: no flows shows flows-empty (no fake flow)', async () => {
   try {
     await waitForReady(window)
 
-    await window.getByRole('button', { name: 'PlexiFlow' }).first().click()
+    await openProduct(window, 'flow')
     await expect(window.locator('[data-testid="plexiflow-view"]')).toBeVisible({ timeout: 8_000 })
     await expect(window.locator('[data-testid="flows-empty"]')).toBeVisible({ timeout: 5_000 })
 
@@ -27,7 +27,7 @@ test('2. create flow: card appears and editor opens', async () => {
   try {
     await waitForReady(window)
 
-    await window.getByRole('button', { name: 'PlexiFlow' }).first().click()
+    await openProduct(window, 'flow')
     await expect(window.locator('[data-testid="plexiflow-view"]')).toBeVisible({ timeout: 8_000 })
 
     await window.locator('[data-testid="flow-new"]').click()
@@ -69,7 +69,7 @@ test('3. create-task action: run produces real task node, log shows success', as
     )
 
     // Open flow editor via UI
-    await window.getByRole('button', { name: 'PlexiFlow' }).first().click()
+    await openProduct(window, 'flow')
     await expect(window.locator(`[data-testid="flow-card-${flowId}"]`)).toBeVisible({ timeout: 8_000 })
     await window.locator(`[data-testid="flow-card-${flowId}"]`).click()
     await expect(window.locator('[data-testid="flow-action-0"]')).toBeVisible({ timeout: 5_000 })
@@ -139,7 +139,7 @@ test('4. send-email with no account: log shows honest failed step, not fake succ
     expect(emailStep!.message).toContain('No mail account connected')
 
     // Open UI and confirm log shows the error (not fake success)
-    await window.getByRole('button', { name: 'PlexiFlow' }).first().click()
+    await openProduct(window, 'flow')
     await expect(window.locator(`[data-testid="flow-card-${flowId}"]`)).toBeVisible({ timeout: 8_000 })
     await window.locator(`[data-testid="flow-card-${flowId}"]`).click()
 
@@ -225,7 +225,7 @@ test('6. trigger persists: set to weekly, reload via IPC, confirm trigger.kind=s
     const flowId: string = (flow as { id: string }).id
 
     // Open editor in UI and select "Every week" via the trigger select
-    await window.getByRole('button', { name: 'PlexiFlow' }).first().click()
+    await openProduct(window, 'flow')
     await expect(window.locator(`[data-testid="flow-card-${flowId}"]`)).toBeVisible({ timeout: 8_000 })
     await window.locator(`[data-testid="flow-card-${flowId}"]`).click()
     await expect(window.locator('[data-testid="flow-trigger"]')).toBeVisible({ timeout: 5_000 })

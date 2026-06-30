@@ -5,7 +5,7 @@
 //              empty query; typed queries still rank by match.
 
 import { test, expect } from '@playwright/test'
-import { launchApp, waitForReady, type LaunchedApp } from './_helpers'
+import { openProduct, launchApp, waitForReady, type LaunchedApp } from './_helpers'
 
 let launched: LaunchedApp | null = null
 
@@ -24,7 +24,7 @@ test('C1-a — Forms empty: rail testid present, emptyHint appears exactly once'
   await waitForReady(window)
 
   // Navigate to PlexiForms
-  await window.locator('button').filter({ hasText: 'PlexiForms' }).first().click()
+  await openProduct(window, 'form')
   await window.waitForSelector('[data-testid="plexiforms-view"]', { timeout: 8_000 })
 
   // Rail empty placeholder exists (testid present)
@@ -47,7 +47,7 @@ test('C1-b — Build empty: rail testid present, emptyHint appears exactly once'
   await waitForReady(window)
 
   // Navigate to PlexiBuild
-  await window.locator('button').filter({ hasText: 'PlexiBuild' }).first().click()
+  await openProduct(window, 'build')
   await window.waitForSelector('[data-testid="plexibuild-view"]', { timeout: 8_000 })
 
   // Rail empty placeholder exists (testid present)
@@ -69,7 +69,7 @@ test('C1-c — Reports empty: rail testid present, no duplicate text in rail', a
   await waitForReady(window)
 
   // Navigate to PlexiReports
-  await window.locator('button').filter({ hasText: 'PlexiReports' }).first().click()
+  await openProduct(window, 'reports')
   await window.waitForSelector('[data-testid="plexireports-view"]', { timeout: 8_000 })
 
   await expect(window.locator('[data-testid="reports-empty"]')).toBeVisible({ timeout: 5_000 })
@@ -93,7 +93,7 @@ test('C1-d — Flows empty: rail testid present, no duplicate text in rail', asy
   await waitForReady(window)
 
   // Navigate to PlexiFlow
-  await window.locator('button').filter({ hasText: 'PlexiFlow' }).first().click()
+  await openProduct(window, 'flow')
   await window.waitForSelector('[data-testid="plexiflow-view"]', { timeout: 8_000 })
 
   await expect(window.locator('[data-testid="flows-empty"]')).toBeVisible({ timeout: 5_000 })

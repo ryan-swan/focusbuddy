@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { launchApp, waitForReady } from './_helpers'
+import { openProduct, launchApp, waitForReady } from './_helpers'
 
 // PlexiAPI verification.
 // HTTP calls are made from the Playwright test process (Node.js) directly to
@@ -45,7 +45,7 @@ test('1. off by default: plexiapi-view shows Stopped', async () => {
   try {
     await waitForReady(window)
 
-    await window.getByRole('button', { name: 'PlexiAPI' }).first().click()
+    await openProduct(window, 'api')
     await expect(window.locator('[data-testid="plexiapi-view"]')).toBeVisible({ timeout: 8_000 })
 
     // Status must say Stopped (not Running) on a fresh DB
@@ -68,7 +68,7 @@ test('2. create write token: revealed secret starts with plx_', async () => {
   try {
     await waitForReady(window)
 
-    await window.getByRole('button', { name: 'PlexiAPI' }).first().click()
+    await openProduct(window, 'api')
     await expect(window.locator('[data-testid="plexiapi-view"]')).toBeVisible({ timeout: 8_000 })
 
     // Fill token name
@@ -93,7 +93,7 @@ test('3-8. server on + auth + write + scope + hash + revoke + stop', async () =>
   const { window, dispose } = await launchApp()
   try {
     await waitForReady(window)
-    await window.getByRole('button', { name: 'PlexiAPI' }).first().click()
+    await openProduct(window, 'api')
     await expect(window.locator('[data-testid="plexiapi-view"]')).toBeVisible({ timeout: 8_000 })
 
     // --- Create a WRITE token via IPC ---

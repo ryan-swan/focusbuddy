@@ -1,7 +1,7 @@
 // E2E verification for PlexiForms: form builder + fill + responses → real table rows.
 
 import { test, expect } from '@playwright/test'
-import { launchApp, waitForReady, type LaunchedApp } from './_helpers'
+import { openProduct, launchApp, waitForReady, type LaunchedApp } from './_helpers'
 
 let launched: LaunchedApp | null = null
 
@@ -13,8 +13,7 @@ test.afterEach(async () => {
 })
 
 async function openForms(window: LaunchedApp['window']): Promise<void> {
-  const btn = window.locator('button').filter({ hasText: 'PlexiForms' }).first()
-  await btn.click()
+  await openProduct(window, 'form')
   await window.waitForSelector('[data-testid="plexiforms-view"]', { timeout: 8_000 })
 }
 
