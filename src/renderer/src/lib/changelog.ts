@@ -36,6 +36,20 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.118',
+    date: '2026-07-01T01:00:00Z',
+    title: 'v2.5.118 — sparklines, a richer Slides editor, and AI for Design',
+    tag: 'feature',
+    summary:
+      'Three upgrades across PlexiOffice. PlexiSheets gets sparklines, a tiny trend chart you draw right inside a cell with =SPARKLINE of a range, as a line or as bars, and a toolbar button puts one next to a row of numbers for you. PlexiSlides gets the side panel its mockup promised, an AI Assistant with ideas for the current slide alongside Slide and Layout tabs that show the real layout, background, theme colours and font, and a proper speaker-notes editor. PlexiDesign gets the same kind of AI Assistant as Docs and Sheets, able to improve your copy, shorten it, suggest a headline or write a caption from the text you actually have on the canvas. As everywhere in Plexi, the assistant works from your real content and shows an honest message when there is nothing to act on or when something goes wrong.',
+    highlights: [
+      'PlexiSheets: =SPARKLINE(range) draws a line or bar trend chart inside a cell, with a one-click insert button.',
+      'PlexiSlides: a right-side panel with per-slide AI ideas, real Slide and Layout properties, and a speaker-notes editor.',
+      'PlexiDesign: an AI Assistant panel that improves, shortens, and drafts copy from the text on your canvas.',
+      'Every assistant runs on your real content; honest empty and error states throughout.'
+    ]
+  },
+  {
     version: '2.5.117',
     date: '2026-06-30T23:00:00Z',
     title: 'v2.5.117 — an AI Assistant for PlexiSheets',
