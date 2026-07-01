@@ -36,6 +36,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.139',
+    date: '2026-07-02T13:00:00Z',
+    title: 'v2.5.139 — a full menu bar for documents',
+    tag: 'feature',
+    summary:
+      'PlexiDocs now has the familiar menu bar across the top, with File, Edit, View, Insert, Format, Tools and Help, each a dropdown just like the word processor you already know. File covers new document, make a copy, rename, download as Word, PDF or web page, and move to trash. Edit has undo, redo, cut, copy, paste, select all and find and replace. Insert adds images, tables, links and lines. Format carries text styles, headings, alignment, lists and clear formatting, and Tools has a live word count. Every item does the real thing, so there is nothing in the menus that does not work.',
+    highlights: [
+      'A real File / Edit / View / Insert / Format / Tools / Help menu bar on documents.',
+      'Download as Word, PDF or web page, make a copy, find and replace, word count and more.',
+      'Every menu item is wired to a genuine action, not a placeholder.'
+    ]
+  },
+  {
     version: '2.5.138',
     date: '2026-07-02T11:00:00Z',
     title: 'v2.5.138 — switch between organisations',
