@@ -11,9 +11,15 @@ import { chimeOut } from '../lib/audioBeep'
 import { catalogFor, WIDGET_CATALOG, DRAG_MIME } from '../lib/widgetCatalog'
 import SegmentSwitcher from './segment/SegmentSwitcher'
 
-// The handful of widgets offered as draggable chips in the sidebar when a desk is
-// open. Kept short on purpose: the full set still lives in the on-canvas palette.
+// What you can drag onto the desk from the sidebar when a desk is open: the common
+// widgets AND the office things (a doc, sheet, slides or a drawing), so you can pull
+// both straight onto the canvas. The full widget set still lives in the on-canvas
+// palette.
 const DESK_WIDGET_KINDS = new Set([
+  'doc',
+  'sheet',
+  'slides',
+  'scratchpad',
   'sticky',
   'note',
   'timer',
@@ -671,12 +677,13 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
           />
         </div>
 
-        {/* ── WIDGETS — only while a desk is open; drag a chip onto the canvas ── */}
+        {/* ── ADD TO DESK — only while a desk is open; drag a widget or an office
+            thing (doc / sheet / slides / draw) straight onto the canvas ── */}
         {view.kind === 'task' && (
           <div className="mb-2" data-testid="sidebar-widgets">
             <div className="px-3 pt-2 pb-1 flex items-center gap-1.5 text-[10px] uppercase tracking-[0.12em] text-stone-500 dark:text-stone-400 font-semibold">
               <Icon name="widgets" size={13} />
-              <span>Widgets</span>
+              <span>Add to desk</span>
               <span className="ml-auto normal-case tracking-normal text-stone-400 dark:text-stone-500">drag onto desk</span>
             </div>
             <div className="grid grid-cols-4 gap-1 px-2">
