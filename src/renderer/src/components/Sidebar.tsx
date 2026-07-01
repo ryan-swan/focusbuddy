@@ -588,25 +588,27 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
   }
 
   return (
-    <aside className="h-full flex flex-col fb-glass-chrome border-r border-[color:var(--glass-chrome-border)]">
-      {/* Header — collapse toggle + master "New" */}
-      <div className="px-3 py-3 border-b border-stone-200 dark:border-stone-700 flex items-center justify-between gap-2">
-        <h2 className="text-[12px] font-semibold tracking-[0.18em] text-stone-900 dark:text-stone-100 inline-flex items-center gap-1.5">
-          <Icon name="auto_awesome" size={13} className="text-accent" />
-          <span>PLEXIDESK</span>
-        </h2>
-        <div className="flex items-center gap-1">
+    <aside className="h-full flex flex-col overflow-hidden border-r border-[var(--edge-soft)] bg-[var(--surface-raised)] text-[var(--ink-100)]">
+      {/* Header — same silhouette as the PlexiOffice menu: the wordmark on the
+          left, then the desk's own actions (New desk, hide) on the right. */}
+      <div className="flex items-center gap-2 px-4 h-14 border-b border-[var(--edge-soft)]">
+        <span className="text-[15px] font-bold tracking-[0.14em] text-[var(--ink-100)]">PLEXIDESK</span>
+        <div className="ml-auto flex items-center gap-1">
           <button
             onClick={requestCreateDesk}
-            title="New top-level project"
-            className="btn-primary !px-2 !py-1"
+            title="New desk"
+            className="inline-flex items-center gap-1 h-7 px-2.5 rounded-lg bg-[rgb(var(--accent))] text-white text-[12px] font-medium hover:bg-[rgb(var(--accent-hover))]"
           >
-            <Icon name="create_new_folder" size={14} />
+            <Icon name="add" size={14} />
             <span>New</span>
           </button>
           {onCollapse && (
-            <button onClick={onCollapse} className="icon-btn" title="Hide sidebar">
-              <Icon name="keyboard_double_arrow_left" size={16} />
+            <button
+              onClick={onCollapse}
+              title="Hide sidebar"
+              className="text-[var(--ink-50)] hover:text-[var(--ink-90)]"
+            >
+              <Icon name="keyboard_double_arrow_left" size={18} />
             </button>
           )}
         </div>
@@ -620,7 +622,7 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
 
         {/* Desk nav — one clean, single list in the same style as the Office /
             People / Brain menus, not a stack of labelled sections. */}
-        <div className="mb-2 px-1">
+        <div className="px-2 pt-1 pb-2">
           <NavRow
             icon="dashboard"
             label="Home"
@@ -681,11 +683,11 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
             canvases now); drag a widget or an office thing (doc / sheet / slides /
             draw) straight onto the canvas ── */}
         {(view.kind === 'task' || view.kind === 'project-dashboard') && (
-          <div className="mb-2" data-testid="sidebar-widgets">
-            <div className="px-3 pt-2 pb-1 flex items-center gap-1.5 text-[10px] uppercase tracking-[0.12em] text-stone-500 dark:text-stone-400 font-semibold">
+          <div className="mb-1" data-testid="sidebar-widgets">
+            <div className="px-4 pt-3 pb-1.5 flex items-center gap-1.5 text-[10px] uppercase tracking-[0.12em] text-[var(--ink-40)] font-semibold">
               <Icon name="widgets" size={13} />
               <span>Add to desk</span>
-              <span className="ml-auto normal-case tracking-normal text-stone-400 dark:text-stone-500">drag onto desk</span>
+              <span className="ml-auto normal-case tracking-normal text-[var(--ink-40)]">drag onto desk</span>
             </div>
             <div className="grid grid-cols-4 gap-1 px-2">
               {WIDGET_CATALOG.filter((e) => DESK_WIDGET_KINDS.has(e.kind)).map((entry) => (
@@ -698,7 +700,7 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
                   }}
                   data-testid={`sidebar-widget-${entry.kind}`}
                   title={`Drag ${entry.label} onto the desk`}
-                  className="flex flex-col items-center gap-1 py-2 rounded-lg text-[9.5px] text-stone-600 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800 cursor-grab active:cursor-grabbing"
+                  className="flex flex-col items-center gap-1 py-2 rounded-lg text-[9.5px] text-[var(--ink-70)] hover:bg-[var(--surface-sunken)] cursor-grab active:cursor-grabbing"
                 >
                   <Icon name={entry.icon} size={16} className="text-accent" />
                   <span className="truncate max-w-full leading-none">{entry.label}</span>
@@ -1206,6 +1208,23 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
         )}
       </div>
 
+      {/* Pro card — the same upgrade block that sits at the foot of the
+          PlexiOffice menu, so every area's menu ends the same way. */}
+      <div className="px-3 pt-2">
+        <div className="rounded-xl border border-[rgb(var(--accent)/0.3)] bg-[rgb(var(--accent)/0.06)] p-3">
+          <div className="flex items-center gap-1.5 mb-1.5">
+            <Icon name="auto_awesome" size={14} className="text-[rgb(var(--accent))]" />
+            <span className="text-[12px] font-semibold">PlexiDesk Pro</span>
+          </div>
+          <button
+            onClick={() => promptUpgrade('PlexiDesk Pro')}
+            className="w-full h-7 rounded-lg bg-[rgb(var(--accent))] text-white text-[11.5px] font-medium hover:bg-[rgb(var(--accent-hover))]"
+          >
+            Upgrade Now
+          </button>
+        </div>
+      </div>
+
       {/* Footer — sync indicator. Stays pinned to the bottom of the
           sidebar regardless of scroll position above. */}
       <SyncIndicator />
@@ -1317,11 +1336,13 @@ interface SectionHeaderProps {
 }
 
 function SectionHeader({ label, open, onToggle, action }: SectionHeaderProps): JSX.Element {
+  // The same quiet uppercase section label the PlexiOffice menu uses for its
+  // "Apps" / "Communicate" groups, with a chevron so the group still folds.
   return (
-    <div className="px-2 pt-1.5 pb-0.5 flex items-center justify-between sticky top-0 bg-stone-50 dark:bg-stone-900 z-10">
+    <div className="px-4 pt-3 pb-1.5 flex items-center justify-between">
       <button
         onClick={onToggle}
-        className="flex items-center gap-1 text-[10px] uppercase tracking-[0.12em] font-semibold text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-100 transition-colors"
+        className="flex items-center gap-1 text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--ink-40)] hover:text-[var(--ink-70)] transition-colors"
       >
         <Icon name={open ? 'expand_more' : 'chevron_right'} size={12} />
         <span>{label}</span>
@@ -1341,31 +1362,22 @@ interface NavRowProps {
 }
 
 function NavRow({ icon, label, active, onClick, badge, testid }: NavRowProps): JSX.Element {
+  // Identical row styling to the PlexiOffice menu: a rounded pill that fills with
+  // a soft accent tint when active, the icon inheriting the row's text colour.
   return (
     <button
       onClick={onClick}
       data-testid={testid}
-      className={`w-full flex items-center gap-2 px-2.5 py-1 text-left transition-colors ${
+      className={`flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-[13px] mb-0.5 text-left transition-colors ${
         active
-          ? 'bg-stone-100/80 dark:bg-stone-800/60 text-stone-900 dark:text-stone-100'
-          : 'text-stone-700 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800'
+          ? 'bg-[rgb(var(--accent)/0.12)] text-[rgb(var(--accent))] font-medium'
+          : 'text-[var(--ink-80)] hover:bg-[var(--surface-sunken)]'
       }`}
     >
-      {active && <span className="absolute left-0 h-5 w-[3px] rounded-r bg-accent" />}
-      <Icon
-        name={icon}
-        size={16}
-        filled={active}
-        className={`shrink-0 ${active ? 'text-accent' : 'text-stone-500 dark:text-stone-400'}`}
-      />
-      {/* Label wraps within the narrow rail instead of forcing the sidebar wider. */}
-      <span className={`text-[13px] flex-1 min-w-0 break-words leading-tight ${active ? 'font-medium' : ''}`}>
-        {label}
-      </span>
+      <Icon name={icon} size={17} filled={active} className="shrink-0" />
+      <span className="flex-1 min-w-0 break-words leading-tight">{label}</span>
       {badge && (
-        <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-stone-200 dark:bg-stone-700 text-stone-600 dark:text-stone-300">
-          {badge}
-        </span>
+        <span className="ml-auto text-[10px] fb-tabular text-[var(--ink-50)]">{badge}</span>
       )}
     </button>
   )
