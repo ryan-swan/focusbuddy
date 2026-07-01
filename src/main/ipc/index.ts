@@ -47,6 +47,7 @@ import {
   deleteDocument
 } from '../db/documents'
 import { searchAll } from '../db/search'
+import { getActiveOrgId, setActiveOrgId } from '../db/activeOrg'
 import { generateDocument, processMeetingEnd, generateDesignContent, generateDesignVariations } from '../ai/anthropic'
 import { generateImage } from '../imageGen'
 import { exportDesign } from '../designExport'
@@ -997,6 +998,14 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('dashboard:resetLayout', (_e, key: string) =>
     deleteDashboardLayout(key)
   )
+
+  // ── Active organisation (multi-org tenancy) ───────────────────────────────
+  // The active org is the tenancy boundary for the local workspace. Reading it
+  // is what every org-scoped query filters by; setting it (from the org switcher)
+  // persists so the choice survives a restart. The renderer reloads its stores
+  // after a set so every surface reflects the new org.
+  ipcMain.handle('session:getActiveOrg', () => getActiveOrgId())
+  ipcMain.handle('session:setActiveOrg', (_e, orgId: string) => setActiveOrgId(orgId))
 
   // ── Vault (Phase 7) ───────────────────────────────────────────────────────
   ipcMain.handle('vault:meta', () => getVaultMeta())

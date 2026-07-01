@@ -36,6 +36,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.138',
+    date: '2026-07-02T11:00:00Z',
+    title: 'v2.5.138 — switch between organisations',
+    tag: 'feature',
+    summary:
+      'You can now switch organisations from the top of the side menu, right under the wordmark, and the whole workspace follows. Each organisation keeps its own separate files, documents, tasks and connected apps, and your own private work lives in a Personal space that is always there. Switching is instant and the menu reflects wherever you are. You reach an organisation by being invited to it, so you only ever see the organisations you belong to, and you can invite other people from Manage. This is the first step of a larger piece of work: the same-organisation data you and a colleague share will sync between you in a following update, and until then each device keeps its own copy of an organisation.',
+    highlights: [
+      'An organisation switcher at the top of every area menu (Desk, Office, People, Brain).',
+      'Each organisation has its own files, documents, tasks and apps; Personal holds your private work.',
+      'You only see organisations you are invited to; invite people from Manage.'
+    ]
+  },
+  {
     version: '2.5.137',
     date: '2026-07-02T09:00:00Z',
     title: 'v2.5.137 — colourful menus everywhere',

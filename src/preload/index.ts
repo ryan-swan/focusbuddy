@@ -516,6 +516,12 @@ const api = {
     resetLayout: (key: string): Promise<boolean> =>
       ipcRenderer.invoke('dashboard:resetLayout', key)
   },
+  session: {
+    // The active organisation is the tenancy boundary for the local workspace.
+    getActiveOrg: (): Promise<string> => ipcRenderer.invoke('session:getActiveOrg'),
+    setActiveOrg: (orgId: string): Promise<string> =>
+      ipcRenderer.invoke('session:setActiveOrg', orgId)
+  },
   haptics: {
     available: (): Promise<boolean> => ipcRenderer.invoke('haptics:available'),
     fire: (feel: HapticFeel): Promise<boolean> => ipcRenderer.invoke('haptics:fire', feel)

@@ -11,6 +11,7 @@ import {
 import { join, extname, basename } from 'path'
 import { app } from 'electron'
 import { getDb } from './database'
+import { getActiveOrgId } from './activeOrg'
 import type { FbFile, FileEntry } from '@shared/fields'
 
 // All uploaded files live in userData/files. We deliberately use the file's
@@ -110,9 +111,9 @@ function insertFileRow(meta: {
   const db = getDb()
   db.prepare(
     `INSERT INTO fb_files
-       (id, original_name, mime_type, size_bytes, ext, created_at, parent_id, kind, display_name, updated_at)
-     VALUES (@id, @originalName, @mimeType, @sizeBytes, @ext, @createdAt, @parentId, 'file', @originalName, @createdAt)`
-  ).run({ ...meta, parentId: meta.parentId ?? null })
+       (id, original_name, mime_type, size_bytes, ext, created_at, parent_id, kind, display_name, updated_at, org_id)
+     VALUES (@id, @originalName, @mimeType, @sizeBytes, @ext, @createdAt, @parentId, 'file', @originalName, @createdAt, @orgId)`
+  ).run({ ...meta, parentId: meta.parentId ?? null, orgId: getActiveOrgId() })
   return rowToFile({
     id: meta.id,
     original_name: meta.originalName,
@@ -242,7 +243,7 @@ export function listEntries(parentId: string | null): FileEntry[] {
   }
   const rows = (
     parentId == null
-      ? db.prepare(`SELECT ${ENTRY_COLS} FROM fb_files WHERE parent_id IS NULL AND trashed_at IS NULL`).all()
+      ? db.prepare(`SELECT ${ENTRY_COLS} FROM fb_files WHERE parent_id IS NULL AND trashed_at IS NULL AND org_id = ?`).all(getActiveOrgId())
       : db.prepare(`SELECT ${ENTRY_COLS} FROM fb_files WHERE parent_id = ? AND trashed_at IS NULL`).all(parentId)
   ) as EntryRow[]
   const out: FileEntry[] = []
@@ -288,9 +289,9 @@ export function createFolder(parentId: string | null, name: string): FileEntry {
   const folderName = name.trim() || 'New folder'
   db.prepare(
     `INSERT INTO fb_files
-       (id, original_name, mime_type, size_bytes, ext, created_at, parent_id, kind, display_name, updated_at)
-     VALUES (@id, @name, '', 0, '', @now, @parentId, 'folder', @name, @now)`
-  ).run({ id, name: folderName, now, parentId })
+       (id, original_name, mime_type, size_bytes, ext, created_at, parent_id, kind, display_name, updated_at, org_id)
+     VALUES (@id, @name, '', 0, '', @now, @parentId, 'folder', @name, @now, @orgId)`
+  ).run({ id, name: folderName, now, parentId, orgId: getActiveOrgId() })
   return { id, parentId, kind: 'folder', name: folderName, childCount: 0, createdAt: now, updatedAt: now }
 }
 
@@ -702,9 +703,9 @@ export function fileDocument(docId: string, parentId: string | null): FileEntry 
   const id = randomUUID()
   db.prepare(
     `INSERT INTO fb_files
-       (id, original_name, mime_type, size_bytes, ext, created_at, parent_id, kind, doc_id, doc_type, updated_at)
-     VALUES (@id, @title, '', 0, '', @now, @parentId, 'doc', @docId, @docType, @now)`
-  ).run({ id, title: doc.title, now, parentId, docId, docType: doc.doc_type })
+       (id, original_name, mime_type, size_bytes, ext, created_at, parent_id, kind, doc_id, doc_type, updated_at, org_id)
+     VALUES (@id, @title, '', 0, '', @now, @parentId, 'doc', @docId, @docType, @now, @orgId)`
+  ).run({ id, title: doc.title, now, parentId, docId, docType: doc.doc_type, orgId: getActiveOrgId() })
   return getEntry(id)
 }
 

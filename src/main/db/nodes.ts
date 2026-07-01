@@ -1,5 +1,6 @@
 import { randomUUID } from 'crypto'
 import { getDb } from './database'
+import { getActiveOrgId } from './activeOrg'
 import { emitAutomationEvent } from './automationEvents'
 import type { FbNode, NodeDraft, NodePatch } from '@shared/types'
 
@@ -66,8 +67,10 @@ export function listNodes(): FbNode[] {
     }
   }
   const rows = db
-    .prepare('SELECT * FROM nodes WHERE trashed_at IS NULL ORDER BY sort_order ASC, created_at ASC')
-    .all() as NodeRow[]
+    .prepare(
+      'SELECT * FROM nodes WHERE trashed_at IS NULL AND org_id = ? ORDER BY sort_order ASC, created_at ASC'
+    )
+    .all(getActiveOrgId()) as NodeRow[]
   return rows.map(rowToNode)
 }
 
@@ -81,9 +84,9 @@ function nextSortOrder(parentId: string | null): number {
   const db = getDb()
   const row = db
     .prepare(
-      'SELECT COALESCE(MAX(sort_order), -1) + 1 AS next FROM nodes WHERE parent_id IS ?'
+      'SELECT COALESCE(MAX(sort_order), -1) + 1 AS next FROM nodes WHERE parent_id IS ? AND org_id = ?'
     )
-    .get(parentId) as { next: number }
+    .get(parentId, getActiveOrgId()) as { next: number }
   return row.next
 }
 
@@ -92,8 +95,8 @@ export function createNode(draft: NodeDraft): FbNode {
   const id = randomUUID()
   const now = Date.now()
   db.prepare(
-    `INSERT INTO nodes (id, parent_id, kind, title, description, status, priority, interest, importance, sort_order, created_at, updated_at, estimate_minutes, extensions_minutes, due_date, shared_from_handle)
-     VALUES (@id, @parentId, @kind, @title, @description, 'open', @priority, @interest, @importance, @sortOrder, @now, @now, @estimateMinutes, 0, @dueDate, @sharedFromHandle)`
+    `INSERT INTO nodes (id, parent_id, kind, title, description, status, priority, interest, importance, sort_order, created_at, updated_at, estimate_minutes, extensions_minutes, due_date, shared_from_handle, org_id)
+     VALUES (@id, @parentId, @kind, @title, @description, 'open', @priority, @interest, @importance, @sortOrder, @now, @now, @estimateMinutes, 0, @dueDate, @sharedFromHandle, @orgId)`
   ).run({
     id,
     parentId: draft.parentId,
@@ -107,6 +110,7 @@ export function createNode(draft: NodeDraft): FbNode {
     estimateMinutes: draft.estimateMinutes ?? null,
     dueDate: draft.dueDate ?? null,
     sharedFromHandle: draft.sharedFromHandle ?? null,
+    orgId: getActiveOrgId(),
     now
   })
   const created = getNode(id)

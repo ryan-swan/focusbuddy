@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useViewStore } from '../../stores/view'
 import SegmentSwitcher from './SegmentSwitcher'
+import OrgSwitcher from '../OrgSwitcher'
 import { promptUpgrade } from '../../stores/upgradePrompt'
 import Icon from '../Icon'
 
@@ -51,6 +52,7 @@ export default function SegmentShell({ def, initialApp }: { def: SegmentDef; ini
           </button>
         </div>
 
+        <OrgSwitcher />
         <SegmentSwitcher />
 
         <nav className="px-2 pt-1 pb-3">

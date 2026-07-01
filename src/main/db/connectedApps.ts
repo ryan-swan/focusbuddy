@@ -1,5 +1,6 @@
 import { randomUUID } from 'crypto'
 import { getDb } from './database'
+import { getActiveOrgId } from './activeOrg'
 import type {
   ConnectedApp,
   ConnectedAppDraft,
@@ -53,17 +54,17 @@ export function listConnectedApps(): ConnectedApp[] {
   const db = getDb()
   const rows = db
     .prepare(
-      'SELECT * FROM connected_apps ORDER BY sort_order ASC, created_at ASC'
+      'SELECT * FROM connected_apps WHERE org_id = ? ORDER BY sort_order ASC, created_at ASC'
     )
-    .all() as AppRow[]
+    .all(getActiveOrgId()) as AppRow[]
   return rows.map(rowToApp)
 }
 
 function nextSortOrder(): number {
   const db = getDb()
   const row = db
-    .prepare('SELECT COALESCE(MAX(sort_order), -1) + 1 AS next FROM connected_apps')
-    .get() as { next: number }
+    .prepare('SELECT COALESCE(MAX(sort_order), -1) + 1 AS next FROM connected_apps WHERE org_id = ?')
+    .get(getActiveOrgId()) as { next: number }
   return row.next
 }
 
@@ -76,13 +77,13 @@ export function createConnectedApp(draft: ConnectedAppDraft): ConnectedApp {
        id, title, url, icon, color, sort_order,
        use_count, last_used_at, pinned, vault_entry_id, autofill_enabled,
        kind, app_path, bundle_id, icon_png_base64,
-       created_at, updated_at
+       created_at, updated_at, org_id
      )
      VALUES (
        @id, @title, @url, @icon, @color, @sortOrder,
        0, NULL, @pinned, @vaultEntryId, 1,
        @kind, @appPath, @bundleId, @iconPngBase64,
-       @now, @now
+       @now, @now, @orgId
      )`
   ).run({
     id,
@@ -97,6 +98,7 @@ export function createConnectedApp(draft: ConnectedAppDraft): ConnectedApp {
     appPath: draft.appPath ?? null,
     bundleId: draft.bundleId ?? null,
     iconPngBase64: draft.iconPngBase64 ?? null,
+    orgId: getActiveOrgId(),
     now
   })
   const row = db

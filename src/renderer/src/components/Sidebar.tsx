@@ -10,6 +10,7 @@ import { useViewStore, type View } from '../stores/view'
 import { chimeOut } from '../lib/audioBeep'
 import { catalogFor, WIDGET_CATALOG, DRAG_MIME } from '../lib/widgetCatalog'
 import SegmentSwitcher from './segment/SegmentSwitcher'
+import OrgSwitcher from './OrgSwitcher'
 
 // What you can drag onto the desk from the sidebar when a desk is open: the common
 // widgets AND the office things (a doc, sheet, slides or a drawing), so you can pull
@@ -615,6 +616,9 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
       </div>
 
       <div className="flex-1 overflow-auto py-1">
+        {/* The organisation switcher sits at the very top of the menu, next to
+            the wordmark above. Switching org swaps the whole workspace. */}
+        <OrgSwitcher />
         {/* One consistent area switcher at the top, the same one the Office /
             People / Brain menus show, so the nice contextual menu and its
             switcher live on every view, not only inside the segments. */}

@@ -473,6 +473,23 @@ export function getDb(): Database.Database {
   // its whole subtree + every widget on those tasks, so we trash instead (hide +
   // recoverable), and purge old trash on launch. trashed_at null = live.
   ensureColumn(db, 'nodes', 'trashed_at', 'INTEGER')
+  // Multi-org tenancy: each of these surfaces is scoped to the active
+  // organisation. Existing rows predate multi-org, so the DEFAULT backfills them
+  // into the reserved 'personal' org — switching to Personal shows exactly the
+  // data the user already had, with no loss. New rows are stamped with whatever
+  // org is active when they are created. Widgets inherit scope from their task
+  // (widgets.task_id -> nodes), so they need no column of their own.
+  // documents is created later in this migration block, so its org_id column is
+  // added right after that CREATE (see below), not here.
+  ensureColumn(db, 'nodes', 'org_id', "TEXT NOT NULL DEFAULT 'personal'")
+  ensureColumn(db, 'fb_files', 'org_id', "TEXT NOT NULL DEFAULT 'personal'")
+  ensureColumn(db, 'connected_apps', 'org_id', "TEXT NOT NULL DEFAULT 'personal'")
+  ensureColumn(db, 'dashboard_layouts', 'org_id', "TEXT NOT NULL DEFAULT 'personal'")
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_nodes_org ON nodes(org_id);
+    CREATE INDEX IF NOT EXISTS idx_fb_files_org ON fb_files(org_id);
+    CREATE INDEX IF NOT EXISTS idx_connected_apps_org ON connected_apps(org_id);
+  `)
   ensureColumn(db, 'nodes', 'estimate_minutes', 'INTEGER')
   ensureColumn(db, 'nodes', 'extensions_minutes', 'INTEGER NOT NULL DEFAULT 0')
   // Soft-delete for undoable widget removal. Deleting a widget hard-cascades its
@@ -705,6 +722,12 @@ export function getDb(): Database.Database {
   ensureColumn(db, 'fb_smart_folders', 'search', "TEXT NOT NULL DEFAULT ''")
   migrateDocumentsDocTypeCheck(db)
   migrateShareKindChecks(db)
+  // Multi-org tenancy for documents. Added AFTER migrateDocumentsDocTypeCheck,
+  // which rebuilds the documents table to drop a legacy CHECK — adding the column
+  // last means the rebuild can never drop it. Existing docs backfill to the
+  // reserved 'personal' org via the DEFAULT.
+  ensureColumn(db, 'documents', 'org_id', "TEXT NOT NULL DEFAULT 'personal'")
+  db.exec('CREATE INDEX IF NOT EXISTS idx_documents_org ON documents(org_id)')
   return db
 }
 
