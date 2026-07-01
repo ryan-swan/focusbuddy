@@ -36,6 +36,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.133',
+    date: '2026-07-02T03:00:00Z',
+    title: 'v2.5.133 — the Desk menu is clean now too',
+    tag: 'feature',
+    summary:
+      'The Desk menu now looks and works like the PlexiOffice menu the rest of the app uses, instead of the busy stack of sections it was. It is the PlexiDesk name, the area switcher, and one clean list of your key places, Home, Plans, Tasks, Calendar, Files and Vault, with your desks listed underneath and, when a desk is open, the widgets you can drag onto it. The extra labelled sections are gone, since everything in them is reachable from the areas the switcher opens or from the nav itself. So the navigation is the same simple menu everywhere.',
+    highlights: [
+      'The Desk menu matches the clean PlexiOffice-style menu used across the app.',
+      'One clear nav list plus your desks, instead of many stacked sections.',
+      'The same simple menu now, genuinely everywhere.'
+    ]
+  },
+  {
     version: '2.5.132',
     date: '2026-07-02T01:00:00Z',
     title: 'v2.5.132 — the simple menu, everywhere',
