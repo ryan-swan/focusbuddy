@@ -38,18 +38,17 @@ test.afterEach(async () => {
 })
 
 async function openOrgView(window: LaunchedApp['window']): Promise<void> {
-  // The NavRow button for "Organization" in the sidebar has a Material icon
-  // character prepended to its text content, so its accessible name is not
-  // simply "Organization". Drive it via textContent match in evaluate
-  // (confirmed working in diagnostic run).
+  // Organisation used to be a standalone sidebar row; it now lives inside the
+  // Settings popover, whose "Manage organisation" button opens OrgAdminView and
+  // closes the popover. Open Settings, scroll the manage button into view, and
+  // click it.
+  const settingsBtn = window.getByRole('button', { name: /appearance settings/i })
+  await settingsBtn.click()
   await window.evaluate(() => {
-    const btns = Array.from(document.querySelectorAll('button, [role="button"]'))
-    const orgBtn = btns.find((el) => el.textContent?.includes('Organization'))
-    if (orgBtn) {
-      orgBtn.scrollIntoView({ block: 'nearest', behavior: 'instant' })
-      ;(orgBtn as HTMLElement).click()
-    }
+    const el = document.querySelector('[data-testid="settings-org-manage"]')
+    if (el) el.scrollIntoView({ block: 'nearest', behavior: 'instant' })
   })
+  await window.locator('[data-testid="settings-org-manage"]').click()
   // React needs a tick to commit the view change.
   await window.waitForTimeout(300)
 }

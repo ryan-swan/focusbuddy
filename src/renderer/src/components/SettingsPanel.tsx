@@ -27,7 +27,10 @@ import {
 } from '../lib/modelPrefs'
 import { haptic } from '../lib/haptics'
 import Icon from './Icon'
+import { useViewStore } from '../stores/view'
 import AccountSection from './settings/AccountSection'
+import OrganisationSection from './settings/OrganisationSection'
+import TemplatesSection from './settings/TemplatesSection'
 import DocumentsSyncSection from './settings/DocumentsSyncSection'
 import ApiKeysSection from './settings/ApiKeysSection'
 import BackupSection from './settings/BackupSection'
@@ -68,6 +71,7 @@ export default function SettingsPanel({
   anchorY
 }: Props): JSX.Element {
   const ref = useRef<HTMLDivElement | null>(null)
+  const goOrg = useViewStore((s) => s.goOrg)
   const [studioOpen, setStudioOpen] = useState(false)
   const [devTier, setDevTierState] = useState<TierId | null>(() => readDevForcedTier())
   const [sound, setSound] = useState<SoundPrefs>(() => getSoundPrefs())
@@ -500,6 +504,15 @@ export default function SettingsPanel({
       </div>
 
       <AccountSection />
+
+      <OrganisationSection
+        onManage={() => {
+          goOrg()
+          onClose()
+        }}
+      />
+
+      <TemplatesSection />
 
       <DocumentsSyncSection />
 

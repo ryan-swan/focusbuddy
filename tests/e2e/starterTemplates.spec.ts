@@ -24,36 +24,36 @@ test('ST-1 — New task dialog shows starter chips including Daily Focus and Pro
   const { window } = launched
   await waitForReady(window)
 
-  // Open the new-task dialog via IPC (no risk of layout-dependent button hunting).
-  // The dialog is triggered by window.__openNewNodeDialog if exposed, or we can
-  // click the + button which is always visible in the sidebar header.
-  // Find and click the "+ New task" / add button in the sidebar.
-  // Based on existing specs, the sidebar has a button that opens the new-task dialog.
-  // Use the data-testid we know exists.
-  const addBtn = window.locator('[data-testid="sidebar-add-task"]').first()
-  const addBtnVisible = await addBtn.isVisible().catch(() => false)
-  if (addBtnVisible) {
-    await addBtn.click()
-  } else {
-    // Fallback: look for the + icon button in the sidebar header area.
-    await window.locator('button[title*="task"], button[aria-label*="task"], button[title*="add"], button[aria-label*="add"]').first().click().catch(() => {})
-    // If that also doesn't work, use keyboard shortcut if mapped, or evaluate to dispatch a DOM event.
-    // Most reliable: use window.api to create a task and test the sidebar template path (ST-4).
-  }
+  // The starter chips render in the TASK create dialog. Create a folder, reload so
+  // the sidebar shows its row, then open that folder's "Add task" dialog. This is
+  // deterministic and does not depend on sidebar button layout.
+  await window.evaluate(async () => {
+    const api = (window as unknown as { api: typeof window.api }).api
+    await api.nodes.create({ parentId: null, kind: 'folder', title: 'Chip Test Desk' })
+  })
+  await window.reload()
+  await waitForReady(window)
+  const row = window.getByText('Chip Test Desk', { exact: true }).first()
+  await expect(row).toBeVisible({ timeout: 8000 })
+  await row.hover()
+  await window.getByRole('button', { name: 'Add task' }).first().click()
 
-  // Allow dialog to animate in.
-  await window.waitForTimeout(400)
+  // Wait for the dialog itself to render before checking its chips.
+  await expect(window.locator('[data-testid="newnode-name"]')).toBeVisible({ timeout: 5000 })
 
   // The dialog renders starter chips labelled with their names.
   // Based on the code: [...STARTER_TEMPLATES, ...templates].map(t => <button>{t.name}</button>)
   const dailyFocusChip = window.getByRole('button', { name: /daily focus/i })
   const projectHubChip = window.getByRole('button', { name: /project hub/i })
 
-  const dfVisible = await dailyFocusChip.isVisible().catch(() => false)
-  const phVisible = await projectHubChip.isVisible().catch(() => false)
-
-  expect(dfVisible, 'Daily Focus chip is visible in the new task dialog').toBe(true)
-  expect(phVisible, 'Project Hub chip is visible in the new task dialog').toBe(true)
+  // The chips live in the "Start from a template" row, which can sit below the
+  // dialog fold, so assert they are rendered and pull them into view rather than
+  // depending on initial scroll position.
+  await expect(dailyFocusChip).toHaveCount(1)
+  await expect(projectHubChip).toHaveCount(1)
+  await dailyFocusChip.scrollIntoViewIfNeeded().catch(() => {})
+  await expect(dailyFocusChip).toBeVisible()
+  await expect(projectHubChip).toBeVisible()
 
   // Dismiss.
   await window.keyboard.press('Escape').catch(() => {})

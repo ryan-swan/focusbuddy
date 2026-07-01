@@ -5,7 +5,6 @@ import { useCanCreateMore } from '../stores/capabilities'
 import { promptUpgrade } from '../stores/upgradePrompt'
 import { useWidgetStore } from '../stores/widgets'
 import { useConnectedAppsStore } from '../stores/connectedApps'
-import { useTemplateStore } from '../stores/templates'
 import SyncIndicator from './SyncIndicator'
 import { useViewStore, type View } from '../stores/view'
 import { useMessagingStore } from '../stores/messaging'
@@ -23,7 +22,6 @@ import { useSharesStore } from '../stores/shares'
 import { useAccountStore } from '../stores/account'
 import { acceptShareIntoWorkspace, type ShareSnap } from '../lib/acceptShare'
 import { promoteToLiveCanvas } from '../lib/liveCanvasMirror'
-import { STARTER_TEMPLATES } from '../lib/starterTemplates'
 import SharedBadge from './SharedBadge'
 import SharedRecipientBadges from './SharedRecipientBadges'
 import Icon from './Icon'
@@ -159,7 +157,6 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
   const goDocuments = useViewStore((s) => s.goDocuments)
   const goFiles = useViewStore((s) => s.goFiles)
   const goCollaborations = useViewStore((s) => s.goCollaborations)
-  const goOrg = useViewStore((s) => s.goOrg)
   const goPeopleMap = useViewStore((s) => s.goPeopleMap)
   const goSign = useViewStore((s) => s.goSign)
   const goSuite = useViewStore((s) => s.goSuite)
@@ -376,10 +373,6 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
       setAcceptingId(null)
     }
   }
-  const [templatesOpen, setTemplatesOpen] = useState(true)
-
-  const templates = useTemplateStore((s) => s.templates)
-
   useEffect(() => {
     if (!sharesLoaded) void refreshShares()
   }, [sharesLoaded, refreshShares])
@@ -415,37 +408,6 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
     setDialog({ mode: 'create', parentId: null, kind: 'folder' })
   }
 
-  async function applyTemplateToActiveTask(templateId: string): Promise<void> {
-    // Templates are applied by spawning their saved widgets on the
-    // currently-active task's canvas. If there's no active task, the user
-    // gets a polite hint instead of a silent no-op.
-    const activeTaskId = useNodeStore.getState().activeTaskId
-    if (!activeTaskId) {
-      window.alert('Open a task first — templates apply to the active task.')
-      return
-    }
-    const tpl = templates.find((t) => t.id === templateId) ?? STARTER_TEMPLATES.find((t) => t.id === templateId)
-    if (!tpl) return
-    // Spawn each widget at its stored position. The template was saved
-    // from a real task layout, so the relative coordinates already make
-    // sense as a group. Future enhancement: detect collisions with
-    // existing widgets and offset the whole template.
-    for (const w of tpl.widgets) {
-      await createWidget({
-        taskId: activeTaskId,
-        kind: w.kind,
-        title: w.title,
-        content: w.content,
-        x: w.x,
-        y: w.y,
-        width: w.width,
-        height: w.height,
-        color: w.color
-      })
-    }
-    bumpLayout()
-    chimeIn()
-  }
   const tree = useMemo(() => buildTree(visibleNodes), [visibleNodes])
   const flat = useMemo(() => flatten(tree, expanded), [tree, expanded])
 
@@ -887,15 +849,6 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
         <SectionHeader label="Team" open={teamOpen} onToggle={() => setTeamOpen((v) => !v)} />
         {teamOpen && (
           <div className="mb-2">
-            <NavRow
-              icon="apartment"
-              label="Organization"
-              active={viewIsActive({ kind: 'organization' })}
-              onClick={() => {
-                setActive(null)
-                goOrg()
-              }}
-            />
             <NavRow
               icon="travel_explore"
               label="People Map"
@@ -1366,47 +1319,6 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
                 </div>
               )
             })}
-          </div>
-        )}
-
-        {/* ── TEMPLATES ─────────────────────────────────────────────────── */}
-        <SectionHeader
-          label="Templates"
-          open={templatesOpen}
-          onToggle={() => setTemplatesOpen((v) => !v)}
-        />
-        {templatesOpen && (
-          <div className="mb-2 px-2">
-            {(
-              <div role="list">
-                {[...STARTER_TEMPLATES, ...templates].map((tpl) => (
-                  <button
-                    key={tpl.id}
-                    onClick={() => void applyTemplateToActiveTask(tpl.id)}
-                    className="group w-full flex items-center gap-1.5 px-2 py-1.5 rounded hover:bg-stone-100 dark:hover:bg-stone-800 text-left"
-                    title={
-                      tpl.description
-                        ? `${tpl.description}\n\nClick to apply to the active task.`
-                        : 'Apply to active task'
-                    }
-                  >
-                    <Icon
-                      name="layers"
-                      size={14}
-                      className="text-accent shrink-0"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <div className="text-[12px] text-stone-800 dark:text-stone-100 truncate">
-                        {tpl.name}
-                      </div>
-                      <div className="text-[9px] text-stone-500 dark:text-stone-400">
-                        {tpl.widgets.length} widget{tpl.widgets.length === 1 ? '' : 's'}
-                      </div>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            )}
           </div>
         )}
 
