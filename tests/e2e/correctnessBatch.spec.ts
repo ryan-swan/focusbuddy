@@ -17,14 +17,10 @@ import type { Page } from '@playwright/test'
 // Forms and Build no longer have a segment home and are driven through the view
 // store; PlexiSign still has a top-level sidebar entry.
 async function openProduct(window: Page, name: string, key: string): Promise<void> {
-  const exit = window.locator('[data-testid="segment-exit"]')
-  if (await exit.isVisible().catch(() => false)) await exit.click()
-  const officeExit = window.locator('[data-testid="office-exit"]')
-  if (await officeExit.isVisible().catch(() => false)) await officeExit.click()
-
+  // The persistent global sidebar is always present, so there is no segment to
+  // exit first — navigation simply swaps the centre panel.
   if (name === 'PlexiMeet') {
-    await window.locator('[data-testid="nav-plexioffice"]').click()
-    await window.locator('[data-testid="office-comms-app-meet"]').click()
+    await window.locator('[data-testid="sidenav-office-meet"]').click()
   } else if (name === 'PlexiForms' || name === 'PlexiBuild') {
     const go = name === 'PlexiForms' ? 'goForms' : 'goApps'
     await window.evaluate((g) => {

@@ -131,10 +131,11 @@ test('3 — action items from a created meeting turn into real task nodes', asyn
     return meetings
   })
 
-  // Navigate away and back to reload the view's store. Meet lives in the
-  // PlexiOffice Communicate menu now, so bounce off another comms app and back.
-  await window.locator('[data-testid="office-comms-app-inbox"]').click()
-  await window.locator('[data-testid="office-comms-app-meet"]').click()
+  // Navigate away and back to reload the view's store. Meet is a PlexiOffice
+  // communication surface reached from the persistent sidebar, so bounce off
+  // another comms deep-link and back.
+  await window.locator('[data-testid="sidenav-office-inbox"]').click()
+  await window.locator('[data-testid="sidenav-office-meet"]').click()
   await window.waitForSelector('[data-testid="pleximeet-view"]', { timeout: 8_000 })
 
   // Click the Standup meeting row.
