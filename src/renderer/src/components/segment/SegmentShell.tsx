@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useViewStore } from '../../stores/view'
+import SegmentSwitcher from './SegmentSwitcher'
 import { promptUpgrade } from '../../stores/upgradePrompt'
 import Icon from '../Icon'
 
@@ -50,7 +51,9 @@ export default function SegmentShell({ def, initialApp }: { def: SegmentDef; ini
           </button>
         </div>
 
-        <nav className="px-2 py-3">
+        <SegmentSwitcher />
+
+        <nav className="px-2 pt-1 pb-3">
           <button
             onClick={() => setActiveKey(null)}
             data-testid="segment-nav-home"
