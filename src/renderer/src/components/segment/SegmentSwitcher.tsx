@@ -14,13 +14,15 @@ const AREAS = [
 
 export default function SegmentSwitcher(): JSX.Element {
   const currentKind = useViewStore((s) => s.view.kind)
-  const goPlexiDesk = useViewStore((s) => s.goPlexiDesk)
+  const goHome = useViewStore((s) => s.goHome)
   const goOffice = useViewStore((s) => s.goOffice)
   const goPlexiPeople = useViewStore((s) => s.goPlexiPeople)
   const goPlexiBrain = useViewStore((s) => s.goPlexiBrain)
 
   function go(kind: string): void {
-    if (kind === 'plexidesk') goPlexiDesk()
+    // Desk is the default area (the workspace, home, tasks, calendar, files and
+    // your desks), so it opens Home rather than a separate segment.
+    if (kind === 'plexidesk') goHome()
     else if (kind === 'office') goOffice()
     else if (kind === 'plexipeople') goPlexiPeople()
     else if (kind === 'plexibrain') goPlexiBrain()
@@ -29,7 +31,12 @@ export default function SegmentSwitcher(): JSX.Element {
   return (
     <div className="grid grid-cols-4 gap-1 px-2 pt-2 pb-1" data-testid="segment-switcher">
       {AREAS.map((a) => {
-        const active = currentKind === a.kind
+        // Desk is active for every view that is not one of the other three areas,
+        // since the whole desk workspace lives under it.
+        const active =
+          a.kind === 'plexidesk'
+            ? !['office', 'plexipeople', 'plexibrain'].includes(currentKind)
+            : currentKind === a.kind
         return (
           <button
             key={a.kind}

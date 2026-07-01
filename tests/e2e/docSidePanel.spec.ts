@@ -34,7 +34,7 @@ async function stubDocAi(app: LaunchedApp['app'], html: string): Promise<void> {
 
 /** Open PlexiOffice and create + open a blank document. */
 async function openOfficeDoc(window: Page): Promise<void> {
-  await window.getByRole('button', { name: 'PlexiOffice' }).first().click()
+  await window.locator('[data-testid="switch-office"]').first().click()
   await expect(window.locator('[data-testid="office-sidebar"]')).toBeVisible({ timeout: 8_000 })
   await window.locator('[data-testid="office-app-docs"]').click()
   await expect(window.locator('[data-testid="doc-editor-surface"]')).toBeVisible({ timeout: 10_000 })

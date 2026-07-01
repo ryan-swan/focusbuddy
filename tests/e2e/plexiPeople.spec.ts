@@ -34,7 +34,7 @@ test.describe('PlexiPeople segment', () => {
 
   test('opens from the sidebar and renders the people home', async () => {
     await exitSegment(window)
-    await window.locator('[data-testid="nav-plexipeople"]').click()
+    await window.locator('[data-testid="switch-plexipeople"]').click()
     await expect(window.locator('[data-testid="segment-plexipeople"]')).toBeVisible({ timeout: 8_000 })
     // The segment lands on its People Home app by default.
     await expect(window.locator('[data-testid="people-home"]')).toBeVisible({ timeout: 8_000 })
@@ -44,7 +44,7 @@ test.describe('PlexiPeople segment', () => {
 
   test('a fresh workspace shows the honest empty directory, not invented people', async () => {
     await exitSegment(window)
-    await window.locator('[data-testid="nav-plexipeople"]').click()
+    await window.locator('[data-testid="switch-plexipeople"]').click()
     await window.locator('[data-testid="people-home"]').waitFor({ timeout: 8_000 })
 
     // No organisation + signed out on a fresh DB → honest empty state, never a
@@ -65,7 +65,7 @@ test.describe('PlexiPeople segment', () => {
 
   test('the directory app and organisation map are reachable from the segment menu', async () => {
     await exitSegment(window)
-    await window.locator('[data-testid="nav-plexipeople"]').click()
+    await window.locator('[data-testid="switch-plexipeople"]').click()
     // Organisation (the directory backend / OrgAdminView) renders inline.
     await window.locator('[data-testid="segment-app-workspaces"]').click()
     await expect(window.locator('[data-testid="org-admin"]')).toBeVisible({ timeout: 8_000 })

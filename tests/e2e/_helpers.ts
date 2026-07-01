@@ -153,37 +153,33 @@ export async function waitForReady(
 //     straight to their view through the view store so their spec coverage
 //     survives. The view renders in the global MainPane, testids unchanged.
 type ProductRoute =
-  | { mode: 'seg'; nav: string; app: string }
+  | { mode: 'seg'; switch: string; app: string }
   | { mode: 'comms'; app: string }
   | { mode: 'direct'; go: string }
 
 const SEGMENT_OF: Record<string, ProductRoute> = {
-  projects: { mode: 'seg', nav: 'nav-plexidesk', app: 'plans' },
-  tasks: { mode: 'seg', nav: 'nav-plexidesk', app: 'tasks' },
+  // Plans and Tasks are Desk-area views reachable straight from the view store.
+  projects: { mode: 'direct', go: 'goProjects' },
+  tasks: { mode: 'direct', go: 'goAllTasks' },
   reports: { mode: 'direct', go: 'goReports' },
-  flow: { mode: 'seg', nav: 'nav-plexibrain', app: 'flows' },
-  api: { mode: 'seg', nav: 'nav-plexibrain', app: 'api' },
+  // Flow / API live in the PlexiBrain area; jump there via the always-visible
+  // area switcher, then click the app tile.
+  flow: { mode: 'seg', switch: 'switch-plexibrain', app: 'flows' },
+  api: { mode: 'seg', switch: 'switch-plexibrain', app: 'api' },
   chat: { mode: 'comms', app: 'chat' },
   meet: { mode: 'comms', app: 'meet' },
   build: { mode: 'direct', go: 'goApps' },
   form: { mode: 'direct', go: 'goForms' }
 }
 
-// Navigate to a product under the new three-segment IA. Exits any active segment
-// first, then routes per the product's mode. The product's own view (and its
-// testids) renders unchanged.
+// Navigate to a product. The area switcher (Desk / Office / People / Brain) is
+// visible on every view, so we switch area then open the app; Desk-area views are
+// driven straight through the view store. The product's own view + testids render
+// unchanged.
 export async function openProduct(window: Page, product: keyof typeof SEGMENT_OF): Promise<void> {
   const route = SEGMENT_OF[product]
-  // Exit any active full-bleed segment back to the global app. SegmentShell uses
-  // segment-exit; the PlexiOffice shell uses office-exit.
-  const segExit = window.locator('[data-testid="segment-exit"]')
-  if (await segExit.isVisible().catch(() => false)) await segExit.click()
-  const officeExit = window.locator('[data-testid="office-exit"]')
-  if (await officeExit.isVisible().catch(() => false)) await officeExit.click()
 
   if (route.mode === 'direct') {
-    // Drive the real view store directly for products with no segment home
-    // (Build / Form). The store is exposed on window by stores/view.ts.
     await window.evaluate((go) => {
       const w = window as unknown as { __fbView?: { getState: () => Record<string, () => void> } }
       w.__fbView?.getState()[go]?.()
@@ -192,11 +188,11 @@ export async function openProduct(window: Page, product: keyof typeof SEGMENT_OF
   }
 
   if (route.mode === 'comms') {
-    await window.locator('[data-testid="nav-plexioffice"]').click()
+    await window.locator('[data-testid="switch-office"]').click()
     await window.locator(`[data-testid="office-comms-app-${route.app}"]`).click()
     return
   }
 
-  await window.locator(`[data-testid="${route.nav}"]`).click()
+  await window.locator(`[data-testid="${route.switch}"]`).click()
   await window.locator(`[data-testid="segment-app-${route.app}"]`).click()
 }
