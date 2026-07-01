@@ -36,6 +36,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.125',
+    date: '2026-07-01T13:00:00Z',
+    title: 'v2.5.125 — your workspaces never look lost again',
+    tag: 'fix',
+    summary:
+      'Fixes a scare where the workspace list in the sidebar could come up empty even though every desk, document and widget was safe on your device. The cause was the tree loader giving up after a single failed read at startup, which can happen if another copy of the app is briefly holding the database, and then showing "no projects yet" as if there were nothing there. The loader now retries, and if it genuinely cannot read right then it says so plainly, reassures you that your data is safe on this device, and gives you a Try again button, rather than showing an empty list. Restarting the app already reloads everything; this makes sure a momentary hiccup can never be mistaken for lost work.',
+    highlights: [
+      'The sidebar no longer shows an empty workspace list after a transient load failure.',
+      'The tree loader retries, and on real failure shows an honest message with a Try again button.',
+      'Your desks, documents and widgets were always safe on-device; this fixes only how a load failure was shown.'
+    ]
+  },
+  {
     version: '2.5.124',
     date: '2026-07-01T11:30:00Z',
     title: 'v2.5.124 — a Plan is more than a timeline',
