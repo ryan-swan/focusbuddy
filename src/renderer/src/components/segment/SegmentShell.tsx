@@ -61,7 +61,9 @@ export default function SegmentShell({ def, initialApp }: { def: SegmentDef; ini
               active === null ? 'bg-[rgb(var(--accent)/0.12)] text-[rgb(var(--accent))] font-medium' : 'text-[var(--ink-80)] hover:bg-[var(--surface-sunken)]'
             }`}
           >
-            <Icon name="home" size={17} />
+            <span className="inline-flex items-center justify-center w-6 h-6 rounded-md text-white shrink-0 bg-indigo-500">
+              <Icon name="home" size={14} />
+            </span>
             <span>Home</span>
           </button>
         </nav>
