@@ -24,6 +24,12 @@ interface NodeStore {
   activeTaskId: string | null
   expanded: Record<string, boolean>
   loading: boolean
+  // Whether a load has ever succeeded, and the last load error if any. These let
+  // the UI tell three states apart that used to look identical: still loading, a
+  // genuinely empty workspace, and a load that FAILED. Conflating the last two is
+  // how a transient failure could read as "all my workspaces disappeared".
+  loaded: boolean
+  error: string | null
   refresh: () => Promise<void>
   create: (draft: NodeDraft) => Promise<FbNode>
   update: (id: string, patch: NodePatch) => Promise<void>
@@ -40,10 +46,33 @@ export const useNodeStore = create<NodeStore>((set, get) => ({
   activeTaskId: null,
   expanded: {},
   loading: false,
+  loaded: false,
+  error: null,
   refresh: async () => {
     set({ loading: true })
-    const nodes = await window.api.nodes.list()
-    set({ nodes, loading: false })
+    // Loading the workspace tree must never fail silently into an empty state that
+    // looks like lost data. A transient DB lock (e.g. another installed build
+    // briefly holding the database at boot) can make the first call reject, so we
+    // retry with a short backoff. On real failure we KEEP whatever nodes we already
+    // had and record an honest error the sidebar surfaces, rather than blanking the
+    // tree.
+    const MAX_ATTEMPTS = 3
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+      try {
+        const nodes = await window.api.nodes.list()
+        set({ nodes, loading: false, loaded: true, error: null })
+        return
+      } catch (e) {
+        if (attempt === MAX_ATTEMPTS) {
+          set({
+            loading: false,
+            error: e instanceof Error ? e.message : String(e)
+          })
+          return
+        }
+        await new Promise((resolve) => setTimeout(resolve, attempt * 300))
+      }
+    }
   },
   create: async (draft) => {
     // Hard backstop for the desk limit — catches EVERY create path (sidebar,
