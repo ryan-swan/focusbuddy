@@ -246,12 +246,13 @@ export default function App(): JSX.Element {
     installCapabilityWatcher()
   }, [refresh, refreshTemplates, refreshVaultMeta, accountInit])
 
-  // On boot, if the persisted view is a task, hydrate the active task id so Canvas
-  // (rendered by MainPane) loads the right widgets without requiring a sidebar click.
+  // Keep the active desk in sync with the view so the Canvas (rendered by MainPane)
+  // shows the right widgets. Every desk is a canvas: both a task and a top-level
+  // folder-desk (project-dashboard) point the canvas at their own node.
   useEffect(() => {
-    const v = useViewStore.getState().view
-    if (v.kind === 'task') setActive(v.taskId)
-  }, [setActive])
+    if (currentView.kind === 'task') setActive(currentView.taskId)
+    else if (currentView.kind === 'project-dashboard') setActive(currentView.projectId)
+  }, [currentView, setActive])
 
   // Feed the active-widget id into the sound system so "Quiet while widget active" works
   useEffect(() => {

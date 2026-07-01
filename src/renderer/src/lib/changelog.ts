@@ -36,6 +36,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.135',
+    date: '2026-07-02T06:00:00Z',
+    title: 'v2.5.135 — every desk is a canvas',
+    tag: 'feature',
+    summary:
+      'Opening a folder-desk now gives you the same canvas you already get on a task, so every desk behaves the same way. There is one drop surface to arrange, and the "Add to desk" strip on the left lets you drag widgets and office things straight onto it. Folders used to open as a separate dashboard, which meant a desk felt different depending on where you clicked. That split is gone. A desk is a canvas, wherever you open it, and you drag things onto it.',
+    highlights: [
+      'Folder-desks open as a canvas, the same as a task.',
+      'The "Add to desk" strip shows on any desk, so you drag widgets and office things onto it.',
+      'One consistent desk experience instead of a canvas here and a dashboard there.'
+    ]
+  },
+  {
     version: '2.5.134',
     date: '2026-07-02T05:00:00Z',
     title: 'v2.5.134 — drag docs and sheets onto your desk',

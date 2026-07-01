@@ -677,9 +677,10 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
           />
         </div>
 
-        {/* ── ADD TO DESK — only while a desk is open; drag a widget or an office
-            thing (doc / sheet / slides / draw) straight onto the canvas ── */}
-        {view.kind === 'task' && (
+        {/* ── ADD TO DESK — while a desk is open (a task or a folder-desk, both
+            canvases now); drag a widget or an office thing (doc / sheet / slides /
+            draw) straight onto the canvas ── */}
+        {(view.kind === 'task' || view.kind === 'project-dashboard') && (
           <div className="mb-2" data-testid="sidebar-widgets">
             <div className="px-3 pt-2 pb-1 flex items-center gap-1.5 text-[10px] uppercase tracking-[0.12em] text-stone-500 dark:text-stone-400 font-semibold">
               <Icon name="widgets" size={13} />
