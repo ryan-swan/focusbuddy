@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useDocumentsStore } from '../../stores/documents'
 import { useViewStore } from '../../stores/view'
 import { useAccountStore } from '../../stores/account'
+import SegmentSwitcher from '../segment/SegmentSwitcher'
 import { useMailStore, selectMailUnread } from '../../stores/mail'
 import { useMessagingStore } from '../../stores/messaging'
 import { CHANGELOG } from '../../lib/changelog'
@@ -723,7 +724,9 @@ function OfficeSidebar({
         </button>
       </div>
 
-      <nav className="px-2 py-3">
+      <SegmentSwitcher />
+
+      <nav className="px-2 pt-1 pb-3">
         {NAV.map((n) => (
           <button
             key={n.id}

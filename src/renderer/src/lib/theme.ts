@@ -85,9 +85,9 @@ export const ACCENT_OPTIONS: Array<{ value: PresetAccent; label: string; preview
 // by index.html; the fallback chain keeps text rendered if the webfont is
 // slow or unavailable (e.g. offline).
 const FONT_STACKS: Record<FontChoice, string> = {
-  system: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-  atkinson: "'Atkinson Hyperlegible', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
-  lexend: "'Lexend', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif"
+  system: "'Inter Variable', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+  atkinson: "'Atkinson Hyperlegible', 'Inter Variable', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+  lexend: "'Lexend Variable', 'Lexend', 'Inter Variable', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif"
 }
 
 export const FONT_OPTIONS: Array<{

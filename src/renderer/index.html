@@ -2,21 +2,15 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https: fb-file: fb-dev:; media-src 'self' fb-file: fb-dev: blob: data:; connect-src 'self' ws: wss: https:;" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: https: fb-file: fb-dev:; media-src 'self' fb-file: fb-dev: blob: data:; connect-src 'self' ws: wss: https:;" />
     <title>PlexiDesk</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <!--
-      Type stack — Inter for everything (full weight range with optical sizing),
-      JetBrains Mono for fixed-width digits + code, Patrick Hand kept for
-      handwritten stickies. Atkinson Hyperlegible and Lexend are the curated
-      accessibility faces the Theme studio lets users switch the whole UI to —
-      loaded here so the swap is instant rather than a network stall mid-session.
+      Type stack (Inter, JetBrains Mono, Patrick Hand, Atkinson Hyperlegible,
+      Lexend) and the Material Symbols icon font are now self-hosted and imported
+      from src/main.tsx via the bundled `material-symbols` and `@fontsource`
+      packages. They no longer load from the Google Fonts CDN, so icons and text
+      render even with no network and the CSP no longer needs to allow fonts.google.
     -->
-    <link
-      href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300..800&family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400;1,700&family=Lexend:wght@300..700&family=JetBrains+Mono:wght@400;500;600&family=Patrick+Hand&family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,300..700,0..1,-50..200&display=swap"
-      rel="stylesheet"
-    />
   </head>
   <body class="bg-desk-50">
     <div id="root"></div>

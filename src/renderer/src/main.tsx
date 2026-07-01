@@ -3,6 +3,17 @@ import ReactDOM from 'react-dom/client'
 import App from './App'
 import ErrorBoundary from './components/ErrorBoundary'
 import { applyUiScale, loadUiScale } from './lib/uiScale'
+// Self-hosted fonts. These used to load from the Google Fonts CDN via a <link> in
+// index.html, which meant every icon (Material Symbols) and the UI type broke the
+// moment the network was unavailable or the CDN was blocked, which a desktop app
+// must never depend on. Bundling them makes icons and text always load, offline
+// included.
+import 'material-symbols/outlined.css'
+import '@fontsource-variable/inter'
+import '@fontsource-variable/lexend'
+import '@fontsource/jetbrains-mono'
+import '@fontsource/patrick-hand'
+import '@fontsource/atkinson-hyperlegible'
 import './styles/globals.css'
 
 // Restore the user's chosen text size before the app renders, so it comes up at
