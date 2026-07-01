@@ -36,6 +36,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.129',
+    date: '2026-07-01T19:30:00Z',
+    title: 'v2.5.129 — dashboards you can lay out your way',
+    tag: 'feature',
+    summary:
+      'Your dashboards are now yours to arrange. You could already add, remove and drag the cards around; now you can also choose whether a dashboard runs in one, two or three columns, and set each card to small, medium or large so the things you care about take the space they deserve. Every area keeps its own layout, so your home, and each individual plan, can look exactly the way that area needs. Open a dashboard, hit Customize, and lay it out to suit you. Your existing dashboards carry over untouched.',
+    highlights: [
+      'Choose 1, 2 or 3 columns for any dashboard.',
+      'Set each card to small, medium or large.',
+      'Every area, including each plan, keeps its own layout, and existing dashboards carry over unchanged.'
+    ]
+  },
+  {
     version: '2.5.128',
     date: '2026-07-01T18:00:00Z',
     title: 'v2.5.128 — Organisation and Templates move into Settings',
