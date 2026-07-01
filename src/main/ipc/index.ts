@@ -337,7 +337,8 @@ import type {
 import {
   deleteDashboardLayout,
   getDashboardLayout,
-  setDashboardLayout
+  setDashboardLayout,
+  type DashboardLayoutInput
 } from '../db/dashboardLayouts'
 import { currentEnergy, logEnergy, recentEnergy } from '../db/energy'
 import {
@@ -990,7 +991,8 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('dashboard:getLayout', (_e, key: string) => getDashboardLayout(key))
   ipcMain.handle(
     'dashboard:setLayout',
-    (_e, key: string, cardIds: DashboardCardKind[]) => setDashboardLayout(key, cardIds)
+    (_e, key: string, input: DashboardCardKind[] | DashboardLayoutInput) =>
+      setDashboardLayout(key, input)
   )
   ipcMain.handle('dashboard:resetLayout', (_e, key: string) =>
     deleteDashboardLayout(key)

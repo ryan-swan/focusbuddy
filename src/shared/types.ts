@@ -897,10 +897,35 @@ export type DashboardCardKind =
   | 'ai-assistant'
   | 'recent-notes'
 
+// The visual size a portlet occupies on the dashboard. Small/Medium/Large map to
+// grid column-span and a min-height so the choice is a real visual difference.
+export type DashboardCardSize = 'small' | 'medium' | 'large'
+
+// How many columns a dashboard flows its portlets into. Responsive rules may
+// collapse this to 1 on narrow widths, but the stored preference is 1, 2 or 3.
+export type DashboardColumns = 1 | 2 | 3
+
 export interface DashboardLayout {
   dashboardKey: string // 'home' for the master dashboard, or a project node id
   cardIds: DashboardCardKind[]
+  // Column count chosen for this dashboard. Defaults to 2 when a legacy layout
+  // (bare card-id array) is loaded and no column preference was ever saved.
+  columns: DashboardColumns
+  // Per-card size overrides. A card absent from this map renders at its default
+  // ('medium'). Legacy layouts load with an empty map so every card is medium.
+  sizes: Partial<Record<DashboardCardKind, DashboardCardSize>>
   updatedAt: number
+}
+
+// Default column count for a dashboard that has never had a preference saved.
+export const DEFAULT_DASHBOARD_COLUMNS: DashboardColumns = 2
+
+// The payload the renderer sends when persisting a dashboard. Columns and sizes
+// are optional so an old-style card-only save preserves the stored preferences.
+export interface DashboardLayoutInput {
+  cardIds: DashboardCardKind[]
+  columns?: DashboardColumns
+  sizes?: Partial<Record<DashboardCardKind, DashboardCardSize>>
 }
 
 // ── Vault (Phase 7) ──────────────────────────────────────────────────────────

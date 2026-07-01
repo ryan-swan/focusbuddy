@@ -1,10 +1,16 @@
 import { useEffect, useMemo, useState } from 'react'
-import type { DashboardCardKind } from '@shared/types'
+import type {
+  DashboardCardKind,
+  DashboardCardSize,
+  DashboardColumns
+} from '@shared/types'
 import { useNodeStore } from '../../stores/nodes'
 import {
+  DEFAULT_CARD_SIZE,
   DEFAULT_LAYOUT,
   useDashboardLayoutStore
 } from '../../stores/dashboardLayouts'
+import { DEFAULT_DASHBOARD_COLUMNS } from '@shared/types'
 import { taskIdsInScope, type DashboardScope } from '../../lib/dashboardScope'
 import StatsCard from './StatsCard'
 import QuickStartCard from './QuickStartCard'
@@ -91,6 +97,46 @@ const CARD_META: Record<
   }
 }
 
+// Garden was deprecated — exclude it everywhere.
+type ActiveCard = Exclude<DashboardCardKind, 'garden' | 'energy'>
+
+// The next size in the Small → Medium → Large → Small cycle. Used by the
+// per-card size control in edit mode.
+const SIZE_ORDER: DashboardCardSize[] = ['small', 'medium', 'large']
+function nextSize(size: DashboardCardSize): DashboardCardSize {
+  const idx = SIZE_ORDER.indexOf(size)
+  return SIZE_ORDER[(idx + 1) % SIZE_ORDER.length]
+}
+const SIZE_LABEL: Record<DashboardCardSize, string> = {
+  small: 'S',
+  medium: 'M',
+  large: 'L'
+}
+
+// How many grid columns a card of a given size spans, capped at the dashboard's
+// column count. Small spans 1, Medium spans up to 2, Large spans the full width.
+function spanFor(size: DashboardCardSize, columns: DashboardColumns): number {
+  if (columns === 1) return 1
+  switch (size) {
+    case 'small':
+      return 1
+    case 'medium':
+      return Math.min(2, columns)
+    case 'large':
+      return columns
+    default:
+      return 1
+  }
+}
+
+// A real min-height difference so the size choice reads visually even for cards
+// whose own content is short.
+const SIZE_MIN_HEIGHT: Record<DashboardCardSize, number> = {
+  small: 0,
+  medium: 120,
+  large: 200
+}
+
 // Build a stable key for the dashboard's layout — 'home' for global, project id otherwise
 function dashboardKeyOf(scope: DashboardScope): string {
   return scope.kind === 'global' ? 'home' : scope.projectId
@@ -109,28 +155,36 @@ export default function Dashboard({
 
   const dashboardKey = dashboardKeyOf(scope)
   const loadLayout = useDashboardLayoutStore((s) => s.load)
-  const setLayout = useDashboardLayoutStore((s) => s.set)
+  const setCards = useDashboardLayoutStore((s) => s.setCards)
+  const setColumns = useDashboardLayoutStore((s) => s.setColumns)
+  const setCardSize = useDashboardLayoutStore((s) => s.setCardSize)
   const resetLayout = useDashboardLayoutStore((s) => s.reset)
-  const layoutFromStore = useDashboardLayoutStore((s) => s.layouts[dashboardKey])
+  const configFromStore = useDashboardLayoutStore((s) => s.configs[dashboardKey])
 
   useEffect(() => {
     void loadLayout(dashboardKey)
   }, [dashboardKey, loadLayout])
 
   const cardIdsRaw =
-    layoutFromStore && layoutFromStore.length > 0 ? layoutFromStore : DEFAULT_LAYOUT
+    configFromStore && configFromStore.cardIds.length > 0
+      ? configFromStore.cardIds
+      : DEFAULT_LAYOUT
   // Filter out deprecated kinds so saved layouts containing 'garden' don't crash
   const cardIdsAll = cardIdsRaw.filter(
-    (c): c is Exclude<DashboardCardKind, 'garden' | 'energy'> =>
-      c !== 'garden' && c !== 'energy'
+    (c): c is ActiveCard => c !== 'garden' && c !== 'energy'
   )
   // Apply tab-driven filter from the parent (Workspace Header tabs).
   const cardIds = cardFilter
     ? cardIdsAll.filter((c) => cardFilter.has(c))
     : cardIdsAll
 
-  // Garden was deprecated — exclude it everywhere
-  type ActiveCard = Exclude<DashboardCardKind, 'garden' | 'energy'>
+  // Column count + per-card sizes for this dashboard, with defaults when unset.
+  const columns: DashboardColumns =
+    configFromStore?.columns ?? DEFAULT_DASHBOARD_COLUMNS
+  const sizes = configFromStore?.sizes ?? {}
+  function sizeOf(card: ActiveCard): DashboardCardSize {
+    return sizes[card] ?? DEFAULT_CARD_SIZE
+  }
 
   const [editing, setEditing] = useState(false)
   const [dragId, setDragId] = useState<ActiveCard | null>(null)
@@ -143,11 +197,11 @@ export default function Dashboard({
   function moveCard(dragged: ActiveCard, before: ActiveCard | null): void {
     const without = cardIds.filter((c) => c !== dragged)
     if (before === null) {
-      void setLayout(dashboardKey, [...without, dragged])
+      void setCards(dashboardKey, [...without, dragged])
     } else {
       const idx = without.indexOf(before)
       const safeIdx = idx >= 0 ? idx : without.length
-      void setLayout(dashboardKey, [
+      void setCards(dashboardKey, [
         ...without.slice(0, safeIdx),
         dragged,
         ...without.slice(safeIdx)
@@ -157,11 +211,18 @@ export default function Dashboard({
 
   function addCard(card: ActiveCard): void {
     if (cardIds.includes(card)) return
-    void setLayout(dashboardKey, [...cardIds, card])
+    void setCards(dashboardKey, [...cardIds, card])
   }
 
   function removeCard(card: ActiveCard): void {
-    void setLayout(dashboardKey, cardIds.filter((c) => c !== card))
+    void setCards(
+      dashboardKey,
+      cardIds.filter((c) => c !== card)
+    )
+  }
+
+  function cycleSize(card: ActiveCard): void {
+    void setCardSize(dashboardKey, card, nextSize(sizeOf(card)))
   }
 
   const todayLabel = new Date().toLocaleDateString(undefined, {
@@ -170,24 +231,71 @@ export default function Dashboard({
     day: 'numeric'
   })
 
+  // Responsive column count. On narrow widths we fall to a single column so
+  // cards never crush. The stored preference is unchanged; only the applied
+  // template collapses. A card can never span more than the applied count.
+  const [narrow, setNarrow] = useState(false)
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 640px)')
+    const apply = (): void => setNarrow(mq.matches)
+    apply()
+    mq.addEventListener('change', apply)
+    return () => mq.removeEventListener('change', apply)
+  }, [])
+  const appliedColumns: DashboardColumns = narrow ? 1 : columns
+
   return (
     <div className="h-full overflow-auto desk-paper no-tod">
       <div className="max-w-5xl mx-auto px-6 py-6 space-y-4">
         {/* Header — suppressed when the parent view renders its own */}
         {!hideHeader && (
-        <div className="flex items-center gap-3 mb-2">
-          <div className="inline-flex items-center justify-center h-10 w-10 rounded-xl bg-white/80 dark:bg-stone-900/80 border border-stone-200 dark:border-stone-700 shadow-sm shrink-0">
-            <Icon name={icon} size={20} className="text-accent" />
+          <div className="flex items-center gap-3 mb-2">
+            <div className="inline-flex items-center justify-center h-10 w-10 rounded-xl bg-white/80 dark:bg-stone-900/80 border border-stone-200 dark:border-stone-700 shadow-sm shrink-0">
+              <Icon name={icon} size={20} className="text-accent" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h1 className="text-xl font-semibold text-stone-900 dark:text-stone-100 truncate">
+                {title}
+              </h1>
+              <p className="text-[12px] text-stone-500 dark:text-stone-400 truncate">
+                {subtitle ?? todayLabel}
+              </p>
+            </div>
+            <div className="flex items-center gap-1 shrink-0">
+              {editing && (
+                <button
+                  onClick={() => {
+                    if (confirm('Reset this dashboard to the default layout?')) {
+                      void resetLayout(dashboardKey)
+                      setEditing(false)
+                    }
+                  }}
+                  className="btn-ghost"
+                  title="Restore default layout"
+                >
+                  <Icon name="restart_alt" size={14} />
+                  <span>Reset</span>
+                </button>
+              )}
+              <button
+                data-testid="dashboard-customize"
+                onClick={() => setEditing((v) => !v)}
+                className={`btn-ghost ${editing ? '!text-accent' : ''}`}
+                title={editing ? 'Done customizing' : 'Customize this dashboard'}
+              >
+                <Icon name={editing ? 'check' : 'tune'} size={14} />
+                <span>{editing ? 'Done' : 'Customize'}</span>
+              </button>
+            </div>
           </div>
-          <div className="flex-1 min-w-0">
-            <h1 className="text-xl font-semibold text-stone-900 dark:text-stone-100 truncate">
-              {title}
-            </h1>
-            <p className="text-[12px] text-stone-500 dark:text-stone-400 truncate">
-              {subtitle ?? todayLabel}
-            </p>
-          </div>
-          <div className="flex items-center gap-1 shrink-0">
+        )}
+
+        {/* When a parent view renders its own header (hideHeader), the
+            Dashboard still needs its own Customize / Done toggle so the layout,
+            column and size controls remain reachable. This compact row provides
+            it without duplicating the parent's title. */}
+        {hideHeader && (
+          <div className="flex items-center justify-end gap-1">
             {editing && (
               <button
                 onClick={() => {
@@ -204,6 +312,7 @@ export default function Dashboard({
               </button>
             )}
             <button
+              data-testid="dashboard-customize"
               onClick={() => setEditing((v) => !v)}
               className={`btn-ghost ${editing ? '!text-accent' : ''}`}
               title={editing ? 'Done customizing' : 'Customize this dashboard'}
@@ -212,89 +321,138 @@ export default function Dashboard({
               <span>{editing ? 'Done' : 'Customize'}</span>
             </button>
           </div>
-        </div>
         )}
 
-        {/* Cards (in order) */}
-        {cardIds.map((cardId) => {
-          const isDragging = dragId === cardId
-          const isDropTarget = dropBefore === cardId
-          return (
+        {/* Column chooser — visible in edit mode so the layout can be set to
+            one, two or three columns. Persisted per dashboard key. */}
+        {editing && (
+          <div className="flex items-center gap-2 rounded-xl border border-stone-200 dark:border-stone-700 bg-white/60 dark:bg-stone-900/60 px-3 py-2">
+            <span className="text-[11px] uppercase tracking-[0.12em] text-stone-500 dark:text-stone-400 font-semibold">
+              Columns
+            </span>
+            <div className="inline-flex rounded-lg border border-stone-200 dark:border-stone-700 overflow-hidden">
+              {([1, 2, 3] as DashboardColumns[]).map((n) => (
+                <button
+                  key={n}
+                  data-testid={`dashboard-columns-${n}`}
+                  aria-pressed={columns === n}
+                  onClick={() => void setColumns(dashboardKey, n)}
+                  className={`px-3 py-1 text-xs font-medium transition-colors ${
+                    columns === n
+                      ? 'bg-accent text-white'
+                      : 'text-stone-600 dark:text-stone-300 hover:bg-accent/10'
+                  }`}
+                >
+                  {n}
+                </button>
+              ))}
+            </div>
+            <span className="text-[11px] text-stone-400 dark:text-stone-500">
+              Cards flow into this many columns. Narrow windows fall back to one.
+            </span>
+          </div>
+        )}
+
+        {/* Cards laid out in a responsive grid. Each card spans a number of
+            columns derived from its size. Drag-reorder + the drop indicator
+            (top border) are preserved on each grid cell. */}
+        <div
+          data-testid="dashboard-grid"
+          data-columns={appliedColumns}
+          style={{
+            display: 'grid',
+            gridTemplateColumns: `repeat(${appliedColumns}, minmax(0, 1fr))`,
+            gap: '16px',
+            alignItems: 'start'
+          }}
+        >
+          {cardIds.map((cardId) => {
+            const isDragging = dragId === cardId
+            const isDropTarget = dropBefore === cardId
+            const size = sizeOf(cardId)
+            const span = spanFor(size, appliedColumns)
+            return (
+              <div
+                key={cardId}
+                data-testid={`dashboard-card-${cardId}`}
+                data-size={size}
+                data-span={span}
+                style={{
+                  gridColumn: `span ${span} / span ${span}`,
+                  minHeight: SIZE_MIN_HEIGHT[size] || undefined,
+                  opacity: isDragging ? 0.45 : 1,
+                  borderTop:
+                    isDropTarget && editing
+                      ? '3px solid rgb(var(--accent))'
+                      : '3px solid transparent',
+                  transition: 'border-color 80ms'
+                }}
+                onDragOver={
+                  editing
+                    ? (e) => {
+                        if (!dragId || dragId === cardId) return
+                        e.preventDefault()
+                        e.dataTransfer.dropEffect = 'move'
+                        setDropBefore(cardId)
+                      }
+                    : undefined
+                }
+                onDrop={
+                  editing
+                    ? (e) => {
+                        e.preventDefault()
+                        if (dragId && dragId !== cardId) moveCard(dragId, cardId)
+                        setDragId(null)
+                        setDropBefore(null)
+                      }
+                    : undefined
+                }
+              >
+                {editing && (
+                  <CardEditChrome
+                    cardKind={cardId}
+                    size={size}
+                    onRemove={() => removeCard(cardId)}
+                    onCycleSize={() => cycleSize(cardId)}
+                    onDragStart={() => setDragId(cardId)}
+                    onDragEnd={() => {
+                      setDragId(null)
+                      setDropBefore(null)
+                    }}
+                  />
+                )}
+                <CardBody cardKind={cardId} taskIds={taskIds} editing={editing} />
+              </div>
+            )
+          })}
+
+          {/* Drop-at-end zone in edit mode — spans the full row. */}
+          {editing && cardIds.length > 0 && (
             <div
-              key={cardId}
+              onDragOver={(e) => {
+                if (!dragId) return
+                e.preventDefault()
+                e.dataTransfer.dropEffect = 'move'
+                setDropBefore(null)
+              }}
+              onDrop={(e) => {
+                e.preventDefault()
+                if (dragId) moveCard(dragId, null)
+                setDragId(null)
+                setDropBefore(null)
+              }}
               style={{
-                opacity: isDragging ? 0.45 : 1,
+                gridColumn: `span ${appliedColumns} / span ${appliedColumns}`,
+                height: 12,
                 borderTop:
-                  isDropTarget && editing
+                  dropBefore === null && dragId
                     ? '3px solid rgb(var(--accent))'
                     : '3px solid transparent',
                 transition: 'border-color 80ms'
               }}
-              onDragOver={
-                editing
-                  ? (e) => {
-                      if (!dragId || dragId === cardId) return
-                      e.preventDefault()
-                      e.dataTransfer.dropEffect = 'move'
-                      setDropBefore(cardId)
-                    }
-                  : undefined
-              }
-              onDrop={
-                editing
-                  ? (e) => {
-                      e.preventDefault()
-                      if (dragId && dragId !== cardId) moveCard(dragId, cardId)
-                      setDragId(null)
-                      setDropBefore(null)
-                    }
-                  : undefined
-              }
-            >
-              {editing && (
-                <CardEditChrome
-                  cardKind={cardId}
-                  onRemove={() => removeCard(cardId)}
-                  onDragStart={() => setDragId(cardId)}
-                  onDragEnd={() => {
-                    setDragId(null)
-                    setDropBefore(null)
-                  }}
-                />
-              )}
-              <CardBody
-                cardKind={cardId}
-                taskIds={taskIds}
-                editing={editing}
-              />
-            </div>
-          )
-        })}
-
-        {/* Drop-at-end zone in edit mode */}
-        {editing && cardIds.length > 0 && (
-          <div
-            onDragOver={(e) => {
-              if (!dragId) return
-              e.preventDefault()
-              e.dataTransfer.dropEffect = 'move'
-              setDropBefore(null)
-            }}
-            onDrop={(e) => {
-              e.preventDefault()
-              if (dragId) moveCard(dragId, null)
-              setDragId(null)
-              setDropBefore(null)
-            }}
-            style={{
-              height: 12,
-              borderTop: dropBefore === null && dragId
-                ? '3px solid rgb(var(--accent))'
-                : '3px solid transparent',
-              transition: 'border-color 80ms'
-            }}
-          />
-        )}
+            />
+          )}
+        </div>
 
         {/* Add-card palette (edit mode only) */}
         {editing && (
@@ -395,15 +553,20 @@ function CardBody({
   }
 }
 
-// Edit-mode chrome: drag handle + label + remove button. Appears ABOVE each card.
+// Edit-mode chrome: drag handle + label + size cycler + remove button.
+// Appears ABOVE each card.
 function CardEditChrome({
   cardKind,
+  size,
   onRemove,
+  onCycleSize,
   onDragStart,
   onDragEnd
 }: {
   cardKind: Exclude<DashboardCardKind, 'garden' | 'energy'>
+  size: DashboardCardSize
   onRemove: () => void
+  onCycleSize: () => void
   onDragStart: () => void
   onDragEnd: () => void
 }): JSX.Element {
@@ -422,6 +585,18 @@ function CardEditChrome({
       <Icon name="drag_indicator" size={14} />
       <Icon name={meta.icon} size={12} />
       <span className="flex-1">{meta.label}</span>
+      <button
+        data-testid={`dashboard-card-size-${cardKind}`}
+        title={`Card size: ${size}. Click to cycle Small / Medium / Large.`}
+        onClick={(e) => {
+          e.stopPropagation()
+          onCycleSize()
+        }}
+        onMouseDown={(e) => e.stopPropagation()}
+        className="h-5 min-w-[20px] px-1 inline-flex items-center justify-center rounded border border-accent/40 hover:bg-accent/20 text-[10px] font-semibold"
+      >
+        {SIZE_LABEL[size]}
+      </button>
       <button
         onClick={(e) => {
           e.stopPropagation()

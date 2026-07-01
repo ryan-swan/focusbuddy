@@ -14,6 +14,7 @@ import type {
   ContextMenuPayload,
   DashboardCardKind,
   DashboardLayout,
+  DashboardLayoutInput,
   EnergyLevel,
   EnergyLogEntry,
   TimeBlock,
@@ -509,9 +510,9 @@ const api = {
       ipcRenderer.invoke('dashboard:getLayout', key),
     setLayout: (
       key: string,
-      cardIds: DashboardCardKind[]
+      input: DashboardCardKind[] | DashboardLayoutInput
     ): Promise<DashboardLayout> =>
-      ipcRenderer.invoke('dashboard:setLayout', key, cardIds),
+      ipcRenderer.invoke('dashboard:setLayout', key, input),
     resetLayout: (key: string): Promise<boolean> =>
       ipcRenderer.invoke('dashboard:resetLayout', key)
   },
