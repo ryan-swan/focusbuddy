@@ -36,6 +36,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.134',
+    date: '2026-07-02T05:00:00Z',
+    title: 'v2.5.134 — drag docs and sheets onto your desk',
+    tag: 'feature',
+    summary:
+      'When you open a desk, the sidebar now lets you drag office things onto the canvas as well as widgets. Alongside a sticky, note, timer, task, calculator, image, page or file, you can now grab a doc, sheet, slides deck or a drawing and drop it straight onto the desk. This sits in the "Add to desk" strip on the clean Desk menu that arrived in the last update, so a desk gives you the simple menu on the left and everything you can add to it right there.',
+    highlights: [
+      'Drag a doc, sheet, slides or drawing from the sidebar onto a desk, not just widgets.',
+      'The office things spawn the same way they do everywhere else.',
+      'It lives in the "Add to desk" strip on the clean Desk menu.'
+    ]
+  },
+  {
     version: '2.5.133',
     date: '2026-07-02T03:00:00Z',
     title: 'v2.5.133 — the Desk menu is clean now too',
