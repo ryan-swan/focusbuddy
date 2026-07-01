@@ -36,6 +36,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.126',
+    date: '2026-07-01T15:00:00Z',
+    title: 'v2.5.126 — one menu, everywhere',
+    tag: 'feature',
+    summary:
+      'The side menu no longer changes as you move around. Until now, opening PlexiOffice, PlexiPeople or any other area swapped the whole sidebar for that area\'s own smaller menu, so you lost sight of everything else. Now there is a single menu, always on the left, with every area and its apps laid out in labelled sections, and only the main panel changes when you pick something. It is the same clear, consistent navigation whether you are in a document, a plan, a chat or your desk, so nothing is ever more than one click away.',
+    highlights: [
+      'A single persistent side menu shown in every view, instead of a different menu per area.',
+      'Choosing an app just changes the main panel; the menu stays put and highlights where you are.',
+      'The same navigation everywhere, so every app is one click away from anywhere.'
+    ]
+  },
+  {
     version: '2.5.125',
     date: '2026-07-01T13:00:00Z',
     title: 'v2.5.125 — your workspaces never look lost again',
