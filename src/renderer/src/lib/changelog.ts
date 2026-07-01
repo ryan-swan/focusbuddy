@@ -36,6 +36,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.130',
+    date: '2026-07-01T21:30:00Z',
+    title: 'v2.5.130 — a simpler menu, and widgets you can drag',
+    tag: 'feature',
+    summary:
+      'The side menu is simple again. A recent change had turned it into one dense menu that showed every area and every app at once, which was a lot to take in. Now each area shows its own short, focused menu, the way PlexiOffice always did, and the home menu is a clean switcher rather than everything expanded at once. On top of that, when you have a desk open the menu shows a small Widgets strip, so you can drag a sticky, note, timer, task, calculator, image, page or file straight onto the canvas. The widgets only appear while you are on a desk, so they never get in the way anywhere else. Your organisation and templates settings and your configurable dashboards are unchanged.',
+    highlights: [
+      'Each area has its own short, focused menu again, instead of one dense menu showing everything.',
+      'Drag widgets straight from the menu onto the desk, shown only while a desk is open.',
+      'Settings and configurable dashboards are unchanged.'
+    ]
+  },
+  {
     version: '2.5.129',
     date: '2026-07-01T19:30:00Z',
     title: 'v2.5.129 — dashboards you can lay out your way',
