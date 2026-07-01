@@ -14,6 +14,7 @@ import {
   type PageMargins
 } from './editor/headingStyles'
 import Toolbar from './editor/Toolbar'
+import DocMenuBar from './editor/DocMenuBar'
 import DocBubbleMenu from './editor/DocBubbleMenu'
 import FindReplace from './editor/FindReplace'
 import DocSidePanel, { type DocSidePanelTab, type PanelCommentThread } from './editor/DocSidePanel'
@@ -374,6 +375,29 @@ export default function DocEditor({
       <div className="relative flex-1 min-w-0 overflow-auto">
       {!focusMode && (
         <div className="max-w-3xl mx-auto px-8 pt-6">
+          {/* Google-Docs-style menu bar sits above the formatting toolbar. Every
+              item is wired to a real editor command, store action or export. */}
+          <div className="mb-1.5 pb-1.5 border-b border-stone-100 dark:border-stone-800">
+            <DocMenuBar
+              editor={editor}
+              title={title}
+              onInsertImage={() => void insertImage()}
+              onExportDocx={() => void exportDocx()}
+              onExportPdf={() => void exportPdf()}
+              onFind={() => setFindOpen(true)}
+              onFocusMode={() => setFocusMode(true)}
+              pageView={pageView}
+              onSetPageView={setPageView}
+              onOutline={() => {
+                setPanelTab('outline')
+                setPanelOpen(true)
+              }}
+              onComments={() => {
+                setPanelTab('comments')
+                setPanelOpen(true)
+              }}
+            />
+          </div>
           <Toolbar
             editor={editor}
             headingStyles={headingStyles}
