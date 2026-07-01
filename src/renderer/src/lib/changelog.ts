@@ -36,6 +36,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.127',
+    date: '2026-07-01T16:30:00Z',
+    title: 'v2.5.127 — drag apps from the menu onto your desk',
+    tag: 'feature',
+    summary:
+      'You can now drag an app straight out of the side menu and drop it on your desk to place it there. Drag Docs, Sheets or Slides to drop a new document, sheet or deck onto the canvas, Draw for a sketch surface, Mail or Chat to pin a mail or conversation, or Brain Map and Agents to drop those in. It lands exactly where you drop it. Apps that do not have a canvas form yet, like Search or your calendar, stay as normal clicks, and clicking any app still just opens it as before.',
+    highlights: [
+      'Drag an app from the menu onto the desk canvas to place it as a widget.',
+      'Docs, Sheets, Slides, Draw, Mail, Chat, Brain Map and Agents can all be dropped onto a desk.',
+      'It drops where you release it, and a normal click still just opens the app.'
+    ]
+  },
+  {
     version: '2.5.126',
     date: '2026-07-01T15:00:00Z',
     title: 'v2.5.126 — one menu, everywhere',
