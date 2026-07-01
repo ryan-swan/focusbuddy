@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { ConnectedApp, FbNode, NodeKind, WidgetSuggestion } from '@shared/types'
+import type { ConnectedApp, FbNode, NodeKind, WidgetKind, WidgetSuggestion } from '@shared/types'
 import { useNodeStore } from '../stores/nodes'
 import { useCanCreateMore } from '../stores/capabilities'
 import { promptUpgrade } from '../stores/upgradePrompt'
@@ -11,7 +11,7 @@ import { useViewStore, type View } from '../stores/view'
 import { useMessagingStore } from '../stores/messaging'
 import { useMailStore, selectMailUnread } from '../stores/mail'
 import { chimeOut } from '../lib/audioBeep'
-import { catalogFor } from '../lib/widgetCatalog'
+import { catalogFor, DRAG_MIME } from '../lib/widgetCatalog'
 import { chimeIn } from '../lib/audioBeep'
 import { splitFavourites } from '../lib/connectedAppSort'
 import NewNodeDialog from './NewNodeDialog'
@@ -755,13 +755,13 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
             goOffice()
           }}
           items={[
-            { app: 'docs', label: 'Docs', icon: 'description' },
-            { app: 'sheets', label: 'Sheets', icon: 'table_chart' },
-            { app: 'slides', label: 'Slides', icon: 'slideshow' },
-            { app: 'draw', label: 'Draw', icon: 'gesture' },
-            { app: 'mail', label: 'Mail', icon: 'mail' },
+            { app: 'docs', label: 'Docs', icon: 'description', dragKind: 'doc' },
+            { app: 'sheets', label: 'Sheets', icon: 'table_chart', dragKind: 'sheet' },
+            { app: 'slides', label: 'Slides', icon: 'slideshow', dragKind: 'slides' },
+            { app: 'draw', label: 'Draw', icon: 'gesture', dragKind: 'scratchpad' },
+            { app: 'mail', label: 'Mail', icon: 'mail', dragKind: 'email' },
             { app: 'inbox', label: 'Inbox', icon: 'inbox' },
-            { app: 'chat', label: 'Chat', icon: 'forum' },
+            { app: 'chat', label: 'Chat', icon: 'forum', dragKind: 'chat-thread' },
             { app: 'meet', label: 'Meet', icon: 'video_call' },
             { app: 'sign', label: 'Sign', icon: 'draw' }
           ]}
@@ -809,9 +809,9 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
           items={[
             { app: 'ask', label: 'Ask Brain', icon: 'neurology' },
             { app: 'search', label: 'Search', icon: 'search' },
-            { app: 'map', label: 'Brain Map', icon: 'bubble_chart' },
+            { app: 'map', label: 'Brain Map', icon: 'bubble_chart', dragKind: 'mindmap' },
             { app: 'flows', label: 'Flows', icon: 'bolt' },
-            { app: 'agents', label: 'Agents', icon: 'smart_toy' },
+            { app: 'agents', label: 'Agents', icon: 'smart_toy', dragKind: 'agent' },
             { app: 'connect', label: 'Connect', icon: 'hub' },
             { app: 'api', label: 'APIs', icon: 'api' },
             { app: 'insights', label: 'Insights', icon: 'insights' }
@@ -1631,6 +1631,13 @@ interface SegmentItem {
   app: string
   label: string
   icon: string
+  // When set, this app row is also draggable onto a desk canvas and drops a
+  // real widget of this kind at the drop point. Only apps that map to a
+  // genuine, functional canvas widget carry this; the rest stay click-only
+  // navigation. We reuse the widget palette's DRAG_MIME so the Canvas drop
+  // handler routes it through the same spawn path as the palette (including
+  // the office-document chooser for doc/sheet/slides).
+  dragKind?: WidgetKind
 }
 
 interface SegmentSectionProps {
@@ -1698,6 +1705,7 @@ function SegmentSection({
               label={it.label}
               active={segmentActive && activeApp === it.app}
               testid={`sidenav-${headerTestid.replace('nav-plexi', '')}-${it.app}`}
+              dragKind={it.dragKind}
               onClick={() => onItem(it.app)}
             />
           ))}
@@ -1707,24 +1715,42 @@ function SegmentSection({
   )
 }
 
-// An indented app row inside a segment section.
+// An indented app row inside a segment section. When dragKind is set the row
+// is also draggable onto a desk canvas and drops a real widget of that kind at
+// the drop point, reusing the widget palette's DRAG_MIME so the Canvas handler
+// runs the same spawn path (office-document chooser included). Native HTML drag
+// and click are distinct events, so making the row draggable does not disturb
+// the existing click-to-navigate behaviour.
 function SegmentSubItem({
   icon,
   label,
   active,
   testid,
+  dragKind,
   onClick
 }: {
   icon: string
   label: string
   active: boolean
   testid: string
+  dragKind?: WidgetKind
   onClick: () => void
 }): JSX.Element {
+  const draggable = dragKind != null
   return (
     <button
       onClick={onClick}
       data-testid={testid}
+      draggable={draggable}
+      onDragStart={
+        draggable
+          ? (e) => {
+              e.dataTransfer.setData(DRAG_MIME, dragKind as string)
+              e.dataTransfer.effectAllowed = 'copy'
+            }
+          : undefined
+      }
+      title={draggable ? `Open ${label}, or drag onto a desk to add it there` : undefined}
       className={`relative w-full flex items-center gap-2 pl-3 pr-2.5 py-1 text-left transition-colors ${
         active
           ? 'bg-stone-100/80 dark:bg-stone-800/60 text-stone-900 dark:text-stone-100'
