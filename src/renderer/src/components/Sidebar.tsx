@@ -626,6 +626,7 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
           <NavRow
             icon="dashboard"
             label="Home"
+            tint="bg-indigo-500"
             active={viewIsActive({ kind: 'home' })}
             onClick={() => {
               setActive(null)
@@ -635,6 +636,7 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
           <NavRow
             icon="account_tree"
             label="Plans"
+            tint="bg-violet-500"
             active={viewIsActive({ kind: 'projects' })}
             onClick={() => {
               setActive(null)
@@ -644,6 +646,7 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
           <NavRow
             icon="checklist"
             label="Tasks"
+            tint="bg-emerald-500"
             active={viewIsActive({ kind: 'all-tasks' })}
             onClick={() => {
               setActive(null)
@@ -653,6 +656,7 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
           <NavRow
             icon="calendar_month"
             label="Calendar"
+            tint="bg-amber-500"
             active={viewIsActive({ kind: 'calendar' })}
             onClick={() => {
               setActive(null)
@@ -662,6 +666,7 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
           <NavRow
             icon="folder"
             label="Files"
+            tint="bg-orange-500"
             active={viewIsActive({ kind: 'files' })}
             onClick={() => {
               setActive(null)
@@ -671,6 +676,7 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
           <NavRow
             icon="lock"
             label="Vault"
+            tint="bg-rose-500"
             active={viewIsActive({ kind: 'vault' })}
             onClick={() => {
               setActive(null)
@@ -1355,15 +1361,16 @@ function SectionHeader({ label, open, onToggle, action }: SectionHeaderProps): J
 interface NavRowProps {
   icon: string
   label: string
+  tint: string
   active: boolean
   onClick: () => void
   badge?: string
   testid?: string
 }
 
-function NavRow({ icon, label, active, onClick, badge, testid }: NavRowProps): JSX.Element {
-  // Identical row styling to the PlexiOffice menu: a rounded pill that fills with
-  // a soft accent tint when active, the icon inheriting the row's text colour.
+function NavRow({ icon, label, tint, active, onClick, badge, testid }: NavRowProps): JSX.Element {
+  // Same row as the PlexiOffice menu's app rows: a coloured rounded square with a
+  // white icon, then the label, and a soft accent fill when the row is active.
   return (
     <button
       onClick={onClick}
@@ -1374,7 +1381,9 @@ function NavRow({ icon, label, active, onClick, badge, testid }: NavRowProps): J
           : 'text-[var(--ink-80)] hover:bg-[var(--surface-sunken)]'
       }`}
     >
-      <Icon name={icon} size={17} filled={active} className="shrink-0" />
+      <span className={`inline-flex items-center justify-center w-6 h-6 rounded-md text-white shrink-0 ${tint}`}>
+        <Icon name={icon} size={14} />
+      </span>
       <span className="flex-1 min-w-0 break-words leading-tight">{label}</span>
       {badge && (
         <span className="ml-auto text-[10px] fb-tabular text-[var(--ink-50)]">{badge}</span>

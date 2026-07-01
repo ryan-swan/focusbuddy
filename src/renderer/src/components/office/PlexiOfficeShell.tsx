@@ -706,13 +706,13 @@ function OfficeSidebar({
   onExit: () => void
   starredCount: number
 }): JSX.Element {
-  const NAV: { id: OfficePage; label: string; icon: string }[] = [
-    { id: 'home', label: 'Home', icon: 'home' },
-    { id: 'recent', label: 'Recent', icon: 'schedule' },
-    { id: 'starred', label: 'Starred', icon: 'star' },
-    { id: 'shared', label: 'Shared with me', icon: 'group' },
-    { id: 'templates', label: 'Templates', icon: 'dashboard' },
-    { id: 'trash', label: 'Trash', icon: 'delete' }
+  const NAV: { id: OfficePage; label: string; icon: string; tint: string }[] = [
+    { id: 'home', label: 'Home', icon: 'home', tint: 'bg-indigo-500' },
+    { id: 'recent', label: 'Recent', icon: 'schedule', tint: 'bg-rose-500' },
+    { id: 'starred', label: 'Starred', icon: 'star', tint: 'bg-amber-500' },
+    { id: 'shared', label: 'Shared with me', icon: 'group', tint: 'bg-teal-500' },
+    { id: 'templates', label: 'Templates', icon: 'dashboard', tint: 'bg-sky-500' },
+    { id: 'trash', label: 'Trash', icon: 'delete', tint: 'bg-slate-500' }
   ]
   return (
     <aside className="w-60 shrink-0 h-full overflow-auto border-r border-[var(--edge-soft)] bg-[var(--surface-raised)] flex flex-col" data-testid="office-sidebar">
@@ -736,7 +736,9 @@ function OfficeSidebar({
               page === n.id ? 'bg-[rgb(var(--accent)/0.12)] text-[rgb(var(--accent))] font-medium' : 'text-[var(--ink-80)] hover:bg-[var(--surface-sunken)]'
             }`}
           >
-            <Icon name={n.icon} size={17} />
+            <span className={`inline-flex items-center justify-center w-6 h-6 rounded-md text-white shrink-0 ${n.tint}`}>
+              <Icon name={n.icon} size={14} />
+            </span>
             <span>{n.label}</span>
             {n.id === 'starred' && starredCount > 0 && <span className="ml-auto text-[10px] text-[var(--ink-50)] fb-tabular">{starredCount}</span>}
           </button>

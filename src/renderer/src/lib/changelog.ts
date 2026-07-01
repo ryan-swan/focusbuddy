@@ -36,6 +36,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.137',
+    date: '2026-07-02T09:00:00Z',
+    title: 'v2.5.137 — colourful menus everywhere',
+    tag: 'design',
+    summary:
+      'Every menu now uses the same colourful style as the PlexiOffice app list, where each item is a rounded coloured square with a white icon. This is now consistent across all four areas. The Desk menu, the People menu and the Brain menu all match PlexiOffice, so Home, Plans, Tasks, Calendar and the rest each get their own colour, and the whole app reads as one place. Home is the same indigo everywhere so you always know where you are.',
+    highlights: [
+      'Colourful rounded-square icons on every menu item, matching the PlexiOffice app list.',
+      'Consistent across all four areas: Desk, Office, People and Brain.',
+      'Each place has its own colour, with Home the same indigo everywhere.'
+    ]
+  },
+  {
     version: '2.5.136',
     date: '2026-07-02T07:00:00Z',
     title: 'v2.5.136 — the Desk menu now matches PlexiOffice',
