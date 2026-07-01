@@ -1,24 +1,25 @@
 /**
- * E2E for the redesigned left-sidebar segment navigation. The single collapsed
- * "Segments" section is now four labelled, collapsible sections, one per segment
- * (PlexiDesk, PlexiOffice, PlexiPeople, PlexiBrain). Each header carries the
- * legacy nav-* testid and opens that segment; under it every app is an indented
- * sub-item that deep-links into the segment with that app preselected.
+ * E2E for the left-sidebar segment navigation. The single global sidebar is now
+ * the one persistent menu, shown in every view including inside segments. It has
+ * four labelled, collapsible sections, one per segment (PlexiDesk, PlexiOffice,
+ * PlexiPeople, PlexiBrain). Each header carries the legacy nav-* testid and opens
+ * that segment's home in the centre panel; under it every app is an indented
+ * sub-item that deep-links into the segment with that app preselected — and the
+ * sidebar itself never disappears.
  *
- * This spec asserts the four headers render, a section's app rows are present
- * when expanded and hidden when collapsed, and that representative sub-items
- * deep-link to the right view (Plans, office Docs flow, Brain Search).
+ * This spec asserts the four headers render, a section's app rows are present when
+ * expanded and hidden when collapsed, and that representative sub-items deep-link
+ * to the right centre-panel content (Plans, office Docs, Brain Search, People map)
+ * while the sidebar stays visible.
  */
 
 import { test, expect, type Page } from '@playwright/test'
 import { launchApp, type LaunchedApp, waitForReady } from './_helpers'
 
-// Return to the global sidebar from inside any segment takeover.
-async function exitSegment(window: Page): Promise<void> {
-  const segExit = window.locator('[data-testid="segment-exit"]')
-  if (await segExit.isVisible().catch(() => false)) await segExit.click()
-  const officeExit = window.locator('[data-testid="office-exit"]')
-  if (await officeExit.isVisible().catch(() => false)) await officeExit.click()
+// The persistent sidebar's own PLEXIDESK wordmark heading — a stable anchor to
+// assert the menu is still present after any navigation.
+function sidebar(window: Page) {
+  return window.getByRole('heading', { name: /^plexidesk$/i, level: 2 }).first()
 }
 
 test.describe('sidebar segment navigation', () => {
@@ -35,14 +36,12 @@ test.describe('sidebar segment navigation', () => {
   })
 
   test('the four segment section headers render with their legacy testids', async () => {
-    await exitSegment(window)
     for (const id of ['nav-plexidesk', 'nav-plexioffice', 'nav-plexipeople', 'nav-plexibrain']) {
       await expect(window.locator(`[data-testid="${id}"]`)).toBeVisible({ timeout: 8_000 })
     }
   })
 
   test('an expanded section shows its app rows; collapsing hides them', async () => {
-    await exitSegment(window)
     // PlexiDesk defaults open, so its app rows are present inline.
     await expect(window.locator('[data-testid="sidenav-desk-plans"]')).toBeVisible()
     await expect(window.locator('[data-testid="sidenav-desk-tasks"]')).toBeVisible()
@@ -56,37 +55,37 @@ test.describe('sidebar segment navigation', () => {
     await expect(window.locator('[data-testid="sidenav-desk-plans"]')).toBeVisible()
   })
 
-  test('clicking a segment header opens that segment (legacy behaviour preserved)', async () => {
-    await exitSegment(window)
+  test('clicking a segment header opens that segment home in the centre panel', async () => {
     await window.locator('[data-testid="nav-plexidesk"]').click()
-    await expect(window.locator('[data-testid="segment-sidebar"]')).toBeVisible({ timeout: 8_000 })
+    // The segment content renders in the centre panel; the sidebar stays put.
+    await expect(window.locator('[data-testid="segment-plexidesk"]')).toBeVisible({ timeout: 8_000 })
+    await expect(sidebar(window)).toBeVisible()
   })
 
-  test('sidenav-desk-plans deep-links into the Plans view', async () => {
-    await exitSegment(window)
+  test('sidenav-desk-plans deep-links into the Plans view with the sidebar still visible', async () => {
     await window.locator('[data-testid="sidenav-desk-plans"]').click()
     await expect(window.locator('[data-testid="plexiprojects-view"]')).toBeVisible({ timeout: 8_000 })
     await expect(window.getByRole('heading', { name: 'Plans' })).toBeVisible()
+    await expect(sidebar(window)).toBeVisible()
   })
 
-  test('sidenav-office-docs opens the PlexiOffice docs flow', async () => {
-    await exitSegment(window)
+  test('sidenav-office-docs opens the PlexiOffice docs area with the sidebar still visible', async () => {
     await window.locator('[data-testid="sidenav-office-docs"]').click()
-    // The office shell opens with its own sidebar and the Docs app present.
-    await expect(window.locator('[data-testid="office-sidebar"]')).toBeVisible({ timeout: 8_000 })
-    await expect(window.locator('[data-testid="office-app-docs"]')).toBeVisible()
+    // Office content renders in the centre panel; the docs app tile is present and
+    // the persistent sidebar stays.
+    await expect(window.locator('[data-testid="office-app-docs"]')).toBeVisible({ timeout: 8_000 })
+    await expect(sidebar(window)).toBeVisible()
   })
 
-  test('sidenav-brain-search opens the Brain search view', async () => {
-    await exitSegment(window)
+  test('sidenav-brain-search opens the Brain search view with the sidebar still visible', async () => {
     await window.locator('[data-testid="sidenav-brain-search"]').click()
     await expect(window.locator('[data-testid="plexisearch-view"]')).toBeVisible({ timeout: 8_000 })
+    await expect(sidebar(window)).toBeVisible()
   })
 
-  test('sidenav-people-map deep-links into the PlexiPeople organisation map', async () => {
-    await exitSegment(window)
+  test('sidenav-people-map deep-links into the PlexiPeople organisation map with the sidebar still visible', async () => {
     await window.locator('[data-testid="sidenav-people-map"]').click()
-    // PlexiPeople is a SegmentShell; opening its map app keeps the segment sidebar.
-    await expect(window.locator('[data-testid="segment-sidebar"]')).toBeVisible({ timeout: 8_000 })
+    await expect(window.locator('[data-testid="segment-plexipeople"]')).toBeVisible({ timeout: 8_000 })
+    await expect(sidebar(window)).toBeVisible()
   })
 })

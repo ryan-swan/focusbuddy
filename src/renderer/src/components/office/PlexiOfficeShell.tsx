@@ -15,11 +15,11 @@ import PlexiSignView from '../views/PlexiSignView'
 import Icon from '../Icon'
 import type { DocType, DocumentMeta, TimeBlock } from '@shared/types'
 
-// PlexiOffice — the office segment of the system. Its own full-bleed shell with a
-// dedicated sidemenu: the place to create Docs, Sheets, Slides, Drawings and
-// Designs, and to send documents for signature (PlexiSign) with an audit trail.
-// Document-type apps open inline so the office sidebar stays put; Sign and Forms
-// route to their own modules.
+// PlexiOffice — the office segment of the system. The global sidebar is the one
+// persistent menu, so this renders the office CONTENT only into the centre panel:
+// the place to create Docs, Sheets, Slides, Drawings and Designs, to open the
+// communication surfaces (Mail, Inbox, Chat, Meet, Sign), and to browse recent
+// files. Deep-links from the sidebar arrive via `initialApp`.
 
 type OfficePage = 'home' | 'recent' | 'starred' | 'shared' | 'templates' | 'trash'
 
@@ -60,6 +60,17 @@ const COMMS_APPS: CommsApp[] = [
   { key: 'chat', label: 'Chat', blurb: 'Channels and direct messages', icon: 'forum', tint: 'bg-sky-500', render: () => <MessagesView /> },
   { key: 'meet', label: 'Meet', blurb: 'Video calls and meetings', icon: 'video_call', tint: 'bg-violet-500', render: () => <PlexiMeetView /> },
   { key: 'sign', label: 'Sign', blurb: 'Send and sign documents', icon: 'draw', tint: 'bg-teal-500', render: () => <PlexiSignView /> }
+]
+
+// The office pages, shown as a slim tab strip in the office content (they used to
+// live in the office side menu).
+const OFFICE_PAGES: { id: OfficePage; label: string; icon: string }[] = [
+  { id: 'home', label: 'Home', icon: 'home' },
+  { id: 'recent', label: 'Recent', icon: 'schedule' },
+  { id: 'starred', label: 'Starred', icon: 'star' },
+  { id: 'shared', label: 'Shared with me', icon: 'group' },
+  { id: 'templates', label: 'Templates', icon: 'dashboard' },
+  { id: 'trash', label: 'Trash', icon: 'delete' }
 ]
 
 const TYPE_ICON: Record<string, { icon: string; tint: string }> = {
@@ -115,7 +126,7 @@ export default function PlexiOfficeShell({ initialApp }: { initialApp?: string }
   const refresh = useDocumentsStore((s) => s.refresh)
   const createBlank = useDocumentsStore((s) => s.createBlank)
   const remove = useDocumentsStore((s) => s.remove)
-  const goHome = useViewStore((s) => s.goHome)
+  const goOffice = useViewStore((s) => s.goOffice)
   const account = useAccountStore((s) => s.account)
 
   // Real unread sources. Mail unread is derived from the loaded IMAP envelope
@@ -143,9 +154,17 @@ export default function PlexiOfficeShell({ initialApp }: { initialApp?: string }
     initialApp && COMMS_APPS.some((a) => a.key === initialApp) ? initialApp : null
   )
   useEffect(() => {
+    // A comms deep-link opens that surface; any other office navigation (a
+    // document-type app, or the office home) returns the centre panel to the
+    // office home, closing any open document or comms surface. This keeps the
+    // sidebar deep-links authoritative now that the office has no side menu.
     if (initialApp && COMMS_APPS.some((a) => a.key === initialApp)) {
       setActiveComms(initialApp)
       setOpenDocId(null)
+    } else {
+      setActiveComms(null)
+      setOpenDocId(null)
+      setPage('home')
     }
   }, [initialApp])
   const [tab, setTab] = useState<'all' | DocType>('all')
@@ -264,35 +283,51 @@ export default function PlexiOfficeShell({ initialApp }: { initialApp?: string }
     }
   }
 
-  // An open document takes over the content area; the office sidebar stays.
+  // Return to the PlexiOffice home content (from an open document or a comms
+  // surface). The persistent global sidebar is always present; this just resets
+  // the office centre panel back to its home.
+  function backToOfficeHome(): void {
+    setOpenDocId(null)
+    setActiveComms(null)
+    setPage('home')
+    goOffice()
+  }
+
+  // An open document takes over the office centre panel; the global sidebar stays.
   if (openDocId) {
     return (
-      <div className="h-full flex bg-[var(--surface-base)]">
-        <OfficeSidebar page={page} onPage={(p) => { setOpenDocId(null); setActiveComms(null); setPage(p) }} onLaunch={(a) => void launch(a)} onComms={openComms} activeComms={null} onExit={goHome} starredCount={starred.size} />
-        <div className="flex-1 min-w-0">
-          <DocumentEditorView documentId={openDocId} onBack={() => { setOpenDocId(null); void refresh() }} />
-        </div>
+      <div className="h-full bg-[var(--surface-base)]">
+        <DocumentEditorView documentId={openDocId} onBack={() => { setOpenDocId(null); void refresh() }} />
       </div>
     )
   }
 
-  // A communication app (Mail / Inbox / Chat / Meet / Sign) takes over the
-  // content area inline; the office side menu stays put.
+  // A communication app (Mail / Inbox / Chat / Meet / Sign) takes over the office
+  // centre panel inline; the global sidebar stays put. A slim header offers a way
+  // back to the office home.
   const comms = activeComms ? COMMS_APPS.find((a) => a.key === activeComms) ?? null : null
   if (comms) {
     return (
-      <div className="h-full flex bg-[var(--surface-base)]">
-        <OfficeSidebar page={page} onPage={(p) => { setActiveComms(null); setPage(p) }} onLaunch={(a) => void launch(a)} onComms={openComms} activeComms={activeComms} onExit={goHome} starredCount={starred.size} />
+      <div className="h-full flex flex-col bg-[var(--surface-base)]">
+        <div className="flex items-center gap-2 px-4 h-11 shrink-0 border-b border-[var(--edge-soft)]">
+          <button
+            onClick={backToOfficeHome}
+            title="Back to PlexiOffice"
+            className="inline-flex items-center gap-1.5 text-[12.5px] text-[var(--ink-70)] hover:text-[var(--ink-100)]"
+          >
+            <Icon name="arrow_back" size={16} />
+            <span>PlexiOffice</span>
+          </button>
+          <span className="text-[13px] font-medium text-[var(--ink-90)]">{comms.label}</span>
+        </div>
         <div className="flex-1 min-w-0 overflow-auto" data-testid={`office-comms-${comms.key}`}>{comms.render()}</div>
       </div>
     )
   }
 
   return (
-    <div className="h-full flex bg-[var(--surface-base)] text-[var(--ink-100)]">
-      <OfficeSidebar page={page} onPage={setPage} onLaunch={(a) => void launch(a)} onComms={openComms} activeComms={null} onExit={goHome} starredCount={starred.size} />
-
-      <div className="flex-1 min-w-0 overflow-auto">
+    <div className="h-full bg-[var(--surface-base)] text-[var(--ink-100)]">
+      <div className="h-full min-w-0 overflow-auto">
         <div className="max-w-[1400px] mx-auto px-6 py-6">
           {/* Header */}
           <div className="flex items-start gap-4 mb-5">
@@ -309,6 +344,51 @@ export default function PlexiOfficeShell({ initialApp }: { initialApp?: string }
                 <Icon name="add" size={16} /> Create
               </button>
             </div>
+          </div>
+
+          {/* Office pages — Home / Recent / Starred / Shared / Templates / Trash.
+              These used to live in the office side menu; now that the global
+              sidebar is the one persistent menu, they are a slim tab strip inside
+              the office content. */}
+          <div className="flex flex-wrap gap-1 mb-4" role="tablist" aria-label="PlexiOffice pages">
+            {OFFICE_PAGES.map((n) => (
+              <button
+                key={n.id}
+                onClick={() => setPage(n.id)}
+                data-testid={`office-nav-${n.id}`}
+                role="tab"
+                aria-selected={page === n.id}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12.5px] ${
+                  page === n.id
+                    ? 'bg-[rgb(var(--accent)/0.12)] text-[rgb(var(--accent))] font-medium'
+                    : 'text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]'
+                }`}
+              >
+                <Icon name={n.icon} size={15} />
+                <span>{n.label}</span>
+                {n.id === 'starred' && starred.size > 0 && (
+                  <span className="text-[10px] text-[var(--ink-50)] fb-tabular">{starred.size}</span>
+                )}
+              </button>
+            ))}
+          </div>
+
+          {/* Communicate — Mail / Inbox / Chat / Meet / Sign open inline in the
+              office centre panel. Reachable here and from the global sidebar. */}
+          <div className="flex flex-wrap gap-1.5 mb-6">
+            {COMMS_APPS.map((a) => (
+              <button
+                key={a.key}
+                onClick={() => openComms(a.key)}
+                data-testid={`office-comms-app-${a.key}`}
+                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-[12.5px] text-[var(--ink-80)] border border-[var(--edge-soft)] bg-[var(--surface-raised)] hover:border-[rgb(var(--accent)/0.5)] transition"
+              >
+                <span className={`inline-flex items-center justify-center w-5 h-5 rounded-md text-white ${a.tint}`}>
+                  <Icon name={a.icon} size={12} />
+                </span>
+                <span>{a.label}</span>
+              </button>
+            ))}
           </div>
 
           {/* App tiles — the document apps plus Meet, which opens the real
@@ -684,117 +764,5 @@ function UnreadRow({ icon, label, count, onClick }: { icon: string; label: strin
         </span>
       )}
     </button>
-  )
-}
-
-// ── The PlexiOffice-specific sidebar ─────────────────────────────────────────
-function OfficeSidebar({
-  page,
-  onPage,
-  onLaunch,
-  onComms,
-  activeComms,
-  onExit,
-  starredCount
-}: {
-  page: OfficePage
-  onPage: (p: OfficePage) => void
-  onLaunch: (a: OfficeApp) => void
-  onComms: (key: string) => void
-  activeComms: string | null
-  onExit: () => void
-  starredCount: number
-}): JSX.Element {
-  const NAV: { id: OfficePage; label: string; icon: string }[] = [
-    { id: 'home', label: 'Home', icon: 'home' },
-    { id: 'recent', label: 'Recent', icon: 'schedule' },
-    { id: 'starred', label: 'Starred', icon: 'star' },
-    { id: 'shared', label: 'Shared with me', icon: 'group' },
-    { id: 'templates', label: 'Templates', icon: 'dashboard' },
-    { id: 'trash', label: 'Trash', icon: 'delete' }
-  ]
-  return (
-    <aside className="w-60 shrink-0 h-full overflow-auto border-r border-[var(--edge-soft)] bg-[var(--surface-raised)] flex flex-col" data-testid="office-sidebar">
-      {/* Logo + app switcher */}
-      <div className="flex items-center gap-2 px-4 h-14 border-b border-[var(--edge-soft)]">
-        <span className="text-[15px] font-bold tracking-[0.14em] text-[var(--ink-100)]">PLEXIOFFICE</span>
-        <button onClick={onExit} className="ml-auto text-[var(--ink-50)] hover:text-[var(--ink-90)]" title="Back to PlexiDesk" data-testid="office-exit">
-          <Icon name="apps" size={18} />
-        </button>
-      </div>
-
-      <nav className="px-2 py-3">
-        {NAV.map((n) => (
-          <button
-            key={n.id}
-            onClick={() => onPage(n.id)}
-            data-testid={`office-nav-${n.id}`}
-            className={`flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-[13px] mb-0.5 ${
-              page === n.id ? 'bg-[rgb(var(--accent)/0.12)] text-[rgb(var(--accent))] font-medium' : 'text-[var(--ink-80)] hover:bg-[var(--surface-sunken)]'
-            }`}
-          >
-            <Icon name={n.icon} size={17} />
-            <span>{n.label}</span>
-            {n.id === 'starred' && starredCount > 0 && <span className="ml-auto text-[10px] text-[var(--ink-50)] fb-tabular">{starredCount}</span>}
-          </button>
-        ))}
-      </nav>
-
-      <div className="px-4 pt-1 pb-1.5 text-[10px] uppercase tracking-[0.12em] text-[var(--ink-40)] font-semibold">Apps</div>
-      <div className="px-2">
-        {APPS.map((a) => (
-          <button
-            key={a.key}
-            onClick={() => onLaunch(a)}
-            data-testid={`office-sideapp-${a.key}`}
-            className="flex items-center gap-2.5 w-full px-3 py-1.5 rounded-lg text-[13px] mb-0.5 text-[var(--ink-80)] hover:bg-[var(--surface-sunken)]"
-          >
-            <span className={`inline-flex items-center justify-center w-6 h-6 rounded-md text-white ${a.tint}`}>
-              <Icon name={a.icon} size={14} />
-            </span>
-            <span>{a.label}</span>
-          </button>
-        ))}
-      </div>
-
-      <div className="px-4 pt-3 pb-1.5 text-[10px] uppercase tracking-[0.12em] text-[var(--ink-40)] font-semibold">Communicate</div>
-      <div className="px-2">
-        {COMMS_APPS.map((a) => (
-          <button
-            key={a.key}
-            onClick={() => onComms(a.key)}
-            data-testid={`office-comms-app-${a.key}`}
-            className={`flex items-center gap-2.5 w-full px-3 py-1.5 rounded-lg text-[13px] mb-0.5 ${
-              activeComms === a.key ? 'bg-[rgb(var(--accent)/0.12)] text-[rgb(var(--accent))] font-medium' : 'text-[var(--ink-80)] hover:bg-[var(--surface-sunken)]'
-            }`}
-          >
-            <span className={`inline-flex items-center justify-center w-6 h-6 rounded-md text-white ${a.tint}`}>
-              <Icon name={a.icon} size={14} />
-            </span>
-            <span>{a.label}</span>
-          </button>
-        ))}
-      </div>
-
-      <div className="px-4 pt-3 pb-1.5 text-[10px] uppercase tracking-[0.12em] text-[var(--ink-40)] font-semibold">Workspaces</div>
-      <div className="px-2 pb-3">
-        <button className="flex items-center gap-2.5 w-full px-3 py-1.5 rounded-lg text-[13px] text-[var(--ink-60)] hover:bg-[var(--surface-sunken)]">
-          <Icon name="add" size={16} />
-          <span>New Workspace</span>
-        </button>
-      </div>
-
-      <div className="mt-auto p-3">
-        <div className="rounded-xl border border-[rgb(var(--accent)/0.3)] bg-[rgb(var(--accent)/0.06)] p-3">
-          <div className="flex items-center gap-1.5 mb-1.5">
-            <Icon name="auto_awesome" size={14} className="text-[rgb(var(--accent))]" />
-            <span className="text-[12px] font-semibold">PlexiOffice Pro</span>
-          </div>
-          <button onClick={() => promptUpgrade('PlexiOffice Pro')} className="w-full h-7 rounded-lg bg-[rgb(var(--accent))] text-white text-[11.5px] font-medium">
-            Upgrade Now
-          </button>
-        </div>
-      </div>
-    </aside>
   )
 }

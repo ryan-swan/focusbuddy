@@ -38,7 +38,7 @@ async function stubSlideAi(app: LaunchedApp['app'], html: string): Promise<void>
 /** Open PlexiOffice and launch a fresh presentation; wait for the panel. */
 async function openSlides(window: Page): Promise<void> {
   await window.getByRole('button', { name: 'PlexiOffice' }).first().click()
-  await expect(window.locator('[data-testid="office-sidebar"]')).toBeVisible({ timeout: 8_000 })
+  await expect(window.locator('[data-testid="office-app-slides"]')).toBeVisible({ timeout: 8_000 })
   await window.locator('[data-testid="office-app-slides"]').click()
   await expect(window.locator('[data-testid="slides-toolbar"]')).toBeVisible({ timeout: 12_000 })
   await expect(window.locator('[data-testid="slides-side-panel"]')).toBeVisible({ timeout: 8_000 })

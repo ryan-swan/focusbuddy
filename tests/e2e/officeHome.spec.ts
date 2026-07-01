@@ -11,7 +11,7 @@ import { launchApp, type LaunchedApp, waitForReady } from './_helpers'
 
 async function openOffice(window: Page): Promise<void> {
   await window.getByRole('button', { name: 'PlexiOffice' }).first().click()
-  await expect(window.locator('[data-testid="office-sidebar"]')).toBeVisible({ timeout: 8_000 })
+  await expect(window.locator('[data-testid="office-app-docs"]')).toBeVisible({ timeout: 8_000 })
 }
 
 // Create a real document straight through the IPC API, the same path the office
@@ -50,9 +50,9 @@ test.describe('PlexiOffice Home', () => {
     const docId = await createDoc(window, 'doc', 'Home recent doc')
     const sheetId = await createDoc(window, 'sheet', 'Home recent sheet')
 
-    // Re-enter the office so the home refresh picks up the new documents.
-    const exit = window.locator('[data-testid="office-exit"]')
-    if (await exit.isVisible().catch(() => false)) await exit.click()
+    // Re-enter the office (via Home then PlexiOffice) so the home refresh picks up
+    // the new documents. The persistent sidebar stays throughout.
+    await window.locator('[data-testid="sidenav-desk-home"]').click()
     await openOffice(window)
     await window.locator('[data-testid="office-nav-home"]').click()
 
@@ -85,9 +85,10 @@ test.describe('PlexiOffice Home', () => {
       await expect(window.locator(`[data-testid="office-qa-${id}"]`)).toBeVisible()
     }
     await window.locator('[data-testid="office-qa-doc"]').click()
-    // The new document opens inline; the back control returns to the office.
-    await expect(window.locator('button[title="Back to PlexiOffice"]')).toBeVisible({ timeout: 8_000 })
-    await window.locator('button[title="Back to PlexiOffice"]').click()
+    // The new document opens inline in the centre panel; the persistent sidebar
+    // remains, so navigate back to the office home through its deep-link row.
+    await expect(window.locator('[data-testid="doc-editor-surface"]')).toBeVisible({ timeout: 10_000 })
+    await window.locator('[data-testid="sidenav-office-docs"]').click()
     await window.locator('[data-testid="office-nav-home"]').click()
     await expect(window.locator('[data-testid="office-app-meet"]')).toBeVisible({ timeout: 8_000 })
   })

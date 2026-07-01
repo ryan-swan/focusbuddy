@@ -144,46 +144,42 @@ export async function waitForReady(
   }
 }
 
-// Where each former top-level product now lives under the three-segment IA.
-//   - `seg` products live inside a SegmentShell (PlexiDesk / PlexiBrain): open
-//     the segment via its nav testid, then click `segment-app-<app>`.
-//   - `comms` products live inside the PlexiOffice shell's Communicate menu:
-//     open PlexiOffice, then click `office-comms-app-<app>`.
-//   - `direct` products no longer have a segment home (Build / Form); navigate
+// Where each former top-level product now lives under the segmented IA. The
+// global sidebar is the single persistent menu, so every segmented product is now
+// reachable through its `sidenav-<segment>-<app>` deep-link row. A section header
+// (nav-plexidesk / nav-plexioffice / nav-plexibrain / nav-plexipeople) can be
+// collapsed, so we expand it first via its header before clicking the row.
+//   - `nav` products click their `sidenav-*` row, which navigates the centre
+//     panel while the sidebar stays put. The product's own view (and its testids)
+//     renders unchanged.
+//   - `direct` products have no sidenav row (Build / Form / Reports); navigate
 //     straight to their view through the view store so their spec coverage
 //     survives. The view renders in the global MainPane, testids unchanged.
 type ProductRoute =
-  | { mode: 'seg'; nav: string; app: string }
-  | { mode: 'comms'; app: string }
+  | { mode: 'nav'; header: string; sidenav: string }
   | { mode: 'direct'; go: string }
 
 const SEGMENT_OF: Record<string, ProductRoute> = {
-  projects: { mode: 'seg', nav: 'nav-plexidesk', app: 'plans' },
-  tasks: { mode: 'seg', nav: 'nav-plexidesk', app: 'tasks' },
+  projects: { mode: 'nav', header: 'nav-plexidesk', sidenav: 'sidenav-desk-plans' },
+  tasks: { mode: 'nav', header: 'nav-plexidesk', sidenav: 'sidenav-desk-tasks' },
   reports: { mode: 'direct', go: 'goReports' },
-  flow: { mode: 'seg', nav: 'nav-plexibrain', app: 'flows' },
-  api: { mode: 'seg', nav: 'nav-plexibrain', app: 'api' },
-  chat: { mode: 'comms', app: 'chat' },
-  meet: { mode: 'comms', app: 'meet' },
+  flow: { mode: 'nav', header: 'nav-plexibrain', sidenav: 'sidenav-brain-flows' },
+  api: { mode: 'nav', header: 'nav-plexibrain', sidenav: 'sidenav-brain-api' },
+  chat: { mode: 'nav', header: 'nav-plexioffice', sidenav: 'sidenav-office-chat' },
+  meet: { mode: 'nav', header: 'nav-plexioffice', sidenav: 'sidenav-office-meet' },
   build: { mode: 'direct', go: 'goApps' },
   form: { mode: 'direct', go: 'goForms' }
 }
 
-// Navigate to a product under the new three-segment IA. Exits any active segment
-// first, then routes per the product's mode. The product's own view (and its
-// testids) renders unchanged.
+// Navigate to a product through the persistent global sidebar. The sidebar never
+// disappears, so there is no segment to exit first — clicking the deep-link row
+// simply swaps the centre panel content.
 export async function openProduct(window: Page, product: keyof typeof SEGMENT_OF): Promise<void> {
   const route = SEGMENT_OF[product]
-  // Exit any active full-bleed segment back to the global app. SegmentShell uses
-  // segment-exit; the PlexiOffice shell uses office-exit.
-  const segExit = window.locator('[data-testid="segment-exit"]')
-  if (await segExit.isVisible().catch(() => false)) await segExit.click()
-  const officeExit = window.locator('[data-testid="office-exit"]')
-  if (await officeExit.isVisible().catch(() => false)) await officeExit.click()
 
   if (route.mode === 'direct') {
-    // Drive the real view store directly for products with no segment home
-    // (Build / Form). The store is exposed on window by stores/view.ts.
+    // Drive the real view store directly for products with no sidenav row
+    // (Build / Form / Reports). The store is exposed on window by stores/view.ts.
     await window.evaluate((go) => {
       const w = window as unknown as { __fbView?: { getState: () => Record<string, () => void> } }
       w.__fbView?.getState()[go]?.()
@@ -191,12 +187,11 @@ export async function openProduct(window: Page, product: keyof typeof SEGMENT_OF
     return
   }
 
-  if (route.mode === 'comms') {
-    await window.locator('[data-testid="nav-plexioffice"]').click()
-    await window.locator(`[data-testid="office-comms-app-${route.app}"]`).click()
-    return
+  // Ensure the segment section is expanded so its deep-link rows are visible, then
+  // click the row. Sections default open, so the expand is only a safety net.
+  const row = window.locator(`[data-testid="${route.sidenav}"]`)
+  if (!(await row.isVisible().catch(() => false))) {
+    await window.locator(`[data-testid="${route.header}"]`).click().catch(() => {})
   }
-
-  await window.locator(`[data-testid="${route.nav}"]`).click()
-  await window.locator(`[data-testid="segment-app-${route.app}"]`).click()
+  await row.click()
 }
