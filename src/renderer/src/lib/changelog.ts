@@ -36,6 +36,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.128',
+    date: '2026-07-01T18:00:00Z',
+    title: 'v2.5.128 — Organisation and Templates move into Settings',
+    tag: 'feature',
+    summary:
+      'Tidies the side menu by moving Organisation and Templates into Settings, where your account already lived, so the three things you configure rather than work in now sit together in one place. Open Settings and you will find your organisation, with a button through to manage members and roles, and your templates, ready to drop onto the desk you have open. The standalone Organisation and Templates entries are gone from the menu, which keeps it focused on the places you actually do your work.',
+    highlights: [
+      'Organisation and Templates now live in Settings, alongside your account.',
+      'The Organisation panel shows your real org with a button to manage members and roles.',
+      'The side menu is cleaner, focused on where you work rather than what you configure.'
+    ]
+  },
+  {
     version: '2.5.127',
     date: '2026-07-01T16:30:00Z',
     title: 'v2.5.127 — drag apps from the menu onto your desk',
