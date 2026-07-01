@@ -24,6 +24,9 @@ test('DW-1 dragging a sidebar widget chip onto the desk creates that widget', as
     // The Widgets section and its chips show while a desk is open.
     await expect(window.locator('[data-testid="sidebar-widgets"]')).toBeVisible()
     await expect(window.locator('[data-testid="sidebar-widget-sticky"]')).toBeVisible()
+    // Office things can be dragged onto the desk too, not just widgets.
+    await expect(window.locator('[data-testid="sidebar-widget-doc"]')).toBeVisible()
+    await expect(window.locator('[data-testid="sidebar-widget-sheet"]')).toBeVisible()
 
     // Drive the chip's real dragstart, then drop onto the canvas with the same
     // DataTransfer (the renderer reads dataTransfer.getData in its handlers).
