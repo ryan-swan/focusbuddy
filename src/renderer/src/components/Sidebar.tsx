@@ -7,8 +7,6 @@ import { useWidgetStore } from '../stores/widgets'
 import { useConnectedAppsStore } from '../stores/connectedApps'
 import SyncIndicator from './SyncIndicator'
 import { useViewStore, type View } from '../stores/view'
-import { useMessagingStore } from '../stores/messaging'
-import { useMailStore, selectMailUnread } from '../stores/mail'
 import { chimeOut } from '../lib/audioBeep'
 import { catalogFor, WIDGET_CATALOG, DRAG_MIME } from '../lib/widgetCatalog'
 import SegmentSwitcher from './segment/SegmentSwitcher'
@@ -162,15 +160,7 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
   const goAllTasks = useViewStore((s) => s.goAllTasks)
   const goCalendar = useViewStore((s) => s.goCalendar)
   const goProjects = useViewStore((s) => s.goProjects)
-  const goMessages = useViewStore((s) => s.goMessages)
-  const goInbox = useViewStore((s) => s.goInbox)
-  const goMail = useViewStore((s) => s.goMail)
-  const goDocuments = useViewStore((s) => s.goDocuments)
   const goFiles = useViewStore((s) => s.goFiles)
-  const goCollaborations = useViewStore((s) => s.goCollaborations)
-  const goSuite = useViewStore((s) => s.goSuite)
-  const unreadMessages = useMessagingStore((s) => s.unreadTotal)
-  const unreadMail = useMailStore(selectMailUnread)
   const goProject = useViewStore((s) => s.goProject)
   const goTask = useViewStore((s) => s.goTask)
   const goLiveCanvas = useViewStore((s) => s.goLiveCanvas)
@@ -297,12 +287,7 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
     setDropTarget(null)
   }
 
-  // Section collapse state — let users hide noise they aren't using yet.
-  const [workspaceOpen, setWorkspaceOpen] = useState(true)
-  // Product nav is grouped into labelled, collapsible sections so the long list
-  // is scannable instead of one undifferentiated run.
-  const [filesOpen, setFilesOpen] = useState(true)
-  const [inboxOpen, setInboxOpen] = useState(true)
+  // Section collapse state for the remaining sections.
   const [projectsOpen, setProjectsOpen] = useState(true)
   const [appsOpen, setAppsOpen] = useState(true)
 
@@ -627,61 +612,64 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
             switcher live on every view, not only inside the segments. */}
         <SegmentSwitcher />
 
-        {/* ── WORKSPACE — universal nav ─────────────────────────────────── */}
-        <SectionHeader
-          label="Workspace"
-          open={workspaceOpen}
-          onToggle={() => setWorkspaceOpen((v) => !v)}
-        />
-        {workspaceOpen && (
-          <div className="mb-2">
-            <NavRow
-              icon="apps"
-              label="PlexiSuite"
-              active={viewIsActive({ kind: 'suite' })}
-              onClick={() => {
-                setActive(null)
-                goSuite()
-              }}
-            />
-            <NavRow
-              icon="dashboard"
-              label="Home"
-              active={viewIsActive({ kind: 'home' })}
-              onClick={() => {
-                setActive(null)
-                goHome()
-              }}
-            />
-            <NavRow
-              icon="account_tree"
-              label="Plans"
-              active={viewIsActive({ kind: 'projects' })}
-              onClick={() => {
-                setActive(null)
-                goProjects()
-              }}
-            />
-            <NavRow
-              icon="checklist"
-              label="All Tasks"
-              active={viewIsActive({ kind: 'all-tasks' })}
-              onClick={() => {
-                setActive(null)
-                goAllTasks()
-              }}
-            />
-            <NavRow
-              icon="calendar_month"
-              label="Calendar"
-              active={viewIsActive({ kind: 'calendar' })}
-              onClick={() => {
-                setActive(null)
-                goCalendar()
-              }}
-            />
-          </div>
-        )}
+        {/* Desk nav — one clean, single list in the same style as the Office /
+            People / Brain menus, not a stack of labelled sections. */}
+        <div className="mb-2 px-1">
+          <NavRow
+            icon="dashboard"
+            label="Home"
+            active={viewIsActive({ kind: 'home' })}
+            onClick={() => {
+              setActive(null)
+              goHome()
+            }}
+          />
+          <NavRow
+            icon="account_tree"
+            label="Plans"
+            active={viewIsActive({ kind: 'projects' })}
+            onClick={() => {
+              setActive(null)
+              goProjects()
+            }}
+          />
+          <NavRow
+            icon="checklist"
+            label="Tasks"
+            active={viewIsActive({ kind: 'all-tasks' })}
+            onClick={() => {
+              setActive(null)
+              goAllTasks()
+            }}
+          />
+          <NavRow
+            icon="calendar_month"
+            label="Calendar"
+            active={viewIsActive({ kind: 'calendar' })}
+            onClick={() => {
+              setActive(null)
+              goCalendar()
+            }}
+          />
+          <NavRow
+            icon="folder"
+            label="Files"
+            active={viewIsActive({ kind: 'files' })}
+            onClick={() => {
+              setActive(null)
+              goFiles()
+            }}
+          />
+          <NavRow
+            icon="lock"
+            label="Vault"
+            active={viewIsActive({ kind: 'vault' })}
+            onClick={() => {
+              setActive(null)
+              goVault()
+            }}
+          />
+        </div>
 
         {/* ── WIDGETS — only while a desk is open; drag a chip onto the canvas ── */}
         {view.kind === 'task' && (
@@ -712,90 +700,8 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
           </div>
         )}
 
-        {/* The old "Segments" nav rows are replaced by the switcher above, and
-            Insights / Marketplace live in the PlexiBrain area now. */}
-        <SectionHeader label="Files" open={filesOpen} onToggle={() => setFilesOpen((v) => !v)} />
-        {filesOpen && (
-          <div className="mb-2">
-            <NavRow
-              icon="folder_open"
-              label="Documents"
-              active={viewIsActive({ kind: 'documents' })}
-              onClick={() => {
-                setActive(null)
-                goDocuments()
-              }}
-            />
-            <NavRow
-              icon="folder"
-              label="Files"
-              active={viewIsActive({ kind: 'files' })}
-              onClick={() => {
-                setActive(null)
-                goFiles()
-              }}
-            />
-            <NavRow
-              icon="group"
-              label="Collaborations"
-              active={
-                viewIsActive({ kind: 'collaborations' }) ||
-                view.kind === 'livecanvas' ||
-                view.kind === 'livefolder' ||
-                view.kind === 'livedoc'
-              }
-              onClick={() => {
-                setActive(null)
-                goCollaborations()
-              }}
-            />
-          </div>
-        )}
-        {/* People Map lives in the PlexiPeople area and PlexiSign in PlexiOffice. */}
-        <SectionHeader label="Inbox" open={inboxOpen} onToggle={() => setInboxOpen((v) => !v)} />
-        {inboxOpen && (
-          <div className="mb-2">
-            <NavRow
-              icon="inbox"
-              label="PlexiInbox"
-              active={viewIsActive({ kind: 'inbox' })}
-              badge={unreadMessages > 0 ? String(unreadMessages) : undefined}
-              onClick={() => {
-                setActive(null)
-                goInbox()
-              }}
-            />
-            <NavRow
-              icon="forum"
-              label="Messages"
-              active={viewIsActive({ kind: 'messages' })}
-              badge={unreadMessages > 0 ? String(unreadMessages) : undefined}
-              onClick={() => {
-                setActive(null)
-                goMessages()
-              }}
-            />
-            <NavRow
-              icon="mail"
-              label="Mail"
-              active={viewIsActive({ kind: 'mail' })}
-              badge={unreadMail > 0 ? String(unreadMail) : undefined}
-              onClick={() => {
-                setActive(null)
-                goMail()
-              }}
-            />
-            <NavRow
-              icon="lock"
-              label="Vault"
-              active={viewIsActive({ kind: 'vault' })}
-              onClick={() => {
-                setActive(null)
-                goVault()
-              }}
-            />
-          </div>
-        )}
+        {/* Documents, Inbox, Messages, Mail and PlexiSign live in the PlexiOffice
+            area; Files and Vault are in the Desk nav above. */}
 
         {/* ── SHARED WITH ME — folders / tasks / widgets others sent you ─ */}
         <SectionHeader
@@ -908,9 +814,9 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
           </div>
         )}
 
-        {/* ── PROJECTS — the tree we had before ────────────────────────── */}
+        {/* ── DESKS — your folders and desks ──────────────────────────────── */}
         <SectionHeader
-          label="Projects"
+          label="Desks"
           open={projectsOpen}
           onToggle={() => setProjectsOpen((v) => !v)}
           action={

@@ -351,7 +351,7 @@ test('7. suite launcher tile opens PlexiProjects view', async () => {
     await expect(window.locator('[data-testid="plexiprojects-view"]')).toBeVisible({ timeout: 8_000 })
 
     // Plans is a Desk-area view (no segment to exit); open the suite home.
-    await window.getByRole('button', { name: 'PlexiSuite' }).first().click()
+    await window.evaluate(() => (window as unknown as { __fbView?: { getState: () => Record<string, () => void> } }).__fbView?.getState().goSuite?.())
     await expect(window.locator('[data-testid="plexisuite-home"]')).toBeVisible({ timeout: 8_000 })
 
     // Click the PlexiProjects tile — this opens ProductHome (product detail page)
