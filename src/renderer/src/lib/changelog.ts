@@ -36,6 +36,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.131',
+    date: '2026-07-01T23:00:00Z',
+    title: 'v2.5.131 — icons always load, and Docs are one click away',
+    tag: 'fix',
+    summary:
+      'Fixes two problems. First, icons could show up as plain words like "checklist" or "folder" instead of the icon. That happened because the icons, and all the app fonts, were fetched from the internet, so anything blocking that connection broke them. The fonts now ship inside the app, so icons and text always appear, even with no connection at all. Second, from your desk it was not obvious how to get to Docs and Sheets, since each area shows only its own apps. Every menu now has a small row at the top to switch between Desk, Office, People and Brain, so Docs and Sheets are always a single click away without going back to a crowded menu.',
+    highlights: [
+      'Icons and fonts are bundled with the app, so they load with no internet and never show as raw text.',
+      'A small switcher at the top of every menu jumps between Desk, Office, People and Brain in one click.',
+      'Docs and Sheets are always one click from the desk.'
+    ]
+  },
+  {
     version: '2.5.130',
     date: '2026-07-01T21:30:00Z',
     title: 'v2.5.130 — a simpler menu, and widgets you can drag',
