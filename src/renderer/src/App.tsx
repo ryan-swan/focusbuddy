@@ -7,6 +7,8 @@ import {
 } from 'react-resizable-panels'
 import Sidebar from './components/Sidebar'
 import MainPane from './components/MainPane'
+import PlexiOfficeShell from './components/office/PlexiOfficeShell'
+import { PlexiDeskShell, PlexiPeopleShell, PlexiBrainShell } from './components/segment/segments'
 import ChatPanel from './components/ChatPanel'
 import TelemetryReporter from './components/TelemetryReporter'
 import ReleaseModal from './components/ReleaseModal'
@@ -76,9 +78,14 @@ export default function App(): JSX.Element {
   const refreshTemplates = useTemplateStore((s) => s.refresh)
   const sidebarRef = useRef<ImperativePanelHandle>(null)
   const chatRef = useRef<ImperativePanelHandle>(null)
-  // The global sidebar is the one persistent menu, shown in every view including
-  // inside the four segments. Segment content renders in the centre panel via
-  // MainPane; there is no full-bleed takeover of the sidebar.
+  // PlexiOffice is a full-bleed segment with its own chrome: when active it takes
+  // over the main area, replacing the global sidebar / desk panels.
+  const currentView = useViewStore((s) => s.view)
+  const segmentTakeover =
+    currentView.kind === 'office' ||
+    currentView.kind === 'plexidesk' ||
+    currentView.kind === 'plexipeople' ||
+    currentView.kind === 'plexibrain'
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [chatCollapsed, setChatCollapsed] = useState(false)
   // On macOS the window uses hiddenInset, so the traffic lights sit at the top
@@ -500,6 +507,17 @@ export default function App(): JSX.Element {
         </div>
       </header>
       <main className="flex-1 min-h-0">
+        {segmentTakeover ? (
+          currentView.kind === 'office' ? (
+            <PlexiOfficeShell initialApp={currentView.app} />
+          ) : currentView.kind === 'plexidesk' ? (
+            <PlexiDeskShell initialApp={currentView.app} />
+          ) : currentView.kind === 'plexipeople' ? (
+            <PlexiPeopleShell initialApp={currentView.app ?? 'home'} />
+          ) : (
+            <PlexiBrainShell initialApp={currentView.app} />
+          )
+        ) : (
         <PanelGroup direction="horizontal" autoSaveId="focusbuddy-main-v2">
           <Panel
             ref={sidebarRef}
@@ -531,6 +549,7 @@ export default function App(): JSX.Element {
             <ChatPanel onCollapse={collapseChat} />
           </Panel>
         </PanelGroup>
+        )}
       </main>
       <Footer />
 

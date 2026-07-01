@@ -1,5 +1,4 @@
-import { useRef } from 'react'
-import { useViewStore, type View } from '../stores/view'
+import { useViewStore } from '../stores/view'
 import Canvas from './Canvas'
 import HomeDashboard from './views/HomeDashboard'
 import AllTasksView from './views/AllTasksView'
@@ -34,35 +33,12 @@ import PlexiReportsView from './views/PlexiReportsView'
 import PlexiFlowView from './views/PlexiFlowView'
 import PlexiApiView from './views/PlexiApiView'
 import PlexiMarketplaceView from './views/PlexiMarketplaceView'
-import PlexiOfficeShell from './office/PlexiOfficeShell'
-import { PlexiDeskShell, PlexiPeopleShell, PlexiBrainShell } from './segment/segments'
-
-// Returns a key that changes on every distinct office navigation. The view store
-// creates a fresh view object per navigation, so a change in object identity means
-// a genuine new navigation; we bump a counter then. This lets MainPane re-mount the
-// office shell to a clean state even when the office `app` value repeats.
-function useOfficeNavKey(view: View): number {
-  const seq = useRef(0)
-  const lastRef = useRef<View | null>(null)
-  if (view.kind === 'office' && view !== lastRef.current) {
-    seq.current += 1
-  }
-  lastRef.current = view
-  return seq.current
-}
 
 // The MainPane routes the central area between the OS-level views.
 // Existing Canvas + chat behavior is preserved for the 'task' view; everything else
 // is new surface introduced by the OS Phase 1 sidebar restructure.
 export default function MainPane(): JSX.Element {
   const view = useViewStore((s) => s.view)
-  // The office shell keeps transient centre-panel state (open document, active
-  // comms surface, page). Because a fresh office navigation can repeat the same
-  // `app` value (e.g. clicking the PlexiOffice header while a document is open),
-  // we key the shell on the view object's identity so every office navigation
-  // re-mounts it to a clean state. The view store creates a new view object on
-  // each navigation, so this is stable for a given view and changes on every hop.
-  const officeKey = useOfficeNavKey(view)
   switch (view.kind) {
     case 'home':
       return <HomeDashboard />
@@ -132,17 +108,6 @@ export default function MainPane(): JSX.Element {
       return <PlexiApiView />
     case 'marketplace':
       return <PlexiMarketplaceView />
-    // The four top-level segments render their content into the centre panel; the
-    // global sidebar stays as the single persistent menu. Each segment shell reads
-    // the active app from the view and renders either that app or the segment home.
-    case 'office':
-      return <PlexiOfficeShell key={officeKey} initialApp={view.app} />
-    case 'plexidesk':
-      return <PlexiDeskShell activeApp={view.app} />
-    case 'plexipeople':
-      return <PlexiPeopleShell activeApp={view.app} />
-    case 'plexibrain':
-      return <PlexiBrainShell activeApp={view.app} />
     default:
       return <HomeDashboard />
   }
