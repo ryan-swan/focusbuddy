@@ -73,3 +73,29 @@ test('DW-2 the Widgets section is desk-only (not shown without a desk open)', as
     await dispose()
   }
 })
+
+test('DW-3 a top-level folder-desk opens as a canvas with the Add-to-desk strip', async () => {
+  const { window, dispose } = await launchApp()
+  try {
+    await waitForReady(window)
+    // Create a top-level folder (a desk) and open it via the view store.
+    const id = await window.evaluate(async () => {
+      const api = (window as unknown as { api: typeof window.api }).api
+      const f = await api.nodes.create({ parentId: null, kind: 'folder', title: 'Folder Desk' })
+      return f.id
+    })
+    // Reload so the node store hydrates the new folder, then open it.
+    await window.reload()
+    await waitForReady(window)
+    await window.evaluate((pid: string) => {
+      const w = window as unknown as { __fbView?: { getState: () => { goProject: (p: string) => void } } }
+      w.__fbView?.getState().goProject(pid)
+    }, id)
+    // A folder-desk is a canvas now: the drop surface and the Add-to-desk strip show.
+    await expect(window.locator('[data-canvas-surface="true"]')).toBeVisible({ timeout: 8_000 })
+    await expect(window.locator('[data-testid="sidebar-widgets"]')).toBeVisible()
+    await expect(window.locator('[data-testid="sidebar-widget-doc"]')).toBeVisible()
+  } finally {
+    await dispose()
+  }
+})
