@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { ConnectedApp, FbNode, NodeKind, WidgetKind, WidgetSuggestion } from '@shared/types'
+import type { ConnectedApp, FbNode, NodeKind, WidgetSuggestion } from '@shared/types'
 import { useNodeStore } from '../stores/nodes'
 import { useCanCreateMore } from '../stores/capabilities'
 import { promptUpgrade } from '../stores/upgradePrompt'
@@ -10,7 +10,20 @@ import { useViewStore, type View } from '../stores/view'
 import { useMessagingStore } from '../stores/messaging'
 import { useMailStore, selectMailUnread } from '../stores/mail'
 import { chimeOut } from '../lib/audioBeep'
-import { catalogFor, DRAG_MIME } from '../lib/widgetCatalog'
+import { catalogFor, WIDGET_CATALOG, DRAG_MIME } from '../lib/widgetCatalog'
+
+// The handful of widgets offered as draggable chips in the sidebar when a desk is
+// open. Kept short on purpose: the full set still lives in the on-canvas palette.
+const DESK_WIDGET_KINDS = new Set([
+  'sticky',
+  'note',
+  'timer',
+  'task-link',
+  'calculator',
+  'image',
+  'page',
+  'file'
+])
 import { chimeIn } from '../lib/audioBeep'
 import { splitFavourites } from '../lib/connectedAppSort'
 import NewNodeDialog from './NewNodeDialog'
@@ -292,13 +305,9 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
 
   // Section collapse state — let users hide noise they aren't using yet.
   const [workspaceOpen, setWorkspaceOpen] = useState(true)
-  // Each top-level segment is its own labelled, collapsible section that lists
-  // its apps inline as deep-linking sub-items. They default open so the segment
-  // apps are discoverable on first run.
-  const [deskOpen, setDeskOpen] = useState(true)
-  const [officeOpen, setOfficeOpen] = useState(true)
-  const [peopleOpen, setPeopleOpen] = useState(true)
-  const [brainOpen, setBrainOpen] = useState(true)
+  // Product nav is grouped into labelled, collapsible sections so the long list
+  // is scannable instead of one undifferentiated run.
+  const [knowledgeOpen, setKnowledgeOpen] = useState(true)
   const [discoverOpen, setDiscoverOpen] = useState(true)
   const [filesOpen, setFilesOpen] = useState(true)
   const [teamOpen, setTeamOpen] = useState(true)
@@ -668,121 +677,81 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
             />
           </div>
         )}
-        {/* Each segment is its own labelled, collapsible section. The header
-            carries the legacy nav-* testid and opens the segment home; under it
-            every app is a deep-linking sub-item that lands on that app. The
-            office segment also lights up for the document and design views it
-            owns. */}
-        <SegmentSection
-          label="PlexiDesk"
-          icon="desktop_windows"
-          headerTestid="nav-plexidesk"
-          open={deskOpen}
-          onToggleOpen={() => setDeskOpen((v) => !v)}
-          segmentActive={viewIsActive({ kind: 'plexidesk' })}
-          activeApp={view.kind === 'plexidesk' ? view.app ?? 'home' : null}
-          onOpenSegment={() => {
-            setActive(null)
-            setDeskOpen(true)
-            goPlexiDesk()
-          }}
-          items={[
-            { app: 'home', label: 'Home', icon: 'dashboard' },
-            { app: 'desk', label: 'My Desk', icon: 'space_dashboard' },
-            { app: 'workspaces', label: 'Workspaces', icon: 'apartment' },
-            { app: 'plans', label: 'Plans', icon: 'account_tree' },
-            { app: 'tasks', label: 'Tasks', icon: 'checklist' },
-            { app: 'calendar', label: 'Calendar', icon: 'calendar_month' },
-            { app: 'files', label: 'Files', icon: 'folder' },
-            { app: 'recent', label: 'Recent', icon: 'schedule' }
-          ]}
-          onItem={(app) => {
-            setActive(null)
-            // Home at the top of PlexiDesk is the workspace home dashboard.
-            if (app === 'home') goPlexiDesk('home')
-            else goPlexiDesk(app)
-          }}
-        />
-        <SegmentSection
-          label="PlexiOffice"
-          icon="grid_view"
-          headerTestid="nav-plexioffice"
-          open={officeOpen}
-          onToggleOpen={() => setOfficeOpen((v) => !v)}
-          segmentActive={viewIsActive({ kind: 'office' }) || view.kind === 'document' || viewIsActive({ kind: 'design' })}
-          activeApp={view.kind === 'office' ? view.app ?? null : null}
-          onOpenSegment={() => {
-            setActive(null)
-            setOfficeOpen(true)
-            goOffice()
-          }}
-          items={[
-            { app: 'docs', label: 'Docs', icon: 'description', dragKind: 'doc' },
-            { app: 'sheets', label: 'Sheets', icon: 'table_chart', dragKind: 'sheet' },
-            { app: 'slides', label: 'Slides', icon: 'slideshow', dragKind: 'slides' },
-            { app: 'draw', label: 'Draw', icon: 'gesture', dragKind: 'scratchpad' },
-            { app: 'mail', label: 'Mail', icon: 'mail', dragKind: 'email' },
-            { app: 'inbox', label: 'Inbox', icon: 'inbox' },
-            { app: 'chat', label: 'Chat', icon: 'forum', dragKind: 'chat-thread' },
-            { app: 'meet', label: 'Meet', icon: 'video_call' },
-            { app: 'sign', label: 'Sign', icon: 'draw' }
-          ]}
-          onItem={(app) => {
-            setActive(null)
-            goOffice(app)
-          }}
-        />
-        <SegmentSection
-          label="PlexiPeople"
-          icon="groups"
-          headerTestid="nav-plexipeople"
-          open={peopleOpen}
-          onToggleOpen={() => setPeopleOpen((v) => !v)}
-          segmentActive={viewIsActive({ kind: 'plexipeople' })}
-          activeApp={view.kind === 'plexipeople' ? view.app ?? 'home' : null}
-          onOpenSegment={() => {
-            setActive(null)
-            setPeopleOpen(true)
-            goPlexiPeople()
-          }}
-          items={[
-            { app: 'home', label: 'Home', icon: 'groups' },
-            { app: 'directory', label: 'Directory', icon: 'badge' },
-            { app: 'map', label: 'Organisation map', icon: 'account_tree' }
-          ]}
-          onItem={(app) => {
-            setActive(null)
-            goPlexiPeople(app)
-          }}
-        />
-        <SegmentSection
-          label="PlexiBrain"
-          icon="neurology"
-          headerTestid="nav-plexibrain"
-          open={brainOpen}
-          onToggleOpen={() => setBrainOpen((v) => !v)}
-          segmentActive={viewIsActive({ kind: 'plexibrain' })}
-          activeApp={view.kind === 'plexibrain' ? view.app ?? null : null}
-          onOpenSegment={() => {
-            setActive(null)
-            setBrainOpen(true)
-            goPlexiBrain()
-          }}
-          items={[
-            { app: 'ask', label: 'Ask Brain', icon: 'neurology' },
-            { app: 'search', label: 'Search', icon: 'search' },
-            { app: 'map', label: 'Brain Map', icon: 'bubble_chart', dragKind: 'mindmap' },
-            { app: 'flows', label: 'Flows', icon: 'bolt' },
-            { app: 'agents', label: 'Agents', icon: 'smart_toy', dragKind: 'agent' },
-            { app: 'connect', label: 'Connect', icon: 'hub' },
-            { app: 'api', label: 'APIs', icon: 'api' },
-            { app: 'insights', label: 'Insights', icon: 'insights' }
-          ]}
-          onItem={(app) => {
-            setActive(null)
-            goPlexiBrain(app)
-          }}
-        />
+
+        {/* ── WIDGETS — only while a desk is open; drag a chip onto the canvas ── */}
+        {view.kind === 'task' && (
+          <div className="mb-2" data-testid="sidebar-widgets">
+            <div className="px-3 pt-2 pb-1 flex items-center gap-1.5 text-[10px] uppercase tracking-[0.12em] text-stone-500 dark:text-stone-400 font-semibold">
+              <Icon name="widgets" size={13} />
+              <span>Widgets</span>
+              <span className="ml-auto normal-case tracking-normal text-stone-400 dark:text-stone-500">drag onto desk</span>
+            </div>
+            <div className="grid grid-cols-4 gap-1 px-2">
+              {WIDGET_CATALOG.filter((e) => DESK_WIDGET_KINDS.has(e.kind)).map((entry) => (
+                <button
+                  key={entry.kind}
+                  draggable
+                  onDragStart={(e) => {
+                    e.dataTransfer.setData(DRAG_MIME, entry.kind)
+                    e.dataTransfer.effectAllowed = 'copy'
+                  }}
+                  data-testid={`sidebar-widget-${entry.kind}`}
+                  title={`Drag ${entry.label} onto the desk`}
+                  className="flex flex-col items-center gap-1 py-2 rounded-lg text-[9.5px] text-stone-600 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800 cursor-grab active:cursor-grabbing"
+                >
+                  <Icon name={entry.icon} size={16} className="text-accent" />
+                  <span className="truncate max-w-full leading-none">{entry.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <SectionHeader label="Segments" open={knowledgeOpen} onToggle={() => setKnowledgeOpen((v) => !v)} />
+        {knowledgeOpen && (
+          <div className="mb-2">
+            <NavRow
+              icon="desktop_windows"
+              label="PlexiDesk"
+              testid="nav-plexidesk"
+              active={viewIsActive({ kind: 'plexidesk' })}
+              onClick={() => {
+                setActive(null)
+                goPlexiDesk()
+              }}
+            />
+            <NavRow
+              icon="grid_view"
+              label="PlexiOffice"
+              testid="nav-plexioffice"
+              active={viewIsActive({ kind: 'office' }) || view.kind === 'document' || viewIsActive({ kind: 'design' })}
+              onClick={() => {
+                setActive(null)
+                goOffice()
+              }}
+            />
+            <NavRow
+              icon="groups"
+              label="PlexiPeople"
+              testid="nav-plexipeople"
+              active={viewIsActive({ kind: 'plexipeople' })}
+              onClick={() => {
+                setActive(null)
+                goPlexiPeople()
+              }}
+            />
+            <NavRow
+              icon="neurology"
+              label="PlexiBrain"
+              testid="nav-plexibrain"
+              active={viewIsActive({ kind: 'plexibrain' })}
+              onClick={() => {
+                setActive(null)
+                goPlexiBrain()
+              }}
+            />
+          </div>
+        )}
         {/* PlexiMeet, PlexiBuild, PlexiForms, PlexiProjects, PlexiReports,
             PlexiFlow and PlexiAPI moved into the PlexiWork / PlexiConnect /
             PlexiFlow segments (see the Files section below). */}
@@ -1531,155 +1500,6 @@ function SectionHeader({ label, open, onToggle, action }: SectionHeaderProps): J
       </button>
       {action}
     </div>
-  )
-}
-
-// A labelled, collapsible section for one top-level segment. The header shows
-// the segment name and icon and carries the legacy nav-* testid; clicking it
-// opens that segment's home and expands the section, while a separate chevron
-// collapses the section without navigating. Under the header each app is an
-// indented sub-item that deep-links into the segment with that app preselected.
-interface SegmentItem {
-  app: string
-  label: string
-  icon: string
-  // When set, this app row is also draggable onto a desk canvas and drops a
-  // real widget of this kind at the drop point. Only apps that map to a
-  // genuine, functional canvas widget carry this; the rest stay click-only
-  // navigation. We reuse the widget palette's DRAG_MIME so the Canvas drop
-  // handler routes it through the same spawn path as the palette (including
-  // the office-document chooser for doc/sheet/slides).
-  dragKind?: WidgetKind
-}
-
-interface SegmentSectionProps {
-  label: string
-  icon: string
-  headerTestid: string
-  open: boolean
-  onToggleOpen: () => void
-  // True when the current view is anywhere inside this segment.
-  segmentActive: boolean
-  // The app key of the currently active item inside this segment, or null.
-  activeApp: string | null
-  onOpenSegment: () => void
-  items: SegmentItem[]
-  onItem: (app: string) => void
-}
-
-function SegmentSection({
-  label,
-  icon,
-  headerTestid,
-  open,
-  onToggleOpen,
-  segmentActive,
-  activeApp,
-  onOpenSegment,
-  items,
-  onItem
-}: SegmentSectionProps): JSX.Element {
-  return (
-    <div>
-      <div className="px-2 pt-1.5 pb-0.5 flex items-center gap-1 sticky top-0 bg-stone-50 dark:bg-stone-900 z-10">
-        <button
-          onClick={onToggleOpen}
-          aria-label={open ? 'Collapse section' : 'Expand section'}
-          title={open ? `Collapse ${label}` : `Expand ${label}`}
-          className="text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 transition-colors"
-        >
-          <Icon name={open ? 'expand_more' : 'chevron_right'} size={14} />
-        </button>
-        <button
-          onClick={onOpenSegment}
-          data-testid={headerTestid}
-          className={`flex items-center gap-1.5 flex-1 min-w-0 text-[10px] uppercase tracking-[0.12em] font-semibold transition-colors ${
-            segmentActive
-              ? 'text-stone-900 dark:text-stone-100'
-              : 'text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-100'
-          }`}
-        >
-          <Icon
-            name={icon}
-            size={13}
-            filled={segmentActive}
-            className={segmentActive ? 'text-accent' : ''}
-          />
-          <span className="truncate">{label}</span>
-        </button>
-      </div>
-      {open && (
-        <div className="mb-2 pl-2">
-          {items.map((it) => (
-            <SegmentSubItem
-              key={it.app}
-              icon={it.icon}
-              label={it.label}
-              active={segmentActive && activeApp === it.app}
-              testid={`sidenav-${headerTestid.replace('nav-plexi', '')}-${it.app}`}
-              dragKind={it.dragKind}
-              onClick={() => onItem(it.app)}
-            />
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
-
-// An indented app row inside a segment section. When dragKind is set the row
-// is also draggable onto a desk canvas and drops a real widget of that kind at
-// the drop point, reusing the widget palette's DRAG_MIME so the Canvas handler
-// runs the same spawn path (office-document chooser included). Native HTML drag
-// and click are distinct events, so making the row draggable does not disturb
-// the existing click-to-navigate behaviour.
-function SegmentSubItem({
-  icon,
-  label,
-  active,
-  testid,
-  dragKind,
-  onClick
-}: {
-  icon: string
-  label: string
-  active: boolean
-  testid: string
-  dragKind?: WidgetKind
-  onClick: () => void
-}): JSX.Element {
-  const draggable = dragKind != null
-  return (
-    <button
-      onClick={onClick}
-      data-testid={testid}
-      draggable={draggable}
-      onDragStart={
-        draggable
-          ? (e) => {
-              e.dataTransfer.setData(DRAG_MIME, dragKind as string)
-              e.dataTransfer.effectAllowed = 'copy'
-            }
-          : undefined
-      }
-      title={draggable ? `Open ${label}, or drag onto a desk to add it there` : undefined}
-      className={`relative w-full flex items-center gap-2 pl-3 pr-2.5 py-1 text-left transition-colors ${
-        active
-          ? 'bg-stone-100/80 dark:bg-stone-800/60 text-stone-900 dark:text-stone-100'
-          : 'text-stone-700 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800'
-      }`}
-    >
-      {active && <span className="absolute left-0 h-5 w-[3px] rounded-r bg-accent" />}
-      <Icon
-        name={icon}
-        size={15}
-        filled={active}
-        className={`shrink-0 ${active ? 'text-accent' : 'text-stone-500 dark:text-stone-400'}`}
-      />
-      <span className={`text-[12.5px] flex-1 min-w-0 break-words leading-tight ${active ? 'font-medium' : ''}`}>
-        {label}
-      </span>
-    </button>
   )
 }
 

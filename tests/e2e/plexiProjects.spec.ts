@@ -350,7 +350,8 @@ test('7. suite launcher tile opens PlexiProjects view', async () => {
     await openProduct(window, 'projects')
     await expect(window.locator('[data-testid="plexiprojects-view"]')).toBeVisible({ timeout: 8_000 })
 
-    // The persistent sidebar is always present; open the suite home directly.
+    // Exit the segment back to the global app, then open the suite home.
+    await window.locator('[data-testid="segment-exit"]').click()
     await window.getByRole('button', { name: 'PlexiSuite' }).first().click()
     await expect(window.locator('[data-testid="plexisuite-home"]')).toBeVisible({ timeout: 8_000 })
 

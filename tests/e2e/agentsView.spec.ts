@@ -8,8 +8,10 @@ import { test, expect, type Page } from '@playwright/test'
 import { launchApp, waitForReady } from './_helpers'
 
 async function openAgents(window: Page): Promise<void> {
-  // The Agents app deep-links from the persistent sidebar into the centre panel.
-  await window.locator('[data-testid="sidenav-brain-agents"]').click()
+  const exit = window.locator('[data-testid="segment-exit"]')
+  if (await exit.isVisible().catch(() => false)) await exit.click()
+  await window.locator('[data-testid="nav-plexibrain"]').click()
+  await window.locator('[data-testid="segment-app-agents"]').click()
   await expect(window.locator('[data-testid="agents-view"]')).toBeVisible({ timeout: 8_000 })
 }
 
