@@ -134,6 +134,9 @@ interface Props {
 
 export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
   const nodes = useNodeStore((s) => s.nodes)
+  const nodesLoaded = useNodeStore((s) => s.loaded)
+  const nodesError = useNodeStore((s) => s.error)
+  const refreshNodes = useNodeStore((s) => s.refresh)
   const expanded = useNodeStore((s) => s.expanded)
   const toggleExpand = useNodeStore((s) => s.toggleExpand)
   const setActive = useNodeStore((s) => s.setActive)
@@ -1089,7 +1092,19 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
         />
         {projectsOpen && (
           <div className="mb-2" role="tree" aria-label="Projects and tasks">
-            {flat.length === 0 && (
+            {flat.length === 0 && nodesError && (
+              <div className="px-4 py-3 text-xs text-amber-600 dark:text-amber-400 leading-relaxed" data-testid="sidebar-nodes-error">
+                Your workspaces could not be loaded just now. Your data is safe on this
+                device.{' '}
+                <button
+                  onClick={() => void refreshNodes()}
+                  className="underline hover:text-stone-900 dark:hover:text-stone-100"
+                >
+                  Try again
+                </button>
+              </div>
+            )}
+            {flat.length === 0 && !nodesError && nodesLoaded && (
               <div className="px-4 py-3 text-xs text-stone-500 dark:text-stone-400 leading-relaxed">
                 No projects yet.{' '}
                 <button
