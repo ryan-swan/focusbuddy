@@ -36,7 +36,7 @@ async function stubDesignAi(app: LaunchedApp['app']): Promise<void> {
 }
 
 async function openDesignStudio(window: Page): Promise<void> {
-  await window.getByRole('button', { name: 'PlexiOffice' }).first().click()
+  await window.locator('[data-testid="switch-office"]').first().click()
   await expect(window.locator('[data-testid="office-app-design"]')).toBeVisible({ timeout: 8_000 })
   await window.locator('[data-testid="office-app-design"]').click()
   await expect(window.locator('[data-testid="design-editor"]')).toBeVisible({ timeout: 10_000 })

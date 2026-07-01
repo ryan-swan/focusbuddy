@@ -7,23 +7,11 @@
 import { test, expect, type Page } from '@playwright/test'
 import { launchApp, waitForReady } from './_helpers'
 
-async function openArea(window: Page, nav: string): Promise<void> {
-  if (await window.locator('[data-testid="segment-switcher"]').isVisible().catch(() => false)) return
-  const navBtn = window.locator(`[data-testid="${nav}"]`)
-  // Enter an area from the global sidebar's Segments list; expand the section only
-  // if the entry is not already visible.
-  if (!(await navBtn.isVisible().catch(() => false))) {
-    await window.getByText('Segments', { exact: true }).click().catch(() => {})
-  }
-  await navBtn.click()
-}
-
 test('SW-1 the switcher jumps to PlexiOffice and its apps (Docs) in one click', async () => {
   const { window, dispose } = await launchApp()
   try {
     await waitForReady(window)
-    // Land in the PlexiDesk area first.
-    await openArea(window, 'nav-plexidesk')
+    // The switcher lives on the Desk sidebar too, so it is visible from the start.
     await expect(window.locator('[data-testid="segment-switcher"]')).toBeVisible({ timeout: 8_000 })
 
     // One click to Office; the office apps (Docs) are now reachable.

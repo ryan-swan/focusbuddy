@@ -30,18 +30,19 @@ test.describe('three-segment IA', () => {
     await app.dispose()
   })
 
-  test('PlexiDesk opens and its Tasks app renders the tasks view', async () => {
+  test('the Desk area Tasks view renders from the view store', async () => {
     await exitSegment(window)
-    await window.locator('[data-testid="nav-plexidesk"]').click()
-    await expect(window.locator('[data-testid="segment-sidebar"]')).toBeVisible()
-    // Representative app: Tasks → AllTasksView (its "All Tasks" heading).
-    await window.locator('[data-testid="segment-app-tasks"]').click()
+    // Tasks is a Desk-area view now, reached from the Desk sidebar / view store.
+    await window.evaluate(() => {
+      const w = window as unknown as { __fbView?: { getState: () => Record<string, () => void> } }
+      w.__fbView?.getState().goAllTasks?.()
+    })
     await expect(window.getByRole('heading', { name: 'All Tasks' })).toBeVisible({ timeout: 8_000 })
   })
 
   test('PlexiOffice opens and its Docs app is present', async () => {
     await exitSegment(window)
-    await window.locator('[data-testid="nav-plexioffice"]').click()
+    await window.locator('[data-testid="switch-office"]').click()
     // The office shell has its own sidebar with the document apps.
     await expect(window.locator('[data-testid="office-sidebar"]')).toBeVisible({ timeout: 8_000 })
     await expect(window.locator('[data-testid="office-app-docs"]')).toBeVisible()
@@ -51,7 +52,7 @@ test.describe('three-segment IA', () => {
 
   test('PlexiBrain opens and its Search app renders the search view', async () => {
     await exitSegment(window)
-    await window.locator('[data-testid="nav-plexibrain"]').click()
+    await window.locator('[data-testid="switch-plexibrain"]').click()
     await expect(window.locator('[data-testid="segment-sidebar"]')).toBeVisible()
     await window.locator('[data-testid="segment-app-search"]').click()
     await expect(window.locator('[data-testid="plexisearch-view"]')).toBeVisible({ timeout: 8_000 })
@@ -59,7 +60,7 @@ test.describe('three-segment IA', () => {
 
   test('PlexiBrain Brain Map app renders a real graph or honest empty state', async () => {
     await exitSegment(window)
-    await window.locator('[data-testid="nav-plexibrain"]').click()
+    await window.locator('[data-testid="switch-plexibrain"]').click()
     await window.locator('[data-testid="segment-app-map"]').click()
     await expect(window.locator('[data-testid="brain-map-view"]')).toBeVisible({ timeout: 8_000 })
     // A fresh test workspace has no knowledge entries, so the honest empty state
@@ -69,8 +70,10 @@ test.describe('three-segment IA', () => {
 
   test('Plans rename: the planning view reads Plans, not Projects', async () => {
     await exitSegment(window)
-    await window.locator('[data-testid="nav-plexidesk"]').click()
-    await window.locator('[data-testid="segment-app-plans"]').click()
+    await window.evaluate(() => {
+      const w = window as unknown as { __fbView?: { getState: () => Record<string, () => void> } }
+      w.__fbView?.getState().goProjects?.()
+    })
     const view = window.locator('[data-testid="plexiprojects-view"]')
     await expect(view).toBeVisible({ timeout: 8_000 })
     // Header reads "Plans" and the create button reads "New plan".

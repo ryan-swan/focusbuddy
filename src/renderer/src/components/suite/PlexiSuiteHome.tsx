@@ -30,15 +30,15 @@ export function launchProduct(product: PlexiProduct): void {
     case 'documents':
       return v.goOffice()
     case 'tasks':
-      return v.goPlexiDesk('tasks')
+      return v.goAllTasks()
     case 'calendar':
-      return v.goPlexiDesk('calendar')
+      return v.goCalendar()
     case 'messages':
       return v.goOffice('chat')
     case 'mail':
       return v.goOffice('mail')
     case 'files':
-      return v.goPlexiDesk('files')
+      return v.goFiles()
     case 'vault':
       return v.goVault()
     case 'knowledge':
@@ -54,7 +54,7 @@ export function launchProduct(product: PlexiProduct): void {
     case 'search':
       return v.goPlexiBrain('search')
     case 'projects':
-      return v.goPlexiDesk('plans')
+      return v.goProjects()
     case 'reports':
       return v.goPlexiBrain('insights')
     case 'flows':
@@ -64,7 +64,7 @@ export function launchProduct(product: PlexiProduct): void {
     case 'marketplace':
       return v.goMarketplace()
     case 'canvas':
-      return v.goPlexiDesk('desk')
+      return v.goHome()
     default:
       return v.goProduct(product.key)
   }

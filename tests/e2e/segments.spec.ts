@@ -34,9 +34,11 @@ test.describe('segments', () => {
     await app.dispose()
   })
 
+  // The Desk area is the global sidebar (not a takeover segment), so it is covered
+  // by the sidebar/home specs. The remaining takeover segments open via the area
+  // switcher and show a side menu of app tiles.
   const SEGMENTS: { name: string; nav: string; apps: string[] }[] = [
-    { name: 'PlexiDesk', nav: 'nav-plexidesk', apps: ['home', 'desk', 'workspaces', 'plans', 'tasks', 'calendar', 'files', 'recent'] },
-    { name: 'PlexiBrain', nav: 'nav-plexibrain', apps: ['ask', 'search', 'map', 'flows', 'agents', 'connect', 'api', 'insights'] }
+    { name: 'PlexiBrain', nav: 'switch-plexibrain', apps: ['ask', 'search', 'map', 'flows', 'agents', 'connect', 'api', 'insights'] }
   ]
 
   for (const seg of SEGMENTS) {
