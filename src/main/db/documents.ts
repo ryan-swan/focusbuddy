@@ -1,5 +1,6 @@
 import { randomUUID } from 'crypto'
 import { getDb } from './database'
+import { getActiveOrgId } from './activeOrg'
 import { deleteEmbedding } from './embeddings'
 import type {
   DocBody,
@@ -126,9 +127,9 @@ export function listDocuments(): DocumentMeta[] {
   const rows = db
     .prepare(
       `SELECT id, doc_type, title, archived, created_at, updated_at
-       FROM documents WHERE archived = 0 ORDER BY updated_at DESC`
+       FROM documents WHERE archived = 0 AND org_id = ? ORDER BY updated_at DESC`
     )
-    .all() as Omit<DocumentRow, 'body'>[]
+    .all(getActiveOrgId()) as Omit<DocumentRow, 'body'>[]
   return rows.map(rowToMeta)
 }
 
@@ -146,13 +147,14 @@ export function createDocument(draft: DocumentDraft): FbDocument {
   const now = Date.now()
   const body = draft.body ?? emptyBody(draft.docType)
   db.prepare(
-    `INSERT INTO documents (id, doc_type, title, body, archived, created_at, updated_at)
-     VALUES (@id, @docType, @title, @body, 0, @now, @now)`
+    `INSERT INTO documents (id, doc_type, title, body, archived, created_at, updated_at, org_id)
+     VALUES (@id, @docType, @title, @body, 0, @now, @now, @orgId)`
   ).run({
     id,
     docType: draft.docType,
     title: draft.title || 'Untitled',
     body: JSON.stringify(body),
+    orgId: getActiveOrgId(),
     now
   })
   return getDocument(id) as FbDocument
@@ -205,9 +207,9 @@ export function upsertDocument(input: {
     ).run({ id: input.id, docType: input.docType, title: input.title, body: bodyStr, archived, now })
   } else {
     db.prepare(
-      `INSERT INTO documents (id, doc_type, title, body, archived, created_at, updated_at)
-       VALUES (@id, @docType, @title, @body, @archived, @now, @now)`
-    ).run({ id: input.id, docType: input.docType, title: input.title, body: bodyStr, archived, now })
+      `INSERT INTO documents (id, doc_type, title, body, archived, created_at, updated_at, org_id)
+       VALUES (@id, @docType, @title, @body, @archived, @now, @now, @orgId)`
+    ).run({ id: input.id, docType: input.docType, title: input.title, body: bodyStr, archived, orgId: getActiveOrgId(), now })
   }
   return getDocument(input.id) as FbDocument
 }
