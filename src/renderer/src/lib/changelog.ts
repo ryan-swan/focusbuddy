@@ -36,6 +36,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.136',
+    date: '2026-07-02T07:00:00Z',
+    title: 'v2.5.136 — the Desk menu now matches PlexiOffice',
+    tag: 'improvement',
+    summary:
+      'The Desk menu on the left now uses the exact same clean look as the PlexiOffice menu, so the whole app feels like one place instead of two. It has the same raised surface, the same wordmark, the same rounded nav rows that fill with a soft accent when active, the same quiet section labels and the same Pro card at the foot. The old heavier styling, with its tighter grey rows and stone headers, is gone. This is the menu style being standardised across every area.',
+    highlights: [
+      'The Desk menu is restyled to match the PlexiOffice menu exactly.',
+      'Rounded accent-tinted nav rows, quiet section labels, one consistent chrome.',
+      'The same clean menu now lives on every area, not just PlexiOffice.'
+    ]
+  },
+  {
     version: '2.5.135',
     date: '2026-07-02T06:00:00Z',
     title: 'v2.5.135 — every desk is a canvas',
