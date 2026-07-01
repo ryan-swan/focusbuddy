@@ -36,6 +36,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.132',
+    date: '2026-07-02T01:00:00Z',
+    title: 'v2.5.132 — the simple menu, everywhere',
+    tag: 'feature',
+    summary:
+      'The clean, focused menu now shows on every screen. Until now it only appeared inside Office, People and Brain; the moment you opened All Tasks, a desk, your calendar or files, the old busy menu came back. That is gone. The main Desk menu is now the same simple menu, with the Desk / Office / People / Brain switcher at the top, so wherever you are the navigation looks and works the same and Docs and Sheets are always one click away. The crowded extra sections have been cleared out, since everything in them is reachable from the areas the switcher opens, leaving a short Desk menu with your key places, your desks and, on a desk, the widgets you can drag onto it.',
+    highlights: [
+      'The same simple menu and area switcher now appear on every view, not just inside the segments.',
+      'Opening All Tasks, a desk, Calendar or Files no longer brings back the old crowded menu.',
+      'The Desk menu is trimmed to what matters: your places, your desks and drag-on widgets.'
+    ]
+  },
+  {
     version: '2.5.131',
     date: '2026-07-01T23:00:00Z',
     title: 'v2.5.131 — icons always load, and Docs are one click away',
