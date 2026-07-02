@@ -36,6 +36,20 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.149',
+    date: '2026-07-03T07:00:00Z',
+    title: 'v2.5.149 — meetings share their artifact with the people you invite',
+    tag: 'feature',
+    summary:
+      'Starting a meeting from a document, sheet, deck, drawing, design or a desk now opens a short dialog where you add the people to invite and choose what access they get to that artifact. That access trickles down as the meeting opens: each attendee is shared the artifact and it lands in their inbox. You can allow view just for this meeting, which expires after it, allow view for good, or invite them to collaborate with an editable copy. Desks got a Meeting button too, so a meeting can start from the canvas the same way it does from an editor. When a notification email cannot be sent the person still gets access in the app, and the result says so rather than pretending an invite went out.',
+    highlights: [
+      'Start-meeting dialog to invite people and set their access to the source artifact.',
+      'Three access levels: view for this meeting, always view, or collaborate.',
+      'A Meeting button on the desk/canvas toolbar.',
+      'Access is shared from the real artifact and lands in each attendee’s inbox.'
+    ]
+  },
+  {
     version: '2.5.148',
     date: '2026-07-03T06:00:00Z',
     title: 'v2.5.148 — start a meeting from anywhere, and schedule one from the calendar',

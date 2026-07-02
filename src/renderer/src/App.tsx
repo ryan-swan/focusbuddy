@@ -22,6 +22,7 @@ import Footer from './components/Footer'
 import FocusSessionOverlay from './components/FocusSessionOverlay'
 import CallOverlay from './components/CallOverlay'
 import MeetingOverlay from './components/MeetingOverlay'
+import MeetingLaunchDialog from './components/MeetingLaunchDialog'
 import WrapupOverlay from './components/WrapupOverlay'
 import KnockOverlay from './components/KnockOverlay'
 import { useCallStore } from './stores/call'
@@ -605,6 +606,7 @@ export default function App(): JSX.Element {
       <FocusSessionOverlay />
       <CallOverlay />
       <MeetingOverlay />
+      <MeetingLaunchDialog />
       <WrapupOverlay />
       <KnockOverlay />
       <BringMeBack />

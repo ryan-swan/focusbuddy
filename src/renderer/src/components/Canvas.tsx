@@ -59,6 +59,7 @@ import ZoomControls from './ZoomControls'
 import CanvasEdgeIndicators from './CanvasEdgeIndicators'
 import { useEdgePan } from '../lib/useEdgePan'
 import { useNavPrefs, frictionFromGlide } from '../lib/navPrefs'
+import { launchMeeting } from '../lib/startMeeting'
 import CanvasAIAssistantRail from './CanvasAIAssistantRail'
 import Icon from './Icon'
 import { useChatStore } from '../stores/chat'
@@ -2239,6 +2240,15 @@ export default function Canvas(): JSX.Element {
             <span>Build</span>
           </button>
           <FivePromiseButton taskId={activeTask.id} />
+          <button
+            onClick={() => void launchMeeting({ kind: 'desk', nodeId: activeTask.id, title: activeTask.title })}
+            className="btn-ghost"
+            title="Start a meeting from this desk and share it with the people you invite"
+            data-testid="desk-start-meeting"
+          >
+            <Icon name="videocam" size={14} />
+            <span>Meeting</span>
+          </button>
           <button
             onClick={() => setShowResume(true)}
             className={`btn-ghost ${activeTask.resumeMarkdown ? '!text-stone-900' : ''}`}
