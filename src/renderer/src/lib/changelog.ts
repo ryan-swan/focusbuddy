@@ -36,6 +36,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.146',
+    date: '2026-07-03T03:00:00Z',
+    title: 'v2.5.146 — a separate mailbox per organisation',
+    tag: 'fix',
+    summary:
+      'Mail is now tied to the organisation you are in, not shared across all of them. Each organisation keeps its own mailbox on this device, so connecting an account in one organisation no longer shows it in the others, and switching organisation switches your mailbox with it. Your existing mailbox moves into your Personal space, and every organisation starts fresh so you can connect the right account for each one.',
+    highlights: [
+      'Each organisation has its own mailbox on this device, tied to you.',
+      'Connecting mail in one org no longer leaks it into every other org.',
+      'Your existing mailbox is kept in your Personal space.'
+    ]
+  },
+  {
     version: '2.5.145',
     date: '2026-07-03T01:00:00Z',
     title: 'v2.5.145 — the org panel follows the org you are in',

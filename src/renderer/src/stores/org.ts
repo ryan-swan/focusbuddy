@@ -5,6 +5,7 @@ import { useNodeStore } from './nodes'
 import { useDocumentsStore } from './documents'
 import { useConnectedAppsStore } from './connectedApps'
 import { useFileManagerStore } from './fileManager'
+import { useMailStore } from './mail'
 import { useViewStore } from './view'
 
 // The active organisation is the tenancy boundary for the whole workspace. The
@@ -95,7 +96,10 @@ export const useOrgStore = create<OrgStore>((set, get) => ({
       useConnectedAppsStore.getState().refresh(),
       // The file manager caches its entries independent of the view, so it must
       // be reloaded explicitly or it would keep showing the previous org's files.
-      useFileManagerStore.getState().refresh()
+      useFileManagerStore.getState().refresh(),
+      // Mail is per-org on this device (each org has its own mailbox), so reload
+      // the active org's account + envelopes on switch.
+      useMailStore.getState().loadAccount()
     ])
     useNodeStore.getState().setActive(null)
     // Resetting the view re-mounts the per-view surfaces (calendar, vault,
