@@ -15,6 +15,7 @@ import {
 } from './editor/headingStyles'
 import Toolbar from './editor/Toolbar'
 import DocMenuBar from './editor/DocMenuBar'
+import { setPaginationConfig } from './editor/pagination'
 import DocBubbleMenu from './editor/DocBubbleMenu'
 import FindReplace from './editor/FindReplace'
 import DocSidePanel, { type DocSidePanelTab, type PanelCommentThread } from './editor/DocSidePanel'
@@ -770,72 +771,81 @@ function MarginMenu({
   )
 }
 
-// The page-view surface: the editor body rendered onto a paper-sized sheet with
-// real per-side margins and a drop shadow on a soft canvas, with dashed page-break
-// guides drawn at each page boundary as the content grows. Paper size, orientation
-// and margins flow straight from the document's own page setup. The breaks are
-// honest guides — the text stays one continuous flow underneath rather than being
-// silently split.
+// The gap drawn between two sheets in page view. The pagination plugin pushes
+// content onto the next sheet with a transparent spacer of matching height, so
+// this is a genuine gap between discrete pages, not a line through one long sheet.
+const PAGE_GAP = 28
+
+// The page-view surface: content laid out onto discrete paper-sized sheets, each
+// at the document's real paper size, orientation and margins, separated by a true
+// gap. The pagination extension measures the blocks and inserts spacers so a block
+// never straddles a page edge; this component draws one white sheet per page under
+// the flowing content and lets the grey canvas show through the gaps.
 function PageSheet({ editor, page }: { editor: Editor; page: PageSetup }): JSX.Element {
   const geom = pageGeometry(page)
-  const contentRef = useRef<HTMLDivElement | null>(null)
-  const [contentH, setContentH] = useState(0)
+  const usable = Math.max(1, geom.h - geom.mTop - geom.mBottom)
+  const [pageCount, setPageCount] = useState(1)
 
+  // Feed the live page metrics to the pagination plugin while this sheet is
+  // mounted, and switch pagination off again when we leave page view.
   useEffect(() => {
-    const el = contentRef.current
-    if (!el) return
-    const ro = new ResizeObserver(() => setContentH(el.scrollHeight))
-    ro.observe(el)
-    setContentH(el.scrollHeight)
-    return () => ro.disconnect()
-  }, [page])
+    setPaginationConfig({
+      enabled: true,
+      pageContentPx: usable,
+      gapPx: PAGE_GAP,
+      mTop: geom.mTop,
+      mBottom: geom.mBottom,
+      onPages: setPageCount
+    })
+    return () => setPaginationConfig({ enabled: false, onPages: null })
+  }, [usable, geom.mTop, geom.mBottom])
 
-  const usable = geom.h - geom.mTop - geom.mBottom
-  const breaks: number[] = []
-  for (let y = usable; y < contentH && breaks.length < 400; y += usable) breaks.push(y)
+  const stride = geom.h + PAGE_GAP
+  const totalH = pageCount * geom.h + (pageCount - 1) * PAGE_GAP
 
   return (
     <div
-      className="flex justify-center py-8 px-4 overflow-x-auto bg-stone-300/40 dark:bg-black/30"
+      className="flex justify-center py-8 px-4 overflow-x-auto bg-stone-300/50 dark:bg-black/40"
       data-testid="doc-page-canvas"
     >
-      <div
-        className="relative bg-white dark:bg-stone-900 shadow-xl rounded-[2px]"
-        data-testid="doc-page"
-        data-orientation={page.orientation}
-        style={{
-          width: geom.w,
-          minHeight: geom.h,
-          paddingTop: geom.mTop,
-          paddingBottom: geom.mBottom,
-          paddingLeft: geom.mLeft,
-          paddingRight: geom.mRight
-        }}
-      >
-        <div ref={contentRef}>
-          <EditorContent editor={editor} />
-        </div>
-        {breaks.map((y, i) => (
-          <div
-            key={i}
-            data-testid="doc-page-break"
-            style={{ position: 'absolute', left: 0, right: 0, top: geom.mTop + y, pointerEvents: 'none' }}
-          >
-            <div style={{ borderTop: '1px dashed rgba(120,120,120,0.45)' }} />
+      <div className="relative" data-testid="doc-page" data-orientation={page.orientation} data-pages={pageCount} style={{ width: geom.w, minHeight: totalH }}>
+        {/* One white sheet per page, each the real paper height, stacked with the
+            gap between them so the grey canvas shows through as a true page split. */}
+        <div className="absolute inset-0 pointer-events-none" aria-hidden>
+          {Array.from({ length: pageCount }).map((_, i) => (
+            <div
+              key={i}
+              data-testid="doc-page-sheet"
+              className="absolute left-0 right-0 bg-white dark:bg-stone-900 shadow-xl rounded-[2px]"
+              style={{ top: i * stride, height: geom.h }}
+            />
+          ))}
+          {/* A small page number in each gap. */}
+          {Array.from({ length: Math.max(0, pageCount - 1) }).map((_, i) => (
             <span
-              style={{
-                position: 'absolute',
-                right: 10,
-                top: 3,
-                fontSize: 9,
-                letterSpacing: '0.04em',
-                color: 'rgba(120,120,120,0.75)'
-              }}
+              key={i}
+              data-testid="doc-page-break"
+              className="absolute right-2 text-stone-500 dark:text-stone-400 fb-tabular"
+              style={{ top: (i + 1) * stride - PAGE_GAP + Math.round((PAGE_GAP - 10) / 2), fontSize: 9, letterSpacing: '0.04em' }}
             >
               Page {i + 2}
             </span>
-          </div>
-        ))}
+          ))}
+        </div>
+
+        {/* The flowing content sits on top of the sheets; the plugin's spacers
+            create the real gaps that align it to each sheet. */}
+        <div
+          className="relative"
+          style={{
+            paddingTop: geom.mTop,
+            paddingBottom: geom.mBottom,
+            paddingLeft: geom.mLeft,
+            paddingRight: geom.mRight
+          }}
+        >
+          <EditorContent editor={editor} />
+        </div>
       </div>
     </div>
   )
