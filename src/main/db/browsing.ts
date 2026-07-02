@@ -1,4 +1,5 @@
 import { getDb } from './database'
+import { getActiveOrgId } from './activeOrg'
 import type { BrowsingHistoryEntry } from '@shared/types'
 
 interface HistoryRow {
@@ -45,14 +46,15 @@ export function recordVisit(url: string, title: string, taskId: string | null): 
   const host = safeHostOf(url)
   const cleanTitle = (title || '').trim()
   db.prepare(
-    `INSERT INTO browsing_history (url, title, host, task_id, first_visited_at, last_visited_at, visit_count)
-     VALUES (@url, @title, @host, @taskId, @now, @now, 1)
+    `INSERT INTO browsing_history (url, title, host, task_id, first_visited_at, last_visited_at, visit_count, org_id)
+     VALUES (@url, @title, @host, @taskId, @now, @now, 1, @orgId)
      ON CONFLICT(url) DO UPDATE SET
        title = CASE WHEN excluded.title != '' THEN excluded.title ELSE browsing_history.title END,
        last_visited_at = excluded.last_visited_at,
        visit_count = browsing_history.visit_count + 1,
-       task_id = COALESCE(excluded.task_id, browsing_history.task_id)`
-  ).run({ url, title: cleanTitle, host, taskId, now })
+       task_id = COALESCE(excluded.task_id, browsing_history.task_id),
+       org_id = excluded.org_id`
+  ).run({ url, title: cleanTitle, host, taskId, now, orgId: getActiveOrgId() })
 }
 
 export function getRecentHistory(limit = 12, taskId?: string | null): BrowsingHistoryEntry[] {
@@ -81,10 +83,10 @@ export function getRecentHistory(limit = 12, taskId?: string | null): BrowsingHi
   }
   const rows = db
     .prepare(
-      `SELECT * FROM browsing_history
+      `SELECT * FROM browsing_history WHERE org_id = ?
        ORDER BY visit_count DESC, last_visited_at DESC LIMIT ?`
     )
-    .all(limit) as HistoryRow[]
+    .all(getActiveOrgId(), limit) as HistoryRow[]
   return rows.map(rowToEntry)
 }
 

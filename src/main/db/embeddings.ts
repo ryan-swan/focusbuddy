@@ -1,4 +1,5 @@
 import { getDb } from './database'
+import { getActiveOrgId } from './activeOrg'
 
 // ── fb_embeddings (semantic-retrieval foundation) ────────────────────────────
 // A vector store keyed by (item_type, item_id). item_type lets one table hold
@@ -17,11 +18,11 @@ interface EmbeddingRow {
 
 const upsertStmt = (): ReturnType<ReturnType<typeof getDb>['prepare']> =>
   getDb().prepare(
-    `INSERT INTO fb_embeddings (item_type, item_id, vector_json, model, dim, updated_at)
-     VALUES (@itemType, @itemId, @vector, @model, @dim, @now)
+    `INSERT INTO fb_embeddings (item_type, item_id, vector_json, model, dim, updated_at, org_id)
+     VALUES (@itemType, @itemId, @vector, @model, @dim, @now, @orgId)
      ON CONFLICT(item_type, item_id)
      DO UPDATE SET vector_json = excluded.vector_json, model = excluded.model,
-                   dim = excluded.dim, updated_at = excluded.updated_at`
+                   dim = excluded.dim, updated_at = excluded.updated_at, org_id = excluded.org_id`
   )
 
 export function setEmbedding(itemType: string, itemId: string, vector: number[], model: string): void {
@@ -31,7 +32,8 @@ export function setEmbedding(itemType: string, itemId: string, vector: number[],
     vector: JSON.stringify(vector),
     model,
     dim: vector.length,
-    now: Date.now()
+    now: Date.now(),
+    orgId: getActiveOrgId()
   })
 }
 
@@ -50,8 +52,8 @@ export function getEmbedding(itemType: string, itemId: string): number[] | null 
 
 export function listEmbeddings(itemType: string): Map<string, number[]> {
   const rows = getDb()
-    .prepare('SELECT item_id, vector_json FROM fb_embeddings WHERE item_type = ?')
-    .all(itemType) as Pick<EmbeddingRow, 'item_id' | 'vector_json'>[]
+    .prepare('SELECT item_id, vector_json FROM fb_embeddings WHERE item_type = ? AND org_id = ?')
+    .all(itemType, getActiveOrgId()) as Pick<EmbeddingRow, 'item_id' | 'vector_json'>[]
   const out = new Map<string, number[]>()
   for (const r of rows) {
     try {

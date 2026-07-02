@@ -36,6 +36,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.155',
+    date: '2026-07-03T13:00:00Z',
+    title: 'v2.5.155 — search and recents respect your organisation too',
+    tag: 'fix',
+    summary:
+      'The last surfaces that still crossed organisations are now scoped. Semantic search only surfaces items from the organisation you are in, and the recent-activity, focus-session and browsing panels show only that organisation’s history rather than a mix. On the server, sending a connect request to someone who already has an account now requires that you share an organisation with them, so the contact list cannot be used to reach across organisations; inviting a brand-new person by email still works as before.',
+    highlights: [
+      'Semantic search results are scoped to the active organisation.',
+      'Recent activity, focus sessions and browsing history are per-organisation.',
+      'Contact requests to existing accounts require a shared organisation.'
+    ]
+  },
+  {
     version: '2.5.154',
     date: '2026-07-03T12:00:00Z',
     title: 'v2.5.154 — every surface now switches with your organisation',

@@ -750,6 +750,12 @@ export function getDb(): Database.Database {
   ensureColumn(db, 'fb_meetings', 'org_id', "TEXT NOT NULL DEFAULT 'personal'")
   ensureColumn(db, 'fb_sign_requests', 'org_id', "TEXT NOT NULL DEFAULT 'personal'")
   ensureColumn(db, 'fb_smart_folders', 'org_id', "TEXT NOT NULL DEFAULT 'personal'")
+  // Semantic-search vectors and the activity / focus / browsing logs are scoped
+  // too, so search results and "recent" panels only reflect the active org.
+  ensureColumn(db, 'fb_embeddings', 'org_id', "TEXT NOT NULL DEFAULT 'personal'")
+  ensureColumn(db, 'activity_log', 'org_id', "TEXT NOT NULL DEFAULT 'personal'")
+  ensureColumn(db, 'focus_sessions', 'org_id', "TEXT NOT NULL DEFAULT 'personal'")
+  ensureColumn(db, 'browsing_history', 'org_id', "TEXT NOT NULL DEFAULT 'personal'")
   db.exec(`
     CREATE INDEX IF NOT EXISTS idx_time_blocks_org ON time_blocks(org_id);
     CREATE INDEX IF NOT EXISTS idx_vault_entries_org ON vault_entries(org_id);
