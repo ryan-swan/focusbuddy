@@ -25,7 +25,7 @@ export interface MeetingAccessOption {
 export const MEETING_ACCESS_OPTIONS: MeetingAccessOption[] = [
   { level: 'view-once', label: 'Allow view for this meeting', hint: 'Read-only, expires after the meeting.' },
   { level: 'view-always', label: 'Always allow view', hint: 'Read-only access that does not expire.' },
-  { level: 'collaborate', label: 'Invite to collaborate', hint: 'Editable during the meeting; you choose what happens after.' }
+  { level: 'collaborate', label: 'Invite to collaborate', hint: 'Edit the same document together during the meeting; you choose what happens after.' }
 ]
 
 // Resolve a level into the share scope + expiry to mint. `endsAtMs` is when the
