@@ -12,11 +12,17 @@ import {
   setLiveDocMemberRole,
   removeLiveDocMember
 } from './docCollabClient'
+import { promoteToLiveCanvas } from './liveCanvasMirror'
 import type { MeetingOrigin } from './startMeeting'
 
-// docTypes that have a live (co-editable) editor. Collaborate on one of these
-// opens a real shared document; other origins fall back to an editable copy.
-const LIVE_DOC_KINDS = new Set(['doc', 'sheet', 'slides'])
+// Meeting origins whose artifact is a document: each becomes a live document of
+// its own docType (a drawing is a 'map', a design is a 'design'), co-edited in
+// the matching live editor.
+const DOC_ORIGIN_KINDS = new Set(['doc', 'sheet', 'slides', 'draw', 'design'])
+// Every origin that has a real live (co-editable) form: the document apps plus
+// a desk (which becomes a live canvas). Collaborate on any of these is genuine
+// co-editing; anything else falls back to an editable copy.
+const COLLAB_LIVE_KINDS = new Set([...DOC_ORIGIN_KINDS, 'desk'])
 
 // What happens to a collaborate grant once the meeting ends. Collaborate access
 // is only meant to last for the meeting by default: attendees work on the
@@ -107,53 +113,72 @@ export async function shareArtifactWithAttendees(input: {
   const emails = input.attendees.map((e) => e.trim().toLowerCase()).filter((e) => e.includes('@'))
   if (emails.length === 0) return { shared: 0, emailed: 0, failed: [] }
 
-  // Collaborate on a live-capable document opens ONE shared document everyone
-  // edits together in real time — genuine co-editing, not a copy each. Every
-  // other case (view levels, or collaborate on a desk/drawing) uses a share.
-  if (input.level === 'collaborate' && LIVE_DOC_KINDS.has(input.origin.kind)) {
+  // Collaborate opens ONE shared object everyone edits together in real time —
+  // genuine co-editing, not a copy each — consistently across every app: a
+  // document / sheet / deck / drawing / design becomes a live document, and a
+  // desk becomes a live canvas. Only if the live object cannot be created do we
+  // fall back to a copy share so attendees still get access rather than nothing.
+  if (input.level === 'collaborate' && COLLAB_LIVE_KINDS.has(input.origin.kind)) {
     const live = await collaborateLive(input.origin, emails, input.afterAccess ?? 'downgrade-view')
     if (live) return live
-    // If the live doc could not be created, fall through to the copy share so
-    // attendees still get access rather than nothing.
   }
 
   return shareViaCopy(input.origin, emails, input.level, input.afterAccess ?? 'downgrade-view')
 }
 
-// Real co-editing: seed a live document from the source, add each attendee who
-// is an existing user as an editor member, and remember them so the meeting's
-// end can turn them read-only, remove them, or leave them. Attendees with no
-// account cannot co-edit, so they get an editable-copy share instead.
+// Create the live object for a meeting origin, seeded from its current content:
+// a document-backed app (doc/sheet/slides/draw/design) becomes a live document
+// of the SAME docType, and a desk becomes a live canvas. Returns the live id, or
+// null when the origin has no live form or creation failed.
+async function createLiveForOrigin(origin: MeetingOrigin, token: string): Promise<string | null> {
+  if (origin.kind === 'desk') {
+    const node = useNodeStore.getState().nodes.find((n) => n.id === origin.nodeId)
+    if (!node) return null
+    // Reuse the app's own desk->live-canvas promotion so co-editing behaves
+    // exactly like the "Collaborate live" action already does for a desk.
+    return promoteToLiveCanvas(node, token)
+  }
+  if (DOC_ORIGIN_KINDS.has(origin.kind) && 'id' in origin) {
+    const doc = await window.api.documents.get(origin.id)
+    if (!doc) return null
+    // The live docType is the document's real type (a drawing is 'map', a design
+    // is 'design'), so it opens in the matching live editor.
+    const live = await createLiveDoc(token, {
+      docType: doc.docType,
+      title: doc.title || origin.title || 'Meeting document',
+      body: JSON.stringify(doc.body ?? {})
+    })
+    return live?.id ?? null
+  }
+  return null
+}
+
+// Real co-editing: build the live object, add each attendee who is an existing
+// user as an editor member, and remember them so the meeting's end can turn them
+// read-only, remove them, or leave them. Attendees with no account cannot
+// co-edit, so they get an editable-copy share instead.
 async function collaborateLive(
   origin: MeetingOrigin,
   emails: string[],
   after: MeetingAfterAccess
 ): Promise<MeetingShareResult | null> {
   const token = useAccountStore.getState().sessionToken
-  if (!token || origin.kind === 'desk' || origin.kind === 'chat' || origin.kind === 'calendar' || origin.kind === 'standalone') {
-    return null
-  }
-  const doc = await window.api.documents.get(origin.id)
-  if (!doc) return null
-  const live = await createLiveDoc(token, {
-    docType: origin.kind,
-    title: doc.title || origin.title || 'Meeting document',
-    body: JSON.stringify(doc.body ?? {})
-  })
-  if (!live) return null
+  if (!token) return null
+  const liveId = await createLiveForOrigin(origin, token)
+  if (!liveId) return null
 
   const memberAccountIds: string[] = []
   const noAccount: string[] = []
   const failed: string[] = []
   for (const email of emails) {
-    const r = await inviteToLiveDocByEmail(token, live.id, email)
+    const r = await inviteToLiveDocByEmail(token, liveId, email)
     if (!r.ok) failed.push(email)
     else if (r.accountId) memberAccountIds.push(r.accountId)
     else noAccount.push(email) // not a user yet — copy-share them below
   }
 
   if (after !== 'keep' && memberAccountIds.length > 0) {
-    pendingLiveDowngrades.push({ token, liveDocId: live.id, memberAccountIds, after })
+    pendingLiveDowngrades.push({ token, liveDocId: liveId, memberAccountIds, after })
     installMeetingEndDowngrade()
   }
 

@@ -36,6 +36,20 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.153',
+    date: '2026-07-03T11:00:00Z',
+    title: 'v2.5.153 — collaborate works the same in every app',
+    tag: 'feature',
+    summary:
+      'Collaborating from a meeting now opens one shared, co-edited object no matter which app you started in. Documents, sheets and decks already did this; drawings and designs now do too, each opening in its own live editor, and a desk becomes a live canvas everyone works on together. To make that real, designs gained a live collaborative editor they were missing, so sharing a design for collaboration now actually opens it for co-editing rather than creating something that could not be opened. As before, people without an account get an editable copy, and when the meeting ends collaborators become read-only, are removed, or keep editing, whichever you chose.',
+    highlights: [
+      'Collaborate is consistent across docs, sheets, decks, drawings, designs and desks.',
+      'Drawings and designs open in their own live editor; a desk becomes a live canvas.',
+      'Designs gained the live collaborative editor they were missing.',
+      'Non-users still get an editable copy; end-of-meeting access rules unchanged.'
+    ]
+  },
+  {
     version: '2.5.152',
     date: '2026-07-03T10:00:00Z',
     title: 'v2.5.152 — collaborate means editing the same document together',
