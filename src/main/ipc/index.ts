@@ -1,6 +1,6 @@
 import { app, ipcMain, BrowserWindow, dialog, shell, webContents as allWebContents, type WebContents } from 'electron'
 import { writeFile } from 'node:fs/promises'
-import { consumePendingAuthHandoff, consumePendingShareToken } from '../authProtocol'
+import { consumePendingAuthHandoff, consumePendingShareToken, consumePendingMeetRoom } from '../authProtocol'
 import {
   checkForUpdates,
   getCurrentUpdateState,
@@ -1658,6 +1658,7 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('auth:get-pending', () => consumePendingAuthHandoff())
   // Same drain-pending pattern for a share deep link (haptyx://share?token=...).
   ipcMain.handle('share:get-pending', () => consumePendingShareToken())
+  ipcMain.handle('meet:get-pending', () => consumePendingMeetRoom())
 
   // ── Auto-update ──────────────────────────────────────────────────────────
   // The renderer subscribes via the `update:state` event (broadcast from

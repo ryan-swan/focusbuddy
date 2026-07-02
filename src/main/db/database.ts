@@ -733,6 +733,9 @@ export function getDb(): Database.Database {
   // documents. Added at the end where every table exists; existing rows backfill
   // to the reserved 'personal' org via the DEFAULT (no data loss).
   ensureColumn(db, 'time_blocks', 'org_id', "TEXT NOT NULL DEFAULT 'personal'")
+  // A calendar block can be a video meeting; its room + invitee list ride along
+  // as JSON. Nullable, so every existing focus block stays a plain focus block.
+  ensureColumn(db, 'time_blocks', 'meeting_json', 'TEXT')
   ensureColumn(db, 'vault_entries', 'org_id', "TEXT NOT NULL DEFAULT 'personal'")
   ensureColumn(db, 'fb_knowledge', 'org_id', "TEXT NOT NULL DEFAULT 'personal'")
   ensureColumn(db, 'fb_tables', 'org_id', "TEXT NOT NULL DEFAULT 'personal'")

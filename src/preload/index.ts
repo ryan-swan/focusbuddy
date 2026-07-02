@@ -1507,6 +1507,16 @@ const api = {
       return () => ipcRenderer.removeListener('share:incoming-token', handler)
     }
   },
+  // Meeting-join deep link (haptyx://meet?room=...) from an invite email —
+  // same drain-on-mount + live-event pattern as share.
+  meet: {
+    getPending: (): Promise<string | null> => ipcRenderer.invoke('meet:get-pending'),
+    onIncomingRoom: (cb: (roomId: string) => void): (() => void) => {
+      const handler = (_: unknown, roomId: string): void => cb(roomId)
+      ipcRenderer.on('meet:incoming-room', handler)
+      return () => ipcRenderer.removeListener('meet:incoming-room', handler)
+    }
+  },
   // File import — opens a native picker scoped to importable extensions,
   // then converts the contents into a widget draft (text / table /
   // page-from-json). The renderer creates the actual widget through the

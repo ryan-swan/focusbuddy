@@ -75,9 +75,41 @@ export default function ShareDialog({
   const inviteToken = fresh?.token ?? outgoing.find((s) => !s.revoked)?.token ?? null
   const entityRecipients = recipientsByEntity[entityId] ?? []
 
+  // The active org's domain, so an invite to someone outside it can be
+  // confirmed before it goes out ("send outside the organisation?"). Loaded
+  // once per active org; a personal org has no domain and never warns.
+  const [orgDomain, setOrgDomain] = useState<string | null>(null)
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      const { useOrgStore } = await import('../stores/org')
+      const { useAccountStore } = await import('../stores/account')
+      const orgId = useOrgStore.getState().activeOrgId
+      const token = useAccountStore.getState().sessionToken
+      if (!token || !orgId || orgId === 'personal') {
+        if (!cancelled) setOrgDomain(null)
+        return
+      }
+      const { getInvitePolicy } = await import('../lib/orgsClient')
+      const p = await getInvitePolicy(token, orgId)
+      if (!cancelled) setOrgDomain(p.domain)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   async function handleInvite(): Promise<void> {
     const email = inviteEmail.trim().toLowerCase()
     if (!email.includes('@') || !inviteToken || inviteBusy) return
+    // Sharing outside the organization domain asks for confirmation first.
+    const domain = email.split('@')[1] ?? ''
+    if (orgDomain && domain !== orgDomain.toLowerCase()) {
+      const ok = window.confirm(
+        `${email} is outside ${orgDomain}. Send this share outside the organisation?`
+      )
+      if (!ok) return
+    }
     setInviteBusy(true)
     setInviteMsg(null)
     try {

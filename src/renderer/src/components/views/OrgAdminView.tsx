@@ -18,6 +18,8 @@ import {
   deleteOffice,
   getOrgHours,
   setOrgHours,
+  getInvitePolicy,
+  setInvitePolicy,
   getMemberProfile,
   setMemberProfile,
   uploadMemberPhoto,
@@ -64,6 +66,10 @@ export default function OrgAdminView(): JSX.Element {
   // People-Map setup state
   const [offices, setOffices] = useState<Office[]>([])
   const [orgHours, setHoursState] = useState<WorkWindow>({ start: 9, end: 17 })
+  const [invitePolicy, setInvitePolicyState] = useState<{ allowExternalInvite: boolean; domain: string | null }>({
+    allowExternalInvite: true,
+    domain: null
+  })
   const [profiles, setProfiles] = useState<Record<string, MemberProfile>>({})
   const [openProfile, setOpenProfile] = useState<string | null>(null)
   const [newOffice, setNewOffice] = useState('')
@@ -115,6 +121,7 @@ export default function OrgAdminView(): JSX.Element {
     }
     setOffices(await listOffices(token, selId))
     setHoursState(await getOrgHours(token, selId))
+    setInvitePolicyState(await getInvitePolicy(token, selId))
     setAudit(await listAudit(token, selId)) // server returns [] for non-admins
     const s = await getSso(token, selId)
     setSsoState(s)
@@ -165,6 +172,16 @@ export default function OrgAdminView(): JSX.Element {
     if (res.ok) {
       setInviteEmail('')
       void refreshDetail()
+    }
+  }
+  async function doSetPolicy(allow: boolean): Promise<void> {
+    if (!token || !selId) return
+    setInvitePolicyState((p) => ({ ...p, allowExternalInvite: allow }))
+    const res = await setInvitePolicy(token, selId, allow)
+    if (!res.ok) {
+      setMsg(res.error ?? 'Could not change the invite policy.')
+      // Revert the optimistic flip on failure.
+      setInvitePolicyState(await getInvitePolicy(token, selId))
     }
   }
   async function doRole(accountId: string, role: OrgRole): Promise<void> {
@@ -401,6 +418,36 @@ export default function OrgAdminView(): JSX.Element {
                     )}
                   </div>
                 ))}
+              </div>
+            )}
+
+            {/* Invite domain policy */}
+            {canAdmin && !detail.org.personal && (
+              <div className="mt-3 pt-3 border-t border-stone-200 dark:border-stone-800">
+                <label className="flex items-start gap-2 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={invitePolicy.allowExternalInvite}
+                    onChange={(e) => void doSetPolicy(e.target.checked)}
+                    className="mt-0.5 accent-accent"
+                    data-testid="org-allow-external"
+                  />
+                  <span className="text-[12px] text-stone-700 dark:text-stone-200">
+                    Allow inviting people outside{' '}
+                    {invitePolicy.domain ? `@${invitePolicy.domain}` : 'the organization domain'}.
+                    {!invitePolicy.allowExternalInvite && (
+                      <span className="block text-[11px] text-stone-500 dark:text-stone-400">
+                        Off: only people at {invitePolicy.domain ? `@${invitePolicy.domain}` : 'your domain'} can be
+                        invited, and sharing outside is flagged.
+                      </span>
+                    )}
+                    {!invitePolicy.domain && (
+                      <span className="block text-[11px] text-stone-500 dark:text-stone-400">
+                        Set an SSO domain below to enforce this.
+                      </span>
+                    )}
+                  </span>
+                </label>
               </div>
             )}
 

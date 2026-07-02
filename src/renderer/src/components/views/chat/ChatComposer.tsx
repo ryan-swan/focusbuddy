@@ -3,6 +3,7 @@ import Icon from '../../Icon'
 import { uploadAttachment, attachmentKindForMime, type MessageAttachment } from '../../../lib/messagingClient'
 import { EmojiPicker } from './EmojiPicker'
 import { GifPicker } from './GifPicker'
+import { launchMeeting } from '../../../lib/startMeeting'
 
 // The message composer: text plus the ways to enrich a message — attach a file or
 // image, record a voice note, insert an emoji. A pending attachment is uploaded
@@ -261,6 +262,14 @@ export function ChatComposer({
           </button>
           {showGif && <GifPicker onSelect={(url, desc) => void pickGif(url, desc)} onClose={() => setShowGif(false)} />}
         </div>
+        <button
+          onClick={() => void launchMeeting({ kind: 'chat', channelId: conversationId, title: 'Chat meeting' })}
+          className="icon-btn shrink-0"
+          title="Start a meeting"
+          data-testid="composer-meet"
+        >
+          <Icon name="videocam" size={16} />
+        </button>
         <textarea
           value={draft}
           onChange={(e) => {

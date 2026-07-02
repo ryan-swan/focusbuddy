@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { FbDocument } from '@shared/types'
 import { useDocumentsStore } from '../../../stores/documents'
 import { useViewStore } from '../../../stores/view'
+import { launchMeeting } from '../../../lib/startMeeting'
 import { MenuBarShell, MenuModal, type MenuDef } from './menuBarKit'
 
 // A Google-Slides-style menu bar for the deck editor. Menus reflect what a
@@ -127,7 +128,9 @@ export default function SlidesMenuBar({ actions }: { actions: SlidesMenuActions 
             { kind: 'item', label: 'Triangle', run: () => a.insertShape('triangle') }
           ]
         },
-        { kind: 'item', label: 'Line', icon: 'horizontal_rule', run: a.insertLine }
+        { kind: 'item', label: 'Line', icon: 'horizontal_rule', run: a.insertLine },
+        { kind: 'sep' },
+        { kind: 'item', label: 'Meeting', icon: 'videocam', run: () => void launchMeeting({ kind: 'slides', id: active?.id ?? '', title: a.title || 'Presentation meeting' }) }
       ]
     },
     {

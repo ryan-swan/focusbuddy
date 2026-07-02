@@ -246,6 +246,34 @@ export async function getOrgHours(token: string, id: string): Promise<WorkWindow
   const { json } = await call<{ ok: boolean; hours?: WorkWindow }>('GET', `/orgs/${id}/settings`, token)
   return json?.hours ?? { start: 9, end: 17 }
 }
+
+export interface InvitePolicy {
+  allowExternalInvite: boolean
+  domain: string | null
+}
+
+// The org's invite domain policy. When allowExternalInvite is false, only people
+// at `domain` can be invited; sharing to others is flagged. Reads from the same
+// /settings endpoint as working hours.
+export async function getInvitePolicy(token: string, id: string): Promise<InvitePolicy> {
+  const { json } = await call<{ ok: boolean; allowExternalInvite?: boolean; domain?: string | null }>(
+    'GET',
+    `/orgs/${id}/settings`,
+    token
+  )
+  return { allowExternalInvite: json?.allowExternalInvite ?? true, domain: json?.domain ?? null }
+}
+
+export async function setInvitePolicy(
+  token: string,
+  id: string,
+  allowExternalInvite: boolean
+): Promise<{ ok: boolean; error?: string }> {
+  const { json } = await call<{ ok: boolean; error?: string }>('PUT', `/orgs/${id}/invite-policy`, token, {
+    allowExternalInvite
+  })
+  return json ?? { ok: false, error: 'Request failed.' }
+}
 export async function setOrgHours(token: string, id: string, hours: WorkWindow): Promise<{ ok: boolean; error?: string }> {
   const { json } = await call<{ ok: boolean; error?: string }>('PUT', `/orgs/${id}/settings`, token, hours)
   return json ?? { ok: false, error: 'Request failed.' }

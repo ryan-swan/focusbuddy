@@ -230,6 +230,29 @@ export default function App(): JSX.Element {
     }
   }, [])
 
+  // Meeting-join deep link (haptyx://meet?room=...) from an invite email → open
+  // the meeting view and join that room. Same drain-pending + subscribe pattern.
+  useEffect(() => {
+    let detach: (() => void) | null = null
+    async function run(): Promise<void> {
+      const join = async (roomId: string): Promise<void> => {
+        try {
+          const { joinMeetingRoom } = await import('./lib/startMeeting')
+          await joinMeetingRoom(roomId, 'Meeting')
+        } catch {
+          /* non-fatal — the user can join from the calendar block instead */
+        }
+      }
+      const pendingRoom = await window.api.meet.getPending()
+      if (pendingRoom) await join(pendingRoom)
+      detach = window.api.meet.onIncomingRoom((r) => void join(r))
+    }
+    void run()
+    return () => {
+      detach?.()
+    }
+  }, [])
+
   // First launch after an update → show the "What's new" modal once for this
   // version. The main process says authoritatively whether this boot followed
   // an update; we then advance the run-version marker so the next update is

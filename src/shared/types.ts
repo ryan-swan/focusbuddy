@@ -208,6 +208,15 @@ export interface NodePatch {
 // 2-3pm to focus on this", and a block can launch a focus session for its task.
 export type TimeBlockStatus = 'planned' | 'done'
 
+// When a time block is a scheduled meeting, it carries the room to join and the
+// people invited to it. The room id is stable so the same link works for the
+// host and every invitee: the join email, the calendar "Join" button, and the
+// haptyx://meet?room= deep link all open this one room.
+export interface TimeBlockMeeting {
+  roomId: string
+  invitees: string[] // email addresses the invite was sent to
+}
+
 export interface TimeBlock {
   id: string
   taskId: string | null // null = a generic focus/time block with no task
@@ -215,6 +224,7 @@ export interface TimeBlock {
   startMs: number // absolute start time
   durationMin: number
   status: TimeBlockStatus
+  meeting?: TimeBlockMeeting | null // set when this block is a video meeting
   createdAt: number
   updatedAt: number
 }
@@ -224,6 +234,7 @@ export interface TimeBlockDraft {
   title?: string
   startMs: number
   durationMin: number
+  meeting?: TimeBlockMeeting | null
 }
 
 export interface TimeBlockPatch {
@@ -232,6 +243,7 @@ export interface TimeBlockPatch {
   startMs?: number
   durationMin?: number
   status?: TimeBlockStatus
+  meeting?: TimeBlockMeeting | null
 }
 
 export interface Widget {
