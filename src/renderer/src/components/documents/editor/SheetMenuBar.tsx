@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { SheetCellFormat, SheetNumberFormat, FbDocument } from '@shared/types'
 import { useDocumentsStore } from '../../../stores/documents'
 import { useViewStore } from '../../../stores/view'
+import { launchMeeting } from '../../../lib/startMeeting'
 import { MenuBarShell, MenuModal, type MenuDef } from './menuBarKit'
 
 // A Google-Sheets-style menu bar for the spreadsheet editor. Every item maps to a
@@ -130,7 +131,9 @@ export default function SheetMenuBar({ actions }: { actions: SheetMenuActions })
         { kind: 'item', label: 'Sparkline', icon: 'show_chart', run: a.insertSparkline },
         { kind: 'sep' },
         { kind: 'item', label: 'Sheet', icon: 'tab', run: a.addSheet },
-        { kind: 'item', label: 'Named range', icon: 'data_object', run: a.namedRanges }
+        { kind: 'item', label: 'Named range', icon: 'data_object', run: a.namedRanges },
+        { kind: 'sep' },
+        { kind: 'item', label: 'Meeting', icon: 'videocam', run: () => void launchMeeting({ kind: 'sheet', id: active?.id ?? '', title: a.title || 'Spreadsheet meeting' }) }
       ]
     },
     {

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { MapShape } from '@shared/types'
 import { useDocumentsStore } from '../../../stores/documents'
 import { useViewStore } from '../../../stores/view'
+import { launchMeeting } from '../../../lib/startMeeting'
 import { MenuBarShell, MenuModal, type MenuDef } from './menuBarKit'
 
 // A menu bar for PlexiDraw (the diagram / mind-map canvas). Draw is a lightweight
@@ -65,8 +66,11 @@ export default function DrawMenuBar({ actions }: { actions: DrawMenuActions }): 
     {
       id: 'insert',
       label: 'Insert',
-      build: () =>
-        a.shapes.map((s) => ({ kind: 'item' as const, label: s.label, run: () => a.addNode(s.shape) }))
+      build: () => [
+        ...a.shapes.map((s) => ({ kind: 'item' as const, label: s.label, run: () => a.addNode(s.shape) })),
+        { kind: 'sep' as const },
+        { kind: 'item' as const, label: 'Meeting', icon: 'videocam', run: () => void launchMeeting({ kind: 'draw', id: active?.id ?? '', title: title || 'Drawing meeting' }) }
+      ]
     },
     {
       id: 'view',

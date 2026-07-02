@@ -36,6 +36,20 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.148',
+    date: '2026-07-03T06:00:00Z',
+    title: 'v2.5.148 — start a meeting from anywhere, and schedule one from the calendar',
+    tag: 'feature',
+    summary:
+      'Meetings now start from wherever you already are. There is a Meeting item in the Insert menu of every editor, so you can jump straight into a call from a document, a spreadsheet, a presentation, a design or a drawing, and a start-meeting button sits in the chat composer too. On the calendar you can now schedule a meeting as a proper event: turn on Video meeting when you book time, add the people you want, and each of them gets an email with the time and a link that opens the meeting in PlexiDesk. The meeting block shows a Join button when the time comes, and clicking the emailed link drops you straight into the room. If no mailbox is connected the meeting is still saved and the join link is on the block, said plainly rather than pretending an invite went out.',
+    highlights: [
+      'A Meeting item in the Insert menu of the document, sheet, slides, design and draw editors.',
+      'A start-meeting button in the chat composer.',
+      'Schedule a meeting from the calendar with invitees who get an email and a one-click join link.',
+      'Meeting blocks carry a Join button; the emailed haptyx://meet link opens the room directly.'
+    ]
+  },
+  {
     version: '2.5.147',
     date: '2026-07-03T05:00:00Z',
     title: 'v2.5.147 — Whisper is opt-in and no longer errors after a meeting',

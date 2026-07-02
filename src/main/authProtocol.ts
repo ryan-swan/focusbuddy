@@ -38,6 +38,9 @@ let pending: AuthHandoff | null = null
 // A share deep link (haptyx://share?token=...) that arrived before a window was
 // ready. Drained by the renderer on load, same pattern as the auth handoff.
 let pendingShareToken: string | null = null
+// A meeting-join deep link (haptyx://meet?room=...) from a meeting invite email,
+// same drain-on-ready pattern.
+let pendingMeetRoom: string | null = null
 
 function parseHaptyxUrl(url: string): Omit<AuthHandoff, 'origin'> | null {
   try {
@@ -95,6 +98,43 @@ export function consumePendingShareToken(): string | null {
   return t
 }
 
+// haptyx://meet?room=<roomId> — the "Join the meeting" link from a meeting
+// invite email. Returns the room id for the renderer to join.
+function parseMeetUrl(url: string): string | null {
+  try {
+    const parsed = new URL(url)
+    if (parsed.protocol !== `${SCHEME}:` || parsed.host !== 'meet') return null
+    return parsed.searchParams.get('room')
+  } catch {
+    return null
+  }
+}
+
+function broadcastMeet(roomId: string) {
+  const wins = BrowserWindow.getAllWindows()
+  if (wins.length === 0) {
+    pendingMeetRoom = roomId
+    return
+  }
+  for (const win of wins) {
+    if (!win.isDestroyed()) {
+      try {
+        win.webContents.send('meet:incoming-room', roomId)
+      } catch {
+        /* renderer still loading; it drains via meet:get-pending on ready */
+      }
+    }
+    if (win.isMinimized()) win.restore()
+    win.focus()
+  }
+}
+
+export function consumePendingMeetRoom(): string | null {
+  const r = pendingMeetRoom
+  pendingMeetRoom = null
+  return r
+}
+
 function broadcast(handoff: AuthHandoff) {
   const wins = BrowserWindow.getAllWindows()
   if (wins.length === 0) {
@@ -125,7 +165,13 @@ function handleAuthUrl(url: string, origin: AuthHandoff['origin']) {
   // Also route share deep links (haptyx://share?token=...) from the share
   // notification email so an existing user can open the shared item in-app.
   const shareToken = parseShareUrl(url)
-  if (shareToken) broadcastShare(shareToken)
+  if (shareToken) {
+    broadcastShare(shareToken)
+    return
+  }
+  // And meeting-join links (haptyx://meet?room=...) from an invite email.
+  const meetRoom = parseMeetUrl(url)
+  if (meetRoom) broadcastMeet(meetRoom)
 }
 
 // Called from main/ipc.ts handler so the renderer can drain anything

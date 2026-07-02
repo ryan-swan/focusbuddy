@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { FbNode, TimeBlock } from '@shared/types'
+import type { FbNode, TimeBlock, TimeBlockMeeting } from '@shared/types'
 import { useNodeStore } from '../../stores/nodes'
 import { useTimeBlockStore } from '../../stores/timeBlocks'
 import { useFocusSessionStore } from '../../stores/focusSession'
 import { useViewStore } from '../../stores/view'
 import { futuristicPowerOn } from '../../lib/audioBeep'
+import { newMeetingRoomId, joinMeetingRoom } from '../../lib/startMeeting'
+import { sendMeetingInvites } from '../../lib/meetingInvite'
 import Icon from '../Icon'
 
 // Week time-grid — the time-blocking surface. Seventeen hour rows × seven day
@@ -280,6 +282,21 @@ export default function WeekTimeGrid({ weekStart }: { weekStart: Date }): JSX.El
 
                       {/* hover actions */}
                       <div className="absolute top-0.5 right-0.5 hidden group-hover/block:flex items-center gap-0.5">
+                        {block.meeting && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              void joinMeetingRoom(block.meeting!.roomId, block.title || 'Meeting')
+                            }}
+                            onPointerDown={(e) => e.stopPropagation()}
+                            className="h-4 w-4 inline-flex items-center justify-center rounded text-white"
+                            style={{ backgroundColor: 'rgb(var(--accent))' }}
+                            title="Join this meeting"
+                            data-testid="block-join-meeting"
+                          >
+                            <Icon name="videocam" size={9} />
+                          </button>
+                        )}
                         {linked && (
                           <button
                             onClick={(e) => {
@@ -355,9 +372,28 @@ export default function WeekTimeGrid({ weekStart }: { weekStart: Date }): JSX.El
           tasks={tasks.filter((t) => t.status !== 'done')}
           prefillNode={composer.prefillNode}
           onCancel={() => setComposer(null)}
-          onCreate={async (taskId, title, durationMin) => {
-            await createBlock({ taskId, title, startMs: composer.startMs, durationMin })
-            setComposer(null)
+          onCreate={async (taskId, title, durationMin, meeting) => {
+            await createBlock({ taskId, title, startMs: composer.startMs, durationMin, meeting })
+            if (!meeting || meeting.invitees.length === 0) return { inviteNote: null }
+            // Send the join details to the invitees over the connected mailbox,
+            // and report the honest outcome (sent / partial / no mailbox).
+            const r = await sendMeetingInvites({
+              title: title || 'Meeting',
+              startMs: composer.startMs,
+              durationMin,
+              roomId: meeting.roomId,
+              invitees: meeting.invitees
+            })
+            if (r.noAccount) {
+              return {
+                inviteNote:
+                  'Meeting saved. Connect a mailbox in Mail to email the invites; the join link is on the calendar block.'
+              }
+            }
+            if (r.failed.length > 0) {
+              return { inviteNote: `Meeting saved. Invited ${r.sent}; could not email ${r.failed.join(', ')}.` }
+            }
+            return { inviteNote: `Meeting saved and invites sent to ${r.sent} ${r.sent === 1 ? 'person' : 'people'}.` }
           }}
         />
       )}
@@ -376,12 +412,20 @@ function BlockComposer({
   tasks: FbNode[]
   prefillNode?: { id: string; title: string; kind: FbNode['kind'] }
   onCancel: () => void
-  onCreate: (taskId: string | null, title: string, durationMin: number) => Promise<void>
+  onCreate: (
+    taskId: string | null,
+    title: string,
+    durationMin: number,
+    meeting: TimeBlockMeeting | null
+  ) => Promise<{ inviteNote: string | null }>
 }): JSX.Element {
   const [taskId, setTaskId] = useState<string>('')
   const [title, setTitle] = useState('')
   const [duration, setDuration] = useState(60)
   const [busy, setBusy] = useState(false)
+  const [isMeeting, setIsMeeting] = useState(false)
+  const [invitees, setInvitees] = useState('')
+  const [inviteNote, setInviteNote] = useState<string | null>(null)
 
   useEffect(() => {
     function onKey(e: KeyboardEvent): void {
@@ -391,16 +435,37 @@ function BlockComposer({
     return () => window.removeEventListener('keydown', onKey)
   }, [onCancel])
 
+  // A meeting block gets a stable room id now so the same link works for the
+  // host and every invitee. Emails are split on commas, spaces, and newlines.
+  function parsedInvitees(): string[] {
+    return invitees
+      .split(/[\s,;]+/)
+      .map((e) => e.trim().toLowerCase())
+      .filter((e) => e.includes('@'))
+  }
+
   async function submit(): Promise<void> {
     if (busy) return
     setBusy(true)
     try {
+      const meeting: TimeBlockMeeting | null = isMeeting
+        ? { roomId: newMeetingRoomId(), invitees: parsedInvitees() }
+        : null
       // A dragged node books directly against that node; otherwise use the
       // picker (a chosen task, or a labelled generic focus block).
+      let result: { inviteNote: string | null }
       if (prefillNode) {
-        await onCreate(prefillNode.id, '', duration)
+        result = await onCreate(prefillNode.id, '', duration, meeting)
       } else {
-        await onCreate(taskId || null, taskId ? '' : title.trim() || 'Focus time', duration)
+        const label = taskId ? '' : title.trim() || (isMeeting ? 'Meeting' : 'Focus time')
+        result = await onCreate(taskId || null, label, duration, meeting)
+      }
+      // If invites went out (or couldn't), show the honest note and keep the
+      // panel open so the user reads it; otherwise close straight away.
+      if (result.inviteNote) {
+        setInviteNote(result.inviteNote)
+      } else {
+        onCancel()
       }
     } finally {
       setBusy(false)
@@ -476,6 +541,46 @@ function BlockComposer({
           </>
         )}
 
+        <label className="flex items-center gap-2 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={isMeeting}
+            onChange={(e) => setIsMeeting(e.target.checked)}
+            className="accent-accent"
+            data-testid="composer-meeting-toggle"
+          />
+          <Icon name="videocam" size={14} className="text-accent" />
+          <span className="text-sm text-stone-800 dark:text-stone-100">Video meeting</span>
+        </label>
+
+        {isMeeting && (
+          <label className="block">
+            <span className="text-[10px] uppercase tracking-wider text-stone-500 dark:text-stone-400 font-medium">
+              Invite people (emails)
+            </span>
+            <textarea
+              value={invitees}
+              onChange={(e) => setInvitees(e.target.value)}
+              placeholder="alex@acme.com, sam@acme.com"
+              rows={2}
+              className="mt-1 w-full bg-white dark:bg-stone-800 border border-stone-300 dark:border-stone-600 rounded-md px-2 py-1.5 text-sm resize-none"
+              data-testid="composer-invitees"
+            />
+            <span className="mt-1 block text-[11px] text-stone-500 dark:text-stone-400">
+              Each invitee gets an email with the time and a link to join in PlexiDesk.
+            </span>
+          </label>
+        )}
+
+        {inviteNote && (
+          <div
+            className="rounded-md border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 px-2.5 py-2 text-[12px] text-stone-700 dark:text-stone-200"
+            data-testid="composer-invite-note"
+          >
+            {inviteNote}
+          </div>
+        )}
+
         <label className="block">
           <span className="text-[10px] uppercase tracking-wider text-stone-500 dark:text-stone-400 font-medium">
             Length
@@ -494,18 +599,27 @@ function BlockComposer({
         </label>
 
         <div className="flex justify-end gap-2 pt-1">
-          <button onClick={onCancel} className="btn-ghost">
-            Cancel
-          </button>
-          <button
-            onClick={() => void submit()}
-            disabled={busy}
-            className="btn-primary"
-            data-testid="composer-create"
-          >
-            <Icon name="add" size={14} />
-            <span>Book it</span>
-          </button>
+          {inviteNote ? (
+            <button onClick={onCancel} className="btn-primary" data-testid="composer-done">
+              <Icon name="check" size={14} />
+              <span>Done</span>
+            </button>
+          ) : (
+            <>
+              <button onClick={onCancel} className="btn-ghost">
+                Cancel
+              </button>
+              <button
+                onClick={() => void submit()}
+                disabled={busy}
+                className="btn-primary"
+                data-testid="composer-create"
+              >
+                <Icon name={isMeeting ? 'videocam' : 'add'} size={14} />
+                <span>{isMeeting ? 'Schedule meeting' : 'Book it'}</span>
+              </button>
+            </>
+          )}
         </div>
       </div>
     </div>

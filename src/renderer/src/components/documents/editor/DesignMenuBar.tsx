@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useDocumentsStore } from '../../../stores/documents'
 import { useViewStore } from '../../../stores/view'
+import { launchMeeting } from '../../../lib/startMeeting'
 import { MenuBarShell, MenuModal, type MenuDef } from './menuBarKit'
 
 // A menu bar for PlexiDesign (the freeform canvas / poster editor). Its menus fit
@@ -103,7 +104,9 @@ export default function DesignMenuBar({ actions }: { actions: DesignMenuActions 
             { kind: 'item', label: 'Triangle', run: () => a.addShape('triangle') }
           ]
         },
-        { kind: 'item', label: 'Line', icon: 'horizontal_rule', run: a.addLine }
+        { kind: 'item', label: 'Line', icon: 'horizontal_rule', run: a.addLine },
+        { kind: 'sep' },
+        { kind: 'item', label: 'Meeting', icon: 'videocam', run: () => void launchMeeting({ kind: 'design', id: active?.id ?? '', title: a.title || 'Design meeting' }) }
       ]
     },
     {
