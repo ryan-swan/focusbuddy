@@ -118,7 +118,8 @@ import {
   listShareLinksForEntity,
   listSharedWithMe,
   removeSharedItem,
-  revokeShareLink
+  revokeShareLink,
+  setShareLinkScope
 } from '../db/shares'
 import {
   createTemplateFromTask,
@@ -528,6 +529,7 @@ export function registerIpcHandlers(): void {
     ) => createShareLink(input)
   )
   ipcMain.handle('shares:revoke', (_e, id: string) => revokeShareLink(id))
+  ipcMain.handle('shares:setScope', (_e, id: string, scope: 'view' | 'copy') => setShareLinkScope(id, scope))
   ipcMain.handle('shares:delete', (_e, id: string) => deleteShareLink(id))
   // "Shared with me" inbox
   ipcMain.handle('shares:inbox', () => listSharedWithMe())

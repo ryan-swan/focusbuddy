@@ -179,6 +179,8 @@ const api = {
     }): Promise<ShareLink> => ipcRenderer.invoke('shares:create', input),
     revoke: (id: string): Promise<boolean> =>
       ipcRenderer.invoke('shares:revoke', id),
+    setScope: (id: string, scope: 'view' | 'copy'): Promise<ShareLink | null> =>
+      ipcRenderer.invoke('shares:setScope', id, scope),
     delete: (id: string): Promise<boolean> =>
       ipcRenderer.invoke('shares:delete', id),
     inbox: (): Promise<SharedItem[]> => ipcRenderer.invoke('shares:inbox'),
