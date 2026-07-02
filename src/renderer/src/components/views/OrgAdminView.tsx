@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import Icon from '../Icon'
 import { DashboardHeader, StatTile, PLEXI_CARD } from '../plexi'
 import { useAccountStore } from '../../stores/account'
+import { useOrgStore } from '../../stores/org'
 import {
   listOrgs,
   getOrg,
@@ -71,12 +72,32 @@ export default function OrgAdminView(): JSX.Element {
   const [ssoConn, setSsoConn] = useState('')
   const [ssoDomain, setSsoDomain] = useState('')
 
+  // Follow the organisation the user has switched to, so the admin/people view
+  // shows the org they're actually working in rather than an arbitrary first one.
+  const activeOrgId = useOrgStore((s) => s.activeOrgId)
+
   const refreshOrgs = useCallback(async () => {
     if (!token) return
     const list = await listOrgs(token)
     setOrgs(list)
-    setSelId((prev) => prev ?? list.find((o) => !o.personal)?.id ?? list[0]?.id ?? null)
-  }, [token])
+    setSelId(
+      (prev) =>
+        (activeOrgId && activeOrgId !== 'personal' && list.some((o) => o.id === activeOrgId)
+          ? activeOrgId
+          : prev) ??
+        prev ??
+        list.find((o) => !o.personal)?.id ??
+        list[0]?.id ??
+        null
+    )
+  }, [token, activeOrgId])
+
+  useEffect(() => {
+    if (activeOrgId && activeOrgId !== 'personal' && orgs.some((o) => o.id === activeOrgId)) {
+      setSelId(activeOrgId)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeOrgId])
 
   const refreshDetail = useCallback(async () => {
     if (!token || !selId) {

@@ -1,5 +1,6 @@
 import { randomUUID } from 'crypto'
 import { getDb } from './database'
+import { getActiveOrgId } from './activeOrg'
 import { emitAutomationEvent } from './automationEvents'
 import type {
   FbRow,
@@ -49,13 +50,14 @@ export function createTable(draft: FbTableDraft): FbTable {
   const now = Date.now()
   const schema: TableSchema = draft.schema ?? { columns: [] }
   db.prepare(
-    `INSERT INTO fb_tables (id, task_id, title, schema_json, created_at, updated_at)
-     VALUES (@id, @taskId, @title, @schema, @now, @now)`
+    `INSERT INTO fb_tables (id, task_id, title, schema_json, created_at, updated_at, org_id)
+     VALUES (@id, @taskId, @title, @schema, @now, @now, @orgId)`
   ).run({
     id,
     taskId: draft.taskId,
     title: draft.title ?? 'Untitled',
     schema: JSON.stringify(schema),
+    orgId: getActiveOrgId(),
     now
   })
   const row = db.prepare('SELECT * FROM fb_tables WHERE id = ?').get(id) as TableRow
@@ -73,8 +75,8 @@ export function getTable(id: string): FbTable | null {
 export function listTables(): FbTable[] {
   const db = getDb()
   const rows = db
-    .prepare('SELECT * FROM fb_tables ORDER BY updated_at DESC')
-    .all() as TableRow[]
+    .prepare('SELECT * FROM fb_tables WHERE org_id = ? ORDER BY updated_at DESC')
+    .all(getActiveOrgId()) as TableRow[]
   return rows.map(rowToTable)
 }
 

@@ -1,5 +1,6 @@
 import { randomUUID } from 'crypto'
 import { getDb } from './database'
+import { getActiveOrgId } from './activeOrg'
 import type { TimeBlock, TimeBlockDraft, TimeBlockPatch } from '@shared/types'
 
 interface TimeBlockRow {
@@ -34,10 +35,10 @@ export function listBlocksInRange(fromMs: number, toMs: number): TimeBlock[] {
   const rows = db
     .prepare(
       `SELECT * FROM time_blocks
-       WHERE start_ms < @to AND (start_ms + duration_min * 60000) > @from
+       WHERE org_id = @orgId AND start_ms < @to AND (start_ms + duration_min * 60000) > @from
        ORDER BY start_ms ASC`
     )
-    .all({ from: fromMs, to: toMs }) as TimeBlockRow[]
+    .all({ from: fromMs, to: toMs, orgId: getActiveOrgId() }) as TimeBlockRow[]
   return rows.map(rowToBlock)
 }
 
@@ -47,14 +48,15 @@ export function createTimeBlock(draft: TimeBlockDraft): TimeBlock {
   const now = Date.now()
   const duration = Math.max(5, Math.round(draft.durationMin))
   db.prepare(
-    `INSERT INTO time_blocks (id, task_id, title, start_ms, duration_min, status, created_at, updated_at)
-     VALUES (@id, @taskId, @title, @startMs, @durationMin, 'planned', @now, @now)`
+    `INSERT INTO time_blocks (id, task_id, title, start_ms, duration_min, status, created_at, updated_at, org_id)
+     VALUES (@id, @taskId, @title, @startMs, @durationMin, 'planned', @now, @now, @orgId)`
   ).run({
     id,
     taskId: draft.taskId ?? null,
     title: draft.title ?? '',
     startMs: Math.round(draft.startMs),
     durationMin: duration,
+    orgId: getActiveOrgId(),
     now
   })
   const row = db.prepare('SELECT * FROM time_blocks WHERE id = ?').get(id) as TimeBlockRow
