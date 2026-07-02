@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { sendSocketMessage, setCallSocketHandler, type CallSocketEvent } from '../lib/messagingSocket'
 import { notifyExternal } from '../lib/notify'
 import { ConversationRecorder } from '../lib/conversationRecorder'
+import { whisperEnabled } from '../lib/whisperPref'
 import { useWrapupStore } from './wrapup'
 
 // PlexiCam: peer-to-peer live audio/video calls. The signal server only relays
@@ -74,7 +75,12 @@ export const useCallStore = create<CallStore>((set, get) => {
         const title = `Call with ${get().peer?.handle ?? 'someone'}`
         void rec.stop().then((res) => {
           if (res && res.durationSec >= 2) {
-            void useWrapupStore.getState().begin({ title, buffer: res.buffer, mimeType: res.mimeType, durationSec: res.durationSec })
+            // begin() resolves errors internally; .catch is belt-and-braces so a
+            // rejection can never surface as an unhandled error after the call.
+            void useWrapupStore
+              .getState()
+              .begin({ title, buffer: res.buffer, mimeType: res.mimeType, durationSec: res.durationSec })
+              .catch(() => {})
           }
         })
       } else {
@@ -132,8 +138,11 @@ export const useCallStore = create<CallStore>((set, get) => {
       const st = conn.connectionState
       if (st === 'connected') {
         set({ status: 'connected' })
-        // Start recording the call audio (both sides) for the end-of-call summary.
-        if (!recorder) {
+        // Start recording the call audio (both sides) for the end-of-call summary
+        // ONLY when Whisper is opted into. Recording is off by default, never
+        // forced; the user turns it on (and can make it their default) in the
+        // meeting UI / settings.
+        if (whisperEnabled() && !recorder) {
           recorder = new ConversationRecorder()
           recorder.addStream(local)
           recorder.addStream(remote)
