@@ -35,6 +35,9 @@ export interface AuthHandoff {
 }
 
 let pending: AuthHandoff | null = null
+// A share deep link (haptyx://share?token=...) that arrived before a window was
+// ready. Drained by the renderer on load, same pattern as the auth handoff.
+let pendingShareToken: string | null = null
 
 function parseHaptyxUrl(url: string): Omit<AuthHandoff, 'origin'> | null {
   try {
@@ -52,6 +55,44 @@ function parseHaptyxUrl(url: string): Omit<AuthHandoff, 'origin'> | null {
   } catch {
     return null
   }
+}
+
+// haptyx://share?token=<shareToken> — the "Open in PlexiDesk" link from the
+// share-notification email. Returns the share token to hand to the renderer,
+// which accepts it into the workspace and opens it.
+function parseShareUrl(url: string): string | null {
+  try {
+    const parsed = new URL(url)
+    if (parsed.protocol !== `${SCHEME}:` || parsed.host !== 'share') return null
+    return parsed.searchParams.get('token')
+  } catch {
+    return null
+  }
+}
+
+function broadcastShare(shareToken: string) {
+  const wins = BrowserWindow.getAllWindows()
+  if (wins.length === 0) {
+    pendingShareToken = shareToken
+    return
+  }
+  for (const win of wins) {
+    if (!win.isDestroyed()) {
+      try {
+        win.webContents.send('share:incoming-token', shareToken)
+      } catch {
+        /* renderer still loading; it drains via share:get-pending on ready */
+      }
+    }
+    if (win.isMinimized()) win.restore()
+    win.focus()
+  }
+}
+
+export function consumePendingShareToken(): string | null {
+  const t = pendingShareToken
+  pendingShareToken = null
+  return t
 }
 
 function broadcast(handoff: AuthHandoff) {
@@ -77,8 +118,14 @@ function broadcast(handoff: AuthHandoff) {
 
 function handleAuthUrl(url: string, origin: AuthHandoff['origin']) {
   const parsed = parseHaptyxUrl(url)
-  if (!parsed) return
-  broadcast({ ...parsed, origin })
+  if (parsed) {
+    broadcast({ ...parsed, origin })
+    return
+  }
+  // Also route share deep links (haptyx://share?token=...) from the share
+  // notification email so an existing user can open the shared item in-app.
+  const shareToken = parseShareUrl(url)
+  if (shareToken) broadcastShare(shareToken)
 }
 
 // Called from main/ipc.ts handler so the renderer can drain anything
