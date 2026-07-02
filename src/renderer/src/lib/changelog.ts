@@ -36,6 +36,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.154',
+    date: '2026-07-03T12:00:00Z',
+    title: 'v2.5.154 — every surface now switches with your organisation',
+    tag: 'fix',
+    summary:
+      'We swept the whole app for anything that was not yet tied to the organisation you are in, and closed the gaps. Your automations, reports, no-code apps, forms, meeting notes, signature requests, saved file views and per-area dashboards now belong to the organisation they were made in, so switching organisation shows only that organisation’s items rather than everything mixed together. Scheduled automations and reports still run across organisations as before. On the server, teams are now scoped to one organisation too, so a team, and anything that flows from it like shared-document invites and who appears in presence, can no longer reach across organisation boundaries.',
+    highlights: [
+      'Automations, reports, apps, forms, meetings, signature requests, smart folders and dashboards are now per-organisation.',
+      'Switching organisation shows only that organisation’s items; scheduled jobs still run across all.',
+      'Teams are scoped to one organisation, so team-based sharing and presence stay within it.'
+    ]
+  },
+  {
     version: '2.5.153',
     date: '2026-07-03T11:00:00Z',
     title: 'v2.5.153 — collaborate works the same in every app',

@@ -1,5 +1,6 @@
 import { randomUUID } from 'crypto'
 import { getDb } from './database'
+import { getActiveOrgId } from './activeOrg'
 import { listTables, getTable, listRows } from './tables'
 import { sendChat } from '../ai/anthropic'
 import { advanceSchedule } from '@shared/schedule'
@@ -59,7 +60,9 @@ function rowToReport(r: ReportRow): ReportDef {
 
 export function listReports(): ReportDef[] {
   const db = getDb()
-  return (db.prepare('SELECT * FROM fb_reports ORDER BY updated_at DESC').all() as ReportRow[]).map(rowToReport)
+  return (
+    db.prepare('SELECT * FROM fb_reports WHERE org_id = ? ORDER BY updated_at DESC').all(getActiveOrgId()) as ReportRow[]
+  ).map(rowToReport)
 }
 
 export function getReport(id: string): ReportDef | null {
@@ -73,8 +76,8 @@ export function createReport(draft: ReportDraft): ReportDef {
   const id = randomUUID()
   const now = Date.now()
   db.prepare(
-    `INSERT INTO fb_reports (id, title, source_table_ids, schedule, recipients, last_output_is_ai, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, 0, ?, ?)`
+    `INSERT INTO fb_reports (id, title, source_table_ids, schedule, recipients, last_output_is_ai, created_at, updated_at, org_id)
+     VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?)`
   ).run(
     id,
     draft.title || 'Untitled report',
@@ -82,7 +85,8 @@ export function createReport(draft: ReportDraft): ReportDef {
     draft.schedule ?? 'manual',
     JSON.stringify(draft.recipients ?? []),
     now,
-    now
+    now,
+    getActiveOrgId()
   )
   return getReport(id)!
 }

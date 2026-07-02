@@ -1,4 +1,5 @@
 import { getDb } from './database'
+import { getActiveOrgId } from './activeOrg'
 import type {
   DashboardCardKind,
   DashboardCardSize,
@@ -109,12 +110,21 @@ function rowToLayout(row: LayoutRow): DashboardLayout {
   }
 }
 
+// The dashboard_key is the table's primary key, so to give each organisation its
+// own layout for the same logical dashboard we qualify the stored key with the
+// active org id. Callers still pass the plain key (e.g. 'home'); the org prefix
+// is applied here and stripped from what we return, so the renderer never sees
+// it. This scopes layouts per org without rebuilding the table's primary key.
+function orgKey(key: string): string {
+  return `${getActiveOrgId()}::${key}`
+}
+
 export function getDashboardLayout(key: string): DashboardLayout | null {
   const db = getDb()
   const row = db
     .prepare('SELECT * FROM dashboard_layouts WHERE dashboard_key = ?')
-    .get(key) as LayoutRow | undefined
-  return row ? rowToLayout(row) : null
+    .get(orgKey(key)) as LayoutRow | undefined
+  return row ? { ...rowToLayout(row), dashboardKey: key } : null
 }
 
 export function setDashboardLayout(
@@ -148,7 +158,7 @@ export function setDashboardLayout(
     `INSERT INTO dashboard_layouts (dashboard_key, card_ids, updated_at)
      VALUES (@key, @json, @now)
      ON CONFLICT(dashboard_key) DO UPDATE SET card_ids = @json, updated_at = @now`
-  ).run({ key, json, now })
+  ).run({ key: orgKey(key), json, now })
   return {
     dashboardKey: key,
     cardIds: stored.cardIds,
@@ -160,6 +170,6 @@ export function setDashboardLayout(
 
 export function deleteDashboardLayout(key: string): boolean {
   const db = getDb()
-  const r = db.prepare('DELETE FROM dashboard_layouts WHERE dashboard_key = ?').run(key)
+  const r = db.prepare('DELETE FROM dashboard_layouts WHERE dashboard_key = ?').run(orgKey(key))
   return r.changes > 0
 }

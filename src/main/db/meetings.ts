@@ -1,5 +1,6 @@
 import { randomUUID } from 'crypto'
 import { getDb } from './database'
+import { getActiveOrgId } from './activeOrg'
 import type { Meeting, MeetingDraft, MeetingPatch } from '@shared/meetings'
 
 // ── fb_meetings (PlexiMeet) ──────────────────────────────────────────────────
@@ -41,7 +42,7 @@ function rowToMeeting(row: MeetingRow): Meeting {
 
 export function listMeetings(): Meeting[] {
   const db = getDb()
-  const rows = db.prepare('SELECT * FROM fb_meetings ORDER BY created_at DESC').all() as MeetingRow[]
+  const rows = db.prepare('SELECT * FROM fb_meetings WHERE org_id = ? ORDER BY created_at DESC').all(getActiveOrgId()) as MeetingRow[]
   return rows.map(rowToMeeting)
 }
 
@@ -56,8 +57,8 @@ export function createMeeting(draft: MeetingDraft): Meeting {
   const id = randomUUID()
   const now = Date.now()
   db.prepare(
-    `INSERT INTO fb_meetings (id, title, transcript, summary, action_items_json, duration_sec, created_at, updated_at)
-     VALUES (@id, @title, @transcript, @summary, @items, @duration, @now, @now)`
+    `INSERT INTO fb_meetings (id, title, transcript, summary, action_items_json, duration_sec, created_at, updated_at, org_id)
+     VALUES (@id, @title, @transcript, @summary, @items, @duration, @now, @now, @orgId)`
   ).run({
     id,
     title: draft.title ?? 'Untitled meeting',
@@ -65,7 +66,8 @@ export function createMeeting(draft: MeetingDraft): Meeting {
     summary: draft.summary ?? '',
     items: JSON.stringify(draft.actionItems ?? []),
     duration: draft.durationSec ?? null,
-    now
+    now,
+    orgId: getActiveOrgId()
   })
   return getMeeting(id) as Meeting
 }
