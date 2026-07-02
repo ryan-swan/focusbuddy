@@ -35,14 +35,45 @@ export function clearMeetingOrigin(): void {
   currentOrigin = null
 }
 
-// Launch a live meeting. `title` names the room (falls back to the origin's
-// title, then a generic label). Returns the room id, or null if a room could
-// not be opened (for example the user is already in a meeting).
+// An origin is a shareable artifact when a meeting started from it can grant its
+// attendees access to that artifact. Chat, the calendar and a plain start have
+// no single artifact to share, so they start the room directly.
+export function isShareableArtifactOrigin(origin: MeetingOrigin | null | undefined): boolean {
+  return (
+    !!origin &&
+    (origin.kind === 'doc' ||
+      origin.kind === 'sheet' ||
+      origin.kind === 'slides' ||
+      origin.kind === 'draw' ||
+      origin.kind === 'design' ||
+      origin.kind === 'desk')
+  )
+}
+
+// Launch a meeting. From a shareable artifact this opens the start-meeting
+// dialog so the user can add attendees and choose what access they get to the
+// artifact before the room opens. From anywhere else it starts the room
+// immediately. Returns the room id when it starts one directly, else null.
 export async function launchMeeting(origin?: MeetingOrigin): Promise<string | null> {
   currentOrigin = origin ?? { kind: 'standalone', title: 'Meeting' }
+  if (origin && isShareableArtifactOrigin(origin)) {
+    // Lazy import to avoid a static cycle between the launcher and the store.
+    const { useMeetingLaunchStore } = await import('../stores/meetingLaunch')
+    useMeetingLaunchStore.getState().open(origin)
+    return null
+  }
   const title = origin?.title?.trim() || 'Meeting'
   useViewStore.getState().goMeetings()
   return useMeetingRoomStore.getState().start(title)
+}
+
+// Start the room for an artifact meeting once the dialog has collected its
+// details. Sharing of the artifact to the attendees is handled by the dialog
+// (via meetingShare) so this only has to open the room.
+export async function startArtifactMeeting(origin: MeetingOrigin): Promise<string | null> {
+  currentOrigin = origin
+  useViewStore.getState().goMeetings()
+  return useMeetingRoomStore.getState().start(origin.title?.trim() || 'Meeting')
 }
 
 // Join a specific, already-known room — the host and every invitee of a
