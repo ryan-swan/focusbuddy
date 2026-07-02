@@ -35,54 +35,72 @@ export const useWrapupStore = create<WrapupState>((set) => ({
 
   begin: async ({ title, buffer, mimeType, durationSec }) => {
     set({ status: 'processing', title, step: 'Transcribing the conversation…', summary: '', transcript: '', proposals: [], error: null, needsApiKey: false })
-
-    const t = await window.api.voiceNote.transcribe({ buffer, mimeType })
-    if (!t.ok) {
+    try {
+      await runWrapup({ title, buffer, mimeType, durationSec }, set)
+    } catch (err) {
+      // Any thrown/rejected step (IPC failure, network, an AI provider error)
+      // resolves to an honest error state instead of an unhandled rejection —
+      // this is the crash the user saw "after the meeting ends".
       set({
         status: 'error',
-        needsApiKey: t.reason === 'no_key',
-        error:
-          t.reason === 'no_key'
-            ? 'Add a transcription key in Settings → AI to get summaries and deliverables from your calls.'
-            : `Could not transcribe the conversation: ${t.error}`
+        error: `The meeting wrap-up could not finish: ${(err as Error)?.message ?? 'unknown error'}.`
       })
-      return
     }
-    const transcript = t.transcript.trim()
-    if (!transcript) {
-      set({ status: 'error', error: 'No speech was captured in this conversation, so there is nothing to summarise.' })
-      return
-    }
-
-    set({ step: 'Summarising and finding deliverables…', transcript })
-    const r = await window.api.voiceNote.processMeetingEnd({ transcript, meetingTitle: title, durationSec })
-    if (!r.ok) {
-      set({
-        status: 'error',
-        needsApiKey: !!r.needsApiKey,
-        error: r.needsApiKey
-          ? 'Add an Anthropic API key in Settings → AI to get a summary and deliverables.'
-          : `Could not summarise the conversation: ${r.error}`
-      })
-      return
-    }
-
-    const summary = r.summary ?? ''
-    const proposals = r.proposals ?? []
-    // Save a real Meeting record so the conversation is kept, best-effort.
-    void useMeetingsStore
-      .getState()
-      .create({
-        title,
-        transcript,
-        summary,
-        actionItems: proposals.filter((p) => p.kind === 'create-task').map((p) => ('title' in p ? p.title : '')),
-        durationSec
-      })
-      .catch(() => {})
-
-    set({ status: 'review', summary, proposals })
   },
 
   dismiss: () => set({ status: 'idle', title: '', step: '', summary: '', transcript: '', proposals: [], error: null, needsApiKey: false })
 }))
+
+// The wrap-up pipeline, extracted so `begin` can wrap the whole thing in one
+// try/catch. Sets state through the store's setter.
+async function runWrapup(
+  { title, buffer, mimeType, durationSec }: { title: string; buffer: ArrayBuffer; mimeType: string; durationSec: number },
+  set: (partial: Partial<WrapupState>) => void
+): Promise<void> {
+  const t = await window.api.voiceNote.transcribe({ buffer, mimeType })
+  if (!t.ok) {
+    set({
+      status: 'error',
+      needsApiKey: t.reason === 'no_key',
+      error:
+        t.reason === 'no_key'
+          ? 'Add a transcription key in Settings → AI to get summaries and deliverables from your calls.'
+          : `Could not transcribe the conversation: ${t.error}`
+    })
+    return
+  }
+  const transcript = t.transcript.trim()
+  if (!transcript) {
+    set({ status: 'error', error: 'No speech was captured in this conversation, so there is nothing to summarise.' })
+    return
+  }
+
+  set({ step: 'Summarising and finding deliverables…', transcript })
+  const r = await window.api.voiceNote.processMeetingEnd({ transcript, meetingTitle: title, durationSec })
+  if (!r.ok) {
+    set({
+      status: 'error',
+      needsApiKey: !!r.needsApiKey,
+      error: r.needsApiKey
+        ? 'Add an Anthropic API key in Settings → AI to get a summary and deliverables.'
+        : `Could not summarise the conversation: ${r.error}`
+    })
+    return
+  }
+
+  const summary = r.summary ?? ''
+  const proposals = r.proposals ?? []
+  // Save a real Meeting record so the conversation is kept, best-effort.
+  void useMeetingsStore
+    .getState()
+    .create({
+      title,
+      transcript,
+      summary,
+      actionItems: proposals.filter((p) => p.kind === 'create-task').map((p) => ('title' in p ? p.title : '')),
+      durationSec
+    })
+    .catch(() => {})
+
+  set({ status: 'review', summary, proposals })
+}

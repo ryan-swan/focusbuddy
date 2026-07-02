@@ -36,6 +36,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.147',
+    date: '2026-07-03T05:00:00Z',
+    title: 'v2.5.147 — Whisper is opt-in and no longer errors after a meeting',
+    tag: 'fix',
+    summary:
+      'Two fixes to meeting transcription. First, Whisper is now something you opt into rather than always-on: a meeting is only recorded, transcribed and summarised when you turn it on, and because the choice is remembered it becomes your default until you turn it off. Second, the error some people saw right after a meeting ended is gone. The wrap-up now handles every failure, a dropped connection, a provider hiccup, a missing key, as a clear message instead of letting it surface as an unhandled error.',
+    highlights: [
+      'Whisper is opt-in, off by default, and never forced; your choice sticks as your default.',
+      'The end-of-meeting wrap-up no longer throws an unhandled error on a failed step.',
+      'A toggle in PlexiMeet turns transcription on or off.'
+    ]
+  },
+  {
     version: '2.5.146',
     date: '2026-07-03T03:00:00Z',
     title: 'v2.5.146 — a separate mailbox per organisation',

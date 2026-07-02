@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Icon from '../Icon'
+import { whisperEnabled, setWhisperEnabled } from '../../lib/whisperPref'
 import ModuleDashboard from '../ModuleDashboard'
 import { bucketByWeek, periodDelta } from '../../lib/dashboardMetrics'
 import { useMeetingsStore } from '../../stores/meetings'
@@ -43,6 +44,7 @@ export default function PlexiMeetView(): JSX.Element {
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [recording, setRecording] = useState(false)
+  const [whisper, setWhisper] = useState(whisperEnabled())
   const recRef = useRef<MediaRecorder | null>(null)
 
   useEffect(() => {
@@ -243,6 +245,25 @@ export default function PlexiMeetView(): JSX.Element {
           >
             <Icon name="video_call" size={17} /> Start a meeting
           </button>
+
+          {/* Whisper opt-in. Off by default (never forced); turning it on also
+              becomes the default for future meetings until turned off. */}
+          <label
+            className="flex items-center gap-2 px-0.5 text-[11.5px] text-[var(--ink-70)] cursor-pointer"
+            title="When on, your live meetings are recorded, transcribed and summarised into a doc with suggested tasks and follow-ups. Off by default."
+          >
+            <input
+              type="checkbox"
+              checked={whisper}
+              onChange={(e) => {
+                setWhisper(e.target.checked)
+                setWhisperEnabled(e.target.checked)
+              }}
+              data-testid="meet-whisper-toggle"
+              className="accent-[rgb(var(--accent))]"
+            />
+            <span>Transcribe &amp; summarise my meetings (Whisper)</span>
+          </label>
 
           {/* Secondary: recording is one option, not the whole feature. */}
           <div className="flex items-center gap-2">
