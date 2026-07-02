@@ -36,6 +36,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.141',
+    date: '2026-07-02T17:00:00Z',
+    title: 'v2.5.141 — real pages in Page view',
+    tag: 'feature',
+    summary:
+      'Page view now shows your document as real, separate sheets. Each page is its own sheet at the exact paper size, orientation and margins you set, and there is a proper gap between one page and the next instead of a thin line drawn through one long sheet. Content flows cleanly onto each page and starts fresh on the next, the way a word processor should. Continuous view is unchanged for when you would rather write in one flowing column.',
+    highlights: [
+      'Pages render as discrete sheets at your real paper size, with a true gap between them.',
+      'Content flows onto each page and continues on the next rather than crossing a page line.',
+      'Continuous view still gives you one uninterrupted writing column.'
+    ]
+  },
+  {
     version: '2.5.140',
     date: '2026-07-02T15:00:00Z',
     title: 'v2.5.140 — menu bars across the whole office',

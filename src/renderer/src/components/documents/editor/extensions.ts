@@ -31,6 +31,7 @@ import { ResizableImage } from './ResizableImage'
 import { SlashCommand } from './SlashMenu'
 import { SearchHighlight } from './searchHighlight'
 import { FocusBlock } from './focusBlock'
+import { PagePagination } from './pagination'
 import { CommentMark } from './CommentMark'
 import Collaboration from '@tiptap/extension-collaboration'
 import CollaborationCaret from '@tiptap/extension-collaboration-caret'
@@ -108,7 +109,11 @@ export function buildDocExtensions(opts: BuildOptions = {}): AnyExt[] {
       CharacterCount as AnyExt,
       SlashCommand as AnyExt,
       SearchHighlight as AnyExt,
-      FocusBlock as AnyExt
+      FocusBlock as AnyExt,
+      // Page view: measures blocks and inserts transparent spacers so content
+      // flows onto discrete sheets with a real gap between pages. Inert unless
+      // page view is on (it reads its config from the active DocEditor).
+      PagePagination as AnyExt
     )
   } else {
     // Headless: a plain image node with the identical schema (no NodeView) plus
