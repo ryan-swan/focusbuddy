@@ -45,6 +45,7 @@ import BrowserContextMenu from './contextMenu/BrowserContextMenu'
 import '../lib/contextMenu'
 import FloatingToolbar, { type ToolbarAction } from './FloatingToolbar'
 import MinimapWidget from './widgets/MinimapWidget'
+import DeskGallery from './DeskGallery'
 import VoiceRecorderWidget from './widgets/VoiceRecorderWidget'
 import MindMapWidget from './widgets/MindMapWidget'
 import DiagramWidget from './widgets/DiagramWidget'
@@ -2101,18 +2102,11 @@ export default function Canvas(): JSX.Element {
   }
 
   if (!activeTask) {
+    // No desk open: show a gallery of the org's desks (each a canvas) to open,
+    // rather than a singular "your desk is clear" dead-end.
     return (
       <>
-        <div className="h-full flex items-center justify-center desk-paper">
-          <div className="text-center max-w-md px-6">
-            <Icon name="desk" size={48} className="text-stone-400 dark:text-stone-500 mb-3" />
-            <h2 className="text-xl font-semibold text-stone-900 dark:text-stone-100 mb-2">Your desk is clear</h2>
-            <p className="text-stone-600 dark:text-stone-300 text-sm leading-relaxed">
-              Pick a task from the left to bring it to the desk — its sticky notes, browser windows
-              and tools will appear here.
-            </p>
-          </div>
-        </div>
+        <DeskGallery />
         <WidgetFocusMode />
       </>
     )
