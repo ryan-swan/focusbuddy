@@ -9,8 +9,9 @@
 // later as an alternative way to populate the same account record.
 
 import { app, safeStorage } from 'electron'
-import { existsSync, readFileSync, writeFileSync, unlinkSync } from 'node:fs'
+import { existsSync, readFileSync, writeFileSync, unlinkSync, renameSync } from 'node:fs'
 import { join } from 'node:path'
+import { getActiveOrgId, PERSONAL_ORG_ID } from '../db/activeOrg'
 
 export interface MailAccountConfig {
   // IMAP server, e.g. imap.gmail.com / outlook.office365.com / mail.fastmail.com
@@ -43,8 +44,28 @@ interface StoredEnvelope {
   v: 1
 }
 
-function filePath(): string {
+// Each organisation has its own mailbox on this device, so the account file is
+// keyed by the active org. The pre-multi-org single file (mail-account.json)
+// belongs to the user's Personal space, so it is migrated to the personal-org
+// file the first time Personal is active and the new file doesn't exist yet.
+function legacyFilePath(): string {
   return join(app.getPath('userData'), 'mail-account.json')
+}
+
+function filePath(): string {
+  const orgId = getActiveOrgId()
+  const path = join(app.getPath('userData'), `mail-account-${orgId}.json`)
+  if (orgId === PERSONAL_ORG_ID && !existsSync(path)) {
+    const legacy = legacyFilePath()
+    if (existsSync(legacy)) {
+      try {
+        renameSync(legacy, path)
+      } catch {
+        return legacy
+      }
+    }
+  }
+  return path
 }
 
 function read(): StoredEnvelope | null {
