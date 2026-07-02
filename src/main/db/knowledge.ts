@@ -1,5 +1,6 @@
 import { randomUUID } from 'crypto'
 import { getDb } from './database'
+import { getActiveOrgId } from './activeOrg'
 import { deleteEmbedding } from './embeddings'
 import { rankKnowledge } from '@shared/knowledge'
 import type { KnowledgeEntry, KnowledgeDraft, KnowledgePatch } from '@shared/knowledge'
@@ -42,8 +43,8 @@ function rowToEntry(row: KnowledgeRow): KnowledgeEntry {
 export function listKnowledge(): KnowledgeEntry[] {
   const db = getDb()
   const rows = db
-    .prepare('SELECT * FROM fb_knowledge ORDER BY pinned DESC, updated_at DESC')
-    .all() as KnowledgeRow[]
+    .prepare('SELECT * FROM fb_knowledge WHERE org_id = ? ORDER BY pinned DESC, updated_at DESC')
+    .all(getActiveOrgId()) as KnowledgeRow[]
   return rows.map(rowToEntry)
 }
 
@@ -58,14 +59,15 @@ export function createKnowledge(draft: KnowledgeDraft): KnowledgeEntry {
   const id = randomUUID()
   const now = Date.now()
   db.prepare(
-    `INSERT INTO fb_knowledge (id, title, body, tags_json, pinned, created_at, updated_at)
-     VALUES (@id, @title, @body, @tags, @pinned, @now, @now)`
+    `INSERT INTO fb_knowledge (id, title, body, tags_json, pinned, created_at, updated_at, org_id)
+     VALUES (@id, @title, @body, @tags, @pinned, @now, @now, @orgId)`
   ).run({
     id,
     title: draft.title ?? 'Untitled entry',
     body: draft.body ?? '',
     tags: JSON.stringify(draft.tags ?? []),
     pinned: draft.pinned ? 1 : 0,
+    orgId: getActiveOrgId(),
     now
   })
   return getKnowledge(id) as KnowledgeEntry

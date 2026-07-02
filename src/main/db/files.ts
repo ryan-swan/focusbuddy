@@ -244,7 +244,7 @@ export function listEntries(parentId: string | null): FileEntry[] {
   const rows = (
     parentId == null
       ? db.prepare(`SELECT ${ENTRY_COLS} FROM fb_files WHERE parent_id IS NULL AND trashed_at IS NULL AND org_id = ?`).all(getActiveOrgId())
-      : db.prepare(`SELECT ${ENTRY_COLS} FROM fb_files WHERE parent_id = ? AND trashed_at IS NULL`).all(parentId)
+      : db.prepare(`SELECT ${ENTRY_COLS} FROM fb_files WHERE parent_id = ? AND trashed_at IS NULL AND org_id = ?`).all(parentId, getActiveOrgId())
   ) as EntryRow[]
   const out: FileEntry[] = []
   for (const row of rows) {

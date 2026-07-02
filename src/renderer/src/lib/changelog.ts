@@ -36,6 +36,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.144',
+    date: '2026-07-02T23:00:00Z',
+    title: 'v2.5.144 — organisations keep to themselves',
+    tag: 'fix',
+    summary:
+      'Switching organisation now fully changes what you see. Before, some parts of the workspace stayed the same across organisations, so you could still see one organisation\'s things while working in another. Now the calendar, the vault, your knowledge, your tables and your files all belong to the organisation you are in, on top of the desks, documents and connected apps that already did. Switching also refreshes the file view straight away instead of holding on to the previous organisation\'s files, and the organisation admin and people view follow the organisation you have switched to. Your existing work stays in your Personal space exactly as it was.',
+    highlights: [
+      'Calendar, vault, knowledge, tables and files are now scoped to the active organisation.',
+      'Switching org refreshes the file view immediately and the admin/people view follows the switch.',
+      'Your existing data stays intact in your Personal space.'
+    ]
+  },
+  {
     version: '2.5.143',
     date: '2026-07-02T21:00:00Z',
     title: 'v2.5.143 — a gallery of your desks',

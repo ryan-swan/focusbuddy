@@ -728,6 +728,20 @@ export function getDb(): Database.Database {
   // reserved 'personal' org via the DEFAULT.
   ensureColumn(db, 'documents', 'org_id', "TEXT NOT NULL DEFAULT 'personal'")
   db.exec('CREATE INDEX IF NOT EXISTS idx_documents_org ON documents(org_id)')
+  // Multi-org tenancy for the remaining user-data surfaces so switching org
+  // isolates the calendar, vault, knowledge and tables too, not just desks and
+  // documents. Added at the end where every table exists; existing rows backfill
+  // to the reserved 'personal' org via the DEFAULT (no data loss).
+  ensureColumn(db, 'time_blocks', 'org_id', "TEXT NOT NULL DEFAULT 'personal'")
+  ensureColumn(db, 'vault_entries', 'org_id', "TEXT NOT NULL DEFAULT 'personal'")
+  ensureColumn(db, 'fb_knowledge', 'org_id', "TEXT NOT NULL DEFAULT 'personal'")
+  ensureColumn(db, 'fb_tables', 'org_id', "TEXT NOT NULL DEFAULT 'personal'")
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_time_blocks_org ON time_blocks(org_id);
+    CREATE INDEX IF NOT EXISTS idx_vault_entries_org ON vault_entries(org_id);
+    CREATE INDEX IF NOT EXISTS idx_fb_knowledge_org ON fb_knowledge(org_id);
+    CREATE INDEX IF NOT EXISTS idx_fb_tables_org ON fb_tables(org_id);
+  `)
   return db
 }
 

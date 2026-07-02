@@ -4,6 +4,7 @@ import { useAccountStore } from './account'
 import { useNodeStore } from './nodes'
 import { useDocumentsStore } from './documents'
 import { useConnectedAppsStore } from './connectedApps'
+import { useFileManagerStore } from './fileManager'
 import { useViewStore } from './view'
 
 // The active organisation is the tenancy boundary for the whole workspace. The
@@ -91,9 +92,14 @@ export const useOrgStore = create<OrgStore>((set, get) => ({
     await Promise.allSettled([
       useNodeStore.getState().refresh(),
       useDocumentsStore.getState().refresh(),
-      useConnectedAppsStore.getState().refresh()
+      useConnectedAppsStore.getState().refresh(),
+      // The file manager caches its entries independent of the view, so it must
+      // be reloaded explicitly or it would keep showing the previous org's files.
+      useFileManagerStore.getState().refresh()
     ])
     useNodeStore.getState().setActive(null)
+    // Resetting the view re-mounts the per-view surfaces (calendar, vault,
+    // knowledge, tables), so they re-query under the new active org.
     useViewStore.getState().goHome()
   }
 }))

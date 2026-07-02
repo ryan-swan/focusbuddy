@@ -6,6 +6,7 @@ import {
   randomUUID
 } from 'crypto'
 import { getDb } from './database'
+import { getActiveOrgId } from './activeOrg'
 import type {
   VaultEntryDraft,
   VaultEntryPatch,
@@ -292,17 +293,17 @@ export function listEntries(): VaultEntryStored[] {
   const db = getDb()
   const rows = db
     .prepare(
-      'SELECT * FROM vault_entries ORDER BY sort_order ASC, created_at ASC'
+      'SELECT * FROM vault_entries WHERE org_id = ? ORDER BY sort_order ASC, created_at ASC'
     )
-    .all() as EntryRow[]
+    .all(getActiveOrgId()) as EntryRow[]
   return rows.map(rowToEntry)
 }
 
 function nextSortOrder(): number {
   const db = getDb()
   const r = db
-    .prepare('SELECT COALESCE(MAX(sort_order), -1) + 1 AS next FROM vault_entries')
-    .get() as { next: number }
+    .prepare('SELECT COALESCE(MAX(sort_order), -1) + 1 AS next FROM vault_entries WHERE org_id = ?')
+    .get(getActiveOrgId()) as { next: number }
   return r.next
 }
 
@@ -312,8 +313,8 @@ export function createEntry(draft: VaultEntryDraft): VaultEntryStored | null {
   const id = randomUUID()
   const now = Date.now()
   db.prepare(
-    `INSERT INTO vault_entries (id, title, url, username, iv, ciphertext, sort_order, created_at, updated_at)
-     VALUES (@id, @title, @url, @username, @iv, @ct, @sortOrder, @now, @now)`
+    `INSERT INTO vault_entries (id, title, url, username, iv, ciphertext, sort_order, created_at, updated_at, org_id)
+     VALUES (@id, @title, @url, @username, @iv, @ct, @sortOrder, @now, @now, @orgId)`
   ).run({
     id,
     title: draft.title,
@@ -322,6 +323,7 @@ export function createEntry(draft: VaultEntryDraft): VaultEntryStored | null {
     iv: draft.iv,
     ct: draft.ciphertext,
     sortOrder: nextSortOrder(),
+    orgId: getActiveOrgId(),
     now
   })
   const row = db
