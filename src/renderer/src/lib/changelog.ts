@@ -36,6 +36,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.143',
+    date: '2026-07-02T21:00:00Z',
+    title: 'v2.5.143 — a gallery of your desks',
+    tag: 'feature',
+    summary:
+      'When no desk is open you now see a gallery of all the desks in the organisation you are working in, each shown as a live thumbnail of what is on it, instead of a single empty "your desk is clear" screen. A desk is simply a canvas, so the gallery is the natural home base: pick a desk to open its canvas, or start a new one from the New desk card. It clears up the odd feeling of a lone empty desk when you actually have several on the go.',
+    highlights: [
+      'The no-desk-open space is now a gallery of every desk in the current organisation.',
+      'Each desk shows a real thumbnail of its contents; click to open its canvas.',
+      'A New desk card is always there to start a fresh canvas.'
+    ]
+  },
+  {
     version: '2.5.142',
     date: '2026-07-02T19:00:00Z',
     title: 'v2.5.142 — a calmer, reliable desk minimap',
