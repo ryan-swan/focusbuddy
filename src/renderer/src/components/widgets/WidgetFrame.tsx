@@ -503,15 +503,25 @@ export default function WidgetFrame({
   // means dragging a zone-pinned widget is a no-op (you can't drag a zone
   // pin — it'd defeat the auto-dock); to move it the user picks a different
   // zone or unpins.
-  const isZonePinned = widget.pinned && widget.pinnedZone !== null && zonePosition
-  const useControlled = isInControlledLayout || Boolean(isZonePinned)
+  // A widget with pinned + pinnedZone set is ALWAYS treated as zone-pinned, even
+  // if the PinLayoutContext map hasn't resolved its position yet — which happens
+  // for a frame after a layoutVersion-keyed remount, after an async widget reload,
+  // or before PinnedLayer's ResizeObserver has measured non-zero bounds. Without
+  // this, a missing zonePosition dropped the widget out of controlled mode and
+  // Rnd fell back to the stored canvas x/y, so the minimap detached to (0,0) and
+  // then drifted with the canvas content as more widgets were added. Falling back
+  // to an off-screen rect keeps Rnd controlled; the next render with a resolved
+  // position snaps it into its corner (invisible in practice).
+  const isZonePinned = widget.pinned && widget.pinnedZone !== null
+  const resolvedZone = zonePosition ?? { x: -9999, y: -9999, width: widget.width, height: widget.height }
+  const useControlled = isInControlledLayout || isZonePinned
   const controlledPos = isZonePinned
-    ? { x: zonePosition!.x, y: zonePosition!.y }
+    ? { x: resolvedZone.x, y: resolvedZone.y }
     : isInControlledLayout
       ? layoutCtx?.position
       : undefined
   const controlledSize = isZonePinned
-    ? { width: zonePosition!.width, height: zonePosition!.height }
+    ? { width: resolvedZone.width, height: resolvedZone.height }
     : isInControlledLayout
       ? layoutCtx?.size
       : undefined
