@@ -1,6 +1,8 @@
 import { create } from 'zustand'
 import type { ActionProposal } from '@shared/types'
 import { useMeetingsStore } from './meetings'
+import { getMeetingOrigin, clearMeetingOrigin } from '../lib/startMeeting'
+import { ensureMeetingFolder, saveTranscriptDoc } from '../lib/meetingWrapup'
 
 // End-of-conversation wrap-up. When a meeting or call ends with a recording, this
 // drives the one honest pipeline: transcribe the mixed audio, ask the AI for a
@@ -19,6 +21,11 @@ interface WrapupState {
   proposals: ActionProposal[]
   error: string | null
   needsApiKey: boolean
+  // Where this meeting's output is kept. The transcript is saved as a document
+  // in this folder, and the deliverables default to it too.
+  folderId: string | null
+  folderName: string
+  transcriptDocId: string | null
   begin: (input: { title: string; buffer: ArrayBuffer; mimeType: string; durationSec: number }) => Promise<void>
   dismiss: () => void
 }
@@ -32,9 +39,12 @@ export const useWrapupStore = create<WrapupState>((set) => ({
   proposals: [],
   error: null,
   needsApiKey: false,
+  folderId: null,
+  folderName: '',
+  transcriptDocId: null,
 
   begin: async ({ title, buffer, mimeType, durationSec }) => {
-    set({ status: 'processing', title, step: 'Transcribing the conversation…', summary: '', transcript: '', proposals: [], error: null, needsApiKey: false })
+    set({ status: 'processing', title, step: 'Transcribing the conversation…', summary: '', transcript: '', proposals: [], error: null, needsApiKey: false, folderId: null, folderName: '', transcriptDocId: null })
     try {
       await runWrapup({ title, buffer, mimeType, durationSec }, set)
     } catch (err) {
@@ -48,7 +58,7 @@ export const useWrapupStore = create<WrapupState>((set) => ({
     }
   },
 
-  dismiss: () => set({ status: 'idle', title: '', step: '', summary: '', transcript: '', proposals: [], error: null, needsApiKey: false })
+  dismiss: () => set({ status: 'idle', title: '', step: '', summary: '', transcript: '', proposals: [], error: null, needsApiKey: false, folderId: null, folderName: '', transcriptDocId: null })
 }))
 
 // The wrap-up pipeline, extracted so `begin` can wrap the whole thing in one
@@ -75,7 +85,21 @@ async function runWrapup(
     return
   }
 
-  set({ step: 'Summarising and finding deliverables…', transcript })
+  // Keep the meeting's output together: create a folder from the meeting origin
+  // (a desk-started meeting nests under that desk; otherwise a top-level folder),
+  // and save the transcript into it as a real document. This is best-effort —
+  // if filing fails the wrap-up still shows the summary and deliverables.
+  const origin = getMeetingOrigin()
+  const folder = await ensureMeetingFolder(origin, title, Date.now())
+  const transcriptDocId = await saveTranscriptDoc(title, transcript, folder?.folderId ?? null)
+  clearMeetingOrigin()
+  set({
+    transcript,
+    step: 'Summarising and finding deliverables…',
+    folderId: folder?.folderId ?? null,
+    folderName: folder?.folderName ?? '',
+    transcriptDocId
+  })
   const r = await window.api.voiceNote.processMeetingEnd({ transcript, meetingTitle: title, durationSec })
   if (!r.ok) {
     set({

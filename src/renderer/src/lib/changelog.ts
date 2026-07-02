@@ -36,6 +36,20 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.151',
+    date: '2026-07-03T09:00:00Z',
+    title: 'v2.5.151 — a meeting leaves a tidy folder behind',
+    tag: 'feature',
+    summary:
+      'When a meeting wraps up, its transcript is now saved as a real document rather than living only inside the meeting record, and it is filed in a folder for that meeting so everything stays together. Where the folder sits follows where the meeting began: a meeting started from a desk keeps its notes with that desk, and anything else gets a top-level meeting folder you can rename or move. The wrap-up review shows where the transcript went, and when you turn the AI suggestions into documents you can pick which folder they land in, defaulting to the meeting folder so related work does not scatter.',
+    highlights: [
+      'The transcript is saved as a document, not just kept inside the meeting.',
+      'A meeting folder keeps the transcript and deliverables together.',
+      'A desk-started meeting files its notes with that desk.',
+      'Choose where the AI-suggested documents are filed, defaulting to the meeting folder.'
+    ]
+  },
+  {
     version: '2.5.150',
     date: '2026-07-03T08:00:00Z',
     title: 'v2.5.150 — collaborate during the meeting, read-only after',

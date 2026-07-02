@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Icon from './Icon'
 import { useWrapupStore } from '../stores/wrapup'
 import { applyProposal, describeProposal } from '../lib/actionExecutor'
 import { useNodeStore } from '../stores/nodes'
 import type { ActionProposal } from '@shared/types'
+import type { FileEntry } from '@shared/fields'
 
 // End-of-conversation review. Mounted once at the app root. When a meeting or call
 // ends with a recording, it shows the AI summary and the deliverables that came
@@ -19,16 +20,36 @@ export default function WrapupOverlay(): JSX.Element | null {
   const proposals = useWrapupStore((s) => s.proposals)
   const error = useWrapupStore((s) => s.error)
   const needsApiKey = useWrapupStore((s) => s.needsApiKey)
+  const folderId = useWrapupStore((s) => s.folderId)
+  const folderName = useWrapupStore((s) => s.folderName)
   const dismiss = useWrapupStore((s) => s.dismiss)
 
   const [applied, setApplied] = useState<Record<string, 'ok' | 'fail'>>({})
   const [busy, setBusy] = useState<string | null>(null)
+  // Where the deliverables the user creates should be filed. Defaults to the
+  // meeting folder; the picker lets them choose another top-level folder or the
+  // workspace root. Documents are filed there; other proposals are unaffected.
+  const [dest, setDest] = useState<string | null>(null)
+  const [folders, setFolders] = useState<FileEntry[]>([])
+
+  useEffect(() => {
+    if (status !== 'review') return
+    setDest(folderId)
+    void window.api.fileManager
+      .list(null)
+      .then((entries) => setFolders(entries.filter((e) => e.kind === 'folder')))
+      .catch(() => setFolders([]))
+  }, [status, folderId])
 
   if (status === 'idle') return null
 
   async function apply(p: ActionProposal): Promise<void> {
     setBusy(p.id)
-    const res = await applyProposal(p, { activeTaskId: useNodeStore.getState().activeTaskId, resolvedIds: new Map() })
+    const res = await applyProposal(p, {
+      activeTaskId: useNodeStore.getState().activeTaskId,
+      resolvedIds: new Map(),
+      destinationFolderId: dest
+    })
     setApplied((prev) => ({ ...prev, [p.id]: res.ok ? 'ok' : 'fail' }))
     setBusy(null)
   }
@@ -80,6 +101,34 @@ export default function WrapupOverlay(): JSX.Element | null {
                   <p className="text-[12.5px] text-[var(--ink-50)]">No summary was produced for this conversation.</p>
                 )}
               </section>
+
+              {folderName && (
+                <section className="mt-4 rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-base)] px-3 py-2.5" data-testid="wrapup-folder">
+                  <p className="text-[12px] text-[var(--ink-80)] flex items-center gap-1.5">
+                    <Icon name="folder" size={14} className="text-[rgb(var(--accent))]" />
+                    Transcript saved in <span className="font-medium">{folderName}</span>.
+                  </p>
+                  <label className="mt-2 flex items-center gap-2 text-[11.5px] text-[var(--ink-60)]">
+                    <span className="shrink-0">Add deliverables to</span>
+                    <select
+                      value={dest ?? ''}
+                      onChange={(e) => setDest(e.target.value || null)}
+                      className="flex-1 bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded px-2 py-1 text-[12px] text-[var(--ink-90)]"
+                      data-testid="wrapup-destination"
+                    >
+                      {folderId && <option value={folderId}>{folderName} (this meeting)</option>}
+                      <option value="">Workspace root</option>
+                      {folders
+                        .filter((f) => f.id !== folderId)
+                        .map((f) => (
+                          <option key={f.id} value={f.id}>
+                            {f.name}
+                          </option>
+                        ))}
+                    </select>
+                  </label>
+                </section>
+              )}
 
               <section className="mt-5">
                 <div className="flex items-center justify-between mb-2">
