@@ -1,5 +1,6 @@
 import { randomUUID } from 'crypto'
 import { getDb } from './database'
+import { getActiveOrgId } from './activeOrg'
 import type { PlexiApp, PlexiAppDraft, PlexiAppPatch, AppComponent } from '@shared/apps'
 
 // ── fb_apps (PlexiBuild) ─────────────────────────────────────────────────────
@@ -36,7 +37,7 @@ function rowToApp(row: AppRow): PlexiApp {
 
 export function listApps(): PlexiApp[] {
   const db = getDb()
-  const rows = db.prepare('SELECT * FROM fb_apps ORDER BY updated_at DESC').all() as AppRow[]
+  const rows = db.prepare('SELECT * FROM fb_apps WHERE org_id = ? ORDER BY updated_at DESC').all(getActiveOrgId()) as AppRow[]
   return rows.map(rowToApp)
 }
 
@@ -51,14 +52,15 @@ export function createApp(draft: PlexiAppDraft): PlexiApp {
   const id = randomUUID()
   const now = Date.now()
   db.prepare(
-    `INSERT INTO fb_apps (id, name, icon, components_json, created_at, updated_at)
-     VALUES (@id, @name, @icon, @components, @now, @now)`
+    `INSERT INTO fb_apps (id, name, icon, components_json, created_at, updated_at, org_id)
+     VALUES (@id, @name, @icon, @components, @now, @now, @orgId)`
   ).run({
     id,
     name: draft.name ?? 'Untitled app',
     icon: draft.icon ?? 'widgets',
     components: JSON.stringify(draft.components ?? []),
-    now
+    now,
+    orgId: getActiveOrgId()
   })
   return getApp(id) as PlexiApp
 }

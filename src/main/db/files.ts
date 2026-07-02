@@ -623,8 +623,8 @@ export function entriesByTags(tags: string[]): FileEntry[] {
 export function listSmartFolders(): SmartFolder[] {
   const db = getDb()
   const rows = db
-    .prepare('SELECT id, name, tags_json, search FROM fb_smart_folders ORDER BY name')
-    .all() as Array<{ id: string; name: string; tags_json: string; search: string }>
+    .prepare('SELECT id, name, tags_json, search FROM fb_smart_folders WHERE org_id = ? ORDER BY name')
+    .all(getActiveOrgId()) as Array<{ id: string; name: string; tags_json: string; search: string }>
   return rows.map((r) => ({ id: r.id, name: r.name, tags: safeTags(r.tags_json), search: r.search ?? '' }))
 }
 
@@ -634,13 +634,9 @@ export function createSmartFolder(name: string, tags: string[], search = ''): Sm
   const clean = tags.map((t) => t.trim()).filter(Boolean)
   const s = search.trim()
   const finalName = name.trim() || (clean.length ? clean.join(' + ') : s) || 'Smart folder'
-  db.prepare('INSERT INTO fb_smart_folders (id, name, tags_json, search, created_at) VALUES (?, ?, ?, ?, ?)').run(
-    id,
-    finalName,
-    JSON.stringify(clean),
-    s,
-    Date.now()
-  )
+  db.prepare(
+    'INSERT INTO fb_smart_folders (id, name, tags_json, search, created_at, org_id) VALUES (?, ?, ?, ?, ?, ?)'
+  ).run(id, finalName, JSON.stringify(clean), s, Date.now(), getActiveOrgId())
   return { id, name: finalName, tags: clean, search: s }
 }
 

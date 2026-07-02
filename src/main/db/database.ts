@@ -739,6 +739,17 @@ export function getDb(): Database.Database {
   ensureColumn(db, 'vault_entries', 'org_id', "TEXT NOT NULL DEFAULT 'personal'")
   ensureColumn(db, 'fb_knowledge', 'org_id', "TEXT NOT NULL DEFAULT 'personal'")
   ensureColumn(db, 'fb_tables', 'org_id', "TEXT NOT NULL DEFAULT 'personal'")
+  // Remaining top-level user-content surfaces get the same per-org scoping so
+  // switching organisation shows only that org's automations, reports, apps,
+  // forms, meetings, signature requests and saved file views. Existing rows
+  // backfill to the reserved 'personal' org via the DEFAULT (no data loss).
+  ensureColumn(db, 'fb_flows', 'org_id', "TEXT NOT NULL DEFAULT 'personal'")
+  ensureColumn(db, 'fb_reports', 'org_id', "TEXT NOT NULL DEFAULT 'personal'")
+  ensureColumn(db, 'fb_apps', 'org_id', "TEXT NOT NULL DEFAULT 'personal'")
+  ensureColumn(db, 'fb_forms', 'org_id', "TEXT NOT NULL DEFAULT 'personal'")
+  ensureColumn(db, 'fb_meetings', 'org_id', "TEXT NOT NULL DEFAULT 'personal'")
+  ensureColumn(db, 'fb_sign_requests', 'org_id', "TEXT NOT NULL DEFAULT 'personal'")
+  ensureColumn(db, 'fb_smart_folders', 'org_id', "TEXT NOT NULL DEFAULT 'personal'")
   db.exec(`
     CREATE INDEX IF NOT EXISTS idx_time_blocks_org ON time_blocks(org_id);
     CREATE INDEX IF NOT EXISTS idx_vault_entries_org ON vault_entries(org_id);

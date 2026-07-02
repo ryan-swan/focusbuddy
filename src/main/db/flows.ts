@@ -1,5 +1,6 @@
 import { randomUUID } from 'crypto'
 import { getDb } from './database'
+import { getActiveOrgId } from './activeOrg'
 import { createNode } from './nodes'
 import { createRow, getTable } from './tables'
 import { createKnowledge } from './knowledge'
@@ -91,7 +92,9 @@ function rowToFlow(r: FlowRow): FlowDef {
 
 export function listFlows(): FlowDef[] {
   const db = getDb()
-  return (db.prepare('SELECT * FROM fb_flows ORDER BY updated_at DESC').all() as FlowRow[]).map(rowToFlow)
+  return (
+    db.prepare('SELECT * FROM fb_flows WHERE org_id = ? ORDER BY updated_at DESC').all(getActiveOrgId()) as FlowRow[]
+  ).map(rowToFlow)
 }
 
 export function getFlow(id: string): FlowDef | null {
@@ -105,9 +108,9 @@ export function createFlow(draft: FlowDraft): FlowDef {
   const id = randomUUID()
   const now = Date.now()
   db.prepare(
-    `INSERT INTO fb_flows (id, title, enabled, trigger_json, actions_json, created_at, updated_at)
-     VALUES (?, ?, 1, ?, ?, ?, ?)`
-  ).run(id, draft.title || 'New flow', JSON.stringify({ kind: 'manual' }), JSON.stringify([]), now, now)
+    `INSERT INTO fb_flows (id, title, enabled, trigger_json, actions_json, created_at, updated_at, org_id)
+     VALUES (?, ?, 1, ?, ?, ?, ?, ?)`
+  ).run(id, draft.title || 'New flow', JSON.stringify({ kind: 'manual' }), JSON.stringify([]), now, now, getActiveOrgId())
   return getFlow(id)!
 }
 

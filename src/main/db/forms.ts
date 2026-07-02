@@ -1,5 +1,6 @@
 import { randomUUID } from 'crypto'
 import { getDb } from './database'
+import { getActiveOrgId } from './activeOrg'
 import type { PlexiForm, PlexiFormDraft, PlexiFormPatch } from '@shared/forms'
 
 // ── fb_forms (PlexiForms) ────────────────────────────────────────────────────
@@ -29,7 +30,7 @@ function rowToForm(row: FormRow): PlexiForm {
 
 export function listForms(): PlexiForm[] {
   const db = getDb()
-  const rows = db.prepare('SELECT * FROM fb_forms ORDER BY updated_at DESC').all() as FormRow[]
+  const rows = db.prepare('SELECT * FROM fb_forms WHERE org_id = ? ORDER BY updated_at DESC').all(getActiveOrgId()) as FormRow[]
   return rows.map(rowToForm)
 }
 
@@ -44,14 +45,15 @@ export function createForm(draft: PlexiFormDraft): PlexiForm {
   const id = randomUUID()
   const now = Date.now()
   db.prepare(
-    `INSERT INTO fb_forms (id, title, description, table_id, created_at, updated_at)
-     VALUES (@id, @title, @description, @tableId, @now, @now)`
+    `INSERT INTO fb_forms (id, title, description, table_id, created_at, updated_at, org_id)
+     VALUES (@id, @title, @description, @tableId, @now, @now, @orgId)`
   ).run({
     id,
     title: draft.title ?? 'Untitled form',
     description: draft.description ?? '',
     tableId: draft.tableId,
-    now
+    now,
+    orgId: getActiveOrgId()
   })
   return getForm(id) as PlexiForm
 }
