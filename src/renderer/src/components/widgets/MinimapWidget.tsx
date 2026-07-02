@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useWidgetStore } from '../../stores/widgets'
 import { computeSectionFrame, effectiveLayout } from '../../lib/sectionGeometry'
+import { useZonePosition } from '../../lib/pinLayout'
 import type { Widget } from '@shared/types'
 import WidgetFrame from './WidgetFrame'
 import WidgetPreview from '../WidgetPreview'
@@ -73,6 +74,60 @@ export default function MinimapWidget({ widget, inline = false }: Props): JSX.El
       if (ro) ro.disconnect()
     }
   }, [])
+
+  // Minimize behaviour: the minimap is an aid for moving around the canvas, so it
+  // only needs to be open while the user is navigating. When they click into and
+  // focus a widget it collapses to a small button, and it reopens whenever they
+  // pan or zoom (navigating), when nothing is focused, or when they click the
+  // button. inline mode (e.g. the control-room panel) never collapses.
+  const activeId = useWidgetStore((s) => s.activeWidgetId)
+  const focusedId = useWidgetStore((s) => s.focusedWidgetId)
+  const zone = useZonePosition(widget.id)
+  const [navExpanded, setNavExpanded] = useState(false)
+  const [manualOpen, setManualOpen] = useState(false)
+  const navTimer = useRef<number | undefined>(undefined)
+
+  // Any pan/zoom counts as navigating: reopen and keep it open for a short
+  // window after the movement stops.
+  useEffect(() => {
+    setNavExpanded(true)
+    if (navTimer.current) window.clearTimeout(navTimer.current)
+    navTimer.current = window.setTimeout(() => setNavExpanded(false), 2200)
+    return () => {
+      if (navTimer.current) window.clearTimeout(navTimer.current)
+    }
+  }, [panX, panY, zoom])
+
+  // Focusing a different widget re-collapses (a manual open only lasts until the
+  // user turns their attention to another widget).
+  useEffect(() => {
+    setManualOpen(false)
+  }, [activeId, focusedId])
+
+  const hasFocusTarget = activeId !== null || focusedId !== null
+  const collapsed = !inline && hasFocusTarget && !navExpanded && !manualOpen
+
+  if (collapsed) {
+    // Sit in the bottom-right of the minimap's reserved pin slot; fall back to the
+    // viewport corner if the zone position has not resolved yet.
+    const pos = zone
+      ? { left: zone.x + zone.width - 44, top: zone.y + zone.height - 44 }
+      : { right: 16, bottom: 16 }
+    return (
+      <button
+        onClick={(e) => {
+          e.stopPropagation()
+          setManualOpen(true)
+        }}
+        data-testid="minimap-collapsed"
+        title="Show minimap"
+        className="absolute w-9 h-9 rounded-full bg-white/95 dark:bg-stone-800/95 shadow-lg ring-1 ring-black/10 dark:ring-white/10 flex items-center justify-center text-stone-500 dark:text-stone-300 hover:text-accent pointer-events-auto"
+        style={{ position: 'absolute', ...pos }}
+      >
+        <Icon name="map" size={18} />
+      </button>
+    )
+  }
 
   const body = (
     <MinimapBody

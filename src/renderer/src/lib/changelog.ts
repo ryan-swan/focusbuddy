@@ -36,6 +36,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.142',
+    date: '2026-07-02T19:00:00Z',
+    title: 'v2.5.142 — a calmer, reliable desk minimap',
+    tag: 'fix',
+    summary:
+      'The desk minimap now gets out of your way while you work. When you click into a widget it folds down to a small button in the corner, and it reopens on its own whenever you pan or zoom around the canvas, or the moment you tap the button. It is there for finding your way around, not for sitting open while you are heads-down in a widget. This release also fixes a bug where the minimap could come unpinned and drift off with the canvas as you added more widgets; it now stays locked to the bottom-right corner no matter how big the canvas gets or how far you pan.',
+    highlights: [
+      'The minimap folds to a small button when you focus a widget, and reopens while you navigate.',
+      'Fixed the minimap coming unpinned and drifting once the canvas grew past the screen.',
+      'It now stays anchored to the bottom-right corner however large the canvas gets.'
+    ]
+  },
+  {
     version: '2.5.141',
     date: '2026-07-02T17:00:00Z',
     title: 'v2.5.141 — real pages in Page view',
