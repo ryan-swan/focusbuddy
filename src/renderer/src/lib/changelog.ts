@@ -36,6 +36,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.140',
+    date: '2026-07-02T15:00:00Z',
+    title: 'v2.5.140 — menu bars across the whole office',
+    tag: 'feature',
+    summary:
+      'The menu bar that arrived on documents now lives on Sheets, Slides, Draw and Design too, so every office app has the same familiar File, Edit, Insert, Format and so on across the top. Each app gets the menus that fit it: Sheets has Data with sort and filter, number formats and charts; Slides has a Slide menu with new, delete and reorder plus Present; Design has shapes, images and Remove image background with export to PNG or PDF; Draw has shapes and fit-to-view. As with documents, every item runs the real action, and where an app genuinely cannot do something it simply is not shown rather than sitting there dead.',
+    highlights: [
+      'The same menu-bar experience now spans Docs, Sheets, Slides, Draw and Design.',
+      'Each app shows the menus that match it: Sheets Data/charts, Slides Slide/Present, Design shapes/export.',
+      'Every menu item performs a genuine action; nothing is a placeholder.'
+    ]
+  },
+  {
     version: '2.5.139',
     date: '2026-07-02T13:00:00Z',
     title: 'v2.5.139 — a full menu bar for documents',

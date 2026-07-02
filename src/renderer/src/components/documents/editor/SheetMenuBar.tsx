@@ -1,0 +1,225 @@
+import { useState } from 'react'
+import type { SheetCellFormat, SheetNumberFormat, FbDocument } from '@shared/types'
+import { useDocumentsStore } from '../../../stores/documents'
+import { useViewStore } from '../../../stores/view'
+import { MenuBarShell, MenuModal, type MenuDef } from './menuBarKit'
+
+// A Google-Sheets-style menu bar for the spreadsheet editor. Every item maps to a
+// real SheetEditor operation (passed in as `actions`) or a documents-store action.
+// Capabilities the editor does not have (merge, freeze, cell find/replace) are
+// simply not listed rather than shown as dead items.
+
+export interface SheetMenuActions {
+  title: string
+  activeFormat: SheetCellFormat | undefined
+  undo: () => void
+  redo: () => void
+  canUndo: boolean
+  canRedo: boolean
+  format: (patch: Partial<SheetCellFormat>) => void
+  numberFormat: (f: SheetNumberFormat) => void
+  insertRowAbove: () => void
+  insertRowBelow: () => void
+  insertColLeft: () => void
+  insertColRight: () => void
+  deleteRow: () => void
+  deleteCol: () => void
+  sort: (dir: 'asc' | 'desc') => void
+  toggleFilter: () => void
+  filterActive: boolean
+  insertChart: (t: 'bar' | 'line' | 'pie') => void
+  insertSparkline: () => void
+  insertPivot: () => void
+  conditionalFormat: () => void
+  dataValidation: () => void
+  addSheet: () => void
+  namedRanges: () => void
+  importFile: () => void
+  exportFile: (f: 'xlsx' | 'csv') => void
+  aiFill: () => void
+}
+
+export default function SheetMenuBar({ actions }: { actions: SheetMenuActions }): JSX.Element {
+  const a = actions
+  const fmt = a.activeFormat
+  const createBlank = useDocumentsStore((s) => s.createBlank)
+  const active = useDocumentsStore((s) => s.active)
+  const rename = useDocumentsStore((s) => s.rename)
+  const remove = useDocumentsStore((s) => s.remove)
+  const goDocument = useViewStore((s) => s.goDocument)
+  const goDocuments = useViewStore((s) => s.goDocuments)
+  const [shortcutsOpen, setShortcutsOpen] = useState(false)
+
+  async function newSheet(): Promise<void> {
+    const doc = await createBlank('sheet')
+    goDocument(doc.id)
+  }
+  async function makeCopy(): Promise<void> {
+    const body = (active?.body ?? undefined) as FbDocument['body'] | undefined
+    const copy = await window.api.documents.create({
+      docType: 'sheet',
+      title: `Copy of ${a.title || 'Untitled sheet'}`,
+      body
+    })
+    goDocument(copy.id)
+  }
+  function doRename(): void {
+    const next = window.prompt('Rename spreadsheet', a.title)
+    if (next != null && next.trim()) void rename(next.trim())
+  }
+  async function moveToTrash(): Promise<void> {
+    if (!active) return
+    if (!window.confirm(`Move "${a.title || 'Untitled sheet'}" to trash?`)) return
+    await remove(active.id)
+    goDocuments()
+  }
+
+  const numFmtKind = fmt?.numFmt?.kind ?? 'general'
+
+  const menus: MenuDef[] = [
+    {
+      id: 'file',
+      label: 'File',
+      build: () => [
+        { kind: 'item', label: 'New spreadsheet', icon: 'note_add', run: () => void newSheet() },
+        { kind: 'item', label: 'Make a copy', icon: 'file_copy', run: () => void makeCopy() },
+        { kind: 'sep' },
+        { kind: 'item', label: 'Rename', icon: 'edit', run: doRename },
+        { kind: 'item', label: 'Import (.xlsx / .csv)', icon: 'upload', run: a.importFile },
+        {
+          kind: 'submenu',
+          label: 'Download',
+          icon: 'download',
+          items: [
+            { kind: 'item', label: 'Microsoft Excel (.xlsx)', run: () => a.exportFile('xlsx') },
+            { kind: 'item', label: 'Comma-separated values (.csv)', run: () => a.exportFile('csv') }
+          ]
+        },
+        { kind: 'sep' },
+        { kind: 'item', label: 'Move to trash', icon: 'delete', run: () => void moveToTrash() }
+      ]
+    },
+    {
+      id: 'edit',
+      label: 'Edit',
+      build: () => [
+        { kind: 'item', label: 'Undo', shortcut: '⌘Z', icon: 'undo', run: a.undo, disabled: !a.canUndo },
+        { kind: 'item', label: 'Redo', shortcut: '⌘Y', icon: 'redo', run: a.redo, disabled: !a.canRedo }
+      ]
+    },
+    {
+      id: 'insert',
+      label: 'Insert',
+      build: () => [
+        { kind: 'item', label: 'Row above', icon: 'add', run: a.insertRowAbove },
+        { kind: 'item', label: 'Row below', run: a.insertRowBelow },
+        { kind: 'item', label: 'Column left', run: a.insertColLeft },
+        { kind: 'item', label: 'Column right', run: a.insertColRight },
+        { kind: 'sep' },
+        {
+          kind: 'submenu',
+          label: 'Chart',
+          icon: 'bar_chart',
+          items: [
+            { kind: 'item', label: 'Bar chart', run: () => a.insertChart('bar') },
+            { kind: 'item', label: 'Line chart', run: () => a.insertChart('line') },
+            { kind: 'item', label: 'Pie chart', run: () => a.insertChart('pie') }
+          ]
+        },
+        { kind: 'item', label: 'Pivot table', icon: 'pivot_table_chart', run: a.insertPivot },
+        { kind: 'item', label: 'Sparkline', icon: 'show_chart', run: a.insertSparkline },
+        { kind: 'sep' },
+        { kind: 'item', label: 'Sheet', icon: 'tab', run: a.addSheet },
+        { kind: 'item', label: 'Named range', icon: 'data_object', run: a.namedRanges }
+      ]
+    },
+    {
+      id: 'format',
+      label: 'Format',
+      build: () => [
+        {
+          kind: 'submenu',
+          label: 'Text',
+          icon: 'format_bold',
+          items: [
+            { kind: 'item', label: 'Bold', shortcut: '⌘B', run: () => a.format({ bold: !fmt?.bold }), active: !!fmt?.bold },
+            { kind: 'item', label: 'Italic', shortcut: '⌘I', run: () => a.format({ italic: !fmt?.italic }), active: !!fmt?.italic },
+            { kind: 'item', label: 'Underline', shortcut: '⌘U', run: () => a.format({ underline: !fmt?.underline }), active: !!fmt?.underline }
+          ]
+        },
+        {
+          kind: 'submenu',
+          label: 'Number',
+          icon: 'tag',
+          items: [
+            { kind: 'item', label: 'Automatic', run: () => a.numberFormat({ kind: 'general' }), active: numFmtKind === 'general' },
+            { kind: 'item', label: 'Number', run: () => a.numberFormat({ kind: 'number', decimals: 2, thousands: true }), active: numFmtKind === 'number' },
+            { kind: 'item', label: 'Percent', run: () => a.numberFormat({ kind: 'percent', decimals: 0 }), active: numFmtKind === 'percent' },
+            { kind: 'item', label: 'Currency', run: () => a.numberFormat({ kind: 'currency', decimals: 2, symbol: '$' }), active: numFmtKind === 'currency' },
+            { kind: 'item', label: 'Date', run: () => a.numberFormat({ kind: 'date', pattern: 'yyyy-MM-dd' }), active: numFmtKind === 'date' }
+          ]
+        },
+        {
+          kind: 'submenu',
+          label: 'Alignment',
+          icon: 'format_align_left',
+          items: [
+            { kind: 'item', label: 'Left', run: () => a.format({ align: 'left' }), active: fmt?.align === 'left' || fmt?.align == null },
+            { kind: 'item', label: 'Center', run: () => a.format({ align: 'center' }), active: fmt?.align === 'center' },
+            { kind: 'item', label: 'Right', run: () => a.format({ align: 'right' }), active: fmt?.align === 'right' }
+          ]
+        },
+        { kind: 'sep' },
+        { kind: 'item', label: 'Conditional formatting', icon: 'palette', run: a.conditionalFormat },
+        { kind: 'item', label: 'Clear formatting', shortcut: '⌘\\', icon: 'format_clear', run: () => a.format({ bold: false, italic: false, underline: false, numFmt: { kind: 'general' } }) }
+      ]
+    },
+    {
+      id: 'data',
+      label: 'Data',
+      build: () => [
+        { kind: 'item', label: 'Sort sheet A → Z', icon: 'sort', run: () => a.sort('asc') },
+        { kind: 'item', label: 'Sort sheet Z → A', run: () => a.sort('desc') },
+        { kind: 'sep' },
+        { kind: 'item', label: a.filterActive ? 'Remove filter' : 'Create a filter', icon: 'filter_alt', run: a.toggleFilter, active: a.filterActive },
+        { kind: 'item', label: 'Data validation', icon: 'rule', run: a.dataValidation },
+        { kind: 'item', label: 'Named ranges', icon: 'data_object', run: a.namedRanges }
+      ]
+    },
+    {
+      id: 'tools',
+      label: 'Tools',
+      build: () => [{ kind: 'item', label: 'AI fill', icon: 'auto_awesome', run: a.aiFill }]
+    },
+    {
+      id: 'help',
+      label: 'Help',
+      build: () => [{ kind: 'item', label: 'Keyboard shortcuts', shortcut: '⌘/', icon: 'keyboard', run: () => setShortcutsOpen(true) }]
+    }
+  ]
+
+  return (
+    <>
+      <MenuBarShell menus={menus} testid="sheet-menubar" />
+      {shortcutsOpen && (
+        <MenuModal title="Keyboard shortcuts" onClose={() => setShortcutsOpen(false)}>
+          <div className="space-y-1.5">
+            {([
+              ['Bold', '⌘B'],
+              ['Italic', '⌘I'],
+              ['Underline', '⌘U'],
+              ['Undo', '⌘Z'],
+              ['Redo', '⌘Y'],
+              ['Clear formatting', '⌘\\']
+            ] as [string, string][]).map(([label, keys]) => (
+              <div key={label} className="flex items-center justify-between text-[13px]">
+                <span className="text-stone-600 dark:text-stone-300">{label}</span>
+                <span className="text-stone-400 dark:text-stone-500 fb-tabular">{keys}</span>
+              </div>
+            ))}
+          </div>
+        </MenuModal>
+      )}
+    </>
+  )
+}

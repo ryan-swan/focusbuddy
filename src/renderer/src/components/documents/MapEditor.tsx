@@ -23,6 +23,7 @@ import type { MapBody, MapEdge, MapShape } from '@shared/types'
 import { normalizeMapBody, autoLayout } from '@shared/mapGraph'
 import { mapTemplate, type MapTemplateId } from './map/mapTemplates'
 import Icon from '../Icon'
+import DrawMenuBar from './editor/DrawMenuBar'
 
 // PlexiMaps editor — a Draw.io / Lucidchart-style diagram and workflow map. Built
 // on React Flow but persists a clean, tool-agnostic MapBody (nodes carry their
@@ -388,6 +389,16 @@ function MapInner({ body, onChange }: Props): JSX.Element {
 
   return (
     <div className="h-full w-full flex flex-col bg-white dark:bg-stone-900">
+      {/* Menu bar — real diagram actions (add shapes, fit view). */}
+      <div className="shrink-0 px-2 pt-1.5 pb-1 border-b border-stone-100 dark:border-stone-800">
+        <DrawMenuBar
+          actions={{
+            shapes: SHAPE_TOOLS.map((t) => ({ shape: t.shape, label: t.label })),
+            addNode,
+            fitView: () => rf.fitView({ padding: 0.2, duration: 300 })
+          }}
+        />
+      </div>
       {/* Toolbar */}
       <div className="shrink-0 flex items-center gap-1 px-2 py-1.5 border-b border-stone-200 dark:border-stone-700 bg-stone-50/80 dark:bg-stone-800/60 flex-wrap">
         {SHAPE_TOOLS.map((t) => (
