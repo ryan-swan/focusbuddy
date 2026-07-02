@@ -36,6 +36,20 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.152',
+    date: '2026-07-03T10:00:00Z',
+    title: 'v2.5.152 — collaborate means editing the same document together',
+    tag: 'feature',
+    summary:
+      'Inviting people to collaborate from a meeting now opens one shared document that everyone edits together in real time, instead of handing each person their own copy. When you start a meeting from a document, sheet or deck and choose collaborate, a live version is created and each attendee who already has an account joins it as an editor; anyone without an account still gets an editable copy so they are not shut out. When the meeting ends the collaborators become read-only, are removed, or keep editing, whichever you picked, and read-only is now genuinely enforced on the server. View for this meeting is tightened too: that access ends the moment the meeting ends rather than on a timer.',
+    highlights: [
+      'Collaborate opens one shared, co-edited document rather than separate copies.',
+      'Existing users join as live editors; others get an editable copy.',
+      'Read-only after the meeting is enforced, not just a downgraded label.',
+      'View-for-this-meeting access ends exactly when the meeting ends.'
+    ]
+  },
+  {
     version: '2.5.151',
     date: '2026-07-03T09:00:00Z',
     title: 'v2.5.151 — a meeting leaves a tidy folder behind',

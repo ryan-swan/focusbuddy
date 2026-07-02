@@ -186,6 +186,41 @@ export async function inviteToLiveDoc(
   return { ok: !!json?.ok, member: json?.member, error: json?.error }
 }
 
+// Invite by email (the meeting-collaborate flow, whose attendees are emails).
+// Returns the invited account id when the email belongs to an existing user
+// (they become a co-editor), or null when there is no account yet.
+export async function inviteToLiveDocByEmail(
+  token: string,
+  id: string,
+  email: string
+): Promise<{ ok: boolean; accountId: string | null; error?: string }> {
+  const { json } = await call<{ ok: boolean; accountId?: string | null; error?: string }>(
+    'POST',
+    `/livedocs/${id}/invite-email`,
+    token,
+    { email }
+  )
+  return { ok: !!json?.ok, accountId: json?.accountId ?? null, error: json?.error }
+}
+
+// Downgrade (viewer) or restore (editor) a member's access. Used to turn a
+// meeting's collaborators read-only when the meeting ends.
+export async function setLiveDocMemberRole(
+  token: string,
+  id: string,
+  accountId: string,
+  role: 'editor' | 'viewer'
+): Promise<boolean> {
+  const { json } = await call<{ ok: boolean }>('POST', `/livedocs/${id}/members/${accountId}/role`, token, { role })
+  return !!json?.ok
+}
+
+// Remove a member entirely (revoke access).
+export async function removeLiveDocMember(token: string, id: string, accountId: string): Promise<boolean> {
+  const { json } = await call<{ ok: boolean }>('DELETE', `/livedocs/${id}/members/${accountId}`, token)
+  return !!json?.ok
+}
+
 export async function requestTakeover(token: string, id: string, message: string): Promise<boolean> {
   const { json } = await call<{ ok: boolean }>('POST', `/livedocs/${id}/takeover`, token, { message })
   return !!json?.ok
