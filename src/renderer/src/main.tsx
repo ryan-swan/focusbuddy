@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client'
 import App from './App'
 import ErrorBoundary from './components/ErrorBoundary'
 import { applyUiScale, loadUiScale } from './lib/uiScale'
+import { installSignalOrgHeader } from './lib/signalOrgHeader'
 // Self-hosted fonts. These used to load from the Google Fonts CDN via a <link> in
 // index.html, which meant every icon (Material Symbols) and the UI type broke the
 // moment the network was unavailable or the CDN was blocked, which a desktop app
@@ -19,6 +20,10 @@ import './styles/globals.css'
 // Restore the user's chosen text size before the app renders, so it comes up at
 // the size they set rather than the default.
 applyUiScale(loadUiScale())
+
+// Attach the active-organisation header to every signal-server request, before
+// any client module can fire one. Multi-org tenancy relies on this.
+installSignalOrgHeader()
 
 // Belt-and-braces: when an unmodified Space (or Shift+Space) is pressed
 // inside a text input, textarea or contenteditable, short-circuit ALL
