@@ -4,7 +4,7 @@ import Icon from './Icon'
 import { useMeetingLaunchStore } from '../stores/meetingLaunch'
 import { startArtifactMeeting } from '../lib/startMeeting'
 import { MEETING_ACCESS_OPTIONS, type MeetingAccessLevel } from '../lib/meetingAccess'
-import { shareArtifactWithAttendees } from '../lib/meetingShare'
+import { shareArtifactWithAttendees, type MeetingAfterAccess } from '../lib/meetingShare'
 import { notifyExternal } from '../lib/notify'
 
 // The start-meeting dialog for a meeting launched from an artifact. It collects
@@ -17,6 +17,7 @@ export default function MeetingLaunchDialog(): JSX.Element | null {
   const close = useMeetingLaunchStore((s) => s.close)
   const [attendees, setAttendees] = useState('')
   const [level, setLevel] = useState<MeetingAccessLevel>('view-once')
+  const [afterAccess, setAfterAccess] = useState<MeetingAfterAccess>('downgrade-view')
   const [busy, setBusy] = useState(false)
 
   if (!origin) return null
@@ -39,7 +40,7 @@ export default function MeetingLaunchDialog(): JSX.Element | null {
       // Trickle the artifact access down to the attendees in the background,
       // then report the honest outcome (sent / partial / no mailbox).
       if (emails.length > 0) {
-        void shareArtifactWithAttendees({ origin, attendees: emails, level }).then((r) => {
+        void shareArtifactWithAttendees({ origin, attendees: emails, level, afterAccess }).then((r) => {
           if (!r) return
           if (r.failed.length > 0) {
             notifyExternal('Meeting started', `Shared with ${r.shared}; could not reach ${r.failed.join(', ')}.`)
@@ -114,6 +115,24 @@ export default function MeetingLaunchDialog(): JSX.Element | null {
             </label>
           ))}
         </fieldset>
+
+        {level === 'collaborate' && (
+          <label className="block">
+            <span className="text-[10px] uppercase tracking-wider text-stone-500 dark:text-stone-400 font-medium">
+              When the meeting ends
+            </span>
+            <select
+              value={afterAccess}
+              onChange={(e) => setAfterAccess(e.target.value as MeetingAfterAccess)}
+              className="mt-1 w-full bg-white dark:bg-stone-800 border border-stone-300 dark:border-stone-600 rounded-md px-2 py-1.5 text-sm"
+              data-testid="launch-after-access"
+            >
+              <option value="downgrade-view">Make it read-only</option>
+              <option value="keep">Keep collaborate access</option>
+              <option value="revoke">Revoke access</option>
+            </select>
+          </label>
+        )}
 
         <div className="flex justify-end gap-2 pt-1">
           <button onClick={close} className="btn-ghost">

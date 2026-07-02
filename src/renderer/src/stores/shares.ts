@@ -56,6 +56,11 @@ interface SharesStore {
   // Adds the resolved item to the inbox + local DB.
   acceptByToken: (token: string) => Promise<SharedItem>
   revoke: (id: string) => Promise<void>
+  // Change a share's scope (e.g. downgrade a meeting-scoped collaborate grant to
+  // read-only when the meeting ends). Updates the local row and, when the remote
+  // snapshot + handle are supplied, re-upserts the same token on the server so
+  // the change reaches recipients too.
+  setScope: (id: string, scope: ShareScope, remote?: { snapshot: unknown; fromHandle: string }) => Promise<void>
   remove: (id: string) => Promise<void>
   removeFromInbox: (id: string) => Promise<void>
 }
@@ -196,6 +201,29 @@ export const useSharesStore = create<SharesStore>((set, get) => ({
       } catch (err) {
         // eslint-disable-next-line no-console
         console.warn('[SharesStore] remote revoke failed:', err)
+      }
+    }
+  },
+  setScope: async (id, scope, remote) => {
+    const updated = await window.api.shares.setScope(id, scope)
+    if (!updated) return
+    set({ outgoing: get().outgoing.map((s) => (s.id === id ? { ...s, scope } : s)) })
+    // Best-effort remote re-upsert so recipients see the new scope. Re-minting
+    // the SAME token updates the existing server record (scope = excluded.scope).
+    const service = getShareService()
+    if (service && remote) {
+      try {
+        await service.mint({
+          token: updated.token,
+          kind: updated.kind,
+          snapshot: remote.snapshot,
+          fromHandle: remote.fromHandle,
+          scope,
+          expiresAt: updated.expiresAt
+        })
+      } catch (err) {
+        // eslint-disable-next-line no-console
+        console.warn('[SharesStore] remote scope update failed:', err)
       }
     }
   },

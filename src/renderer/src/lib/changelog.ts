@@ -36,6 +36,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.150',
+    date: '2026-07-03T08:00:00Z',
+    title: 'v2.5.150 — collaborate during the meeting, read-only after',
+    tag: 'feature',
+    summary:
+      'When you invite people to collaborate on the artifact a meeting is about, that access is now meeting-scoped by default. Attendees can work on it while the meeting is live, and the moment the meeting ends it becomes read-only, so a working session does not quietly leave the door open afterward. You choose this when you start the meeting: make it read-only after, keep collaborate access, or revoke access entirely when the meeting ends. View access is unchanged, you can still grant a view just for the meeting or a lasting one.',
+    highlights: [
+      'Collaborate access is meeting-scoped: editable during, read-only after.',
+      'Choose what happens when the meeting ends: read-only, keep, or revoke.',
+      'The downgrade runs automatically the moment the meeting ends.'
+    ]
+  },
+  {
     version: '2.5.149',
     date: '2026-07-03T07:00:00Z',
     title: 'v2.5.149 — meetings share their artifact with the people you invite',

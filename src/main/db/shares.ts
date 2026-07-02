@@ -119,6 +119,16 @@ export function revokeShareLink(id: string): boolean {
   return result.changes > 0
 }
 
+// Change a share's scope after creation. Used when a meeting-scoped collaborate
+// grant is downgraded to read-only once the meeting ends. Returns the updated
+// link (with its token, so the caller can re-sync the same token to the server).
+export function setShareLinkScope(id: string, scope: ShareScope): ShareLink | null {
+  const db = getDb()
+  db.prepare('UPDATE share_links SET scope = ? WHERE id = ?').run(scope, id)
+  const row = db.prepare('SELECT * FROM share_links WHERE id = ?').get(id) as ShareLinkRow | undefined
+  return row ? rowToShareLink(row) : null
+}
+
 export function deleteShareLink(id: string): boolean {
   const db = getDb()
   const result = db.prepare('DELETE FROM share_links WHERE id = ?').run(id)
