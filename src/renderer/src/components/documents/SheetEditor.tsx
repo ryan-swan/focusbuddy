@@ -35,6 +35,7 @@ import { rewriteFormulaRefs, displayCell, makeWorkbook, makeNames } from '../../
 import { isSingleCell } from '@shared/gridClipboard'
 import SheetGrid from './sheet/SheetGrid'
 import SheetToolbar from './sheet/SheetToolbar'
+import SheetMenuBar from './editor/SheetMenuBar'
 import SheetTabStrip from './sheet/SheetTabStrip'
 import SheetChart from './sheet/SheetChart'
 import SheetPivot from './sheet/SheetPivot'
@@ -872,6 +873,46 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
 
   return (
     <div className="flex flex-col h-full">
+      {/* Google-Sheets-style menu bar above the toolbar. Every item is wired to a
+          real SheetEditor op or a documents-store action. */}
+      <div className="px-2 pt-1.5 pb-1 border-b border-stone-100 dark:border-stone-800">
+        <SheetMenuBar
+          actions={{
+            title,
+            activeFormat: cellFormat(tab, focus.r, focus.c),
+            undo,
+            redo,
+            canUndo: undoStack.current.length > 0,
+            canRedo: redoStack.current.length > 0,
+            format: applyToSelection,
+            numberFormat: applyNumberFormat,
+            insertRowAbove: () => mutateTab((t) => insertRowAt(t, selection.r0)),
+            insertRowBelow: () => mutateTab((t) => insertRowAt(t, selection.r1 + 1)),
+            insertColLeft: () => mutateTab((t) => insertColAt(t, selection.c0)),
+            insertColRight: () => mutateTab((t) => insertColAt(t, selection.c1 + 1)),
+            deleteRow: () => mutateTab((t) => deleteRowAt(t, selection.r0)),
+            deleteCol: () => mutateTab((t) => deleteColAt(t, selection.c0)),
+            sort: (dir) => mutateTab((t) => sortByColumn(t, selection.c0, dir)),
+            toggleFilter: () =>
+              mutateTab((t) => ({
+                ...t,
+                filterActive: !t.filterActive,
+                ...(t.filterActive ? { filters: {} } : {})
+              })),
+            filterActive: !!tab.filterActive,
+            insertChart,
+            insertSparkline,
+            insertPivot: () => setPivotOpen(true),
+            conditionalFormat: () => setCondOpen(true),
+            dataValidation: () => setValidationOpen(true),
+            addSheet: addTab,
+            namedRanges: () => setNamesOpen((v) => !v),
+            importFile: () => void importFile(),
+            exportFile: (f) => void exportFile(f),
+            aiFill: () => setAiOpen((v) => !v)
+          }}
+        />
+      </div>
       <SheetToolbar
         activeFont={cellFormat(tab, focus.r, focus.c)?.fontFamily}
         onFormat={applyToSelection}

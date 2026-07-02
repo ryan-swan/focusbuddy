@@ -37,6 +37,7 @@ import { useBrandStore } from '../../stores/brand'
 import BrandKitModal from './BrandKitModal'
 import { GOOGLE_FONTS, loadGoogleFont, fontFamilyValue, familyLabel } from '../../lib/googleFonts'
 import DesignAiPanel from './DesignAiPanel'
+import DesignMenuBar from './editor/DesignMenuBar'
 import { useAccountStore } from '../../stores/account'
 
 // PlexiDesign — the on-platform design studio. A design is a single arbitrary-size
@@ -571,6 +572,23 @@ export default function DesignEditor({ content, title, onChange }: Props): JSX.E
 
   return (
     <div className="flex flex-col h-full" data-testid="design-editor">
+      {/* Menu bar — real design-canvas actions. */}
+      <div className="px-2 pt-1.5 pb-1 border-b border-stone-100 dark:border-stone-800">
+        <DesignMenuBar
+          actions={{
+            title,
+            undo,
+            redo,
+            deleteSelected,
+            addText,
+            addShape,
+            addLine,
+            addImageFromFile: () => void addImageFromFile(),
+            removeBgSelected: () => void removeBgSelected(),
+            exportAs: (f) => void exportAs(f)
+          }}
+        />
+      </div>
       {/* Toolbar */}
       <div className="flex items-center gap-1.5 px-3 py-2 border-b border-stone-200 dark:border-stone-700 flex-wrap text-[12px]">
         <button

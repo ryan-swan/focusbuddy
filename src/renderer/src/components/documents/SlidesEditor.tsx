@@ -7,6 +7,7 @@ import SlideFace from './slides/SlideFace'
 import SlideCanvas from './slides/SlideCanvas'
 import ElementInspector from './slides/ElementInspector'
 import SlidesToolbar from './slides/SlidesToolbar'
+import SlidesMenuBar from './editor/SlidesMenuBar'
 import SlideTemplateGallery from './slides/SlideTemplateGallery'
 import PresentOverlay from './slides/PresentOverlay'
 import AiSlidePanel from './slides/AiSlidePanel'
@@ -510,6 +511,34 @@ export default function SlidesEditor({ body: rawBody, title, onChange }: Props):
 
   return (
     <div className="h-full flex flex-col">
+      {/* Google-Slides-style menu bar above the toolbar, wired to real deck ops. */}
+      <div className="px-2 pt-1.5 pb-1 border-b border-stone-100 dark:border-stone-800">
+        <SlidesMenuBar
+          actions={{
+            title,
+            undo: undoLast,
+            redo: redoLast,
+            canUndo: undo.current.length > 0,
+            canRedo: redo.current.length > 0,
+            present: () => setPresenting(true),
+            newSlide: () => addSlideFromTemplate('blank'),
+            deleteSlide: () => deleteSlide(slideIdx),
+            moveSlideUp: () => moveSlide(slideIdx, -1),
+            moveSlideDown: () => moveSlide(slideIdx, 1),
+            duplicateSelection,
+            deleteSelection,
+            insertText,
+            insertImage: () => void insertImage(),
+            insertShape,
+            insertLine,
+            align: (dir) => doAlign(dir),
+            group: doGroup,
+            ungroup: doUngroup,
+            exportFile: (f) => void exportFile(f),
+            importFile: () => void importFile()
+          }}
+        />
+      </div>
       <SlidesToolbar
         onInsertText={insertText}
         onInsertImage={() => void insertImage()}
