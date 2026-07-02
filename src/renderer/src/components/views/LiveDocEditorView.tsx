@@ -16,7 +16,7 @@ import { setDocCommentHandler } from '../../lib/messagingSocket'
 import CommentsPanel from './CommentsPanel'
 import type { Editor } from '@tiptap/react'
 import { listTeams, inviteTeamToDoc, type Team } from '../../lib/teamsClient'
-import { DocEditor, SheetEditor, SlidesEditor, MapEditor } from '@office'
+import { DocEditor, SheetEditor, SlidesEditor, MapEditor, DesignEditor } from '@office'
 import Icon from '../Icon'
 import CollaboratorBar from './CollaboratorBar'
 import { collaborators } from '../../lib/presence'
@@ -634,6 +634,9 @@ export default function LiveDocEditorView({ liveDocId, onBack }: Props): JSX.Ele
           ))}
         {meta.docType === 'map' && (
           <MapEditor key={editorKey} body={bodyObj as MapBody} title={meta.title} onChange={(b) => saveBody(b)} />
+        )}
+        {meta.docType === 'design' && (
+          <DesignEditor key={editorKey} content={bodyObj} title={meta.title} onChange={(b) => saveBody(b)} />
         )}
         </div>
         {canComment && commentsOpen && (
