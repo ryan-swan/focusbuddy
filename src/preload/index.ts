@@ -1497,6 +1497,16 @@ const api = {
       return () => ipcRenderer.removeListener('auth:incoming-token', handler)
     }
   },
+  // Share deep links (haptyx://share?token=...) from the "Open in PlexiDesk"
+  // notification email. Same drain-pending + subscribe pattern as auth.
+  share: {
+    getPending: (): Promise<string | null> => ipcRenderer.invoke('share:get-pending'),
+    onIncomingToken: (cb: (token: string) => void): (() => void) => {
+      const handler = (_: unknown, token: string): void => cb(token)
+      ipcRenderer.on('share:incoming-token', handler)
+      return () => ipcRenderer.removeListener('share:incoming-token', handler)
+    }
+  },
   // File import — opens a native picker scoped to importable extensions,
   // then converts the contents into a widget draft (text / table /
   // page-from-json). The renderer creates the actual widget through the

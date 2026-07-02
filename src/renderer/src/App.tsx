@@ -205,6 +205,31 @@ export default function App(): JSX.Element {
     return () => { detach?.() }
   }, [adoptHandoff])
 
+  // Share deep link (haptyx://share?token=...) from the "Open in PlexiDesk"
+  // notification email → accept the share into "Shared with me" so it appears in
+  // the app, exactly as the paste-a-link flow does. Same drain-pending +
+  // subscribe pattern as the auth handoff.
+  useEffect(() => {
+    let detach: (() => void) | null = null
+    async function run(): Promise<void> {
+      const accept = async (token: string): Promise<void> => {
+        try {
+          const { useSharesStore } = await import('./stores/shares')
+          await useSharesStore.getState().acceptByToken(token)
+        } catch {
+          /* non-fatal — the item is also in the server inbox */
+        }
+      }
+      const pendingToken = await window.api.share.getPending()
+      if (pendingToken) await accept(pendingToken)
+      detach = window.api.share.onIncomingToken((t) => void accept(t))
+    }
+    void run()
+    return () => {
+      detach?.()
+    }
+  }, [])
+
   // First launch after an update → show the "What's new" modal once for this
   // version. The main process says authoritatively whether this boot followed
   // an update; we then advance the run-version marker so the next update is
