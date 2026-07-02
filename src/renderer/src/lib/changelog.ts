@@ -36,6 +36,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.145',
+    date: '2026-07-03T01:00:00Z',
+    title: 'v2.5.145 — the org panel follows the org you are in',
+    tag: 'fix',
+    summary:
+      'The Organizations panel now shows the organisation you are actually in rather than a list of all of them; you switch organisations from the switcher at the top of the side menu, and the admin and people view stays scoped to the active one. The app can also now open a shared item directly from an "Open in PlexiDesk" link, so when someone shares something with you it opens straight into your Shared with me. This is part of a larger piece of work making every part of the app respect the organisation you are working in.',
+    highlights: [
+      'The Organizations admin panel is scoped to the active organisation.',
+      'Shared items can open directly in the app from an "Open in PlexiDesk" link.',
+      'More organisation scoping across shares, chat, inbox and mail is on the way.'
+    ]
+  },
+  {
     version: '2.5.144',
     date: '2026-07-02T23:00:00Z',
     title: 'v2.5.144 — organisations keep to themselves',

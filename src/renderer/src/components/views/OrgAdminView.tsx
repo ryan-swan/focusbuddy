@@ -237,9 +237,11 @@ export default function OrgAdminView(): JSX.Element {
           </div>
         )}
 
-        {/* Org switcher + create */}
+        {/* Only the active organisation is shown here — switching is done from the
+            top-of-sidebar org switcher, so this admin panel stays scoped to the
+            org you are actually in. Creating a new org is still available. */}
         <div className="flex flex-wrap items-center gap-1.5 mb-4">
-          {orgs.map((o) => (
+          {orgs.filter((o) => o.id === selId).map((o) => (
             <button
               key={o.id}
               onClick={() => setSelId(o.id)}
