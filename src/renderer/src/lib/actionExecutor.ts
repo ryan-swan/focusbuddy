@@ -52,7 +52,7 @@ export interface ApplyResult {
  */
 export async function applyProposal(
   proposal: ActionProposal,
-  ctx: { activeTaskId: string | null; resolvedIds?: Map<string, string> }
+  ctx: { activeTaskId: string | null; resolvedIds?: Map<string, string>; destinationFolderId?: string | null }
 ): Promise<ApplyResult> {
   switch (proposal.kind) {
     case 'create-widget':
@@ -92,7 +92,7 @@ export async function applyProposal(
     case 'create-knowledge-entry':
       return applyCreateKnowledgeEntry(proposal)
     case 'create-document':
-      return applyCreateDocument(proposal)
+      return applyCreateDocument(proposal, ctx)
     default:
       // Exhaustive switch — TS yells if a new kind is added without a handler.
       return { ok: false, message: 'Unknown action kind.' }
@@ -144,11 +144,17 @@ async function applyCreateKnowledgeEntry(
 // carrying the proposal's title. A real fb_documents row, the same as the New
 // button makes, so it opens and edits normally.
 async function applyCreateDocument(
-  p: Extract<ActionProposal, { kind: 'create-document' }>
+  p: Extract<ActionProposal, { kind: 'create-document' }>,
+  ctx: { destinationFolderId?: string | null }
 ): Promise<ApplyResult> {
   try {
     const doc = await useDocumentsStore.getState().createBlank(p.docType, p.title)
     const label = p.docType === 'sheet' ? 'spreadsheet' : p.docType === 'slides' ? 'deck' : 'document'
+    // File the new document into the meeting's folder when one was chosen, so
+    // deliverables stay with the meeting rather than scattering to the root.
+    if (doc && ctx.destinationFolderId) {
+      await window.api.fileManager.fileDocument(doc.id, ctx.destinationFolderId).catch(() => null)
+    }
     return { ok: true, message: doc ? `Created ${label} "${p.title}"` : `Could not create the ${label}.` }
   } catch (e) {
     return { ok: false, message: `Could not create the document: ${e instanceof Error ? e.message : String(e)}` }
