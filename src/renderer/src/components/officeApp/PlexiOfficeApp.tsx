@@ -32,6 +32,7 @@ import OfficeTeamsDialog from './OfficeTeamsDialog'
 import LiveDocEditorView from '../views/LiveDocEditorView'
 import { createLiveDoc } from '../../lib/docCollabClient'
 import UpdaterBanner from '../UpdaterBanner'
+import { PromptDialogHost } from '../plexi/PromptDialog'
 import ApiKeysSection from '../settings/ApiKeysSection'
 import OfficeAsk from './OfficeAsk'
 import OfficeRelated from './OfficeRelated'
@@ -239,6 +240,7 @@ export default function PlexiOfficeApp(): JSX.Element {
       </main>
       </div>
 
+      <PromptDialogHost />
       {shareTarget && <OfficeShareDialog target={shareTarget} onClose={() => setShareTarget(null)} />}
       {teamsOpen && <OfficeTeamsDialog onClose={() => setTeamsOpen(false)} />}
       {askOpen && <OfficeAsk onClose={() => setAskOpen(false)} />}

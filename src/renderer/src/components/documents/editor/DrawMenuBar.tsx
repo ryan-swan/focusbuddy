@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { promptText } from '../../plexi/PromptDialog'
 import type { MapShape } from '@shared/types'
 import { useDocumentsStore } from '../../../stores/documents'
 import { useViewStore } from '../../../stores/view'
@@ -40,8 +41,8 @@ export default function DrawMenuBar({ actions }: { actions: DrawMenuActions }): 
     })
     goDocument(copy.id)
   }
-  function doRename(): void {
-    const next = window.prompt('Rename drawing', title)
+  async function doRename(): Promise<void> {
+    const next = await promptText({ title: 'Rename drawing', initial: title, confirmLabel: 'Rename' })
     if (next != null && next.trim()) void rename(next.trim())
   }
   async function moveToTrash(): Promise<void> {

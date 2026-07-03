@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { promptText } from './plexi/PromptDialog'
 import type { ConnectedApp, FbNode, NodeKind, WidgetSuggestion } from '@shared/types'
 import { useNodeStore } from '../stores/nodes'
 import { useCanCreateMore } from '../stores/capabilities'
@@ -735,10 +736,11 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
                 // Paste a share link. v1: prompts for the token; future
                 // server-backed version will fetch the snapshot
                 // automatically. Accepted shares appear in this section.
-                const url = window.prompt(
-                  'Paste a share link:',
-                  'https://focusbuddy-viewer.vercel.app/share/…'
-                )
+                const url = await promptText({
+                  title: 'Paste a share link',
+                  placeholder: 'https://focusbuddy-viewer.vercel.app/share/…',
+                  confirmLabel: 'Add share'
+                })
                 if (!url) return
                 const m = url.match(/\/share\/([a-z0-9]+)/i)
                 if (!m) {

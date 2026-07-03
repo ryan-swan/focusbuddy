@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { promptText } from '../plexi/PromptDialog'
 import type { Widget } from '@shared/types'
 import WidgetFrame from './WidgetFrame'
 import { useWidgetStore } from '../../stores/widgets'
@@ -163,9 +164,15 @@ export default function CustomBlockWidget({ widget, inline = false }: Props): JS
   const templates = listTemplates()
 
   function doSaveTemplate(): void {
-    const name = window.prompt('Save this layout as a template named:', data.title || 'My block')
-    if (name === null) return
-    saveTemplate(name, data)
+    void promptText({
+      title: 'Save as template',
+      label: 'Name this layout so you can spawn it again from the palette.',
+      initial: data.title || 'My block',
+      confirmLabel: 'Save template'
+    }).then((name) => {
+      if (name === null) return
+      saveTemplate(name, data)
+    })
   }
   function applyTemplate(tplId: string): void {
     const tpl = listTemplates().find((t) => t.id === tplId)

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { promptText } from '../../plexi/PromptDialog'
 import type { FbDocument } from '@shared/types'
 import { useDocumentsStore } from '../../../stores/documents'
 import { useViewStore } from '../../../stores/view'
@@ -61,8 +62,8 @@ export default function SlidesMenuBar({ actions }: { actions: SlidesMenuActions 
     })
     goDocument(copy.id)
   }
-  function doRename(): void {
-    const next = window.prompt('Rename presentation', a.title)
+  async function doRename(): Promise<void> {
+    const next = await promptText({ title: 'Rename presentation', initial: a.title, confirmLabel: 'Rename' })
     if (next != null && next.trim()) void rename(next.trim())
   }
   async function moveToTrash(): Promise<void> {

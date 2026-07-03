@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { promptText } from '../../plexi/PromptDialog'
 import type { SheetCellFormat, SheetNumberFormat, FbDocument } from '@shared/types'
 import { useDocumentsStore } from '../../../stores/documents'
 import { useViewStore } from '../../../stores/view'
@@ -64,8 +65,8 @@ export default function SheetMenuBar({ actions }: { actions: SheetMenuActions })
     })
     goDocument(copy.id)
   }
-  function doRename(): void {
-    const next = window.prompt('Rename spreadsheet', a.title)
+  async function doRename(): Promise<void> {
+    const next = await promptText({ title: 'Rename spreadsheet', initial: a.title, confirmLabel: 'Rename' })
     if (next != null && next.trim()) void rename(next.trim())
   }
   async function moveToTrash(): Promise<void> {

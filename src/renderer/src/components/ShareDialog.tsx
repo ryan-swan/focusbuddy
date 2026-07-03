@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { showCopyFallback } from './plexi/PromptDialog'
 import { createPortal } from 'react-dom'
 import type {
   ShareableKind,
@@ -163,8 +164,8 @@ export default function ShareDialog({
       setJustCopiedId(linkId)
       setTimeout(() => setJustCopiedId((id) => (id === linkId ? null : id)), 1800)
     } catch {
-      // Clipboard write failed (rare on Electron) — fall back to prompt.
-      window.prompt('Copy this link manually:', text)
+      // Clipboard write failed (rare on Electron) — show it to copy by hand.
+      void showCopyFallback('Copy this link manually', text)
     }
   }
 
