@@ -20,6 +20,7 @@ import { usePresenceStore } from './presence'
 import { useAccountStore } from './account'
 import { useViewStore } from './view'
 import { notifyExternal } from '../lib/notify'
+import { bodyMentionsHandle } from '../lib/mentions'
 
 // Apply a reaction add/remove to a message in the conversation map, immutably and
 // idempotently (so the actor's own optimistic update plus the echoed broadcast do
@@ -212,7 +213,16 @@ export const useMessagingStore = create<MessagingStore>((set, get) => ({
       const sender =
         conv?.members.find((m) => m.accountId === incoming.message.fromAccount)?.handle ?? 'New message'
       const preview = incoming.message.body || (incoming.message.attachment ? 'Shared something' : '')
-      notifyExternal(conv ? conv.title : sender, conv ? `${sender}: ${preview}` : preview, {
+      // A message that @mentions the signed-in handle alerts even while the
+      // app is focused elsewhere: being named is the one chat event that
+      // should cut through.
+      const myHandle = useAccountStore.getState().account?.handle ?? null
+      const mentioned = bodyMentionsHandle(incoming.message.body ?? '', myHandle)
+      notifyExternal(
+        mentioned ? `${sender} mentioned you` : conv ? conv.title : sender,
+        conv ? `${sender}: ${preview}` : preview,
+        {
+        force: mentioned,
         tag: `msg-${incoming.conversationId}`,
         onClick: () => {
           useViewStore.getState().goMessages()
