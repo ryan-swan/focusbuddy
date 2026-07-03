@@ -20,6 +20,10 @@ interface DocumentsStore {
   active: FbDocument | null
   loadingList: boolean
   saving: boolean
+  // Set when the last debounced persist REJECTED. The editor shows an honest
+  // "Couldn't save" banner instead of a stuck "Saving" and the in-memory edit
+  // is retried on the next change. Cleared on the next successful write.
+  saveError: boolean
 
   refresh: () => Promise<void>
   refreshTrashed: () => Promise<void>
@@ -47,6 +51,7 @@ export const useDocumentsStore = create<DocumentsStore>((set, get) => ({
   active: null,
   loadingList: false,
   saving: false,
+  saveError: false,
 
   refresh: async () => {
     set({ loadingList: true })
@@ -63,12 +68,18 @@ export const useDocumentsStore = create<DocumentsStore>((set, get) => ({
   },
 
   close: () => {
-    // Flush any pending body save before leaving the editor.
+    // Flush any pending body save before leaving the editor. A failure here is
+    // logged (not swallowed) so a lost final buffer is at least diagnosable.
     if (saveTimer) {
       clearTimeout(saveTimer)
       saveTimer = null
       const a = get().active
-      if (a) void window.api.documents.update(a.id, { body: a.body })
+      if (a) {
+        void window.api.documents.update(a.id, { body: a.body }).catch((err) => {
+          // eslint-disable-next-line no-console
+          console.error('[documents.close] final flush failed', err)
+        })
+      }
     }
     set({ active: null })
   },
@@ -113,8 +124,18 @@ export const useDocumentsStore = create<DocumentsStore>((set, get) => ({
       saveTimer = null
       const cur = get().active
       if (!cur || cur.id !== a.id) return
-      await window.api.documents.update(cur.id, { body: cur.body })
-      set({ saving: false })
+      try {
+        await window.api.documents.update(cur.id, { body: cur.body })
+        set({ saving: false, saveError: false })
+      } catch (err) {
+        // Never lose work silently: keep the in-memory edit, drop the stuck
+        // "Saving" state, and flag the error so the editor shows a banner. The
+        // next edit re-attempts the write.
+        // eslint-disable-next-line no-console
+        console.error('[documents.saveBody] persist failed', err)
+        set({ saving: false, saveError: true })
+        return
+      }
       // Mirror to the cloud (no-op when the flag is off). On a rev conflict the
       // server copy wins and is reflected in the open editor.
       const { conflictedTo } = await pushCloudDoc(cur).catch(() => ({ conflictedTo: undefined }))

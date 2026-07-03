@@ -1847,11 +1847,15 @@ export function registerIpcHandlers(): void {
     async (_e, incoming: { subject: string; from: string; body: string }) => {
       const config = mailAccount.getFull()
       if (!config) return { ok: false as const, error: 'No mail account connected.' }
-      return suggestReply(config, {
-        subject: incoming?.subject ?? '',
-        from: incoming?.from ?? '',
-        body: incoming?.body ?? ''
-      })
+      try {
+        return await suggestReply(config, {
+          subject: incoming?.subject ?? '',
+          from: incoming?.from ?? '',
+          body: incoming?.body ?? ''
+        })
+      } catch (err) {
+        return { ok: false as const, error: (err as Error).message }
+      }
     }
   )
 
