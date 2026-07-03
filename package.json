@@ -1,6 +1,6 @@
 {
   "name": "focusbuddy",
-  "version": "2.5.155",
+  "version": "3.0.0-preview.0",
   "private": true,
   "description": "Task-scoped digital work environment for people with ADHD and high distractibility.",
   "main": "./out/main/index.js",
@@ -18,6 +18,9 @@
     "dist": "npm run build && electron-builder --mac --publish never",
     "dist:zip": "npm run build && electron-builder --mac zip --publish never",
     "dev:office": "PLEXI_APP=office node scripts/dev.cjs dev",
+    "dev:preview": "PLEXI_APP=preview3 node scripts/dev.cjs dev",
+    "dist:preview": "npm run build && electron-builder --mac zip --publish never --config electron-builder.plexi3preview.yml",
+    "dist:preview:win": "npm run build && electron-builder --win --publish never --config electron-builder.plexi3preview.yml",
     "dist:office:zip": "npm run build && electron-builder --mac zip --publish never --config electron-builder.plexioffice.yml",
     "dist:office:release": "npm run build && electron-builder --mac zip --publish always --config electron-builder.plexioffice.yml",
     "dist:release": "npm run build && electron-builder --mac zip --publish always",

@@ -36,6 +36,21 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.0.0-preview.0',
+    date: '2026-07-03T14:00:00Z',
+    title: 'v3.0 preview — the review fixes, side by side with your current install',
+    tag: 'feature',
+    summary:
+      'A test build of the Plexi 3.0 branch that runs alongside your existing PlexiDesk with completely separate data. Deleting a document now moves it to a real Trash you can restore from, every rename and insert-link menu that silently did nothing now opens a proper dialog, documents keep automatic version history you can roll back to, search also finds calendar blocks, meetings and signature requests, the command palette can create everything, and a keyboard shortcut reference lives on Cmd+/.',
+    highlights: [
+      'Documents move to a restorable Trash instead of being deleted outright, with undo.',
+      'Version history for documents, sheets, slides, drawings and designs, with safe restore.',
+      'Search also finds calendar blocks, meetings and signature requests.',
+      'Cmd+/ opens a keyboard shortcuts reference; the palette can create every item type.',
+      'Simpler settings and onboarding; the AI key step is clearly optional.'
+    ]
+  },
+  {
     version: '2.5.155',
     date: '2026-07-03T13:00:00Z',
     title: 'v2.5.155 — search and recents respect your organisation too',

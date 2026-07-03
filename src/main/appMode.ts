@@ -25,3 +25,27 @@ export function detectOfficeBuild(opts: {
     opts.appName.toLowerCase().includes('office')
   )
 }
+
+// Is this binary the side-by-side "PlexiDesk 3 Preview" build? Same detection
+// strategy as detectOfficeBuild and for the same reason: the packaged bundle's
+// app.getName() is "focusbuddy" until setName runs, so we look at the PLEXI_APP
+// env var (dev), then the executable path (packaged: the bundle is
+// "PlexiDesk 3 Preview.app" / "PlexiDesk 3 Preview.exe"), then the app name.
+// The preview runs the full PlexiDesk renderer but with its OWN userData
+// directory, its own single-instance lock, no claim on the haptyx:// protocol,
+// and the auto-updater disabled — so it can be tested end to end alongside a
+// production install without touching its data or being "updated" back to the
+// release channel.
+export function detectPreviewBuild(opts: {
+  plexiAppEnv?: string | undefined
+  execPath: string
+  appName: string
+}): boolean {
+  const path = opts.execPath.toLowerCase()
+  return (
+    opts.plexiAppEnv === 'preview3' ||
+    path.includes('plexidesk 3 preview') ||
+    path.includes('plexidesk3preview') ||
+    opts.appName.toLowerCase().includes('preview')
+  )
+}
