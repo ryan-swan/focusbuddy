@@ -728,6 +728,11 @@ export function getDb(): Database.Database {
   // reserved 'personal' org via the DEFAULT.
   ensureColumn(db, 'documents', 'org_id', "TEXT NOT NULL DEFAULT 'personal'")
   db.exec('CREATE INDEX IF NOT EXISTS idx_documents_org ON documents(org_id)')
+  // Soft-delete for documents, mirroring the fb_files trash. NULL means live;
+  // a timestamp means the document sits in the Documents Trash until the user
+  // restores it or deletes it forever. Editors' "Move to trash" lands here, so
+  // the menu label is finally truthful (it used to hard-DELETE the row).
+  ensureColumn(db, 'documents', 'trashed_at', 'INTEGER')
   // Multi-org tenancy for the remaining user-data surfaces so switching org
   // isolates the calendar, vault, knowledge and tables too, not just desks and
   // documents. Added at the end where every table exists; existing rows backfill

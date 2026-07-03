@@ -102,7 +102,7 @@ export async function searchAll(rawQuery: string): Promise<SearchHit[]> {
   const docTitleRows = db
     .prepare(
       `SELECT id, doc_type, title FROM documents
-       WHERE archived = 0 AND title LIKE ?${ESC} LIMIT ?`
+       WHERE archived = 0 AND trashed_at IS NULL AND title LIKE ?${ESC} LIMIT ?`
     )
     .all(like, PER_CATEGORY) as Array<{ id: string; doc_type: 'doc' | 'sheet' | 'slides'; title: string }>
   for (const r of docTitleRows) {

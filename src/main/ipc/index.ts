@@ -40,10 +40,13 @@ import {
 } from '../mail/imap'
 import {
   listDocuments,
+  listTrashedDocuments,
   getDocument,
   createDocument,
   updateDocument,
   upsertDocument,
+  trashDocument,
+  restoreDocument,
   deleteDocument
 } from '../db/documents'
 import { searchAll } from '../db/search'
@@ -1854,7 +1857,17 @@ export function registerIpcHandlers(): void {
     if (doc) void embedDocument(doc.id)
     return doc
   })
-  ipcMain.handle('documents:delete', (_e, id: string) => {
+  // "Delete" from the editors and the Documents list is a soft-delete into the
+  // Documents Trash — the menu item says "Move to trash" and now means it.
+  // Permanent removal is only the Trash view's explicit "Delete forever".
+  ipcMain.handle('documents:delete', (_e, id: string) => trashDocument(id))
+  ipcMain.handle('documents:listTrashed', () => listTrashedDocuments())
+  ipcMain.handle('documents:restore', (_e, id: string) => {
+    const ok = restoreDocument(id)
+    if (ok) void embedDocument(id) // back into semantic search, best-effort
+    return ok
+  })
+  ipcMain.handle('documents:purge', (_e, id: string) => {
     deleteEmbedding('document', id)
     return deleteDocument(id)
   })

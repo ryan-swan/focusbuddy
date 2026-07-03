@@ -204,7 +204,7 @@ function rowToEntry(row: EntryRow): FileEntry | null {
     if (!row.doc_id) return null
     const db = getDb()
     const doc = db
-      .prepare('SELECT title, doc_type, updated_at FROM documents WHERE id = ? AND archived = 0')
+      .prepare('SELECT title, doc_type, updated_at FROM documents WHERE id = ? AND archived = 0 AND trashed_at IS NULL')
       .get(row.doc_id) as { title: string; doc_type: string; updated_at: number } | undefined
     if (!doc) return null
     return {
@@ -441,7 +441,7 @@ export function searchEntries(query: string): FileEntry[] {
        WHERE trashed_at IS NULL
          AND (
            COALESCE(display_name, original_name) LIKE @like ESCAPE '\\'
-           OR doc_id IN (SELECT id FROM documents WHERE archived = 0 AND title LIKE @like ESCAPE '\\')
+           OR doc_id IN (SELECT id FROM documents WHERE archived = 0 AND trashed_at IS NULL AND title LIKE @like ESCAPE '\\')
          )
        ORDER BY updated_at DESC LIMIT 200`
     )
@@ -660,7 +660,7 @@ export function smartFolderEntries(tags: string[], search = ''): FileEntry[] {
   if (q) {
     const like = `%${q.replace(/[\\%_]/g, (m) => `\\${m}`)}%`
     where.push(
-      `(COALESCE(f.display_name, f.original_name) LIKE ? ESCAPE '\\' OR f.doc_id IN (SELECT id FROM documents WHERE archived = 0 AND title LIKE ? ESCAPE '\\'))`
+      `(COALESCE(f.display_name, f.original_name) LIKE ? ESCAPE '\\' OR f.doc_id IN (SELECT id FROM documents WHERE archived = 0 AND trashed_at IS NULL AND title LIKE ? ESCAPE '\\'))`
     )
     params.push(like, like)
   }
@@ -684,7 +684,7 @@ export function deleteSmartFolder(id: string): boolean {
 // place, so re-filing moves its reference rather than duplicating it.
 export function fileDocument(docId: string, parentId: string | null): FileEntry | null {
   const db = getDb()
-  const doc = db.prepare('SELECT id, doc_type, title FROM documents WHERE id = ? AND archived = 0').get(docId) as
+  const doc = db.prepare('SELECT id, doc_type, title FROM documents WHERE id = ? AND archived = 0 AND trashed_at IS NULL').get(docId) as
     | { id: string; doc_type: string; title: string }
     | undefined
   if (!doc) return null
@@ -712,7 +712,7 @@ export function unfiledDocuments(): Array<{ id: string; title: string; docType: 
   const rows = db
     .prepare(
       `SELECT id, title, doc_type FROM documents
-       WHERE archived = 0 AND id NOT IN (SELECT doc_id FROM fb_files WHERE kind = 'doc' AND doc_id IS NOT NULL)
+       WHERE archived = 0 AND trashed_at IS NULL AND id NOT IN (SELECT doc_id FROM fb_files WHERE kind = 'doc' AND doc_id IS NOT NULL)
        ORDER BY updated_at DESC`
     )
     .all() as Array<{ id: string; title: string; doc_type: string }>

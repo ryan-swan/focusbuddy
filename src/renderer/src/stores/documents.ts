@@ -1,20 +1,28 @@
 import { create } from 'zustand'
 import type { DocType, DocumentMeta, FbDocument } from '@shared/types'
 import { pullCloudDocs, pushCloudDoc, pushCloudDelete } from '../lib/cloudDocsSync'
+import { recordActionWithToast } from './actionHistory'
 
 // Documents store — the standalone office files (doc / sheet / slides). Holds
 // the list for the hub and the one open document for the editor. Body edits are
 // debounced to disk so typing stays smooth and we never lose work.
+//
+// Deleting is a two-stage affair, mirroring Drive: remove() soft-deletes into
+// the Documents Trash (undoable via the toast and recoverable from the Trash
+// section any time after), and only purge() — the Trash view's "Delete
+// forever" — actually destroys the row and tells the cloud to forget it.
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null
 
 interface DocumentsStore {
   list: DocumentMeta[]
+  trashed: DocumentMeta[]
   active: FbDocument | null
   loadingList: boolean
   saving: boolean
 
   refresh: () => Promise<void>
+  refreshTrashed: () => Promise<void>
   open: (id: string) => Promise<void>
   close: () => void
   createBlank: (docType: DocType, title?: string) => Promise<FbDocument>
@@ -25,11 +33,17 @@ interface DocumentsStore {
   }) => Promise<{ ok: boolean; id?: string; error?: string; needsApiKey?: boolean }>
   saveBody: (body: unknown) => void
   rename: (title: string) => Promise<void>
+  /** Move to the Documents Trash (restorable; surfaces an Undo toast). */
   remove: (id: string) => Promise<void>
+  /** Bring a trashed document back into the live list. */
+  restore: (id: string) => Promise<void>
+  /** Delete forever, from the Trash view only. */
+  purge: (id: string) => Promise<void>
 }
 
 export const useDocumentsStore = create<DocumentsStore>((set, get) => ({
   list: [],
+  trashed: [],
   active: null,
   loadingList: false,
   saving: false,
@@ -118,10 +132,40 @@ export const useDocumentsStore = create<DocumentsStore>((set, get) => ({
     await get().refresh()
   },
 
+  refreshTrashed: async () => {
+    const trashed = await window.api.documents.listTrashed()
+    set({ trashed })
+  },
+
   remove: async (id) => {
+    const meta = get().list.find((d) => d.id === id)
     await window.api.documents.delete(id)
-    void pushCloudDelete(id).catch(() => {})
+    // No cloud delete here: the document is only in the local Trash. The cloud
+    // copy is forgotten when (and only when) the user purges it.
     if (get().active?.id === id) set({ active: null })
-    await get().refresh()
+    await Promise.all([get().refresh(), get().refreshTrashed()])
+    recordActionWithToast({
+      label: `Moved "${meta?.title ?? 'document'}" to trash`,
+      undo: async () => {
+        await window.api.documents.restore(id)
+        await Promise.all([get().refresh(), get().refreshTrashed()])
+      },
+      redo: async () => {
+        await window.api.documents.delete(id)
+        if (get().active?.id === id) set({ active: null })
+        await Promise.all([get().refresh(), get().refreshTrashed()])
+      }
+    })
+  },
+
+  restore: async (id) => {
+    await window.api.documents.restore(id)
+    await Promise.all([get().refresh(), get().refreshTrashed()])
+  },
+
+  purge: async (id) => {
+    await window.api.documents.purge(id)
+    void pushCloudDelete(id).catch(() => {})
+    await get().refreshTrashed()
   }
 }))
