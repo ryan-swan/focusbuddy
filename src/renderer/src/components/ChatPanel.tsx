@@ -435,6 +435,39 @@ function ProposalCards({
       // doesn't see a duplicate "create table" card sitting around.
       onConsume(parent.id)
     }
+    // edit-document → create-document in the same batch, same shape.
+    if (p.kind === 'edit-document' && p.documentId.startsWith('$')) {
+      const refKey = p.documentId.slice(1)
+      if (!resolvedIds.has(refKey)) {
+        const parent = proposals.find((x) => x.id === refKey && x.kind === 'create-document')
+        if (!parent) {
+          return {
+            ok: false,
+            message: 'Edit references a document that was never proposed alongside it — try regenerating.'
+          }
+        }
+        const parentResult = await applyProposal(parent, { activeTaskId, resolvedIds })
+        if (!parentResult.ok) {
+          return { ok: false, message: `Couldn't auto-create the document first: ${parentResult.message}` }
+        }
+        onConsume(parent.id)
+      }
+    }
+    // schedule-event bound to a create-task in the same batch.
+    if (p.kind === 'schedule-event' && p.taskId && p.taskId.startsWith('$')) {
+      const refKey = p.taskId.slice(1)
+      if (!resolvedIds.has(refKey)) {
+        const parent = proposals.find((x) => x.id === refKey && x.kind === 'create-task')
+        if (!parent) {
+          return { ok: false, message: 'Event references a task that was never proposed alongside it.' }
+        }
+        const parentResult = await applyProposal(parent, { activeTaskId, resolvedIds })
+        if (!parentResult.ok) {
+          return { ok: false, message: `Couldn't auto-create the task first: ${parentResult.message}` }
+        }
+        onConsume(parent.id)
+      }
+    }
     return { ok: true }
   }
 

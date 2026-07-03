@@ -200,6 +200,23 @@ function summarizeWidgets(widgets: Widget[]): string {
             .map((c) => `${c.id}:${c.label}(${c.type})`)
             .join(', ')
           lines.push(`    tableId=${w.content} columns=[${cols}]`)
+          // A capped sample of row ids (with their first cell as a handle) so
+          // set-cell can address existing rows. Without real row ids the model
+          // cannot legally emit a set-cell at all.
+          try {
+            // eslint-disable-next-line @typescript-eslint/no-var-requires
+            const { listRows } = require('../db/tables') as typeof import('../db/tables')
+            const rows = listRows(w.content).slice(0, 8)
+            if (rows.length > 0) {
+              const firstCol = table.schema.columns[0]?.id
+              const sample = rows
+                .map((r) => `${r.id}="${String((firstCol && (r.cells as Record<string, unknown>)[firstCol]) ?? '').slice(0, 24)}"`)
+                .join(', ')
+              lines.push(`    rowIds: ${sample}`)
+            }
+          } catch {
+            // best-effort
+          }
         }
       } catch {
         // best-effort
@@ -301,6 +318,11 @@ function buildSystemPrompt(taskId: string | null): string {
     '  { "kind": "start-focus-session", "minutes": 5, "reason": "..." }\n' +
     '  { "kind": "update-task", "taskId": "<the Task id shown above>", "label": "this task", "status": "done", "dueDate": null, "title": "new title", "reason": "user marked it complete" }\n' +
     '  { "kind": "create-knowledge-entry", "title": "Brand voice rule", "body": "We write in first-person plural and never use em dashes.", "tags": ["brand"], "reason": "user stated this as a rule" }\n' +
+    '  { "kind": "edit-document", "documentId": "<from the documents list>", "label": "the Q3 brief", "body": "New section text...", "operation": "append", "reason": "..." }\n' +
+    '  { "kind": "set-cell", "tableId": "<from canvas summary>", "rowId": "<from rowIds>", "cells": {"Status":"Live"}, "reason": "..." }\n' +
+    '  { "kind": "schedule-event", "title": "Deep work: brief", "startMs": 1780000000000, "durationMinutes": 60, "recurrence": null, "reason": "..." }\n' +
+    '  { "kind": "compose-mail", "to": ["ana@example.com"], "subject": "Q3 brief attached", "body": "Hi Ana, ...", "reason": "..." }\n' +
+    '  { "kind": "post-chat", "conversationId": "<from chat conversations>", "conversationLabel": "#launch", "body": "Draft update: ...", "reason": "..." }\n' +
     '\n' +
     '⚠ HARD RULES:\n' +
     '1. The user sees ONLY two things: (a) the "reply" field rendered as markdown, and (b) one action card for each item in the "actions" array. They do NOT see anything else you write. Describing widgets in prose inside "reply" does NOT create them — the actions array must contain the entries.\n' +
@@ -314,7 +336,10 @@ function buildSystemPrompt(taskId: string | null): string {
     '8. Delete only on explicit user request, never speculatively.\n' +
     '7b. To change the CURRENT task (mark it done, rename it, move its due date) use "update-task" with "taskId" set to the exact "Task id" shown in the context above. status must be one of open|in_progress|done|parked. Use dueDate as unix ms, or null to clear it. Omit fields you are not changing.\n' +
     '7c. To remember a fact, decision, or rule the user states, use "create-knowledge-entry". The "body" MUST be real content from this conversation. Never invent facts, names, numbers, or decisions; if the user did not state it, do not store it.\n' +
-    '9. "reply" should be short (1-2 sentences). Markdown is rendered. Don\'t list the widgets in reply — let the cards speak.\n\n' +
+    '9. "reply" should be short (1-2 sentences). Markdown is rendered. Don\'t list the widgets in reply — let the cards speak.\n' +
+    '10. compose-mail and post-chat ALWAYS produce a DRAFT the user reviews and sends themselves. There is no send action and never will be. NEVER say or imply in "reply" that a message was sent. Their bodies must carry only content grounded in this conversation — never invent claims, commitments, dates, names, or recipients on the user\'s behalf. Use real addresses/conversation ids from context or leave "to" empty for the user to fill.\n' +
+    '11. edit-document targets a documentId from the documents list (or "$<id>" of a create-document in this same response). Omit "operation" to append; use "replace" only when the user explicitly asked to rewrite. set-cell requires a real rowId from the rowIds sample — if the row is not listed, say so in reply instead of guessing.\n' +
+    '12. schedule-event uses absolute unix-ms startMs computed from the Current date/time fact above. durationMinutes is required.\n\n' +
     'CORRECT for "set up a podcast launch workspace":\n' +
     '{\n' +
     '  "reply": "Setting up your podcast launch — apply the cards below.",\n' +
@@ -326,10 +351,57 @@ function buildSystemPrompt(taskId: string | null): string {
     'CORRECT for "what time is it in Tokyo":\n' +
     '{ "reply": "Tokyo is JST (UTC+9). Right now it\'s roughly 17 hours ahead of Pacific Time.", "actions": [] }\n\n' +
     'INCORRECT (NEVER do this): A reply that says "Here are the widgets I\'ve added: 📝 **Launch checklist** with these items..." while actions is empty. The widgets do not exist if they are not in the actions array.'
-  if (!taskId) return base
+  const extras = [clockBlock(), documentsBlock(), conversationsBlock()].filter(Boolean).join('\n')
+  const withExtras = `${base}\n\n${extras}`
+  if (!taskId) return withExtras
   const block = taskBlock(taskId)
-  if (!block) return base
-  return `${base}\n\n${block}`
+  if (!block) return withExtras
+  return `${withExtras}\n\n${block}`
+}
+
+// Current wall-clock fact so relative phrases ("tomorrow at 3pm") resolve to a
+// correct absolute startMs in schedule-event. Without this the model guesses.
+function clockBlock(): string {
+  const now = new Date()
+  return `Current date/time: ${now.toISOString()} (local: ${now.toString()})`
+}
+
+// Recent documents so edit-document has real ids to target. Capped and
+// metadata-only; the model asks for content via the user, not this block.
+function documentsBlock(): string {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { listDocuments } = require('../db/documents') as typeof import('../db/documents')
+    const docs = listDocuments().slice(0, 12)
+    if (docs.length === 0) return ''
+    const lines = docs.map((d) => `- documentId=${d.id} type=${d.docType} "${d.title}"`)
+    return 'Documents in the library (newest first):\n' + lines.join('\n')
+  } catch {
+    return ''
+  }
+}
+
+// Open chat conversations so post-chat has real conversation ids. Names only.
+function conversationsBlock(): string {
+  try {
+    const convs = latestConversationSummaries()
+    if (convs.length === 0) return ''
+    const lines = convs.slice(0, 8).map((c) => `- conversationId=${c.id} "${c.label}"`)
+    return 'Chat conversations:\n' + lines.join('\n')
+  } catch {
+    return ''
+  }
+}
+
+// The renderer keeps the live conversation list (chat is server-backed); it
+// mirrors a compact {id,label} snapshot to the main process over IPC so the
+// prompt builder can surface real conversation ids. Empty until the first sync.
+let conversationSnapshot: Array<{ id: string; label: string }> = []
+export function setConversationSnapshot(convs: Array<{ id: string; label: string }>): void {
+  conversationSnapshot = convs.slice(0, 20)
+}
+function latestConversationSummaries(): Array<{ id: string; label: string }> {
+  return conversationSnapshot
 }
 
 // ── Parse the JSON-structured chat response ────────────────────────────────
@@ -592,6 +664,89 @@ export function parseChatJson(raw: string): {
           tags: Array.isArray(action.tags)
             ? (action.tags as unknown[]).filter((t): t is string => typeof t === 'string')
             : undefined,
+          reason
+        })
+        break
+      }
+      case 'edit-document': {
+        const documentId = typeof action.documentId === 'string' ? action.documentId.trim() : ''
+        const body = typeof action.body === 'string' ? action.body : undefined
+        const title = typeof action.title === 'string' ? action.title.trim() : undefined
+        if (!documentId || (!body && !title)) break
+        const op = action.operation
+        proposals.push({
+          id: makeProposalId('edoc', i++),
+          kind: 'edit-document',
+          documentId,
+          label: typeof action.label === 'string' && action.label ? action.label : 'the document',
+          title,
+          body,
+          operation: op === 'replace' || op === 'prepend' || op === 'append' ? op : undefined,
+          reason
+        })
+        break
+      }
+      case 'set-cell': {
+        const tableId = typeof action.tableId === 'string' ? action.tableId.trim() : ''
+        const rowId = typeof action.rowId === 'string' ? action.rowId.trim() : ''
+        const cells =
+          action.cells && typeof action.cells === 'object' && !Array.isArray(action.cells)
+            ? Object.fromEntries(
+                Object.entries(action.cells as Record<string, unknown>)
+                  .filter(([, v]) => typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean')
+                  .map(([k, v]) => [k, String(v)])
+              )
+            : {}
+        if (!tableId || !rowId || Object.keys(cells).length === 0) break
+        proposals.push({ id: makeProposalId('cell', i++), kind: 'set-cell', tableId, rowId, cells, reason })
+        break
+      }
+      case 'schedule-event': {
+        const title = typeof action.title === 'string' ? action.title.trim() : ''
+        const startMs = typeof action.startMs === 'number' ? action.startMs : NaN
+        const durationMinutes =
+          typeof action.durationMinutes === 'number' ? Math.max(5, Math.round(action.durationMinutes)) : NaN
+        if (!title || !Number.isFinite(startMs) || !Number.isFinite(durationMinutes)) break
+        const rec = action.recurrence
+        proposals.push({
+          id: makeProposalId('evt', i++),
+          kind: 'schedule-event',
+          title,
+          startMs,
+          durationMinutes,
+          taskId: typeof action.taskId === 'string' ? action.taskId : undefined,
+          recurrence: rec === 'daily' || rec === 'weekly' || rec === 'monthly' ? rec : null,
+          reason
+        })
+        break
+      }
+      case 'compose-mail': {
+        const subject = typeof action.subject === 'string' ? action.subject.trim() : ''
+        const body = typeof action.body === 'string' ? action.body : ''
+        if (!subject && !body) break
+        proposals.push({
+          id: makeProposalId('mail', i++),
+          kind: 'compose-mail',
+          to: Array.isArray(action.to)
+            ? (action.to as unknown[]).filter((t): t is string => typeof t === 'string' && t.includes('@'))
+            : undefined,
+          subject,
+          body,
+          reason
+        })
+        break
+      }
+      case 'post-chat': {
+        const conversationId = typeof action.conversationId === 'string' ? action.conversationId.trim() : ''
+        const body = typeof action.body === 'string' ? action.body.trim() : ''
+        if (!conversationId || !body) break
+        proposals.push({
+          id: makeProposalId('chat', i++),
+          kind: 'post-chat',
+          conversationId,
+          conversationLabel:
+            typeof action.conversationLabel === 'string' ? action.conversationLabel : undefined,
+          body,
           reason
         })
         break
@@ -1765,6 +1920,8 @@ export async function generateDocument(input: {
       })
       if ((resp.stop_reason as string) === 'refusal')
         return { ok: false, error: 'Claude declined this request. Try rephrasing it.' }
+      if ((resp.stop_reason as string) === 'model_context_window_exceeded')
+        return { ok: false, error: 'The document is too large for the model context window.' }
       const text = resp.content
         .filter((b) => b.type === 'text')
         .map((b) => ('text' in b ? b.text : ''))
@@ -1794,6 +1951,8 @@ export async function generateDocument(input: {
       })
       if ((resp.stop_reason as string) === 'refusal')
         return { ok: false, error: 'Claude declined this request. Try rephrasing it.' }
+      if ((resp.stop_reason as string) === 'model_context_window_exceeded')
+        return { ok: false, error: 'The document is too large for the model context window.' }
       const text = resp.content
         .filter((b) => b.type === 'text')
         .map((b) => ('text' in b ? b.text : ''))
@@ -1833,6 +1992,8 @@ export async function generateDocument(input: {
       })
       if ((resp.stop_reason as string) === 'refusal')
         return { ok: false, error: 'Claude declined this request. Try rephrasing it.' }
+      if ((resp.stop_reason as string) === 'model_context_window_exceeded')
+        return { ok: false, error: 'The document is too large for the model context window.' }
       const text = resp.content
         .filter((b) => b.type === 'text')
         .map((b) => ('text' in b ? b.text : ''))
@@ -1870,6 +2031,8 @@ export async function generateDocument(input: {
     })
     if ((resp.stop_reason as string) === 'refusal')
       return { ok: false, error: 'Claude declined this request. Try rephrasing it.' }
+    if ((resp.stop_reason as string) === 'model_context_window_exceeded')
+      return { ok: false, error: 'The document is too large for the model context window.' }
     const text = resp.content
       .filter((b) => b.type === 'text')
       .map((b) => ('text' in b ? b.text : ''))
@@ -1944,6 +2107,8 @@ export async function generateDesignContent(input: {
     })
     if ((resp.stop_reason as string) === 'refusal')
       return { ok: false, error: 'Claude declined this request. Try rephrasing it.' }
+    if ((resp.stop_reason as string) === 'model_context_window_exceeded')
+      return { ok: false, error: 'The document is too large for the model context window.' }
     const text = resp.content
       .filter((b) => b.type === 'text')
       .map((b) => ('text' in b ? b.text : ''))

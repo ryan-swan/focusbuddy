@@ -586,6 +586,67 @@ export type ActionProposal =
       title: string
       reason?: string
     }
+  | {
+      // Edit an EXISTING document's content. documentId is a real id from the
+      // documents context block, or "$<proposalId>" referencing a sibling
+      // create-document in the same batch. Defaults to append — the least
+      // destructive operation — when the model omits it; replace is available
+      // but the doc_snapshots history makes even that recoverable.
+      id: string
+      kind: 'edit-document'
+      documentId: string
+      label: string // user-facing description ("the Q3 brief")
+      title?: string
+      body?: string // markdown-ish text; converted to the doc body format
+      operation?: 'replace' | 'append' | 'prepend'
+      reason?: string
+    }
+  | {
+      // Write one or more cells in an EXISTING table row. v1 requires a real
+      // rowId surfaced in the table context (no symbolic row refs — rows
+      // created in the same batch are set via add-table-row's cells instead).
+      // tableId may be real or a "$<proposalId>" create-table reference.
+      id: string
+      kind: 'set-cell'
+      tableId: string
+      rowId: string
+      cells: Record<string, string>
+      reason?: string
+    }
+  | {
+      // Schedule a calendar time block. startMs is absolute unix ms — the
+      // model resolves relative phrases itself using the current-time fact in
+      // its context. Undoable via the shared action history.
+      id: string
+      kind: 'schedule-event'
+      title: string
+      startMs: number
+      durationMinutes: number
+      taskId?: string | null
+      recurrence?: 'daily' | 'weekly' | 'monthly' | null
+      reason?: string
+    }
+  | {
+      // DRAFT ONLY: opens the mail composer pre-filled. There is deliberately
+      // no send field — the human always reviews and sends. Never recorded on
+      // the undo timeline (nothing was mutated).
+      id: string
+      kind: 'compose-mail'
+      to?: string[]
+      subject: string
+      body: string
+      reason?: string
+    }
+  | {
+      // DRAFT ONLY: pre-fills the chat composer for a conversation the model
+      // was shown. Same contract as compose-mail: a human presses send.
+      id: string
+      kind: 'post-chat'
+      conversationId: string
+      conversationLabel?: string
+      body: string
+      reason?: string
+    }
 
 // ── AI model routing ─────────────────────────────────────────────────────────
 // The user picks a mode (Auto / Haiku / Sonnet / Opus). In Auto mode, each AI

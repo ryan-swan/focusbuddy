@@ -1,5 +1,6 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Icon from '../../Icon'
+import { useMessagingStore } from '../../../stores/messaging'
 import { uploadAttachment, attachmentKindForMime, type MessageAttachment } from '../../../lib/messagingClient'
 import { EmojiPicker } from './EmojiPicker'
 import { GifPicker } from './GifPicker'
@@ -28,6 +29,15 @@ export function ChatComposer({
   onTyping: () => void
 }): JSX.Element {
   const [draft, setDraft] = useState('')
+  // Consume an AI-queued draft for this conversation (post-chat proposal).
+  // One-shot: clears the pending entry the moment it lands in the input.
+  const pendingDraft = useMessagingStore((s) => s.pendingDraft)
+  useEffect(() => {
+    if (pendingDraft && pendingDraft.conversationId === conversationId) {
+      setDraft(pendingDraft.text)
+      useMessagingStore.getState().setPendingDraft(null)
+    }
+  }, [pendingDraft, conversationId])
   const [pending, setPending] = useState<PendingAttachment | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
