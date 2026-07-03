@@ -45,6 +45,8 @@ import { promoteToLiveCanvas } from '../lib/liveCanvasMirror'
 import SharedBadge from './SharedBadge'
 import SharedRecipientBadges from './SharedRecipientBadges'
 import Icon from './Icon'
+import { StatusPill } from './plexi'
+import { fieldInputClass } from './plexi/forms'
 
 // MIME used when dragging a Connected App row from the sidebar onto the canvas.
 // The Canvas drop handler reads this to spawn a webview widget bound to the app.
@@ -77,7 +79,7 @@ function renderConnectedAppRow(
         e.dataTransfer.effectAllowed = 'copy'
       }}
       className={`relative group flex items-center pr-1.5 py-0.5 px-2 ${
-        active ? 'bg-stone-100/80 dark:bg-stone-800/60' : ''
+        active ? 'bg-[rgb(var(--accent)/0.08)]' : ''
       }`}
       title={
         isLocal
@@ -89,7 +91,7 @@ function renderConnectedAppRow(
       <button
         onClick={onOpen}
         className={`flex-1 flex items-center gap-2 px-1.5 py-1 rounded text-left min-w-0 ${
-          active ? '' : 'hover:bg-stone-100 dark:hover:bg-stone-800'
+          active ? '' : 'hover:bg-[var(--surface-sunken)]'
         }`}
       >
         {app.iconPngBase64 ? (
@@ -118,8 +120,8 @@ function renderConnectedAppRow(
         <span
           className={`text-[13px] flex-1 min-w-0 break-words line-clamp-2 leading-tight ${
             active
-              ? 'text-stone-900 dark:text-stone-100 font-medium'
-              : 'text-stone-800 dark:text-stone-200'
+              ? 'text-[var(--ink-100)] font-medium'
+              : 'text-[var(--ink-90)]'
           }`}
         >
           {app.title}
@@ -766,7 +768,7 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
         {sharedOpen && (
           <div className="mb-2 px-2">
             {sharedInbox.length === 0 ? (
-              <div className="text-[11px] text-stone-500 dark:text-stone-400 leading-relaxed px-2 py-2">
+              <div className="text-[11px] text-[var(--ink-70)] leading-relaxed px-2 py-2">
                 Items others share with you land here. Get a link from a
                 collaborator, then click the{' '}
                 <Icon
@@ -785,7 +787,7 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
                     <div
                       key={item.id}
                       role="listitem"
-                      className="group flex items-center gap-1.5 px-2 py-1.5 rounded hover:bg-stone-100 dark:hover:bg-stone-800"
+                      className="group flex items-center gap-1.5 px-2 py-1.5 rounded hover:bg-[var(--surface-sunken)]"
                       title={`Shared by ${item.fromHandle}`}
                     >
                       <Icon
@@ -800,10 +802,10 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
                         className="text-accent shrink-0"
                       />
                       <div className="flex-1 min-w-0">
-                        <div className="text-[12px] text-stone-800 dark:text-stone-100 truncate">
+                        <div className="text-[12px] text-[var(--ink-90)] truncate">
                           {title}
                         </div>
-                        <div className="text-[9px] text-stone-500 dark:text-stone-400 truncate font-mono">
+                        <div className="text-[9px] text-[var(--ink-50)] truncate font-mono">
                           {item.fromHandle} ·{' '}
                           {item.scope === 'copy' ? 'can copy' : 'view only'}
                         </div>
@@ -862,18 +864,18 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
                 device.{' '}
                 <button
                   onClick={() => void refreshNodes()}
-                  className="underline hover:text-stone-900 dark:hover:text-stone-100"
+                  className="underline hover:text-[var(--ink-100)]"
                 >
                   Try again
                 </button>
               </div>
             )}
             {flat.length === 0 && !nodesError && nodesLoaded && (
-              <div className="px-4 py-3 text-xs text-stone-500 dark:text-stone-400 leading-relaxed">
+              <div className="px-4 py-3 text-xs text-[var(--ink-70)] leading-relaxed">
                 No projects yet.{' '}
                 <button
                   onClick={requestCreateDesk}
-                  className="underline hover:text-stone-900 dark:hover:text-stone-100"
+                  className="underline hover:text-[var(--ink-100)]"
                 >
                   Create one
                 </button>{' '}
@@ -935,7 +937,7 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
                     transition: 'border-color 80ms, background-color 80ms'
                   }}
                   className={`relative group flex items-center pr-1.5 py-0.5 outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-inset focus-visible:bg-accent/[0.06] ${
-                    isActive && !isDropTarget ? 'bg-stone-100/80 dark:bg-stone-800/60' : ''
+                    isActive && !isDropTarget ? 'bg-[rgb(var(--accent)/0.08)]' : ''
                   }`}
                   onDragOver={(e) => handleRowDragOver(e, node)}
                   onDragLeave={(e) => handleRowDragLeave(e, node)}
@@ -950,7 +952,7 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
                   )}
                   <button
                     onClick={() => hasChildren && toggleExpand(node.id)}
-                    className={`w-5 h-5 flex items-center justify-center text-stone-500 hover:text-stone-900 transition-colors ${
+                    className={`w-5 h-5 flex items-center justify-center text-[var(--ink-50)] hover:text-[var(--ink-100)] transition-colors ${
                       hasChildren ? '' : 'invisible'
                     }`}
                     aria-label={isOpen ? 'Collapse' : 'Expand'}
@@ -981,7 +983,7 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
                     className={`flex-1 flex items-center gap-1.5 px-1.5 py-1 rounded min-w-0 ${
                       isRenaming ? '' : 'cursor-grab active:cursor-grabbing'
                     } ${
-                      !isActive ? 'hover:bg-stone-100 dark:hover:bg-stone-800' : ''
+                      !isActive ? 'hover:bg-[var(--surface-sunken)]' : ''
                     }`}
                   >
                     <Icon
@@ -995,7 +997,7 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
                             ? 'text-emerald-700'
                             : node.status === 'in_progress'
                               ? 'text-blue-700'
-                              : 'text-stone-500'
+                              : 'text-[var(--ink-50)]'
                       }
                     />
                     {isRenaming ? (
@@ -1017,16 +1019,16 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
                           }
                         }}
                         onClick={(e) => e.stopPropagation()}
-                        className="flex-1 bg-white dark:bg-stone-800 text-stone-900 dark:text-stone-100 px-1.5 py-0.5 rounded border border-stone-300 dark:border-stone-600 text-sm focus:outline-none focus:border-stone-700 dark:focus:border-stone-400"
+                        className={`${fieldInputClass()} flex-1 !px-1.5 !py-0.5`}
                       />
                     ) : (
                       <>
                         <span
                           className={`text-sm truncate flex-1 ${
                             isActive
-                              ? 'text-stone-900 dark:text-stone-100 font-medium'
-                              : 'text-stone-800 dark:text-stone-200'
-                          } ${node.status === 'done' ? 'line-through text-stone-400 dark:text-stone-500' : ''}`}
+                              ? 'text-[var(--ink-100)] font-medium'
+                              : 'text-[var(--ink-90)]'
+                          } ${node.status === 'done' ? 'line-through text-[var(--ink-50)]' : ''}`}
                         >
                           {node.title}
                         </span>
@@ -1055,18 +1057,17 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
                                 : overdue
                                   ? `${-daysLeft}d late`
                                   : `${daysLeft}d`
+                          // Same StatusPill tone mapping as AllTasksView: rose
+                          // (busy) overdue, amber (away) soon, neutral otherwise.
                           return (
                             <span
-                              className={`text-[10px] font-mono px-1.5 py-0.5 rounded shrink-0 ${
-                                overdue
-                                  ? 'bg-red-100 dark:bg-red-950/50 text-red-700 dark:text-red-400'
-                                  : soon
-                                    ? 'bg-amber-100 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400'
-                                    : 'bg-stone-100 dark:bg-stone-800 text-stone-500 dark:text-stone-400'
-                              }`}
+                              className="shrink-0"
                               title={`Due ${new Date(node.dueDate).toLocaleDateString()}`}
                             >
-                              {label}
+                              <StatusPill
+                                tone={overdue ? 'busy' : soon ? 'away' : 'offline'}
+                                label={label}
+                              />
                             </span>
                           )
                         })()}
@@ -1122,7 +1123,7 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
                         }
                       }}
                       title="Delete permanently"
-                      className="icon-btn hover:!text-red-700"
+                      className="icon-btn hover:!text-rose-600"
                     >
                       <Icon name="delete" size={14} />
                     </button>
@@ -1154,13 +1155,13 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
         {appsOpen && (
           <div className="mb-2">
             {connectedApps.length === 0 ? (
-              <div className="mx-3 mb-2 rounded-md border border-dashed border-stone-300 dark:border-stone-700 p-3 text-center">
+              <div className="mx-3 mb-2 rounded-md border border-dashed border-[var(--edge-soft)] p-3 text-center">
                 <Icon
                   name="apps"
                   size={18}
-                  className="text-stone-400 dark:text-stone-500 mx-auto mb-1"
+                  className="text-[var(--ink-40)] mx-auto mb-1"
                 />
-                <p className="text-[11px] text-stone-500 dark:text-stone-400 leading-snug mb-2">
+                <p className="text-[11px] text-[var(--ink-40)] leading-snug mb-2">
                   Pin Spotify, Gmail, Slack, ChatGPT and others you use across every task.
                   Drag them onto a canvas to work with them inside a task.
                 </p>
@@ -1191,7 +1192,7 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
                     <button
                       type="button"
                       onClick={() => setMoreAppsOpen((v) => !v)}
-                      className="w-full mt-1 px-3 py-1 flex items-center gap-1 text-[11px] uppercase tracking-wider text-stone-500 dark:text-stone-400 hover:text-stone-700 dark:hover:text-stone-200"
+                      className="w-full mt-1 px-3 py-1 flex items-center gap-1 text-[11px] uppercase tracking-wider text-[var(--ink-50)] hover:text-[var(--ink-90)]"
                     >
                       <Icon
                         name={moreAppsOpen ? 'expand_more' : 'chevron_right'}

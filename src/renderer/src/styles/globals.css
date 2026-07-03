@@ -206,11 +206,23 @@ body {
   .chip-btn {
     @apply inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border text-xs transition-colors select-none;
   }
+  /* Token-driven (not stone-*): these repaint correctly in futuristic /
+     atelier / gemstone, whose ink and surface ramps are not grey. */
   .chip-active {
-    @apply border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-800 text-stone-900 dark:text-stone-100 hover:bg-stone-100 dark:hover:bg-stone-700 hover:border-stone-400 dark:hover:border-stone-500 shadow-sm cursor-grab active:cursor-grabbing;
+    @apply shadow-sm cursor-grab active:cursor-grabbing;
+    border-color: var(--edge-firm);
+    background: var(--surface-raised);
+    color: var(--ink-100);
+  }
+  .chip-active:hover {
+    background: var(--surface-sunken);
+    border-color: var(--edge-strong, var(--edge-firm));
   }
   .chip-disabled {
-    @apply border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800/50 text-stone-400 dark:text-stone-600 cursor-not-allowed;
+    @apply cursor-not-allowed;
+    border-color: var(--edge-soft);
+    background: var(--surface-sunken);
+    color: var(--ink-40);
   }
   /* Primary action — accent fill with spring micro-press, inset highlight for
      a sense of being a physical key, and an accent-tinted shadow that
@@ -239,19 +251,29 @@ body {
     transition-duration: var(--dur-instant);
   }
   .btn-ghost {
-    @apply inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-stone-600 dark:text-stone-400 text-xs hover:bg-stone-100/70 dark:hover:bg-stone-800/70 hover:text-stone-900 dark:hover:text-stone-100;
+    @apply inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs;
+    color: var(--ink-70);
     transition: background-color var(--dur-quick) var(--ease-spring-crisp),
       color var(--dur-quick) var(--ease-spring-crisp),
       transform var(--dur-quick) var(--ease-spring-crisp);
+  }
+  .btn-ghost:hover {
+    background: var(--surface-sunken);
+    color: var(--ink-100);
   }
   .btn-ghost:active:not(:disabled) {
     transform: scale(0.97);
   }
   .icon-btn {
-    @apply inline-flex items-center justify-center h-6 w-6 rounded text-stone-500 dark:text-stone-400 hover:bg-stone-100/70 dark:hover:bg-stone-800/70 hover:text-stone-900 dark:hover:text-stone-100;
+    @apply inline-flex items-center justify-center h-6 w-6 rounded;
+    color: var(--ink-50);
     transition: background-color var(--dur-quick) var(--ease-spring-crisp),
       color var(--dur-quick) var(--ease-spring-crisp),
       transform var(--dur-quick) var(--ease-spring-crisp);
+  }
+  .icon-btn:hover {
+    background: var(--surface-sunken);
+    color: var(--ink-100);
   }
   .icon-btn:active:not(:disabled) {
     transform: scale(0.92);

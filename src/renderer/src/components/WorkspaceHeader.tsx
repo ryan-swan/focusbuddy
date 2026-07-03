@@ -4,6 +4,7 @@ import { useViewStore } from '../stores/view'
 import { useNodeStore } from '../stores/nodes'
 import ShareDialog from './ShareDialog'
 import Icon from './Icon'
+import { StatusPill } from './plexi'
 
 interface Props {
   project: FbNode
@@ -58,19 +59,16 @@ export default function WorkspaceHeader({
 
   return (
     <>
-      <div className="border-b border-stone-200 dark:border-stone-700 bg-white/50 dark:bg-stone-900/40 backdrop-blur px-6 py-4">
+      <div className="border-b border-[var(--edge-soft)] fb-glass-chrome px-6 py-4">
         <div className="flex items-start gap-3">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
-              <h1 className="text-xl font-semibold text-stone-900 dark:text-stone-100 truncate">
+              <h1 className="text-xl font-semibold fb-display text-[var(--ink-100)] truncate">
                 {project.title || '(untitled project)'}
               </h1>
-              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-stone-100 dark:bg-stone-800 border border-stone-300/50 dark:border-stone-700 text-[10px] text-stone-600 dark:text-stone-300">
-                <Icon name="lock" size={9} />
-                Private
-              </span>
+              <StatusPill tone="offline" label="Private" />
             </div>
-            <p className="text-[12px] text-stone-600 dark:text-stone-300 leading-relaxed line-clamp-2 max-w-3xl">
+            <p className="text-[12px] text-[var(--ink-70)] leading-relaxed line-clamp-2 max-w-3xl">
               {description}
             </p>
           </div>
@@ -123,7 +121,7 @@ export default function WorkspaceHeader({
                 className={`relative px-3 py-1.5 inline-flex items-center gap-1.5 text-[12px] transition-colors ${
                   active
                     ? 'text-accent font-medium'
-                    : 'text-stone-600 dark:text-stone-300 hover:text-stone-900 dark:hover:text-stone-100'
+                    : 'text-[var(--ink-70)] hover:text-[var(--ink-100)]'
                 }`}
               >
                 <Icon name={t.icon} size={12} className={active ? 'text-accent' : ''} />
@@ -159,7 +157,7 @@ function MemberAvatars(): JSX.Element {
   return (
     <div className="flex items-center -space-x-1.5">
       <div
-        className="h-6 w-6 rounded-full bg-accent/20 border-2 border-white dark:border-stone-900 inline-flex items-center justify-center text-[9px] font-medium text-accent"
+        className="h-6 w-6 rounded-full bg-accent/20 border-2 border-[var(--surface-raised)] inline-flex items-center justify-center text-[9px] font-medium text-accent"
         title="You"
       >
         Y
