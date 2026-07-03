@@ -26,7 +26,7 @@ The quick-create store (stores/quickCreate.ts) had consumers wired in six module
 
 ## Global shortcuts overlay
 
-Cmd+/ outside the editors opens ShortcutsOverlay.tsx, which documents the global bindings and generates the canvas quick-add rows from WIDGET_SHORTCUTS and WIDGET_CATALOG so the panel cannot drift from the real key handlers. The document editors keep their own Cmd+/ panels; the App-level listener only acts on presses no editor claimed (it checks defaultPrevented). Rebindable shortcuts, the second half of the power-user ask, are not built; that needs a keymap store consulted by every handler and is tracked as open.
+Cmd+/ outside the editors opens ShortcutsOverlay.tsx, which documents the global bindings and generates the canvas quick-add rows from WIDGET_SHORTCUTS and WIDGET_CATALOG so the panel cannot drift from the real key handlers. The document editors keep their own Cmd+/ panels; the App-level listener only acts on presses no editor claimed (it checks defaultPrevented). Rebindable quick-add keys shipped in the second wave (see below): lib/keymap.ts holds the overrides and the overlay is the remap UI.
 
 ## Onboarding and settings
 
