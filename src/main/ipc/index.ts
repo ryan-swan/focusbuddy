@@ -85,8 +85,7 @@ import {
   getWidget,
   listWidgetsByTask,
   listWidgetsByKind,
-  updateWidget
-} from '../db/widgets'
+  updateWidget, createWidgetIfTaskExists } from '../db/widgets'
 import { collectTelemetry, recordAiCall } from '../db/telemetry'
 import { getLaunchInfo } from '../launchVersion'
 import {
@@ -508,6 +507,8 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('widgets:listByTask', (_e, taskId: string) => listWidgetsByTask(taskId))
   ipcMain.handle('widgets:listByKind', (_e, kind: Widget['kind']) => listWidgetsByKind(kind))
   ipcMain.handle('widgets:create', (_e, draft: WidgetDraft) => createWidget(draft))
+  // Tolerant variant for auto-spawned chrome (minimap): no-op if the task is gone.
+  ipcMain.handle('widgets:createOptional', (_e, draft: WidgetDraft) => createWidgetIfTaskExists(draft))
   ipcMain.handle('widgets:update', (_e, id: string, patch: WidgetPatch) => updateWidget(id, patch))
   ipcMain.handle('widgets:delete', (_e, id: string) => deleteWidget(id))
   ipcMain.handle('widgets:restore', (_e, id: string) => restoreWidget(id))

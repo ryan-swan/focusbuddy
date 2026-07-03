@@ -37,6 +37,8 @@ interface WidgetStore {
   loadForTask: (taskId: string, opts?: { refresh?: boolean }) => Promise<void>
   clear: () => void
   create: (draft: WidgetDraft) => Promise<Widget>
+  /** Best-effort create for auto-spawned chrome; resolves null if the task is gone. */
+  createOptional: (draft: WidgetDraft) => Promise<Widget | null>
   update: (id: string, patch: WidgetPatch) => Promise<void>
   remove: (id: string) => Promise<void>
   archive: (id: string) => Promise<void>
@@ -223,6 +225,13 @@ export const useWidgetStore = create<WidgetStore>((set, get) => ({
     })
   },
   resetView: () => set({ zoom: 1, panX: 0, panY: 0 }),
+  createOptional: async (draft) => {
+    const widget = await window.api.widgets.createOptional(draft)
+    if (!widget) return null // task vanished before the create landed; clean no-op
+    set({ widgets: [...get().widgets, widget] })
+    recordSnapshotSoon(widget.taskId)
+    return widget
+  },
   create: async (draft) => {
     const widget = await window.api.widgets.create(draft)
     set({ widgets: [...get().widgets, widget] })

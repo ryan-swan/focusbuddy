@@ -434,7 +434,7 @@ export default function Canvas(): JSX.Element {
       return
     }
     createdMinimapForRef.current.add(activeTaskId)
-    void createWidget({
+    void useWidgetStore.getState().createOptional({
       taskId: activeTaskId,
       kind: 'minimap',
       title: '',
