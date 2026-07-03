@@ -1,5 +1,5 @@
 import { exec, execFile } from 'child_process'
-import { app, BrowserWindow, shell, systemPreferences } from 'electron'
+import { app, BrowserWindow, dialog, shell, systemPreferences } from 'electron'
 import { promisify } from 'util'
 import type {
   KeyComboAction,
@@ -24,10 +24,15 @@ import type {
 // native modules. Windows + Linux paths are stubs we'd fill in later
 // with nircmd / xdotool respectively — for now they fail gracefully.
 //
-// Security note: run-shell is INTENTIONALLY gated. The renderer prompts
-// the user with a one-time "this button runs a shell command, confirm"
-// dialog before persisting the action. Once saved, clicking executes
-// without re-prompting — the user trusted it once.
+// Security note: run-shell is gated in the MAIN process at execution time.
+// A security audit found that the previously-claimed renderer "one-time
+// confirm" did not exist, and that a shared/imported SpeedDeck widget could
+// carry a run-shell command that ran on a single click with no prompt (a
+// remotely-deliverable one-click RCE). The gate below shows a native,
+// cancel-by-default confirmation displaying the exact command before every
+// execution, so no execution can happen without a deliberate human decision.
+// Delivery is also cut off upstream: shares/imports strip run-shell actions
+// and the AI applier refuses to mint them.
 
 const execAsync = promisify(exec)
 const execFileAsync = promisify(execFile)
@@ -365,6 +370,23 @@ async function setVolume(action: SetVolumeAction): Promise<void> {
 
 async function runShell(action: RunShellAction): Promise<void> {
   if (!action.command.trim()) throw new Error('Shell command is empty.')
+  // Execution-time gate: a native, cancel-by-default dialog showing the exact
+  // command. This is the one control that holds no matter how the action was
+  // created (hand-authored, shared, imported, AI-proposed), so a single click
+  // can never silently run a shell command.
+  const parent = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0]
+  const opts = {
+    type: 'warning' as const,
+    buttons: ['Cancel', 'Run command'],
+    defaultId: 0,
+    cancelId: 0,
+    title: 'Run a shell command?',
+    message: 'This SpeedDeck button wants to run a shell command on your computer.',
+    detail: `${action.command}\n\nOnly continue if you created this button yourself and trust this command.`,
+    noLink: true
+  }
+  const { response } = parent ? await dialog.showMessageBox(parent, opts) : await dialog.showMessageBox(opts)
+  if (response !== 1) throw new Error('Shell command cancelled by the user.')
   await execAsync(action.command, {
     timeout: action.timeoutMs ?? 10_000,
     // Cap output to prevent runaway logs; we don't surface stdout/stderr

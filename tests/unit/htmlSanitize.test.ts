@@ -65,6 +65,27 @@ describe('sanitizeHtml — dangerous content is removed', () => {
     expect(out).not.toContain('data:text/html')
   })
 
+  // Regression for the confirmed control-character scheme bypass: an embedded
+  // tab (as a numeric entity) made "java&#9;script:" pass a startsWith test but
+  // still execute on navigation. normalizeScheme strips control chars first.
+  it('blocks javascript: hrefs with embedded control characters', () => {
+    for (const raw of [
+      '<a href="java&#9;script:alert(1)">x</a>',
+      '<a href="java&#10;script:alert(1)">x</a>',
+      '<a href="  \tjavascript:alert(1)">x</a>',
+      '<a href="&#1;javascript:alert(1)">x</a>'
+    ]) {
+      const out = sanitizeHtml(raw)
+      // No surviving href should normalise to a javascript: scheme.
+      const m = out.match(/href="([^"]*)"/i)
+      if (m) {
+        const scheme = m[1].replace(/[\u0000-\u0020]+/g, '').toLowerCase()
+        expect(scheme.startsWith('javascript:')).toBe(false)
+      }
+      expect(out).toContain('x')
+    }
+  })
+
   it('unwraps unknown tags but keeps their text', () => {
     const out = sanitizeHtml('<section><custom-thing>hello</custom-thing></section>')
     expect(out).toContain('hello')

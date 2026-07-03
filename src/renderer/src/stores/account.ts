@@ -172,7 +172,13 @@ export const useAccountStore = create<AccountStore>((set, get) => ({
       // eslint-disable-next-line no-console
       console.warn('[accountStore.adoptHandoff] email hint mismatch', email, account.email)
     }
-    await window.api.account.saveSession({ token: sessionToken, email: account.email })
+    // Persisting can fail on a machine with no OS secure storage (we refuse to
+    // write the token in plaintext now). That must not block sign-in: keep the
+    // session in memory for this run and carry on.
+    await window.api.account.saveSession({ token: sessionToken, email: account.email }).catch((err) => {
+      // eslint-disable-next-line no-console
+      console.warn('[accountStore.adoptHandoff] session not persisted (no secure storage):', err)
+    })
     set({
       sessionToken,
       account,

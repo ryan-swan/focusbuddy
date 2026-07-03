@@ -88,6 +88,15 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
   // that keeps a malicious web page from reaching the API at all.
   if (req.headers['origin']) return send(res, 403, { error: 'Cross-origin requests are not permitted.' })
 
+  // DNS-rebinding guard: a rebinding page makes same-origin (Origin-less) simple
+  // requests to its own hostname rebound to 127.0.0.1, slipping past the Origin
+  // check above. Require the Host header to be loopback so only genuinely local
+  // callers reach the API (the token-less webhook route especially).
+  const host = (req.headers['host'] || '').split(':')[0].toLowerCase()
+  if (host && host !== 'localhost' && host !== '127.0.0.1' && host !== '[::1]' && host !== '::1') {
+    return send(res, 403, { error: 'Only loopback host is permitted.' })
+  }
+
   const url = new URL(req.url || '/', `http://${HOST}`)
   const path = url.pathname
   const method = (req.method || 'GET').toUpperCase()

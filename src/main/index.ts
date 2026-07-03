@@ -1,5 +1,5 @@
 import { app, BrowserWindow, Menu, MenuItem, protocol, session, shell, net } from 'electron'
-import { join } from 'path'
+import { join, resolve as resolvePath, sep } from 'path'
 import { existsSync } from 'fs'
 import { pathToFileURL } from 'url'
 import { config as loadEnv } from 'dotenv'
@@ -183,7 +183,18 @@ function createCommandCenter(): BrowserWindow {
   win.on('ready-to-show', () => win.show())
 
   win.webContents.setWindowOpenHandler((details) => {
-    shell.openExternal(details.url)
+    // Validate the scheme before handing the URL to the OS. Content rendered in
+    // the trusted main renderer (a shared document, imported markdown, AI
+    // output) could otherwise open a dangerous scheme (file:, smb:, ms-msdt:)
+    // via a target=_blank link. Mirrors the will-navigate guard below.
+    let ok = false
+    try {
+      const p = new URL(details.url).protocol
+      ok = p === 'http:' || p === 'https:' || p === 'mailto:'
+    } catch {
+      ok = false
+    }
+    if (ok) void shell.openExternal(details.url)
     return { action: 'deny' }
   })
 
@@ -429,7 +440,15 @@ app.whenReady().then(() => {
           return new Response('Forbidden', { status: 403 })
         }
         const root = app.getAppPath()
-        const onDisk = `${root}/${mappedSubdir}/${relPath}`
+        const baseDir = `${root}/${mappedSubdir}`
+        const onDisk = `${baseDir}/${relPath}`
+        // Path-traversal guard: resolve and confirm the final path stays under
+        // the mapped directory, so a "../.." relPath cannot escape it. Dev-only
+        // handler, but cheap and correct to lock down.
+        const resolved = resolvePath(onDisk)
+        if (resolved !== resolvePath(baseDir) && !resolved.startsWith(resolvePath(baseDir) + sep)) {
+          return new Response('Forbidden', { status: 403 })
+        }
         // Sanity check before handing off — net.fetch's 404 page wraps the
         // real cause in a long HTML body that's hard to spot in the log.
         if (!existsSync(onDisk)) {

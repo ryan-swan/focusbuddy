@@ -61,7 +61,7 @@ import { installCapabilityWatcher } from './stores/capabilities'
 import { useViewStore } from './stores/view'
 import { useActionHistory } from './stores/actionHistory'
 import UndoToast from './components/UndoToast'
-import { PromptDialogHost } from './components/plexi/PromptDialog'
+import { PromptDialogHost, confirmDialog } from './components/plexi/PromptDialog'
 import { DocHistoryPanelHost } from './components/documents/DocHistoryPanel'
 import ShortcutsOverlay from './components/ShortcutsOverlay'
 import './lib/timeOfDay' // side-effect: pushes --tod-* CSS vars to :root + ticks every 60s
@@ -203,8 +203,21 @@ export default function App(): JSX.Element {
     async function consumeAndSubscribe(): Promise<void> {
       const pending = await window.api.auth.getPending()
       if (pending) await adoptHandoff({ sessionToken: pending.sessionToken, email: pending.email })
+      // A haptyx://auth deep link can be triggered by ANY website while the app
+      // is open, so a live incoming token is a forced-login (session-fixation)
+      // vector. Require an explicit confirmation naming the account before
+      // adopting it. The startup getPending path above is the user's own
+      // just-completed login returning focus, so it stays friction-free.
       detach = window.api.auth.onIncomingToken((handoff) => {
-        void adoptHandoff({ sessionToken: handoff.sessionToken, email: handoff.email })
+        void confirmDialog({
+          title: 'Sign in to PlexiDesk?',
+          body: handoff.email
+            ? `A sign-in link wants to log this app in as ${handoff.email}. Only continue if you just started this sign-in.`
+            : 'A sign-in link wants to log this app in. Only continue if you just started this sign-in.',
+          confirmLabel: 'Sign in'
+        }).then((ok) => {
+          if (ok) void adoptHandoff({ sessionToken: handoff.sessionToken, email: handoff.email })
+        })
       })
     }
     void consumeAndSubscribe()

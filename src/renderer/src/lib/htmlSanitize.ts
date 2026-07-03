@@ -50,10 +50,20 @@ const ALLOWED_STYLE_PROPS = new Set([
   'text-decoration'
 ])
 
+// Normalise a URL value the way a browser does before scheme resolution: strip
+// ALL leading control characters and whitespace (tab, newline, C0 controls),
+// which browsers remove from the scheme. Without this, "java&#9;script:" (a
+// literal tab) slips past a startsWith('javascript:') test but still executes
+// on navigation — the confirmed sanitizer bypass. lowercased for the compare.
+function normalizeScheme(value: string): string {
+  // eslint-disable-next-line no-control-regex
+  return value.replace(/[\u0000-\u0020]+/g, '').toLowerCase()
+}
+
 // A safe href scheme guard: block javascript:, data: (except images handled on
 // img), vbscript:, etc. Allow http(s), mailto, tel, and relative/anchor links.
 function isSafeHref(value: string): boolean {
-  const v = value.trim().toLowerCase()
+  const v = normalizeScheme(value)
   if (v.startsWith('javascript:') || v.startsWith('vbscript:') || v.startsWith('data:')) return false
   return true
 }
@@ -61,7 +71,7 @@ function isSafeHref(value: string): boolean {
 // img src may be an http(s) URL or a base64 data URI (how pasted/exported
 // images travel). Block javascript:/vbscript: and non-image data URIs.
 function isSafeImageSrc(value: string): boolean {
-  const v = value.trim().toLowerCase()
+  const v = normalizeScheme(value)
   if (v.startsWith('javascript:') || v.startsWith('vbscript:')) return false
   if (v.startsWith('data:')) return v.startsWith('data:image/')
   return true

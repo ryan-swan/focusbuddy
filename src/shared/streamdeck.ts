@@ -228,3 +228,75 @@ export const BUTTON_PALETTE = [
   '#94a3b8', // slate
   '#1f2937' // ink
 ] as const
+
+// Security: neutralise run-shell actions in a deck that arrived from an
+// untrusted source (an accepted share, an import). A shared SpeedDeck widget
+// could otherwise carry an arbitrary shell command that runs when the
+// recipient clicks the button. The main-process executor also confirms every
+// run-shell at click time, so this is defense in depth: strip the delivery so
+// the button never even offers to run. A stripped button keeps its label/icon
+// but its action becomes a no-op that explains why. Returns a new config; the
+// input is not mutated. Recurses into multi-step steps and folder pages
+// (pages are flat in DeckConfig, so every page is visited).
+function sanitizeAction(action: StreamDeckAction): { action: StreamDeckAction; stripped: boolean } {
+  if (action.type === 'run-shell') {
+    return { action: { type: 'open-url', url: '' }, stripped: true }
+  }
+  if (action.type === 'multi-step') {
+    let stripped = false
+    const steps = action.steps.map((s) => {
+      if (s.type === 'run-shell') {
+        stripped = true
+        return { type: 'open-url', url: '' } as SingleStepAction
+      }
+      return s
+    })
+    return { action: { ...action, steps }, stripped }
+  }
+  return { action, stripped: false }
+}
+
+export function stripRunShellFromDeck(config: DeckConfig): { config: DeckConfig; strippedCount: number } {
+  let strippedCount = 0
+  const pages: Record<string, DeckPage> = {}
+  for (const [pageId, page] of Object.entries(config.pages)) {
+    const buttons: Partial<Record<number, DeckButton>> = {}
+    for (const [pos, button] of Object.entries(page.buttons)) {
+      if (button && button.kind === 'action') {
+        const { action, stripped } = sanitizeAction(button.action)
+        if (stripped) {
+          strippedCount++
+          buttons[Number(pos)] = { ...button, action, label: button.label || 'Removed for safety' }
+          continue
+        }
+      }
+      if (button) buttons[Number(pos)] = button
+    }
+    pages[pageId] = { ...page, buttons }
+  }
+  return { config: { ...config, pages }, strippedCount }
+}
+
+// Convenience for the accept-share / import path: takes the raw widget content
+// JSON of a streamdeck widget, strips run-shell, and returns the cleaned JSON.
+// Handles both the bare DeckConfig and the { scope, taskDeck } wrapper the
+// widget persists. On any parse failure it returns the input unchanged, since
+// the executor gate is the authoritative backstop.
+export function stripRunShellFromDeckContent(content: string): string {
+  if (!content) return content
+  try {
+    const parsed = JSON.parse(content) as Record<string, unknown>
+    if (parsed && typeof parsed === 'object' && 'taskDeck' in parsed) {
+      const deck = parsed.taskDeck as DeckConfig
+      const { config } = stripRunShellFromDeck(deck)
+      return JSON.stringify({ ...parsed, taskDeck: config })
+    }
+    if (parsed && typeof parsed === 'object' && 'pages' in parsed) {
+      const { config } = stripRunShellFromDeck(parsed as unknown as DeckConfig)
+      return JSON.stringify(config)
+    }
+    return content
+  } catch {
+    return content
+  }
+}

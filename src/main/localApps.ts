@@ -1,5 +1,5 @@
 import { dialog, nativeImage, shell } from 'electron'
-import { exec, execFile } from 'child_process'
+import { execFile } from 'child_process'
 import { promisify } from 'util'
 import { basename, extname, join } from 'path'
 import { readFileSync, existsSync, rmSync } from 'fs'
@@ -11,13 +11,17 @@ import { readFileSync, existsSync, rmSync } from 'fs'
 // app never runs a missing macOS command on Windows/Linux.
 const isMac = process.platform === 'darwin'
 
-const execAsync = promisify(exec)
 // execFile variant that CAPTURES stdout, with NO shell — arguments are passed
 // as a discrete argv array so a path/value can never be interpreted as shell
 // syntax (closes the `defaults`/`sips` command-injection vector). The osascript
-// calls below keep execAsync only where their arguments are already escaped and
-// shell-free by construction.
 const execFileP = promisify(execFile)
+
+// Safely embed a string as an AppleScript string literal: wrap in double quotes
+// and backslash-escape backslashes and quotes. Combined with execFile (no
+// shell), this closes the single-quote-breakout injection the audit found.
+function asAppleScriptString(value: string): string {
+  return '"' + value.replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"'
+}
 
 // ── Picker ──────────────────────────────────────────────────────────────────
 // Surfaces the macOS file picker filtered to .app bundles. Returns a structured
@@ -281,18 +285,21 @@ export async function launchLocalApp(input: {
     // Activate + unhide + unminimise. Each step is best-effort and wrapped in
     // its own try/catch so a single failure doesn't abort the rest. Errors
     // here are not user-visible — the `open` call above already succeeded.
-    const safe = procName.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
+    // execFile (no shell): the process name is an -e argument, so quotes or
+    // shell metacharacters in an app name cannot inject a command.
     try {
-      await execAsync(
-        `osascript -e 'tell application "System Events" to tell process "${safe}" to set visible to true'`
-      )
+      await execFileP('osascript', [
+        '-e',
+        `tell application "System Events" to tell process ${asAppleScriptString(procName)} to set visible to true`
+      ])
     } catch {
       // app may not be Accessibility-allowed yet — fine
     }
     try {
-      await execAsync(
-        `osascript -e 'tell application "System Events" to tell process "${safe}" to if (count of windows) > 0 then if value of attribute "AXMinimized" of window 1 is true then set value of attribute "AXMinimized" of window 1 to false'`
-      )
+      await execFileP('osascript', [
+        '-e',
+        `tell application "System Events" to tell process ${asAppleScriptString(procName)} to if (count of windows) > 0 then if value of attribute "AXMinimized" of window 1 is true then set value of attribute "AXMinimized" of window 1 to false`
+      ])
     } catch {
       // window may not support AXMinimized — fine
     }
@@ -310,10 +317,10 @@ async function resolveProcessName(input: {
 }): Promise<string | null> {
   if (input.bundleId) {
     try {
-      const escaped = input.bundleId.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
-      const { stdout } = await execAsync(
-        `osascript -e 'tell application "System Events" to return name of (first process whose bundle identifier is "${escaped}")'`
-      )
+      const { stdout } = await execFileP('osascript', [
+        '-e',
+        `tell application "System Events" to return name of (first process whose bundle identifier is ${asAppleScriptString(input.bundleId)})`
+      ])
       const name = stdout.trim()
       if (name) return name
     } catch {
@@ -345,12 +352,11 @@ export async function isLocalAppRunning(input: {
   if (!isMac) return false // running-state detection uses AppleScript (macOS)
   const name = input.appPath ? basename(input.appPath).replace(/\.app$/, '') : input.title
   if (!name) return false
-  // Escape double quotes in the app name for the AppleScript literal.
-  const safe = name.replace(/"/g, '\\"')
   try {
-    const { stdout } = await execAsync(
-      `osascript -e 'tell application "System Events" to return (count of (processes whose name is "${safe}")) > 0'`
-    )
+    const { stdout } = await execFileP('osascript', [
+      '-e',
+      `tell application "System Events" to return (count of (processes whose name is ${asAppleScriptString(name)})) > 0`
+    ])
     return stdout.trim() === 'true'
   } catch {
     return false
