@@ -172,10 +172,12 @@ test('TRASH-3 — Restore from the Trash section brings a document back; Delete 
     expect(afterRestore.inList, 'restored doc must be back in the live list').toBe(true)
     expect(afterRestore.trashedCount, 'only the purge candidate remains trashed').toBe(1)
 
-    // Delete forever the remaining trashed doc. Confirm the native confirm() dialog.
-    window.once('dialog', (d) => void d.accept())
+    // Delete forever the remaining trashed doc. Purge is gated behind the
+    // app's styled confirm dialog (PromptDialog's confirmDialog helper), not
+    // a native window.confirm() — Electron doesn't implement that anyway.
     const purgeRow = window.locator('div.border-dashed', { hasText: purgeTitle }).first()
     await purgeRow.locator('[data-testid="doc-purge"]').click()
+    await window.locator('[data-testid="prompt-dialog-confirm"]').click()
 
     await window.waitForTimeout(300)
     const afterPurge = await window.evaluate(async (t) => {
