@@ -752,6 +752,14 @@ export function getDb(): Database.Database {
   // documents. Added at the end where every table exists; existing rows backfill
   // to the reserved 'personal' org via the DEFAULT (no data loss).
   ensureColumn(db, 'time_blocks', 'org_id', "TEXT NOT NULL DEFAULT 'personal'")
+  // Repeating time blocks: recurrence ('daily'|'weekly'|'monthly', NULL = one
+  // off) plus series_id grouping the occurrences (the first block's id). Each
+  // occurrence is a real row so range queries, drags and per-occurrence edits
+  // need no special casing; the materialiser in timeBlocks.ts extends series
+  // forward on a rolling horizon.
+  ensureColumn(db, 'time_blocks', 'recurrence', 'TEXT')
+  ensureColumn(db, 'time_blocks', 'series_id', 'TEXT')
+  db.exec('CREATE INDEX IF NOT EXISTS idx_time_blocks_series ON time_blocks(series_id)')
   // A calendar block can be a video meeting; its room + invitee list ride along
   // as JSON. Nullable, so every existing focus block stays a plain focus block.
   ensureColumn(db, 'time_blocks', 'meeting_json', 'TEXT')

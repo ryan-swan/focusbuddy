@@ -351,8 +351,7 @@ import {
   createTimeBlock,
   deleteTimeBlock,
   listBlocksInRange,
-  updateTimeBlock
-} from '../db/timeBlocks'
+  updateTimeBlock, materializeRecurringBlocks } from '../db/timeBlocks'
 import { fireHaptic, isHapticsAvailable, type HapticFeel } from '../haptics'
 import {
   backupInfo,
@@ -1046,14 +1045,19 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('energy:recent', (_e, hours: number) => recentEnergy(hours))
 
   // ── Calendar time blocks ────────────────────────────────────────────────
-  ipcMain.handle('timeblocks:list', (_e, fromMs: number, toMs: number) =>
-    listBlocksInRange(fromMs, toMs)
-  )
+  ipcMain.handle('timeblocks:list', (_e, fromMs: number, toMs: number) => {
+    // Keep repeating series materialised ahead whenever the calendar is read;
+    // idempotent and cheap (each series continues from its newest row).
+    materializeRecurringBlocks()
+    return listBlocksInRange(fromMs, toMs)
+  })
   ipcMain.handle('timeblocks:create', (_e, draft: TimeBlockDraft) => createTimeBlock(draft))
   ipcMain.handle('timeblocks:update', (_e, id: string, patch: TimeBlockPatch) =>
     updateTimeBlock(id, patch)
   )
-  ipcMain.handle('timeblocks:delete', (_e, id: string) => deleteTimeBlock(id))
+  ipcMain.handle('timeblocks:delete', (_e, id: string, scope?: 'one' | 'series') =>
+    deleteTimeBlock(id, scope ?? 'one')
+  )
 
   // ── Mac haptics ───────────────────────────────────────────────────────────
   ipcMain.handle('haptics:available', () => isHapticsAvailable())

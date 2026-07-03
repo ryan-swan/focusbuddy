@@ -65,6 +65,7 @@ import { PromptDialogHost } from './components/plexi/PromptDialog'
 import { DocHistoryPanelHost } from './components/documents/DocHistoryPanel'
 import ShortcutsOverlay from './components/ShortcutsOverlay'
 import './lib/timeOfDay' // side-effect: pushes --tod-* CSS vars to :root + ticks every 60s
+import './lib/blockReminders' // side-effect: desktop notification 5 min before each planned time block
 import './lib/modelPrefs' // side-effect: pushes user's saved model mode to main process
 import './lib/bodyDouble' // side-effect: auto-resumes Body Double mode if user had it enabled
 import './lib/driftDetector' // side-effect: listens for window/document visibility + idle to detect drift

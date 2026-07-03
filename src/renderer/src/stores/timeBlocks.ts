@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import type { TimeBlock, TimeBlockDraft, TimeBlockPatch } from '@shared/types'
+import { recordAction, recordActionWithToast } from './actionHistory'
 
 // Calendar time blocks for the currently-viewed range. The view sets the range
 // (a week / a day); the store loads the blocks that overlap it and keeps an
@@ -14,7 +15,8 @@ interface TimeBlockStore {
   reload: () => Promise<void>
   create: (draft: TimeBlockDraft) => Promise<TimeBlock>
   update: (id: string, patch: TimeBlockPatch) => Promise<void>
-  remove: (id: string) => Promise<void>
+  /** scope 'series' deletes this occurrence and all future ones in its series. */
+  remove: (id: string, scope?: 'one' | 'series') => Promise<void>
 }
 
 // A block is in the loaded window if it overlaps [from, to).
@@ -42,6 +44,19 @@ export const useTimeBlockStore = create<TimeBlockStore>((set, get) => ({
     if (rangeFrom != null && rangeTo != null && overlaps(created, rangeFrom, rangeTo)) {
       set({ blocks: [...blocks, created].sort((a, b) => a.startMs - b.startMs) })
     }
+    // Structural undo: creating a block (or a repeating series) reverses by
+    // deleting it (scope 'series' also stops the materialiser regrowing it).
+    recordAction({
+      label: `Scheduled "${created.title || 'time block'}"`,
+      undo: async () => {
+        await window.api.timeBlocks.delete(created.id, created.seriesId ? 'series' : 'one')
+        await get().reload()
+      },
+      redo: async () => {
+        await window.api.timeBlocks.create(draft)
+        await get().reload()
+      }
+    })
     return created
   },
   update: async (id, patch) => {
@@ -54,8 +69,36 @@ export const useTimeBlockStore = create<TimeBlockStore>((set, get) => ({
     if (stillInRange) next.push(updated)
     set({ blocks: next.sort((a, b) => a.startMs - b.startMs) })
   },
-  remove: async (id) => {
-    await window.api.timeBlocks.delete(id)
-    set({ blocks: get().blocks.filter((b) => b.id !== id) })
+  remove: async (id, scope = 'one') => {
+    const existing = get().blocks.find((b) => b.id === id)
+    await window.api.timeBlocks.delete(id, scope)
+    await get().reload()
+    if (!existing) return
+    // Undo recreates the block from what we knew about it. A series delete
+    // reverses into a fresh series with the same pattern (ids change, which
+    // the calendar does not care about).
+    recordActionWithToast({
+      label: scope === 'series' ? `Deleted "${existing.title || 'block'}" series` : `Deleted "${existing.title || 'block'}"`,
+      undo: async () => {
+        await window.api.timeBlocks.create({
+          taskId: existing.taskId,
+          title: existing.title,
+          startMs: existing.startMs,
+          durationMin: existing.durationMin,
+          meeting: existing.meeting ?? null,
+          recurrence: scope === 'series' ? (existing.recurrence ?? null) : null
+        })
+        await get().reload()
+      },
+      redo: async () => {
+        // Best effort: the recreated block has a new id, so redo removes the
+        // block at the same start in the same series shape.
+        const again = get().blocks.find(
+          (b) => b.startMs === existing.startMs && b.title === existing.title
+        )
+        if (again) await window.api.timeBlocks.delete(again.id, scope)
+        await get().reload()
+      }
+    })
   }
 }))

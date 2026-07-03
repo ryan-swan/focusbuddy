@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { FbNode, TimeBlock, TimeBlockMeeting } from '@shared/types'
+import type { FbNode, TimeBlock, TimeBlockMeeting, TimeBlockRecurrence } from '@shared/types'
 import { useNodeStore } from '../../stores/nodes'
 import { useTimeBlockStore } from '../../stores/timeBlocks'
 import { useFocusSessionStore } from '../../stores/focusSession'
@@ -340,7 +340,16 @@ export default function WeekTimeGrid({ weekStart }: { weekStart: Date }): JSX.El
                         <button
                           onClick={(e) => {
                             e.stopPropagation()
-                            void removeBlock(block.id)
+                            // Repeating blocks offer this-only vs this-and-future.
+                            // The Undo toast covers recovery either way.
+                            if (block.seriesId) {
+                              const wholeSeries = confirm(
+                                'This block repeats. OK deletes this and all future occurrences; Cancel deletes just this one.'
+                              )
+                              void removeBlock(block.id, wholeSeries ? 'series' : 'one')
+                            } else {
+                              void removeBlock(block.id)
+                            }
                           }}
                           onPointerDown={(e) => e.stopPropagation()}
                           className="h-4 w-4 inline-flex items-center justify-center rounded bg-white/70 dark:bg-stone-900/70 text-stone-600 hover:text-red-600 dark:text-stone-300"
@@ -372,8 +381,8 @@ export default function WeekTimeGrid({ weekStart }: { weekStart: Date }): JSX.El
           tasks={tasks.filter((t) => t.status !== 'done')}
           prefillNode={composer.prefillNode}
           onCancel={() => setComposer(null)}
-          onCreate={async (taskId, title, durationMin, meeting) => {
-            await createBlock({ taskId, title, startMs: composer.startMs, durationMin, meeting })
+          onCreate={async (taskId, title, durationMin, meeting, recurrence) => {
+            await createBlock({ taskId, title, startMs: composer.startMs, durationMin, meeting, recurrence })
             if (!meeting || meeting.invitees.length === 0) return { inviteNote: null }
             // Send the join details to the invitees over the connected mailbox,
             // and report the honest outcome (sent / partial / no mailbox).
@@ -416,12 +425,14 @@ function BlockComposer({
     taskId: string | null,
     title: string,
     durationMin: number,
-    meeting: TimeBlockMeeting | null
+    meeting: TimeBlockMeeting | null,
+    recurrence: TimeBlockRecurrence | null
   ) => Promise<{ inviteNote: string | null }>
 }): JSX.Element {
   const [taskId, setTaskId] = useState<string>('')
   const [title, setTitle] = useState('')
   const [duration, setDuration] = useState(60)
+  const [repeat, setRepeat] = useState<TimeBlockRecurrence | ''>('')
   const [busy, setBusy] = useState(false)
   const [isMeeting, setIsMeeting] = useState(false)
   const [invitees, setInvitees] = useState('')
@@ -455,10 +466,10 @@ function BlockComposer({
       // picker (a chosen task, or a labelled generic focus block).
       let result: { inviteNote: string | null }
       if (prefillNode) {
-        result = await onCreate(prefillNode.id, '', duration, meeting)
+        result = await onCreate(prefillNode.id, '', duration, meeting, repeat || null)
       } else {
         const label = taskId ? '' : title.trim() || (isMeeting ? 'Meeting' : 'Focus time')
-        result = await onCreate(taskId || null, label, duration, meeting)
+        result = await onCreate(taskId || null, label, duration, meeting, repeat || null)
       }
       // If invites went out (or couldn't), show the honest note and keep the
       // panel open so the user reads it; otherwise close straight away.
@@ -595,6 +606,23 @@ function BlockComposer({
                 {m} min
               </option>
             ))}
+          </select>
+        </label>
+
+        <label className="block">
+          <span className="text-[10px] uppercase tracking-wider text-stone-500 dark:text-stone-400 font-medium">
+            Repeats
+          </span>
+          <select
+            value={repeat}
+            onChange={(e) => setRepeat(e.target.value as TimeBlockRecurrence | '')}
+            className="mt-1 w-full bg-white dark:bg-stone-800 border border-stone-300 dark:border-stone-600 rounded-md px-2 py-1.5 text-sm"
+            data-testid="block-repeat"
+          >
+            <option value="">Does not repeat</option>
+            <option value="daily">Daily</option>
+            <option value="weekly">Weekly</option>
+            <option value="monthly">Monthly</option>
           </select>
         </label>
 
