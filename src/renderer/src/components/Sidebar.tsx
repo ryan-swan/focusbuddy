@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { promptText } from './plexi/PromptDialog'
+import { confirmDialog, promptText } from './plexi/PromptDialog'
 import type { ConnectedApp, FbNode, NodeKind, WidgetSuggestion } from '@shared/types'
 import { useNodeStore } from '../stores/nodes'
 import { useCanCreateMore } from '../stores/capabilities'
@@ -1118,9 +1118,19 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
                     </button>
                     <button
                       onClick={() => {
-                        if (confirm(`Delete "${node.title}"? Children will be removed too.`)) {
-                          void remove(node.id)
-                        }
+                        // This is the genuinely irreversible delete (Archive
+                        // above is the recoverable one), so it gets the styled
+                        // danger confirm rather than the bare native box.
+                        void confirmDialog({
+                          title: `Delete "${node.title}" permanently?`,
+                          body: isFolder
+                            ? 'This folder and everything inside it are removed for good. Use Archive instead if you might want it back.'
+                            : 'This task is removed for good. Use Archive instead if you might want it back.',
+                          confirmLabel: 'Delete permanently',
+                          danger: true
+                        }).then((ok) => {
+                          if (ok) void remove(node.id)
+                        })
                       }}
                       title="Delete permanently"
                       className="icon-btn hover:!text-rose-600"

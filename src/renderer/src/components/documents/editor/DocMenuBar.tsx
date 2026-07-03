@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { openDocHistory } from '../DocHistoryPanel'
-import { promptText } from '../../plexi/PromptDialog'
+import { confirmDialog, promptText } from '../../plexi/PromptDialog'
 import type { Editor } from '@tiptap/react'
 import { useDocumentsStore } from '../../../stores/documents'
 import { useViewStore } from '../../../stores/view'
@@ -112,7 +112,12 @@ export default function DocMenuBar({
 
   async function moveToTrash(): Promise<void> {
     if (!active) return
-    if (!window.confirm(`Move "${title || 'Untitled document'}" to trash?`)) return
+    const ok = await confirmDialog({
+      title: `Move "${title || 'Untitled document'}" to trash?`,
+      body: 'You can restore it from the Documents trash.',
+      confirmLabel: 'Move to trash'
+    })
+    if (!ok) return
     await remove(active.id)
     goDocuments()
   }
