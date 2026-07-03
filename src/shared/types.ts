@@ -217,6 +217,8 @@ export interface TimeBlockMeeting {
   invitees: string[] // email addresses the invite was sent to
 }
 
+export type TimeBlockRecurrence = 'daily' | 'weekly' | 'monthly'
+
 export interface TimeBlock {
   id: string
   taskId: string | null // null = a generic focus/time block with no task
@@ -225,6 +227,12 @@ export interface TimeBlock {
   durationMin: number
   status: TimeBlockStatus
   meeting?: TimeBlockMeeting | null // set when this block is a video meeting
+  // Repeating blocks: every occurrence is a real row (materialised forward on a
+  // rolling horizon by the main process), grouped by seriesId. recurrence is
+  // carried on every occurrence so the series keeps extending from its newest
+  // row; clearing it (delete "this and future") stops the series.
+  recurrence?: TimeBlockRecurrence | null
+  seriesId?: string | null
   createdAt: number
   updatedAt: number
 }
@@ -235,6 +243,7 @@ export interface TimeBlockDraft {
   startMs: number
   durationMin: number
   meeting?: TimeBlockMeeting | null
+  recurrence?: TimeBlockRecurrence | null
 }
 
 export interface TimeBlockPatch {

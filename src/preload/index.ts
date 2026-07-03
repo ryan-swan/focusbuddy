@@ -544,7 +544,10 @@ const api = {
       ipcRenderer.invoke('timeblocks:create', draft),
     update: (id: string, patch: TimeBlockPatch): Promise<TimeBlock | null> =>
       ipcRenderer.invoke('timeblocks:update', id, patch),
-    delete: (id: string): Promise<boolean> => ipcRenderer.invoke('timeblocks:delete', id)
+    // scope 'series' removes this occurrence and everything after it in the
+    // repeating series; 'one' (default) removes just this occurrence.
+    delete: (id: string, scope?: 'one' | 'series'): Promise<boolean> =>
+      ipcRenderer.invoke('timeblocks:delete', id, scope)
   },
   vault: {
     meta: (): Promise<VaultMeta> => ipcRenderer.invoke('vault:meta'),
