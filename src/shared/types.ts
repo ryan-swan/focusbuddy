@@ -1584,11 +1584,20 @@ export interface SlideLineElement extends SlideElementBase {
   strokeWidth: number
   arrowEnd?: boolean
 }
+// A live embed of a desk widget (by id). The element stores only the reference;
+// the renderer resolves the widget's current content at view time, so the deck
+// or design never carries a stale copy. Static exports (pptx/pdf/png) render a
+// labelled placeholder frame rather than pretending to include live content.
+export interface SlideWidgetElement extends SlideElementBase {
+  type: 'widget'
+  widgetId: string
+}
 export type SlideElement =
   | SlideTextElement
   | SlideImageElement
   | SlideShapeElement
   | SlideLineElement
+  | SlideWidgetElement
 
 export interface DeckTheme {
   id: string
@@ -1641,6 +1650,7 @@ export type MapShape =
   | 'database' // cylinder — a store
   | 'circle' // connector / state
   | 'note' // free text label
+  | 'widget' // live embed of a desk widget (widgetId on the node)
 
 export interface MapNode {
   id: string
@@ -1651,6 +1661,9 @@ export interface MapNode {
   color: string
   width?: number
   height?: number
+  // Only meaningful when shape === 'widget': the desk widget this node embeds.
+  // The renderer resolves the widget live; a dangling id renders a missing state.
+  widgetId?: string
 }
 
 export interface MapEdge {

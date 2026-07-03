@@ -25,6 +25,8 @@ import { normalizeMapBody, autoLayout } from '@shared/mapGraph'
 import { mapTemplate, type MapTemplateId } from './map/mapTemplates'
 import Icon from '../Icon'
 import DrawMenuBar from './editor/DrawMenuBar'
+import WidgetEmbed from './embed/WidgetEmbed'
+import WidgetPickerDialog from './embed/WidgetPickerDialog'
 
 // PlexiMaps editor — a Draw.io / Lucidchart-style diagram and workflow map. Built
 // on React Flow but persists a clean, tool-agnostic MapBody (nodes carry their
@@ -49,7 +51,14 @@ interface ShapeData extends Record<string, unknown> {
   label: string
   shape: MapShape
   color: string
+  // Set only for shape === 'widget': the desk widget this node embeds.
+  widgetId?: string
 }
+
+// The on-canvas size of a widget-embed node. Fixed rather than resizable so it
+// behaves like the other draw shapes (which size to their content).
+const WIDGET_NODE_W = 280
+const WIDGET_NODE_H = 190
 
 const HANDLE_STYLE = { width: 9, height: 9, background: '#94a3b8', border: '2px solid #fff' }
 const SIDES: { id: string; position: Position }[] = [
@@ -72,7 +81,15 @@ function ShapeNode({ id, data, selected }: NodeProps): JSX.Element {
     'flex items-center justify-center text-center text-[12px] font-medium px-3 py-2 select-none text-stone-900 dark:text-stone-900'
   let inner: JSX.Element
 
-  if (d.shape === 'decision') {
+  if (d.shape === 'widget') {
+    // A live desk-widget embed. WidgetEmbed handles loading / missing states;
+    // a node saved without a widgetId renders the missing state honestly.
+    inner = (
+      <div className={ring} style={{ width: WIDGET_NODE_W, height: WIDGET_NODE_H }}>
+        <WidgetEmbed widgetId={d.widgetId ?? ''} />
+      </div>
+    )
+  } else if (d.shape === 'decision') {
     inner = (
       <div
         className={`${baseText} ${ring}`}
@@ -223,7 +240,7 @@ function toFlowNodes(body: MapBody): Node<ShapeData>[] {
     id: n.id,
     type: 'shape',
     position: { x: n.x, y: n.y },
-    data: { label: n.label, shape: n.shape, color: n.color }
+    data: { label: n.label, shape: n.shape, color: n.color, ...(n.widgetId ? { widgetId: n.widgetId } : {}) }
   }))
 }
 function edgeStyle(e: MapEdge): React.CSSProperties {
@@ -257,7 +274,8 @@ function fromFlow(
       y: Math.round(n.position.y),
       label: n.data.label,
       shape: n.data.shape,
-      color: n.data.color
+      color: n.data.color,
+      ...(n.data.widgetId ? { widgetId: n.data.widgetId } : {})
     })),
     edges: edges.map((e) => ({
       id: e.id,
@@ -286,6 +304,7 @@ function MapInner({ body, onChange }: Props): JSX.Element {
   const [color, setColor] = useState(NODE_COLORS[0])
   const [dashed, setDashed] = useState(false)
   const [aiOpen, setAiOpen] = useState(false)
+  const [widgetPickerOpen, setWidgetPickerOpen] = useState(false)
   const seq = useRef(initial.nodes.length)
   const viewportRef = useRef(initial.viewport ?? { x: 0, y: 0, zoom: 1 })
   const rf = useReactFlow()
@@ -360,6 +379,24 @@ function MapInner({ body, onChange }: Props): JSX.Element {
     ])
   }
 
+  // Drop a live desk-widget embed near the viewport centre. The node stores
+  // only the widget id; WidgetEmbed resolves the current content at render.
+  function addWidgetNode(widgetId: string): void {
+    const id = newId('n')
+    const center = rf.screenToFlowPosition
+      ? rf.screenToFlowPosition({ x: window.innerWidth / 2, y: window.innerHeight / 2 })
+      : { x: 160, y: 120 }
+    setNodes((ns) => [
+      ...ns,
+      {
+        id,
+        type: 'shape',
+        position: { x: center.x - WIDGET_NODE_W / 2, y: center.y - WIDGET_NODE_H / 2 },
+        data: { label: '', shape: 'widget', color, widgetId }
+      }
+    ])
+  }
+
   // Edge label edit on double-click.
   const onEdgeDoubleClick = useCallback(
     (_: React.MouseEvent, edge: Edge) => {
@@ -401,6 +438,7 @@ function MapInner({ body, onChange }: Props): JSX.Element {
           actions={{
             shapes: SHAPE_TOOLS.map((t) => ({ shape: t.shape, label: t.label })),
             addNode,
+            insertWidget: () => setWidgetPickerOpen(true),
             fitView: () => rf.fitView({ padding: 0.2, duration: 300 })
           }}
         />
@@ -499,6 +537,16 @@ function MapInner({ body, onChange }: Props): JSX.Element {
       </div>
 
       {aiOpen && <AiMapPanel onClose={() => setAiOpen(false)} onApply={loadBody} />}
+
+      {widgetPickerOpen && (
+        <WidgetPickerDialog
+          onPick={(widgetId) => {
+            setWidgetPickerOpen(false)
+            addWidgetNode(widgetId)
+          }}
+          onClose={() => setWidgetPickerOpen(false)}
+        />
+      )}
     </div>
   )
 }

@@ -24,6 +24,7 @@ import { useRegisterEditorCommands, type EditorCommand } from '../../stores/edit
 import type { Doc as YDoc } from 'yjs'
 import type { Awareness } from 'y-protocols/awareness'
 import Icon from '../Icon'
+import WidgetPickerDialog from './embed/WidgetPickerDialog'
 
 // Focus mode dims every block except the one under the cursor, so a long draft
 // collapses to the single sentence being written. The FocusBlock decoration tags
@@ -151,6 +152,7 @@ export default function DocEditor({
   const [aiInstruction, setAiInstruction] = useState('')
   const [busyOffice, setBusyOffice] = useState<string | null>(null)
   const [officeMsg, setOfficeMsg] = useState<string | null>(null)
+  const [widgetPickerOpen, setWidgetPickerOpen] = useState(false)
 
   // Parse the (possibly legacy) body once into the Tiptap doc + named heading
   // styles + page setup. The body is persisted wrapped as { doc, headingStyles,
@@ -241,6 +243,7 @@ export default function DocEditor({
         insertImage: () => void insertImage(),
         insertTable: () =>
           editor?.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run(),
+        insertWidget: () => setWidgetPickerOpen(true),
         importDocx: () => void importDocx(),
         exportDocx: () => void exportDocx(),
         exportPdf: () => void exportPdf()
@@ -383,6 +386,7 @@ export default function DocEditor({
               editor={editor}
               title={title}
               onInsertImage={() => void insertImage()}
+              onInsertWidget={() => setWidgetPickerOpen(true)}
               onExportDocx={() => void exportDocx()}
               onExportPdf={() => void exportPdf()}
               onFind={() => setFindOpen(true)}
@@ -686,6 +690,16 @@ export default function DocEditor({
       )}
       </div>
 
+      {widgetPickerOpen && (
+        <WidgetPickerDialog
+          onPick={(widgetId) => {
+            setWidgetPickerOpen(false)
+            editor.chain().focus().insertWidgetEmbed(widgetId).run()
+          }}
+          onClose={() => setWidgetPickerOpen(false)}
+        />
+      )}
+
       {showPanel && (
         <DocSidePanel
           editor={editor}
@@ -889,6 +903,7 @@ interface DocCommandHandlers {
   rewriteAi: () => void
   insertImage: () => void
   insertTable: () => void
+  insertWidget: () => void
   importDocx: () => void
   exportDocx: () => void
   exportPdf: () => void
@@ -929,6 +944,7 @@ function buildDocCommands(editor: Editor | null, h: DocCommandHandlers): EditorC
     // Insert
     { id: 'doc-insert-image', label: 'Insert image', icon: 'image', group: 'Insert', keywords: 'picture photo', run: h.insertImage },
     { id: 'doc-insert-table', label: 'Insert table', icon: 'table_chart', group: 'Insert', keywords: 'grid', run: h.insertTable },
+    { id: 'doc-insert-widget', label: 'Insert widget from a desk', icon: 'widgets', group: 'Insert', keywords: 'embed desk canvas', run: h.insertWidget },
     // Find
     { id: 'doc-find', label: 'Find and replace', icon: 'search', shortcut: '⌘F', group: 'Edit', keywords: 'search replace', run: h.openFind },
     // AI

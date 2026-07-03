@@ -6,6 +6,7 @@
 import type { SlideElement, SlideTextElement } from '@shared/types'
 import { fillToCss } from '@shared/fills'
 import { cropStyle } from './slideOps'
+import WidgetEmbed from '../embed/WidgetEmbed'
 
 // Drop-shadow presets, soft enough to read as depth rather than a hard edge.
 const SHADOW: Record<NonNullable<SlideElement['shadow']>, string> = {
@@ -146,6 +147,15 @@ export default function SlideElementView({ el }: { el: SlideElement }): JSX.Elem
           border: borderCss(el.border)
         }}
       />
+    )
+  }
+  if (el.type === 'widget') {
+    // A live desk-widget embed. WidgetEmbed resolves the widget itself and
+    // renders honest loading / missing states, so nothing is faked here.
+    return (
+      <div style={{ ...base, ...frame(el) }}>
+        <WidgetEmbed widgetId={el.widgetId} />
+      </div>
     )
   }
   // line: drawn as the diagonal of its box (top-left to bottom-right)

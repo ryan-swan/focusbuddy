@@ -510,6 +510,11 @@ function elementHtml(el: SlideElement): string {
       typeof radius === 'number' ? radius + 'px' : radius
     };${border(el.border)}"></div>`
   }
+  if (el.type === 'widget') {
+    // Static export cannot include the live widget (it resolves through the
+    // renderer's IPC), so export an honest labelled frame instead of a fake.
+    return `<div style="${base}border:1px solid #d6d3d1;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#a8a29e;font-size:12px;font-family:system-ui,sans-serif">Embedded desk widget</div>`
+  }
   // line
   return `<div style="${base}"><svg width="100%" height="100%" viewBox="0 0 ${el.w} ${el.h}" preserveAspectRatio="none">${
     el.arrowEnd

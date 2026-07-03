@@ -31,6 +31,7 @@ interface Props {
   // DocEditor owns these because they touch its local state (page setup, panels,
   // the office export busy indicator). The menu just triggers them.
   onInsertImage: () => void
+  onInsertWidget: () => void
   onExportDocx: () => void
   onExportPdf: () => void
   onFind: () => void
@@ -45,6 +46,7 @@ export default function DocMenuBar({
   editor,
   title,
   onInsertImage,
+  onInsertWidget,
   onExportDocx,
   onExportPdf,
   onFind,
@@ -201,6 +203,7 @@ export default function DocMenuBar({
       build: () => [
         { kind: 'item', label: 'Image', icon: 'image', run: onInsertImage },
         { kind: 'item', label: 'Table', icon: 'grid_on', run: () => chain().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run() },
+        { kind: 'item', label: 'Widget from a desk', icon: 'widgets', run: onInsertWidget },
         { kind: 'item', label: 'Link', shortcut: '⌘K', icon: 'link', run: insertLink },
         { kind: 'item', label: 'Horizontal line', icon: 'horizontal_rule', run: () => chain().setHorizontalRule().run() },
         { kind: 'sep' },

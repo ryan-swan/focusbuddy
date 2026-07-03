@@ -35,6 +35,7 @@ import {
 } from './slides/slideOps'
 import { useRegisterEditorCommands, type EditorCommand } from '../../stores/editorCommands'
 import Icon from '../Icon'
+import WidgetPickerDialog from './embed/WidgetPickerDialog'
 
 // PowerPoint-class slides editor. The deck is held as v2 (element-based) in local
 // state; legacy decks migrate on mount. The rail manages slides, the canvas edits
@@ -62,6 +63,7 @@ export default function SlidesEditor({ body: rawBody, title, onChange }: Props):
   const [cropId, setCropId] = useState<string | null>(null)
   const [aiOpen, setAiOpen] = useState(false)
   const [galleryOpen, setGalleryOpen] = useState(false)
+  const [widgetPickerOpen, setWidgetPickerOpen] = useState(false)
   const [status, setStatus] = useState<string | null>(null)
   const [canvasW, setCanvasW] = useState(720)
   const [panelTab, setPanelTab] = useState<SlidesPanelTab>('slide')
@@ -269,6 +271,13 @@ export default function SlidesEditor({ body: rawBody, title, onChange }: Props):
     mutateSlide((s) => addElement(s, el))
     setSelectedIds([el.id])
   }
+  // Insert a live desk-widget embed sized like a content card. The element only
+  // stores the widget id; rendering resolves the current content every time.
+  function insertWidget(widgetId: string): void {
+    const el: SlideElement = { id: elementId(), type: 'widget', widgetId, x: 400, y: 200, w: 480, h: 320, z: 10 }
+    mutateSlide((s) => addElement(s, el))
+    setSelectedIds([el.id])
+  }
   function applyLayout(layout: SlideLayout): void {
     mutateSlide((s) => ({ ...s, layout, elements: layoutElements(layout, theme) }))
     setSelectedIds([])
@@ -461,6 +470,7 @@ export default function SlidesEditor({ body: rawBody, title, onChange }: Props):
         { id: 'sl-ellipse', label: 'Insert ellipse', icon: 'circle', group: 'Insert', keywords: 'oval circle', run: () => insertShape('ellipse') },
         { id: 'sl-image', label: 'Insert image', icon: 'image', group: 'Insert', keywords: 'picture photo', run: () => void insertImage() },
         { id: 'sl-line', label: 'Insert line', icon: 'horizontal_rule', group: 'Insert', keywords: 'arrow connector', run: insertLine },
+        { id: 'sl-widget', label: 'Insert widget from a desk', icon: 'widgets', group: 'Insert', keywords: 'embed desk canvas', run: () => setWidgetPickerOpen(true) },
         { id: 'sl-new', label: 'New slide', icon: 'add_to_photos', group: 'Slide', keywords: 'add template', run: () => setGalleryOpen(true) },
         { id: 'sl-present', label: 'Present deck', icon: 'play_arrow', group: 'Slide', keywords: 'slideshow play', run: () => setPresenting(true) },
         { id: 'sl-ai', label: 'AI: generate or redesign slides', icon: 'auto_awesome', group: 'AI', keywords: 'design make beautiful', run: () => setAiOpen(true) },
@@ -531,6 +541,7 @@ export default function SlidesEditor({ body: rawBody, title, onChange }: Props):
             insertImage: () => void insertImage(),
             insertShape,
             insertLine,
+            insertWidget: () => setWidgetPickerOpen(true),
             align: (dir) => doAlign(dir),
             group: doGroup,
             ungroup: doUngroup,
@@ -701,6 +712,16 @@ export default function SlidesEditor({ body: rawBody, title, onChange }: Props):
 
       {galleryOpen && (
         <SlideTemplateGallery theme={theme} onPick={addSlideFromTemplate} onClose={() => setGalleryOpen(false)} />
+      )}
+
+      {widgetPickerOpen && (
+        <WidgetPickerDialog
+          onPick={(widgetId) => {
+            setWidgetPickerOpen(false)
+            insertWidget(widgetId)
+          }}
+          onClose={() => setWidgetPickerOpen(false)}
+        />
       )}
 
       {presenting && <PresentOverlay slides={slides} theme={theme} startIndex={slideIdx} onClose={() => setPresenting(false)} />}

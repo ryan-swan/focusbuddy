@@ -2010,7 +2010,10 @@ export async function generateDocument(input: {
         data: '#0891b2',
         database: '#16a34a',
         circle: '#7c3aed',
-        note: '#475569'
+        note: '#475569',
+        // Not offered to the AI (the prompt enumerates its own shapes); listed
+        // only to keep this record total over MapShape.
+        widget: '#6d5dfc'
       }
       const coloured = norm.nodes.map((n) => ({ ...n, color: SHAPE_COLOR[n.shape] || n.color }))
       const body = { ...norm, nodes: autoLayout(coloured, norm.edges) }
