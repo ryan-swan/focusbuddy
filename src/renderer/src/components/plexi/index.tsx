@@ -188,6 +188,51 @@ export function StatusPill({ tone, label, dot = true }: { tone: PillTone; label:
   )
 }
 
+// ── List row ─────────────────────────────────────────────────────────────────
+// The flat list-row idiom: rounded, token-driven hover, accent-tinted active
+// state. Content can be supplied structurally (icon / title / trailing) or as
+// free-form children for rows with richer interiors.
+export function ListRow({
+  as: Tag = 'div',
+  icon,
+  depth = 0,
+  active = false,
+  title,
+  trailing,
+  onClick,
+  className = '',
+  children
+}: {
+  as?: 'div' | 'li'
+  icon?: string
+  depth?: number
+  active?: boolean
+  title?: ReactNode
+  trailing?: ReactNode
+  onClick?: () => void
+  className?: string
+  children?: ReactNode
+}): JSX.Element {
+  return (
+    <Tag
+      onClick={onClick}
+      style={depth > 0 ? { paddingLeft: depth * 14 + 8 } : undefined}
+      className={`flex items-center gap-2 rounded-lg transition-colors ${
+        active ? 'bg-[rgb(var(--accent)/0.10)]' : 'hover:bg-[var(--surface-sunken)]'
+      } ${className}`}
+    >
+      {icon && <Icon name={icon} size={16} className="shrink-0 text-[var(--ink-50)]" />}
+      {title != null && (
+        <span className="flex-1 min-w-0 truncate text-sm text-[var(--ink-90)]">{title}</span>
+      )}
+      {children}
+      {trailing != null && (
+        <span className="ml-auto shrink-0 inline-flex items-center gap-1.5">{trailing}</span>
+      )}
+    </Tag>
+  )
+}
+
 // ── Inline chart primitives ─────────────────────────────────────────────────
 // Tiny, dependency-free SVG charts for use inside tiles, headers and rail cards.
 // They render real values only; with no data they return null (Sparkline/MiniBars)

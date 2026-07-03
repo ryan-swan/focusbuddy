@@ -2453,9 +2453,10 @@ export default function Canvas(): JSX.Element {
           )}
           {widgets.length === 0 && (
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              <p className="text-sm text-stone-500">
-                Drag an object from the palette onto the desk.
-              </p>
+              <div className="fb-glass-panel rounded-full px-4 py-2 inline-flex items-center gap-2 text-[var(--ink-50)]">
+                <Icon name="widgets" size={16} />
+                <p className="text-sm">Drag an object from the palette onto the desk.</p>
+              </div>
             </div>
           )}
           <LinkDragContext.Provider value={linkDragController}>

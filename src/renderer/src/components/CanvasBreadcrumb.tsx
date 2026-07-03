@@ -48,7 +48,7 @@ export default function CanvasBreadcrumb({
     >
       <button
         onClick={onHome}
-        className="inline-flex items-center justify-center h-6 w-6 rounded text-stone-500 hover:bg-stone-200/70 dark:hover:bg-stone-700/70 shrink-0"
+        className="inline-flex items-center justify-center h-6 w-6 rounded text-[var(--ink-70)] hover:bg-[var(--surface-sunken)] shrink-0"
         title="Workspace home"
         aria-label="Workspace home"
       >
@@ -59,10 +59,10 @@ export default function CanvasBreadcrumb({
         const isFolder = n.kind === 'folder'
         return (
           <span key={n.id} className="inline-flex items-center gap-0.5 shrink-0">
-            <Icon name="chevron_right" size={15} className="text-stone-400 dark:text-stone-500" />
+            <Icon name="chevron_right" size={15} className="text-[var(--ink-50)]" />
             {isLast ? (
               <span
-                className="inline-flex items-center gap-1.5 px-1.5 py-0.5 font-semibold text-stone-900 dark:text-stone-100 max-w-[280px]"
+                className="inline-flex items-center gap-1.5 px-1.5 py-0.5 font-semibold text-[var(--ink-100)] max-w-[280px]"
                 data-testid="breadcrumb-current"
               >
                 <Icon
@@ -75,14 +75,14 @@ export default function CanvasBreadcrumb({
             ) : (
               <button
                 onClick={() => (isFolder ? onRevealFolder(n.id) : onOpenTask(n.id))}
-                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-stone-600 dark:text-stone-400 hover:bg-stone-200/70 dark:hover:bg-stone-700/70 hover:text-stone-900 dark:hover:text-stone-100 max-w-[200px]"
+                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[var(--ink-70)] hover:bg-[var(--surface-sunken)] hover:text-[var(--ink-100)] max-w-[200px]"
                 title={isFolder ? `Reveal “${n.title}” in the sidebar` : `Open “${n.title}”`}
                 data-testid={`breadcrumb-${n.id}`}
               >
                 <Icon
                   name={isFolder ? 'folder' : 'task_alt'}
                   size={13}
-                  className="text-stone-400 dark:text-stone-500 shrink-0"
+                  className="text-[var(--ink-50)] shrink-0"
                 />
                 <span className="truncate">{n.title || '(untitled)'}</span>
               </button>

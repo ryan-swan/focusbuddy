@@ -38,7 +38,9 @@
   --ink-100: oklch(15% 0.012 264);     /* primary body */
   --ink-90: oklch(28% 0.011 264);      /* secondary */
   --ink-70: oklch(46% 0.010 264);      /* tertiary, meta */
+  --ink-60: oklch(54% 0.009 264);      /* between meta and placeholder */
   --ink-50: oklch(62% 0.008 264);      /* placeholder, disabled */
+  --ink-40: oklch(70% 0.007 264);      /* faint meta, section eyebrows */
   --ink-30: oklch(78% 0.006 264);      /* hairlines, dim */
   --ink-10: oklch(94% 0.004 264);      /* surface tone */
 
@@ -121,7 +123,9 @@
   --ink-100: oklch(96% 0.005 264);
   --ink-90: oklch(86% 0.006 264);
   --ink-70: oklch(72% 0.008 264);
+  --ink-60: oklch(64% 0.009 264);
   --ink-50: oklch(56% 0.010 264);
+  --ink-40: oklch(47% 0.011 264);
   --ink-30: oklch(38% 0.012 264);
   --ink-10: oklch(22% 0.015 264);
 
@@ -186,7 +190,9 @@
   --ink-100: oklch(95% 0.012 80);
   --ink-90: oklch(85% 0.014 80);
   --ink-70: oklch(70% 0.016 80);
+  --ink-60: oklch(62% 0.017 80);
   --ink-50: oklch(54% 0.018 80);
+  --ink-40: oklch(45% 0.019 80);
   --ink-30: oklch(36% 0.020 80);
   --ink-10: oklch(22% 0.024 250);
 

@@ -4,6 +4,7 @@ import { useNodeStore } from '../stores/nodes'
 import { useViewStore } from '../stores/view'
 import DeskMiniature from './DeskMiniature'
 import Icon from './Icon'
+import { DashboardHeader, PLEXI_CARD } from './plexi'
 
 // Shown when no desk is open (Canvas has no active node). A "desk" is a canvas —
 // the same thing under one name — so rather than a dead-end "your desk is clear"
@@ -66,9 +67,9 @@ export default function DeskGallery(): JSX.Element {
     return (
       <div className="h-full flex items-center justify-center desk-paper">
         <div className="text-center max-w-md px-6">
-          <Icon name="desk" size={48} className="text-stone-400 dark:text-stone-500 mb-3" />
-          <h2 className="text-xl font-semibold text-stone-900 dark:text-stone-100 mb-2">No desks yet</h2>
-          <p className="text-stone-600 dark:text-stone-300 text-sm leading-relaxed mb-4">
+          <Icon name="desk" size={48} className="text-[var(--ink-50)] mb-3" />
+          <h2 className="text-xl font-semibold text-[var(--ink-100)] mb-2">No desks yet</h2>
+          <p className="text-[var(--ink-70)] text-sm leading-relaxed mb-4">
             A desk is a canvas you fill with notes, files, browsers and tools. Create your first one to get started.
           </p>
           <button
@@ -86,10 +87,10 @@ export default function DeskGallery(): JSX.Element {
   return (
     <div className="h-full overflow-auto desk-paper" data-testid="desk-gallery">
       <div className="max-w-[1100px] mx-auto px-6 py-8">
-        <h2 className="text-[20px] font-semibold text-stone-900 dark:text-stone-100">Your desks</h2>
-        <p className="text-[13px] text-stone-500 dark:text-stone-400 mb-5">
-          Every desk is a canvas. Open one to bring its notes, files and tools to the surface.
-        </p>
+        <DashboardHeader
+          title="Your desks"
+          subtitle="Every desk is a canvas. Open one to bring its notes, files and tools to the surface."
+        />
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
           {desks.map((d) => {
             const ws = widgetsByDesk[d.id] ?? []
@@ -101,9 +102,9 @@ export default function DeskGallery(): JSX.Element {
                 key={d.id}
                 onClick={() => openDesk(d)}
                 data-testid={`desk-card-${d.id}`}
-                className="group text-left rounded-2xl border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 overflow-hidden hover:border-[rgb(var(--accent)/0.5)] hover:shadow-sm transition"
+                className={`group text-left ${PLEXI_CARD} overflow-hidden fb-lift hover:border-[rgb(var(--accent)/0.5)]`}
               >
-                <div className="h-36 flex items-center justify-center overflow-hidden bg-stone-100/70 dark:bg-stone-800/50 border-b border-stone-200 dark:border-stone-800">
+                <div className="h-36 flex items-center justify-center overflow-hidden bg-[var(--surface-sunken)] border-b border-[var(--edge-soft)]">
                   <DeskMiniature widgets={ws} width={320} height={144} />
                 </div>
                 <div className="px-3 py-2 flex items-center gap-2">
@@ -111,12 +112,12 @@ export default function DeskGallery(): JSX.Element {
                     name={d.kind === 'folder' ? 'folder' : 'task_alt'}
                     size={16}
                     filled
-                    className={d.kind === 'folder' ? 'text-amber-700 shrink-0' : 'text-stone-500 shrink-0'}
+                    className={d.kind === 'folder' ? 'text-amber-700 shrink-0' : 'text-[var(--ink-50)] shrink-0'}
                   />
-                  <span className="flex-1 min-w-0 truncate text-[13px] font-medium text-stone-800 dark:text-stone-100">
+                  <span className="flex-1 min-w-0 truncate text-[13px] font-medium text-[var(--ink-100)]">
                     {d.title || 'Untitled desk'}
                   </span>
-                  <span className="text-[11px] text-stone-400 dark:text-stone-500 fb-tabular shrink-0">
+                  <span className="text-[11px] text-[var(--ink-50)] fb-tabular shrink-0">
                     {count === 0 ? 'empty' : count}
                   </span>
                 </div>
@@ -126,7 +127,7 @@ export default function DeskGallery(): JSX.Element {
           <button
             onClick={newDesk}
             data-testid="desk-card-new"
-            className="rounded-2xl border border-dashed border-stone-300 dark:border-stone-600 flex flex-col items-center justify-center gap-2 min-h-[180px] text-stone-500 dark:text-stone-400 hover:border-[rgb(var(--accent)/0.5)] hover:text-[rgb(var(--accent))] transition"
+            className="rounded-xl border border-dashed border-[var(--edge-firm)] flex flex-col items-center justify-center gap-2 min-h-[180px] text-[var(--ink-50)] fb-lift hover:border-[rgb(var(--accent)/0.5)] hover:text-[rgb(var(--accent))]"
           >
             <Icon name="add" size={22} />
             <span className="text-[13px] font-medium">New desk</span>
