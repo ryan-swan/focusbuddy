@@ -113,6 +113,14 @@ export function applyRemote(items: RemoteItem[]): { applied: number } {
         continue
       }
       if (!item.body || typeof item.body !== 'object') continue
+      // Echo/stale suppression: the pull window includes items this device just
+      // pushed (the cursor only advances after the pull). Re-applying an echo is
+      // what made the whole desk visibly reload every sync cycle, so skip any
+      // item whose rev we already have locally.
+      const local = db.prepare(`SELECT sync_rev FROM ${table} WHERE id = ?`).get(item.id) as
+        | { sync_rev: number | null }
+        | undefined
+      if (local && (local.sync_rev ?? -1) >= item.rev) continue
       // Upsert every column present in both the body and the table; set the sync
       // bookkeeping to "clean at this rev" so we never re-push what we just pulled.
       const cols = tableCols(table)

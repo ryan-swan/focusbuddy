@@ -1157,6 +1157,13 @@ const api = {
     delete: (id: string): Promise<boolean> => ipcRenderer.invoke('tables:delete', id),
     listRows: (tableId: string): Promise<FbRow[]> =>
       ipcRenderer.invoke('tables:listRows', tableId),
+    // Fires whenever ANY writer (flows, forms, the local REST API, templates,
+    // or this window) changes a table's rows, so cached views can refetch.
+    onRowsChanged: (cb: (tableId: string) => void): (() => void) => {
+      const listener = (_e: unknown, tableId: string): void => cb(tableId)
+      ipcRenderer.on('tables:rowsChanged', listener)
+      return () => ipcRenderer.removeListener('tables:rowsChanged', listener)
+    },
     createRow: (draft: FbRowDraft): Promise<FbRow> =>
       ipcRenderer.invoke('tables:createRow', draft),
     updateRow: (id: string, patch: FbRowPatch): Promise<FbRow | null> =>
@@ -1740,6 +1747,9 @@ const api = {
     }
   },
   app: {
+    // Keep the native window background in step with the theme.
+    setBackgroundColor: (hex: string): Promise<boolean> =>
+      ipcRenderer.invoke('app:setBackgroundColor', hex),
     // Whether this launch followed an update (authoritative; main-process
     // persisted). Drives the first-run "What's new" modal.
     getLaunchInfo: (): Promise<{
