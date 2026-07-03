@@ -98,6 +98,18 @@ export async function exportPptx(body: SlidesBody, _title: string, outPath: stri
             ...frame,
             line: { color: hex(el.stroke, hex(theme.accent)), width: el.strokeWidth, endArrowType: el.arrowEnd ? 'triangle' : 'none' }
           })
+        } else if (el.type === 'widget') {
+          // A live desk-widget embed has no static form here; keep the frame in
+          // the layout with an honest label rather than fake widget content.
+          s.addText('Embedded desk widget', {
+            ...pos,
+            ...frame,
+            fontSize: 10,
+            color: 'A8A29E',
+            align: 'center',
+            valign: 'middle',
+            line: { color: 'D6D3D1', width: 1 }
+          })
         }
       }
       if (slide.notes) s.addNotes(slide.notes)
@@ -144,8 +156,11 @@ function slideHtml(slide: Slide, theme: DeckTheme): string {
         const clip = el.shape === 'triangle' ? 'clip-path:polygon(50% 0,0 100%,100% 100%);' : ''
         return `<div style="position:absolute;left:${el.x}px;top:${el.y}px;width:${el.w}px;height:${el.h}px;background:${el.fill?.type === 'solid' ? el.fill.color : 'transparent'};border-radius:${radius};${clip}${el.border ? `border:${el.border.width}px ${el.border.style ?? 'solid'} ${el.border.color}` : ''}"></div>`
       }
-      // line
-      return `<svg style="position:absolute;left:${el.x}px;top:${el.y}px" width="${el.w}" height="${el.h}"><line x1="0" y1="0" x2="${el.w}" y2="${el.h}" stroke="${el.stroke}" stroke-width="${el.strokeWidth}"/></svg>`
+      if (el.type === 'line')
+        return `<svg style="position:absolute;left:${el.x}px;top:${el.y}px" width="${el.w}" height="${el.h}"><line x1="0" y1="0" x2="${el.w}" y2="${el.h}" stroke="${el.stroke}" stroke-width="${el.strokeWidth}"/></svg>`
+      // widget: a live desk-widget embed cannot be rendered in a static export
+      // (it resolves via renderer IPC), so print an honest labelled frame.
+      return `<div style="position:absolute;left:${el.x}px;top:${el.y}px;width:${el.w}px;height:${el.h}px;border:1px solid #d6d3d1;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#a8a29e;font-size:14px">Embedded desk widget</div>`
     })
     .join('')
   return `<div class="page" style="position:relative;width:${SLIDE_W}px;height:${SLIDE_H}px;background:${bg};overflow:hidden;color:${theme.textColor}">${els}</div>`

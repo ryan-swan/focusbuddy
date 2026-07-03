@@ -28,6 +28,7 @@ import { TableKit } from '@tiptap/extension-table'
 import { Markdown } from 'tiptap-markdown'
 import { createLowlight, common } from 'lowlight'
 import { ResizableImage } from './ResizableImage'
+import { WidgetEmbedNode } from '../embed/WidgetEmbedNode'
 import { SlashCommand } from './SlashMenu'
 import { SearchHighlight } from './searchHighlight'
 import { FocusBlock } from './focusBlock'
@@ -97,7 +98,11 @@ export function buildDocExtensions(opts: BuildOptions = {}): AnyExt[] {
     Markdown.configure({ html: true, transformPastedText: true, transformCopiedText: false }) as AnyExt,
     // Comment anchors. Always present so a doc carrying comment marks renders the
     // highlight; the thread bodies live on the server.
-    CommentMark as AnyExt
+    CommentMark as AnyExt,
+    // Desk-widget embeds. In BOTH branches: the schema must be shared with the
+    // headless converters or a document carrying an embed would lose it on an
+    // HTML round trip. Headless use only exercises renderHTML/parseHTML.
+    WidgetEmbedNode as AnyExt
   ]
 
   if (interactive) {

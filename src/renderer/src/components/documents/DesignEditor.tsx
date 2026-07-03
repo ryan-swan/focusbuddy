@@ -39,6 +39,7 @@ import { GOOGLE_FONTS, loadGoogleFont, fontFamilyValue, familyLabel } from '../.
 import DesignAiPanel from './DesignAiPanel'
 import DesignMenuBar from './editor/DesignMenuBar'
 import { useAccountStore } from '../../stores/account'
+import WidgetPickerDialog from './embed/WidgetPickerDialog'
 
 // PlexiDesign — the on-platform design studio. A design is a single arbitrary-size
 // canvas of the same elements a slide uses, so this editor reuses the proven slide
@@ -95,6 +96,7 @@ export default function DesignEditor({ content, title, onChange }: Props): JSX.E
   const [status, setStatus] = useState<string | null>(null)
   const [canvasW, setCanvasW] = useState(640)
   const [brandOpen, setBrandOpen] = useState(false)
+  const [widgetPickerOpen, setWidgetPickerOpen] = useState(false)
   // The right-side AI Assistant panel, persistent and collapsible to match the
   // other Office editors. Open by default so the assistant is discoverable.
   const [aiPanelOpen, setAiPanelOpen] = useState(true)
@@ -325,6 +327,24 @@ export default function DesignEditor({ content, title, onChange }: Props): JSX.E
   async function addImageFromFile(): Promise<void> {
     const res = await window.api.office.pickImage()
     if (res.ok && res.dataUrl) placeImage(res.dataUrl)
+  }
+
+  // Place a live desk-widget embed on the canvas. Only the id is stored; the
+  // renderer resolves the widget's current content every time.
+  function addWidget(widgetId: string): void {
+    const w = Math.round(design.width * 0.4)
+    const el: SlideElement = {
+      id: elementId(),
+      type: 'widget',
+      widgetId,
+      x: Math.round(design.width * 0.3),
+      y: Math.round(design.height * 0.3),
+      w,
+      h: Math.round(w * 0.7),
+      z: topZ + 1
+    }
+    mutate((s) => addElement(s, el))
+    setSelectedIds([el.id])
   }
 
   // Drop the brand logo onto the canvas. If no brand logo is set, open the brand
@@ -584,6 +604,7 @@ export default function DesignEditor({ content, title, onChange }: Props): JSX.E
             addShape,
             addLine,
             addImageFromFile: () => void addImageFromFile(),
+            addWidget: () => setWidgetPickerOpen(true),
             removeBgSelected: () => void removeBgSelected(),
             exportAs: (f) => void exportAs(f)
           }}
@@ -1026,6 +1047,16 @@ export default function DesignEditor({ content, title, onChange }: Props): JSX.E
       </div>
 
       {brandOpen && <BrandKitModal onClose={() => setBrandOpen(false)} />}
+
+      {widgetPickerOpen && (
+        <WidgetPickerDialog
+          onPick={(widgetId) => {
+            setWidgetPickerOpen(false)
+            addWidget(widgetId)
+          }}
+          onClose={() => setWidgetPickerOpen(false)}
+        />
+      )}
 
       {variations.length > 0 && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 p-6" onClick={() => setVariations([])} data-testid="design-variations-modal">

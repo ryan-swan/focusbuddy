@@ -11,7 +11,10 @@ export const MAP_SHAPES: MapShape[] = [
   'data',
   'database',
   'circle',
-  'note'
+  'note',
+  // A live desk-widget embed; carries widgetId on the node. Inserted from the
+  // editor's Insert menu, never proposed by the AI generator.
+  'widget'
 ]
 
 const VALID_SHAPES = new Set<string>(MAP_SHAPES)
@@ -54,7 +57,10 @@ export function normalizeMapBody(raw: unknown): MapBody {
       shape: VALID_SHAPES.has(c.shape as string) ? (c.shape as MapShape) : 'process',
       color: typeof c.color === 'string' && c.color ? c.color : '#2563eb',
       ...(Number.isFinite(c.width) ? { width: c.width as number } : {}),
-      ...(Number.isFinite(c.height) ? { height: c.height as number } : {})
+      ...(Number.isFinite(c.height) ? { height: c.height as number } : {}),
+      // Preserve widget references. Dropping this would silently unlink every
+      // widget node on load, so it is part of the normaliser's whitelist.
+      ...(typeof c.widgetId === 'string' && c.widgetId ? { widgetId: c.widgetId } : {})
     })
   }
   const ids = new Set(nodes.map((n) => n.id))
