@@ -125,6 +125,8 @@ const api = {
     listByKind: (kind: Widget['kind']): Promise<Widget[]> =>
       ipcRenderer.invoke('widgets:listByKind', kind),
     create: (draft: WidgetDraft): Promise<Widget> => ipcRenderer.invoke('widgets:create', draft),
+    createOptional: (draft: WidgetDraft): Promise<Widget | null> =>
+      ipcRenderer.invoke('widgets:createOptional', draft),
     update: (id: string, patch: WidgetPatch): Promise<Widget | null> =>
       ipcRenderer.invoke('widgets:update', id, patch),
     delete: (id: string): Promise<boolean> => ipcRenderer.invoke('widgets:delete', id),

@@ -142,6 +142,18 @@ export function createWidget(draft: WidgetDraft): Widget {
   return rowToWidget(row)
 }
 
+// Best-effort create for auto-spawned chrome (the minimap): if the parent task
+// no longer exists (a desk switch or a trash landed between the renderer
+// deciding to create and this running), return null instead of letting the
+// task_id foreign key throw a raw SQLite error into the main log. Real,
+// user-driven creates keep using createWidget so genuine bugs stay loud.
+export function createWidgetIfTaskExists(draft: WidgetDraft): Widget | null {
+  const db = getDb()
+  const exists = db.prepare('SELECT 1 FROM nodes WHERE id = ?').get(draft.taskId)
+  if (!exists) return null
+  return createWidget(draft)
+}
+
 export function updateWidget(id: string, patch: WidgetPatch): Widget | null {
   const db = getDb()
   const fields: string[] = []
