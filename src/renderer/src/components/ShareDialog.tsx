@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { showCopyFallback } from './plexi/PromptDialog'
+import Modal from './plexi/Modal'
 import { createPortal } from 'react-dom'
 import type {
   ShareableKind,
@@ -144,19 +145,7 @@ export default function ShareDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Esc closes — stabilise onClose with a ref so the listener doesn't
-  // re-bind on every parent re-render.
-  const onCloseRef = useRef(onClose)
-  useEffect(() => {
-    onCloseRef.current = onClose
-  }, [onClose])
-  useEffect(() => {
-    function onKey(e: KeyboardEvent): void {
-      if (e.key === 'Escape') onCloseRef.current()
-    }
-    document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
-  }, [])
+  // Escape and backdrop close are handled by the Modal wrapper.
 
   async function copyToClipboard(text: string, linkId: string): Promise<void> {
     try {
@@ -225,16 +214,12 @@ export default function ShareDialog({
   }
 
   return createPortal(
-    <div
-      className="fixed inset-0 z-[260] bg-stone-900/40 backdrop-blur-[2px] flex items-center justify-center"
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onClose()
-      }}
+    <Modal
+      onClose={onClose}
+      label={`Share this ${KIND_LABEL[kind]}`}
+      z={260}
+      className="w-[460px] max-h-[80vh] rounded-lg bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-700 shadow-2xl flex flex-col"
     >
-      <div
-        className="w-[460px] max-h-[80vh] rounded-lg bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-700 shadow-2xl flex flex-col"
-        onMouseDown={(e) => e.stopPropagation()}
-      >
         <div className="flex items-center gap-2 px-4 py-3 border-b border-stone-200 dark:border-stone-700">
           <div className="h-8 w-8 rounded-full bg-accent/10 inline-flex items-center justify-center">
             <Icon name="share" size={16} className="text-accent" />
@@ -479,8 +464,7 @@ export default function ShareDialog({
             <em>Sidebar → Shared with me → Paste a share link</em>).
           </div>
         </div>
-      </div>
-    </div>,
+    </Modal>,
     document.body
   )
 }

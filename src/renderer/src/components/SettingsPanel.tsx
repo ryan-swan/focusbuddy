@@ -133,9 +133,22 @@ export default function SettingsPanel({
     }
   }, [onClose])
 
+  // Move focus into the popover when it opens so keyboard users land inside it
+  // rather than being left on the trigger. The first control is the close
+  // button in the header.
+  useEffect(() => {
+    const first = ref.current?.querySelector<HTMLElement>(
+      'input, textarea, select, button, [tabindex]:not([tabindex="-1"])'
+    )
+    first?.focus()
+  }, [])
+
   return (
     <div
       ref={ref}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Settings"
       className="fixed z-[200] w-96 max-h-[80vh] overflow-y-auto rounded-lg bg-stone-50 dark:bg-stone-900 border border-stone-200 dark:border-stone-700 shadow-2xl backdrop-blur"
       style={{ top: anchorY, right: window.innerWidth - anchorX }}
     >

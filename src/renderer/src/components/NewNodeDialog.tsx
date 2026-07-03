@@ -250,8 +250,17 @@ export default function NewNodeDialog({
       onClick={onClose}
     >
       <form
+        role="dialog"
+        aria-modal="true"
+        aria-label={dialogTitle}
         onSubmit={handleSubmit}
         onClick={(e) => e.stopPropagation()}
+        onKeyDown={(e) => {
+          if (e.key === 'Escape') {
+            e.stopPropagation()
+            onClose()
+          }
+        }}
         className="fb-glass-pillow rounded-xl w-full max-w-xl mx-4 overflow-hidden max-h-[90vh] flex flex-col"
       >
         <div className="px-5 py-4 border-b border-[var(--edge-soft)] flex items-center gap-2 shrink-0">

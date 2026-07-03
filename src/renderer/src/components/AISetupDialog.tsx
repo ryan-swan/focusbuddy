@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import type { FbNode, WidgetSuggestion } from '@shared/types'
 import { catalogFor } from '../lib/widgetCatalog'
 import Icon from './Icon'
+import Modal from './plexi/Modal'
 
 interface Props {
   task: FbNode
@@ -17,14 +18,6 @@ type State =
 
 export default function AISetupDialog({ task, onClose, onAccept }: Props): JSX.Element {
   const [state, setState] = useState<State>({ stage: 'loading' })
-
-  useEffect(() => {
-    function onKey(e: KeyboardEvent): void {
-      if (e.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
 
   useEffect(() => {
     let cancelled = false
@@ -73,14 +66,12 @@ export default function AISetupDialog({ task, onClose, onAccept }: Props): JSX.E
   const selectedCount = state.stage === 'ready' ? state.selected.size : 0
 
   return (
-    <div
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-stone-900/55 backdrop-blur-md p-6"
-      onClick={onClose}
+    <Modal
+      onClose={onClose}
+      label="Let me set up your desk"
+      z={60}
+      className="bg-white dark:bg-stone-900 rounded-lg shadow-2xl border border-stone-200 dark:border-stone-700 w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden"
     >
-      <div
-        className="bg-white dark:bg-stone-900 rounded-lg shadow-2xl border border-stone-200 dark:border-stone-700 w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden"
-        onClick={(e) => e.stopPropagation()}
-      >
         <div className="px-5 py-3 border-b border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 flex items-center gap-2">
           <Icon name="auto_awesome" size={20} className="text-accent" />
           <div className="flex-1 min-w-0">
@@ -219,7 +210,6 @@ export default function AISetupDialog({ task, onClose, onAccept }: Props): JSX.E
             </button>
           )}
         </div>
-      </div>
-    </div>
+    </Modal>
   )
 }

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import Icon from './Icon'
+import Modal from './plexi/Modal'
 import { PRICING_URL } from '../lib/siteUrls'
 import {
   useStoredTier,
@@ -96,15 +97,13 @@ function TierPickerModal({ onClose }: { onClose: () => void }): JSX.Element {
     stayOnFree() // record acknowledgment so we don't immediately re-pop
   }
   return (
-    <div
-      className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-6"
-      onClick={onClose}
-      data-testid="tier-picker-modal"
+    <Modal
+      onClose={onClose}
+      label="Pick a plan"
+      z={9999}
+      className="bg-white dark:bg-stone-900 rounded-xl shadow-2xl border border-stone-200 dark:border-stone-700 max-w-md w-full p-6"
+      testId="tier-picker-modal"
     >
-      <div
-        className="bg-white dark:bg-stone-900 rounded-xl shadow-2xl border border-stone-200 dark:border-stone-700 max-w-md w-full p-6"
-        onClick={(e) => e.stopPropagation()}
-      >
         <div className="flex items-center justify-between mb-2">
           <h2 className="text-base font-semibold text-stone-900 dark:text-stone-100">
             Pick a plan
@@ -154,8 +153,7 @@ function TierPickerModal({ onClose }: { onClose: () => void }): JSX.Element {
             See pricing
           </button>
         </div>
-      </div>
-    </div>
+    </Modal>
   )
 }
 

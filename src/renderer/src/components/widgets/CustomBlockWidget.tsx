@@ -260,7 +260,7 @@ export default function CustomBlockWidget({ widget, inline = false }: Props): JS
                     </button>
                     <button
                       onClick={() => deleteTemplate(t.id)}
-                      className="opacity-0 group-hover/tpl:opacity-100 text-stone-400 hover:text-rose-500"
+                      className="opacity-0 group-hover/tpl:opacity-100 group-focus-within/tpl:opacity-100 text-stone-400 hover:text-rose-500"
                       aria-label="Delete template"
                     >
                       <Icon name="delete" size={13} />
