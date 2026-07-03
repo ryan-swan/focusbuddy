@@ -34,7 +34,7 @@ test('ONB-1 — a fresh install sees onboarding, can skip through, and it never 
 
   // Welcome → skip the key → tour → start blank.
   await window.getByRole('button', { name: 'Get started' }).click()
-  await window.getByRole('button', { name: 'Skip for now' }).click()
+  await window.locator('[data-testid="onboarding-key-skip"]').click()
   await expect(window.locator('[data-testid="onboarding-tour"]')).toBeVisible()
   await window.locator('[data-testid="onboarding-tour-continue"]').click()
   await window.locator('[data-testid="onboarding-start-blank"]').click()
@@ -54,7 +54,7 @@ test('ONB-2 — creating the starter workspace seeds a real folder and closes on
   await expect(onboarding(launched)).toBeVisible({ timeout: 8000 })
 
   await window.getByRole('button', { name: 'Get started' }).click()
-  await window.getByRole('button', { name: 'Skip for now' }).click()
+  await window.locator('[data-testid="onboarding-key-skip"]').click()
   await window.locator('[data-testid="onboarding-tour-continue"]').click()
   await window.locator('[data-testid="onboarding-create-starter"]').click()
 

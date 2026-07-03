@@ -73,6 +73,7 @@ export default function SettingsPanel({
   const ref = useRef<HTMLDivElement | null>(null)
   const goOrg = useViewStore((s) => s.goOrg)
   const [studioOpen, setStudioOpen] = useState(false)
+  const [advancedOpen, setAdvancedOpen] = useState(false)
   const [devTier, setDevTierState] = useState<TierId | null>(() => readDevForcedTier())
   const [sound, setSound] = useState<SoundPrefs>(() => getSoundPrefs())
   const [modelMode, setModelMode] = useModelMode()
@@ -135,12 +136,12 @@ export default function SettingsPanel({
   return (
     <div
       ref={ref}
-      className="fixed z-[200] w-80 max-h-[80vh] overflow-y-auto rounded-lg bg-stone-50 dark:bg-stone-900 border border-stone-200 dark:border-stone-700 shadow-2xl backdrop-blur"
+      className="fixed z-[200] w-96 max-h-[80vh] overflow-y-auto rounded-lg bg-stone-50 dark:bg-stone-900 border border-stone-200 dark:border-stone-700 shadow-2xl backdrop-blur"
       style={{ top: anchorY, right: window.innerWidth - anchorX }}
     >
       <div className="px-3 py-2 border-b border-stone-200 dark:border-stone-700 flex items-center justify-between">
         <span className="text-[11px] uppercase tracking-[0.12em] text-stone-500 dark:text-stone-400 font-medium">
-          Appearance
+          Settings
         </span>
         <button onClick={onClose} className="icon-btn" aria-label="Close settings">
           <Icon name="close" size={14} />
@@ -261,6 +262,42 @@ export default function SettingsPanel({
         )}
       </div>
 
+      <AccountSection />
+
+      <OrganisationSection
+        onManage={() => {
+          goOrg()
+          onClose()
+        }}
+      />
+
+      <ApiKeysSection />
+
+      <BackupSection />
+
+      <PrivacyHelpSection />
+
+      {/* Advanced — the tuning surfaces most people never touch (sounds,
+          haptics, model routing, voice, templates, sync, navigation). Collapsed
+          by default so the everyday settings above stay a short, plain list;
+          the review found the old flat panel buried theme/account/backup under
+          developer-flavoured detail. */}
+      <div className="px-3 py-2 border-t border-stone-200 dark:border-stone-700">
+        <button
+          onClick={() => setAdvancedOpen((v) => !v)}
+          aria-expanded={advancedOpen}
+          data-testid="settings-advanced-toggle"
+          className="w-full flex items-center gap-1.5 py-1 text-[12px] font-medium text-stone-600 dark:text-stone-300 hover:text-stone-900 dark:hover:text-stone-100"
+        >
+          <Icon name={advancedOpen ? 'expand_more' : 'chevron_right'} size={15} />
+          <span>Advanced</span>
+          <span className="ml-auto text-[11px] font-normal text-stone-400 dark:text-stone-500">
+            sounds, AI model, voice, more
+          </span>
+        </button>
+      </div>
+      {advancedOpen && (
+        <>
       <div className="px-3 py-3 border-t border-stone-200 dark:border-stone-700 space-y-2">
         <div className="text-[11px] uppercase tracking-[0.12em] text-stone-500 dark:text-stone-400 font-medium mb-1">
           Sounds
@@ -503,26 +540,11 @@ export default function SettingsPanel({
         </div>
       </div>
 
-      <AccountSection />
+          <TemplatesSection />
 
-      <OrganisationSection
-        onManage={() => {
-          goOrg()
-          onClose()
-        }}
-      />
+          <DocumentsSyncSection />
 
-      <TemplatesSection />
-
-      <DocumentsSyncSection />
-
-      <ApiKeysSection />
-
-      <BackupSection />
-
-      <NavigationSection />
-
-      <PrivacyHelpSection />
+          <NavigationSection />
 
       {voicePrefs && (
         <div className="px-3 py-3 border-t border-stone-200 dark:border-stone-700 space-y-3">
@@ -610,8 +632,12 @@ export default function SettingsPanel({
         </div>
       )}
 
-      <div className="px-3 py-2 border-t border-stone-200 dark:border-stone-700 bg-stone-100/50 dark:bg-stone-800/50 text-[10px] text-stone-500 dark:text-stone-500">
-        Preferences saved locally. Click sounds in browser widgets aren't captured yet — only in stickies, notes, chat, and dialogs.
+        </>
+      )}
+
+
+      <div className="px-3 py-2 border-t border-stone-200 dark:border-stone-700 bg-stone-100/50 dark:bg-stone-800/50 text-[11px] text-stone-600 dark:text-stone-400">
+        Preferences saved locally.
       </div>
 
       {studioOpen && (

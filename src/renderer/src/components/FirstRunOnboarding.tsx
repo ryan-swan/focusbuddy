@@ -144,10 +144,12 @@ export default function FirstRunOnboarding(): JSX.Element | null {
 
         {step === 1 && (
           <div className="px-6 py-6">
-            <h2 className="text-xl font-semibold mb-2">Connect AI</h2>
+            <h2 className="text-xl font-semibold mb-2">Turn on the AI helper (optional)</h2>
             <p className="text-[13px] text-stone-300 leading-relaxed mb-3">
-              The build-with-AI features use your own Anthropic key, so you stay in control of cost
-              and data. Paste a key to switch them on. You can also do this later in Settings.
+              Everything in PlexiDesk works without this step, so feel free to skip it. The AI
+              features run on a personal access key from Anthropic, which keeps you in control of
+              cost and data. If someone set PlexiDesk up for you, ask them for the key; otherwise the
+              link below walks you through getting one. You can always add it later in Settings.
             </p>
             <button
               onClick={() => void window.api.files.openExternal(ANTHROPIC_KEYS_URL)}
@@ -183,9 +185,10 @@ export default function FirstRunOnboarding(): JSX.Element | null {
             <div className="flex items-center justify-between mt-6">
               <button
                 onClick={() => setStep(2)}
-                className="text-[13px] text-stone-400 hover:text-stone-200"
+                className="btn-ghost !text-[13px]"
+                data-testid="onboarding-key-skip"
               >
-                Skip for now
+                <span>Skip, set up AI later</span>
               </button>
               <div className="flex items-center gap-2">
                 {keyStatus.kind === 'ok' ? (
@@ -220,16 +223,22 @@ export default function FirstRunOnboarding(): JSX.Element | null {
             <h2 className="text-xl font-semibold mb-2">What is inside</h2>
             <p className="text-[13px] text-stone-300 leading-relaxed mb-4">
               Everything lives in the left sidebar. Here is the quick map so you know where to reach
-              for each thing.
+              for each thing. If you belong to more than one organisation, the switcher at the top of
+              the sidebar swaps the whole workspace between them.
             </p>
             <div className="grid grid-cols-2 gap-2.5" data-testid="onboarding-tour">
               {[
+                // Keep this map in step with the live 3-segment IA (PlexiDesk /
+                // PlexiOffice / PlexiBrain); the review flagged that it had
+                // fallen behind the suite and newer surfaces were undiscoverable.
                 { icon: 'dashboard', name: 'Home & Tasks', blurb: 'Your desks and to-dos, each with its own glass canvas.' },
                 { icon: 'description', name: 'Documents', blurb: 'Word, Excel and PowerPoint-class docs, sheets and slides.' },
                 { icon: 'folder', name: 'Files', blurb: 'A folder library for any file, with views and sorting.' },
                 { icon: 'calendar_month', name: 'Calendar', blurb: 'Time-block your day and plan focus sessions.' },
                 { icon: 'mail', name: 'Mail', blurb: 'Read and reply to email, and turn any message into a task.' },
-                { icon: 'lock', name: 'Vault', blurb: 'Encrypted passwords and secrets, with auto-fill.' }
+                { icon: 'forum', name: 'Chat, calls & meetings', blurb: 'Message teammates, jump on a call, meet from any document.' },
+                { icon: 'public', name: 'People Map', blurb: 'See who is online across your organisation, and where.' },
+                { icon: 'lock', name: 'Vault & Sign', blurb: 'Encrypted passwords, plus documents sent for signature.' }
               ].map((s) => (
                 <div key={s.name} className="flex gap-2.5 rounded-lg bg-white/5 border border-white/10 px-3 py-2.5">
                   <Icon name={s.icon} size={18} className="text-accent shrink-0 mt-0.5" />
