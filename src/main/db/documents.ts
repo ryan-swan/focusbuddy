@@ -121,13 +121,25 @@ function rowToMeta(row: Omit<DocumentRow, 'body'>): DocumentMeta {
   }
 }
 
-/** All non-archived documents, newest-edited first (metadata only). */
+/** All non-archived, non-trashed documents, newest-edited first (metadata only). */
 export function listDocuments(): DocumentMeta[] {
   const db = getDb()
   const rows = db
     .prepare(
       `SELECT id, doc_type, title, archived, created_at, updated_at
-       FROM documents WHERE archived = 0 AND org_id = ? ORDER BY updated_at DESC`
+       FROM documents WHERE archived = 0 AND trashed_at IS NULL AND org_id = ? ORDER BY updated_at DESC`
+    )
+    .all(getActiveOrgId()) as Omit<DocumentRow, 'body'>[]
+  return rows.map(rowToMeta)
+}
+
+/** Trashed documents for the active org, newest-deleted first. */
+export function listTrashedDocuments(): DocumentMeta[] {
+  const db = getDb()
+  const rows = db
+    .prepare(
+      `SELECT id, doc_type, title, archived, created_at, updated_at
+       FROM documents WHERE trashed_at IS NOT NULL AND org_id = ? ORDER BY trashed_at DESC`
     )
     .all(getActiveOrgId()) as Omit<DocumentRow, 'body'>[]
   return rows.map(rowToMeta)
@@ -214,11 +226,36 @@ export function upsertDocument(input: {
   return getDocument(input.id) as FbDocument
 }
 
+// Soft-delete: the document moves to the Documents Trash and disappears from
+// every list, search index and Drive reference, but the row survives so the
+// user can restore it. This is what the editors' "Move to trash" actually does.
+export function trashDocument(id: string): boolean {
+  const db = getDb()
+  const info = db.prepare('UPDATE documents SET trashed_at = ? WHERE id = ? AND trashed_at IS NULL').run(Date.now(), id)
+  // The semantic vector goes too so AI retrieval never surfaces trashed work;
+  // restoreDocument re-embeds.
+  if (info.changes > 0) deleteEmbedding('document', id)
+  return info.changes > 0
+}
+
+/** Undo of trashDocument. The caller re-embeds (embedDocument) after restore. */
+export function restoreDocument(id: string): boolean {
+  const db = getDb()
+  const info = db.prepare('UPDATE documents SET trashed_at = NULL WHERE id = ? AND trashed_at IS NOT NULL').run(id)
+  return info.changes > 0
+}
+
+// Permanent delete, used by the Trash view's "Delete forever" and by cloud-sync
+// driven removals. Also prunes any Drive reference to the document so no
+// dangling fb_files row survives it.
 export function deleteDocument(id: string): boolean {
   const db = getDb()
   const info = db.prepare('DELETE FROM documents WHERE id = ?').run(id)
-  // Remove the document's semantic vector on the same path, so no delete route
-  // leaves an orphaned embedding behind.
-  if (info.changes > 0) deleteEmbedding('document', id)
+  if (info.changes > 0) {
+    // Remove the document's semantic vector on the same path, so no delete route
+    // leaves an orphaned embedding behind.
+    deleteEmbedding('document', id)
+    db.prepare("DELETE FROM fb_files WHERE kind = 'doc' AND doc_id = ?").run(id)
+  }
   return info.changes > 0
 }

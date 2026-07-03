@@ -36,10 +36,14 @@ function relTime(ms: number): string {
 
 export default function DocumentsView(): JSX.Element {
   const list = useDocumentsStore((s) => s.list)
+  const trashed = useDocumentsStore((s) => s.trashed)
   const refresh = useDocumentsStore((s) => s.refresh)
+  const refreshTrashed = useDocumentsStore((s) => s.refreshTrashed)
   const createWithAI = useDocumentsStore((s) => s.createWithAI)
   const createBlank = useDocumentsStore((s) => s.createBlank)
   const remove = useDocumentsStore((s) => s.remove)
+  const restore = useDocumentsStore((s) => s.restore)
+  const purge = useDocumentsStore((s) => s.purge)
   const goDocument = useViewStore((s) => s.goDocument)
   const goLiveDoc = useViewStore((s) => s.goLiveDoc)
   const token = useAccountStore((s) => s.sessionToken)
@@ -49,14 +53,16 @@ export default function DocumentsView(): JSX.Element {
   const [audience, setAudience] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [showTrash, setShowTrash] = useState(false)
 
   useEffect(() => {
     void refresh()
+    void refreshTrashed()
     // Backfill document embeddings so "ask your workspace" grounds by meaning.
     // Best-effort and silent: with no embedding key it is a no-op and grounding
     // stays keyword-based.
     void window.api.documents.reindex()
-  }, [refresh])
+  }, [refresh, refreshTrashed])
 
   // Turn a local document into a live, shared one and open it. Its current body
   // becomes the server-canonical copy; from there it's check-out collaborative.
@@ -208,10 +214,11 @@ export default function DocumentsView(): JSX.Element {
                   <button
                     onClick={(e) => {
                       e.stopPropagation()
-                      if (confirm(`Delete "${d.title}"? This cannot be undone.`)) void remove(d.id)
+                      // Recoverable: lands in the Trash below, with an Undo toast.
+                      void remove(d.id)
                     }}
-                    className="text-stone-400 hover:text-red-500 p-1"
-                    title="Delete"
+                    className="text-stone-400 hover:text-red-500 p-1 focus-visible:opacity-100"
+                    title="Move to trash (recoverable below)"
                   >
                     <Icon name="delete" size={15} />
                   </button>
@@ -221,6 +228,60 @@ export default function DocumentsView(): JSX.Element {
           </div>
         )}
         {/* Live, shared documents now live in their own Collaborations section. */}
+
+        {/* Trash — soft-deleted documents. Restore any time, or delete forever. */}
+        {trashed.length > 0 && (
+          <div className="mt-6">
+            <button
+              onClick={() => setShowTrash((v) => !v)}
+              className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-stone-500 dark:text-stone-400 hover:text-stone-700 dark:hover:text-stone-200"
+              aria-expanded={showTrash}
+            >
+              <Icon name={showTrash ? 'expand_more' : 'chevron_right'} size={15} />
+              Trash ({trashed.length})
+            </button>
+            {showTrash && (
+              <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {trashed.map((d) => (
+                  <div
+                    key={d.id}
+                    className="flex items-center gap-3 rounded-xl border border-dashed border-stone-300 dark:border-stone-700 bg-white/40 dark:bg-stone-900/40 px-3.5 py-3"
+                  >
+                    <div className="h-9 w-9 rounded-lg bg-stone-200/60 dark:bg-stone-800 text-stone-400 inline-flex items-center justify-center shrink-0">
+                      <Icon name={typeIcon(d.docType)} size={17} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[13px] font-medium text-stone-500 dark:text-stone-400 truncate line-through decoration-stone-300 dark:decoration-stone-600">
+                        {d.title}
+                      </div>
+                      <div className="text-[11px] text-stone-400 dark:text-stone-500">In trash</div>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => void restore(d.id)}
+                        className="text-stone-400 hover:text-accent p-1"
+                        title="Restore"
+                        data-testid="doc-restore"
+                      >
+                        <Icon name="restore_from_trash" size={15} />
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (confirm(`Delete "${d.title}" forever? This cannot be undone.`)) void purge(d.id)
+                        }}
+                        className="text-stone-400 hover:text-red-500 p-1"
+                        title="Delete forever"
+                        data-testid="doc-purge"
+                      >
+                        <Icon name="delete_forever" size={15} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   )

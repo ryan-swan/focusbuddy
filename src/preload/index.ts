@@ -1337,7 +1337,12 @@ const api = {
       ipcRenderer.invoke('documents:create', draft),
     update: (id: string, patch: DocumentPatch): Promise<FbDocument | null> =>
       ipcRenderer.invoke('documents:update', id, patch),
+    // Soft-delete into the Documents Trash (restorable); purge is the only
+    // permanent removal, from the Trash view's "Delete forever".
     delete: (id: string): Promise<boolean> => ipcRenderer.invoke('documents:delete', id),
+    listTrashed: (): Promise<DocumentMeta[]> => ipcRenderer.invoke('documents:listTrashed'),
+    restore: (id: string): Promise<boolean> => ipcRenderer.invoke('documents:restore', id),
+    purge: (id: string): Promise<boolean> => ipcRenderer.invoke('documents:purge', id),
     // Insert-or-replace by explicit id (used by cloud-document sync to land a
     // server document under its own id).
     upsert: (input: {
