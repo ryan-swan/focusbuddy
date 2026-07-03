@@ -1329,6 +1329,9 @@ const api = {
       ipcRenderer.on('mail:newMail', listener)
       return () => ipcRenderer.removeListener('mail:newMail', listener)
     },
+    // Move a message to the account's archive mailbox.
+    archive: (uid: number): Promise<{ ok: boolean; error?: string }> =>
+      ipcRenderer.invoke('mail:archive', uid),
     getAccount: (): Promise<MailAccountPublic> => ipcRenderer.invoke('mail:getAccount'),
     saveAccount: (
       config: MailAccountInput
