@@ -291,6 +291,10 @@ const api = {
       ipcRenderer.invoke('livingPage:regenerate', widgetId)
   },
   ai: {
+    // Mirror a compact {id,label} snapshot of chat conversations so the main
+    // process prompt builder can offer real conversation ids to post-chat.
+    setConversationSnapshot: (convs: Array<{ id: string; label: string }>): Promise<boolean> =>
+      ipcRenderer.invoke('ai:setConversationSnapshot', convs),
     // Raw single-turn completion for the command bar's intent router. The caller
     // supplies the system prompt and receives the model's text verbatim (no
     // workspace-build envelope parsing), so the router's small intent JSON
@@ -1339,8 +1343,8 @@ const api = {
     get: (id: string): Promise<FbDocument | null> => ipcRenderer.invoke('documents:get', id),
     create: (draft: DocumentDraft): Promise<FbDocument> =>
       ipcRenderer.invoke('documents:create', draft),
-    update: (id: string, patch: DocumentPatch): Promise<FbDocument | null> =>
-      ipcRenderer.invoke('documents:update', id, patch),
+    update: (id: string, patch: DocumentPatch, snapshotLabel?: string): Promise<FbDocument | null> =>
+      ipcRenderer.invoke('documents:update', id, patch, snapshotLabel),
     // Soft-delete into the Documents Trash (restorable); purge is the only
     // permanent removal, from the Trash view's "Delete forever".
     delete: (id: string): Promise<boolean> => ipcRenderer.invoke('documents:delete', id),

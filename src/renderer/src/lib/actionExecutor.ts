@@ -17,6 +17,10 @@ import { useTablesStore } from '../stores/tables'
 import { useLinksStore } from '../stores/links'
 import { useKnowledgeStore } from '../stores/knowledge'
 import { useDocumentsStore } from '../stores/documents'
+import { useTimeBlockStore } from '../stores/timeBlocks'
+import { useMailStore } from '../stores/mail'
+import { useMessagingStore } from '../stores/messaging'
+import { useViewStore } from '../stores/view'
 import { catalogFor } from './widgetCatalog'
 import { spawnPositionFor } from './spawnPosition'
 
@@ -64,7 +68,7 @@ export async function applyProposal(
     case 'create-page':
       return applyCreatePage(proposal, ctx)
     case 'create-task':
-      return applyCreateTask(proposal)
+      return applyCreateTask(proposal, ctx)
     case 'start-focus-session':
       return applyStartFocusSession(proposal, ctx)
     case 'delete-widget':
@@ -93,10 +97,206 @@ export async function applyProposal(
       return applyCreateKnowledgeEntry(proposal)
     case 'create-document':
       return applyCreateDocument(proposal, ctx)
-    default:
-      // Exhaustive switch — TS yells if a new kind is added without a handler.
+    case 'edit-document':
+      return applyEditDocument(proposal, ctx)
+    case 'set-cell':
+      return applySetCell(proposal, ctx)
+    case 'schedule-event':
+      return applyScheduleEvent(proposal, ctx)
+    case 'compose-mail':
+      return applyComposeMail(proposal)
+    case 'post-chat':
+      return applyPostChat(proposal)
+    default: {
+      // Compile-time exhaustiveness: adding a kind to the union without a case
+      // here fails `npm run typecheck` instead of silently no-oping at Apply
+      // time (the applier owner's prerequisite 1).
+      const _exhaustive: never = proposal
+      void _exhaustive
       return { ok: false, message: 'Unknown action kind.' }
+    }
   }
+}
+
+// ── The suite-wide actions (Plexi 3.0): the AI acts beyond the canvas ────────
+
+// Minimal markdown-ish text → Tiptap nodes: '#'-prefixed lines become headings,
+// blank-line-separated runs become paragraphs. Deliberately simple — rich
+// inline marks can come later; content is never lost, only plainly formatted.
+function textToTiptapNodes(text: string): Array<Record<string, unknown>> {
+  const nodes: Array<Record<string, unknown>> = []
+  for (const chunk of text.split(/\n{2,}/)) {
+    const line = chunk.trim()
+    if (!line) continue
+    const heading = line.match(/^(#{1,3})\s+(.*)$/)
+    if (heading) {
+      nodes.push({
+        type: 'heading',
+        attrs: { level: heading[1].length },
+        content: [{ type: 'text', text: heading[2] }]
+      })
+    } else {
+      nodes.push({ type: 'paragraph', content: [{ type: 'text', text: line.replace(/\n/g, ' ') }] })
+    }
+  }
+  return nodes
+}
+
+async function applyEditDocument(
+  p: Extract<ActionProposal, { kind: 'edit-document' }>,
+  ctx: { resolvedIds?: Map<string, string> }
+): Promise<ApplyResult> {
+  let documentId = p.documentId
+  if (documentId.startsWith('$')) {
+    const resolved = ctx.resolvedIds?.get(documentId.slice(1))
+    if (!resolved) {
+      return { ok: false, message: 'Edit references a document that was not created in this batch.' }
+    }
+    documentId = resolved
+  }
+  const doc = await window.api.documents.get(documentId)
+  if (!doc) return { ok: false, message: 'That document no longer exists.' }
+  if (doc.docType !== 'doc') {
+    return { ok: false, message: 'AI edits cover written documents for now; use set-cell for sheets.' }
+  }
+  try {
+    if (p.body !== undefined) {
+      // Doc bodies come in two shapes: bare Tiptap {type:'doc',content} or the
+      // brand-kit wrapper {doc, headingStyles}. Edit the inner doc either way.
+      const raw = doc.body as Record<string, unknown>
+      const wrapped = 'doc' in raw && raw.doc && typeof raw.doc === 'object'
+      const inner = (wrapped ? raw.doc : raw) as { type?: string; content?: unknown[] }
+      const existing = Array.isArray(inner.content) ? inner.content : []
+      const incoming = textToTiptapNodes(p.body)
+      const op = p.operation ?? 'append' // least destructive default
+      const content =
+        op === 'replace' ? incoming : op === 'prepend' ? [...incoming, ...existing] : [...existing, ...incoming]
+      const nextInner = { ...inner, type: 'doc', content }
+      const nextBody = wrapped ? { ...raw, doc: nextInner } : nextInner
+      await window.api.documents.update(
+        documentId,
+        { body: nextBody as never, ...(p.title ? { title: p.title } : {}) },
+        'AI edit' // labelled snapshot: distinguishable in Version history
+      )
+    } else if (p.title) {
+      await window.api.documents.update(documentId, { title: p.title }, 'AI edit')
+    }
+    // Refresh the hub list and (if this doc is open) the editor.
+    const store = useDocumentsStore.getState()
+    await store.refresh()
+    if (store.active?.id === documentId) await store.open(documentId)
+    const what = p.operation === 'replace' ? 'Rewrote' : 'Updated'
+    return { ok: true, message: `${what} "${p.label}" — recoverable in Version history` }
+  } catch (e) {
+    return { ok: false, message: `Could not edit the document: ${e instanceof Error ? e.message : String(e)}` }
+  }
+}
+
+async function applySetCell(
+  p: Extract<ActionProposal, { kind: 'set-cell' }>,
+  ctx: { resolvedIds?: Map<string, string> }
+): Promise<ApplyResult> {
+  let tableId = p.tableId
+  if (tableId.startsWith('$')) {
+    const resolved = ctx.resolvedIds?.get(tableId.slice(1))
+    if (!resolved) return { ok: false, message: 'Cell references a table that was not created in this batch.' }
+    tableId = resolved
+  }
+  // Same widget-id fallback as add-table-row: the model may only have seen the
+  // table WIDGET's id; its content field holds the real backing-table id.
+  const maybeWidget = useWidgetStore.getState().widgets.find((w) => w.id === tableId)
+  if (maybeWidget && maybeWidget.kind === 'table' && maybeWidget.content) tableId = maybeWidget.content
+  const tablesState = useTablesStore.getState()
+  const table = await tablesState.ensureTableLoaded(tableId)
+  if (!table) return { ok: false, message: `No table with id ${tableId.slice(0, 8)}…` }
+  const byKey = new Map<string, (typeof table.schema.columns)[number]>()
+  for (const col of table.schema.columns) {
+    byKey.set(col.id, col)
+    byKey.set(col.label.toLowerCase().trim(), col)
+  }
+  const cells: Record<string, unknown> = {}
+  const unrecognised: string[] = []
+  for (const [key, raw] of Object.entries(p.cells)) {
+    const col = byKey.get(key) ?? byKey.get(key.toLowerCase().trim())
+    if (!col) {
+      unrecognised.push(key)
+      continue
+    }
+    cells[col.id] = coerceCellValue(col.type, raw, col.config)
+  }
+  if (Object.keys(cells).length === 0) {
+    return {
+      ok: false,
+      message: unrecognised.length ? `No matching columns for: ${unrecognised.join(', ')}` : 'No cell values provided.'
+    }
+  }
+  try {
+    await tablesState.updateCells(p.rowId, cells)
+    return { ok: true, message: `Updated ${Object.keys(cells).length} cell${Object.keys(cells).length === 1 ? '' : 's'} in "${table.title || 'table'}"` }
+  } catch (e) {
+    return { ok: false, message: `Could not update the row: ${e instanceof Error ? e.message : String(e)}` }
+  }
+}
+
+async function applyScheduleEvent(
+  p: Extract<ActionProposal, { kind: 'schedule-event' }>,
+  ctx: { activeTaskId: string | null; resolvedIds?: Map<string, string> }
+): Promise<ApplyResult> {
+  let taskId = p.taskId ?? null
+  if (taskId && taskId.startsWith('$')) {
+    taskId = ctx.resolvedIds?.get(taskId.slice(1)) ?? null
+  }
+  try {
+    // Goes through the store so it lands on the shared undo timeline and the
+    // open calendar refreshes.
+    const block = await useTimeBlockStore.getState().create({
+      taskId,
+      title: p.title,
+      startMs: p.startMs,
+      durationMin: p.durationMinutes,
+      recurrence: p.recurrence ?? null
+    })
+    const when = new Date(block.startMs).toLocaleString(undefined, {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit'
+    })
+    return { ok: true, message: `Scheduled "${p.title}" for ${when}${p.recurrence ? `, repeats ${p.recurrence}` : ''}` }
+  } catch (e) {
+    return { ok: false, message: `Could not schedule that: ${e instanceof Error ? e.message : String(e)}` }
+  }
+}
+
+// DRAFT ONLY: opens the composer pre-filled; the human reviews and sends.
+// Deliberately never touches the undo timeline (nothing was mutated) and never
+// sends — the same contract as PlexiDesk Mail's own reply drafts.
+async function applyComposeMail(
+  p: Extract<ActionProposal, { kind: 'compose-mail' }>
+): Promise<ApplyResult> {
+  const mail = useMailStore.getState()
+  if (!mail.account && mail.loadedAccount) {
+    return { ok: false, message: 'Connect a mailbox in Mail first — then I can pre-fill drafts.' }
+  }
+  useViewStore.getState().goMail()
+  mail.startCompose({ to: p.to, subject: p.subject, text: p.body, aiDrafted: true })
+  return { ok: true, message: 'Opened a pre-filled draft — review and send it yourself' }
+}
+
+// DRAFT ONLY: navigates to the conversation and pre-fills the chat composer.
+async function applyPostChat(
+  p: Extract<ActionProposal, { kind: 'post-chat' }>
+): Promise<ApplyResult> {
+  const messaging = useMessagingStore.getState()
+  const conv = messaging.conversations.find((c) => c.id === p.conversationId)
+  if (!conv) {
+    return { ok: false, message: 'That conversation is not in your chat list (sign in and open Chat once, then retry).' }
+  }
+  messaging.setPendingDraft({ conversationId: p.conversationId, text: p.body })
+  useViewStore.getState().goOffice('chat')
+  void messaging.setActive(p.conversationId)
+  return { ok: true, message: `Drafted a message in "${p.conversationLabel ?? 'the conversation'}" — press send yourself` }
 }
 
 // Update an existing task. taskId comes from the model's context (a real node
@@ -145,10 +345,13 @@ async function applyCreateKnowledgeEntry(
 // button makes, so it opens and edits normally.
 async function applyCreateDocument(
   p: Extract<ActionProposal, { kind: 'create-document' }>,
-  ctx: { destinationFolderId?: string | null }
+  ctx: { destinationFolderId?: string | null; resolvedIds?: Map<string, string> }
 ): Promise<ApplyResult> {
   try {
     const doc = await useDocumentsStore.getState().createBlank(p.docType, p.title)
+    // Register the real id so a sibling edit-document can reference this
+    // proposal symbolically ("$<proposalId>") in the same batch.
+    if (doc) ctx.resolvedIds?.set(p.id, doc.id)
     const label = p.docType === 'sheet' ? 'spreadsheet' : p.docType === 'slides' ? 'deck' : 'document'
     // File the new document into the meeting's folder when one was chosen, so
     // deliverables stay with the meeting rather than scattering to the root.
@@ -268,7 +471,8 @@ async function applyCreatePage(
 }
 
 async function applyCreateTask(
-  p: Extract<ActionProposal, { kind: 'create-task' }>
+  p: Extract<ActionProposal, { kind: 'create-task' }>,
+  ctx?: { resolvedIds?: Map<string, string> }
 ): Promise<ApplyResult> {
   const node = await useNodeStore.getState().create({
     parentId: p.parentId ?? null,
@@ -277,6 +481,9 @@ async function applyCreateTask(
     description: p.notes ?? ''
   })
   if (!node) return { ok: false, message: 'Could not create task.' }
+  // Register the real id so a sibling schedule-event can bind to this task
+  // symbolically in the same batch.
+  ctx?.resolvedIds?.set(p.id, node.id)
   return { ok: true, message: `Created task "${p.title}"` }
 }
 
@@ -778,6 +985,32 @@ export function describeProposal(
       return { icon: 'delete', verb: 'Remove', subject: p.label }
     case 'update-widget':
       return { icon: 'edit', verb: 'Update', subject: p.label }
+    case 'edit-document':
+      return {
+        icon: 'edit_document',
+        verb: p.operation === 'replace' ? 'Rewrite' : 'Update',
+        subject: `${p.label}${p.body ? ` · ${p.body.replace(/\s+/g, ' ').slice(0, 60)}…` : ''}`
+      }
+    case 'set-cell':
+      return {
+        icon: 'table_chart',
+        verb: 'Set cells',
+        subject: Object.entries(p.cells)
+          .slice(0, 3)
+          .map(([k, v]) => `${k} = ${v}`)
+          .join(' · ')
+      }
+    case 'schedule-event':
+      return {
+        icon: 'calendar_month',
+        verb: 'Schedule',
+        subject: `${p.title} · ${new Date(p.startMs).toLocaleString(undefined, { weekday: 'short', hour: 'numeric', minute: '2-digit' })} · ${p.durationMinutes} min${p.recurrence ? ` · ${p.recurrence}` : ''}`
+      }
+    case 'compose-mail':
+      // "Draft", never "Send": the card itself must carry the non-finality.
+      return { icon: 'drafts', verb: 'Draft email', subject: p.subject || p.to?.join(', ') || 'new message' }
+    case 'post-chat':
+      return { icon: 'chat', verb: 'Draft message', subject: p.conversationLabel ?? 'a conversation' }
     case 'create-table':
       return {
         icon: 'table_chart',

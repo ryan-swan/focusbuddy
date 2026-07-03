@@ -52,7 +52,7 @@ import {
 import { captureDocSnapshot, listDocSnapshots, restoreDocSnapshot } from '../db/docSnapshots'
 import { searchAll } from '../db/search'
 import { getActiveOrgId, setActiveOrgId } from '../db/activeOrg'
-import { generateDocument, processMeetingEnd, generateDesignContent, generateDesignVariations } from '../ai/anthropic'
+import { generateDocument, processMeetingEnd, generateDesignContent, generateDesignVariations, setConversationSnapshot } from '../ai/anthropic'
 import { generateImage } from '../imageGen'
 import { exportDesign } from '../designExport'
 import { searchStockPhotos, fetchImageDataUrl, removeBackground } from '../stockMedia'
@@ -1846,6 +1846,13 @@ export function registerIpcHandlers(): void {
     }
   })
 
+  // The renderer mirrors a compact chat-conversation snapshot so the AI
+  // prompt builder can surface real conversation ids for post-chat drafts.
+  ipcMain.handle('ai:setConversationSnapshot', (_e, convs: Array<{ id: string; label: string }>) => {
+    setConversationSnapshot(Array.isArray(convs) ? convs : [])
+    return true
+  })
+
   // ── Global search ───────────────────────────────────────────────────────
   ipcMain.handle('search:query', (_e, q: string) => searchAll(typeof q === 'string' ? q : ''))
 
@@ -1857,13 +1864,15 @@ export function registerIpcHandlers(): void {
     void embedDocument(doc.id) // best-effort index; never blocks the save
     return doc
   })
-  ipcMain.handle('documents:update', (_e, id: string, patch: DocumentPatch) => {
+  ipcMain.handle('documents:update', (_e, id: string, patch: DocumentPatch, snapshotLabel?: string) => {
     const doc = updateDocument(id, patch)
     if (doc) {
       void embedDocument(doc.id)
       // Version history: body saves accrue periodic snapshots (interval-gated
-      // and deduped inside captureDocSnapshot, so this is cheap to call).
-      if (patch.body !== undefined) captureDocSnapshot(id)
+      // and deduped inside captureDocSnapshot, so this is cheap to call). A
+      // label (e.g. "AI edit") bypasses the interval gate so the entry is
+      // distinguishable in the history panel.
+      if (patch.body !== undefined) captureDocSnapshot(id, snapshotLabel ?? '')
     }
     return doc
   })

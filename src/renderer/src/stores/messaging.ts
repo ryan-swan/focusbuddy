@@ -152,12 +152,19 @@ interface MessagingStore {
   threadsByParent: Record<string, ChatMessage[]>
   // The parent message whose thread panel is open, or null.
   activeThreadId: string | null
+  // A composer draft queued by the AI post-chat proposal: consumed (once) by
+  // ChatComposer when its conversation becomes active. Draft only — the human
+  // presses send.
+  pendingDraft: { conversationId: string; text: string } | null
 
   connect: (token: string) => Promise<void>
   disconnect: () => void
   refreshConversations: () => Promise<void>
   refreshInbox: () => Promise<void>
   openConversation: (id: string) => Promise<void>
+  setPendingDraft: (draft: { conversationId: string; text: string } | null) => void
+  /** Alias used by the AI applier: open a conversation as the active one. */
+  setActive: (id: string) => Promise<void>
   startDm: (handle: string) => Promise<{ ok: true; id: string } | { ok: false; error: string }>
   send: (body: string, attachment?: MessageAttachment | null) => Promise<void>
   react: (messageId: string, emoji: string) => Promise<void>
@@ -183,6 +190,7 @@ export const useMessagingStore = create<MessagingStore>((set, get) => ({
   messagesByConv: {},
   inboxItems: [],
   activeId: null,
+  pendingDraft: null,
   unreadTotal: 0,
   connected: false,
   typingByConv: {},
@@ -304,6 +312,10 @@ export const useMessagingStore = create<MessagingStore>((set, get) => ({
     set({ inboxItems: items })
   },
 
+  setPendingDraft: (draft) => set({ pendingDraft: draft }),
+  setActive: async (id) => {
+    await get().openConversation(id)
+  },
   openConversation: async (id) => {
     const { token } = get()
     if (!token) return
@@ -494,3 +506,13 @@ export const useMessagingStore = create<MessagingStore>((set, get) => ({
     await get().refreshInbox()
   }
 }))
+
+// Mirror the conversation list to the main process whenever it changes, so the
+// AI prompt builder can surface real conversation ids for post-chat drafts.
+// Fire-and-forget; a failed mirror only means the AI omits chat targets.
+useMessagingStore.subscribe((state, prev) => {
+  if (state.conversations === prev.conversations) return
+  void window.api.ai
+    .setConversationSnapshot(state.conversations.map((c) => ({ id: c.id, label: c.title || c.id })))
+    .catch(() => {})
+})
