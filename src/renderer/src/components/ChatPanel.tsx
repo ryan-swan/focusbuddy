@@ -485,7 +485,16 @@ function ProposalCards({
       setTimeout(() => setToast((t) => (t?.id === p.id ? null : t)), 2800)
       return
     }
-    const result = await applyProposal(p, { activeTaskId, resolvedIds: ids })
+    // A canvas handler (or its store IPC) can throw rather than return a
+    // failure envelope. Without this guard the throw skipped setBusy(null), so
+    // every Apply button stayed disabled and the panel looked frozen. Always
+    // clear busy and show an honest failure chip; the card stays for a retry.
+    let result: { ok: boolean; message: string }
+    try {
+      result = await applyProposal(p, { activeTaskId, resolvedIds: ids })
+    } catch (err) {
+      result = { ok: false, message: err instanceof Error ? err.message : 'Could not apply that action.' }
+    }
     setBusy(null)
     setToast({ id: p.id, ok: result.ok, message: result.message })
     // Only remove from the list if it succeeded. Failures stay so the user

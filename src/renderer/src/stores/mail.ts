@@ -206,14 +206,24 @@ export const useMailStore = create<MailStore>((set, get) => ({
     const from = msg.fromAddress
       ? `${msg.fromName} <${msg.fromAddress}>`
       : msg.fromName || 'Unknown sender'
-    const r = await window.api.mail.suggestReply({
-      subject: msg.subject,
-      from,
-      body: msg.text
-    })
-    // A newer open may have superseded this draft while the call was in flight.
-    if (get().draftUid !== msg.uid) return
-    set({ replyDraft: r, loadingDraft: false })
+    try {
+      const r = await window.api.mail.suggestReply({
+        subject: msg.subject,
+        from,
+        body: msg.text
+      })
+      // A newer open may have superseded this draft while the call was in flight.
+      if (get().draftUid !== msg.uid) return
+      set({ replyDraft: r, loadingDraft: false })
+    } catch (err) {
+      // The IPC itself rejected (channel error, unexpected throw). Clear the
+      // spinner and surface an honest failed draft instead of spinning forever.
+      if (get().draftUid !== msg.uid) return
+      set({
+        replyDraft: { ok: false, error: err instanceof Error ? err.message : 'Could not draft a reply.' },
+        loadingDraft: false
+      })
+    }
   }
 }))
 

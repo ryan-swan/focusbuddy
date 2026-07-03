@@ -35,6 +35,7 @@ interface Props {
 export default function DocumentEditorView({ documentId, onBack }: Props): JSX.Element {
   const active = useDocumentsStore((s) => s.active)
   const saving = useDocumentsStore((s) => s.saving)
+  const saveError = useDocumentsStore((s) => s.saveError)
   const open = useDocumentsStore((s) => s.open)
   const close = useDocumentsStore((s) => s.close)
   const saveBody = useDocumentsStore((s) => s.saveBody)
@@ -172,10 +173,21 @@ export default function DocumentEditorView({ documentId, onBack }: Props): JSX.E
           onChange={(e) => void rename(e.target.value)}
           className="flex-1 min-w-0 bg-transparent text-[14px] font-semibold text-stone-900 dark:text-stone-100 focus:outline-none"
         />
-        <span className="text-[11px] text-stone-400 dark:text-stone-500 inline-flex items-center gap-1 shrink-0">
-          <Icon name={saving ? 'sync' : 'cloud_done'} size={13} className={saving ? 'animate-spin' : 'text-emerald-500'} />
-          {saving ? 'Saving' : 'Saved'}
-        </span>
+        {saveError ? (
+          <span
+            className="text-[11px] text-red-600 dark:text-red-400 inline-flex items-center gap-1 shrink-0"
+            title="The last change could not be saved to disk. Your edits are still here; they will be retried when you next type."
+            data-testid="doc-save-error"
+          >
+            <Icon name="error_outline" size={13} />
+            Couldn&apos;t save
+          </span>
+        ) : (
+          <span className="text-[11px] text-stone-400 dark:text-stone-500 inline-flex items-center gap-1 shrink-0">
+            <Icon name={saving ? 'sync' : 'cloud_done'} size={13} className={saving ? 'animate-spin' : 'text-emerald-500'} />
+            {saving ? 'Saving' : 'Saved'}
+          </span>
+        )}
         <span className="text-[11px] text-stone-400 dark:text-stone-500 shrink-0">{typeLabel}</span>
       </div>
 
