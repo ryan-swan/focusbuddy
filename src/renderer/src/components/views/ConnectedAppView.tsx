@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { confirmDialog } from '../plexi/PromptDialog'
 import { useConnectedAppsStore } from '../../stores/connectedApps'
 import { useVaultStore } from '../../stores/vault'
 import { useViewStore } from '../../stores/view'
@@ -229,9 +230,14 @@ export default function ConnectedAppView({ appId }: Props): JSX.Element {
         </div>
         <button
           onClick={() => {
-            if (confirm(`Remove "${app.title}" from your Connected Apps?`)) {
-              void remove(app.id).then(goHome)
-            }
+            void confirmDialog({
+              title: `Remove "${app.title}"?`,
+              body: 'It disappears from Connected Apps. You can add it again any time.',
+              confirmLabel: 'Remove',
+              danger: true
+            }).then((ok) => {
+              if (ok) void remove(app.id).then(goHome)
+            })
           }}
           className="icon-btn hover:!text-red-700"
           title="Remove this app"

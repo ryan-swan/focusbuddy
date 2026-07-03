@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { confirmDialog } from '../plexi/PromptDialog'
 import type { VaultEntryStored, VaultSecret } from '@shared/types'
 import { useVaultStore } from '../../stores/vault'
 import { generateTotp, looksLikeTotpSecret } from '../../lib/totp'
@@ -450,9 +451,16 @@ function EntryRow({
           </button>
           <button
             onClick={() => {
-              if (confirm(`Delete "${entry.title}"? This can't be undone.`)) {
-                onRemove()
-              }
+              // No undo here on purpose: reversing would keep the decrypted
+              // secret alive inside an undo closure. Confirm, honestly worded.
+              void confirmDialog({
+                title: `Delete "${entry.title}"?`,
+                body: 'Vault entries are gone for good once deleted. This cannot be undone.',
+                confirmLabel: 'Delete forever',
+                danger: true
+              }).then((ok) => {
+                if (ok) onRemove()
+              })
             }}
             className="icon-btn hover:!text-red-700"
             title="Delete"

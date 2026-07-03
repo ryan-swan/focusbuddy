@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { confirmDialog } from '../plexi/PromptDialog'
 import type { DocType } from '@shared/types'
 import { useDocumentsStore } from '../../stores/documents'
 import { useViewStore } from '../../stores/view'
@@ -267,7 +268,14 @@ export default function DocumentsView(): JSX.Element {
                       </button>
                       <button
                         onClick={() => {
-                          if (confirm(`Delete "${d.title}" forever? This cannot be undone.`)) void purge(d.id)
+                          void confirmDialog({
+                            title: `Delete "${d.title}" forever?`,
+                            body: 'This removes it permanently, including from the cloud mirror. It cannot be undone.',
+                            confirmLabel: 'Delete forever',
+                            danger: true
+                          }).then((ok) => {
+                            if (ok) void purge(d.id)
+                          })
                         }}
                         className="text-stone-400 hover:text-red-500 p-1"
                         title="Delete forever"

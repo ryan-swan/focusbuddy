@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { confirmDialog } from '../plexi/PromptDialog'
 import type {
   DashboardCardKind,
   DashboardCardSize,
@@ -264,8 +265,8 @@ export default function Dashboard({
             <div className="flex items-center gap-1 shrink-0">
               {editing && (
                 <button
-                  onClick={() => {
-                    if (confirm('Reset this dashboard to the default layout?')) {
+                  onClick={async () => {
+                    if (await confirmDialog({ title: 'Reset this dashboard?', body: 'Your portlet layout returns to the default. Portlet data is untouched.', confirmLabel: 'Reset layout' }) === true) {
                       void resetLayout(dashboardKey)
                       setEditing(false)
                     }
@@ -298,8 +299,8 @@ export default function Dashboard({
           <div className="flex items-center justify-end gap-1">
             {editing && (
               <button
-                onClick={() => {
-                  if (confirm('Reset this dashboard to the default layout?')) {
+                onClick={async () => {
+                  if (await confirmDialog({ title: 'Reset this dashboard?', body: 'Your portlet layout returns to the default. Portlet data is untouched.', confirmLabel: 'Reset layout' }) === true) {
                     void resetLayout(dashboardKey)
                     setEditing(false)
                   }

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { showCopyFallback } from '../plexi/PromptDialog'
+import { confirmDialog, showCopyFallback } from '../plexi/PromptDialog'
 import type { Widget } from '@shared/types'
 import {
   STREAMDECK_COLUMNS,
@@ -563,8 +563,13 @@ export default function StreamDeckWidget({ widget, inline = false }: Props): JSX
   const importDeck = (): void => {
     fileInputRef.current?.click()
   }
-  const resetDeck = (): void => {
-    if (!window.confirm(`Reset the ${content.scope === 'universal' ? 'Universal' : 'Task'} deck? This wipes every button and folder.`)) {
+  const resetDeck = async (): Promise<void> => {
+    if (!(await confirmDialog({
+      title: `Reset the ${content.scope === 'universal' ? 'Universal' : 'Task'} deck?`,
+      body: 'This wipes every button and folder on the deck.',
+      confirmLabel: 'Reset deck',
+      danger: true
+    }))) {
       return
     }
     const fresh = emptyDeckConfig()
