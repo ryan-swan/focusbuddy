@@ -816,7 +816,7 @@ export default function TableWidget({ widget, inline = false }: Props): JSX.Elem
             {rowsReorderable && (
               <span
                 onMouseDown={(e) => rowReorder.start(e, row.id)}
-                className="widget-nodrag text-stone-300 dark:text-stone-600 hover:text-accent cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 transition-opacity"
+                className="widget-nodrag text-stone-300 dark:text-stone-600 hover:text-accent cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity"
                 title="Drag to reorder row"
               >
                 <Icon name="drag_indicator" size={12} />

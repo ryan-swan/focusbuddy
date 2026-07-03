@@ -62,6 +62,7 @@ import { useViewStore } from './stores/view'
 import { useActionHistory } from './stores/actionHistory'
 import UndoToast from './components/UndoToast'
 import { PromptDialogHost } from './components/plexi/PromptDialog'
+import ShortcutsOverlay from './components/ShortcutsOverlay'
 import './lib/timeOfDay' // side-effect: pushes --tod-* CSS vars to :root + ticks every 60s
 import './lib/modelPrefs' // side-effect: pushes user's saved model mode to main process
 import './lib/bodyDouble' // side-effect: auto-resumes Body Double mode if user had it enabled
@@ -121,6 +122,7 @@ export default function App(): JSX.Element {
   // chrome, future keyboard shortcut, future "you've been stuck for 20
   // minutes — try a body double?" nudge) without losing state.
   const [bodyDoubleOpen, setBodyDoubleOpen] = useState(false)
+  const [shortcutsOpen, setShortcutsOpen] = useState(false)
   const peerStatus = usePeerBodyDoubleStore((s) => s.status)
   const settingsBtnRef = useRef<HTMLButtonElement | null>(null)
   const activeTaskId = useNodeStore((s) => s.activeTaskId)
@@ -328,6 +330,20 @@ export default function App(): JSX.Element {
       if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'k') {
         e.preventDefault()
         toggleAiBar()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
+
+  // Cmd+/ opens the global shortcuts reference. The document editors bind the
+  // same key for their own editor-scoped panel and preventDefault when they
+  // handle it, so we only act on unclaimed presses.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent): void {
+      if ((e.metaKey || e.ctrlKey) && e.key === '/' && !e.defaultPrevented) {
+        e.preventDefault()
+        setShortcutsOpen((v) => !v)
       }
     }
     window.addEventListener('keydown', onKey)
@@ -622,6 +638,7 @@ export default function App(): JSX.Element {
       <FirstRunOnboarding />
       <UndoToast />
       <PromptDialogHost />
+      {shortcutsOpen && <ShortcutsOverlay onClose={() => setShortcutsOpen(false)} />}
       <LaunchSignInModal />
       <UpgradePromptModal />
       <MetricsOverlay />

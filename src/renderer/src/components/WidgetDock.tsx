@@ -59,7 +59,7 @@ export default function WidgetDock(): JSX.Element | null {
                   e.stopPropagation()
                   if (confirm('Remove from the desk?')) void remove(w.id)
                 }}
-                className="opacity-0 group-hover:opacity-100 absolute -top-1 -right-1 h-4 w-4 rounded-full bg-white dark:bg-stone-800 border border-stone-300 dark:border-stone-600 hover:border-red-500 dark:hover:border-red-400 hover:text-red-700 dark:hover:text-red-400 text-stone-500 dark:text-stone-400 inline-flex items-center justify-center transition-opacity"
+                className="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 absolute -top-1 -right-1 h-4 w-4 rounded-full bg-white dark:bg-stone-800 border border-stone-300 dark:border-stone-600 hover:border-red-500 dark:hover:border-red-400 hover:text-red-700 dark:hover:text-red-400 text-stone-500 dark:text-stone-400 inline-flex items-center justify-center transition-opacity"
                 aria-label="Remove"
                 title="Remove from desk"
               >

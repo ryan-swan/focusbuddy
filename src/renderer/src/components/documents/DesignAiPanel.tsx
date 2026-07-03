@@ -212,7 +212,7 @@ export default function DesignAiPanel({
               disabled={busy}
               data-testid="design-ai-improve"
             >
-              <Icon name="auto_fix_high" size={15} className="text-[rgb(var(--accent))]" />
+              <Icon name="auto_awesome" size={15} className="text-[rgb(var(--accent))]" />
               <span>Improve copy</span>
             </button>
             <button

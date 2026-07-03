@@ -199,7 +199,7 @@ export default function DocumentsView(): JSX.Element {
                   <div className="text-[13px] font-medium text-stone-900 dark:text-stone-100 truncate">{d.title}</div>
                   <div className="text-[11px] text-stone-400 dark:text-stone-500">Edited {relTime(d.updatedAt)}</div>
                 </div>
-                <div className="opacity-0 group-hover:opacity-100 flex items-center gap-1">
+                <div className="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 flex items-center gap-1">
                   <button
                     onClick={(e) => {
                       e.stopPropagation()

@@ -290,7 +290,7 @@ export default function AgentWidget({ widget }: Props): JSX.Element {
                         if (edit.profileId === p.id) set({ profileId: undefined })
                         removeProfile(p.id)
                       }}
-                      className="opacity-0 group-hover:opacity-100 text-stone-400 hover:text-red-600"
+                      className="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 text-stone-400 hover:text-red-600"
                       title="Delete profile"
                     >
                       <Icon name="delete" size={12} />

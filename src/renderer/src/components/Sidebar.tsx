@@ -132,7 +132,7 @@ function renderConnectedAppRow(
         }}
         title={app.pinned ? 'Unpin from Favourites' : 'Pin to Favourites'}
         className={`icon-btn !h-5 !w-5 transition-opacity ${
-          app.pinned ? 'opacity-100 text-accent' : 'opacity-0 group-hover:opacity-100'
+          app.pinned ? 'opacity-100 text-accent' : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100'
         }`}
       >
         <Icon name={app.pinned ? 'push_pin' : 'push_pin'} size={11} />
@@ -823,7 +823,7 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
                       )}
                       <button
                         onClick={() => void removeFromInbox(item.id)}
-                        className="icon-btn !h-5 !w-5 opacity-0 group-hover:opacity-100"
+                        className="icon-btn !h-5 !w-5 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"
                         title="Remove from Shared with me"
                       >
                         <Icon name="close" size={11} />
@@ -1073,7 +1073,7 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
                       </>
                     )}
                   </div>
-                  <div className="opacity-0 group-hover:opacity-100 flex items-center transition-opacity">
+                  <div className="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 flex items-center transition-opacity">
                     {isFolder && (
                       <>
                         <button

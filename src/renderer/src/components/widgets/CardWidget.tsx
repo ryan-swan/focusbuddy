@@ -144,7 +144,7 @@ export default function CardWidget({ widget, inline = false }: Props): JSX.Eleme
             onClick={() => setPickIcon((v) => !v)}
             onMouseDown={(e) => e.stopPropagation()}
             className={`shrink-0 h-6 w-6 inline-flex items-center justify-center rounded text-[15px] leading-none ${
-              data.icon ? '' : 'opacity-0 group-hover:opacity-100 text-stone-400 hover:bg-stone-200/60 dark:hover:bg-stone-700/60'
+              data.icon ? '' : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 text-stone-400 hover:bg-stone-200/60 dark:hover:bg-stone-700/60'
             } transition-opacity`}
             title="Card icon"
             aria-label="Card icon"
@@ -209,7 +209,7 @@ export default function CardWidget({ widget, inline = false }: Props): JSX.Eleme
       </div>
 
       {/* Accent picker (hover) */}
-      <div className="absolute top-2.5 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+      <div className="absolute top-2.5 right-2 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
         <button
           onClick={() => setPickAccent((v) => !v)}
           onMouseDown={(e) => e.stopPropagation()}

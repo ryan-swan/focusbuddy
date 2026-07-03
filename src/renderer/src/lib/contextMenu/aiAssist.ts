@@ -92,7 +92,7 @@ export function buildAiAssistContribution(ctx: MenuContext): MenuContribution | 
     section: MenuSection.AiAssist,
     priority: 30,
     label: 'Custom Prompt...',
-    icon: 'auto_fix_high',
+    icon: 'auto_awesome',
     onSelect: (c) => runAiAssist(c, 'Custom prompt', '', true)
   }
 

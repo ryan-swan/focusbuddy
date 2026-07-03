@@ -53,7 +53,7 @@ export default function SheetTabStrip({ body, onSwitch, onAdd, onRename, onDelet
                 e.stopPropagation()
                 onDelete(i)
               }}
-              className="opacity-0 group-hover:opacity-100 text-stone-400 hover:text-red-500"
+              className="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 text-stone-400 hover:text-red-500"
               title="Delete sheet"
             >
               <Icon name="close" size={11} />

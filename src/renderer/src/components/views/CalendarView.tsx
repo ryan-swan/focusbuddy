@@ -213,6 +213,15 @@ export default function CalendarView(): JSX.Element {
           </span>
         </div>
 
+        {/* Empty-month hint — the one quiet line that tells a new user what this
+            surface is for, instead of a bare grid. Only when there is truly
+            nothing: no tasks due this month and no time blocks anywhere. */}
+        {monthTasks.length === 0 && blockCount === 0 && (
+          <p className="text-[12px] text-stone-500 dark:text-stone-400 mb-2">
+            Nothing scheduled yet. Give a task a due date, or switch to Week view and drag on the grid to block time for focused work.
+          </p>
+        )}
+
         {/* Day-of-week header */}
         <div className="grid grid-cols-7 gap-1 mb-1">
           {DAY_LABELS.map((d) => (
