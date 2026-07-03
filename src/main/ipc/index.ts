@@ -1,4 +1,5 @@
 import { app, ipcMain, BrowserWindow, dialog, shell, webContents as allWebContents, type WebContents } from 'electron'
+import { detectPreviewBuild } from '../appMode'
 import { writeFile } from 'node:fs/promises'
 import { consumePendingAuthHandoff, consumePendingShareToken, consumePendingMeetRoom } from '../authProtocol'
 import {
@@ -1865,6 +1866,13 @@ export function registerIpcHandlers(): void {
       return { ok: false as const, error: explainSendError(err) }
     }
   })
+
+  // Lets the renderer know it is the side-by-side preview build, so sync
+  // layers can refuse to run against the production backend (the preview must
+  // never touch existing accounts' synced data).
+  ipcMain.handle('app:isPreviewBuild', () =>
+    detectPreviewBuild({ plexiAppEnv: process.env['PLEXI_APP'], execPath: process.execPath, appName: app.getName() })
+  )
 
   // Native window background follows the renderer theme so occlusion
   // recovery, resizes and webview surface churn expose the right colour

@@ -56,7 +56,7 @@ export function listBlocksInRange(fromMs: number, toMs: number): TimeBlock[] {
   const rows = db
     .prepare(
       `SELECT * FROM time_blocks
-       WHERE org_id = @orgId AND start_ms < @to AND (start_ms + duration_min * 60000) > @from
+       WHERE org_id = @orgId AND trashed_at IS NULL AND start_ms < @to AND (start_ms + duration_min * 60000) > @from
        ORDER BY start_ms ASC`
     )
     .all({ from: fromMs, to: toMs, orgId: getActiveOrgId() }) as TimeBlockRow[]
@@ -110,15 +110,21 @@ export function materializeRecurringBlocks(): void {
     .prepare(
       `SELECT t.* FROM time_blocks t
        JOIN (SELECT series_id, MAX(start_ms) AS max_start FROM time_blocks
-             WHERE series_id IS NOT NULL GROUP BY series_id) m
+             WHERE series_id IS NOT NULL AND trashed_at IS NULL GROUP BY series_id) m
          ON t.series_id = m.series_id AND t.start_ms = m.max_start
-       WHERE t.recurrence IS NOT NULL AND t.start_ms < @horizon`
+       WHERE t.recurrence IS NOT NULL AND t.trashed_at IS NULL AND t.start_ms < @horizon`
     )
     .all({ horizon }) as TimeBlockRow[]
   let budget = RECUR_MAX_PER_RUN
+  // Occurrence ids are DETERMINISTIC (seriesId@startMs): with multi-device
+  // sync, two devices materialising the same series produce identical rows
+  // that upsert-dedupe by id instead of duplicating, and a tombstoned
+  // (deleted) occurrence blocks its own regeneration because the row id
+  // already exists. ON CONFLICT DO NOTHING makes the whole pass idempotent.
   const insert = db.prepare(
     `INSERT INTO time_blocks (id, task_id, title, start_ms, duration_min, status, meeting_json, recurrence, series_id, created_at, updated_at, org_id)
-     VALUES (@id, @taskId, @title, @startMs, @durationMin, 'planned', NULL, @recurrence, @seriesId, @now, @now, @orgId)`
+     VALUES (@id, @taskId, @title, @startMs, @durationMin, 'planned', NULL, @recurrence, @seriesId, @now, @now, @orgId)
+     ON CONFLICT(id) DO NOTHING`
   )
   for (const head of heads) {
     let cursor = head.start_ms
@@ -127,7 +133,7 @@ export function materializeRecurringBlocks(): void {
       if (cursor >= horizon) break
       const now = Date.now()
       insert.run({
-        id: randomUUID(),
+        id: `${head.series_id}@${cursor}`,
         taskId: head.task_id,
         title: head.title,
         startMs: cursor,
@@ -182,19 +188,24 @@ export function updateTimeBlock(id: string, patch: TimeBlockPatch): TimeBlock | 
  */
 export function deleteTimeBlock(id: string, scope: 'one' | 'series' = 'one'): boolean {
   const db = getDb()
+  const now = Date.now()
   if (scope === 'series') {
     const row = db.prepare('SELECT series_id, start_ms FROM time_blocks WHERE id = ?').get(id) as
       | { series_id: string | null; start_ms: number }
       | undefined
     if (row?.series_id) {
+      // Tombstones, not hard deletes: sync propagates the deletion to other
+      // devices, and the tombstoned deterministic ids stop the materialiser
+      // regenerating the tail everywhere.
       const tx = db.transaction(() => {
-        db.prepare('DELETE FROM time_blocks WHERE series_id = ? AND start_ms >= ?').run(row.series_id, row.start_ms)
-        db.prepare('UPDATE time_blocks SET recurrence = NULL WHERE series_id = ?').run(row.series_id)
+        db.prepare('UPDATE time_blocks SET trashed_at = ?, updated_at = ? WHERE series_id = ? AND start_ms >= ? AND trashed_at IS NULL')
+          .run(now, now, row.series_id, row.start_ms)
+        db.prepare('UPDATE time_blocks SET recurrence = NULL, updated_at = ? WHERE series_id = ?').run(now, row.series_id)
       })
       tx()
       return true
     }
   }
-  const r = db.prepare('DELETE FROM time_blocks WHERE id = ?').run(id)
+  const r = db.prepare('UPDATE time_blocks SET trashed_at = ?, updated_at = ? WHERE id = ? AND trashed_at IS NULL').run(now, now, id)
   return r.changes > 0
 }

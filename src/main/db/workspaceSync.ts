@@ -7,9 +7,9 @@ import { getDb } from './database'
 // dirty state in needs_sync (set by the DB triggers in database.ts on any content
 // write, cleared here after a push or an applied pull).
 
-type SyncTable = 'nodes' | 'widgets'
-type ItemType = 'node' | 'widget'
-const TABLE: Record<ItemType, SyncTable> = { node: 'nodes', widget: 'widgets' }
+type SyncTable = 'nodes' | 'widgets' | 'time_blocks'
+type ItemType = 'node' | 'widget' | 'timeblock'
+const TABLE: Record<ItemType, SyncTable> = { node: 'nodes', widget: 'widgets', timeblock: 'time_blocks' }
 
 export interface PendingUpsert {
   id: string
@@ -70,7 +70,7 @@ export function collectPending(): { upserts: PendingUpsert[]; deletes: PendingDe
   const db = getDb()
   const upserts: PendingUpsert[] = []
   const deletes: PendingDelete[] = []
-  for (const itemType of ['node', 'widget'] as ItemType[]) {
+  for (const itemType of ['node', 'widget', 'timeblock'] as ItemType[]) {
     const table = TABLE[itemType]
     const rows = db.prepare(`SELECT * FROM ${table} WHERE needs_sync = 1`).all() as Array<
       Record<string, unknown>
@@ -96,11 +96,16 @@ export function markPushed(itemType: ItemType, id: string, rev: number): void {
 // Nodes are applied before widgets so a widget's task always exists first.
 export function applyRemote(items: RemoteItem[]): { applied: number } {
   const db = getDb()
-  const ordered = [...items].sort((a, b) => (a.itemType === b.itemType ? 0 : a.itemType === 'node' ? -1 : 1))
+  // Nodes first: widgets and time blocks may reference them by foreign key.
+  const rank = (t: ItemType): number => (t === 'node' ? 0 : 1)
+  const ordered = [...items].sort((a, b) => rank(a.itemType) - rank(b.itemType))
   let applied = 0
   const tx = db.transaction(() => {
     for (const item of ordered) {
       const table = TABLE[item.itemType]
+      // Forward compatibility: an item type this build does not know is
+      // skipped, never a crash (a newer device may sync richer types).
+      if (!table) continue
       if (item.deleted) {
         // Soft-delete locally if the row exists; keep an existing trash timestamp.
         const exists = db.prepare(`SELECT 1 FROM ${table} WHERE id = ?`).get(item.id)
@@ -134,10 +139,15 @@ export function applyRemote(items: RemoteItem[]): { applied: number } {
       const insertList = allCols.join(', ')
       const valueList = allCols.map((c) => `@${c}`).join(', ')
       const updateList = allCols.filter((c) => c !== 'id').map((c) => `${c} = @${c}`).join(', ')
-      db.prepare(
-        `INSERT INTO ${table} (${insertList}) VALUES (${valueList}) ON CONFLICT(id) DO UPDATE SET ${updateList}`
-      ).run(params)
-      applied++
+      try {
+        db.prepare(
+          `INSERT INTO ${table} (${insertList}) VALUES (${valueList}) ON CONFLICT(id) DO UPDATE SET ${updateList}`
+        ).run(params)
+        applied++
+      } catch {
+        // One bad row (e.g. a foreign key whose parent has not synced yet)
+        // must not abort the whole batch; the next cycle retries it.
+      }
     }
   })
   tx()

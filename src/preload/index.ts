@@ -1295,13 +1295,13 @@ const api = {
   // local DB. These expose the local half (collect changes, apply pulls, cursor).
   workspaceSync: {
     pending: (): Promise<{
-      upserts: Array<{ id: string; itemType: 'node' | 'widget'; body: Record<string, unknown>; baseRev: number }>
-      deletes: Array<{ id: string; itemType: 'node' | 'widget'; baseRev: number }>
+      upserts: Array<{ id: string; itemType: 'node' | 'widget' | 'timeblock'; body: Record<string, unknown>; baseRev: number }>
+      deletes: Array<{ id: string; itemType: 'node' | 'widget' | 'timeblock'; baseRev: number }>
     }> => ipcRenderer.invoke('workspace:pending'),
-    markPushed: (itemType: 'node' | 'widget', id: string, rev: number): Promise<void> =>
+    markPushed: (itemType: 'node' | 'widget' | 'timeblock', id: string, rev: number): Promise<void> =>
       ipcRenderer.invoke('workspace:markPushed', itemType, id, rev),
     applyRemote: (
-      items: Array<{ id: string; itemType: 'node' | 'widget'; body: Record<string, unknown> | null; rev: number; deleted: boolean }>
+      items: Array<{ id: string; itemType: 'node' | 'widget' | 'timeblock'; body: Record<string, unknown> | null; rev: number; deleted: boolean }>
     ): Promise<{ applied: number }> => ipcRenderer.invoke('workspace:applyRemote', items),
     getCursor: (): Promise<number> => ipcRenderer.invoke('workspace:getCursor'),
     setCursor: (n: number): Promise<void> => ipcRenderer.invoke('workspace:setCursor', n)
@@ -1757,6 +1757,8 @@ const api = {
     // Keep the native window background in step with the theme.
     setBackgroundColor: (hex: string): Promise<boolean> =>
       ipcRenderer.invoke('app:setBackgroundColor', hex),
+    // True in the side-by-side "PlexiDesk 3 Preview" build.
+    isPreviewBuild: (): Promise<boolean> => ipcRenderer.invoke('app:isPreviewBuild'),
     // Whether this launch followed an update (authoritative; main-process
     // persisted). Drives the first-run "What's new" modal.
     getLaunchInfo: (): Promise<{
