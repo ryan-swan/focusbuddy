@@ -11,6 +11,7 @@ import { useCapabilityEnabled, useCapabilityStore } from '../stores/capabilities
 import { canCreateWidget } from '../lib/gating'
 import { promptUpgrade } from '../stores/upgradePrompt'
 import { useEditorCommandStore } from '../stores/editorCommands'
+import { useDocumentsStore } from '../stores/documents'
 import { useQuickCreate } from '../stores/quickCreate'
 import { recencyRank } from '../lib/viewRecency'
 
@@ -89,6 +90,11 @@ export default function CommandCenter({
   const goPlexiBrain = useViewStore((s) => s.goPlexiBrain)
   const goDocument = useViewStore((s) => s.goDocument)
   const goKnowledge = useViewStore((s) => s.goKnowledge)
+  const goReports = useViewStore((s) => s.goReports)
+  const goForms = useViewStore((s) => s.goForms)
+  const goApps = useViewStore((s) => s.goApps)
+  const goSign = useViewStore((s) => s.goSign)
+  const goMail = useViewStore((s) => s.goMail)
   const requestCreate = useQuickCreate((s) => s.request)
   const view = useViewStore((s) => s.view)
   const activeTaskId = useNodeStore((s) => s.activeTaskId)
@@ -383,7 +389,15 @@ export default function CommandCenter({
     const createTargets: Array<{ id: string; label: string; words: string; icon: string; key: string; viewKind: string; go: () => void }> = [
       { id: 'new-project', label: 'New plan', words: 'new plan project gantt timeline create', icon: 'account_tree', key: 'projects', viewKind: 'plexidesk', go: () => goPlexiDesk('plans') },
       { id: 'new-flow', label: 'New flow', words: 'new flow automation create', icon: 'bolt', key: 'flows', viewKind: 'plexibrain', go: () => goPlexiBrain('flows') },
-      { id: 'new-meeting', label: 'Start a meeting', words: 'new meeting meet call video start', icon: 'video_call', key: 'meet', viewKind: 'office', go: () => goOffice('meet') }
+      { id: 'new-meeting', label: 'Start a meeting', words: 'new meeting meet call video start', icon: 'video_call', key: 'meet', viewKind: 'office', go: () => goOffice('meet') },
+      // The remaining createable types. Their views already consume these keys
+      // (PlexiReportsView / PlexiFormsView / PlexiBuildView / PlexiSignView /
+      // MailView), so every "New <thing>" in the app is one palette command.
+      { id: 'new-report', label: 'New report', words: 'new report insight dashboard create', icon: 'monitoring', key: 'reports', viewKind: 'plexibrain', go: goReports },
+      { id: 'new-form', label: 'New form', words: 'new form survey intake create', icon: 'assignment', key: 'forms', viewKind: 'office', go: goForms },
+      { id: 'new-app', label: 'New app', words: 'new app build no-code tool create', icon: 'construction', key: 'build', viewKind: 'plexibrain', go: goApps },
+      { id: 'new-sign', label: 'New signature request', words: 'new sign signature request esign send document create', icon: 'draw', key: 'sign', viewKind: 'office', go: goSign },
+      { id: 'compose-mail', label: 'Compose mail', words: 'new mail email compose write send message', icon: 'edit_note', key: 'mail', viewKind: 'office', go: () => goMail() }
     ]
     for (const t of createTargets) {
       items.push({
@@ -398,6 +412,31 @@ export default function CommandCenter({
           setActive(null)
           t.go()
           closePalette()
+        }
+      })
+    }
+    // Office files create directly (no quick-create detour): a blank file exists
+    // the moment the command runs and opens straight into its editor.
+    const docTargets: Array<{ id: string; label: string; words: string; icon: string; docType: 'doc' | 'sheet' | 'slides' }> = [
+      { id: 'new-document', label: 'New document', words: 'new document doc write text word create', icon: 'description', docType: 'doc' },
+      { id: 'new-sheet', label: 'New spreadsheet', words: 'new spreadsheet sheet table excel create', icon: 'table_chart', docType: 'sheet' },
+      { id: 'new-deck', label: 'New presentation', words: 'new presentation deck slides powerpoint create', icon: 'slideshow', docType: 'slides' }
+    ]
+    for (const t of docTargets) {
+      items.push({
+        id: t.id,
+        label: t.label,
+        hint: 'Create and open it',
+        icon: t.icon,
+        kind: 'action',
+        score: (q === '' ? 57 : matchScore(t.words, q)) + recBonus('office'),
+        run: () => {
+          setActive(null)
+          closePalette()
+          void useDocumentsStore
+            .getState()
+            .createBlank(t.docType)
+            .then((doc) => goDocument(doc.id))
         }
       })
     }
@@ -555,6 +594,11 @@ export default function CommandCenter({
     goPlexiBrain,
     goDocument,
     goKnowledge,
+    goReports,
+    goForms,
+    goApps,
+    goSign,
+    goMail,
     requestCreate,
     spawnWidget,
     deepHits,

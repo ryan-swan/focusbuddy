@@ -5,6 +5,7 @@ import type { MailAccountInput } from '@shared/types'
 import { threadMailbox } from '../../lib/mailThreads'
 import Icon from '../Icon'
 import ComposeDialog from '../ComposeDialog'
+import { useQuickCreate } from '../../stores/quickCreate'
 import EmailTaskDialog from '../mail/EmailTaskDialog'
 
 // Mail — the IMAP email inbox. The user connects their own mailbox (Gmail,
@@ -521,6 +522,16 @@ export default function MailView(): JSX.Element {
   useEffect(() => {
     if (deepUid && account) void openMessage(deepUid)
   }, [deepUid, account, openMessage])
+
+  // Palette quick-create ("Compose mail" from Cmd+K anywhere): open the
+  // composer once the account is loaded. Without an account the setup form is
+  // showing, so the request is consumed and dropped rather than left pending.
+  const quickPending = useQuickCreate((s) => s.pending)
+  useEffect(() => {
+    if (quickPending === 'mail' && loaded && useQuickCreate.getState().consume('mail')) {
+      if (account) startCompose()
+    }
+  }, [quickPending, loaded, account, startCompose])
 
   // Group the inbox into conversation threads (Gmail-style), newest first.
   const threads = useMemo(() => threadMailbox(messages), [messages])
