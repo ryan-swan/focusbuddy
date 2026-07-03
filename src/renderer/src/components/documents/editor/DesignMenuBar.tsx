@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { openDocHistory } from '../DocHistoryPanel'
-import { promptText } from '../../plexi/PromptDialog'
+import { confirmDialog, promptText } from '../../plexi/PromptDialog'
 import { useDocumentsStore } from '../../../stores/documents'
 import { useViewStore } from '../../../stores/view'
 import { launchMeeting } from '../../../lib/startMeeting'
@@ -53,7 +53,12 @@ export default function DesignMenuBar({ actions }: { actions: DesignMenuActions 
   }
   async function moveToTrash(): Promise<void> {
     if (!active) return
-    if (!window.confirm(`Move "${a.title || 'Untitled design'}" to trash?`)) return
+    const ok = await confirmDialog({
+      title: `Move "${a.title || 'Untitled design'}" to trash?`,
+      body: 'You can restore it from the Documents trash.',
+      confirmLabel: 'Move to trash'
+    })
+    if (!ok) return
     await remove(active.id)
     goDocuments()
   }

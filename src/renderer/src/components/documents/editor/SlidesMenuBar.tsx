@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { openDocHistory } from '../DocHistoryPanel'
-import { promptText } from '../../plexi/PromptDialog'
+import { confirmDialog, promptText } from '../../plexi/PromptDialog'
 import type { FbDocument } from '@shared/types'
 import { useDocumentsStore } from '../../../stores/documents'
 import { useViewStore } from '../../../stores/view'
@@ -70,7 +70,12 @@ export default function SlidesMenuBar({ actions }: { actions: SlidesMenuActions 
   }
   async function moveToTrash(): Promise<void> {
     if (!active) return
-    if (!window.confirm(`Move "${a.title || 'Untitled deck'}" to trash?`)) return
+    const ok = await confirmDialog({
+      title: `Move "${a.title || 'Untitled deck'}" to trash?`,
+      body: 'You can restore it from the Documents trash.',
+      confirmLabel: 'Move to trash'
+    })
+    if (!ok) return
     await remove(active.id)
     goDocuments()
   }
