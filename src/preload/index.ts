@@ -36,6 +36,7 @@ import type {
   DocType,
   DocumentDraft,
   DocumentMeta,
+  DocSnapshotMeta,
   DocumentPatch,
   FbDocument,
   ModelMode,
@@ -1341,6 +1342,10 @@ const api = {
     // permanent removal, from the Trash view's "Delete forever".
     delete: (id: string): Promise<boolean> => ipcRenderer.invoke('documents:delete', id),
     listTrashed: (): Promise<DocumentMeta[]> => ipcRenderer.invoke('documents:listTrashed'),
+    listSnapshots: (docId: string): Promise<DocSnapshotMeta[]> =>
+      ipcRenderer.invoke('documents:listSnapshots', docId),
+    restoreSnapshot: (snapshotId: string): Promise<FbDocument | null> =>
+      ipcRenderer.invoke('documents:restoreSnapshot', snapshotId),
     restore: (id: string): Promise<boolean> => ipcRenderer.invoke('documents:restore', id),
     purge: (id: string): Promise<boolean> => ipcRenderer.invoke('documents:purge', id),
     // Insert-or-replace by explicit id (used by cloud-document sync to land a

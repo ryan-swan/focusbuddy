@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { openDocHistory } from '../DocHistoryPanel'
 import { promptText } from '../../plexi/PromptDialog'
 import { useDocumentsStore } from '../../../stores/documents'
 import { useViewStore } from '../../../stores/view'
@@ -65,6 +66,7 @@ export default function DesignMenuBar({ actions }: { actions: DesignMenuActions 
         { kind: 'item', label: 'Make a copy', icon: 'file_copy', run: () => void makeCopy() },
         { kind: 'sep' },
         { kind: 'item', label: 'Rename', icon: 'edit', run: doRename },
+        { kind: 'item', label: 'Version history', icon: 'history', run: () => { if (active) openDocHistory(active.id) } },
         {
           kind: 'submenu',
           label: 'Download',

@@ -733,6 +733,20 @@ export function getDb(): Database.Database {
   // restores it or deletes it forever. Editors' "Move to trash" lands here, so
   // the menu label is finally truthful (it used to hard-DELETE the row).
   ensureColumn(db, 'documents', 'trashed_at', 'INTEGER')
+  // Document version history, the same pattern as canvas_snapshots for desks:
+  // periodic full-body snapshots per document, pruned to a per-doc cap, with
+  // restore capturing a "Before restore" snapshot first so it is reversible.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS doc_snapshots (
+      id TEXT PRIMARY KEY,
+      doc_id TEXT NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+      at INTEGER NOT NULL,
+      label TEXT NOT NULL DEFAULT '',
+      title TEXT NOT NULL DEFAULT '',
+      payload TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_doc_snapshots_doc ON doc_snapshots(doc_id, at DESC);
+  `)
   // Multi-org tenancy for the remaining user-data surfaces so switching org
   // isolates the calendar, vault, knowledge and tables too, not just desks and
   // documents. Added at the end where every table exists; existing rows backfill

@@ -49,6 +49,7 @@ import {
   restoreDocument,
   deleteDocument
 } from '../db/documents'
+import { captureDocSnapshot, listDocSnapshots, restoreDocSnapshot } from '../db/docSnapshots'
 import { searchAll } from '../db/search'
 import { getActiveOrgId, setActiveOrgId } from '../db/activeOrg'
 import { generateDocument, processMeetingEnd, generateDesignContent, generateDesignVariations } from '../ai/anthropic'
@@ -1854,7 +1855,12 @@ export function registerIpcHandlers(): void {
   })
   ipcMain.handle('documents:update', (_e, id: string, patch: DocumentPatch) => {
     const doc = updateDocument(id, patch)
-    if (doc) void embedDocument(doc.id)
+    if (doc) {
+      void embedDocument(doc.id)
+      // Version history: body saves accrue periodic snapshots (interval-gated
+      // and deduped inside captureDocSnapshot, so this is cheap to call).
+      if (patch.body !== undefined) captureDocSnapshot(id)
+    }
     return doc
   })
   // "Delete" from the editors and the Documents list is a soft-delete into the
@@ -1870,6 +1876,13 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('documents:purge', (_e, id: string) => {
     deleteEmbedding('document', id)
     return deleteDocument(id)
+  })
+  // Version history.
+  ipcMain.handle('documents:listSnapshots', (_e, docId: string) => listDocSnapshots(docId))
+  ipcMain.handle('documents:restoreSnapshot', (_e, snapshotId: string) => {
+    const doc = restoreDocSnapshot(snapshotId)
+    if (doc) void embedDocument(doc.id)
+    return doc
   })
   ipcMain.handle('documents:reindex', () => reindexDocuments())
   ipcMain.handle('documents:semanticActive', () => documentSemanticActive())

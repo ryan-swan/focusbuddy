@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { FbNode } from '@shared/types'
 import { useNodeStore } from '../../stores/nodes'
 import { useFocusSessionStore } from '../../stores/focusSession'
@@ -139,6 +139,30 @@ export default function AllTasksView(): JSX.Element {
   const [filter, setFilter] = useState<Filter>('today')
   const [sort, setSort] = useState<Sort>('smart')
   const [search, setSearch] = useState('')
+  // Progressive rendering: with years of tasks a flat .map() renders thousands
+  // of rows and the view starts to chug (review scale finding). We mount the
+  // first chunk and reveal more as the sentinel at the bottom scrolls into
+  // view, so the DOM stays small without a windowing dependency. Every task is
+  // still reachable by scrolling; nothing is silently capped.
+  const CHUNK = 120
+  const [renderCap, setRenderCap] = useState(CHUNK)
+  const sentinelRef = useRef<HTMLLIElement | null>(null)
+
+  // A new filter/search/sort starts back at the first chunk.
+  useEffect(() => {
+    setRenderCap(CHUNK)
+  }, [filter, sort, search])
+
+  // Reveal the next chunk whenever the sentinel row becomes visible.
+  useEffect(() => {
+    const el = sentinelRef.current
+    if (!el) return
+    const io = new IntersectionObserver((entries) => {
+      if (entries.some((e) => e.isIntersecting)) setRenderCap((c) => c + CHUNK)
+    })
+    io.observe(el)
+    return () => io.disconnect()
+  })
 
   const now = Date.now()
   const allTasks = useMemo(() => nodes.filter((n) => n.kind === 'task'), [nodes])
@@ -283,7 +307,7 @@ export default function AllTasksView(): JSX.Element {
             <EmptyState filter={filter} hasSearch={search.trim().length > 0} />
           ) : (
             <ul className="divide-y divide-stone-100 dark:divide-stone-800">
-              {visible.map((task) => (
+              {visible.slice(0, renderCap).map((task) => (
                 <TaskRow
                   key={task.id}
                   task={task}
@@ -294,6 +318,11 @@ export default function AllTasksView(): JSX.Element {
                   onOpenProject={(id) => goProject(id)}
                 />
               ))}
+              {visible.length > renderCap && (
+                <li ref={sentinelRef} className="py-3 text-center text-[11px] text-stone-400 dark:text-stone-500">
+                  Loading more…
+                </li>
+              )}
             </ul>
           )}
         </div>

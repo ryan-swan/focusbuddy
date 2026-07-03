@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { openDocHistory } from '../DocHistoryPanel'
 import { promptText } from '../../plexi/PromptDialog'
 import type { FbDocument } from '@shared/types'
 import { useDocumentsStore } from '../../../stores/documents'
@@ -82,6 +83,7 @@ export default function SlidesMenuBar({ actions }: { actions: SlidesMenuActions 
         { kind: 'item', label: 'Make a copy', icon: 'file_copy', run: () => void makeCopy() },
         { kind: 'sep' },
         { kind: 'item', label: 'Rename', icon: 'edit', run: doRename },
+        { kind: 'item', label: 'Version history', icon: 'history', run: () => { if (active) openDocHistory(active.id) } },
         { kind: 'item', label: 'Import (.pptx)', icon: 'upload', run: a.importFile },
         {
           kind: 'submenu',
