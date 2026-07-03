@@ -9,6 +9,7 @@
 // Installed copies poll for updates on boot + every 4h.
 
 import { app, autoUpdater as nativeAutoUpdater, BrowserWindow, shell } from 'electron'
+import { detectPreviewBuild } from './appMode'
 import { autoUpdater, type UpdateInfo, type ProgressInfo } from 'electron-updater'
 import { spawn } from 'node:child_process'
 import {
@@ -181,6 +182,12 @@ export function installUpdateAndRestart(): void {
 }
 
 export function checkForUpdates(): void {
+  // Manual checks (footer version click) are also a no-op on the preview
+  // build, for the same reason installAutoUpdater bails there.
+  if (detectPreviewBuild({ plexiAppEnv: process.env['PLEXI_APP'], execPath: process.execPath, appName: app.getName() })) {
+    broadcast({ kind: 'idle' })
+    return
+  }
   // checkForUpdatesAndNotify is the all-in-one but it spawns a native
   // notification, which we don't want — the in-app banner is enough.
   // Plain checkForUpdates() emits the events we wire to below.
@@ -195,6 +202,13 @@ export function installAutoUpdater(): void {
   // refuses to run against them. Bail without erroring so the rest of
   // the boot path stays green.
   if (!app.isPackaged) {
+    broadcast({ kind: 'idle' })
+    return
+  }
+  // The side-by-side "PlexiDesk 3 Preview" build must never be offered the
+  // release channel's updates (that would "upgrade" it back to the current
+  // production version). It has no channel of its own; testers rebuild.
+  if (detectPreviewBuild({ plexiAppEnv: process.env['PLEXI_APP'], execPath: process.execPath, appName: app.getName() })) {
     broadcast({ kind: 'idle' })
     return
   }

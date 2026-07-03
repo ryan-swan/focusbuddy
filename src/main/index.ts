@@ -13,7 +13,7 @@ import { installFocusTracker } from './streamdeckActions'
 import { installActivityTracker } from './activityTracker'
 import { registerHaptyxAuthProtocol } from './authProtocol'
 import { installAutoUpdater } from './autoUpdate'
-import { detectOfficeBuild } from './appMode'
+import { detectOfficeBuild, detectPreviewBuild } from './appMode'
 import { runDueFlows } from './db/flows'
 import { runDueReports } from './db/reports'
 
@@ -34,8 +34,23 @@ const isOfficeBuild = detectOfficeBuild({
 })
 if (isOfficeBuild) app.setName('PlexiOffice')
 
+const isPreviewBuild =
+  !isOfficeBuild &&
+  detectPreviewBuild({
+    plexiAppEnv: process.env['PLEXI_APP'],
+    execPath: process.execPath,
+    appName: app.getName()
+  })
+if (isPreviewBuild) app.setName('PlexiDesk 3 Preview')
+
 if (process.env.FB_TEST_USER_DATA) {
   app.setPath('userData', process.env.FB_TEST_USER_DATA)
+} else if (isPreviewBuild) {
+  // The preview build ALWAYS gets its own userData directory — packaged AND
+  // dev — so it can never open the production install's database (which the
+  // legacy-Haptyx pinning below would otherwise hand it) and never contends
+  // for its single-instance lock. Delete this directory to reset the preview.
+  app.setPath('userData', join(app.getPath('appData'), 'PlexiDesk3Preview'))
 } else if (isOfficeBuild) {
   // PlexiOffice gets its OWN userData directory. Without this it inherits
   // PlexiDesk's directory and therefore PlexiDesk's single-instance lock, so
@@ -132,7 +147,8 @@ function applyPermissionPolicy(ses: Electron.Session): void {
 // PlexiOffice must not claim the haptyx:// scheme — only one app can own it, and
 // it belongs to PlexiDesk's web→desktop auth handoff. PlexiOffice still takes its
 // own single-instance lock (on its own userData) inside this call.
-registerHaptyxAuthProtocol({ claimProtocol: !isOfficeBuild })
+// The preview must not steal haptyx:// deep links from the production install.
+registerHaptyxAuthProtocol({ claimProtocol: !isOfficeBuild && !isPreviewBuild })
 
 function createCommandCenter(): BrowserWindow {
   // The window stays opaque. Live-mirror widgets render desktopCapturer
