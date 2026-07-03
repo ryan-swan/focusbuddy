@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import Icon from '../Icon'
 import { DashboardHeader, StatTile, StatusPill, PLEXI_CARD } from '../plexi'
 import { useSignStore } from '../../stores/sign'
+import { useQuickCreate } from '../../stores/quickCreate'
 import type { PlexiSignRequest, Signer, SignStatus, SignatureKind } from '@shared/sign'
 
 // PlexiSign — send a document for signature, collect approvals in order, keep a
@@ -279,6 +280,13 @@ export default function PlexiSignView(): JSX.Element {
   useEffect(() => {
     void load()
   }, [load])
+
+  // Palette quick-create ("New signature request" from Cmd+K anywhere) lands
+  // here: consume the pending request and open the composer.
+  const quickPending = useQuickCreate((s) => s.pending)
+  useEffect(() => {
+    if (quickPending === 'sign' && useQuickCreate.getState().consume('sign')) setComposing(true)
+  }, [quickPending])
 
   const selected = requests.find((r) => r.id === selId) ?? null
   const total = requests.length
