@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { effectiveShortcutToKind } from '../lib/keymap'
 import { useNodeStore } from '../stores/nodes'
 import { useWidgetStore } from '../stores/widgets'
 import { useAiCommandBar } from '../stores/aiCommandBar'
@@ -70,7 +71,6 @@ import {
   CATEGORIES,
   DRAG_MIME,
   WIDGET_CATALOG,
-  SHORTCUT_TO_KIND,
   catalogFor,
   type WidgetCatalogEntry,
   type WidgetCategory
@@ -1120,7 +1120,7 @@ export default function Canvas(): JSX.Element {
       const typing =
         !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)
       if (typing) return
-      const kind = SHORTCUT_TO_KIND[e.key.toUpperCase()]
+      const kind = effectiveShortcutToKind()[e.key.toUpperCase()]
       if (!kind) return
       if (!useNodeStore.getState().activeTaskId) return
       e.preventDefault()

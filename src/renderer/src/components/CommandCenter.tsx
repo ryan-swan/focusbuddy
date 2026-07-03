@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { effectiveQuickAddMap } from '../lib/keymap'
 import { createPortal } from 'react-dom'
 import { useNodeStore } from '../stores/nodes'
 import { useViewStore } from '../stores/view'
 import { useWidgetStore } from '../stores/widgets'
 import type { WidgetKind, SearchHit } from '@shared/types'
-import { WIDGET_CATALOG, WIDGET_SHORTCUTS } from '../lib/widgetCatalog'
+import { WIDGET_CATALOG } from '../lib/widgetCatalog'
 import { getNavPrefs, setNavPrefs } from '../lib/navPrefs'
 import Icon from './Icon'
 import { useCapabilityEnabled, useCapabilityStore } from '../stores/capabilities'
@@ -497,7 +498,7 @@ export default function CommandCenter({
       // is shown in the row and works directly on the canvas.
       for (const entry of WIDGET_CATALOG) {
         if (entry.hideFromPicker) continue
-        const sc = WIDGET_SHORTCUTS[entry.kind]
+        const sc = effectiveQuickAddMap()[entry.kind]
         items.push({
           id: `add-${entry.kind}`,
           label: `Add ${entry.label}`,
