@@ -50,7 +50,11 @@ import {
   deleteDocument
 } from '../db/documents'
 import { captureDocSnapshot, listDocSnapshots, restoreDocSnapshot } from '../db/docSnapshots'
-import { searchAll } from '../db/search'
+import { searchAll, setMailSearchCache } from '../db/search'
+
+// Unseen mail uids already announced with a desktop notification, so a banner
+// fires once per message per app run (the renderer polls mail:list).
+const announcedMailUids = new Set<number>()
 import { getActiveOrgId, setActiveOrgId } from '../db/activeOrg'
 import { generateDocument, processMeetingEnd, generateDesignContent, generateDesignVariations, setConversationSnapshot } from '../ai/anthropic'
 import { generateImage } from '../imageGen'
@@ -1776,11 +1780,27 @@ export function registerIpcHandlers(): void {
     return { ok: true as const }
   })
 
-  ipcMain.handle('mail:list', async (_e, limit?: number) => {
+  ipcMain.handle('mail:list', async (e, limit?: number) => {
     const config = mailAccount.getFull()
     if (!config) return { ok: false as const, error: 'No mail account connected.' }
     try {
       const items = await listInbox(config, limit ?? 40)
+      // New-mail detection: any unseen uid we have not announced yet fires one
+      // OS notification (batched: one banner per fetch, not one per message).
+      // The cache also powers global-search mail hits (search.ts).
+      const fresh = items.filter((m) => !m.seen && !announcedMailUids.has(m.uid))
+      if (announcedMailUids.size > 0 && fresh.length > 0) {
+        const first = fresh[0]
+        const title = fresh.length === 1 ? `Mail from ${first.fromName || first.fromAddress}` : `${fresh.length} new emails`
+        const body = fresh.length === 1 ? first.subject || '(no subject)' : fresh.map((f) => f.subject || '(no subject)').slice(0, 3).join(' · ')
+        try {
+          e.sender.send('mail:newMail', { title, body, uid: first.uid })
+        } catch {
+          // window gone — skip
+        }
+      }
+      for (const m of items) if (!m.seen) announcedMailUids.add(m.uid)
+      setMailSearchCache(items)
       return { ok: true as const, items }
     } catch (err) {
       return { ok: false as const, error: (err as Error).message }

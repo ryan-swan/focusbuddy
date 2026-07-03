@@ -567,6 +567,7 @@ export default function CommandCenter({
             goCalendar,
             goMeet: () => goOffice('meet'),
             goSign,
+            goMailHit: (uid) => goMail(uid),
             setActive
           })
           closePalette()
@@ -841,6 +842,8 @@ function hitIcon(h: SearchHit): string {
       return 'video_call'
     case 'sign':
       return 'draw'
+    case 'mail':
+      return 'mail'
     default:
       return 'widgets' // widget
   }
@@ -866,6 +869,8 @@ function hitKindLabel(h: SearchHit): string {
       return 'Meeting'
     case 'sign':
       return 'Signature'
+    case 'mail':
+      return 'Email'
     default:
       return 'On a desk'
   }
@@ -880,6 +885,7 @@ interface HitNav {
   goCalendar: () => void
   goMeet: () => void
   goSign: () => void
+  goMailHit: (uid: number) => void
   setActive: (id: string | null) => void
 }
 
@@ -917,6 +923,9 @@ function runHit(h: SearchHit, nav: HitNav): void {
       break
     case 'sign':
       nav.goSign()
+      break
+    case 'mail':
+      nav.goMailHit(Number(h.id))
       break
   }
 }

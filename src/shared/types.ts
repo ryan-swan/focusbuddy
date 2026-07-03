@@ -1332,6 +1332,7 @@ export interface SearchHit {
     | 'event'
     | 'meeting'
     | 'sign'
+    | 'mail'
   id: string
   title: string
   snippet: string

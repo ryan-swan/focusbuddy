@@ -1310,6 +1310,13 @@ const api = {
   // The password never crosses this boundary on read; the renderer only ever
   // sees host/port/user and the message list/body it asks for.
   mail: {
+    // Fired by the main process when a fetch discovers unseen messages that
+    // have not been announced this run. One event per fetch, batched.
+    onNewMail: (cb: (info: { title: string; body: string; uid: number }) => void): (() => void) => {
+      const listener = (_e: unknown, info: { title: string; body: string; uid: number }): void => cb(info)
+      ipcRenderer.on('mail:newMail', listener)
+      return () => ipcRenderer.removeListener('mail:newMail', listener)
+    },
     getAccount: (): Promise<MailAccountPublic> => ipcRenderer.invoke('mail:getAccount'),
     saveAccount: (
       config: MailAccountInput

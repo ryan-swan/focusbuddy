@@ -1,4 +1,6 @@
 import { create } from 'zustand'
+import { notifyExternal } from '../lib/notify'
+import { useViewStore } from './view'
 import type {
   MailAccountInput,
   MailAccountPublic,
@@ -200,3 +202,16 @@ export const useMailStore = create<MailStore>((set, get) => ({
     set({ replyDraft: r, loadingDraft: false })
   }
 }))
+
+// New-mail banners: the main process announces unseen messages found during a
+// fetch (batched, once per message per run). Clicking opens Mail on the item.
+if (typeof window !== 'undefined' && window.api?.mail?.onNewMail) {
+  window.api.mail.onNewMail(({ title, body, uid }) => {
+    notifyExternal(title, body, {
+      tag: `mail-${uid}`,
+      onClick: () => {
+        useViewStore.getState().goMail(uid)
+      }
+    })
+  })
+}
