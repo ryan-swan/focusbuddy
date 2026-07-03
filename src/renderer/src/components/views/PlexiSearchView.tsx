@@ -40,7 +40,8 @@ const TYPE_META: Record<
   knowledge: { icon: 'neurology', label: 'PlexiBrain', tone: 'violet' },
   event: { icon: 'calendar_month', label: 'Calendar', tone: 'sky' },
   meeting: { icon: 'video_call', label: 'Meeting', tone: 'violet' },
-  sign: { icon: 'draw', label: 'Signature', tone: 'stone' }
+  sign: { icon: 'draw', label: 'Signature', tone: 'stone' },
+  mail: { icon: 'mail', label: 'Email', tone: 'sky' }
 }
 
 function hitMeta(h: SearchHit): { icon: string; label: string; tone: 'accent' | 'stone' | 'sky' | 'violet' } {
@@ -61,6 +62,7 @@ export default function PlexiSearchView(): JSX.Element {
   const goCalendar = useViewStore((s) => s.goCalendar)
   const goOffice = useViewStore((s) => s.goOffice)
   const goSign = useViewStore((s) => s.goSign)
+  const goMail = useViewStore((s) => s.goMail)
   const goMeet = (): void => goOffice('meet')
   const setActive = useNodeStore((s) => s.setActive)
 
@@ -174,6 +176,9 @@ export default function PlexiSearchView(): JSX.Element {
         break
       case 'sign':
         goSign()
+        break
+      case 'mail':
+        goMail(Number(h.id))
         break
     }
   }

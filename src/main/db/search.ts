@@ -17,6 +17,28 @@ import type { SearchHit, DocType } from '@shared/types'
 
 const PER_CATEGORY = 20
 const TOTAL = 40
+
+// Mail is a live IMAP view with no local message store, so global search
+// covers what the app has actually fetched: the main process keeps the most
+// recent inbox page here (fed by the mail:list IPC handler). Honest partial
+// coverage — recent inbox only — until a real local mail index exists.
+interface CachedMailItem {
+  uid: number
+  fromName: string
+  fromAddress: string
+  subject: string
+  snippet?: string
+}
+let mailCache: CachedMailItem[] = []
+export function setMailSearchCache(items: Array<CachedMailItem & { snippet?: string }>): void {
+  mailCache = items.map((m) => ({
+    uid: m.uid,
+    fromName: m.fromName,
+    fromAddress: m.fromAddress,
+    subject: m.subject,
+    snippet: m.snippet
+  }))
+}
 const ESC = " ESCAPE '\\'"
 
 export async function searchAll(rawQuery: string): Promise<SearchHit[]> {
@@ -274,7 +296,21 @@ export async function searchAll(rawQuery: string): Promise<SearchHit[]> {
     })
   }
 
-  // NOT covered here (yet): Mail and Chat. Mail is a live IMAP view with no
+  // Recently fetched mail (see setMailSearchCache above for the coverage note).
+  const q = query.toLowerCase()
+  for (const m of mailCache) {
+    const hay = `${m.fromName} ${m.fromAddress} ${m.subject} ${m.snippet ?? ''}`.toLowerCase()
+    if (!hay.includes(q)) continue
+    hits.push({
+      type: 'mail',
+      id: String(m.uid),
+      title: m.subject || '(no subject)',
+      snippet: `${m.fromName || m.fromAddress}${m.snippet ? ` — ${m.snippet.slice(0, 80)}` : ''}`,
+      score: scoreMatch(m.subject, `${m.fromName} ${m.snippet ?? ''}`, query)
+    })
+  }
+
+  // NOT covered here (yet): Chat. Mail is a live IMAP view with no
   // local message store, and chat history lives on the signal server — both
   // need their own search infrastructure (IMAP SEARCH / a server endpoint)
   // rather than a LIKE over local SQLite. Tracked in docs/PLEXI-REVIEW-2026-07.
