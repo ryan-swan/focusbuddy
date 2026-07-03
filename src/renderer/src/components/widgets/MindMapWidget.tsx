@@ -1034,7 +1034,7 @@ export default function MindMapWidget({ widget, inline = false }: Props): JSX.El
   // ── Render ───────────────────────────────────────────────────────────────
   const body = (
     <div
-      className="h-full w-full flex bg-stone-50 dark:bg-stone-900 overflow-hidden"
+      className="h-full w-full flex bg-[var(--surface-sunken)] overflow-hidden"
       onContextMenu={(e) => {
         // Right-click anywhere in the mind map opens the unified menu, which is
         // where "Build with AI" lives. Shift-right-click falls through to the
@@ -1059,20 +1059,20 @@ export default function MindMapWidget({ widget, inline = false }: Props): JSX.El
             to drill back up. */}
         {breadcrumb.length > 1 && (
           <div
-            className="sticky top-0 z-10 bg-stone-50/95 dark:bg-stone-900/95 backdrop-blur px-3 py-1.5 border-b border-stone-200 dark:border-stone-800 flex items-center gap-1 text-[10px] overflow-x-auto"
+            className="sticky top-0 z-10 bg-[var(--surface-sunken)]/95 backdrop-blur px-3 py-1.5 border-b border-[var(--edge-soft)] flex items-center gap-1 text-[10px] overflow-x-auto"
             data-testid="mindmap-breadcrumb"
           >
             {breadcrumb.map((b, i) => (
               <span key={b.id} className="inline-flex items-center gap-1 shrink-0">
                 {i > 0 && (
-                  <Icon name="chevron_right" size={11} className="text-stone-400" />
+                  <Icon name="chevron_right" size={11} className="text-[var(--ink-40)]" />
                 )}
                 <button
                   onClick={() => drillUp(b.id)}
                   disabled={i === breadcrumb.length - 1}
                   className={`px-1 py-0.5 rounded ${
                     i === breadcrumb.length - 1
-                      ? 'text-stone-800 dark:text-stone-100 font-semibold cursor-default'
+                      ? 'text-[var(--ink-90)] font-semibold cursor-default'
                       : 'text-accent hover:underline'
                   }`}
                   data-testid={`mindmap-breadcrumb-${i}`}
@@ -1094,10 +1094,9 @@ export default function MindMapWidget({ widget, inline = false }: Props): JSX.El
               key={`${e.from}-${e.to}`}
               d={curvedEdge(e.x1, e.y1, e.x2, e.y2)}
               fill="none"
-              stroke="currentColor"
+              stroke="var(--edge-firm)"
               strokeOpacity={0.25}
               strokeWidth={1.5}
-              className="text-stone-700 dark:text-stone-300"
             />
           ))}
           {layout.nodes.map((n) => {
@@ -1309,7 +1308,7 @@ export default function MindMapWidget({ widget, inline = false }: Props): JSX.El
 
   if (inline) return body
   return (
-    <WidgetFrame widget={widget} headerLabel="Mind map" headerAccent="bg-stone-300/60">
+    <WidgetFrame widget={widget} headerLabel="Mind map" headerAccent="bg-[var(--edge-firm)]/60">
       {body}
     </WidgetFrame>
   )
@@ -1398,28 +1397,28 @@ function SidePanel({
   onClose: () => void
 }): JSX.Element {
   return (
-    <aside className="w-[300px] shrink-0 border-l border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-950 flex flex-col">
-      <div className="flex items-center justify-between px-3 py-2 border-b border-stone-200 dark:border-stone-800">
-        <span className="text-[10px] uppercase tracking-[0.12em] text-stone-500 dark:text-stone-400 font-semibold">
+    <aside className="w-[300px] shrink-0 border-l border-[var(--edge-soft)] bg-[var(--surface-raised)] flex flex-col">
+      <div className="flex items-center justify-between px-3 py-2 border-b border-[var(--edge-soft)]">
+        <span className="text-[10px] uppercase tracking-[0.12em] text-[var(--ink-50)] font-semibold">
           Node
         </span>
         <button
           onClick={onClose}
-          className="h-5 w-5 inline-flex items-center justify-center text-stone-400 hover:text-stone-900 dark:hover:text-stone-100"
+          className="h-5 w-5 inline-flex items-center justify-center text-[var(--ink-40)] hover:text-[var(--ink-100)]"
         >
           <Icon name="close" size={11} />
         </button>
       </div>
       <div className="px-3 py-2 space-y-3 overflow-y-auto flex-1">
         {rootPath.length > 1 && (
-          <div className="text-[10px] text-stone-500 dark:text-stone-400 leading-snug">
+          <div className="text-[10px] text-[var(--ink-50)] leading-snug">
             {rootPath.slice(0, -1).join(' › ')} ›
           </div>
         )}
         <input
           value={node.label}
           onChange={(e) => onLabelEdit(e.target.value)}
-          className="w-full text-[13px] font-medium bg-transparent border-b border-stone-200 dark:border-stone-700 px-1 py-1 focus:outline-none focus:border-accent text-stone-900 dark:text-stone-100"
+          className="w-full text-[13px] font-medium bg-transparent border-b border-[var(--edge-soft)] px-1 py-1 focus:outline-none focus:border-accent text-[var(--ink-100)]"
           data-testid="mindmap-node-label-input"
         />
         <div className="flex flex-wrap gap-1">
@@ -1430,7 +1429,7 @@ function SidePanel({
               className={`text-[10px] px-1.5 py-0.5 rounded-full ${
                 node.kind === k
                   ? 'bg-accent text-white'
-                  : 'bg-stone-100 dark:bg-stone-800 text-stone-600 dark:text-stone-300 hover:bg-stone-200 dark:hover:bg-stone-700'
+                  : 'bg-[var(--surface-sunken)] text-[var(--ink-70)] hover:bg-[var(--edge-soft)]'
               }`}
             >
               {k}
@@ -1438,7 +1437,7 @@ function SidePanel({
           ))}
         </div>
         {node.rationale && (
-          <div className="text-[10px] text-stone-500 dark:text-stone-400 leading-snug italic">
+          <div className="text-[10px] text-[var(--ink-50)] leading-snug italic">
             "{node.rationale}"
           </div>
         )}
@@ -1458,7 +1457,7 @@ function SidePanel({
           <div className="grid grid-cols-2 gap-1.5">
             <button
               onClick={onAddChild}
-              className="text-[11px] px-2 py-1.5 rounded-md bg-stone-200 dark:bg-stone-700 text-stone-800 dark:text-stone-100 hover:opacity-90 inline-flex items-center justify-center gap-1"
+              className="text-[11px] px-2 py-1.5 rounded-md bg-[var(--surface-sunken)] text-[var(--ink-90)] hover:opacity-90 inline-flex items-center justify-center gap-1"
               data-testid="mindmap-add-child"
             >
               <Icon name="add" size={11} />
@@ -1468,7 +1467,7 @@ function SidePanel({
               onClick={onAddSibling}
               disabled={isRoot}
               title={isRoot ? 'Root has no sibling' : 'Add a peer node at the same level'}
-              className="text-[11px] px-2 py-1.5 rounded-md bg-stone-200 dark:bg-stone-700 text-stone-800 dark:text-stone-100 hover:opacity-90 inline-flex items-center justify-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
+              className="text-[11px] px-2 py-1.5 rounded-md bg-[var(--surface-sunken)] text-[var(--ink-90)] hover:opacity-90 inline-flex items-center justify-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
               data-testid="mindmap-add-sibling"
             >
               <Icon name="add" size={11} />
@@ -1490,7 +1489,7 @@ function SidePanel({
           </button>
           <button
             onClick={onConvertToTask}
-            className="w-full text-[11px] px-2 py-1.5 rounded-md bg-stone-200 dark:bg-stone-700 text-stone-800 dark:text-stone-100 hover:opacity-90 inline-flex items-center justify-center gap-1.5"
+            className="w-full text-[11px] px-2 py-1.5 rounded-md bg-[var(--surface-sunken)] text-[var(--ink-90)] hover:opacity-90 inline-flex items-center justify-center gap-1.5"
             data-testid="mindmap-convert-task"
             title="Add this node to the sidebar as a task, without leaving the map"
           >
@@ -1501,7 +1500,7 @@ function SidePanel({
             onClick={onDelete}
             disabled={isRoot}
             title={isRoot ? 'Can\'t delete the root' : 'Delete this node and its subtree'}
-            className="w-full text-[11px] px-2 py-1.5 rounded-md text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950 inline-flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
+            className="w-full text-[11px] px-2 py-1.5 rounded-md text-rose-500 hover:bg-rose-500/10 inline-flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <Icon name="delete_outline" size={12} />
             Delete this node
@@ -1517,7 +1516,7 @@ function SidePanel({
             <div className="text-[10px] uppercase tracking-[0.12em] text-accent font-semibold">
               {pendingChildrenCount} proposed branch{pendingChildrenCount === 1 ? '' : 'es'}
             </div>
-            <div className="text-[10px] text-stone-600 dark:text-stone-300 leading-snug">
+            <div className="text-[10px] text-[var(--ink-70)] leading-snug">
               Click ✓ or × on each dashed node, or use:
             </div>
             <div className="grid grid-cols-2 gap-1.5">
@@ -1530,7 +1529,7 @@ function SidePanel({
               </button>
               <button
                 onClick={onRejectAllPending}
-                className="text-[10px] px-1.5 py-1 rounded border border-stone-300 dark:border-stone-600 text-stone-600 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800"
+                className="text-[10px] px-1.5 py-1 rounded border border-[var(--edge-firm)] text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]"
                 data-testid="mindmap-reject-all-pending"
               >
                 Reject all
@@ -1540,9 +1539,9 @@ function SidePanel({
         )}
 
         {/* Phase 2B — attached widgets */}
-        <div className="pt-3 border-t border-stone-200 dark:border-stone-800">
+        <div className="pt-3 border-t border-[var(--edge-soft)]">
           <div className="flex items-center justify-between mb-1.5">
-            <span className="text-[10px] uppercase tracking-[0.12em] text-stone-500 dark:text-stone-400 font-semibold">
+            <span className="text-[10px] uppercase tracking-[0.12em] text-[var(--ink-50)] font-semibold">
               Tools attached ({attachedWidgets.length})
             </span>
             <button
@@ -1554,7 +1553,7 @@ function SidePanel({
             </button>
           </div>
           {attachedWidgets.length === 0 ? (
-            <div className="text-[10px] text-stone-500 dark:text-stone-400 leading-snug">
+            <div className="text-[10px] text-[var(--ink-50)] leading-snug">
               Attach any widget kind to this node — table, search, sticky, etc.
               The widget spawns on the canvas and the link lets you find it
               again from here.
@@ -1564,25 +1563,25 @@ function SidePanel({
               {attachedWidgets.map((w) => (
                 <li
                   key={w.id}
-                  className="text-[11px] bg-stone-50 dark:bg-stone-900 border border-stone-200 dark:border-stone-700 rounded px-2 py-1 flex items-center gap-2"
+                  className="text-[11px] bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded px-2 py-1 flex items-center gap-2"
                   data-testid={`mindmap-attached-${w.id}`}
                 >
                   <Icon
                     name={catalogFor(w.kind)?.icon ?? 'widgets'}
                     size={12}
-                    className="text-stone-500 shrink-0"
+                    className="text-[var(--ink-50)] shrink-0"
                   />
                   <div className="flex-1 min-w-0">
-                    <div className="font-medium text-stone-800 dark:text-stone-100 truncate">
+                    <div className="font-medium text-[var(--ink-90)] truncate">
                       {w.title || catalogFor(w.kind)?.label || w.kind}
                     </div>
-                    <div className="text-[10px] text-stone-500 dark:text-stone-400 truncate">
+                    <div className="text-[10px] text-[var(--ink-50)] truncate">
                       {w.kind}
                     </div>
                   </div>
                   <button
                     onClick={() => onDetachWidget(w.id)}
-                    className="text-[10px] text-stone-400 hover:text-stone-700 dark:hover:text-stone-200"
+                    className="text-[10px] text-[var(--ink-40)] hover:text-[var(--ink-70)]"
                     title="Detach (does NOT delete the widget — only removes the link)"
                   >
                     Unlink
@@ -1594,9 +1593,9 @@ function SidePanel({
         </div>
 
         {/* Phase 1 + 2A + 2C — suggested agents with Run + Create-new */}
-        <div className="pt-3 border-t border-stone-200 dark:border-stone-800">
+        <div className="pt-3 border-t border-[var(--edge-soft)]">
           <div className="flex items-center justify-between mb-1.5">
-            <span className="text-[10px] uppercase tracking-[0.12em] text-stone-500 dark:text-stone-400 font-semibold">
+            <span className="text-[10px] uppercase tracking-[0.12em] text-[var(--ink-50)] font-semibold">
               Suggested agents
             </span>
             <div className="flex gap-2">
@@ -1622,7 +1621,7 @@ function SidePanel({
             </div>
           </div>
           {agentsInventory && (
-            <div className="text-[9px] text-stone-500 dark:text-stone-400 mb-1.5 leading-snug">
+            <div className="text-[9px] text-[var(--ink-50)] mb-1.5 leading-snug">
               <div className="flex items-center gap-1.5">
                 <span className="truncate">
                   {agentsInventory.source === 'none'
@@ -1650,7 +1649,7 @@ function SidePanel({
             </div>
           )}
           {suggestions.length === 0 ? (
-            <div className="text-[10px] text-stone-500 dark:text-stone-400 leading-snug">
+            <div className="text-[10px] text-[var(--ink-50)] leading-snug">
               Find agents picks the best matches from .claude/agents/.
               + New opens a wizard to author one for this node.
             </div>
@@ -1663,15 +1662,15 @@ function SidePanel({
                 return (
                   <li
                     key={a.slug}
-                    className="text-[11px] bg-stone-50 dark:bg-stone-900 border border-stone-200 dark:border-stone-700 rounded px-2 py-1.5"
+                    className="text-[11px] bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded px-2 py-1.5"
                     data-testid={`mindmap-agent-${a.slug}`}
                   >
                     <div className="flex items-start gap-1.5 mb-1">
                       <div className="flex-1 min-w-0">
-                        <div className="font-medium text-stone-800 dark:text-stone-100 truncate">
+                        <div className="font-medium text-[var(--ink-90)] truncate">
                           {a.name}
                         </div>
-                        <div className="text-[10px] text-stone-500 dark:text-stone-400 leading-snug">
+                        <div className="text-[10px] text-[var(--ink-50)] leading-snug">
                           {a.rationale}
                         </div>
                         {/* Per-agent track-record badge — surfaces
@@ -1679,7 +1678,7 @@ function SidePanel({
                             calibrate trust per agent over time. */}
                         {stats && stats.invocations > 0 && (
                           <div
-                            className="text-[9px] text-stone-500 dark:text-stone-400 mt-0.5 tabular-nums"
+                            className="text-[9px] text-[var(--ink-50)] mt-0.5 tabular-nums"
                             data-testid={`mindmap-agent-stats-${a.slug}`}
                           >
                             {stats.invocations} run{stats.invocations === 1 ? '' : 's'} · {stats.applied} applied · {stats.dismissed} dismissed
@@ -1723,7 +1722,7 @@ function SidePanel({
           {Object.keys(conversations).length > 0 && (
             <button
               onClick={onUndoLastApply}
-              className="mt-2 w-full text-[10px] px-2 py-1 rounded border border-stone-200 dark:border-stone-700 text-stone-600 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800 inline-flex items-center justify-center gap-1.5"
+              className="mt-2 w-full text-[10px] px-2 py-1 rounded border border-[var(--edge-soft)] text-[var(--ink-70)] hover:bg-[var(--surface-sunken)] inline-flex items-center justify-center gap-1.5"
               data-testid="mindmap-undo-last-apply"
               title="Reverses the most recent applied proposal across all agents (deletes the entity it created)"
             >
@@ -1734,7 +1733,7 @@ function SidePanel({
         </div>
 
         {errorMsg && (
-          <div className="text-[10px] text-red-600 dark:text-red-400 leading-snug whitespace-pre-wrap">
+          <div className="text-[10px] text-rose-500 leading-snug whitespace-pre-wrap">
             {errorMsg}
           </div>
         )}
@@ -1783,7 +1782,7 @@ function ConversationView({
   }
   return (
     <div
-      className="mt-1 pt-1 border-t border-stone-200 dark:border-stone-700 space-y-1.5"
+      className="mt-1 pt-1 border-t border-[var(--edge-soft)] space-y-1.5"
       data-testid={`mindmap-conversation-${suggestion.slug}`}
     >
       {conversation.turns.map((turn, ti) => (
@@ -1793,11 +1792,11 @@ function ConversationView({
               turn. Render it for ti >= 1 so the first turn has no
               preceding user message. */}
           {ti >= 1 && conversation.userReplies[ti - 1] && (
-            <div className="text-[10px] text-stone-500 dark:text-stone-400 italic mb-1">
+            <div className="text-[10px] text-[var(--ink-50)] italic mb-1">
               You: {conversation.userReplies[ti - 1].content}
             </div>
           )}
-          <div className="text-[10px] text-stone-700 dark:text-stone-200 leading-snug whitespace-pre-wrap">
+          <div className="text-[10px] text-[var(--ink-70)] leading-snug whitespace-pre-wrap">
             {turn.reply}
           </div>
           {turn.proposalStates.length > 0 && (
@@ -1809,15 +1808,15 @@ function ConversationView({
                     ps.state === 'applied'
                       ? 'bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800'
                       : ps.state === 'dismissed'
-                        ? 'bg-stone-100 dark:bg-stone-800 border-stone-200 dark:border-stone-700 opacity-60'
+                        ? 'bg-[var(--surface-sunken)] border-[var(--edge-soft)] opacity-60'
                         : ps.state === 'undone'
                           ? 'bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800 opacity-75'
-                          : 'bg-white dark:bg-stone-800 border-stone-200 dark:border-stone-700'
+                          : 'bg-[var(--surface-raised)] border-[var(--edge-soft)]'
                   }`}
                   data-testid={`mindmap-proposal-${ps.proposal.id}`}
                 >
                   <div className="flex-1 min-w-0">
-                    <div className="font-medium text-stone-800 dark:text-stone-100 truncate">
+                    <div className="font-medium text-[var(--ink-90)] truncate">
                       {labelForProposal(ps.proposal)}
                     </div>
                     {ps.state === 'applied' && (
@@ -1831,7 +1830,7 @@ function ConversationView({
                       </div>
                     )}
                     {ps.state === 'dismissed' && (
-                      <div className="text-[9px] text-stone-500 mt-0.5">
+                      <div className="text-[9px] text-[var(--ink-50)] mt-0.5">
                         ⊘ dismissed
                       </div>
                     )}
@@ -1847,7 +1846,7 @@ function ConversationView({
                       </button>
                       <button
                         onClick={() => onDismissProposal(conversationKey, ti, pi)}
-                        className="text-[10px] px-1.5 py-0.5 rounded text-stone-500 hover:bg-stone-100 dark:hover:bg-stone-700"
+                        className="text-[10px] px-1.5 py-0.5 rounded text-[var(--ink-50)] hover:bg-[var(--surface-sunken)]"
                       >
                         ⊘
                       </button>
@@ -1869,7 +1868,7 @@ function ConversationView({
         </div>
       ))}
       {conversation.capped ? (
-        <div className="text-[9px] text-stone-500 dark:text-stone-400 italic mt-1">
+        <div className="text-[9px] text-[var(--ink-50)] italic mt-1">
           Conversation full ({MAX_CONVERSATION_TURNS} turns). Start a fresh Run
           for further work.
         </div>
@@ -1887,7 +1886,7 @@ function ConversationView({
             }}
             placeholder="Reply to the agent…"
             disabled={busy === 'invoke'}
-            className="flex-1 min-w-0 text-[10px] bg-stone-50 dark:bg-stone-900 border border-stone-200 dark:border-stone-700 rounded px-1.5 py-0.5 focus:outline-none focus:border-accent disabled:opacity-60"
+            className="flex-1 min-w-0 text-[10px] bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded px-1.5 py-0.5 focus:outline-none focus:border-accent disabled:opacity-60"
             data-testid={`mindmap-reply-input-${suggestion.slug}`}
           />
           <button
@@ -1965,16 +1964,16 @@ function AgentBuilderModal({
       onClick={onCancel}
     >
       <div
-        className="bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-700 rounded-lg shadow-xl w-full max-w-[420px] p-3 max-h-[90%] overflow-y-auto"
+        className="bg-[var(--surface-raised)] border border-[var(--edge-soft)] rounded-lg shadow-xl w-full max-w-[420px] p-3 max-h-[90%] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-2">
-          <span className="text-[10px] uppercase tracking-[0.12em] text-stone-500 dark:text-stone-400 font-semibold">
+          <span className="text-[10px] uppercase tracking-[0.12em] text-[var(--ink-50)] font-semibold">
             New agent
           </span>
           <button
             onClick={onCancel}
-            className="h-5 w-5 inline-flex items-center justify-center text-stone-400 hover:text-stone-900 dark:hover:text-stone-100"
+            className="h-5 w-5 inline-flex items-center justify-center text-[var(--ink-40)] hover:text-[var(--ink-100)]"
           >
             <Icon name="close" size={11} />
           </button>
@@ -1984,7 +1983,7 @@ function AgentBuilderModal({
             <input
               value={slug}
               onChange={(e) => setSlug(slugify(e.target.value))}
-              className="w-full text-[12px] bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded px-2 py-1 focus:outline-none focus:border-accent"
+              className="w-full text-[12px] bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded px-2 py-1 focus:outline-none focus:border-accent"
               data-testid="agent-wizard-slug"
             />
           </Field>
@@ -1992,7 +1991,7 @@ function AgentBuilderModal({
             <input
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="w-full text-[12px] bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded px-2 py-1 focus:outline-none focus:border-accent"
+              className="w-full text-[12px] bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded px-2 py-1 focus:outline-none focus:border-accent"
               data-testid="agent-wizard-description"
             />
           </Field>
@@ -2005,7 +2004,7 @@ function AgentBuilderModal({
                   className={`flex-1 text-[10px] px-1.5 py-1 rounded ${
                     model === m
                       ? 'bg-accent text-white'
-                      : 'bg-stone-100 dark:bg-stone-800 text-stone-600 dark:text-stone-300'
+                      : 'bg-[var(--surface-sunken)] text-[var(--ink-70)]'
                   }`}
                   data-testid={`agent-wizard-model-${m}`}
                 >
@@ -2035,7 +2034,7 @@ function AgentBuilderModal({
                   className={`text-[10px] px-1.5 py-0.5 rounded ${
                     tools.includes(t)
                       ? 'bg-accent text-white'
-                      : 'bg-stone-100 dark:bg-stone-800 text-stone-600 dark:text-stone-300'
+                      : 'bg-[var(--surface-sunken)] text-[var(--ink-70)]'
                   }`}
                 >
                   {t}
@@ -2048,19 +2047,19 @@ function AgentBuilderModal({
               value={purpose}
               onChange={(e) => setPurpose(e.target.value)}
               rows={5}
-              className="w-full text-[11px] bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded px-2 py-1 focus:outline-none focus:border-accent font-mono"
+              className="w-full text-[11px] bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded px-2 py-1 focus:outline-none focus:border-accent font-mono"
               data-testid="agent-wizard-purpose"
             />
           </Field>
           {err && (
-            <div className="text-[10px] text-red-600 dark:text-red-400 leading-snug">
+            <div className="text-[10px] text-rose-500 leading-snug">
               {err}
             </div>
           )}
           <div className="flex gap-1.5 pt-1">
             <button
               onClick={onCancel}
-              className="text-[11px] px-2 py-1.5 rounded text-stone-600 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800"
+              className="text-[11px] px-2 py-1.5 rounded text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]"
             >
               Cancel
             </button>
@@ -2088,7 +2087,7 @@ function Field({
 }): JSX.Element {
   return (
     <div>
-      <label className="block text-[10px] uppercase tracking-wider text-stone-500 dark:text-stone-400 mb-0.5">
+      <label className="block text-[10px] uppercase tracking-wider text-[var(--ink-50)] mb-0.5">
         {label}
       </label>
       {children}
@@ -2112,16 +2111,16 @@ function ToolPickerModal({
       onClick={onCancel}
     >
       <div
-        className="bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-700 rounded-lg shadow-xl w-full max-w-[360px] p-3 max-h-[80%] overflow-y-auto"
+        className="bg-[var(--surface-raised)] border border-[var(--edge-soft)] rounded-lg shadow-xl w-full max-w-[360px] p-3 max-h-[80%] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-2">
-          <span className="text-[10px] uppercase tracking-[0.12em] text-stone-500 dark:text-stone-400 font-semibold">
+          <span className="text-[10px] uppercase tracking-[0.12em] text-[var(--ink-50)] font-semibold">
             Attach a tool to this node
           </span>
           <button
             onClick={onCancel}
-            className="h-5 w-5 inline-flex items-center justify-center text-stone-400 hover:text-stone-900 dark:hover:text-stone-100"
+            className="h-5 w-5 inline-flex items-center justify-center text-[var(--ink-40)] hover:text-[var(--ink-100)]"
           >
             <Icon name="close" size={11} />
           </button>
@@ -2131,7 +2130,7 @@ function ToolPickerModal({
             if (items.length === 0) return null
             return (
               <div key={cat}>
-                <div className="text-[9px] uppercase tracking-[0.14em] text-stone-500 dark:text-stone-400 font-semibold mb-1">
+                <div className="text-[9px] uppercase tracking-[0.14em] text-[var(--ink-50)] font-semibold mb-1">
                   {cat}
                 </div>
                 <div className="grid grid-cols-3 gap-1">
@@ -2139,14 +2138,14 @@ function ToolPickerModal({
                     <button
                       key={entry.kind}
                       onClick={() => onPick(entry.kind)}
-                      className="flex flex-col items-center gap-0.5 px-1.5 py-1.5 rounded border border-stone-200 dark:border-stone-700 hover:border-accent hover:bg-accent/5 dark:hover:bg-accent/10 text-stone-700 dark:text-stone-300"
+                      className="flex flex-col items-center gap-0.5 px-1.5 py-1.5 rounded border border-[var(--edge-soft)] hover:border-accent hover:bg-accent/5 dark:hover:bg-accent/10 text-[var(--ink-70)]"
                       title={entry.hint}
                       data-testid={`mindmap-tool-${entry.kind}`}
                     >
                       <Icon
                         name={entry.icon}
                         size={14}
-                        className="text-stone-600 dark:text-stone-400"
+                        className="text-[var(--ink-70)]"
                       />
                       <span className="text-[9px] font-medium text-center">
                         {entry.label}
@@ -2424,9 +2423,9 @@ function fillForKind(kind: MindMapNodeKind, selected: boolean): string {
     case 'question':
       return 'rgba(245,158,11,0.10)'
     case 'tool':
-      return 'rgba(99,102,241,0.10)'
+      return 'rgb(14 165 233 / 0.10)'
     case 'agent':
-      return 'rgba(168,85,247,0.10)'
+      return 'rgb(139 92 246 / 0.10)'
     case 'idea':
     default:
       return 'rgba(120,113,108,0.08)'
