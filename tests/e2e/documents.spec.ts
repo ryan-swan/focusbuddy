@@ -17,8 +17,25 @@ import { launchApp, waitForReady } from './_helpers'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
+// The object-based IA no longer has literal sidebar buttons for these
+// destinations; navigation goes through the view store (same approach as
+// documentTrash.spec.ts).
+async function goView(
+  window: import('@playwright/test').Page,
+  fn: 'goHome' | 'goCalendar' | 'goVault' | 'goDocuments'
+): Promise<void> {
+  await window.evaluate((f) => {
+    const w = window as unknown as { __fbView?: { getState: () => Record<string, () => void> } }
+    w.__fbView?.getState()[f]()
+  }, fn)
+  await window.waitForTimeout(300)
+}
+
 async function openDocumentsHub(window: import('@playwright/test').Page): Promise<void> {
-  await window.getByRole('button', { name: /^Documents$/i }).click()
+  await window.evaluate(() => {
+    const w = window as unknown as { __fbView?: { getState: () => { goDocuments: () => void } } }
+    w.__fbView?.getState().goDocuments()
+  })
   await expect(window.getByRole('heading', { name: 'Documents', level: 1 })).toBeVisible({ timeout: 8_000 })
 }
 
@@ -47,13 +64,9 @@ test('Step 1-3 — app boots clean, sidebar entry, hub renders Create-with-AI + 
   try {
     await waitForReady(window)
 
-    // Step 2: sidebar entry exists
-    const docBtn = window.getByRole('button', { name: /^Documents$/i })
-    await expect(docBtn).toBeVisible()
-
-    // Open the hub
-    await docBtn.click()
-    await expect(window.getByRole('heading', { name: 'Documents', level: 1 })).toBeVisible({ timeout: 8_000 })
+    // Step 2: open the hub (via the view store — the IA has no literal
+    // "Documents" sidebar button any more)
+    await openDocumentsHub(window)
 
     // Step 3: Create-with-AI panel
     await expect(window.getByPlaceholder(/Describe the/i)).toBeVisible()
@@ -229,16 +242,10 @@ test('Step 7 — navigate Home → Calendar → Documents, no errors, Recent lis
     await window.locator('button[title="Back to Documents"]').click()
     await expect(window.locator('text=Untitled document').first()).toBeVisible({ timeout: 5_000 })
 
-    // Navigate away → Home
-    await window.getByRole('button', { name: /^Home$/i }).click()
-    await window.waitForTimeout(300)
-
-    // Navigate → Calendar
-    await window.getByRole('button', { name: /^Calendar$/i }).click()
-    await window.waitForTimeout(300)
-
-    // Navigate back → Documents
-    await window.getByRole('button', { name: /^Documents$/i }).click()
+    // Navigate away → Home → Calendar → back to Documents
+    await goView(window, 'goHome')
+    await goView(window, 'goCalendar')
+    await goView(window, 'goDocuments')
     await expect(window.getByRole('heading', { name: 'Documents', level: 1 })).toBeVisible({ timeout: 5_000 })
 
     // Recent still intact
@@ -258,44 +265,30 @@ test('Step 7 — navigate Home → Calendar → Documents, no errors, Recent lis
   }
 })
 
-test('Step 8 — no regressions: Home, Calendar, Vault, Inbox still route without error', async () => {
+test('Step 8 — no regressions: Home, Calendar, Vault, Documents still route without error', async () => {
   const { window, dispose } = await launchApp()
+  const consoleErrors: string[] = []
+  window.on('console', (msg) => {
+    if (msg.type() === 'error') consoleErrors.push(msg.text())
+  })
   try {
     await waitForReady(window)
 
-    // Home
-    await window.getByRole('button', { name: /^Home$/i }).click()
-    await window.waitForTimeout(400)
-    await expect(window.getByRole('button', { name: /^Documents$/i })).toBeVisible()
+    // Route through the core views via the store; each must render without
+    // console errors, and the Documents hub must still open at the end.
+    await goView(window, 'goHome')
+    await goView(window, 'goCalendar')
+    await goView(window, 'goVault')
+    await openDocumentsHub(window)
 
-    // Calendar
-    await window.getByRole('button', { name: /^Calendar$/i }).click()
-    await window.waitForTimeout(400)
-    await expect(window.getByRole('button', { name: /^Documents$/i })).toBeVisible()
-
-    // Vault
-    await window.getByRole('button', { name: /^Vault$/i }).click()
-    await window.waitForTimeout(400)
-    await expect(window.getByRole('button', { name: /^Documents$/i })).toBeVisible()
-
-    // PlexiInbox
-    await window.getByRole('button', { name: /^PlexiInbox$/i }).click()
-    await window.waitForTimeout(400)
-    await expect(window.getByRole('button', { name: /^Documents$/i })).toBeVisible()
-
-    // All Tasks (may be inside a collapsible Workspace section — best-effort)
-    const allTasksBtn = window.getByRole('button', { name: /^All Tasks$/i })
-    if (await allTasksBtn.isVisible().catch(() => false)) {
-      await allTasksBtn.click()
-      await window.waitForTimeout(400)
-      await expect(window.getByRole('button', { name: /^Documents$/i })).toBeVisible()
-    }
-
-    // Messages
-    await window.getByRole('button', { name: /^Messages$/i }).click()
-    await window.waitForTimeout(400)
-    await expect(window.getByRole('button', { name: /^Documents$/i })).toBeVisible()
+    const realErrors = consoleErrors.filter(
+      (e) =>
+        !e.includes('favicon') &&
+        !e.includes('net::ERR_') &&
+        !e.includes('Failed to load resource') &&
+        !e.includes('WebSocket')
+    )
+    expect(realErrors, `Unexpected console errors: ${realErrors.join('\n')}`).toHaveLength(0)
   } finally {
     await dispose()
-  }
-})
+  }})

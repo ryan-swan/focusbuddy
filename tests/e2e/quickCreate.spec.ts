@@ -208,9 +208,9 @@ test('4 — quick-create fires a second time while already on Reports', async ()
   expect(afterSecond, 'second quick-create while already on module also creates').toBe(afterFirst + 1)
 })
 
-// ── Test 5: "New project" appears in palette; projects module reached ─────────
+// ── Test 5: "New plan" appears in palette; plans module reached ──────────────
 
-test('5 — palette "New project" command navigates to Projects and creates a project node', async () => {
+test('5 — palette "New plan" command navigates to Plans and creates a plan node', async () => {
   launched = await launchApp()
   const { window } = launched
   await waitForReady(window)
@@ -222,7 +222,7 @@ test('5 — palette "New project" command navigates to Projects and creates a pr
   })
 
   await openPalette(window)
-  await runPaletteCommand(window, 'new project', 'New project')
+  await runPaletteCommand(window, 'new plan', 'New plan')
 
   await window.waitForSelector('[data-testid="plexiprojects-view"]', { timeout: 8_000 })
   await expect(window.locator('[role="dialog"][aria-label="Command palette"]')).toHaveCount(0)
