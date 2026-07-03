@@ -2149,11 +2149,11 @@ export default function Canvas(): JSX.Element {
           fromMindmap={!!nodeOrigin}
         />
         <div className="px-4 py-2.5 border-b border-[color:var(--glass-chrome-border)] fb-glass-chrome flex flex-wrap items-center gap-x-2 gap-y-1.5">
-          <Icon name="task_alt" size={18} className="text-stone-700 dark:text-stone-300 shrink-0" />
-          <h2 className="text-sm font-semibold text-stone-900 dark:text-stone-100 truncate flex-1 min-w-[80px]">
+          <Icon name="task_alt" size={18} className="text-[var(--ink-70)] shrink-0" />
+          <h2 className="text-sm font-semibold text-[var(--ink-100)] truncate flex-1 min-w-[80px]">
             {activeTask.title}
           </h2>
-          <div className="hidden md:flex items-center gap-3 text-[11px] text-stone-500 dark:text-stone-400">
+          <div className="hidden md:flex items-center gap-3 text-[11px] text-[var(--ink-60)]">
             <span className="flex items-center gap-1" title="Priority">
               <Icon name="priority_high" size={14} />
               {activeTask.priority}
@@ -2175,7 +2175,7 @@ export default function Canvas(): JSX.Element {
                   ? 'border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-400 animate-pulse'
                   : remainingMin < 5
                     ? 'border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-400'
-                    : 'border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-800 text-stone-700 dark:text-stone-300'
+                    : 'border-[var(--edge-firm)] bg-[var(--surface-raised)] text-[var(--ink-70)]'
               }`}
               title={`${Math.floor(elapsedMin)} of ${totalEstimateMin} min elapsed`}
             >
@@ -2185,7 +2185,7 @@ export default function Canvas(): JSX.Element {
           )}
 
           {/* Zoom controls */}
-          <div className="flex items-center gap-0.5 px-1 border border-stone-300 dark:border-stone-600 rounded">
+          <div className="flex items-center gap-0.5 px-1 border border-[var(--edge-firm)] rounded">
             <button
               onClick={() => setZoom(zoom - 0.1)}
               className="icon-btn !h-6 !w-6"
@@ -2195,7 +2195,7 @@ export default function Canvas(): JSX.Element {
             </button>
             <button
               onClick={resetView}
-              className="text-[11px] text-stone-700 dark:text-stone-300 font-mono px-1.5 min-w-[42px] hover:text-stone-900 dark:hover:text-stone-100"
+              className="text-[11px] text-[var(--ink-70)] font-mono px-1.5 min-w-[42px] hover:text-[var(--ink-100)]"
               title="Reset view (⌘0)"
             >
               {zoomPct}%
@@ -2250,7 +2250,7 @@ export default function Canvas(): JSX.Element {
           </button>
           <button
             onClick={() => setShowResume(true)}
-            className={`btn-ghost ${activeTask.resumeMarkdown ? '!text-stone-900' : ''}`}
+            className={`btn-ghost ${activeTask.resumeMarkdown ? '!text-[var(--ink-100)]' : ''}`}
             title={
               activeTask.resumeMarkdown
                 ? 'View / regenerate your handoff document'

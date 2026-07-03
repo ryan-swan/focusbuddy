@@ -277,13 +277,13 @@ export default function TableWidget({ widget, inline = false }: Props): JSX.Elem
 
   if (!table) {
     const body = (
-      <div className="h-full w-full flex items-center justify-center text-[11px] text-stone-500">
+      <div className="h-full w-full flex items-center justify-center text-[11px] text-[var(--ink-50)]">
         Loading table…
       </div>
     )
     if (inline) return body
     return (
-      <WidgetFrame widget={widget} headerLabel="Table" headerAccent="bg-stone-300/60">
+      <WidgetFrame widget={widget} headerLabel="Table" headerAccent="bg-[var(--edge-firm)]/60">
         {body}
       </WidgetFrame>
     )
@@ -799,10 +799,10 @@ export default function TableWidget({ widget, inline = false }: Props): JSX.Elem
       <tr
         key={row.id}
         data-row-index={idx}
-        className={`border-b border-stone-200 dark:border-stone-700 group ${
+        className={`border-b border-[var(--edge-soft)] group ${
           idx % 2 === 0
-            ? 'bg-white dark:bg-stone-900'
-            : 'bg-stone-50/60 dark:bg-stone-800/30'
+            ? 'bg-[var(--surface-raised)]'
+            : 'bg-[var(--surface-sunken)]/60'
         } hover:bg-accent/[0.04] dark:hover:bg-accent/[0.08] ${
           rowReorder.dragId === row.id ? 'opacity-40' : ''
         } ${
@@ -811,12 +811,12 @@ export default function TableWidget({ widget, inline = false }: Props): JSX.Elem
             : ''
         }`}
       >
-        <td className="w-8 px-0.5 py-1 border-r border-stone-200 dark:border-stone-700 align-middle">
+        <td className="w-8 px-0.5 py-1 border-r border-[var(--edge-soft)] align-middle">
           <div className="flex flex-col items-center gap-0.5">
             {rowsReorderable && (
               <span
                 onMouseDown={(e) => rowReorder.start(e, row.id)}
-                className="widget-nodrag text-stone-300 dark:text-stone-600 hover:text-accent cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity"
+                className="widget-nodrag text-[var(--ink-30)] hover:text-accent cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity"
                 title="Drag to reorder row"
               >
                 <Icon name="drag_indicator" size={12} />
@@ -824,7 +824,7 @@ export default function TableWidget({ widget, inline = false }: Props): JSX.Elem
             )}
             <button
               onClick={() => void deleteRow(row.id)}
-              className="text-stone-300 dark:text-stone-600 hover:text-red-600 transition-colors"
+              className="text-[var(--ink-30)] hover:text-rose-500 transition-colors"
               title="Delete row"
             >
               <Icon name="delete" size={13} />
@@ -835,7 +835,7 @@ export default function TableWidget({ widget, inline = false }: Props): JSX.Elem
           <td
             key={col.id}
             data-testid={`table-cell-${idx}-${ci}`}
-            className={`border-r border-stone-200 dark:border-stone-700 align-top ${
+            className={`border-r border-[var(--edge-soft)] align-top ${
               cellSelectable && inCellRange(selRange, idx, ci) ? 'bg-accent/[0.12]' : ''
             } ${
               cellSelectable && activeCell?.r === idx && activeCell?.c === ci
@@ -873,7 +873,7 @@ export default function TableWidget({ widget, inline = false }: Props): JSX.Elem
             />
           </td>
         ))}
-        <td className="border-r border-stone-200 dark:border-stone-700" />
+        <td className="border-r border-[var(--edge-soft)]" />
       </tr>
     )
   }
@@ -881,38 +881,38 @@ export default function TableWidget({ widget, inline = false }: Props): JSX.Elem
   const body = (
     <div
       ref={bodyRef}
-      className="h-full w-full bg-white dark:bg-stone-900 overflow-auto relative outline-none"
+      className="h-full w-full bg-[var(--surface-raised)] overflow-auto relative outline-none"
       data-testid="table-body"
       tabIndex={0}
       onKeyDown={onTableKeyDown}
     >
       {selNote && (
         <div
-          className="absolute bottom-2 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 rounded-md border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 px-3 py-1.5 text-[12px] shadow-lg"
+          className="absolute bottom-2 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 rounded-md border border-[var(--edge-soft)] bg-[var(--surface-raised)] px-3 py-1.5 text-[12px] shadow-lg"
           data-testid="table-paste-note"
         >
-          <span className="text-stone-600 dark:text-stone-300">{selNote}</span>
-          <button onClick={() => setSelNote(null)} className="text-stone-400 hover:text-stone-600">
+          <span className="text-[var(--ink-70)]">{selNote}</span>
+          <button onClick={() => setSelNote(null)} className="text-[var(--ink-40)] hover:text-[var(--ink-70)]">
             <Icon name="close" size={12} />
           </button>
         </div>
       )}
       {/* Title row */}
-      <div className="sticky top-0 z-10 px-3 py-2 bg-white/95 dark:bg-stone-900/95 border-b border-stone-200 dark:border-stone-700 flex items-center gap-1.5">
+      <div className="sticky top-0 z-10 px-3 py-2 bg-[var(--surface-raised)]/95 border-b border-[var(--edge-soft)] flex items-center gap-1.5">
         <Icon name={currentViewMeta.icon} size={15} className="text-accent shrink-0" />
         <input
           value={table.title}
           onChange={(e) => renameTable(e.target.value)}
           placeholder="Untitled table"
-          className="flex-1 bg-transparent text-[14px] font-semibold text-stone-800 dark:text-stone-100 outline-none placeholder-stone-300 dark:placeholder-stone-600"
+          className="flex-1 bg-transparent text-[14px] font-semibold text-[var(--ink-90)] outline-none placeholder-[var(--ink-30)]"
         />
-        <span className="text-[11px] text-stone-400 dark:text-stone-500 font-medium tabular-nums">
+        <span className="text-[11px] text-[var(--ink-40)] font-medium tabular-nums">
           {rows.length} {rows.length === 1 ? 'row' : 'rows'}
         </span>
         <button
           onClick={() => void handleImport()}
           data-testid="table-import-button"
-          className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium text-stone-500 dark:text-stone-400 hover:text-accent hover:bg-accent/10 transition-colors"
+          className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium text-[var(--ink-50)] hover:text-accent hover:bg-accent/10 transition-colors"
           title="Import CSV, JSON, XLS, or XLSX — map columns and upsert by a key"
         >
           <Icon name="upload_file" size={12} />
@@ -932,7 +932,7 @@ export default function TableWidget({ widget, inline = false }: Props): JSX.Elem
         </button>
       </div>
       {importError && (
-        <div className="px-2.5 py-1 text-[11px] text-red-500 bg-red-50 dark:bg-red-950/30 border-b border-red-100 dark:border-red-900" data-testid="import-error">
+        <div className="px-2.5 py-1 text-[11px] text-rose-500 bg-rose-500/10 border-b border-rose-500/10" data-testid="import-error">
           {importError}
         </div>
       )}
@@ -953,7 +953,7 @@ export default function TableWidget({ widget, inline = false }: Props): JSX.Elem
           highlighted; clicking switches without losing data. Each non-
           table view uses TableSchema.viewConfig to remember which column
           drives its grouping (kanban lanes / calendar date / etc.). */}
-      <div className="sticky top-[44px] z-[9] px-2.5 py-1.5 border-b border-stone-200 dark:border-stone-700 bg-stone-50/60 dark:bg-stone-900/60 flex items-center gap-0.5 overflow-x-auto">
+      <div className="sticky top-[44px] z-[9] px-2.5 py-1.5 border-b border-[var(--edge-soft)] bg-[var(--surface-sunken)]/60 flex items-center gap-0.5 overflow-x-auto">
         {VIEW_OPTIONS.map((v) => {
           const active = v.id === viewMode
           return (
@@ -963,7 +963,7 @@ export default function TableWidget({ widget, inline = false }: Props): JSX.Elem
               className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium transition-colors shrink-0 ${
                 active
                   ? 'bg-accent/15 text-accent'
-                  : 'text-stone-500 dark:text-stone-400 hover:text-stone-800 dark:hover:text-stone-100 hover:bg-stone-100 dark:hover:bg-stone-800/60'
+                  : 'text-[var(--ink-50)] hover:text-[var(--ink-90)] hover:bg-[var(--surface-sunken)]'
               }`}
               title={`Switch to ${v.label} view`}
               aria-pressed={active}
@@ -1059,7 +1059,7 @@ export default function TableWidget({ widget, inline = false }: Props): JSX.Elem
             <col style={{ width: ADD_COL_WIDTH }} />
           </colgroup>
           <thead>
-            <tr className="border-b border-stone-300 dark:border-stone-600 bg-stone-100/70 dark:bg-stone-800/60">
+            <tr className="border-b border-[var(--edge-firm)] bg-[var(--surface-sunken)]/70">
               <th className="px-1 py-1.5" />
               {table.schema.columns.map((col, index) => (
                 <ColumnHeader
@@ -1095,11 +1095,11 @@ export default function TableWidget({ widget, inline = false }: Props): JSX.Elem
               <tr>
                 <td
                   colSpan={table.schema.columns.length + 2}
-                  className="py-8 text-center text-[12px] text-stone-400 dark:text-stone-500"
+                  className="py-8 text-center text-[12px] text-[var(--ink-40)]"
                 >
                   <div className="flex flex-col items-center gap-1">
-                    <Icon name="table_rows" size={20} className="text-stone-300 dark:text-stone-600" />
-                    <span>No rows yet — click <strong className="text-stone-600 dark:text-stone-300">Add row</strong> below or use the <strong className="text-accent">AI</strong> button to generate some.</span>
+                    <Icon name="table_rows" size={20} className="text-[var(--ink-30)]" />
+                    <span>No rows yet — click <strong className="text-[var(--ink-70)]">Add row</strong> below or use the <strong className="text-accent">AI</strong> button to generate some.</span>
                   </div>
                 </td>
               </tr>
@@ -1108,11 +1108,11 @@ export default function TableWidget({ widget, inline = false }: Props): JSX.Elem
               <tr>
                 <td
                   colSpan={table.schema.columns.length + 2}
-                  className="py-8 text-center text-[12px] text-stone-400 dark:text-stone-500"
+                  className="py-8 text-center text-[12px] text-[var(--ink-40)]"
                   data-testid="table-no-matches"
                 >
                   <div className="flex flex-col items-center gap-1">
-                    <Icon name="filter_list_off" size={20} className="text-stone-300 dark:text-stone-600" />
+                    <Icon name="filter_list_off" size={20} className="text-[var(--ink-30)]" />
                     <span>No rows match the current filter.</span>
                   </div>
                 </td>
@@ -1137,10 +1137,10 @@ export default function TableWidget({ widget, inline = false }: Props): JSX.Elem
               })}
             {/* Add-row footer */}
             <tr>
-              <td colSpan={table.schema.columns.length + 2} className="p-1.5 border-t border-stone-200 dark:border-stone-700">
+              <td colSpan={table.schema.columns.length + 2} className="p-1.5 border-t border-[var(--edge-soft)]">
                 <button
                   onClick={() => void addRow(table.id)}
-                  className="w-full inline-flex items-center justify-center gap-1 text-[12px] py-1.5 rounded text-stone-500 dark:text-stone-400 hover:text-accent hover:bg-accent/5 transition-colors"
+                  className="w-full inline-flex items-center justify-center gap-1 text-[12px] py-1.5 rounded text-[var(--ink-50)] hover:text-accent hover:bg-accent/5 transition-colors"
                 >
                   <Icon name="add" size={14} />
                   <span>Add row</span>
@@ -1153,7 +1153,7 @@ export default function TableWidget({ widget, inline = false }: Props): JSX.Elem
       )}
 
       {aiOpen && (
-        <div className="absolute bottom-2 left-2 right-2 z-50 rounded-lg border border-accent bg-white dark:bg-stone-900 shadow-xl p-3 max-h-[70%] flex flex-col gap-2">
+        <div className="absolute bottom-2 left-2 right-2 z-50 rounded-lg border border-accent bg-[var(--surface-raised)] shadow-xl p-3 max-h-[70%] flex flex-col gap-2">
           <div className="flex items-center gap-1.5">
             <Icon name="auto_awesome" size={13} className="text-accent" />
             <span className="text-[10px] uppercase tracking-wider font-semibold text-accent">
@@ -1164,7 +1164,7 @@ export default function TableWidget({ widget, inline = false }: Props): JSX.Elem
                 setAiOpen(false)
                 rejectAi()
               }}
-              className="ml-auto h-5 w-5 rounded inline-flex items-center justify-center text-stone-400 hover:bg-stone-100 dark:hover:bg-stone-800"
+              className="ml-auto h-5 w-5 rounded inline-flex items-center justify-center text-[var(--ink-40)] hover:bg-[var(--surface-sunken)]"
               aria-label="Close"
             >
               <Icon name="close" size={12} />
@@ -1182,11 +1182,11 @@ export default function TableWidget({ widget, inline = false }: Props): JSX.Elem
             }}
             placeholder='e.g. "Add 5 fictional podcast episodes about climate tech"'
             rows={2}
-            className="w-full text-[13px] px-2.5 py-1.5 bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-md resize-none text-stone-900 dark:text-stone-100 placeholder:text-stone-400 dark:placeholder:text-stone-500 focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
+            className="w-full text-[13px] px-2.5 py-1.5 bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded-md resize-none text-[var(--ink-100)] placeholder:text-[var(--ink-40)] focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
           />
           <div className="flex items-center gap-2 text-[11px] flex-wrap">
-            <label className="text-stone-500 dark:text-stone-400">Rows:</label>
-            <label className="inline-flex items-center gap-1 cursor-pointer text-stone-700 dark:text-stone-200">
+            <label className="text-[var(--ink-50)]">Rows:</label>
+            <label className="inline-flex items-center gap-1 cursor-pointer text-[var(--ink-70)]">
               <input
                 type="checkbox"
                 checked={aiAutoCount}
@@ -1197,7 +1197,7 @@ export default function TableWidget({ widget, inline = false }: Props): JSX.Elem
             </label>
             {!aiAutoCount && (
               <>
-                <span className="text-stone-300 dark:text-stone-600">·</span>
+                <span className="text-[var(--ink-30)]">·</span>
                 <input
                   type="number"
                   min={1}
@@ -1206,9 +1206,9 @@ export default function TableWidget({ widget, inline = false }: Props): JSX.Elem
                   onChange={(e) =>
                     setAiCount(Math.max(1, Math.min(20, parseInt(e.target.value) || 1)))
                   }
-                  className="w-14 px-2 py-0.5 bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded text-stone-800 dark:text-stone-100 focus:outline-none focus:border-accent"
+                  className="w-14 px-2 py-0.5 bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded text-[var(--ink-90)] focus:outline-none focus:border-accent"
                 />
-                <span className="text-stone-400 dark:text-stone-500">fixed</span>
+                <span className="text-[var(--ink-40)]">fixed</span>
               </>
             )}
           </div>
@@ -1234,7 +1234,7 @@ export default function TableWidget({ widget, inline = false }: Props): JSX.Elem
                 {aiStagedColumns.map((c, i) => (
                   <span
                     key={i}
-                    className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-white dark:bg-stone-800 border border-accent/40 text-[11px] text-stone-700 dark:text-stone-200"
+                    className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-[var(--surface-raised)] border border-accent/40 text-[11px] text-[var(--ink-70)]"
                     title={
                       c.options && c.options.length > 0
                         ? `Options: ${c.options.join(', ')}`
@@ -1242,12 +1242,12 @@ export default function TableWidget({ widget, inline = false }: Props): JSX.Elem
                     }
                   >
                     <Icon name="view_column" size={11} className="text-accent" />
-                    <strong className="text-stone-800 dark:text-stone-100">{c.label}</strong>
-                    <span className="text-stone-400 dark:text-stone-500">{c.type}</span>
+                    <strong className="text-[var(--ink-90)]">{c.label}</strong>
+                    <span className="text-[var(--ink-40)]">{c.type}</span>
                   </span>
                 ))}
               </div>
-              <div className="text-[10px] text-stone-500 dark:text-stone-400">
+              <div className="text-[10px] text-[var(--ink-50)]">
                 Adding these will update your table's schema. Rows preview unlocks once you decide.
               </div>
               <div className="flex justify-end gap-1.5">
@@ -1260,7 +1260,7 @@ export default function TableWidget({ widget, inline = false }: Props): JSX.Elem
                     setAiStagedColumns(null)
                     setColumnsApplied(true)
                   }}
-                  className="text-[11px] px-3 py-1 rounded text-stone-600 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800"
+                  className="text-[11px] px-3 py-1 rounded text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]"
                 >
                   Skip
                 </button>
@@ -1285,14 +1285,14 @@ export default function TableWidget({ widget, inline = false }: Props): JSX.Elem
                   Step 2 — Approve {aiStaged.length} {aiStaged.length === 1 ? 'row' : 'rows'}
                 </div>
               </div>
-              <div className="flex-1 min-h-0 overflow-auto bg-stone-50 dark:bg-stone-800/60 border border-stone-200 dark:border-stone-700 rounded-md">
+              <div className="flex-1 min-h-0 overflow-auto bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded-md">
                 <table className="w-full text-[11px]">
-                  <thead className="bg-stone-100 dark:bg-stone-800 sticky top-0">
+                  <thead className="bg-[var(--surface-sunken)] sticky top-0">
                     <tr>
                       {table.schema.columns.map((col) => (
                         <th
                           key={col.id}
-                          className="text-left px-2 py-1 font-medium text-stone-700 dark:text-stone-200 border-r border-stone-200 dark:border-stone-700"
+                          className="text-left px-2 py-1 font-medium text-[var(--ink-70)] border-r border-[var(--edge-soft)]"
                         >
                           {col.label}
                         </th>
@@ -1303,7 +1303,7 @@ export default function TableWidget({ widget, inline = false }: Props): JSX.Elem
                     {aiStaged.map((row, i) => (
                       <tr
                         key={i}
-                        className="border-b border-stone-200 dark:border-stone-700"
+                        className="border-b border-[var(--edge-soft)]"
                       >
                         {table.schema.columns.map((col) => {
                           const v =
@@ -1319,10 +1319,10 @@ export default function TableWidget({ widget, inline = false }: Props): JSX.Elem
                           return (
                             <td
                               key={col.id}
-                              className="px-2 py-1 text-stone-700 dark:text-stone-200 border-r border-stone-200 dark:border-stone-700 align-top max-w-[200px] truncate"
+                              className="px-2 py-1 text-[var(--ink-70)] border-r border-[var(--edge-soft)] align-top max-w-[200px] truncate"
                               title={display}
                             >
-                              {display || <span className="text-stone-300 dark:text-stone-600">—</span>}
+                              {display || <span className="text-[var(--ink-30)]">—</span>}
                             </td>
                           )
                         })}
@@ -1338,14 +1338,14 @@ export default function TableWidget({ widget, inline = false }: Props): JSX.Elem
               <>
                 <button
                   onClick={rejectAi}
-                  className="text-[11px] px-3 py-1 rounded text-stone-600 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800"
+                  className="text-[11px] px-3 py-1 rounded text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]"
                 >
                   Discard
                 </button>
                 <button
                   onClick={() => void runAi()}
                   disabled={!aiPrompt.trim() || aiBusy}
-                  className="text-[11px] px-3 py-1 rounded text-stone-700 dark:text-stone-200 border border-stone-300 dark:border-stone-600 hover:bg-stone-100 dark:hover:bg-stone-800 disabled:opacity-50"
+                  className="text-[11px] px-3 py-1 rounded text-[var(--ink-70)] border border-[var(--edge-firm)] hover:bg-[var(--surface-sunken)] disabled:opacity-50"
                 >
                   {aiBusy ? 'Regenerating…' : 'Regenerate'}
                 </button>
@@ -1377,7 +1377,7 @@ export default function TableWidget({ widget, inline = false }: Props): JSX.Elem
               </button>
             )}
           </div>
-          <div className="text-[9px] text-stone-400 dark:text-stone-500">
+          <div className="text-[9px] text-[var(--ink-40)]">
             Cmd+Enter to draft · rows are previewed before they touch the table
           </div>
         </div>
@@ -1425,7 +1425,7 @@ export default function TableWidget({ widget, inline = false }: Props): JSX.Elem
     <WidgetFrame
       widget={widget}
       headerLabel={table.title}
-      headerAccent="bg-stone-300/60"
+      headerAccent="bg-[var(--edge-firm)]/60"
     >
       {body}
     </WidgetFrame>
@@ -1448,16 +1448,16 @@ function GroupRows({
 }): JSX.Element {
   return (
     <>
-      <tr className="bg-stone-100/80 dark:bg-stone-800/70 border-b border-stone-300 dark:border-stone-600">
+      <tr className="bg-[var(--surface-sunken)]/80 border-b border-[var(--edge-firm)]">
         <td colSpan={colSpan} className="px-2 py-1.5">
           <button
             onClick={onToggle}
-            className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-stone-700 dark:text-stone-200 hover:text-accent"
+            className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-[var(--ink-70)] hover:text-accent"
           >
             <Icon
               name={collapsed ? 'chevron_right' : 'expand_more'}
               size={15}
-              className="text-stone-400"
+              className="text-[var(--ink-40)]"
             />
             {group.color && (
               <span
@@ -1466,7 +1466,7 @@ function GroupRows({
               />
             )}
             <span className="truncate max-w-[280px]">{group.label}</span>
-            <span className="text-stone-400 dark:text-stone-500 font-normal tabular-nums">
+            <span className="text-[var(--ink-40)] font-normal tabular-nums">
               {group.rows.length}
             </span>
           </button>
@@ -1523,7 +1523,7 @@ function ColumnHeader({
       ref={ref}
       data-col-index={index}
       onContextMenu={onContextMenu}
-      className={`text-left px-2 py-1 font-medium text-[11px] text-stone-700 dark:text-stone-200 relative ${
+      className={`text-left px-2 py-1 font-medium text-[11px] text-[var(--ink-70)] relative ${
         isDragging ? 'opacity-40' : ''
       } ${isDragOver ? 'border-l-2 border-l-accent' : ''}`}
     >
@@ -1532,17 +1532,17 @@ function ColumnHeader({
             same gesture from moving the table widget on the canvas. */}
         <span
           onMouseDown={onReorderDown}
-          className="widget-nodrag shrink-0 text-stone-300 dark:text-stone-600 hover:text-accent cursor-grab active:cursor-grabbing"
+          className="widget-nodrag shrink-0 text-[var(--ink-30)] hover:text-accent cursor-grab active:cursor-grabbing"
           title="Drag to reorder column"
         >
           <Icon name="drag_indicator" size={12} />
         </span>
         <button
           onClick={() => setOpen((v) => !v)}
-          className="inline-flex items-center gap-1 hover:bg-stone-100 dark:hover:bg-stone-800 rounded px-1 py-0.5 flex-1 min-w-0 text-left"
+          className="inline-flex items-center gap-1 hover:bg-[var(--surface-sunken)] rounded px-1 py-0.5 flex-1 min-w-0 text-left"
           title="Click to edit · right-click for more"
         >
-          <Icon name={FIELD_TYPE_ICONS[col.type]} size={11} className="text-stone-400 shrink-0" />
+          <Icon name={FIELD_TYPE_ICONS[col.type]} size={11} className="text-[var(--ink-40)] shrink-0" />
           <span className="truncate">{col.label}</span>
         </button>
       </div>
@@ -1555,20 +1555,20 @@ function ColumnHeader({
         title="Drag to resize column"
       />
       {open && (
-        <div className="absolute z-50 mt-1 left-0 w-56 rounded border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 shadow-lg p-2 space-y-1.5 text-stone-700 dark:text-stone-200 font-normal">
+        <div className="absolute z-50 mt-1 left-0 w-56 rounded border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-lg p-2 space-y-1.5 text-[var(--ink-70)] font-normal">
           <input
             value={col.label}
             onChange={(e) => onRename(e.target.value)}
             placeholder="Column name"
-            className="w-full text-[11px] bg-stone-50 dark:bg-stone-800 border border-stone-300 dark:border-stone-700 rounded px-2 py-1 text-stone-900 dark:text-stone-100 placeholder:text-stone-400 dark:placeholder:text-stone-500"
+            className="w-full text-[11px] bg-[var(--surface-sunken)] border border-[var(--edge-firm)] rounded px-2 py-1 text-[var(--ink-100)] placeholder:text-[var(--ink-40)]"
           />
-          <div className="text-[10px] uppercase tracking-wider text-stone-400">
+          <div className="text-[10px] uppercase tracking-wider text-[var(--ink-40)]">
             Type
           </div>
           <select
             value={col.type}
             onChange={(e) => onSetType(e.target.value as FieldType)}
-            className="w-full text-[11px] bg-stone-50 dark:bg-stone-800 border border-stone-300 dark:border-stone-700 rounded px-2 py-1 text-stone-900 dark:text-stone-100 placeholder:text-stone-400 dark:placeholder:text-stone-500"
+            className="w-full text-[11px] bg-[var(--surface-sunken)] border border-[var(--edge-firm)] rounded px-2 py-1 text-[var(--ink-100)] placeholder:text-[var(--ink-40)]"
             title="Change this column's field type"
           >
             {(Object.keys(FIELD_TYPE_LABELS) as FieldType[]).map((t) => (
@@ -1604,7 +1604,7 @@ function ColumnHeader({
               onRemove()
               setOpen(false)
             }}
-            className="w-full text-[11px] text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 rounded px-2 py-1 text-left"
+            className="w-full text-[11px] text-rose-500 hover:bg-rose-500/10 rounded px-2 py-1 text-left"
           >
             <Icon name="delete" size={11} className="inline mr-1" />
             Delete column
@@ -1636,7 +1636,7 @@ function SelectOptionsMini({
   }
   return (
     <div className="space-y-1">
-      <div className="text-[10px] uppercase tracking-wider text-stone-400">Options</div>
+      <div className="text-[10px] uppercase tracking-wider text-[var(--ink-40)]">Options</div>
       <div className="flex flex-wrap gap-1">
         {options.map((o) => (
           <span
@@ -1662,7 +1662,7 @@ function SelectOptionsMini({
             if (e.key === 'Enter') add()
           }}
           placeholder="New option…"
-          className="flex-1 text-[10px] bg-stone-50 dark:bg-stone-800 border border-stone-300 dark:border-stone-700 rounded px-1.5 py-0.5 text-stone-900 dark:text-stone-100 placeholder:text-stone-400 dark:placeholder:text-stone-500"
+          className="flex-1 text-[10px] bg-[var(--surface-sunken)] border border-[var(--edge-firm)] rounded px-1.5 py-0.5 text-[var(--ink-100)] placeholder:text-[var(--ink-40)]"
         />
         <button
           onClick={add}
@@ -1692,13 +1692,13 @@ function ColumnAdder({ onAdd }: { onAdd: (t: FieldType) => void }): JSX.Element 
     <div ref={ref} className="relative">
       <button
         onClick={() => setOpen((v) => !v)}
-        className="inline-flex items-center justify-center h-5 w-5 rounded hover:bg-stone-200 dark:hover:bg-stone-700 text-stone-500"
+        className="inline-flex items-center justify-center h-5 w-5 rounded hover:bg-[var(--edge-soft)] text-[var(--ink-50)]"
         title="Add column"
       >
         <Icon name="add" size={12} />
       </button>
       {open && (
-        <div className="absolute right-0 z-50 mt-1 w-44 rounded border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 shadow-lg py-1">
+        <div className="absolute right-0 z-50 mt-1 w-44 rounded border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-lg py-1">
           {(Object.keys(FIELD_TYPE_LABELS) as FieldType[]).map((t) => (
             <button
               key={t}
@@ -1706,9 +1706,9 @@ function ColumnAdder({ onAdd }: { onAdd: (t: FieldType) => void }): JSX.Element 
                 onAdd(t)
                 setOpen(false)
               }}
-              className="w-full flex items-center gap-1.5 px-2 py-1 hover:bg-stone-100 dark:hover:bg-stone-800 text-left font-normal text-stone-700 dark:text-stone-200"
+              className="w-full flex items-center gap-1.5 px-2 py-1 hover:bg-[var(--surface-sunken)] text-left font-normal text-[var(--ink-70)]"
             >
-              <Icon name={FIELD_TYPE_ICONS[t]} size={11} className="text-stone-400" />
+              <Icon name={FIELD_TYPE_ICONS[t]} size={11} className="text-[var(--ink-40)]" />
               <span className="text-[11px]">{FIELD_TYPE_LABELS[t]}</span>
             </button>
           ))}
@@ -1760,7 +1760,7 @@ function HeaderContextMenu({
   return (
     <div
       ref={ref}
-      className="fixed z-[100] w-52 rounded-md border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 shadow-xl py-1 text-stone-700 dark:text-stone-200"
+      className="fixed z-[100] w-52 rounded-md border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-xl py-1 text-[var(--ink-70)]"
       style={{ left, top }}
       onContextMenu={(e) => e.preventDefault()}
     >
@@ -1768,26 +1768,26 @@ function HeaderContextMenu({
         <>
           <button
             onClick={() => setMode('left')}
-            className="w-full flex items-center gap-2 px-3 py-1.5 text-[12px] hover:bg-stone-100 dark:hover:bg-stone-800 text-left"
+            className="w-full flex items-center gap-2 px-3 py-1.5 text-[12px] hover:bg-[var(--surface-sunken)] text-left"
           >
-            <Icon name="keyboard_tab_rtl" size={13} className="text-stone-400" />
+            <Icon name="keyboard_tab_rtl" size={13} className="text-[var(--ink-40)]" />
             <span className="flex-1">Insert column left</span>
-            <Icon name="chevron_right" size={13} className="text-stone-400" />
+            <Icon name="chevron_right" size={13} className="text-[var(--ink-40)]" />
           </button>
           <button
             onClick={() => setMode('right')}
-            className="w-full flex items-center gap-2 px-3 py-1.5 text-[12px] hover:bg-stone-100 dark:hover:bg-stone-800 text-left"
+            className="w-full flex items-center gap-2 px-3 py-1.5 text-[12px] hover:bg-[var(--surface-sunken)] text-left"
           >
-            <Icon name="keyboard_tab" size={13} className="text-stone-400" />
+            <Icon name="keyboard_tab" size={13} className="text-[var(--ink-40)]" />
             <span className="flex-1">Insert column right</span>
-            <Icon name="chevron_right" size={13} className="text-stone-400" />
+            <Icon name="chevron_right" size={13} className="text-[var(--ink-40)]" />
           </button>
-          <div className="my-1 border-t border-stone-200 dark:border-stone-700" />
+          <div className="my-1 border-t border-[var(--edge-soft)]" />
           <button
             onClick={onDelete}
             disabled={!canDelete}
             title={canDelete ? undefined : 'A table needs at least one column'}
-            className="w-full flex items-center gap-2 px-3 py-1.5 text-[12px] text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 text-left disabled:opacity-40 disabled:hover:bg-transparent"
+            className="w-full flex items-center gap-2 px-3 py-1.5 text-[12px] text-rose-500 hover:bg-rose-500/10 text-left disabled:opacity-40 disabled:hover:bg-transparent"
           >
             <Icon name="delete" size={13} />
             <span>Delete column</span>
@@ -1797,19 +1797,19 @@ function HeaderContextMenu({
         <>
           <button
             onClick={() => setMode('main')}
-            className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] uppercase tracking-wider text-stone-400 hover:bg-stone-100 dark:hover:bg-stone-800 text-left"
+            className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] uppercase tracking-wider text-[var(--ink-40)] hover:bg-[var(--surface-sunken)] text-left"
           >
             <Icon name="chevron_left" size={13} />
             <span>Insert {mode === 'left' ? 'left' : 'right'} — pick type</span>
           </button>
-          <div className="border-t border-stone-200 dark:border-stone-700 max-h-64 overflow-auto">
+          <div className="border-t border-[var(--edge-soft)] max-h-64 overflow-auto">
             {(Object.keys(FIELD_TYPE_LABELS) as FieldType[]).map((t) => (
               <button
                 key={t}
                 onClick={() => onInsert(mode === 'left' ? 'left' : 'right', t)}
-                className="w-full flex items-center gap-2 px-3 py-1.5 text-[12px] hover:bg-stone-100 dark:hover:bg-stone-800 text-left font-normal"
+                className="w-full flex items-center gap-2 px-3 py-1.5 text-[12px] hover:bg-[var(--surface-sunken)] text-left font-normal"
               >
-                <Icon name={FIELD_TYPE_ICONS[t]} size={12} className="text-stone-400" />
+                <Icon name={FIELD_TYPE_ICONS[t]} size={12} className="text-[var(--ink-40)]" />
                 <span>{FIELD_TYPE_LABELS[t]}</span>
               </button>
             ))}
