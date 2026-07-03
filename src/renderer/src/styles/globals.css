@@ -483,8 +483,12 @@ body {
   animation: futuristic-pulse 2.5s ease-in-out infinite;
 }
 
-/* Header — pure glass with the softest possible hairline. */
-.futuristic header {
+/* Titlebar — pure glass with the softest possible hairline. Scoped to
+   header.titlebar-drag (the single top masthead in App.tsx) — a bare
+   `header` tag selector would also match every semantic <header> a page
+   view renders (DashboardHeader, DocumentsView, VaultView, etc.), painting
+   an unwanted dark glass bar behind ordinary page titles. */
+.futuristic header.titlebar-drag {
   border-color: rgba(255, 255, 255, 0.04) !important;
   background: rgba(10, 15, 30, 0.62) !important;
   backdrop-filter: saturate(160%) blur(30px) !important;
@@ -642,8 +646,8 @@ body {
    as breath, not as lines. */
 .futuristic aside .border-stone-200,
 .futuristic aside .border-stone-700,
-.futuristic header .border-stone-200,
-.futuristic header .border-stone-700 {
+.futuristic header.titlebar-drag .border-stone-200,
+.futuristic header.titlebar-drag .border-stone-700 {
   border-color: rgba(255, 255, 255, 0.04) !important;
 }
 
@@ -1179,7 +1183,11 @@ body {
     ) !important;
 }
 
-.atelier header {
+/* Scoped to header.titlebar-drag (the single top masthead in App.tsx) — a
+   bare `header` tag selector also matched every semantic <header> a page
+   view renders (DashboardHeader in AllTasksView/DeskGallery, VaultView,
+   etc.), painting an unwanted dark glass bar behind ordinary page titles. */
+.atelier header.titlebar-drag {
   background: oklch(20% 0.028 250 / 0.65) !important;
   backdrop-filter: saturate(160%) blur(24px);
   -webkit-backdrop-filter: saturate(160%) blur(24px);
@@ -1270,8 +1278,12 @@ body {
   background-color: oklch(92% 0.022 80) !important;
 }
 
-/* Titlebar wordmark in Atelier — heritage gold, not white */
-.atelier header h1 {
+/* Titlebar wordmark in Atelier — heritage gold, not white. Scoped to the
+   masthead's own h1 (header.titlebar-drag h1) — a bare `header h1` selector
+   also caught DashboardHeader's <h1> in AllTasksView/DeskGallery/HomeDashboard
+   and any other view header, shrinking their page titles down to a 11px
+   uppercase gold label. */
+.atelier header.titlebar-drag h1 {
   color: rgb(var(--accent)) !important;
   letter-spacing: 0.04em;
   text-transform: uppercase;
