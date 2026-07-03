@@ -1,4 +1,5 @@
 import { getDb } from './database'
+import { getActiveOrgId } from './activeOrg'
 import { contentToText, makeSnippet, escapeLike, scoreMatch, semanticHitScore } from './searchText'
 import { semanticSearchKnowledge, knowledgeSemanticActive } from '../semanticRetrieval'
 import { semanticSearchDocuments, documentSemanticActive } from '../documentRetrieval'
@@ -206,6 +207,77 @@ export async function searchAll(rawQuery: string): Promise<SearchHit[]> {
       score: semanticHitScore(keyword, rank, semanticActive)
     })
   })
+
+  // Calendar time blocks by title, scoped to the active org. A hit routes to
+  // the Calendar view (startMs lets it land on the right month).
+  const eventRows = db
+    .prepare(
+      `SELECT id, title, start_ms FROM time_blocks
+       WHERE org_id = ? AND title LIKE ?${ESC} LIMIT ?`
+    )
+    .all(getActiveOrgId(), like, PER_CATEGORY) as Array<{ id: string; title: string; start_ms: number }>
+  for (const r of eventRows) {
+    hits.push({
+      type: 'event',
+      id: r.id,
+      title: r.title || 'Untitled block',
+      snippet: new Date(r.start_ms).toLocaleString(undefined, {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit'
+      }),
+      score: scoreMatch(r.title, '', query),
+      startMs: r.start_ms
+    })
+  }
+
+  // Meetings — title, summary and transcript, so "what did we decide about X"
+  // finds the meeting even when only the transcript mentions it.
+  const meetingRows = db
+    .prepare(
+      `SELECT id, title, summary, transcript FROM fb_meetings
+       WHERE org_id = ? AND (title LIKE ?${ESC} OR summary LIKE ?${ESC} OR transcript LIKE ?${ESC}) LIMIT ?`
+    )
+    .all(getActiveOrgId(), like, like, like, PER_CATEGORY) as Array<{
+    id: string
+    title: string
+    summary: string
+    transcript: string
+  }>
+  for (const r of meetingRows) {
+    const body = r.summary || r.transcript
+    hits.push({
+      type: 'meeting',
+      id: r.id,
+      title: r.title || 'Untitled meeting',
+      snippet: makeSnippet(body || r.title, query),
+      score: scoreMatch(r.title, body, query)
+    })
+  }
+
+  // Signature requests by title and body.
+  const signRows = db
+    .prepare(
+      `SELECT id, title, body FROM fb_sign_requests
+       WHERE org_id = ? AND (title LIKE ?${ESC} OR body LIKE ?${ESC}) LIMIT ?`
+    )
+    .all(getActiveOrgId(), like, like, PER_CATEGORY) as Array<{ id: string; title: string; body: string }>
+  for (const r of signRows) {
+    hits.push({
+      type: 'sign',
+      id: r.id,
+      title: r.title || 'Untitled agreement',
+      snippet: makeSnippet(r.body || r.title, query),
+      score: scoreMatch(r.title, r.body, query)
+    })
+  }
+
+  // NOT covered here (yet): Mail and Chat. Mail is a live IMAP view with no
+  // local message store, and chat history lives on the signal server — both
+  // need their own search infrastructure (IMAP SEARCH / a server endpoint)
+  // rather than a LIKE over local SQLite. Tracked in docs/PLEXI-REVIEW-2026-07.
 
   // Dedupe (a table can match on several rows) by type+id, keeping the best
   // score, then rank and cap.

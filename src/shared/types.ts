@@ -1242,7 +1242,17 @@ export type DocType = 'doc' | 'sheet' | 'slides' | 'map' | 'design'
 // `taskId` is the canvas to open for widget / table-row hits, `docType` the
 // document kind. `snippet` is a short, match-centred excerpt for display.
 export interface SearchHit {
-  type: 'task' | 'folder' | 'widget' | 'document' | 'file' | 'table-row' | 'knowledge'
+  type:
+    | 'task'
+    | 'folder'
+    | 'widget'
+    | 'document'
+    | 'file'
+    | 'table-row'
+    | 'knowledge'
+    | 'event'
+    | 'meeting'
+    | 'sign'
   id: string
   title: string
   snippet: string
@@ -1250,6 +1260,8 @@ export interface SearchHit {
   taskId?: string | null
   docType?: DocType
   widgetKind?: string
+  /** For 'event' hits: the block's start, so the calendar can land on its month. */
+  startMs?: number
 }
 
 // ── Spreadsheet body ────────────────────────────────────────────────────────
