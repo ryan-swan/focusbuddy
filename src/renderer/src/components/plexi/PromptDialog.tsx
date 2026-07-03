@@ -24,6 +24,10 @@ export interface PromptRequest {
   multiline?: boolean
   /** Pre-select the initial text so typing replaces it (renames). Default true. */
   selectAll?: boolean
+  /** Confirm mode: no input field; resolves 'yes' or null. Set by confirmDialog. */
+  confirmOnly?: boolean
+  /** Styles the confirm button red for destructive confirms. */
+  danger?: boolean
 }
 
 interface PromptState {
@@ -57,6 +61,26 @@ export function promptText(req: PromptRequest): Promise<string | null> {
 }
 
 /**
+ * Styled in-app replacement for window.confirm on destructive actions: same
+ * design language as the rest of the suite instead of OS-native chrome.
+ * Resolves true when confirmed.
+ */
+export function confirmDialog(req: {
+  title: string
+  body?: string
+  confirmLabel?: string
+  danger?: boolean
+}): Promise<boolean> {
+  return promptText({
+    title: req.title,
+    label: req.body,
+    confirmLabel: req.confirmLabel ?? 'Confirm',
+    confirmOnly: true,
+    danger: req.danger
+  }).then((v) => v !== null)
+}
+
+/**
  * Show text for the user to copy by hand — the fallback when the clipboard API
  * fails. Replaces the old `window.prompt('Copy this…', text)` idiom.
  */
@@ -76,9 +100,14 @@ export function PromptDialogHost(): JSX.Element | null {
     setValue(req?.initial ?? '')
   }, [req])
 
-  // Initial focus (with optional select-all) once the field exists.
+  // Initial focus (with optional select-all) once the field exists. Confirm
+  // mode has no field, so the panel itself takes focus for Enter/Escape.
   useEffect(() => {
     if (!req) return
+    if (req.confirmOnly) {
+      panelRef.current?.focus()
+      return
+    }
     const el = fieldRef.current
     if (!el) return
     el.focus()
@@ -131,6 +160,7 @@ export function PromptDialogHost(): JSX.Element | null {
         role="dialog"
         aria-modal="true"
         aria-label={req.title}
+        tabIndex={-1}
         onMouseDown={(e) => e.stopPropagation()}
         onKeyDown={onKeyDown}
         className="w-[min(440px,90vw)] rounded-xl border border-stone-200 dark:border-white/10 bg-white dark:bg-stone-900 shadow-2xl p-4"
@@ -138,7 +168,7 @@ export function PromptDialogHost(): JSX.Element | null {
       >
         <div className="text-[14px] font-semibold text-stone-900 dark:text-stone-100">{req.title}</div>
         {req.label && <div className="text-[12px] text-stone-500 dark:text-stone-400 mt-0.5">{req.label}</div>}
-        {req.multiline ? (
+        {req.confirmOnly ? null : req.multiline ? (
           <textarea
             ref={(el) => (fieldRef.current = el)}
             value={value}
@@ -165,7 +195,15 @@ export function PromptDialogHost(): JSX.Element | null {
           >
             Cancel
           </button>
-          <button onClick={confirm} className="btn-primary" data-testid="prompt-dialog-confirm">
+          <button
+            onClick={confirm}
+            className={
+              req.danger
+                ? 'px-3 py-1.5 rounded-lg text-[13px] font-medium bg-red-600 text-white hover:bg-red-700'
+                : 'btn-primary'
+            }
+            data-testid="prompt-dialog-confirm"
+          >
             {req.confirmLabel ?? 'OK'}
           </button>
         </div>
