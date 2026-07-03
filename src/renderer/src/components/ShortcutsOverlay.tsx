@@ -1,5 +1,7 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import type { WidgetKind } from '@shared/types'
 import { WIDGET_CATALOG, WIDGET_SHORTCUTS } from '../lib/widgetCatalog'
+import { effectiveQuickAddMap, useKeymap } from '../lib/keymap'
 import Icon from './Icon'
 
 // Global keyboard-shortcuts reference, opened with Cmd+/ from anywhere (the
@@ -31,11 +33,77 @@ const CANVAS_ROWS: Row[] = [
   { keys: '⌘A', label: 'Select all widgets' }
 ]
 
-function quickAddRows(): Row[] {
-  return Object.entries(WIDGET_SHORTCUTS).map(([kind, key]) => {
-    const entry = WIDGET_CATALOG.find((e) => e.kind === kind)
-    return { keys: key as string, label: `Add ${entry?.label ?? kind}` }
-  })
+// The quick-add section is editable: click a key chip, press a new letter to
+// rebind it (Backspace disables, Escape cancels). Overrides persist locally
+// via useKeymap; Reset restores the defaults.
+function QuickAddEditor(): JSX.Element {
+  const overrides = useKeymap((s) => s.overrides)
+  const setKey = useKeymap((s) => s.setKey)
+  const reset = useKeymap((s) => s.reset)
+  const [capturing, setCapturing] = useState<WidgetKind | null>(null)
+  const map = effectiveQuickAddMap()
+  void overrides // subscribe so edits re-render
+
+  useEffect(() => {
+    if (!capturing) return
+    function onKey(e: KeyboardEvent): void {
+      e.preventDefault()
+      e.stopPropagation()
+      if (e.key === 'Escape') {
+        setCapturing(null)
+        return
+      }
+      if (e.key === 'Backspace' || e.key === 'Delete') {
+        setKey(capturing!, '') // disable this quick-add
+        setCapturing(null)
+        return
+      }
+      if (/^[a-z]$/i.test(e.key) && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        setKey(capturing!, e.key.toUpperCase())
+        setCapturing(null)
+      }
+    }
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
+  }, [capturing, setKey])
+
+  const kinds = WIDGET_CATALOG.filter((e) => e.kind in WIDGET_SHORTCUTS)
+  return (
+    <div>
+      <div className="flex items-baseline justify-between mb-1.5">
+        <div className="text-[11px] uppercase tracking-[0.12em] text-stone-500 dark:text-stone-400 font-semibold">
+          Canvas quick-add (single letter, when not typing) — click a key to rebind
+        </div>
+        <button onClick={reset} className="text-[11px] text-stone-400 hover:text-accent">
+          Reset to defaults
+        </button>
+      </div>
+      <div className="space-y-1">
+        {kinds.map((entry) => {
+          const key = map[entry.kind]
+          const active = capturing === entry.kind
+          return (
+            <div key={entry.kind} className="flex items-baseline gap-3">
+              <button
+                onClick={() => setCapturing(active ? null : entry.kind)}
+                className={`shrink-0 min-w-[64px] text-center px-1.5 py-0.5 rounded border text-[11px] font-mono ${
+                  active
+                    ? 'border-accent text-accent bg-accent/10 animate-pulse'
+                    : 'border-stone-300 dark:border-stone-600 bg-stone-100 dark:bg-stone-800 text-stone-700 dark:text-stone-200 hover:border-accent'
+                }`}
+                data-testid={`rebind-${entry.kind}`}
+              >
+                {active ? 'press key…' : (key ?? 'off')}
+              </button>
+              <span className="text-[12.5px] text-stone-700 dark:text-stone-300 leading-relaxed">
+                Add {entry.label}
+              </span>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
 }
 
 function Section({ title, rows }: { title: string; rows: Row[] }): JSX.Element {
@@ -103,7 +171,7 @@ export default function ShortcutsOverlay({ onClose }: { onClose: () => void }): 
           <Section title="Everywhere" rows={GLOBAL_ROWS} />
           <Section title="On the canvas" rows={CANVAS_ROWS} />
           <div className="sm:col-span-2">
-            <Section title="Canvas quick-add (single letter, when not typing)" rows={quickAddRows()} />
+            <QuickAddEditor />
           </div>
         </div>
         <p className="mt-4 text-[11px] text-stone-500 dark:text-stone-400">
