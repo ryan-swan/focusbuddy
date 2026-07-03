@@ -67,6 +67,11 @@ async function seedStickyAndOpen(l: LaunchedApp): Promise<{ taskId: string; widg
   const { window } = l
   const seeded = await window.evaluate(async () => {
     const api = (window as unknown as { api: typeof window.api }).api
+    // Seed a folder too so MakeTaskDialog's folder picker defaults to the
+    // "search existing folders" view rather than the "create new folder" view
+    // (its default order is: prop parent -> active task's folder parent ->
+    // first existing folder -> create-new).
+    await api.nodes.create({ parentId: null, kind: 'folder', title: 'Modal a11y folder' })
     const task = await api.nodes.create({ parentId: null, kind: 'task', title: 'Modal a11y test' })
     const w = await api.widgets.create({
       taskId: task.id,

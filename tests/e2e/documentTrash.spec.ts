@@ -202,12 +202,19 @@ test('TRASH-4 — editor File > Move to trash soft-deletes the open document and
     }, id)
     await expect(window.locator('[data-testid="doc-editor-surface"]')).toBeVisible({ timeout: 10_000 })
 
-    // File > Move to trash triggers a native confirm(); accept it.
-    window.once('dialog', (d) => void d.accept())
+    // File > Move to trash now opens the styled confirmDialog (86821ed
+    // replaced the native window.confirm() here with the same shared
+    // PromptDialog-backed confirm the Documents-hub delete already used).
+    // Confirm it via its own "Move to trash" button.
     await window.locator('[data-testid="doc-menu-file"]').click()
     const dropdown = window.locator('[data-testid="doc-menu-file-list"]')
     await expect(dropdown).toBeVisible({ timeout: 3_000 })
     await dropdown.locator('span.truncate', { hasText: 'Move to trash' }).click()
+
+    const confirmDialog = window.locator('[data-testid="prompt-dialog"]')
+    await expect(confirmDialog).toBeVisible({ timeout: 3_000 })
+    await expect(confirmDialog).toHaveAttribute('aria-label', /Move ".*" to trash\?/)
+    await confirmDialog.locator('[data-testid="prompt-dialog-confirm"]').click()
 
     // Lands back on the Documents hub.
     await expect(window.getByRole('heading', { name: 'Documents', level: 1 })).toBeVisible({ timeout: 8_000 })
