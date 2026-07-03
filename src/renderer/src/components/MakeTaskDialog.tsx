@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { FbNode, Widget } from '@shared/types'
 import { useNodeStore } from '../stores/nodes'
 import { useWidgetStore } from '../stores/widgets'
 import Icon from './Icon'
+import Modal from './plexi/Modal'
 
 // "Make this a task" dialog — invoked from a widget or section's right-click
 // context menu. Lets the user create a task in an existing folder OR in a
@@ -85,14 +86,6 @@ export default function MakeTaskDialog({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    function onKey(e: KeyboardEvent): void {
-      if (e.key === 'Escape') onClose()
-    }
-    document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
-  }, [onClose])
-
   async function handleSubmit(): Promise<void> {
     if (busy) return
     const title = taskTitle.trim()
@@ -173,18 +166,12 @@ export default function MakeTaskDialog({
   }
 
   return createPortal(
-    <div
-      // Modal backdrop — click to dismiss, but only on the backdrop
-      // itself (not when the click bubbles up from a child input/button).
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onClose()
-      }}
-      className="fixed inset-0 z-[250] bg-stone-900/40 backdrop-blur-[2px] flex items-center justify-center"
+    <Modal
+      onClose={onClose}
+      label="Make this a task"
+      z={250}
+      className="w-[380px] rounded-lg bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-700 shadow-2xl p-4"
     >
-      <div
-        className="w-[380px] rounded-lg bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-700 shadow-2xl p-4"
-        onMouseDown={(e) => e.stopPropagation()}
-      >
         <div className="flex items-center gap-1.5 mb-3">
           <Icon name="task_alt" size={16} className="text-accent" />
           <h2 className="text-sm font-semibold text-stone-900 dark:text-stone-100">
@@ -375,8 +362,7 @@ export default function MakeTaskDialog({
             {busy ? 'Creating…' : 'Create task'}
           </button>
         </div>
-      </div>
-    </div>,
+    </Modal>,
     document.body
   )
 }

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { createPortal } from 'react-dom'
 import Icon from './Icon'
+import Modal from './plexi/Modal'
 import { useMeetingLaunchStore } from '../stores/meetingLaunch'
 import { startArtifactMeeting } from '../lib/startMeeting'
 import { MEETING_ACCESS_OPTIONS, type MeetingAccessLevel } from '../lib/meetingAccess'
@@ -59,15 +60,13 @@ export default function MeetingLaunchDialog(): JSX.Element | null {
   }
 
   return createPortal(
-    <div
-      className="fixed inset-0 z-[300] flex items-center justify-center bg-stone-900/40 backdrop-blur-sm"
-      onClick={close}
+    <Modal
+      onClose={close}
+      label="Start a meeting"
+      z={300}
+      className="w-[380px] rounded-xl bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-700 shadow-2xl p-4 space-y-3"
+      testId="meeting-launch-dialog"
     >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className="w-[380px] rounded-xl bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-700 shadow-2xl p-4 space-y-3"
-        data-testid="meeting-launch-dialog"
-      >
         <div className="flex items-center gap-2">
           <Icon name="videocam" size={16} className="text-accent" />
           <h3 className="text-sm font-semibold text-stone-900 dark:text-stone-100">Start a meeting</h3>
@@ -143,8 +142,7 @@ export default function MeetingLaunchDialog(): JSX.Element | null {
             <span>Start meeting</span>
           </button>
         </div>
-      </div>
-    </div>,
+    </Modal>,
     document.body
   )
 }

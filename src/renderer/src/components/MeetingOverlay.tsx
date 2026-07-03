@@ -63,6 +63,17 @@ export default function MeetingOverlay(): JSX.Element | null {
     [presencePeers, participants]
   )
 
+  // While a room is open, Escape leaves the meeting. The fullscreen surface is
+  // not wrapped in the shared Modal, so this is its own dialog-dismiss handler.
+  useEffect(() => {
+    if (status === 'idle') return
+    function onKey(e: KeyboardEvent): void {
+      if (e.key === 'Escape') leave()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [status, leave])
+
   // Incoming invite while not in a room: a compact ringing card.
   if (status === 'idle' && incomingInvite) {
     return (
@@ -94,7 +105,7 @@ export default function MeetingOverlay(): JSX.Element | null {
   const cols = Math.ceil(Math.sqrt(tileCount))
 
   return (
-    <div className="fixed inset-0 z-[200] bg-stone-950/95 flex flex-col" data-testid="meeting-window">
+    <div className="fixed inset-0 z-[200] bg-stone-950/95 flex flex-col" role="dialog" aria-modal="true" aria-label="Meeting" data-testid="meeting-window">
       <div className="flex items-center gap-3 px-5 py-3 text-white">
         <Icon name="groups" size={20} className="text-rose-400" filled />
         <h2 className="text-[15px] font-semibold truncate">{title || 'Meeting'}</h2>

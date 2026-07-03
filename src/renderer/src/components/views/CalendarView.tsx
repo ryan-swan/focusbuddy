@@ -335,7 +335,7 @@ function CalendarTaskChip({
             e.stopPropagation()
             onQuickStart()
           }}
-          className="opacity-0 group-hover/chip:opacity-100 h-3.5 w-3.5 inline-flex items-center justify-center rounded shrink-0"
+          className="opacity-0 group-hover/chip:opacity-100 group-focus-within/chip:opacity-100 h-3.5 w-3.5 inline-flex items-center justify-center rounded shrink-0"
           style={{ backgroundColor: 'rgb(var(--accent))', color: 'white' }}
           title="Just 5 min on this task"
         >

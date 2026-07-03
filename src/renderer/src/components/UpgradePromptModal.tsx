@@ -1,4 +1,5 @@
 import Icon from './Icon'
+import Modal from './plexi/Modal'
 import { useUpgradePromptStore } from '../stores/upgradePrompt'
 import { useStoredTier } from '../stores/capabilities'
 import { PRICING_URL } from '../lib/siteUrls'
@@ -24,15 +25,13 @@ export default function UpgradePromptModal(): JSX.Element | null {
   }
 
   return (
-    <div
-      className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-6"
-      onClick={dismiss}
-      data-testid="upgrade-prompt-modal"
+    <Modal
+      onClose={dismiss}
+      label={`A ${tierName} feature`}
+      z={9999}
+      className="bg-white dark:bg-stone-900 rounded-xl shadow-2xl border border-stone-200 dark:border-stone-700 max-w-sm w-full p-6"
+      testId="upgrade-prompt-modal"
     >
-      <div
-        className="bg-white dark:bg-stone-900 rounded-xl shadow-2xl border border-stone-200 dark:border-stone-700 max-w-sm w-full p-6"
-        onClick={(e) => e.stopPropagation()}
-      >
         <div className="flex items-start justify-between mb-2">
           <div className="flex items-center gap-2">
             <span className="h-8 w-8 inline-flex items-center justify-center rounded-lg bg-accent/15 text-accent">
@@ -74,7 +73,6 @@ export default function UpgradePromptModal(): JSX.Element | null {
             See {tierName} pricing
           </button>
         </div>
-      </div>
-    </div>
+    </Modal>
   )
 }

@@ -2148,7 +2148,10 @@ export default function Canvas(): JSX.Element {
           onHome={() => setActiveTask(null)}
           fromMindmap={!!nodeOrigin}
         />
-        <div className="px-4 py-2.5 border-b border-[color:var(--glass-chrome-border)] fb-glass-chrome flex flex-wrap items-center gap-x-2 gap-y-1.5">
+        <div
+          data-testid="canvas-task-header"
+          className="px-4 py-2.5 border-b border-[color:var(--glass-chrome-border)] fb-glass-chrome flex flex-wrap items-center gap-x-2 gap-y-1.5"
+        >
           <Icon name="task_alt" size={18} className="text-[var(--ink-70)] shrink-0" />
           <h2 className="text-sm font-semibold text-[var(--ink-100)] truncate flex-1 min-w-[80px]">
             {activeTask.title}

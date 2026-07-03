@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useMailStore, type ComposeInitial } from '../stores/mail'
 import Icon from './Icon'
+import Modal from './plexi/Modal'
 
 // Compose / reply window for the user's own mailbox. One component serves new
 // mail, reply, reply-all and forward — the caller just seeds the fields and the
@@ -44,10 +45,11 @@ export default function ComposeDialog({ initial, onClose, onSent }: Props): JSX.
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // Escape and backdrop close are handled by the Modal wrapper (guarded below so
+  // a send in flight is not interrupted). This listener only carries the
+  // Cmd/Ctrl+Enter send shortcut, the universal mail shortcut.
   useEffect(() => {
     function onKey(e: KeyboardEvent): void {
-      if (e.key === 'Escape' && !busy) onClose()
-      // Cmd/Ctrl+Enter sends, the universal mail shortcut.
       if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') void handleSend()
     }
     document.addEventListener('keydown', onKey)
@@ -93,16 +95,14 @@ export default function ComposeDialog({ initial, onClose, onSent }: Props): JSX.
     'w-full text-[13px] px-2.5 py-1.5 rounded border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-800 text-stone-900 dark:text-stone-100 focus:outline-none focus:border-accent'
 
   return createPortal(
-    <div
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget && !busy) onClose()
+    <Modal
+      onClose={() => {
+        if (!busy) onClose()
       }}
-      className="fixed inset-0 z-[260] bg-stone-900/40 backdrop-blur-[2px] flex items-center justify-center"
+      label={initial?.subject?.toLowerCase().startsWith('re:') ? 'Reply' : 'New message'}
+      z={260}
+      className="w-[560px] max-w-[92vw] max-h-[88vh] flex flex-col rounded-lg bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-700 shadow-2xl"
     >
-      <div
-        className="w-[560px] max-w-[92vw] max-h-[88vh] flex flex-col rounded-lg bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-700 shadow-2xl"
-        onMouseDown={(e) => e.stopPropagation()}
-      >
         <div className="flex items-center gap-2 px-4 py-3 border-b border-stone-200 dark:border-stone-700">
           <Icon name="edit" size={16} className="text-accent" />
           <h2 className="text-sm font-semibold text-stone-900 dark:text-stone-100">
@@ -198,8 +198,7 @@ export default function ComposeDialog({ initial, onClose, onSent }: Props): JSX.
             Discard
           </button>
         </div>
-      </div>
-    </div>,
+    </Modal>,
     document.body
   )
 }
