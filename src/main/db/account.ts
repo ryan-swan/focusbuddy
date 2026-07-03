@@ -100,15 +100,13 @@ export function loadAccountState(): PublicAccountState {
 
 export function saveSession(token: string, email: string | null): void {
   const cur = read()
-  let encryptedToken: string
-  if (safeStorage.isEncryptionAvailable()) {
-    encryptedToken = safeStorage.encryptString(token).toString('base64')
-  } else {
-    // No encryption available — store raw. The file lives in userData
-    // which has OS-level permissions; not as good as keychain but the
-    // best we can do on this platform.
-    encryptedToken = token
+  if (!safeStorage.isEncryptionAvailable()) {
+    // Match the mail-password and API-key stores: refuse to persist a session
+    // token in plaintext when OS encryption is unavailable, rather than
+    // silently writing it raw. The session stays in memory for this run only.
+    throw new Error('OS secure storage is unavailable, so the session cannot be saved securely on this device.')
   }
+  const encryptedToken = safeStorage.encryptString(token).toString('base64')
   write({
     encryptedToken,
     // Saving a session implicitly clears the skip flag — the user is

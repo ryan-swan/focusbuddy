@@ -269,6 +269,23 @@ function ReadingPane(): JSX.Element {
   const [taskError, setTaskError] = useState<string | null>(null)
   const [taskDialogOpen, setTaskDialogOpen] = useState(false)
   const [draftDismissed, setDraftDismissed] = useState(false)
+  // Block remote content by default: HTML email that loads remote images or CSS
+  // discloses the recipient's IP and a read-receipt to the sender (tracking
+  // pixels), which the empty sandbox does NOT stop. We inject a strict CSP into
+  // the message document that permits only inline styles and data: images, and
+  // offer a per-message "load remote content" opt-in. Reset on each message.
+  const [showRemote, setShowRemote] = useState(false)
+  useEffect(() => {
+    setShowRemote(false)
+  }, [open?.uid])
+  const hasRemote =
+    !!open?.html && /(?:src|background)\s*=\s*["']?https?:\/\/|url\(\s*["']?https?:\/\//i.test(open.html)
+  const BLOCK_REMOTE_CSP =
+    "default-src 'none'; img-src data:; style-src 'unsafe-inline'; font-src data:; media-src data:"
+  const mailSrcDoc =
+    open?.html && !showRemote
+      ? `<meta http-equiv="Content-Security-Policy" content="${BLOCK_REMOTE_CSP}">${open.html}`
+      : (open?.html ?? '')
 
   useEffect(() => {
     setTaskState('idle')
@@ -447,14 +464,24 @@ function ReadingPane(): JSX.Element {
         </div>
       )}
 
+      {open.html && hasRemote && !showRemote && (
+        <div className="shrink-0 px-4 py-1.5 text-[12px] bg-amber-500/10 border-b border-amber-500/20 text-stone-700 dark:text-stone-200 flex items-center gap-2">
+          <Icon name="visibility_off" size={13} className="shrink-0" />
+          <span className="flex-1">Remote images are blocked to stop senders tracking when you open mail.</span>
+          <button onClick={() => setShowRemote(true)} className="underline underline-offset-2 shrink-0" data-testid="mail-load-remote">
+            Load remote content
+          </button>
+        </div>
+      )}
       <div className="flex-1 overflow-auto">
         {open.html ? (
-          // Sandboxed: scripts are disabled, so a message can render its own
-          // styles and images but cannot run code or reach the app.
+          // Sandboxed: scripts are disabled. By default a strict CSP is injected
+          // (mailSrcDoc) so remote images/CSS cannot load either, defeating
+          // tracking pixels; "Load remote content" re-renders with the original.
           <iframe
             title="Email body"
             sandbox=""
-            srcDoc={open.html}
+            srcDoc={mailSrcDoc}
             className="w-full h-full bg-white"
           />
         ) : (

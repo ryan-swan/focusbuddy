@@ -360,17 +360,20 @@ export function updateEntry(
     return row ? rowToEntry(row) : null
   }
   fields.push('updated_at = @now')
-  db.prepare(`UPDATE vault_entries SET ${fields.join(', ')} WHERE id = @id`).run(params)
+  // Scope by the active org too, so an id from one org cannot be mutated while
+  // another org is active (the by-id mutations were previously org-blind).
+  params.orgId = getActiveOrgId()
+  db.prepare(`UPDATE vault_entries SET ${fields.join(', ')} WHERE id = @id AND org_id = @orgId`).run(params)
   const row = db
-    .prepare('SELECT * FROM vault_entries WHERE id = ?')
-    .get(id) as EntryRow | undefined
+    .prepare('SELECT * FROM vault_entries WHERE id = ? AND org_id = ?')
+    .get(id, getActiveOrgId()) as EntryRow | undefined
   return row ? rowToEntry(row) : null
 }
 
 export function deleteEntry(id: string): boolean {
   if (!isUnlocked()) return false
   const db = getDb()
-  const r = db.prepare('DELETE FROM vault_entries WHERE id = ?').run(id)
+  const r = db.prepare('DELETE FROM vault_entries WHERE id = ? AND org_id = ?').run(id, getActiveOrgId())
   return r.changes > 0
 }
 

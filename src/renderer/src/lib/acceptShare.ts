@@ -1,4 +1,5 @@
 import type { WidgetDraft } from '@shared/types'
+import { stripRunShellFromDeckContent } from '@shared/streamdeck'
 import { useNodeStore } from '../stores/nodes'
 import { useWidgetStore } from '../stores/widgets'
 
@@ -76,11 +77,16 @@ async function createWidgetsFor(taskId: string, widgets: SerWidget[] | undefined
   if (!widgets || widgets.length === 0) return
   const create = useWidgetStore.getState().create
   for (const w of widgets) {
+    // Defense in depth: a shared SpeedDeck widget could carry a run-shell
+    // command. Strip those on the way in so a delivered button can never even
+    // offer to run a shell command (the executor also confirms at click time).
+    const content =
+      w.kind === 'streamdeck' ? stripRunShellFromDeckContent(w.content ?? '') : (w.content ?? '')
     await create({
       taskId,
       kind: w.kind as WidgetDraft['kind'],
       title: w.title ?? '',
-      content: w.content ?? '',
+      content,
       x: typeof w.x === 'number' ? w.x : 80,
       y: typeof w.y === 'number' ? w.y : 80,
       width: typeof w.width === 'number' ? w.width : 280,

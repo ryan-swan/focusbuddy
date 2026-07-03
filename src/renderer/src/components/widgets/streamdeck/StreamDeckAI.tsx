@@ -232,8 +232,16 @@ function sanitizeColor(c: string): string {
 
 function isValidAction(a: unknown): boolean {
   if (!a || typeof a !== 'object') return false
-  const x = a as { type?: string }
-  return typeof x.type === 'string'
+  const x = a as { type?: string; steps?: unknown }
+  if (typeof x.type !== 'string') return false
+  // The AI must never mint a shell command: a prompt-injected source could
+  // otherwise steer it to create a run-shell button. Shell actions are only
+  // ever hand-authored by the user in the editor.
+  if (x.type === 'run-shell') return false
+  if (x.type === 'multi-step' && Array.isArray(x.steps)) {
+    if (x.steps.some((s) => (s as { type?: string })?.type === 'run-shell')) return false
+  }
+  return true
 }
 
 function normalizeProposals(parsed: unknown): AIProposal[] {
