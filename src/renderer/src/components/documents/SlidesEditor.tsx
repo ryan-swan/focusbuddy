@@ -568,7 +568,7 @@ export default function SlidesEditor({ body: rawBody, title, onChange }: Props):
                 <SlideFace slide={s} theme={theme} width={140} />
               </button>
               <span className="absolute top-1 left-1 text-[9px] font-semibold text-white bg-black/40 rounded px-1">{i + 1}</span>
-              <div className="absolute top-0.5 right-0.5 opacity-0 group-hover:opacity-100 flex flex-col gap-0.5">
+              <div className="absolute top-0.5 right-0.5 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 flex flex-col gap-0.5">
                 <button onClick={() => moveSlide(i, -1)} className="bg-white/90 dark:bg-stone-900/90 rounded p-0.5" title="Move up"><Icon name="keyboard_arrow_up" size={12} /></button>
                 <button onClick={() => moveSlide(i, 1)} className="bg-white/90 dark:bg-stone-900/90 rounded p-0.5" title="Move down"><Icon name="keyboard_arrow_down" size={12} /></button>
                 <button onClick={() => deleteSlide(i)} className="bg-white/90 dark:bg-stone-900/90 rounded p-0.5 text-red-500" title="Delete"><Icon name="close" size={12} /></button>

@@ -703,7 +703,7 @@ function CompactChildView({
             e.stopPropagation()
             onEject()
           }}
-          className="opacity-0 group-hover:opacity-100 text-stone-500 hover:text-amber-700 transition-opacity"
+          className="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 text-stone-500 hover:text-amber-700 transition-opacity"
           title="Remove from section"
         >
           <Icon name="layers_clear" size={14} />
@@ -748,7 +748,7 @@ function CompactChildView({
           e.stopPropagation()
           onEject()
         }}
-        className="opacity-0 group-hover:opacity-100 absolute -top-1 -right-1 h-4 w-4 rounded-full bg-white border border-stone-300 text-stone-500 hover:text-amber-700 inline-flex items-center justify-center transition-opacity"
+        className="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 absolute -top-1 -right-1 h-4 w-4 rounded-full bg-white border border-stone-300 text-stone-500 hover:text-amber-700 inline-flex items-center justify-center transition-opacity"
         title="Remove from section"
       >
         <Icon name="layers_clear" size={9} />

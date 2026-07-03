@@ -97,7 +97,7 @@ export default function AiSlidePanel({ theme, slideSummary, onApply, onClose }: 
           disabled={busy}
           className="mt-2 inline-flex items-center gap-1 text-[12px] px-2.5 py-1.5 rounded-full border border-accent/40 bg-accent/[0.06] text-accent hover:bg-accent/[0.12] disabled:opacity-50"
         >
-          <Icon name="auto_fix_high" size={13} />
+          <Icon name="auto_awesome" size={13} />
           Make this slide beautiful in the theme
         </button>
       )}

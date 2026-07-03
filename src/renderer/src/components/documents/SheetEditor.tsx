@@ -1106,7 +1106,7 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
             className="mb-2 inline-flex items-center gap-2 rounded-md border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 px-2 py-1 text-[12px]"
             data-testid="sheet-fill-options"
           >
-            <Icon name="auto_fix_high" size={13} className="text-accent" />
+            <Icon name="auto_awesome" size={13} className="text-accent" />
             <span className="text-stone-500 dark:text-stone-400">Filled as {lastFill.mode === 'series' ? 'series' : 'copy'}.</span>
             <button onClick={toggleFillMode} className="text-accent hover:underline">
               Switch to {lastFill.mode === 'series' ? 'copy' : 'series'}

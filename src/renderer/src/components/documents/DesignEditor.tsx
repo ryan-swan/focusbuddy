@@ -918,7 +918,7 @@ export default function DesignEditor({ content, title, onChange }: Props): JSX.E
                 data-testid="design-remove-bg"
                 className="w-full mb-2 px-2 py-1.5 rounded-lg border border-stone-300 dark:border-stone-600 text-[12px] hover:border-accent disabled:opacity-50 inline-flex items-center justify-center gap-1.5"
               >
-                <Icon name="auto_fix_high" size={14} /> Remove background
+                <Icon name="auto_awesome" size={14} /> Remove background
               </button>
             )}
             <Field label={`Opacity ${Math.round((selected.opacity ?? 1) * 100)}%`}>

@@ -2547,7 +2547,7 @@ export default function Canvas(): JSX.Element {
                   separatorAfter: true
                 },
                 {
-                  icon: 'auto_fix_high',
+                  icon: 'auto_awesome',
                   label: 'Clean up',
                   onClick: () => void handleAutoArrange(),
                   separatorAfter: true

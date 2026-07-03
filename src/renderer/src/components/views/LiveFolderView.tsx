@@ -386,7 +386,7 @@ export default function LiveFolderView({ liveFolderId }: Props): JSX.Element {
                   </button>
                 )}
                 {isHolder && renamingId !== e.id && (
-                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
+                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition">
                     <button onClick={() => startRename(e)} className="icon-btn" title="Rename" data-testid="livefolder-rename">
                       <Icon name="edit" size={14} />
                     </button>

@@ -440,7 +440,7 @@ function TaskRow({
       {!isDone && (
         <button
           onClick={onQuickStart}
-          className="opacity-0 group-hover:opacity-100 inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium text-white transition-all shrink-0"
+          className="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium text-white transition-all shrink-0"
           style={{ backgroundColor: 'rgb(var(--accent))' }}
           title="Start a 5-minute focus session on this task"
         >

@@ -112,7 +112,7 @@ function AiAssistant({
           disabled={ai.busy}
           data-testid="slides-ai-improve"
         >
-          <Icon name="auto_fix_high" size={15} className="text-[rgb(var(--accent))]" />
+          <Icon name="auto_awesome" size={15} className="text-[rgb(var(--accent))]" />
           <span>Improve slide</span>
         </button>
         <button

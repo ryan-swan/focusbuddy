@@ -160,7 +160,7 @@ export default function ShapeWidget({ widget, inline = false }: Props): JSX.Elem
         <button
           onClick={() => setEditingLabel(true)}
           onMouseDown={(e) => e.stopPropagation()}
-          className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-[11px] text-stone-500"
+          className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity text-[11px] text-stone-500"
         >
           <span className="px-2 py-0.5 rounded bg-white/70 dark:bg-stone-900/70">+ label</span>
         </button>
@@ -176,7 +176,7 @@ export default function ShapeWidget({ widget, inline = false }: Props): JSX.Elem
 
       {/* Hover toolbar: shape picker + fill/stroke */}
       <div
-        className="absolute top-1.5 left-1/2 -translate-x-1/2 flex items-center gap-1 rounded-full bg-stone-900/90 backdrop-blur px-1.5 py-1 shadow-lg ring-1 ring-white/10 opacity-0 group-hover:opacity-100 transition-opacity"
+        className="absolute top-1.5 left-1/2 -translate-x-1/2 flex items-center gap-1 rounded-full bg-stone-900/90 backdrop-blur px-1.5 py-1 shadow-lg ring-1 ring-white/10 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity"
         onMouseDown={(e) => e.stopPropagation()}
       >
         <select

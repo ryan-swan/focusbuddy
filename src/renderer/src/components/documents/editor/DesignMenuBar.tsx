@@ -113,7 +113,7 @@ export default function DesignMenuBar({ actions }: { actions: DesignMenuActions 
     {
       id: 'tools',
       label: 'Tools',
-      build: () => [{ kind: 'item', label: 'Remove image background', icon: 'auto_fix_high', run: a.removeBgSelected }]
+      build: () => [{ kind: 'item', label: 'Remove image background', icon: 'auto_awesome', run: a.removeBgSelected }]
     },
     {
       id: 'help',

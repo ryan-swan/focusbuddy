@@ -378,7 +378,7 @@ export default function OfficeDrive({
               <button
                 onClick={() => void deleteSmart(sf.id)}
                 data-testid={`office-smart-del-${sf.name}`}
-                className="opacity-0 group-hover:opacity-100 text-stone-400 hover:text-rose-500 ml-0.5"
+                className="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 text-stone-400 hover:text-rose-500 ml-0.5"
                 title="Delete smart folder"
               >
                 <Icon name="close" size={11} />
@@ -697,7 +697,7 @@ function DriveRow({
         <button
           onClick={onShare}
           data-testid={`office-folder-share-${entry.name}`}
-          className="opacity-0 group-hover:opacity-100 text-stone-400 hover:text-accent shrink-0"
+          className="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 text-stone-400 hover:text-accent shrink-0"
           title="Share folder"
         >
           <Icon name="share" size={13} />
@@ -707,7 +707,7 @@ function DriveRow({
         <button
           onClick={onTag}
           data-testid={`office-tagbtn-${entry.name}`}
-          className="opacity-0 group-hover:opacity-100 text-stone-400 hover:text-accent shrink-0"
+          className="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 text-stone-400 hover:text-accent shrink-0"
           title="Tags"
         >
           <Icon name="sell" size={13} />
@@ -715,7 +715,7 @@ function DriveRow({
       )}
       <button
         onClick={onDelete}
-        className="opacity-0 group-hover:opacity-100 text-stone-400 hover:text-rose-500 shrink-0"
+        className="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 text-stone-400 hover:text-rose-500 shrink-0"
         title={isFolder ? 'Delete folder' : 'Remove'}
       >
         <Icon name="delete" size={13} />
@@ -909,7 +909,7 @@ function TrashRow({
       <button
         onClick={onRestore}
         data-testid={`office-trash-restore-${entry.name}`}
-        className="opacity-0 group-hover:opacity-100 text-stone-400 hover:text-accent shrink-0"
+        className="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 text-stone-400 hover:text-accent shrink-0"
         title="Restore"
       >
         <Icon name="restore_from_trash" size={14} />
@@ -917,7 +917,7 @@ function TrashRow({
       <button
         onClick={onPurge}
         data-testid={`office-trash-purge-${entry.name}`}
-        className="opacity-0 group-hover:opacity-100 text-stone-400 hover:text-rose-500 shrink-0"
+        className="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 text-stone-400 hover:text-rose-500 shrink-0"
         title="Delete forever"
       >
         <Icon name="delete_forever" size={14} />

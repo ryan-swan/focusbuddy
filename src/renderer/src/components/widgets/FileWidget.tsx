@@ -218,7 +218,7 @@ export default function FileWidget({ widget, inline = false }: Props): JSX.Eleme
           {widget.title || host}
         </div>
         <div className="text-[10px] text-stone-500 truncate max-w-full">{host}</div>
-        <div className="text-[10px] text-accent opacity-0 group-hover:opacity-100 transition-opacity inline-flex items-center gap-1">
+        <div className="text-[10px] text-accent opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity inline-flex items-center gap-1">
           <Icon name="open_in_new" size={12} />
           Open in browser
         </div>

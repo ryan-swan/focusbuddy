@@ -933,7 +933,7 @@ function buildDocCommands(editor: Editor | null, h: DocCommandHandlers): EditorC
     { id: 'doc-find', label: 'Find and replace', icon: 'search', shortcut: '⌘F', group: 'Edit', keywords: 'search replace', run: h.openFind },
     // AI
     { id: 'doc-ai-draft', label: 'Draft with AI', icon: 'auto_awesome', group: 'AI', keywords: 'generate write', run: h.draftAi },
-    { id: 'doc-ai-rewrite', label: 'Rewrite selection with AI', icon: 'auto_fix_high', group: 'AI', keywords: 'improve tone', run: h.rewriteAi },
+    { id: 'doc-ai-rewrite', label: 'Rewrite selection with AI', icon: 'auto_awesome', group: 'AI', keywords: 'improve tone', run: h.rewriteAi },
     // View
     { id: 'doc-focus', label: 'Toggle focus mode', icon: 'center_focus_strong', group: 'View', keywords: 'zen distraction free writing', run: h.toggleFocus },
     { id: 'doc-outline', label: 'Toggle outline', icon: 'format_list_bulleted', group: 'View', keywords: 'navigation headings map', run: h.toggleOutline },

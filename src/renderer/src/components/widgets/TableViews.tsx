@@ -170,7 +170,7 @@ export function ListView({
             </div>
             <button
               onClick={() => deleteRow(row.id)}
-              className="opacity-0 group-hover:opacity-100 text-stone-400 hover:text-red-500 transition-opacity"
+              className="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 text-stone-400 hover:text-red-500 transition-opacity"
               title="Delete row"
               aria-label="Delete row"
             >
@@ -234,7 +234,7 @@ export function CardsView({
             ))}
             <button
               onClick={() => deleteRow(row.id)}
-              className="self-end mt-1 opacity-0 group-hover:opacity-100 text-stone-400 hover:text-red-500 transition-opacity"
+              className="self-end mt-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 text-stone-400 hover:text-red-500 transition-opacity"
               title="Delete row"
               aria-label="Delete row"
             >
@@ -387,7 +387,7 @@ export function KanbanView({
                     <div className="flex items-center justify-end mt-1">
                       <button
                         onClick={() => deleteRow(row.id)}
-                        className="opacity-0 group-hover:opacity-100 text-stone-400 hover:text-red-500 transition-opacity"
+                        className="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 text-stone-400 hover:text-red-500 transition-opacity"
                         title="Delete row"
                         aria-label="Delete row"
                       >

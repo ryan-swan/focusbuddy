@@ -121,7 +121,7 @@ function AiTab({ ai, userName }: { ai: DocAi; userName?: string | null }): JSX.E
           <span>Summarize this document</span>
         </button>
         <button className={actionClass} onClick={() => void ai.improve()} disabled={ai.busy} data-testid="doc-ai-action-improve">
-          <Icon name="auto_fix_high" size={15} className="text-[rgb(var(--accent))]" />
+          <Icon name="auto_awesome" size={15} className="text-[rgb(var(--accent))]" />
           <span>Improve writing</span>
         </button>
         <button className={actionClass} onClick={() => void ai.shorten()} disabled={ai.busy} data-testid="doc-ai-action-shorter">

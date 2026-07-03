@@ -133,7 +133,7 @@ export default function DesignsView(): JSX.Element {
                       e.stopPropagation()
                       void remove(d.id)
                     }}
-                    className="opacity-0 group-hover:opacity-100 text-stone-400 hover:text-red-500"
+                    className="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 text-stone-400 hover:text-red-500"
                     title="Delete"
                   >
                     <Icon name="delete" size={14} />

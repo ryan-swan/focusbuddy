@@ -487,7 +487,7 @@ export default function FoldersCard({ nodes }: Props): JSX.Element {
                       {node.title || '(untitled)'}
                     </span>
                   </div>
-                  <div className="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 flex items-center transition-opacity">
+                  <div className="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 group-focus-within:opacity-100 flex items-center transition-opacity">
                     {tab === 'archived' ? (
                       <button
                         onClick={() => restore(node.id)}

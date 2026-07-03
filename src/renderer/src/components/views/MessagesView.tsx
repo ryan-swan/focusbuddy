@@ -24,7 +24,7 @@ function ReactPicker({ onPick }: { onPick: (emoji: string) => void }): JSX.Eleme
         onClick={() => setOpen((o) => !o)}
         aria-label="Add reaction"
         data-testid="react-open"
-        className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 h-6 w-6 inline-flex items-center justify-center rounded-full text-[var(--ink-50)] hover:bg-[var(--surface-sunken)] transition-opacity"
+        className="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 h-6 w-6 inline-flex items-center justify-center rounded-full text-[var(--ink-50)] hover:bg-[var(--surface-sunken)] transition-opacity"
       >
         <Icon name="add_reaction" size={14} />
       </button>
@@ -162,7 +162,7 @@ function MessageRow({
             onClick={() => setMenuOpen((o) => !o)}
             aria-label="Message actions"
             data-testid={`msg-menu-${m.id}`}
-            className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 h-6 w-6 inline-flex items-center justify-center rounded-full text-[var(--ink-50)] hover:bg-[var(--surface-sunken)] transition-opacity"
+            className="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 h-6 w-6 inline-flex items-center justify-center rounded-full text-[var(--ink-50)] hover:bg-[var(--surface-sunken)] transition-opacity"
           >
             <Icon name="more_horiz" size={14} />
           </button>
@@ -283,7 +283,7 @@ function MessageRow({
             <button
               onClick={onOpenThread}
               data-testid={`thread-reply-${m.id}`}
-              className="mt-1 text-[11px] text-[var(--ink-50)] inline-flex items-center gap-1 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity hover:text-[var(--ink-90)]"
+              className="mt-1 text-[11px] text-[var(--ink-50)] inline-flex items-center gap-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 transition-opacity hover:text-[var(--ink-90)]"
             >
               <Icon name="reply" size={12} /> Reply in thread
             </button>
