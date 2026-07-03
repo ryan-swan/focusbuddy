@@ -1,10 +1,23 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
+import type { Editor } from '@tiptap/react'
 import type { MapBody, SheetBody, SlidesBody } from '@shared/types'
 import { useDocumentsStore } from '../../stores/documents'
 import { useViewStore } from '../../stores/view'
 import { useAccountStore } from '../../stores/account'
 import { DocEditor, SheetEditor, SlidesEditor, MapEditor, DesignEditor } from '@office'
+import { promptText } from '../plexi/PromptDialog'
 import Icon from '../Icon'
+
+// Local-document comment row (matches the docComments IPC surface).
+interface LocalComment {
+  id: string
+  parentId: string | null
+  anchorId: string | null
+  author: string
+  body: string
+  resolved: boolean
+  createdAt: number
+}
 
 // Document editor — loads the active document and hands its body to the right
 // surface (doc / sheet / slides). The header carries the editable title, a
@@ -38,6 +51,75 @@ export default function DocumentEditorView({ documentId, onBack }: Props): JSX.E
     return () => close()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [documentId])
+
+  // Local comments. Live/collaborative docs keep comments on the signal
+  // server (LiveDocEditorView); ordinary local docs store them in SQLite via
+  // the docComments IPC, so the panel works signed out too.
+  const [editor, setEditor] = useState<Editor | null>(null)
+  const [comments, setComments] = useState<LocalComment[]>([])
+  useEffect(() => {
+    setComments([])
+    void window.api.documents.listComments(documentId).then(setComments)
+  }, [documentId])
+
+  const author = userName ?? 'You'
+  const panelThreads = comments
+    .filter((c) => !c.parentId)
+    .map((root) => ({
+      id: root.id,
+      author: root.author || 'You',
+      createdAt: root.createdAt,
+      body: root.body,
+      resolved: root.resolved,
+      you: true, // single-user local doc: every comment is the local user's
+      replies: comments
+        .filter((c) => c.parentId === root.id)
+        .map((r) => ({ id: r.id, author: r.author || 'You', createdAt: r.createdAt, body: r.body, you: true }))
+    }))
+
+  async function addComment(): Promise<void> {
+    if (!editor) return
+    const { from, to, empty } = editor.state.selection
+    if (empty) {
+      void promptText({
+        title: 'Select some text first',
+        label: 'Highlight the passage the comment is about, then add the comment.',
+        confirmLabel: 'OK',
+        confirmOnly: true
+      })
+      return
+    }
+    const body = await promptText({ title: 'New comment', multiline: true, confirmLabel: 'Comment' })
+    if (!body || !body.trim()) return
+    const anchorId = 'cmt_' + crypto.randomUUID().replace(/-/g, '').slice(0, 16)
+    editor.chain().setTextSelection({ from, to }).setComment(anchorId).run()
+    const created = await window.api.documents.addComment({
+      docId: documentId,
+      body: body.trim(),
+      author,
+      anchorId
+    })
+    setComments((prev) => [...prev, created])
+  }
+
+  async function replyComment(threadId: string, body: string): Promise<void> {
+    if (!body.trim()) return
+    const created = await window.api.documents.addComment({
+      docId: documentId,
+      body: body.trim(),
+      author,
+      parentId: threadId
+    })
+    setComments((prev) => [...prev, created])
+  }
+
+  function jumpToComment(threadId: string): void {
+    const anchor = comments.find((c) => c.id === threadId)?.anchorId
+    if (!anchor || !editor) return
+    // Scroll the highlighted mark into view by locating its DOM node.
+    const el = editor.view.dom.querySelector(`[data-comment-id="${anchor}"]`)
+    el?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }
 
   if (!active || active.id !== documentId) {
     return (
@@ -100,17 +182,18 @@ export default function DocumentEditorView({ documentId, onBack }: Props): JSX.E
       {/* Surface */}
       <div className="flex-1 overflow-auto min-h-0">
         {active.docType === 'doc' && (
-          // This non-live editor has no comment backend (comments are a shared
-          // live-document feature), so it passes an empty thread list and the
-          // panel shows an honest empty state rather than any fabricated threads.
           <DocEditor
             key={active.id}
             content={active.body}
             title={active.title}
             onChange={(json) => saveBody(json)}
             userName={userName}
-            comments={[]}
-            canComment={false}
+            onEditorReady={setEditor}
+            comments={panelThreads}
+            canComment
+            onAddComment={() => void addComment()}
+            onReplyComment={(threadId, body) => void replyComment(threadId, body)}
+            onJumpComment={jumpToComment}
           />
         )}
         {active.docType === 'sheet' && (

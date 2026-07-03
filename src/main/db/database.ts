@@ -747,6 +747,24 @@ export function getDb(): Database.Database {
     );
     CREATE INDEX IF NOT EXISTS idx_doc_snapshots_doc ON doc_snapshots(doc_id, at DESC);
   `)
+  // Comments on LOCAL documents. Live/collaborative docs keep their comments on
+  // the signal server; this table gives ordinary local docs the same panel.
+  // anchor_id is the Tiptap comment-mark id inside the body (nullable: a reply
+  // has no own anchor). Single-user local docs, so author is the local display
+  // name at write time.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS doc_comments (
+      id TEXT PRIMARY KEY,
+      doc_id TEXT NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+      parent_id TEXT,
+      anchor_id TEXT,
+      author TEXT NOT NULL DEFAULT '',
+      body TEXT NOT NULL,
+      resolved INTEGER NOT NULL DEFAULT 0,
+      created_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_doc_comments_doc ON doc_comments(doc_id, created_at);
+  `)
   // Multi-org tenancy for the remaining user-data surfaces so switching org
   // isolates the calendar, vault, knowledge and tables too, not just desks and
   // documents. Added at the end where every table exists; existing rows backfill

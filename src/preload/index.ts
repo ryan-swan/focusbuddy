@@ -73,6 +73,18 @@ import type {
   FbTablePatch
 } from '@shared/fields'
 import type { KnowledgeEntry, KnowledgeDraft, KnowledgePatch } from '@shared/knowledge'
+
+// Local-document comment row as returned by the docComments IPC.
+interface DocCommentDto {
+  id: string
+  docId: string
+  parentId: string | null
+  anchorId: string | null
+  author: string
+  body: string
+  resolved: boolean
+  createdAt: number
+}
 import type { Meeting, MeetingDraft, MeetingPatch } from '@shared/meetings'
 import type { PlexiApp, PlexiAppDraft, PlexiAppPatch } from '@shared/apps'
 import type { PlexiForm, PlexiFormDraft, PlexiFormPatch } from '@shared/forms'
@@ -1363,6 +1375,17 @@ const api = {
     // permanent removal, from the Trash view's "Delete forever".
     delete: (id: string): Promise<boolean> => ipcRenderer.invoke('documents:delete', id),
     listTrashed: (): Promise<DocumentMeta[]> => ipcRenderer.invoke('documents:listTrashed'),
+    // Comments on local documents (live docs use the signal server instead).
+    listComments: (docId: string): Promise<DocCommentDto[]> => ipcRenderer.invoke('docComments:list', docId),
+    addComment: (input: {
+      docId: string
+      body: string
+      author: string
+      anchorId?: string | null
+      parentId?: string | null
+    }): Promise<DocCommentDto> => ipcRenderer.invoke('docComments:add', input),
+    resolveComment: (id: string, resolved: boolean): Promise<boolean> =>
+      ipcRenderer.invoke('docComments:resolve', id, resolved),
     listSnapshots: (docId: string): Promise<DocSnapshotMeta[]> =>
       ipcRenderer.invoke('documents:listSnapshots', docId),
     restoreSnapshot: (snapshotId: string): Promise<FbDocument | null> =>

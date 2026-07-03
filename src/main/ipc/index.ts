@@ -51,6 +51,7 @@ import {
   deleteDocument
 } from '../db/documents'
 import { captureDocSnapshot, listDocSnapshots, restoreDocSnapshot } from '../db/docSnapshots'
+import { listDocComments, addDocComment, resolveDocComment } from '../db/docComments'
 import { searchAll, setMailSearchCache } from '../db/search'
 
 // Unseen mail uids already announced with a desktop notification, so a banner
@@ -1939,6 +1940,14 @@ export function registerIpcHandlers(): void {
     if (doc) void embedDocument(doc.id)
     return doc
   })
+  // Local-document comments (live docs keep theirs on the signal server).
+  ipcMain.handle('docComments:list', (_e, docId: string) => listDocComments(docId))
+  ipcMain.handle(
+    'docComments:add',
+    (_e, input: { docId: string; body: string; author: string; anchorId?: string | null; parentId?: string | null }) =>
+      addDocComment(input)
+  )
+  ipcMain.handle('docComments:resolve', (_e, id: string, resolved: boolean) => resolveDocComment(id, resolved))
   ipcMain.handle('documents:reindex', () => reindexDocuments())
   ipcMain.handle('documents:semanticActive', () => documentSemanticActive())
 
