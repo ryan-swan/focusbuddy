@@ -291,6 +291,12 @@ export function applyTheme(mode: ThemeMode, accent: AccentColor, customHex?: str
     root.style.setProperty('--accent', palette.base)
     root.style.setProperty('--accent-hover', palette.hover)
   }
+  // Mirror the theme onto the NATIVE window background. The BrowserWindow is
+  // created with the light cream (#fbf7ee); without this, any moment Chromium
+  // exposes the window background (occlusion recovery, resize, webview churn)
+  // flashes cream over a dark desk — one of the reported "blink" mechanisms.
+  const nativeBg = effective === 'dark' ? '#0c0a09' : '#fbf7ee'
+  void window.api?.app?.setBackgroundColor?.(nativeBg)?.catch?.(() => {})
 }
 
 // Apply the chosen interface font by overriding the --font-sans / --font-display

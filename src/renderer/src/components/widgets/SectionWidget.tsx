@@ -67,7 +67,6 @@ export default function SectionWidget({
   const bumpLayout = useWidgetStore((s) => s.bumpLayoutVersion)
   const zoom = useWidgetStore((s) => s.zoom)
   const allWidgets = useWidgetStore((s) => s.widgets)
-  const layoutVersion = useWidgetStore((s) => s.layoutVersion)
   const isActive = useWidgetStore((s) => s.activeWidgetId === widget.id)
   const isHovered = useWidgetStore((s) => s.hoveredSectionId === widget.id)
   const [editing, setEditing] = useState(false)
@@ -413,7 +412,7 @@ export default function SectionWidget({
             {layout === 'icons' || layout === 'list' ? (
               children.map((c, i) => (
                 <CompactChildView
-                  key={`${c.id}-${layoutVersion}`}
+                  key={c.id}
                   child={c}
                   cell={cells[i]}
                   layout={layout}
@@ -440,7 +439,7 @@ export default function SectionWidget({
               renderChild &&
               children.map((c, i) => (
                 <SectionLayoutContext.Provider
-                  key={`${c.id}-${layoutVersion}`}
+                  key={c.id}
                   value={{
                     layout,
                     position: { x: cells[i].x, y: cells[i].y },

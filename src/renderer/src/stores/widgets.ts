@@ -34,7 +34,7 @@ interface WidgetStore {
   zoom: number
   panX: number
   panY: number
-  loadForTask: (taskId: string) => Promise<void>
+  loadForTask: (taskId: string, opts?: { refresh?: boolean }) => Promise<void>
   clear: () => void
   create: (draft: WidgetDraft) => Promise<Widget>
   update: (id: string, patch: WidgetPatch) => Promise<void>
@@ -99,7 +99,18 @@ export const useWidgetStore = create<WidgetStore>((set, get) => ({
   zoom: 1,
   panX: 0,
   panY: 0,
-  loadForTask: async (taskId) => {
+  loadForTask: async (taskId, opts) => {
+    if (opts?.refresh) {
+      // In-place refresh (sync applied remote changes, etc.): keep the current
+      // widget array, camera and selection mounted while the fresh list loads.
+      // The old behaviour cleared everything first, which blanked the desk for
+      // a frame and remounted every widget — each <webview> is its own process,
+      // so that read as the whole desktop "blinking" every sync cycle.
+      set({ loadingFor: taskId })
+      const widgets = await window.api.widgets.listByTask(taskId)
+      if (get().loadingFor === taskId) set({ widgets, loadingFor: null })
+      return
+    }
     set({
       loadingFor: taskId,
       widgets: [],

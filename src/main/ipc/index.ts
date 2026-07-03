@@ -1846,6 +1846,20 @@ export function registerIpcHandlers(): void {
     }
   })
 
+  // Native window background follows the renderer theme so occlusion
+  // recovery, resizes and webview surface churn expose the right colour
+  // instead of flashing the hardcoded light cream over a dark desk.
+  ipcMain.handle('app:setBackgroundColor', (e, hex: string) => {
+    if (typeof hex !== 'string' || !/^#[0-9a-fA-F]{6}$/.test(hex)) return false
+    const win = BrowserWindow.fromWebContents(e.sender)
+    try {
+      win?.setBackgroundColor(hex)
+      return true
+    } catch {
+      return false
+    }
+  })
+
   // The renderer mirrors a compact chat-conversation snapshot so the AI
   // prompt builder can surface real conversation ids for post-chat drafts.
   ipcMain.handle('ai:setConversationSnapshot', (_e, convs: Array<{ id: string; label: string }>) => {

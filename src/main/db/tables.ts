@@ -1,4 +1,5 @@
 import { randomUUID } from 'crypto'
+import { notifyRowsChanged } from '../tableEvents'
 import { getDb } from './database'
 import { getActiveOrgId } from './activeOrg'
 import { emitAutomationEvent } from './automationEvents'
@@ -175,6 +176,8 @@ export function createRow(draft: FbRowDraft): FbRow {
   const row = db.prepare('SELECT * FROM fb_rows WHERE id = ?').get(id) as RowRow
   // Let PlexiFlow react to a new row (suppressed automatically during flow runs).
   emitAutomationEvent({ name: 'row-added', tableId: draft.tableId })
+  // And let the renderer invalidate its cached rows for this table.
+  notifyRowsChanged(draft.tableId)
   return rowToFbRow(row)
 }
 
@@ -201,12 +204,17 @@ export function updateRow(id: string, patch: FbRowPatch): FbRow | null {
   const row = db.prepare('SELECT * FROM fb_rows WHERE id = ?').get(id) as
     | RowRow
     | undefined
+  if (row) notifyRowsChanged(row.table_id)
   return row ? rowToFbRow(row) : null
 }
 
 export function deleteRow(id: string): boolean {
   const db = getDb()
+  const row = db.prepare('SELECT table_id FROM fb_rows WHERE id = ?').get(id) as
+    | { table_id: string }
+    | undefined
   const r = db.prepare('DELETE FROM fb_rows WHERE id = ?').run(id)
+  if (r.changes > 0 && row) notifyRowsChanged(row.table_id)
   return r.changes > 0
 }
 

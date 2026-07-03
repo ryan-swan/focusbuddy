@@ -105,10 +105,14 @@ export const useTablesStore = create<TablesStore>((set, get) => ({
       cells: rowsCopy[foundTableId].find((r) => r.id === rowId)?.cells
     })
     if (updated) {
-      const list = rowsCopy[foundTableId]
-      const idx = list.findIndex((r) => r.id === rowId)
+      // Reconcile against the LIVE state, not the pre-await snapshot: another
+      // cell edit or an AI row-add may have landed during the IPC round trip,
+      // and rebuilding from the stale copy silently reverted it (the reported
+      // "cell stays stale until re-selected" bug). Patch only this one row.
+      const live = get().rows[foundTableId] ?? []
+      const idx = live.findIndex((r) => r.id === rowId)
       if (idx !== -1) {
-        const next = [...list]
+        const next = [...live]
         next[idx] = updated
         set({ rows: { ...get().rows, [foundTableId]: next } })
       }
@@ -158,3 +162,16 @@ export const useTablesStore = create<TablesStore>((set, get) => ({
     await window.api.tables.reorderRows(tableId, ids)
   }
 }))
+
+// Refetch a table's rows whenever any writer changes them (flows and forms run
+// in the main process and used to write behind this cache's back — the rows
+// only appeared after an app restart). Only tables already cached refetch.
+if (typeof window !== 'undefined' && window.api?.tables?.onRowsChanged) {
+  window.api.tables.onRowsChanged((tableId) => {
+    const state = useTablesStore.getState()
+    if (!(tableId in state.rows)) return
+    void window.api.tables.listRows(tableId).then((rows) => {
+      useTablesStore.setState({ rows: { ...useTablesStore.getState().rows, [tableId]: rows } })
+    })
+  })
+}

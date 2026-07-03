@@ -135,7 +135,7 @@ export async function syncWorkspaceOnce(): Promise<number> {
     if (applied > 0) {
       await useNodeStore.getState().refresh()
       const activeTaskId = useNodeStore.getState().activeTaskId
-      if (activeTaskId) await useWidgetStore.getState().loadForTask(activeTaskId)
+      if (activeTaskId) await useWidgetStore.getState().loadForTask(activeTaskId, { refresh: true })
     }
     return applied
   } finally {

@@ -265,7 +265,6 @@ export default function Canvas(): JSX.Element {
   const setActive = useWidgetStore((s) => s.setActive)
   const focusOn = useWidgetStore((s) => s.focusOn)
   const centerToken = useWidgetStore((s) => s.centerToken)
-  const layoutVersion = useWidgetStore((s) => s.layoutVersion)
   const zoom = useWidgetStore((s) => s.zoom)
   const panX = useWidgetStore((s) => s.panX)
   const panY = useWidgetStore((s) => s.panY)
@@ -2475,7 +2474,7 @@ export default function Canvas(): JSX.Element {
               if (w.archived) return null
               if (w.pinned || w.kind !== 'section') return null
               return (
-                <div key={`${w.id}-${layoutVersion}`}>{renderWidget(w)}</div>
+                <div key={w.id}>{renderWidget(w)}</div>
               )
             })}
             {widgets.map((w) => {
@@ -2486,7 +2485,7 @@ export default function Canvas(): JSX.Element {
               // commits the latest URL before focus mode's separate WebViewWidget mounts.
               if (focusedId === w.id && isWebKind(w.kind)) return null
               return (
-                <div key={`${w.id}-${layoutVersion}`}>
+                <div key={w.id}>
                   {renderWidget(w)}
                 </div>
               )
@@ -2514,12 +2513,7 @@ export default function Canvas(): JSX.Element {
               Zone-pinned widgets have their position computed here and provided
               via PinLayoutContext so any nested WidgetFrame can look up its
               docked rect without prop-drilling through every widget kind. */}
-          <PinnedLayer
-            widgets={widgets}
-            layoutVersion={layoutVersion}
-            focusedId={focusedId}
-            renderWidget={renderWidget}
-          />
+          <PinnedLayer widgets={widgets} focusedId={focusedId} renderWidget={renderWidget} />
           <FloatingToolbar
             actions={(() => {
               // Quick-jump buttons for every section currently on the canvas
@@ -2765,12 +2759,10 @@ function FivePromiseButton({ taskId }: { taskId: string }): JSX.Element {
 
 function PinnedLayer({
   widgets,
-  layoutVersion,
   focusedId,
   renderWidget
 }: {
   widgets: Widget[]
-  layoutVersion: number
   focusedId: string | null
   renderWidget: (w: Widget) => JSX.Element | null
 }): JSX.Element {
@@ -2821,7 +2813,7 @@ function PinnedLayer({
           if (w.archived) return null
           if (!w.pinned || w.kind !== 'section') return null
           return (
-            <div key={`${w.id}-pin-${layoutVersion}`}>{renderWidget(w)}</div>
+            <div key={`${w.id}-pin`}>{renderWidget(w)}</div>
           )
         })}
         {widgets.map((w) => {
@@ -2830,7 +2822,7 @@ function PinnedLayer({
           if (w.parentSectionId !== null) return null
           if (focusedId === w.id && isWebKind(w.kind)) return null
           return (
-            <div key={`${w.id}-pin-${layoutVersion}`}>{renderWidget(w)}</div>
+            <div key={`${w.id}-pin`}>{renderWidget(w)}</div>
           )
         })}
       </div>
