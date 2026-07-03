@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { promptText } from '../../plexi/PromptDialog'
 import type { Editor } from '@tiptap/react'
 import { useDocumentsStore } from '../../../stores/documents'
 import { useViewStore } from '../../../stores/view'
@@ -101,8 +102,8 @@ export default function DocMenuBar({
     goDocument(copy.id)
   }
 
-  function doRename(): void {
-    const next = window.prompt('Rename document', title)
+  async function doRename(): Promise<void> {
+    const next = await promptText({ title: 'Rename document', initial: title, confirmLabel: 'Rename' })
     if (next != null && next.trim()) void rename(next.trim())
   }
 
@@ -120,9 +121,9 @@ export default function DocMenuBar({
     })
   }
 
-  function insertLink(): void {
+  async function insertLink(): Promise<void> {
     const prev = (editor.getAttributes('link').href as string) || ''
-    const url = window.prompt('Link URL', prev)
+    const url = await promptText({ title: 'Link URL', initial: prev, placeholder: 'https://', confirmLabel: 'Set link' })
     if (url == null) return
     if (url.trim() === '') {
       chain().extendMarkRange('link').unsetLink().run()

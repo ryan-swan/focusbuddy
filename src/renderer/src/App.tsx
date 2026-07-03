@@ -61,6 +61,7 @@ import { installCapabilityWatcher } from './stores/capabilities'
 import { useViewStore } from './stores/view'
 import { useActionHistory } from './stores/actionHistory'
 import UndoToast from './components/UndoToast'
+import { PromptDialogHost } from './components/plexi/PromptDialog'
 import './lib/timeOfDay' // side-effect: pushes --tod-* CSS vars to :root + ticks every 60s
 import './lib/modelPrefs' // side-effect: pushes user's saved model mode to main process
 import './lib/bodyDouble' // side-effect: auto-resumes Body Double mode if user had it enabled
@@ -620,6 +621,7 @@ export default function App(): JSX.Element {
       />
       <FirstRunOnboarding />
       <UndoToast />
+      <PromptDialogHost />
       <LaunchSignInModal />
       <UpgradePromptModal />
       <MetricsOverlay />

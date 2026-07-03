@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { promptText } from '../plexi/PromptDialog'
 import {
   ReactFlow,
   ReactFlowProvider,
@@ -362,9 +363,14 @@ function MapInner({ body, onChange }: Props): JSX.Element {
   // Edge label edit on double-click.
   const onEdgeDoubleClick = useCallback(
     (_: React.MouseEvent, edge: Edge) => {
-      const next = window.prompt('Edge label', typeof edge.label === 'string' ? edge.label : '')
-      if (next === null) return
-      setEdges((es) => es.map((e) => (e.id === edge.id ? { ...e, label: next } : e)))
+      void promptText({
+        title: 'Edge label',
+        initial: typeof edge.label === 'string' ? edge.label : '',
+        confirmLabel: 'Set label'
+      }).then((next) => {
+        if (next === null) return
+        setEdges((es) => es.map((e) => (e.id === edge.id ? { ...e, label: next } : e)))
+      })
     },
     [setEdges]
   )

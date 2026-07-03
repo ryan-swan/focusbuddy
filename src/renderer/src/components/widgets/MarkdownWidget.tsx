@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { promptText } from '../plexi/PromptDialog'
 import { EditorContent, useEditor } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Link from '@tiptap/extension-link'
@@ -100,13 +101,14 @@ const TOOLBAR: ToolbarBtn[] = [
         return
       }
       const prev = (e.getAttributes('link').href as string) || 'https://'
-      const url = window.prompt('Link URL', prev)
-      if (url === null) return
-      if (url === '') {
-        e.chain().focus().unsetLink().run()
-        return
-      }
-      e.chain().focus().setLink({ href: url }).run()
+      void promptText({ title: 'Link URL', initial: prev, confirmLabel: 'Set link' }).then((url) => {
+        if (url === null) return
+        if (url === '') {
+          e.chain().focus().unsetLink().run()
+          return
+        }
+        e.chain().focus().setLink({ href: url }).run()
+      })
     }
   },
   {
@@ -401,12 +403,11 @@ export default function MarkdownWidget({ widget, inline = false }: Props): JSX.E
             <SlashItem
               icon="link"
               label="Link"
-              onClick={() =>
-                applyBlock((e) => {
-                  const url = window.prompt('Link URL', 'https://')
-                  if (url) e.chain().focus().setLink({ href: url }).run()
+              onClick={() => {
+                void promptText({ title: 'Link URL', initial: 'https://', confirmLabel: 'Set link' }).then((url) => {
+                  if (url) applyBlock((e) => e.chain().focus().setLink({ href: url }).run())
                 })
-              }
+              }}
             />
           </div>
         </>

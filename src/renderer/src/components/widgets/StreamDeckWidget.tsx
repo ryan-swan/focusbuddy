@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { showCopyFallback } from '../plexi/PromptDialog'
 import type { Widget } from '@shared/types'
 import {
   STREAMDECK_COLUMNS,
@@ -556,7 +557,7 @@ export default function StreamDeckWidget({ widget, inline = false }: Props): JSX
     try {
       await navigator.clipboard.writeText(json)
     } catch {
-      window.prompt('Copy this deck JSON manually:', json)
+      await showCopyFallback('Copy this deck JSON manually', json)
     }
   }
   const importDeck = (): void => {

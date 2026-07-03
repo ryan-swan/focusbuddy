@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { promptText } from '../../plexi/PromptDialog'
 import { createPortal } from 'react-dom'
 import type {
   ActionButton,
@@ -486,14 +487,16 @@ export default function StreamDeckAI({
     setTrackingState(s)
   }
 
-  function applyProposal(p: AIProposal): void {
+  async function applyProposal(p: AIProposal): Promise<void> {
     if (!currentPage) return
     let slot = emptySlot
     if (slot === null) {
-      const raw = window.prompt(
-        `This page is full. Pick a slot number (1-${STREAMDECK_SLOTS}) to replace, or Cancel.`,
-        '1'
-      )
+      const raw = await promptText({
+        title: 'This page is full',
+        label: `Pick a slot number (1-${STREAMDECK_SLOTS}) to replace, or cancel.`,
+        initial: '1',
+        confirmLabel: 'Replace slot'
+      })
       if (!raw) return
       const parsed = parseInt(raw, 10)
       if (!parsed || parsed < 1 || parsed > STREAMDECK_SLOTS) return
