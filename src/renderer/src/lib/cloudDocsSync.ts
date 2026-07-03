@@ -15,6 +15,7 @@
 // + re-pull is the safe resolution).
 
 import type { DocType, FbDocument } from '@shared/types'
+import { initPreviewGuard, previewSyncBlocked } from './previewGuard'
 import {
   syncCloudDocs,
   putCloudDoc,
@@ -30,6 +31,7 @@ const REVS_KEY = 'fb.clouddocs.revs'
 
 export function cloudDocsEnabled(): boolean {
   try {
+    if (previewSyncBlocked()) return false
     return localStorage.getItem(FLAG_KEY) === '1'
   } catch {
     return false
@@ -170,3 +172,5 @@ export async function pushCloudDelete(id: string): Promise<void> {
   await deleteCloudDoc(t, id)
   forgetRev(id)
 }
+
+initPreviewGuard()

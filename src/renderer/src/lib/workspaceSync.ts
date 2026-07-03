@@ -1,7 +1,9 @@
 import { signalConfig } from './signalConfig'
+import { initPreviewGuard, previewSyncBlocked } from './previewGuard'
 import { useAccountStore } from '../stores/account'
 import { useNodeStore } from '../stores/nodes'
 import { useWidgetStore } from '../stores/widgets'
+import { useTimeBlockStore } from '../stores/timeBlocks'
 
 // Renderer half of multi-device workspace sync. It owns the network (it has the
 // signal URL + session token); the main process owns the local SQLite and exposes
@@ -17,6 +19,7 @@ const FLAG_KEY = 'fb.workspace.sync'
 const SYNC_INTERVAL_MS = 20_000
 
 function enabled(): boolean {
+  if (previewSyncBlocked()) return false
   return localStorage.getItem(FLAG_KEY) !== '0'
 }
 export function setWorkspaceSyncEnabled(on: boolean): void {
@@ -29,7 +32,7 @@ function urlFor(path: string): string {
 
 interface ServerItem {
   id: string
-  itemType: 'node' | 'widget'
+  itemType: 'node' | 'widget' | 'timeblock'
   body: Record<string, unknown> | null
   rev: number
   deleted: boolean
@@ -57,7 +60,7 @@ type PutResult =
 async function putItem(
   token: string,
   id: string,
-  itemType: 'node' | 'widget',
+  itemType: 'node' | 'widget' | 'timeblock',
   body: Record<string, unknown>,
   baseRev: number
 ): Promise<PutResult> {
@@ -136,6 +139,8 @@ export async function syncWorkspaceOnce(): Promise<number> {
       await useNodeStore.getState().refresh()
       const activeTaskId = useNodeStore.getState().activeTaskId
       if (activeTaskId) await useWidgetStore.getState().loadForTask(activeTaskId, { refresh: true })
+      // Calendar blocks sync too (rung 1): refresh whatever range is loaded.
+      await useTimeBlockStore.getState().reload()
     }
     return applied
   } finally {
@@ -148,6 +153,7 @@ let timer: number | null = null
 // Start the periodic sync loop (idempotent). Runs once immediately, then on an
 // interval. Safe to call on every sign-in; stops cleanly on sign-out.
 export function startWorkspaceSync(): void {
+  initPreviewGuard()
   if (timer != null) return
   void syncWorkspaceOnce()
   timer = window.setInterval(() => void syncWorkspaceOnce(), SYNC_INTERVAL_MS)

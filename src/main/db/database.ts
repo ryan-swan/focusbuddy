@@ -760,6 +760,18 @@ export function getDb(): Database.Database {
   ensureColumn(db, 'time_blocks', 'recurrence', 'TEXT')
   ensureColumn(db, 'time_blocks', 'series_id', 'TEXT')
   db.exec('CREATE INDEX IF NOT EXISTS idx_time_blocks_series ON time_blocks(series_id)')
+  // Calendar sync (sync-ladder rung 1). trashed_at makes deletes tombstones so
+  // they propagate across devices instead of resurrecting on the next pull;
+  // sync_rev/needs_sync mirror the nodes/widgets bookkeeping, with the same
+  // guarded dirty trigger. New rows default needs_sync = 1.
+  ensureColumn(db, 'time_blocks', 'trashed_at', 'INTEGER')
+  ensureColumn(db, 'time_blocks', 'sync_rev', 'INTEGER NOT NULL DEFAULT 0')
+  ensureColumn(db, 'time_blocks', 'needs_sync', 'INTEGER NOT NULL DEFAULT 1')
+  db.exec(`
+    CREATE TRIGGER IF NOT EXISTS time_blocks_mark_dirty AFTER UPDATE ON time_blocks
+    WHEN NEW.needs_sync = OLD.needs_sync AND NEW.sync_rev = OLD.sync_rev AND OLD.needs_sync = 0
+    BEGIN UPDATE time_blocks SET needs_sync = 1 WHERE id = NEW.id; END;
+  `)
   // A calendar block can be a video meeting; its room + invitee list ride along
   // as JSON. Nullable, so every existing focus block stays a plain focus block.
   ensureColumn(db, 'time_blocks', 'meeting_json', 'TEXT')

@@ -235,7 +235,7 @@ export async function searchAll(rawQuery: string): Promise<SearchHit[]> {
   const eventRows = db
     .prepare(
       `SELECT id, title, start_ms FROM time_blocks
-       WHERE org_id = ? AND title LIKE ?${ESC} LIMIT ?`
+       WHERE org_id = ? AND trashed_at IS NULL AND title LIKE ?${ESC} LIMIT ?`
     )
     .all(getActiveOrgId(), like, PER_CATEGORY) as Array<{ id: string; title: string; start_ms: number }>
   for (const r of eventRows) {
