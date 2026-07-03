@@ -402,6 +402,33 @@ export async function sampleSent(config: MailAccountConfig, limit = 20): Promise
 }
 
 /** Mark a message read on the server (so the unread state stays in sync). */
+// Move a message out of the inbox into the account's archive mailbox. The
+// target is detected from the special-use \\Archive attribute when the server
+// advertises one, falling back to common names, and finally to "Archive"
+// (created if missing). Honest failure: throws when the move fails, so the
+// caller reports it rather than pretending the inbox changed.
+export async function archiveMessage(config: MailAccountConfig, uid: number): Promise<void> {
+  const client = await acquireWarm(config)
+  let target = 'Archive'
+  try {
+    const boxes = await client.list()
+    const special = boxes.find((b) => (b.specialUse ?? '') === '\\Archive')
+    const byName = boxes.find((b) => /^(archive|archived|all mail)$/i.test(b.name))
+    if (special) target = special.path
+    else if (byName) target = byName.path
+    else await client.mailboxCreate('Archive').catch(() => undefined)
+  } catch {
+    // listing failed; try the default target anyway
+  }
+  const lock = await client.getMailboxLock('INBOX')
+  try {
+    await client.messageMove(String(uid), target, { uid: true })
+  } finally {
+    lock.release()
+    releaseWarm()
+  }
+}
+
 export async function markSeen(config: MailAccountConfig, uid: number): Promise<void> {
   const client = await acquireWarm(config)
   const lock = await client.getMailboxLock('INBOX')

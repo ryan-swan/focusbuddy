@@ -37,8 +37,7 @@ import {
   listInbox,
   getMessage,
   markSeen,
-  resetConnection as resetMailConnection
-} from '../mail/imap'
+  resetConnection as resetMailConnection, archiveMessage } from '../mail/imap'
 import {
   listDocuments,
   listTrashedDocuments,
@@ -1821,6 +1820,16 @@ export function registerIpcHandlers(): void {
     }
   })
 
+  ipcMain.handle('mail:archive', async (_e, uid: number) => {
+    const config = mailAccount.getFull()
+    if (!config) return { ok: false as const, error: 'No mail account connected.' }
+    try {
+      await archiveMessage(config, uid)
+      return { ok: true as const }
+    } catch (err) {
+      return { ok: false as const, error: (err as Error).message }
+    }
+  })
   ipcMain.handle('mail:markSeen', async (_e, uid: number) => {
     const config = mailAccount.getFull()
     if (!config) return { ok: false as const, error: 'No mail account connected.' }

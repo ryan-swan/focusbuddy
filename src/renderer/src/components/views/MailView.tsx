@@ -536,6 +536,51 @@ export default function MailView(): JSX.Element {
   // Group the inbox into conversation threads (Gmail-style), newest first.
   const threads = useMemo(() => threadMailbox(messages), [messages])
 
+  // Keyboard triage (power-user ask): j/k move through threads, Enter opens
+  // the highlighted one, r starts a reply to the open message, a archives it.
+  // Only when not typing, so the composer and search stay unaffected.
+  const archive = useMailStore((s) => s.archive)
+  useEffect(() => {
+    function typing(): boolean {
+      const el = document.activeElement as HTMLElement | null
+      const tag = (el?.tagName ?? '').toLowerCase()
+      return tag === 'input' || tag === 'textarea' || !!el?.isContentEditable
+    }
+    function onKey(e: KeyboardEvent): void {
+      if (typing() || e.metaKey || e.ctrlKey || e.altKey) return
+      const list = threadMailbox(useMailStore.getState().messages)
+      if (list.length === 0) return
+      const openNow = useMailStore.getState().open
+      const idx = openNow ? list.findIndex((t) => t.messages.some((m) => m.uid === openNow.uid)) : -1
+      if (e.key === 'j' || e.key === 'k') {
+        e.preventDefault()
+        const next = e.key === 'j' ? Math.min(idx + 1, list.length - 1) : Math.max(idx - 1, 0)
+        const t = list[next]
+        if (t) void useMailStore.getState().openMessage(t.latest.uid)
+        return
+      }
+      if (e.key === 'a' && openNow) {
+        e.preventDefault()
+        // Archive, then advance to what is now at the same position.
+        const at = idx
+        void archive(openNow.uid).then((r) => {
+          if (!r.ok) return
+          const after = threadMailbox(useMailStore.getState().messages)
+          const t = after[Math.min(at, after.length - 1)]
+          if (t) void useMailStore.getState().openMessage(t.latest.uid)
+        })
+        return
+      }
+      if (e.key === 'r' && openNow) {
+        e.preventDefault()
+        const seed = useMailStore.getState().replyToOpen(false)
+        if (seed) useMailStore.getState().startCompose(seed)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [archive])
+
   if (loaded && !account) {
     return <SetupForm onConnected={() => undefined} />
   }
@@ -604,6 +649,11 @@ export default function MailView(): JSX.Element {
             <div className="m-2 text-[12px] text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/50 rounded-lg px-3 py-2">
               {error}
             </div>
+          )}
+          {threads.length > 0 && (
+            <p className="px-3 py-1 text-[10.5px] text-stone-400 dark:text-stone-500 border-b border-stone-100 dark:border-stone-800/60">
+              j / k move through the inbox, r replies, a archives
+            </p>
           )}
           {threads.length === 0 && !loadingList ? (
             <p className="text-[12px] text-stone-500 dark:text-stone-400 px-3 py-4">

@@ -53,6 +53,8 @@ interface MailStore {
   testAccount: (config: MailAccountInput) => Promise<{ ok: boolean; error?: string }>
   disconnect: () => Promise<void>
   refresh: () => Promise<void>
+  /** Move a message to the archive mailbox; removes it from the inbox list. */
+  archive: (uid: number) => Promise<{ ok: boolean; error?: string }>
   openMessage: (uid: number) => Promise<void>
   closeMessage: () => void
   // Send a message (new, reply, or reply-all). Returns the result so the
@@ -150,6 +152,18 @@ export const useMailStore = create<MailStore>((set, get) => ({
   send: async (input) => {
     const r = await window.api.mail.send(input)
     return r.ok ? { ok: true } : { ok: false, error: r.error }
+  },
+
+  archive: async (uid) => {
+    const before = get().messages
+    // Optimistic: drop it from the list; restore on failure with the error.
+    set({ messages: before.filter((m) => m.uid !== uid), open: get().open?.uid === uid ? null : get().open })
+    const r = await window.api.mail.archive(uid)
+    if (!r.ok) {
+      set({ messages: before, error: r.error ?? 'Could not archive that message.' })
+      return { ok: false, error: r.error }
+    }
+    return { ok: true }
   },
 
   startCompose: (initial) => set({ composing: initial ?? {} }),
