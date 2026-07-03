@@ -558,7 +558,17 @@ export default function CommandCenter({
         // top, a weak body match still above the static nav items.
         score: 140 + h.score / 8,
         run: () => {
-          runHit(h, { goProject, goTask, goDocument, goFiles, goKnowledge, setActive })
+          runHit(h, {
+            goProject,
+            goTask,
+            goDocument,
+            goFiles,
+            goKnowledge,
+            goCalendar,
+            goMeet: () => goOffice('meet'),
+            goSign,
+            setActive
+          })
           closePalette()
         }
       })
@@ -825,6 +835,12 @@ function hitIcon(h: SearchHit): string {
       return 'table_chart'
     case 'knowledge':
       return 'neurology'
+    case 'event':
+      return 'calendar_month'
+    case 'meeting':
+      return 'video_call'
+    case 'sign':
+      return 'draw'
     default:
       return 'widgets' // widget
   }
@@ -844,6 +860,12 @@ function hitKindLabel(h: SearchHit): string {
       return 'Table'
     case 'knowledge':
       return 'PlexiBrain'
+    case 'event':
+      return 'Calendar'
+    case 'meeting':
+      return 'Meeting'
+    case 'sign':
+      return 'Signature'
     default:
       return 'On a desk'
   }
@@ -855,6 +877,9 @@ interface HitNav {
   goDocument: (id: string) => void
   goFiles: () => void
   goKnowledge: (entryId?: string) => void
+  goCalendar: () => void
+  goMeet: () => void
+  goSign: () => void
   setActive: (id: string | null) => void
 }
 
@@ -883,6 +908,15 @@ function runHit(h: SearchHit, nav: HitNav): void {
       break
     case 'knowledge':
       nav.goKnowledge(h.id)
+      break
+    case 'event':
+      nav.goCalendar()
+      break
+    case 'meeting':
+      nav.goMeet()
+      break
+    case 'sign':
+      nav.goSign()
       break
   }
 }

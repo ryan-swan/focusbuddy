@@ -37,7 +37,10 @@ const TYPE_META: Record<
   'table-row': { icon: 'table_chart', label: 'Table', tone: 'stone' },
   widget: { icon: 'widgets', label: 'On a desk', tone: 'stone' },
   file: { icon: 'draft', label: 'File', tone: 'sky' },
-  knowledge: { icon: 'neurology', label: 'PlexiBrain', tone: 'violet' }
+  knowledge: { icon: 'neurology', label: 'PlexiBrain', tone: 'violet' },
+  event: { icon: 'calendar_month', label: 'Calendar', tone: 'sky' },
+  meeting: { icon: 'video_call', label: 'Meeting', tone: 'violet' },
+  sign: { icon: 'draw', label: 'Signature', tone: 'stone' }
 }
 
 function hitMeta(h: SearchHit): { icon: string; label: string; tone: 'accent' | 'stone' | 'sky' | 'violet' } {
@@ -55,6 +58,10 @@ export default function PlexiSearchView(): JSX.Element {
   const goDocument = useViewStore((s) => s.goDocument)
   const goFiles = useViewStore((s) => s.goFiles)
   const goKnowledge = useViewStore((s) => s.goKnowledge)
+  const goCalendar = useViewStore((s) => s.goCalendar)
+  const goOffice = useViewStore((s) => s.goOffice)
+  const goSign = useViewStore((s) => s.goSign)
+  const goMeet = (): void => goOffice('meet')
   const setActive = useNodeStore((s) => s.setActive)
 
   const [query, setQuery] = useState('')
@@ -158,6 +165,15 @@ export default function PlexiSearchView(): JSX.Element {
         break
       case 'knowledge':
         goKnowledge(h.id)
+        break
+      case 'event':
+        goCalendar()
+        break
+      case 'meeting':
+        goMeet()
+        break
+      case 'sign':
+        goSign()
         break
     }
   }
