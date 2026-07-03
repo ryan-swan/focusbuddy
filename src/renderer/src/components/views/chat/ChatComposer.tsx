@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Icon from '../../Icon'
 import { useMessagingStore } from '../../../stores/messaging'
 import { uploadAttachment, attachmentKindForMime, type MessageAttachment } from '../../../lib/messagingClient'
@@ -38,6 +38,28 @@ export function ChatComposer({
       useMessagingStore.getState().setPendingDraft(null)
     }
   }, [pendingDraft, conversationId])
+
+  // @mention autocomplete: when the draft ends in "@prefix", offer matching
+  // member handles from this conversation. Arrow keys move, Enter/Tab or a
+  // click inserts. Purely additive — typing an unknown @word sends as-is.
+  const conversations = useMessagingStore((s) => s.conversations)
+  const memberHandles = useMemo(() => {
+    const conv = conversations.find((c) => c.id === conversationId)
+    return (conv?.members ?? [])
+      .map((m) => m.handle)
+      .filter((h): h is string => !!h)
+  }, [conversations, conversationId])
+  const [mentionIdx, setMentionIdx] = useState(0)
+  const mentionMatch = /(^|\s)@([a-z0-9._-]*)$/i.exec(draft)
+  const mentionCandidates = mentionMatch
+    ? memberHandles.filter((h) => h.toLowerCase().startsWith(mentionMatch[2].toLowerCase())).slice(0, 6)
+    : []
+  function insertMention(handle: string): void {
+    if (!mentionMatch) return
+    const upto = draft.slice(0, draft.length - mentionMatch[2].length)
+    setDraft(`${upto}${handle} `)
+    setMentionIdx(0)
+  }
   const [pending, setPending] = useState<PendingAttachment | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -212,7 +234,7 @@ export function ChatComposer({
           </button>
         </div>
       )}
-      <div className="flex items-end gap-1.5">
+      <div className="relative flex items-end gap-1.5">
         <input
           ref={fileInputRef}
           type="file"
@@ -280,6 +302,32 @@ export function ChatComposer({
         >
           <Icon name="videocam" size={16} />
         </button>
+        {mentionCandidates.length > 0 && (
+          <div
+            className="absolute bottom-full mb-1 left-0 z-40 min-w-[180px] rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 shadow-lg py-1"
+            role="listbox"
+            data-testid="mention-popover"
+          >
+            {mentionCandidates.map((h, i) => (
+              <button
+                key={h}
+                role="option"
+                aria-selected={i === mentionIdx}
+                onMouseDown={(e) => {
+                  e.preventDefault()
+                  insertMention(h)
+                }}
+                className={`w-full text-left px-2.5 py-1 text-[12.5px] ${
+                  i === mentionIdx
+                    ? 'bg-accent/10 text-accent'
+                    : 'text-stone-700 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800'
+                }`}
+              >
+                @{h}
+              </button>
+            ))}
+          </div>
+        )}
         <textarea
           value={draft}
           onChange={(e) => {
@@ -287,6 +335,26 @@ export function ChatComposer({
             onTyping()
           }}
           onKeyDown={(e) => {
+            if (mentionCandidates.length > 0) {
+              if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                e.preventDefault()
+                setMentionIdx((i) => {
+                  const n = mentionCandidates.length
+                  return e.key === 'ArrowDown' ? (i + 1) % n : (i - 1 + n) % n
+                })
+                return
+              }
+              if (e.key === 'Enter' || e.key === 'Tab') {
+                e.preventDefault()
+                insertMention(mentionCandidates[Math.min(mentionIdx, mentionCandidates.length - 1)])
+                return
+              }
+              if (e.key === 'Escape') {
+                // Swallow so the mention popover closes without closing panels.
+                e.stopPropagation()
+                setDraft((d) => d) // no-op; popover hides when match breaks
+              }
+            }
             if (e.key === 'Enter' && !e.shiftKey) {
               e.preventDefault()
               void submit()

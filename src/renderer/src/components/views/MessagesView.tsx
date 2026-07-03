@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import MentionText from './chat/MentionText'
 import { useMessagingStore } from '../../stores/messaging'
 import { useAccountStore } from '../../stores/account'
 import { useCallStore } from '../../stores/call'
@@ -129,6 +130,19 @@ function AttachmentView({ m, mine }: { m: ChatMessage; mine: boolean }): JSX.Ele
   )
 }
 
+// Message body with @mentions highlighted. Handles come from the message's
+// conversation members; the viewer's own handle gets the accent chip.
+function MentionBody({ m }: { m: ChatMessage }): JSX.Element {
+  const conversations = useMessagingStore((s) => s.conversations)
+  const myHandle = useAccountStore((s) => s.account?.handle ?? null)
+  const conv = conversations.find((c) => c.id === m.conversationId)
+  const known = new Set<string>()
+  for (const member of conv?.members ?? []) {
+    if (member.handle) known.add(member.handle.toLowerCase())
+  }
+  return <MentionText body={m.body} myHandle={myHandle} knownHandles={known} />
+}
+
 function MessageRow({
   m,
   mine,
@@ -237,7 +251,11 @@ function MessageRow({
             </div>
           ) : (
             <>
-              {m.body && <div className="whitespace-pre-wrap break-words">{m.body}</div>}
+              {m.body && (
+                <div className="whitespace-pre-wrap break-words">
+                  <MentionBody m={m} />
+                </div>
+              )}
               <AttachmentView m={m} mine={mine} />
             </>
           )}
