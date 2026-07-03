@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { openDocHistory } from '../DocHistoryPanel'
 import { promptText } from '../../plexi/PromptDialog'
 import type { MapShape } from '@shared/types'
 import { useDocumentsStore } from '../../../stores/documents'
@@ -61,6 +62,7 @@ export default function DrawMenuBar({ actions }: { actions: DrawMenuActions }): 
         { kind: 'item', label: 'Make a copy', icon: 'file_copy', run: () => void makeCopy() },
         { kind: 'sep' },
         { kind: 'item', label: 'Rename', icon: 'edit', run: doRename },
+        { kind: 'item', label: 'Version history', icon: 'history', run: () => { if (active) openDocHistory(active.id) } },
         { kind: 'item', label: 'Move to trash', icon: 'delete', run: () => void moveToTrash() }
       ]
     },

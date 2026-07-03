@@ -62,6 +62,7 @@ import { useViewStore } from './stores/view'
 import { useActionHistory } from './stores/actionHistory'
 import UndoToast from './components/UndoToast'
 import { PromptDialogHost } from './components/plexi/PromptDialog'
+import { DocHistoryPanelHost } from './components/documents/DocHistoryPanel'
 import ShortcutsOverlay from './components/ShortcutsOverlay'
 import './lib/timeOfDay' // side-effect: pushes --tod-* CSS vars to :root + ticks every 60s
 import './lib/modelPrefs' // side-effect: pushes user's saved model mode to main process
@@ -638,6 +639,7 @@ export default function App(): JSX.Element {
       <FirstRunOnboarding />
       <UndoToast />
       <PromptDialogHost />
+      <DocHistoryPanelHost />
       {shortcutsOpen && <ShortcutsOverlay onClose={() => setShortcutsOpen(false)} />}
       <LaunchSignInModal />
       <UpgradePromptModal />

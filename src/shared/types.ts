@@ -620,6 +620,15 @@ export interface EmailReplyDraftResult {
 
 // Desk time-travel: metadata for one canvas snapshot (the full widget payload
 // lives in the DB and is fetched on demand).
+// Document version history metadata (payload stays in the main process).
+export interface DocSnapshotMeta {
+  id: string
+  docId: string
+  at: number
+  label: string
+  title: string
+}
+
 export interface SnapshotMeta {
   id: string
   taskId: string
