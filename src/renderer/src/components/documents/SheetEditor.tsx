@@ -51,7 +51,8 @@ import CondFormatDialog from './sheet/CondFormatDialog'
 import ValidationDialog from './sheet/ValidationDialog'
 import { validationForCell, valueIsValid, isRowHidden, parseA1Range } from '../../lib/sheetCond'
 import { runSheetScript, type SheetScriptResult } from '../../lib/sheetScript'
-import type { SheetCondRule, SheetValidation } from '@shared/types'
+import { applyQuery, stepLabel, type QueryStep, type QueryTable, type SheetQuery } from '../../lib/sheetQuery'
+import type { SheetCondRule, SheetValidation, SheetCondOp } from '@shared/types'
 import SheetAiPanel from './sheet/SheetAiPanel'
 import { useSheetAi } from './sheet/useSheetAi'
 import Icon from '../Icon'
@@ -202,6 +203,7 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
   const [pivotOpen, setPivotOpen] = useState(false)
   const [lookupOpen, setLookupOpen] = useState(false)
   const [macrosOpen, setMacrosOpen] = useState(false)
+  const [queryOpen, setQueryOpen] = useState(false)
   // The right-side AI Assistant panel is shown by default and is collapsible.
   const [aiPanelOpen, setAiPanelOpen] = useState(true)
   const [liveWidth, setLiveWidth] = useState<{ c: number; w: number } | null>(null)
@@ -1305,6 +1307,7 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
         onInsertSparkline={insertSparkline}
         onInsertLookup={() => setLookupOpen(true)}
         onMacros={() => setMacrosOpen(true)}
+        onQuery={() => setQueryOpen(true)}
         filterActive={!!tab.filterActive}
         onToggleFilter={() =>
           mutateTab((t) => ({
@@ -1700,6 +1703,19 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
               return res
             }}
             onClose={() => setMacrosOpen(false)}
+          />
+        )}
+
+        {queryOpen && (
+          <QueryPanel
+            columns={tab.columns}
+            query={(tab.query as SheetQuery | undefined) ?? null}
+            captureSource={() => ({ columns: tab.columns.slice(), rows: tab.rows.map((r) => r.slice()) })}
+            onApply={(q) => {
+              const out = applyQuery(q.source, q.steps)
+              mutateTab((t) => ({ ...t, columns: out.columns, rows: out.rows, query: q }))
+            }}
+            onClose={() => setQueryOpen(false)}
           />
         )}
       </div>
@@ -2131,6 +2147,251 @@ function MacrosPanel({
             <Icon name="play_arrow" size={14} /> Run macro
           </button>
         </div>
+      </div>
+    </div>
+  )
+}
+
+// The Power-Query panel: turn the current sheet into a refreshable SOURCE, then
+// stack transform STEPS (filter, sort, drop/keep/rename columns, dedupe, keep-top,
+// skip, promote-headers, trim, change-case) that shape the output non-destructively.
+// Editing a step re-applies the whole pipeline immediately; Refresh re-runs it.
+const QUERY_OPS: Array<{ v: SheetCondOp; label: string }> = [
+  { v: 'eq', label: 'equals' },
+  { v: 'ne', label: 'does not equal' },
+  { v: 'contains', label: 'contains' },
+  { v: 'gt', label: '>' },
+  { v: 'ge', label: '>=' },
+  { v: 'lt', label: '<' },
+  { v: 'le', label: '<=' },
+  { v: 'notEmpty', label: 'is not empty' },
+  { v: 'empty', label: 'is empty' }
+]
+const QUERY_KINDS: Array<{ v: QueryStep['kind']; label: string }> = [
+  { v: 'filter', label: 'Filter rows' },
+  { v: 'sort', label: 'Sort' },
+  { v: 'removeColumns', label: 'Remove column' },
+  { v: 'keepColumns', label: 'Keep only column' },
+  { v: 'rename', label: 'Rename column' },
+  { v: 'removeDuplicates', label: 'Remove duplicate rows' },
+  { v: 'keepTop', label: 'Keep top N rows' },
+  { v: 'skip', label: 'Skip first N rows' },
+  { v: 'promoteHeaders', label: 'Use first row as headers' },
+  { v: 'trim', label: 'Trim column whitespace' },
+  { v: 'changeCase', label: 'Change column case' }
+]
+
+function QueryPanel({
+  columns,
+  query,
+  captureSource,
+  onApply,
+  onClose
+}: {
+  columns: string[]
+  query: SheetQuery | null
+  captureSource: () => QueryTable
+  onApply: (q: SheetQuery) => void
+  onClose: () => void
+}): JSX.Element {
+  const [q, setQ] = useState<SheetQuery | null>(query)
+  const [kind, setKind] = useState<QueryStep['kind']>('filter')
+  const [col, setCol] = useState(0)
+  const [op, setOp] = useState<SheetCondOp>('eq')
+  const [value, setValue] = useState('')
+  const [n, setN] = useState(10)
+  const [name, setName] = useState('')
+  const [dir, setDir] = useState<'asc' | 'desc'>('asc')
+  const [to, setTo] = useState<'upper' | 'lower'>('upper')
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent): void {
+      if (e.key === 'Escape') onClose()
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [onClose])
+
+  // The shape the NEXT step will see: source folded through the current steps.
+  const preview = q ? applyQuery(q.source, q.steps) : { columns, rows: [] }
+  const pickCols = preview.columns.length ? preview.columns : columns
+
+  function commit(next: SheetQuery): void {
+    setQ(next)
+    onApply(next)
+  }
+
+  function buildStep(): QueryStep | null {
+    const c = Math.max(0, Math.min(col, Math.max(0, pickCols.length - 1)))
+    switch (kind) {
+      case 'filter':
+        return { kind, col: c, op, value: op === 'empty' || op === 'notEmpty' ? undefined : value }
+      case 'sort':
+        return { kind, col: c, dir }
+      case 'removeColumns':
+        return { kind, cols: [c] }
+      case 'keepColumns':
+        return { kind, cols: [c] }
+      case 'rename':
+        return name.trim() ? { kind, col: c, name: name.trim() } : null
+      case 'removeDuplicates':
+        return { kind }
+      case 'keepTop':
+        return { kind, n: Math.max(0, n) }
+      case 'skip':
+        return { kind, n: Math.max(0, n) }
+      case 'promoteHeaders':
+        return { kind }
+      case 'trim':
+        return { kind, col: c }
+      case 'changeCase':
+        return { kind, col: c, to }
+    }
+  }
+
+  function addStep(): void {
+    if (!q) return
+    const step = buildStep()
+    if (!step) return
+    commit({ source: q.source, steps: [...q.steps, step] })
+  }
+  function removeStep(i: number): void {
+    if (!q) return
+    commit({ source: q.source, steps: q.steps.filter((_, j) => j !== i) })
+  }
+  function moveStep(i: number, delta: number): void {
+    if (!q) return
+    const j = i + delta
+    if (j < 0 || j >= q.steps.length) return
+    const steps = q.steps.slice()
+    ;[steps[i], steps[j]] = [steps[j], steps[i]]
+    commit({ source: q.source, steps })
+  }
+
+  const needsCol = kind === 'filter' || kind === 'sort' || kind === 'removeColumns' || kind === 'keepColumns' || kind === 'rename' || kind === 'trim' || kind === 'changeCase'
+  const sel = 'h-7 bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded text-[12px] px-1.5 text-[var(--ink-70)] focus:outline-none focus:border-accent'
+
+  return (
+    <div className="absolute inset-0 z-40 bg-black/30 flex items-center justify-center" onMouseDown={onClose}>
+      <div
+        data-testid="sheet-query-panel"
+        className="w-[560px] max-w-[94%] rounded-lg bg-[var(--surface-raised)] border border-[var(--edge-soft)] shadow-xl p-4 space-y-3"
+        onMouseDown={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center gap-2 text-[13px] font-semibold">
+          <Icon name="account_tree" size={15} className="text-accent" />
+          Query
+          <button onClick={onClose} className="ml-auto icon-btn" aria-label="Close">
+            <Icon name="close" size={14} />
+          </button>
+        </div>
+
+        {!q ? (
+          <>
+            <p className="text-[11px] text-[var(--ink-50)]">
+              A query takes a snapshot of this sheet as its source, then shapes it with an ordered
+              list of steps. The steps never touch the source, so you can refresh or reorder them
+              at any time.
+            </p>
+            <button
+              data-testid="query-capture"
+              className="btn-primary text-[12px] px-3 py-1.5 inline-flex items-center gap-1"
+              onClick={() => commit({ source: captureSource(), steps: [] })}
+            >
+              <Icon name="add" size={14} /> Use this sheet as the source
+            </button>
+          </>
+        ) : (
+          <>
+            <p className="text-[11px] text-[var(--ink-50)]">
+              Source: {q.source.columns.length} columns, {q.source.rows.length} rows. Output after{' '}
+              {q.steps.length} step{q.steps.length === 1 ? '' : 's'}: {preview.columns.length} columns,{' '}
+              {preview.rows.length} rows.
+            </p>
+
+            <div className="rounded-md border border-[var(--edge-soft)] divide-y divide-[var(--edge-soft)]" data-testid="query-steps">
+              {q.steps.length === 0 && (
+                <div className="px-2.5 py-2 text-[12px] text-[var(--ink-40)]">No steps yet. Add one below.</div>
+              )}
+              {q.steps.map((s, i) => (
+                <div key={i} className="flex items-center gap-2 px-2.5 py-1.5 text-[12px]" data-testid={`query-step-${i}`}>
+                  <span className="text-[var(--ink-40)] font-mono w-4">{i + 1}</span>
+                  <span className="flex-1 text-[var(--ink-70)]">{stepLabel(s, i === 0 ? q.source.columns : applyQuery(q.source, q.steps.slice(0, i)).columns)}</span>
+                  <button className="icon-btn" title="Move up" onClick={() => moveStep(i, -1)} disabled={i === 0}>
+                    <Icon name="arrow_upward" size={13} />
+                  </button>
+                  <button className="icon-btn" title="Move down" onClick={() => moveStep(i, 1)} disabled={i === q.steps.length - 1}>
+                    <Icon name="arrow_downward" size={13} />
+                  </button>
+                  <button className="icon-btn" title="Remove step" data-testid={`query-remove-${i}`} onClick={() => removeStep(i)}>
+                    <Icon name="close" size={13} />
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex items-center gap-1.5 flex-wrap rounded-md border border-[var(--edge-soft)] bg-[var(--surface-sunken)] p-2">
+              <select className={sel} data-testid="query-kind" value={kind} onChange={(e) => setKind(e.target.value as QueryStep['kind'])}>
+                {QUERY_KINDS.map((k) => (
+                  <option key={k.v} value={k.v}>{k.label}</option>
+                ))}
+              </select>
+              {needsCol && (
+                <select className={sel} data-testid="query-col" value={col} onChange={(e) => setCol(Number(e.target.value))}>
+                  {pickCols.map((c, i) => (
+                    <option key={i} value={i}>{c || `Col ${i + 1}`}</option>
+                  ))}
+                </select>
+              )}
+              {kind === 'filter' && (
+                <>
+                  <select className={sel} data-testid="query-op" value={op} onChange={(e) => setOp(e.target.value as SheetCondOp)}>
+                    {QUERY_OPS.map((o) => (
+                      <option key={o.v} value={o.v}>{o.label}</option>
+                    ))}
+                  </select>
+                  {op !== 'empty' && op !== 'notEmpty' && (
+                    <input className={sel + ' w-24'} data-testid="query-value" placeholder="value" value={value} onChange={(e) => setValue(e.target.value)} />
+                  )}
+                </>
+              )}
+              {kind === 'sort' && (
+                <select className={sel} value={dir} onChange={(e) => setDir(e.target.value as 'asc' | 'desc')}>
+                  <option value="asc">ascending</option>
+                  <option value="desc">descending</option>
+                </select>
+              )}
+              {kind === 'rename' && (
+                <input className={sel + ' w-28'} data-testid="query-name" placeholder="new name" value={name} onChange={(e) => setName(e.target.value)} />
+              )}
+              {(kind === 'keepTop' || kind === 'skip') && (
+                <input className={sel + ' w-16'} type="number" data-testid="query-n" value={n} onChange={(e) => setN(Number(e.target.value))} />
+              )}
+              {kind === 'changeCase' && (
+                <select className={sel} value={to} onChange={(e) => setTo(e.target.value as 'upper' | 'lower')}>
+                  <option value="upper">UPPERCASE</option>
+                  <option value="lower">lowercase</option>
+                </select>
+              )}
+              <button className="btn-secondary text-[12px] px-2.5 py-1 inline-flex items-center gap-1 ml-auto" data-testid="query-add" onClick={addStep}>
+                <Icon name="add" size={13} /> Add step
+              </button>
+            </div>
+
+            <div className="flex items-center justify-end gap-2">
+              <button onClick={onClose} className="text-[12px] px-3 py-1.5 rounded-md text-[var(--ink-50)] hover:text-[var(--ink-80)]">
+                Close
+              </button>
+              <button
+                data-testid="query-refresh"
+                className="btn-primary text-[12px] px-3 py-1.5 inline-flex items-center gap-1"
+                onClick={() => commit({ source: captureSource(), steps: q.steps })}
+              >
+                <Icon name="refresh" size={14} /> Refresh from sheet
+              </button>
+            </div>
+          </>
+        )}
       </div>
     </div>
   )

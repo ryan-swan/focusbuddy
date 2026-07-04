@@ -25,6 +25,7 @@ interface Props {
   onInsertSparkline: () => void
   onInsertLookup: () => void
   onMacros: () => void
+  onQuery: () => void
   onInsertChart: (type: 'bar' | 'line' | 'pie') => void
   onImport: () => void
   onExport: (format: 'xlsx' | 'csv') => void
@@ -194,6 +195,14 @@ export default function SheetToolbar(props: Props): JSX.Element {
         onClick={props.onMacros}
       >
         <Icon name="code" size={15} />
+      </button>
+      <button
+        className={btn}
+        title="Query — shape data with refreshable transform steps"
+        data-testid="sheet-query-btn"
+        onClick={props.onQuery}
+      >
+        <Icon name="account_tree" size={15} />
       </button>
       <Divider />
 
