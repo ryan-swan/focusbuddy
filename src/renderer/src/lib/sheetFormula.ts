@@ -48,6 +48,20 @@ let WB: Workbook | null = null
 // the parser behaves exactly as before (a bare name that isn't a cell ref errors).
 let NAMES: Map<string, string> | null = null
 
+// LET binds names to values for the duration of its body. A stack of frames
+// supports nesting and shadowing; a bare identifier that is neither a cell ref
+// nor a named range (a 'name' node) resolves against these frames. LET pushes a
+// frame, evaluates, and pops in a finally, so the stack is balanced even on error.
+const SCOPE: Array<Map<string, CellValue>> = []
+function lookupScope(name: string): CellValue | undefined {
+  const key = name.toLowerCase()
+  for (let i = SCOPE.length - 1; i >= 0; i--) {
+    const f = SCOPE[i]
+    if (f.has(key)) return f.get(key)
+  }
+  return undefined
+}
+
 // Build the names map the evaluator consults, from the sheet body's definitions.
 export function makeNames(defs: Array<{ name: string; ref: string }> | undefined): Map<string, string> {
   const m = new Map<string, string>()
@@ -364,6 +378,9 @@ type Node =
   | { k: 'unary'; op: string; x: Node }
   | { k: 'binary'; op: string; a: Node; b: Node }
   | { k: 'call'; name: string; args: Node[] }
+  // A bare identifier that is neither a cell reference nor a defined named range.
+  // It resolves at eval time against LET's scope stack; unresolved is a #NAME?.
+  | { k: 'name'; name: string }
 
 // Resolve a named range's A1 reference string into an AST node, handling an
 // optional sheet qualifier and a single cell or a range. Returns null if it does
@@ -504,7 +521,10 @@ function parse(src: string): Node {
         const node = ref ? refToNode(ref) : null
         if (node) return node
       }
-      throw new Error(`bad ref ${name}`)
+      // Not a cell ref or a named range: defer to eval, where it resolves against
+      // a LET scope (or surfaces #NAME? if unbound). This is what lets LET name
+      // its locals without a parse-time declaration.
+      return { k: 'name', name }
     }
     throw new Error('parse error')
   }
@@ -606,6 +626,8 @@ function nodeToString(node: Node): string {
     }
     case 'call':
       return `${node.name}(${node.args.map(nodeToString).join(', ')})`
+    case 'name':
+      return node.name
   }
 }
 
@@ -861,6 +883,11 @@ function evalNode(node: Node, grid: Grid, seen: Set<string>): CellValue {
     }
     case 'call':
       return evalCall(node, grid, seen)
+    case 'name': {
+      const v = lookupScope(node.name)
+      if (v === undefined) throw new FormulaError('#NAME?')
+      return v
+    }
   }
 }
 
@@ -928,6 +955,25 @@ function evalCall(node: Extract<Node, { k: 'call' }>, grid: Grid, seen: Set<stri
     pickGrid(grid, n && (n.k === 'range' || n.k === 'ref') ? n.sheet : undefined)
 
   switch (name) {
+    // LET(name1, value1, [name2, value2, ...], calculation). Binds each name to
+    // its value (evaluated with the prior names already in scope), then returns
+    // the final calculation. Names that look like a cell reference are rejected
+    // by the parser (they parse as refs), matching Excel.
+    case 'LET': {
+      if (args.length < 3 || args.length % 2 === 0) throw new FormulaError('#VALUE!')
+      const frame = new Map<string, CellValue>()
+      SCOPE.push(frame)
+      try {
+        for (let i = 0; i < args.length - 1; i += 2) {
+          const nameNode = args[i]
+          if (nameNode.k !== 'name') throw new FormulaError('#NAME?')
+          frame.set(nameNode.name.toLowerCase(), evalNode(args[i + 1], grid, seen))
+        }
+        return evalNode(args[args.length - 1], grid, seen)
+      } finally {
+        SCOPE.pop()
+      }
+    }
     // Aggregates
     case 'SUM':
       return collectNumbers(args, grid, seen).reduce((a, b) => a + b, 0)
