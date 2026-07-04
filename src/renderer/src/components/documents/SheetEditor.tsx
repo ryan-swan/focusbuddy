@@ -49,7 +49,7 @@ import SheetAiFill from './sheet/SheetAiFill'
 import SheetFormulaAssist, { type FormulaPlan } from './sheet/SheetFormulaAssist'
 import CondFormatDialog from './sheet/CondFormatDialog'
 import ValidationDialog from './sheet/ValidationDialog'
-import { validationForCell, valueIsValid, isRowHidden } from '../../lib/sheetCond'
+import { validationForCell, valueIsValid, isRowHidden, parseA1Range } from '../../lib/sheetCond'
 import type { SheetCondRule, SheetValidation } from '@shared/types'
 import SheetAiPanel from './sheet/SheetAiPanel'
 import { useSheetAi } from './sheet/useSheetAi'
@@ -199,6 +199,7 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
   const [condOpen, setCondOpen] = useState(false)
   const [validationOpen, setValidationOpen] = useState(false)
   const [pivotOpen, setPivotOpen] = useState(false)
+  const [lookupOpen, setLookupOpen] = useState(false)
   // The right-side AI Assistant panel is shown by default and is collapsible.
   const [aiPanelOpen, setAiPanelOpen] = useState(true)
   const [liveWidth, setLiveWidth] = useState<{ c: number; w: number } | null>(null)
@@ -1022,6 +1023,22 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
     })
     selectCell(target.r, target.c)
   }
+  // A "lookup cell": materialise an =XLOOKUP(...) into the active cell so the
+  // result is a real, live-recomputing formula rather than a frozen copy. Given
+  // the table's A1 range and 1-based match/return columns, it builds the match
+  // and return column sub-ranges and writes the formula.
+  function insertLookup(key: string, tableRange: string, matchCol: number, returnCol: number, ifMissing: string): void {
+    const rg = parseA1Range(tableRange)
+    if (!rg || !key.trim()) return
+    const matchLetter = colLabel(rg.c1 + Math.max(1, matchCol) - 1)
+    const returnLetter = colLabel(rg.c1 + Math.max(1, returnCol) - 1)
+    const lookupArr = `${matchLetter}${rg.r1 + 1}:${matchLetter}${rg.r2 + 1}`
+    const returnArr = `${returnLetter}${rg.r1 + 1}:${returnLetter}${rg.r2 + 1}`
+    const miss = ifMissing.trim() ? `, "${ifMissing.replace(/"/g, '')}"` : ''
+    const formula = `=XLOOKUP(${key.trim()}, ${lookupArr}, ${returnArr}${miss})`
+    mutateTab((t) => setCell(t, focus.r, focus.c, formula))
+    setLookupOpen(false)
+  }
   function insertPivot(spec: SheetPivotSpec): void {
     mutateTab((t) => ({ ...t, pivots: [...(t.pivots ?? []), spec] }))
   }
@@ -1284,6 +1301,7 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
         onDataValidation={() => setValidationOpen(true)}
         onInsertPivot={() => setPivotOpen(true)}
         onInsertSparkline={insertSparkline}
+        onInsertLookup={() => setLookupOpen(true)}
         filterActive={!!tab.filterActive}
         onToggleFilter={() =>
           mutateTab((t) => ({
@@ -1656,6 +1674,20 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
             onClose={() => setPivotOpen(false)}
           />
         )}
+
+        {lookupOpen && (
+          <LookupDialog
+            defaultKey={focus.c > 0 ? `${colLabel(focus.c - 1)}${focus.r + 1}` : ''}
+            defaultTable={
+              selection.c1 > selection.c0 || selection.r1 > selection.r0
+                ? `${colLabel(selection.c0)}${selection.r0 + 1}:${colLabel(selection.c1)}${selection.r1 + 1}`
+                : ''
+            }
+            target={`${colLabel(focus.c)}${focus.r + 1}`}
+            onCreate={insertLookup}
+            onClose={() => setLookupOpen(false)}
+          />
+        )}
       </div>
 
         {aiPanelOpen && <SheetAiPanel ai={sheetAi} onCollapse={() => setAiPanelOpen(false)} />}
@@ -1916,6 +1948,85 @@ function MoveConfirmDialog({
             data-testid="sheet-move-autofix"
           >
             Auto-fix &amp; move
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// A "lookup cell" builder. Collects a key, a table range, and which columns hold
+// the match keys and the return values, then writes a real =XLOOKUP(...) into the
+// active cell (the value recomputes live; nothing is copied or frozen).
+function LookupDialog({
+  defaultKey,
+  defaultTable,
+  target,
+  onCreate,
+  onClose
+}: {
+  defaultKey: string
+  defaultTable: string
+  target: string
+  onCreate: (key: string, tableRange: string, matchCol: number, returnCol: number, ifMissing: string) => void
+  onClose: () => void
+}): JSX.Element {
+  const [key, setKey] = useState(defaultKey)
+  const [table, setTable] = useState(defaultTable)
+  const [matchCol, setMatchCol] = useState('1')
+  const [returnCol, setReturnCol] = useState('2')
+  const [ifMissing, setIfMissing] = useState('')
+  const field =
+    'text-[12px] bg-[var(--surface-sunken)] border border-[var(--edge-firm)] rounded px-2 py-1.5 focus:outline-none focus:border-accent'
+  return (
+    <div className="absolute inset-0 z-40 bg-black/30 flex items-center justify-center" onMouseDown={onClose}>
+      <div
+        data-testid="sheet-lookup-dialog"
+        className="w-[440px] max-w-[92%] rounded-lg bg-[var(--surface-raised)] border border-[var(--edge-soft)] shadow-xl p-4 space-y-3"
+        onMouseDown={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center gap-2 text-[13px] font-semibold">
+          <Icon name="search" size={15} className="text-accent" />
+          Lookup a value
+          <button onClick={onClose} className="ml-auto icon-btn" aria-label="Close">
+            <Icon name="close" size={14} />
+          </button>
+        </div>
+        <p className="text-[11px] text-[var(--ink-50)]">
+          Writes <span className="font-mono text-[var(--ink-70)]">=XLOOKUP(…)</span> into{' '}
+          <span className="font-mono text-[var(--ink-70)]">{target}</span>. It looks the key up in the
+          match column of the table and returns the matching return-column value, recomputing live.
+        </p>
+        <div className="grid grid-cols-2 gap-2">
+          <label className="flex flex-col gap-1 text-[11px] text-[var(--ink-60)]">
+            Look up this key
+            <input value={key} onChange={(e) => setKey(e.target.value)} placeholder="e.g. A2 or 42" data-testid="lookup-key" className={field} />
+          </label>
+          <label className="flex flex-col gap-1 text-[11px] text-[var(--ink-60)]">
+            In this table range
+            <input value={table} onChange={(e) => setTable(e.target.value)} placeholder="e.g. A2:C50" data-testid="lookup-table" className={field} />
+          </label>
+          <label className="flex flex-col gap-1 text-[11px] text-[var(--ink-60)]">
+            Match column (in table)
+            <input value={matchCol} onChange={(e) => setMatchCol(e.target.value)} type="number" min="1" data-testid="lookup-matchcol" className={field} />
+          </label>
+          <label className="flex flex-col gap-1 text-[11px] text-[var(--ink-60)]">
+            Return column (in table)
+            <input value={returnCol} onChange={(e) => setReturnCol(e.target.value)} type="number" min="1" data-testid="lookup-returncol" className={field} />
+          </label>
+          <label className="flex flex-col gap-1 text-[11px] text-[var(--ink-60)] col-span-2">
+            If not found (optional)
+            <input value={ifMissing} onChange={(e) => setIfMissing(e.target.value)} placeholder="leave blank for an error" className={field} />
+          </label>
+        </div>
+        <div className="flex">
+          <button
+            onClick={() => onCreate(key, table, Number(matchCol) || 1, Number(returnCol) || 2, ifMissing)}
+            data-testid="lookup-create"
+            disabled={!key.trim() || !table.trim()}
+            className="btn-primary ml-auto text-[12px] px-3 py-1.5 disabled:opacity-40"
+          >
+            Insert lookup
           </button>
         </div>
       </div>
