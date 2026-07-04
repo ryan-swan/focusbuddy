@@ -102,27 +102,43 @@ export function collectPending(): { upserts: PendingUpsert[]; deletes: PendingDe
   const db = getDb()
   const upserts: PendingUpsert[] = []
   const deletes: PendingDelete[] = []
-  for (const itemType of ['node', 'widget', 'timeblock'] as ItemType[]) {
-    const table = TABLE[itemType]
-    // Leak guard: time blocks are the only org-shared type in this slice, so the
-    // personal loop must never push a block that belongs to a real org up the
-    // per-account endpoint. Nodes/widgets stay personal-only this slice and are
-    // collected unscoped, exactly as before.
-    const rows =
-      itemType === 'timeblock'
-        ? (db
-            .prepare(`SELECT * FROM ${table} WHERE needs_sync = 1 AND org_id = ?`)
-            .all(PERSONAL_ORG_ID) as Array<Record<string, unknown>>)
-        : (db.prepare(`SELECT * FROM ${table} WHERE needs_sync = 1`).all() as Array<
-            Record<string, unknown>
-          >)
-    for (const row of rows) {
-      const id = String(row.id)
-      const baseRev = Number(row.sync_rev) || 0
-      if (row.trashed_at != null) deletes.push({ id, itemType, baseRev })
-      else upserts.push({ id, itemType, body: bodyFromRow(row), baseRev })
-    }
+
+  const pushRow = (row: Record<string, unknown>, itemType: ItemType): void => {
+    const id = String(row.id)
+    const baseRev = Number(row.sync_rev) || 0
+    if (row.trashed_at != null) deletes.push({ id, itemType, baseRev })
+    else upserts.push({ id, itemType, body: bodyFromRow(row), baseRev })
   }
+
+  // Anti-double-sync leak guard. Nodes and time blocks each carry org_id, so the
+  // personal loop must take ONLY the rows scoped to the personal org. Now that
+  // nodes can belong to a real org (and sync down the org endpoint), pushing them
+  // here unscoped would double-push an org node to both the per-account store and
+  // the org store — leaking org content into the owner's personal per-account
+  // data and syncing it twice. Filtering by org_id = 'personal' keeps genuinely
+  // personal content byte-for-byte as before while excluding org content entirely.
+  for (const itemType of ['node', 'timeblock'] as ItemType[]) {
+    const table = TABLE[itemType]
+    const rows = db
+      .prepare(`SELECT * FROM ${table} WHERE needs_sync = 1 AND org_id = ?`)
+      .all(PERSONAL_ORG_ID) as Array<Record<string, unknown>>
+    for (const row of rows) pushRow(row, itemType)
+  }
+
+  // Widgets have no org_id of their own; a widget derives its scope from its
+  // parent node (the established precedent). So the personal loop takes only the
+  // widgets whose parent node is personal, joining widgets to nodes on task_id.
+  // A widget on an org node is excluded here and picked up by collectPendingOrg
+  // instead, which is the mirror of the node filter above.
+  const widgetRows = db
+    .prepare(
+      `SELECT w.* FROM widgets w
+       JOIN nodes n ON w.task_id = n.id
+       WHERE w.needs_sync = 1 AND n.org_id = ?`
+    )
+    .all(PERSONAL_ORG_ID) as Array<Record<string, unknown>>
+  for (const row of widgetRows) pushRow(row, 'widget')
+
   return { upserts, deletes }
 }
 
@@ -132,12 +148,12 @@ export function collectPending(): { upserts: PendingUpsert[]; deletes: PendingDe
 // the org endpoint. Rung 2 widens this beyond time blocks to documents, tables
 // and table rows.
 //
-// time_blocks, documents and fb_tables each carry their own org_id, so they are
-// filtered directly. fb_rows deliberately has NO org_id — a row derives its org
-// scope from its parent fb_tables.org_id (the widget-from-node precedent), so
-// rows are joined to their table and filtered by the table's org. A row body
-// already carries table_id, so the row can be reattached to its table on the
-// other device.
+// nodes, time_blocks, documents and fb_tables each carry their own org_id, so
+// they are filtered directly. fb_rows and widgets deliberately have NO org_id —
+// each derives its org scope from a parent (a row from its fb_tables.org_id, a
+// widget from its parent nodes.org_id, the widget-from-node precedent), so they
+// are joined to that parent and filtered by the parent's org. Both bodies already
+// carry the parent id (table_id / task_id), so they reattach on the other device.
 export function collectPendingOrg(orgId: string): {
   upserts: PendingUpsert[]
   deletes: PendingDelete[]
@@ -156,6 +172,7 @@ export function collectPendingOrg(orgId: string): {
 
   // Types that carry org_id directly: filter by the column.
   const directTypes: Array<[ItemType, SyncTable]> = [
+    ['node', TABLE.node],
     ['timeblock', TABLE.timeblock],
     ['document', TABLE.document],
     ['table', TABLE.table]
@@ -166,6 +183,18 @@ export function collectPendingOrg(orgId: string): {
       .all(orgId) as Array<Record<string, unknown>>
     for (const row of rows) pushRow(row, itemType)
   }
+
+  // Widgets: no org_id of their own, so join to the parent node and filter by the
+  // node's org. The widget body still includes task_id for reattachment. This is
+  // the mirror of the personal collectPending widget filter.
+  const widgetRows = db
+    .prepare(
+      `SELECT w.* FROM widgets w
+       JOIN nodes n ON w.task_id = n.id
+       WHERE w.needs_sync = 1 AND n.org_id = ?`
+    )
+    .all(orgId) as Array<Record<string, unknown>>
+  for (const row of widgetRows) pushRow(row, 'widget')
 
   // Rows: no org_id of their own, so join to the parent table and filter by the
   // table's org. The row body still includes table_id for reattachment.
@@ -254,14 +283,16 @@ export function applyRemote(items: RemoteItem[]): { applied: number } {
 // rung 2 to time blocks, documents, tables and table rows. Two rules keep it
 // correct across types:
 //
-//   1. Ordering: tables are applied before rows, because a row's foreign key to
-//      fb_tables needs the parent table present first (the same reason applyRemote
-//      applies nodes before widgets). Other types are order-independent.
+//   1. Ordering: parents are applied before children. Nodes come before widgets
+//      (a widget's task_id foreign key needs its node) and before rows, and tables
+//      come before rows (a row's table_id foreign key needs its table). The rank
+//      below encodes node < widget < row and table < row; other types are
+//      order-independent.
 //   2. org_id stamping: the active org's id is stamped onto any applied row whose
-//      table actually has an org_id column (time blocks, documents, tables), so a
-//      pulled row always lands in the correct org bucket regardless of what its
-//      serialized body carried. fb_rows has no org_id column (its scope derives
-//      from the parent table), so it is never stamped.
+//      table actually has an org_id column (nodes, time blocks, documents, tables),
+//      so a pulled row always lands in the correct org bucket regardless of what
+//      its serialized body carried. fb_rows and widgets have no org_id column
+//      (their scope derives from a parent), so they are never stamped.
 //
 // Kept separate from applyRemote so the personal path stays byte-for-byte
 // unchanged. Each row is applied under its own try/catch so one bad foreign key
@@ -269,8 +300,9 @@ export function applyRemote(items: RemoteItem[]): { applied: number } {
 export function applyRemoteOrg(items: RemoteItem[], orgId: string): { applied: number } {
   const db = getDb()
   if (!orgId || orgId === PERSONAL_ORG_ID) return { applied: 0 }
-  // Tables before rows; everything else keeps its relative order.
-  const rank = (t: ItemType): number => (t === 'table' ? 0 : t === 'row' ? 1 : 0)
+  // Parents before children: node (0) before widget (1) before row (2), and table
+  // (0) before row (2). Everything else keeps rank 0 (order-independent).
+  const rank = (t: ItemType): number => (t === 'node' ? 0 : t === 'widget' ? 1 : t === 'row' ? 2 : 0)
   const ordered = [...items].sort((a, b) => rank(a.itemType) - rank(b.itemType))
   let applied = 0
   const tx = db.transaction(() => {

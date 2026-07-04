@@ -9,9 +9,11 @@ import { useDocumentsStore } from '../stores/documents'
 import { useTablesStore } from '../stores/tables'
 import { useOrgStore, PERSONAL_ORG_ID } from '../stores/org'
 
-// Every item type carried over the sync transport. Rung 2 added document, table
-// and row alongside the rung-1 timeblock. The transport is type-agnostic (a JSON
-// body plus this discriminator), so a wider union is all the client needs.
+// Every item type carried over the sync transport. The personal loop has always
+// carried node and widget; rung 2 added document, table and row alongside the
+// rung-1 timeblock, and rung 3 routes node and widget down the org loop too. The
+// transport is type-agnostic (a JSON body plus this discriminator), so the union
+// already covers every type either loop sends.
 type SyncItemType = 'node' | 'widget' | 'timeblock' | 'document' | 'table' | 'row'
 
 // Renderer half of multi-device workspace sync. It owns the network (it has the
@@ -212,8 +214,9 @@ async function deleteItemOrg(
 }
 
 // One full push+pull cycle against the ORG endpoint for the active shared org.
-// Mirrors the personal cycle but only time blocks are org-shared this slice, so
-// the only store refreshed on change is the calendar.
+// Mirrors the personal cycle. As of rung 3 the org-shared set is nodes, widgets,
+// time blocks, documents, tables and rows, so every surface the personal loop
+// refreshes is refreshed here too when a pull lands.
 async function syncOrgWorkspaceOnce(token: string, orgId: string): Promise<number> {
   // ── Push local changes ──
   const pending = await window.api.workspaceSync.pendingOrg(orgId)
@@ -261,11 +264,16 @@ async function syncOrgWorkspaceOnce(token: string, orgId: string): Promise<numbe
   else if (verdict === 'offline') useSyncStatus.getState().setOffline()
   else useSyncStatus.getState().setOk()
 
-  // Rung 2 shares time blocks, documents and tables (with rows), so refresh each
-  // affected surface when anything landed. applyRemoteOrg writes tables/rows
-  // straight to the DB (bypassing the notifyRowsChanged event the store listens
-  // for), so the cached tables/rows are re-fetched here explicitly.
+  // Rung 3 shares nodes and widgets on top of time blocks, documents and tables
+  // (with rows), so refresh each affected surface when anything landed. Nodes and
+  // widgets are refreshed exactly as the personal loop does: reload the node tree
+  // and, if a task is open, its widgets. applyRemoteOrg writes tables/rows straight
+  // to the DB (bypassing the notifyRowsChanged event the store listens for), so the
+  // cached tables/rows are re-fetched here explicitly.
   if (applied > 0) {
+    await useNodeStore.getState().refresh()
+    const activeTaskId = useNodeStore.getState().activeTaskId
+    if (activeTaskId) await useWidgetStore.getState().loadForTask(activeTaskId, { refresh: true })
     await useTimeBlockStore.getState().reload()
     await useDocumentsStore.getState().refresh().catch(() => {})
     await refreshCachedTables()
