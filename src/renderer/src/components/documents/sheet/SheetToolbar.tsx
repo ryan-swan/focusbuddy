@@ -23,6 +23,7 @@ interface Props {
   onToggleFilter: () => void
   onInsertPivot: () => void
   onInsertSparkline: () => void
+  onInsertLookup: () => void
   onInsertChart: (type: 'bar' | 'line' | 'pie') => void
   onImport: () => void
   onExport: (format: 'xlsx' | 'csv') => void
@@ -176,6 +177,14 @@ export default function SheetToolbar(props: Props): JSX.Element {
         onClick={props.onInsertSparkline}
       >
         <Icon name="show_chart" size={15} />
+      </button>
+      <button
+        className={btn}
+        title="Insert a lookup (XLOOKUP) into the active cell"
+        data-testid="sheet-lookup-btn"
+        onClick={props.onInsertLookup}
+      >
+        <Icon name="search" size={15} />
       </button>
       <Divider />
 
