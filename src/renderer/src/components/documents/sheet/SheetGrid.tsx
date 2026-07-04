@@ -13,7 +13,14 @@ import {
   applyCondFormat,
   validationForCell,
   valueIsValid,
-  distinctValues
+  distinctValues,
+  isVisualCond,
+  condNumber,
+  colorScaleColor,
+  dataBarPct,
+  iconForValue,
+  parseA1Range,
+  rangeHas
 } from '../../../lib/sheetCond'
 import Icon from '../../Icon'
 import { loadGoogleFont, familyLabel } from '../../../lib/googleFonts'
@@ -137,6 +144,29 @@ export default function SheetGrid(props: Props): JSX.Element {
     () => buildSpillMap({ columns: tab.columns, rows: tab.rows }, props.workbook, props.names),
     [tab.columns, tab.rows, props.workbook, props.names]
   )
+  // Range extents for colour-scale / data-bar / icon-set rules, computed once per
+  // data change so each cell can map its value onto the range's min..max.
+  const condStats = useMemo(() => {
+    const g: Grid = { columns: tab.columns, rows: tab.rows }
+    return (tab.condRules ?? []).filter(isVisualCond).map((rule) => {
+      const rg = parseA1Range(rule.range)
+      let min = Infinity
+      let max = -Infinity
+      if (rg) {
+        for (let r = rg.r1; r <= rg.r2; r++) {
+          for (let c = rg.c1; c <= rg.c2; c++) {
+            const n = condNumber(displayCell(g, r, c, props.workbook, spill, props.names))
+            if (n !== null) {
+              if (n < min) min = n
+              if (n > max) max = n
+            }
+          }
+        }
+      }
+      return { rule, min, max, ok: min <= max }
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab.condRules, tab.columns, tab.rows, props.workbook, props.names, spill])
   const editRef = useRef<HTMLInputElement | null>(null)
   // Which cell's data-validation list dropdown is open (null = none).
   const [openList, setOpenList] = useState<{ r: number; c: number } | null>(null)
@@ -350,6 +380,27 @@ export default function SheetGrid(props: Props): JSX.Element {
                 // rule (paint only — the true value is unchanged).
                 const fmt = applyCondFormat(cellFormat(tab, r, c), tab.condRules, r, c, computed)
                 const shown = formatValue(computed, fmt?.numFmt)
+                // Rich conditional formats: colour scale (a computed bg), data bar
+                // (a proportional bar behind the value), icon set (an icon before
+                // it). Only numeric cells inside a rule's range are decorated.
+                let scaleBg: string | undefined
+                let dataBar: { pct: number; color: string } | undefined
+                let condIcon: { char: string; color: string } | undefined
+                if (condStats.length) {
+                  const cv = condNumber(computed)
+                  if (cv !== null) {
+                    for (const s of condStats) {
+                      if (!s.ok || !rangeHas(s.rule.range, r, c)) continue
+                      if (s.rule.kind === 'colorScale') scaleBg = colorScaleColor(s.rule, cv, s.min, s.max) ?? scaleBg
+                      else if (s.rule.kind === 'dataBar')
+                        dataBar = { pct: dataBarPct(cv, s.min, s.max), color: s.rule.barColor ?? '#63be7b' }
+                      else if (s.rule.kind === 'iconSet') {
+                        const ic = iconForValue(s.rule, cv, s.min, s.max)
+                        if (ic) condIcon = ic
+                      }
+                    }
+                  }
+                }
                 // Data validation: a list rule shows an in-cell dropdown; any rule
                 // flags an invalid current value (the value is never auto-changed).
                 const validation = validationForCell(tab.validations, r, c)
@@ -364,7 +415,7 @@ export default function SheetGrid(props: Props): JSX.Element {
                   fontStyle: fmt?.italic ? 'italic' : undefined,
                   textDecoration: fmt?.underline ? 'underline' : undefined,
                   color: isErr ? '#ef4444' : isSpilled ? '#7c6cf0' : fmt?.color,
-                  backgroundColor: fmt?.bg,
+                  backgroundColor: scaleBg ?? fmt?.bg,
                   fontFamily: fmt?.fontFamily || undefined,
                   textAlign: fmt?.align ?? (computed !== '' && Number.isFinite(Number(computed)) ? 'right' : 'left')
                 }
@@ -428,6 +479,15 @@ export default function SheetGrid(props: Props): JSX.Element {
                           props.onFillToEnd?.()
                         }}
                         className="absolute -bottom-[3px] -right-[3px] z-10 h-[7px] w-[7px] cursor-crosshair rounded-[1px] bg-accent border border-white dark:border-stone-900"
+                      />
+                    )}
+                    {/* Conditional-format data bar: a proportional bar behind the value. */}
+                    {dataBar && !isEditing && (
+                      <div
+                        data-testid={`cell-databar-${r}-${c}`}
+                        aria-hidden
+                        className="absolute left-0 top-[3px] bottom-[3px] z-0 rounded-sm pointer-events-none"
+                        style={{ width: `${Math.round(dataBar.pct * 100)}%`, backgroundColor: dataBar.color, opacity: 0.35 }}
                       />
                     )}
                     {/* Data validation: invalid-value marker (a small red corner). */}
@@ -532,9 +592,19 @@ export default function SheetGrid(props: Props): JSX.Element {
                     ) : (
                       <div
                         style={style}
-                        className={`px-2.5 py-1 whitespace-pre-wrap break-words select-none text-stone-800 dark:text-stone-100 ${listValues ? 'pr-4' : ''}`}
+                        className={`relative z-[1] px-2.5 py-1 whitespace-pre-wrap break-words select-none text-stone-800 dark:text-stone-100 ${listValues ? 'pr-4' : ''}`}
                         title={shown}
                       >
+                        {condIcon && (
+                          <span
+                            data-testid={`cell-icon-${r}-${c}`}
+                            aria-hidden
+                            className="mr-1 text-[11px] leading-none"
+                            style={{ color: condIcon.color }}
+                          >
+                            {condIcon.char}
+                          </span>
+                        )}
                         {shown}
                       </div>
                     )}

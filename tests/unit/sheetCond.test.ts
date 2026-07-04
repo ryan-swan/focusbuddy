@@ -6,7 +6,12 @@ import {
   matchCond,
   applyCondFormat,
   validationForCell,
-  valueIsValid
+  valueIsValid,
+  isVisualCond,
+  lerpColor,
+  colorScaleColor,
+  dataBarPct,
+  iconForValue
 } from '../../src/renderer/src/lib/sheetCond'
 import type { SheetCondRule, SheetValidation } from '../../src/shared/types'
 
@@ -142,5 +147,34 @@ describe('sheetCond — column filters', () => {
   it('distinctValues dedupes and sorts numerically then lexically', () => {
     expect(distinctValues(['2', '10', '1', '2'])).toEqual(['1', '2', '10'])
     expect(distinctValues(['b', 'a', 'b', ''])).toEqual(['', 'a', 'b'])
+  })
+})
+
+describe('sheetCond — rich formats (colour scale / data bar / icon set)', () => {
+  it('isVisualCond flags the range-based kinds', () => {
+    expect(isVisualCond({ id: 'x', range: 'A1', op: 'notEmpty', kind: 'colorScale' })).toBe(true)
+    expect(isVisualCond({ id: 'x', range: 'A1', op: 'gt', value: '5' })).toBe(false)
+  })
+  it('lerpColor interpolates hex endpoints', () => {
+    expect(lerpColor('#000000', '#ffffff', 0)).toBe('#000000')
+    expect(lerpColor('#000000', '#ffffff', 1)).toBe('#ffffff')
+    expect(lerpColor('#000000', '#ffffff', 0.5)).toBe('#808080')
+  })
+  it('colorScaleColor maps min/max onto the endpoint colours', () => {
+    const rule: SheetCondRule = { id: 'x', range: 'A1:A3', op: 'notEmpty', kind: 'colorScale', minColor: '#000000', maxColor: '#ffffff' }
+    expect(colorScaleColor(rule, 0, 0, 10)).toBe('#000000')
+    expect(colorScaleColor(rule, 10, 0, 10)).toBe('#ffffff')
+    expect(colorScaleColor(rule, 5, 0, 10)).toBe('#808080')
+  })
+  it('dataBarPct is a 0..1 fraction with a zero baseline for positives', () => {
+    expect(dataBarPct(0, 0, 10)).toBe(0)
+    expect(dataBarPct(10, 0, 10)).toBe(1)
+    expect(dataBarPct(5, 0, 10)).toBe(0.5)
+  })
+  it('iconForValue picks a band by tertile', () => {
+    const rule: SheetCondRule = { id: 'x', range: 'A1:A3', op: 'notEmpty', kind: 'iconSet', iconSet: 'arrows' }
+    expect(iconForValue(rule, 10, 0, 10)?.char).toBe('↑')
+    expect(iconForValue(rule, 5, 0, 10)?.char).toBe('→')
+    expect(iconForValue(rule, 0, 0, 10)?.char).toBe('↓')
   })
 })
