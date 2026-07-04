@@ -50,6 +50,7 @@ import SheetFormulaAssist, { type FormulaPlan } from './sheet/SheetFormulaAssist
 import CondFormatDialog from './sheet/CondFormatDialog'
 import ValidationDialog from './sheet/ValidationDialog'
 import { validationForCell, valueIsValid, isRowHidden, parseA1Range } from '../../lib/sheetCond'
+import { runSheetScript, type SheetScriptResult } from '../../lib/sheetScript'
 import type { SheetCondRule, SheetValidation } from '@shared/types'
 import SheetAiPanel from './sheet/SheetAiPanel'
 import { useSheetAi } from './sheet/useSheetAi'
@@ -200,6 +201,7 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
   const [validationOpen, setValidationOpen] = useState(false)
   const [pivotOpen, setPivotOpen] = useState(false)
   const [lookupOpen, setLookupOpen] = useState(false)
+  const [macrosOpen, setMacrosOpen] = useState(false)
   // The right-side AI Assistant panel is shown by default and is collapsible.
   const [aiPanelOpen, setAiPanelOpen] = useState(true)
   const [liveWidth, setLiveWidth] = useState<{ c: number; w: number } | null>(null)
@@ -1302,6 +1304,7 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
         onInsertPivot={() => setPivotOpen(true)}
         onInsertSparkline={insertSparkline}
         onInsertLookup={() => setLookupOpen(true)}
+        onMacros={() => setMacrosOpen(true)}
         filterActive={!!tab.filterActive}
         onToggleFilter={() =>
           mutateTab((t) => ({
@@ -1688,6 +1691,17 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
             onClose={() => setLookupOpen(false)}
           />
         )}
+
+        {macrosOpen && (
+          <MacrosPanel
+            onRun={(code) => {
+              const res = runSheetScript(tab, code)
+              if (!res.error) mutateTab(() => res.tab)
+              return res
+            }}
+            onClose={() => setMacrosOpen(false)}
+          />
+        )}
       </div>
 
         {aiPanelOpen && <SheetAiPanel ai={sheetAi} onCollapse={() => setAiPanelOpen(false)} />}
@@ -2027,6 +2041,94 @@ function LookupDialog({
             className="btn-primary ml-auto text-[12px] px-3 py-1.5 disabled:opacity-40"
           >
             Insert lookup
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// The Macros panel: write a JavaScript macro with a main(sheet) function and run
+// it against the active tab. The result applies through the normal undo path;
+// logs and any error are shown honestly (the sheet is untouched on error).
+const MACRO_EXAMPLE = `// Double column A into column B for every row.
+function main(sheet) {
+  for (let r = 0; r < sheet.rowCount(); r++) {
+    const n = Number(sheet.getValue(r, 0))
+    if (!Number.isNaN(n)) sheet.setValue(r, 1, n * 2)
+  }
+  sheet.log('Updated', sheet.rowCount(), 'rows')
+}`
+
+function MacrosPanel({
+  onRun,
+  onClose
+}: {
+  onRun: (code: string) => SheetScriptResult
+  onClose: () => void
+}): JSX.Element {
+  const [code, setCode] = useState(MACRO_EXAMPLE)
+  const [logs, setLogs] = useState<string[]>([])
+  const [error, setError] = useState<string | null>(null)
+  const [ran, setRan] = useState(false)
+  useEffect(() => {
+    function onKey(e: KeyboardEvent): void {
+      if (e.key === 'Escape') onClose()
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [onClose])
+  return (
+    <div className="absolute inset-0 z-40 bg-black/30 flex items-center justify-center" onMouseDown={onClose}>
+      <div
+        data-testid="sheet-macros-panel"
+        className="w-[560px] max-w-[94%] rounded-lg bg-[var(--surface-raised)] border border-[var(--edge-soft)] shadow-xl p-4 space-y-3"
+        onMouseDown={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center gap-2 text-[13px] font-semibold">
+          <Icon name="code" size={15} className="text-accent" />
+          Macros
+          <button onClick={onClose} className="ml-auto icon-btn" aria-label="Close">
+            <Icon name="close" size={14} />
+          </button>
+        </div>
+        <p className="text-[11px] text-[var(--ink-50)]">
+          Automate this sheet with a script. Define <span className="font-mono">main(sheet)</span> and
+          use <span className="font-mono">sheet.getValue / setValue / getColumn / setRange / addRow /
+          addColumn / log</span>. It runs on this tab and applies with a single undo.
+        </p>
+        <textarea
+          value={code}
+          onChange={(e) => setCode(e.target.value)}
+          spellCheck={false}
+          data-testid="macros-code"
+          className="w-full h-56 font-mono text-[12px] bg-[var(--surface-sunken)] border border-[var(--edge-firm)] rounded-md p-2.5 focus:outline-none focus:border-accent resize-none"
+        />
+        {error && (
+          <div className="rounded-md border border-rose-500/30 bg-rose-500/10 px-2.5 py-2 text-[12px] text-rose-500" data-testid="macros-error">
+            {error}
+          </div>
+        )}
+        {ran && !error && (
+          <div className="rounded-md border border-[var(--edge-soft)] bg-[var(--surface-sunken)] px-2.5 py-2 text-[12px] text-[var(--ink-70)]" data-testid="macros-logs">
+            {logs.length ? logs.map((l, i) => <div key={i} className="font-mono">{l}</div>) : 'Ran — no output logged.'}
+          </div>
+        )}
+        <div className="flex items-center justify-end gap-2">
+          <button onClick={onClose} className="text-[12px] px-3 py-1.5 rounded-md text-[var(--ink-50)] hover:text-[var(--ink-80)]">
+            Close
+          </button>
+          <button
+            data-testid="macros-run"
+            className="btn-primary text-[12px] px-3 py-1.5 inline-flex items-center gap-1"
+            onClick={() => {
+              const res = onRun(code)
+              setError(res.error)
+              setLogs(res.logs)
+              setRan(true)
+            }}
+          >
+            <Icon name="play_arrow" size={14} /> Run macro
           </button>
         </div>
       </div>
