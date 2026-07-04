@@ -62,17 +62,17 @@ export default function AgentProfileDialog({ onClose, onSave }: Props): JSX.Elem
       onMouseDown={(e) => e.stopPropagation()}
     >
       <div
-        className="w-full max-w-lg max-h-[88vh] overflow-y-auto rounded-xl bg-stone-50 dark:bg-stone-900 border border-stone-200 dark:border-stone-700 shadow-2xl"
+        className="w-full max-w-lg max-h-[88vh] overflow-y-auto rounded-xl bg-[var(--surface-sunken)] border border-[var(--edge-soft)] shadow-2xl"
         data-testid="agent-profile-dialog"
       >
-        <div className="px-4 py-3 border-b border-stone-200 dark:border-stone-700 flex items-center justify-between">
+        <div className="px-4 py-3 border-b border-[var(--edge-soft)] flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Icon name="badge" size={18} className="text-accent" />
             <div>
-              <div className="text-sm font-semibold text-stone-900 dark:text-stone-100">
+              <div className="text-sm font-semibold text-[var(--ink-100)]">
                 New agent profile
               </div>
-              <div className="text-[10px] text-stone-500 dark:text-stone-400">
+              <div className="text-[10px] text-[var(--ink-50)]">
                 A job description that shapes how this agent works.
               </div>
             </div>
@@ -85,14 +85,14 @@ export default function AgentProfileDialog({ onClose, onSave }: Props): JSX.Elem
         <div className="p-4 space-y-3">
           {/* Describe → generate */}
           <div>
-            <div className="text-[11px] text-stone-600 dark:text-stone-400 mb-1">
+            <div className="text-[11px] text-[var(--ink-70)] mb-1">
               Describe what you need this agent to be great at
             </div>
             <textarea
               value={desc}
               onChange={(e) => setDesc(e.target.value)}
               placeholder="e.g. reviews supplier contracts and flags risky or unusual clauses with a short rationale"
-              className="w-full h-16 resize-none rounded-md bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 px-2.5 py-2 text-[12px] focus:outline-none focus:ring-1 focus:ring-accent"
+              className="w-full h-16 resize-none rounded-md bg-[var(--surface-raised)] border border-[var(--edge-soft)] px-2.5 py-2 text-[12px] focus:outline-none focus:ring-1 focus:ring-accent"
               data-testid="agent-profile-desc"
             />
             <button
@@ -106,7 +106,7 @@ export default function AgentProfileDialog({ onClose, onSave }: Props): JSX.Elem
             </button>
           </div>
 
-          <div className="border-t border-stone-200 dark:border-stone-700 pt-3 space-y-2.5">
+          <div className="border-t border-[var(--edge-soft)] pt-3 space-y-2.5">
             <div className="flex items-center gap-2">
               <div className="flex flex-wrap gap-1">
                 {ICONS.map((ic) => (
@@ -116,7 +116,7 @@ export default function AgentProfileDialog({ onClose, onSave }: Props): JSX.Elem
                     className={`h-7 w-7 inline-flex items-center justify-center rounded border ${
                       icon === ic
                         ? 'border-accent bg-accent/10 text-accent'
-                        : 'border-stone-200 dark:border-stone-700 text-stone-500'
+                        : 'border-[var(--edge-soft)] text-[var(--ink-50)]'
                     }`}
                   >
                     <Icon name={ic} size={15} />
@@ -128,25 +128,25 @@ export default function AgentProfileDialog({ onClose, onSave }: Props): JSX.Elem
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Profile name (e.g. Contract Reviewer)"
-              className="w-full rounded-md bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 px-2.5 py-1.5 text-[12px] font-medium focus:outline-none focus:ring-1 focus:ring-accent"
+              className="w-full rounded-md bg-[var(--surface-raised)] border border-[var(--edge-soft)] px-2.5 py-1.5 text-[12px] font-medium focus:outline-none focus:ring-1 focus:ring-accent"
               data-testid="agent-profile-name"
             />
             <input
               value={blurb}
               onChange={(e) => setBlurb(e.target.value)}
               placeholder="One-line summary"
-              className="w-full rounded-md bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 px-2.5 py-1.5 text-[11px] focus:outline-none focus:ring-1 focus:ring-accent"
+              className="w-full rounded-md bg-[var(--surface-raised)] border border-[var(--edge-soft)] px-2.5 py-1.5 text-[11px] focus:outline-none focus:ring-1 focus:ring-accent"
               data-testid="agent-profile-blurb"
             />
             <div>
-              <div className="text-[10px] text-stone-500 dark:text-stone-400 mb-1">
+              <div className="text-[10px] text-[var(--ink-50)] mb-1">
                 How it works (its expertise + approach)
               </div>
               <textarea
                 value={systemPrompt}
                 onChange={(e) => setSystemPrompt(e.target.value)}
                 placeholder="You are a … You approach work by …"
-                className="w-full h-24 resize-none rounded-md bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 px-2.5 py-2 text-[12px] leading-snug focus:outline-none focus:ring-1 focus:ring-accent"
+                className="w-full h-24 resize-none rounded-md bg-[var(--surface-raised)] border border-[var(--edge-soft)] px-2.5 py-2 text-[12px] leading-snug focus:outline-none focus:ring-1 focus:ring-accent"
                 data-testid="agent-profile-prompt"
               />
             </div>
@@ -155,11 +155,11 @@ export default function AgentProfileDialog({ onClose, onSave }: Props): JSX.Elem
           {error && <div className="text-[11px] text-red-600 dark:text-red-400">{error}</div>}
 
           <div className="flex items-center justify-between pt-1">
-            <p className="text-[9px] text-stone-400 dark:text-stone-500 max-w-[60%] leading-snug">
+            <p className="text-[9px] text-[var(--ink-40)] max-w-[60%] leading-snug">
               A profile changes how the agent thinks, never how its output is saved — your data stays safe.
             </p>
             <div className="flex items-center gap-2">
-              <button onClick={onClose} className="px-3 py-1.5 rounded-md text-[12px] text-stone-600 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800">
+              <button onClick={onClose} className="px-3 py-1.5 rounded-md text-[12px] text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]">
                 Cancel
               </button>
               <button

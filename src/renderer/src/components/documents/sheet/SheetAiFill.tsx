@@ -138,7 +138,7 @@ export default function SheetAiFill({
         placeholder={'Describe the data. e.g. "A project plan for a Loop ERP marketing launch with tasks, owners, start and end dates, and status"'}
         rows={2}
         autoFocus
-        className="w-full bg-white dark:bg-stone-800 border border-stone-300 dark:border-stone-600 rounded-lg px-3 py-2 text-[13px] focus:outline-none focus:border-accent resize-none"
+        className="w-full bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded-lg px-3 py-2 text-[13px] focus:outline-none focus:border-accent resize-none"
       />
       {error && <div className="text-[12px] text-red-600 dark:text-red-400 mt-1">{error}</div>}
 
@@ -147,19 +147,19 @@ export default function SheetAiFill({
         <>
           {cols && (
             <div className="mt-2" data-testid="sheet-ai-columns">
-              <div className="text-[11px] text-stone-500 dark:text-stone-400 mb-1">
+              <div className="text-[11px] text-[var(--ink-50)] mb-1">
                 Proposed columns — edit, add, or remove, then create them.
               </div>
               <div className="space-y-1.5 max-h-48 overflow-auto">
                 {cols.map((col, i) => (
                   <div key={i} className="flex items-center gap-1.5">
-                    <span className="text-[11px] font-mono text-stone-400 w-5 text-right shrink-0">{i + 1}</span>
+                    <span className="text-[11px] font-mono text-[var(--ink-40)] w-5 text-right shrink-0">{i + 1}</span>
                     <input
                       value={col}
                       onChange={(e) =>
                         setCols((cur) => (cur ? cur.map((c, j) => (j === i ? e.target.value : c)) : cur))
                       }
-                      className="flex-1 bg-white dark:bg-stone-800 border border-stone-300 dark:border-stone-600 rounded px-2 py-1 text-[12px] focus:outline-none focus:border-accent"
+                      className="flex-1 bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded px-2 py-1 text-[12px] focus:outline-none focus:border-accent"
                     />
                     <button
                       onClick={() => setCols((cur) => (cur ? cur.filter((_, j) => j !== i) : cur))}
@@ -201,7 +201,7 @@ export default function SheetAiFill({
                 <button
                   onClick={() => void suggestColumns()}
                   disabled={busy}
-                  className="text-[12px] px-3 py-1.5 rounded border border-stone-300 dark:border-stone-600 hover:bg-stone-100 dark:hover:bg-stone-800"
+                  className="text-[12px] px-3 py-1.5 rounded border border-[var(--edge-firm)] hover:bg-[var(--surface-sunken)]"
                 >
                   Re-suggest
                 </button>
@@ -210,12 +210,12 @@ export default function SheetAiFill({
             {hasNamedColumns(headers) && (
               <button
                 onClick={() => commitColumns(headers.filter((h, i) => h.trim() && h.trim() !== defaultLabel(i)))}
-                className="text-[12px] px-3 py-1.5 rounded border border-stone-300 dark:border-stone-600 hover:bg-stone-100 dark:hover:bg-stone-800"
+                className="text-[12px] px-3 py-1.5 rounded border border-[var(--edge-firm)] hover:bg-[var(--surface-sunken)]"
               >
                 Use existing columns
               </button>
             )}
-            <span className="text-[11px] text-stone-400">Cmd+Enter</span>
+            <span className="text-[11px] text-[var(--ink-40)]">Cmd+Enter</span>
           </div>
         </>
       )}
@@ -227,7 +227,7 @@ export default function SheetAiFill({
             {activeHeaders.map((h, i) => (
               <span
                 key={i}
-                className="text-[11px] px-2 py-0.5 rounded-full bg-stone-200/70 dark:bg-stone-700/70 text-stone-600 dark:text-stone-300"
+                className="text-[11px] px-2 py-0.5 rounded-full bg-[var(--surface-sunken)]/70 text-[var(--ink-70)]"
               >
                 {h}
               </span>
@@ -245,18 +245,18 @@ export default function SheetAiFill({
           </div>
 
           <div className="mt-2 flex items-center gap-2" data-testid="sheet-ai-row-mode">
-            <label className="text-[12px] text-stone-500 dark:text-stone-400">Rows</label>
-            <div className="inline-flex rounded-md border border-stone-300 dark:border-stone-600 overflow-hidden text-[12px]">
+            <label className="text-[12px] text-[var(--ink-50)]">Rows</label>
+            <div className="inline-flex rounded-md border border-[var(--edge-firm)] overflow-hidden text-[12px]">
               <button
                 onClick={() => setRowMode('auto')}
                 data-testid="sheet-ai-rowmode-auto"
-                className={`px-2.5 py-1 ${rowMode === 'auto' ? 'bg-accent text-white' : 'hover:bg-stone-100 dark:hover:bg-stone-800'}`}
+                className={`px-2.5 py-1 ${rowMode === 'auto' ? 'bg-accent text-white' : 'hover:bg-[var(--surface-sunken)]'}`}
               >
                 As many as needed
               </button>
               <button
                 onClick={() => setRowMode('exact')}
-                className={`px-2.5 py-1 border-l border-stone-300 dark:border-stone-600 ${rowMode === 'exact' ? 'bg-accent text-white' : 'hover:bg-stone-100 dark:hover:bg-stone-800'}`}
+                className={`px-2.5 py-1 border-l border-[var(--edge-firm)] ${rowMode === 'exact' ? 'bg-accent text-white' : 'hover:bg-[var(--surface-sunken)]'}`}
               >
                 Exact
               </button>
@@ -267,23 +267,23 @@ export default function SheetAiFill({
                 min={1}
                 value={rowCount}
                 onChange={(e) => setRowCount(Math.max(1, Math.floor(Number(e.target.value) || 1)))}
-                className="w-20 bg-white dark:bg-stone-800 border border-stone-300 dark:border-stone-600 rounded px-2 py-1 text-[12px] focus:outline-none focus:border-accent"
+                className="w-20 bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded px-2 py-1 text-[12px] focus:outline-none focus:border-accent"
               />
             )}
             {rowMode === 'auto' && (
-              <span className="text-[11px] text-stone-400">The AI decides how many rows the task needs.</span>
+              <span className="text-[11px] text-[var(--ink-40)]">The AI decides how many rows the task needs.</span>
             )}
           </div>
 
           {rows && (
-            <div className="mt-2 max-h-48 overflow-auto rounded-lg border border-stone-200 dark:border-stone-700">
+            <div className="mt-2 max-h-48 overflow-auto rounded-lg border border-[var(--edge-soft)]">
               <table className="w-full text-[11px]">
                 <thead>
-                  <tr className="border-b border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800/60">
+                  <tr className="border-b border-[var(--edge-soft)] bg-[var(--surface-sunken)]">
                     {activeHeaders.map((h, j) => (
                       <th
                         key={j}
-                        className="px-2 py-1 border-r border-stone-100 dark:border-stone-800 text-left font-semibold truncate max-w-[160px]"
+                        className="px-2 py-1 border-r border-[var(--edge-soft)] text-left font-semibold truncate max-w-[160px]"
                       >
                         {h}
                       </th>
@@ -292,11 +292,11 @@ export default function SheetAiFill({
                 </thead>
                 <tbody>
                   {rows.slice(0, 30).map((row, i) => (
-                    <tr key={i} className="border-b border-stone-100 dark:border-stone-800">
+                    <tr key={i} className="border-b border-[var(--edge-soft)]">
                       {row.map((cell, j) => (
                         <td
                           key={j}
-                          className="px-2 py-1 border-r border-stone-100 dark:border-stone-800 truncate max-w-[160px]"
+                          className="px-2 py-1 border-r border-[var(--edge-soft)] truncate max-w-[160px]"
                         >
                           {cell}
                         </td>
@@ -329,13 +329,13 @@ export default function SheetAiFill({
                 <button
                   onClick={() => void generateRows()}
                   disabled={busy}
-                  className="text-[12px] px-3 py-1.5 rounded border border-stone-300 dark:border-stone-600 hover:bg-stone-100 dark:hover:bg-stone-800"
+                  className="text-[12px] px-3 py-1.5 rounded border border-[var(--edge-firm)] hover:bg-[var(--surface-sunken)]"
                 >
                   Regenerate
                 </button>
               </>
             )}
-            <span className="text-[11px] text-stone-400">Previewed before it writes. Cmd+Enter</span>
+            <span className="text-[11px] text-[var(--ink-40)]">Previewed before it writes. Cmd+Enter</span>
           </div>
         </>
       )}

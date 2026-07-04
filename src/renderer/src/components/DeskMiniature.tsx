@@ -59,7 +59,7 @@ export default function DeskMiniature({ widgets, width, height, padding = 6 }: P
 
   if (!bbox || visible.length === 0) {
     return (
-      <div className="h-full w-full flex items-center justify-center text-[10px] text-stone-400 dark:text-stone-500">
+      <div className="h-full w-full flex items-center justify-center text-[10px] text-[var(--ink-40)]">
         Empty desk
       </div>
     )

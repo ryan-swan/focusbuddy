@@ -165,25 +165,25 @@ function ApplyAcrossConfirm({
     <div className="fixed inset-0 z-[200] bg-black/40 flex items-center justify-center" onMouseDown={onClose}>
       <div
         data-testid="doc-apply-across-confirm"
-        className="w-[420px] max-w-[92vw] rounded-xl border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 shadow-2xl p-4 space-y-3"
+        className="w-[420px] max-w-[92vw] rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-2xl p-4 space-y-3"
         onMouseDown={(e) => e.stopPropagation()}
       >
         <div className="flex items-center gap-2">
           <Icon name="format_paint" size={16} className="text-accent" />
-          <span className="text-[14px] font-semibold text-stone-800 dark:text-stone-100">Apply this style across the document</span>
+          <span className="text-[14px] font-semibold text-[var(--ink-90)]">Apply this style across the document</span>
         </div>
         {nothing ? (
-          <p className="text-[13px] text-stone-500 dark:text-stone-400">
+          <p className="text-[13px] text-[var(--ink-50)]">
             This selection has no character formatting to apply. Style some text first, keep it selected, then try again.
           </p>
         ) : (
           <>
-            <p className="text-[13px] text-stone-600 dark:text-stone-300">
+            <p className="text-[13px] text-[var(--ink-70)]">
               Every piece of text in the document will be set to match the selected text. This affects the whole document and can be undone with Cmd or Ctrl Z.
             </p>
             <div className="flex flex-wrap gap-1.5">
               {items.map((it) => (
-                <span key={it} className="text-[11px] rounded-full bg-stone-100 dark:bg-stone-800 px-2 py-0.5 text-stone-600 dark:text-stone-300">
+                <span key={it} className="text-[11px] rounded-full bg-[var(--surface-sunken)] px-2 py-0.5 text-[var(--ink-70)]">
                   {it}
                 </span>
               ))}
@@ -191,7 +191,7 @@ function ApplyAcrossConfirm({
           </>
         )}
         <div className="flex items-center justify-end gap-2 pt-1">
-          <button onClick={onClose} className="text-[12px] px-3 py-1.5 rounded-lg border border-stone-300 dark:border-stone-600 text-stone-600 dark:text-stone-300">
+          <button onClick={onClose} className="text-[12px] px-3 py-1.5 rounded-lg border border-[var(--edge-firm)] text-[var(--ink-70)]">
             Cancel
           </button>
           {!nothing && (

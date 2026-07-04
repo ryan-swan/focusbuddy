@@ -21,13 +21,13 @@ function renderInline(text: string): React.ReactNode {
 function renderMarkdown(md: string): JSX.Element {
   const lines = md.split('\n')
   return (
-    <div className="text-sm text-stone-800 leading-relaxed">
+    <div className="text-sm text-[var(--ink-90)] leading-relaxed">
       {lines.map((line, i) => {
         if (line.startsWith('# ')) {
           return (
             <h2
               key={i}
-              className="text-base font-semibold text-stone-900 mt-3 mb-1 first:mt-0"
+              className="text-base font-semibold text-[var(--ink-100)] mt-3 mb-1 first:mt-0"
             >
               {line.slice(2)}
             </h2>
@@ -35,7 +35,7 @@ function renderMarkdown(md: string): JSX.Element {
         }
         if (line.startsWith('## ')) {
           return (
-            <h3 key={i} className="text-sm font-semibold text-stone-900 mt-2 mb-1">
+            <h3 key={i} className="text-sm font-semibold text-[var(--ink-100)] mt-2 mb-1">
               {line.slice(3)}
             </h3>
           )
@@ -51,7 +51,7 @@ function renderMarkdown(md: string): JSX.Element {
         if (numMatch) {
           return (
             <div key={i} className="pl-5 -indent-3 my-0.5">
-              <span className="text-stone-500 font-medium">{numMatch[1]}.</span>{' '}
+              <span className="text-[var(--ink-50)] font-medium">{numMatch[1]}.</span>{' '}
               {renderInline(numMatch[2])}
             </div>
           )
@@ -117,17 +117,17 @@ export default function ResumeModal({ task, onClose }: Props): JSX.Element {
       onClick={onClose}
     >
       <div
-        className="bg-white dark:bg-stone-900 rounded-lg shadow-2xl border border-stone-200 dark:border-stone-700 w-full max-w-2xl max-h-[80vh] flex flex-col overflow-hidden"
+        className="bg-[var(--surface-raised)] rounded-lg shadow-2xl border border-[var(--edge-soft)] w-full max-w-2xl max-h-[80vh] flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="px-5 py-3 border-b border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 flex items-center gap-2">
-          <Icon name="description" size={18} className="text-stone-600" />
+        <div className="px-5 py-3 border-b border-[var(--edge-soft)] bg-[var(--surface-sunken)] flex items-center gap-2">
+          <Icon name="description" size={18} className="text-[var(--ink-70)]" />
           <div className="flex-1 min-w-0">
-            <h3 className="text-sm font-semibold text-stone-900 dark:text-stone-100 truncate">
+            <h3 className="text-sm font-semibold text-[var(--ink-100)] truncate">
               Resume — {task.title}
             </h3>
             {updatedAt && (
-              <p className="text-[11px] text-stone-500 dark:text-stone-400">Updated {updatedAt}</p>
+              <p className="text-[11px] text-[var(--ink-50)]">Updated {updatedAt}</p>
             )}
           </div>
           <button onClick={onClose} className="icon-btn" title="Close (Esc)">
@@ -139,8 +139,8 @@ export default function ResumeModal({ task, onClose }: Props): JSX.Element {
           {content ? (
             renderMarkdown(content)
           ) : (
-            <div className="text-center py-8 text-stone-600 dark:text-stone-400 text-sm">
-              <Icon name="description" size={36} className="text-stone-400 mb-2" />
+            <div className="text-center py-8 text-[var(--ink-70)] text-sm">
+              <Icon name="description" size={36} className="text-[var(--ink-40)] mb-2" />
               <p className="mb-3">
                 No resume saved yet for this task.
                 <br />
@@ -155,7 +155,7 @@ export default function ResumeModal({ task, onClose }: Props): JSX.Element {
           )}
         </div>
 
-        <div className="px-5 py-3 border-t border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 flex justify-end gap-2">
+        <div className="px-5 py-3 border-t border-[var(--edge-soft)] bg-[var(--surface-sunken)] flex justify-end gap-2">
           <button onClick={onClose} className="btn-ghost">
             Close
           </button>

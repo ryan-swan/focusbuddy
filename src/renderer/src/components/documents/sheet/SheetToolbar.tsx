@@ -54,12 +54,12 @@ export default function SheetToolbar(props: Props): JSX.Element {
   }, [])
 
   const btn =
-    'h-7 min-w-7 px-1 inline-flex items-center justify-center rounded text-[13px] text-stone-600 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800 disabled:opacity-40'
-  const Divider = (): JSX.Element => <div className="w-px h-5 bg-stone-200 dark:bg-stone-700 mx-0.5" />
-  const sel = 'h-7 bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded text-[11px] px-1 text-stone-600 dark:text-stone-300 focus:outline-none'
+    'h-7 min-w-7 px-1 inline-flex items-center justify-center rounded text-[13px] text-[var(--ink-70)] hover:bg-[var(--surface-sunken)] disabled:opacity-40'
+  const Divider = (): JSX.Element => <div className="w-px h-5 bg-[var(--edge-soft)] mx-0.5" />
+  const sel = 'h-7 bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded text-[11px] px-1 text-[var(--ink-70)] focus:outline-none'
 
   return (
-    <div ref={ref} className="flex items-center gap-0.5 flex-wrap px-2 py-1.5 border-b border-stone-200 dark:border-stone-700" data-testid="sheet-toolbar">
+    <div ref={ref} className="flex items-center gap-0.5 flex-wrap px-2 py-1.5 border-b border-[var(--edge-soft)]" data-testid="sheet-toolbar">
       <button className={btn} title="Undo" onClick={props.onUndo} disabled={!props.canUndo}>
         <Icon name="undo" size={15} />
       </button>
@@ -184,7 +184,7 @@ export default function SheetToolbar(props: Props): JSX.Element {
           <Icon name="bar_chart" size={15} />
         </button>
         {menu === 'chart' && (
-          <div className="absolute left-0 z-50 mt-1 w-36 rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 shadow-xl py-1 text-[12px]">
+          <div className="absolute left-0 z-50 mt-1 w-36 rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-xl py-1 text-[12px]">
             {(['bar', 'line', 'pie'] as const).map((t) => (
               <button
                 key={t}
@@ -192,7 +192,7 @@ export default function SheetToolbar(props: Props): JSX.Element {
                   props.onInsertChart(t)
                   setMenu(null)
                 }}
-                className="w-full text-left px-3 py-1.5 hover:bg-stone-100 dark:hover:bg-stone-800 capitalize"
+                className="w-full text-left px-3 py-1.5 hover:bg-[var(--surface-sunken)] capitalize"
               >
                 {t} chart
               </button>
@@ -207,15 +207,15 @@ export default function SheetToolbar(props: Props): JSX.Element {
             <Icon name="folder_open" size={15} />
           </button>
           {menu === 'io' && (
-            <div className="absolute right-0 z-50 mt-1 w-44 rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 shadow-xl py-1 text-[12px]">
-              <button onClick={() => { setMenu(null); props.onImport() }} className="w-full text-left px-3 py-1.5 hover:bg-stone-100 dark:hover:bg-stone-800">
-                <Icon name="upload_file" size={14} className="inline mr-1.5 text-stone-400" /> Import .xlsx / .csv
+            <div className="absolute right-0 z-50 mt-1 w-44 rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-xl py-1 text-[12px]">
+              <button onClick={() => { setMenu(null); props.onImport() }} className="w-full text-left px-3 py-1.5 hover:bg-[var(--surface-sunken)]">
+                <Icon name="upload_file" size={14} className="inline mr-1.5 text-[var(--ink-40)]" /> Import .xlsx / .csv
               </button>
-              <button onClick={() => { setMenu(null); props.onExport('xlsx') }} className="w-full text-left px-3 py-1.5 hover:bg-stone-100 dark:hover:bg-stone-800">
-                <Icon name="table_chart" size={14} className="inline mr-1.5 text-stone-400" /> Export .xlsx
+              <button onClick={() => { setMenu(null); props.onExport('xlsx') }} className="w-full text-left px-3 py-1.5 hover:bg-[var(--surface-sunken)]">
+                <Icon name="table_chart" size={14} className="inline mr-1.5 text-[var(--ink-40)]" /> Export .xlsx
               </button>
-              <button onClick={() => { setMenu(null); props.onExport('csv') }} className="w-full text-left px-3 py-1.5 hover:bg-stone-100 dark:hover:bg-stone-800">
-                <Icon name="description" size={14} className="inline mr-1.5 text-stone-400" /> Export .csv
+              <button onClick={() => { setMenu(null); props.onExport('csv') }} className="w-full text-left px-3 py-1.5 hover:bg-[var(--surface-sunken)]">
+                <Icon name="description" size={14} className="inline mr-1.5 text-[var(--ink-40)]" /> Export .csv
               </button>
             </div>
           )}

@@ -875,7 +875,7 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
     <div className="flex flex-col h-full">
       {/* Google-Sheets-style menu bar above the toolbar. Every item is wired to a
           real SheetEditor op or a documents-store action. */}
-      <div className="px-2 pt-1.5 pb-1 border-b border-stone-100 dark:border-stone-800">
+      <div className="px-2 pt-1.5 pb-1 border-b border-[var(--edge-soft)]">
         <SheetMenuBar
           actions={{
             title,
@@ -949,7 +949,7 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
       <div className="flex-1 flex flex-col min-h-0 px-3 py-2">
         {/* Formula bar */}
         <div className="flex items-center gap-2 mb-2 shrink-0">
-          <span className="text-[11px] font-mono text-stone-400 w-12 text-center shrink-0">
+          <span className="text-[11px] font-mono text-[var(--ink-40)] w-12 text-center shrink-0">
             {colLabel(focus.c)}
             {focus.r + 1}
           </span>
@@ -957,7 +957,7 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
             value={activeRaw}
             onChange={(e) => mutateTab((t) => setCell(t, focus.r, focus.c, e.target.value))}
             placeholder="Select a cell. Start with = for a formula, e.g. =SUM(A2:A9)"
-            className="flex-1 bg-white dark:bg-stone-800 border border-stone-300 dark:border-stone-600 rounded-lg px-3 py-1.5 text-[13px] font-mono focus:outline-none focus:border-accent"
+            className="flex-1 bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded-lg px-3 py-1.5 text-[13px] font-mono focus:outline-none focus:border-accent"
           />
           <button
             onClick={() => setFormulaAiOpen((v) => !v)}
@@ -975,7 +975,7 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
             className={`shrink-0 inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-[12px] ${
               namesOpen
                 ? 'border-accent bg-accent/[0.12] text-accent'
-                : 'border-stone-300 dark:border-stone-600 text-stone-600 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800'
+                : 'border-[var(--edge-firm)] text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]'
             }`}
           >
             <Icon name="label" size={13} />
@@ -989,7 +989,7 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
             className={`shrink-0 inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-[12px] ${
               aiPanelOpen
                 ? 'border-accent bg-accent/[0.12] text-accent'
-                : 'border-stone-300 dark:border-stone-600 text-stone-600 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800'
+                : 'border-[var(--edge-firm)] text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]'
             }`}
           >
             <Icon name="auto_awesome" size={13} />
@@ -999,22 +999,22 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
 
         {namesOpen && (
           <div
-            className="mb-2 rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 p-2 space-y-1.5"
+            className="mb-2 rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-raised)] p-2 space-y-1.5"
             data-testid="sheet-names-panel"
           >
-            <div className="text-[11px] uppercase tracking-wide text-stone-400">Named ranges</div>
+            <div className="text-[11px] uppercase tracking-wide text-[var(--ink-40)]">Named ranges</div>
             {(body.names ?? []).length === 0 ? (
-              <div className="text-[12px] text-stone-400">No names yet. Name the selection below, then use it in any formula.</div>
+              <div className="text-[12px] text-[var(--ink-40)]">No names yet. Name the selection below, then use it in any formula.</div>
             ) : (
               (body.names ?? []).map((nm) => (
                 <div key={nm.name} className="flex items-center gap-2 text-[12px]" data-testid={`sheet-name-row-${nm.name}`}>
-                  <span className="font-mono font-medium text-stone-700 dark:text-stone-200">{nm.name}</span>
-                  <span className="text-stone-400">→</span>
-                  <span className="font-mono text-stone-500 dark:text-stone-400 truncate flex-1">{nm.ref}</span>
+                  <span className="font-mono font-medium text-[var(--ink-70)]">{nm.name}</span>
+                  <span className="text-[var(--ink-40)]">→</span>
+                  <span className="font-mono text-[var(--ink-50)] truncate flex-1">{nm.ref}</span>
                   <button
                     onClick={() => removeNamedRange(nm.name)}
                     data-testid={`sheet-name-del-${nm.name}`}
-                    className="text-stone-400 hover:text-rose-500 shrink-0"
+                    className="text-[var(--ink-40)] hover:text-rose-500 shrink-0"
                     title="Delete name"
                   >
                     <Icon name="delete" size={13} />
@@ -1028,7 +1028,7 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
                 onChange={(e) => setNewName(e.target.value)}
                 placeholder="Name"
                 data-testid="sheet-name-input"
-                className="w-28 bg-stone-50 dark:bg-stone-900 border border-stone-300 dark:border-stone-600 rounded px-2 py-1 text-[12px] font-mono focus:outline-none focus:border-accent"
+                className="w-28 bg-[var(--surface-sunken)] border border-[var(--edge-firm)] rounded px-2 py-1 text-[12px] font-mono focus:outline-none focus:border-accent"
               />
               <input
                 value={newRef}
@@ -1038,7 +1038,7 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
                 }}
                 placeholder="A1:B10"
                 data-testid="sheet-ref-input"
-                className="flex-1 bg-stone-50 dark:bg-stone-900 border border-stone-300 dark:border-stone-600 rounded px-2 py-1 text-[12px] font-mono focus:outline-none focus:border-accent"
+                className="flex-1 bg-[var(--surface-sunken)] border border-[var(--edge-firm)] rounded px-2 py-1 text-[12px] font-mono focus:outline-none focus:border-accent"
               />
               <button
                 onClick={addNamedRange}
@@ -1091,9 +1091,9 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
         )}
 
         {status && (
-          <div className="mb-2 text-[12px] text-stone-500 dark:text-stone-400 flex items-center gap-1.5" data-testid="sheet-status">
+          <div className="mb-2 text-[12px] text-[var(--ink-50)] flex items-center gap-1.5" data-testid="sheet-status">
             <span>{status}</span>
-            <button onClick={() => setStatus(null)} className="text-stone-400 hover:text-stone-600">
+            <button onClick={() => setStatus(null)} className="text-[var(--ink-40)] hover:text-[var(--ink-70)]">
               <Icon name="close" size={12} />
             </button>
           </div>
@@ -1103,15 +1103,15 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
             copying the value and continuing the series. */}
         {lastFill && (
           <div
-            className="mb-2 inline-flex items-center gap-2 rounded-md border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 px-2 py-1 text-[12px]"
+            className="mb-2 inline-flex items-center gap-2 rounded-md border border-[var(--edge-soft)] bg-[var(--surface-raised)] px-2 py-1 text-[12px]"
             data-testid="sheet-fill-options"
           >
             <Icon name="auto_awesome" size={13} className="text-accent" />
-            <span className="text-stone-500 dark:text-stone-400">Filled as {lastFill.mode === 'series' ? 'series' : 'copy'}.</span>
+            <span className="text-[var(--ink-50)]">Filled as {lastFill.mode === 'series' ? 'series' : 'copy'}.</span>
             <button onClick={toggleFillMode} className="text-accent hover:underline">
               Switch to {lastFill.mode === 'series' ? 'copy' : 'series'}
             </button>
-            <button onClick={() => setLastFill(null)} className="text-stone-400 hover:text-stone-600">
+            <button onClick={() => setLastFill(null)} className="text-[var(--ink-40)] hover:text-[var(--ink-70)]">
               <Icon name="close" size={12} />
             </button>
           </div>
@@ -1194,7 +1194,7 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
 
         <button
           onClick={() => mutateTab((t) => addRow(t))}
-          className="mt-2 text-[12px] text-stone-500 dark:text-stone-400 hover:text-accent inline-flex items-center gap-1"
+          className="mt-2 text-[12px] text-[var(--ink-50)] hover:text-accent inline-flex items-center gap-1"
         >
           <Icon name="add" size={14} /> Add row
         </button>
@@ -1275,21 +1275,21 @@ function ColumnHeaderMenu({
   const left = Math.min(x, window.innerWidth - 210)
   const top = Math.min(y, window.innerHeight - 140)
   const item =
-    'w-full flex items-center gap-2 px-3 py-1.5 text-[12px] hover:bg-stone-100 dark:hover:bg-stone-800 text-left'
+    'w-full flex items-center gap-2 px-3 py-1.5 text-[12px] hover:bg-[var(--surface-sunken)] text-left'
   return (
     <div
       ref={ref}
       data-testid="sheet-col-menu"
-      className="fixed z-[100] w-52 rounded-md border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 shadow-xl py-1 text-stone-700 dark:text-stone-200"
+      className="fixed z-[100] w-52 rounded-md border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-xl py-1 text-[var(--ink-70)]"
       style={{ left, top }}
     >
       <button className={item} onClick={onInsertLeft}>
-        <Icon name="add" size={13} className="text-stone-400" /> Insert column left
+        <Icon name="add" size={13} className="text-[var(--ink-40)]" /> Insert column left
       </button>
       <button className={item} onClick={onInsertRight}>
-        <Icon name="add" size={13} className="text-stone-400" /> Insert column right
+        <Icon name="add" size={13} className="text-[var(--ink-40)]" /> Insert column right
       </button>
-      <div className="my-1 border-t border-stone-200 dark:border-stone-700" />
+      <div className="my-1 border-t border-[var(--edge-soft)]" />
       <button
         className={item + ' text-red-600 disabled:opacity-40'}
         onClick={onDelete}
@@ -1320,7 +1320,7 @@ function FormulaMenu({
   return (
     <div
       data-testid="sheet-formula-menu"
-      className="fixed z-[120] w-[268px] max-h-[230px] overflow-auto rounded-md border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 shadow-xl py-1 text-stone-700 dark:text-stone-200"
+      className="fixed z-[120] w-[268px] max-h-[230px] overflow-auto rounded-md border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-xl py-1 text-[var(--ink-70)]"
       style={{ top, left }}
     >
       {menu.items.map((f, i) => (
@@ -1332,11 +1332,11 @@ function FormulaMenu({
             onPick(i)
           }}
           className={`w-full text-left px-3 py-1.5 ${
-            i === activeIndex ? 'bg-accent/15' : 'hover:bg-stone-100 dark:hover:bg-stone-800'
+            i === activeIndex ? 'bg-accent/15' : 'hover:bg-[var(--surface-sunken)]'
           }`}
         >
           <span className="font-mono text-[12px] font-semibold text-accent">{f.name}</span>
-          <span className="block text-[11px] text-stone-500 dark:text-stone-400 truncate">{f.hint}</span>
+          <span className="block text-[11px] text-[var(--ink-50)] truncate">{f.hint}</span>
         </button>
       ))}
     </div>

@@ -242,7 +242,7 @@ function MenuPanel({
       data-canvas-ctx-menu
       role="menu"
       tabIndex={-1}
-      className="fixed z-[260] bg-white dark:bg-stone-800 rounded-md shadow-2xl border border-stone-200 dark:border-stone-700 py-1 min-w-[210px] max-h-[85vh] overflow-y-auto text-sm outline-none"
+      className="fixed z-[260] bg-[var(--surface-raised)] rounded-md shadow-2xl border border-[var(--edge-soft)] py-1 min-w-[210px] max-h-[85vh] overflow-y-auto text-sm outline-none"
       style={{ left: pos.left, top: pos.top }}
       onKeyDown={onKeyDown}
       onContextMenu={(e) => e.preventDefault()}
@@ -250,7 +250,7 @@ function MenuPanel({
       onMouseLeave={onPointerLeave}
     >
       {items.map((item, i) => {
-        if (item.separator) return <div key={i} role="separator" className="my-1 h-px bg-stone-200 dark:bg-stone-700" />
+        if (item.separator) return <div key={i} role="separator" className="my-1 h-px bg-[var(--surface-sunken)]" />
         const hasChildren = !!item.children?.length
         return (
           <div
@@ -282,20 +282,20 @@ function MenuPanel({
               disabled={item.disabled && !hasChildren}
               className={`w-full text-left px-3 py-1.5 flex items-center gap-2 ${
                 item.disabled
-                  ? 'text-stone-400 dark:text-stone-600 cursor-not-allowed'
-                  : `text-stone-800 dark:text-stone-200 ${active === i ? 'bg-stone-100 dark:bg-stone-700' : 'hover:bg-stone-100 dark:hover:bg-stone-700'}`
+                  ? 'text-[var(--ink-40)] cursor-not-allowed'
+                  : `text-[var(--ink-90)] ${active === i ? 'bg-[var(--surface-sunken)]' : 'hover:bg-[var(--surface-sunken)]'}`
               }`}
             >
               {item.icon ? (
-                <Icon name={item.icon} size={14} className="text-stone-500 dark:text-stone-400" />
+                <Icon name={item.icon} size={14} className="text-[var(--ink-50)]" />
               ) : (
                 <span className="w-3.5" />
               )}
               <span className="flex-1 truncate">{item.label}</span>
               {item.shortcut && (
-                <span className="text-[11px] text-stone-500 dark:text-stone-400 font-mono">{item.shortcut}</span>
+                <span className="text-[11px] text-[var(--ink-50)] font-mono">{item.shortcut}</span>
               )}
-              {hasChildren && <Icon name="chevron_right" size={14} className="text-stone-500 dark:text-stone-400" />}
+              {hasChildren && <Icon name="chevron_right" size={14} className="text-[var(--ink-50)]" />}
             </button>
           </div>
         )

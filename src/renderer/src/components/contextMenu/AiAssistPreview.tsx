@@ -98,14 +98,14 @@ export default function AiAssistPreview(): JSX.Element | null {
     >
       <div
         data-testid="ai-assist-preview"
-        className="w-full max-w-2xl max-h-[85vh] overflow-hidden flex flex-col rounded-lg bg-white dark:bg-stone-900 shadow-2xl border border-stone-200 dark:border-stone-700"
+        className="w-full max-w-2xl max-h-[85vh] overflow-hidden flex flex-col rounded-lg bg-[var(--surface-raised)] shadow-2xl border border-[var(--edge-soft)]"
       >
-        <div className="flex items-center gap-2 px-4 py-3 border-b border-stone-200 dark:border-stone-700">
+        <div className="flex items-center gap-2 px-4 py-3 border-b border-[var(--edge-soft)]">
           <Icon name="auto_awesome" size={18} className="text-accent" />
-          <span className="font-medium text-stone-900 dark:text-stone-100">{request.label}</span>
+          <span className="font-medium text-[var(--ink-100)]">{request.label}</span>
           <button
             onClick={close}
-            className="ml-auto h-7 w-7 inline-flex items-center justify-center rounded hover:bg-stone-100 dark:hover:bg-stone-800 text-stone-500"
+            className="ml-auto h-7 w-7 inline-flex items-center justify-center rounded hover:bg-[var(--surface-sunken)] text-[var(--ink-50)]"
             aria-label="Close"
           >
             <Icon name="close" size={16} />
@@ -113,18 +113,18 @@ export default function AiAssistPreview(): JSX.Element | null {
         </div>
 
         <div className="px-4 py-3 overflow-y-auto flex-1 flex flex-col gap-3">
-          <label className="text-xs uppercase tracking-wide text-stone-500">Instruction</label>
+          <label className="text-xs uppercase tracking-wide text-[var(--ink-50)]">Instruction</label>
           <textarea
             data-testid="ai-assist-instruction"
             value={instr}
             onChange={(e) => setInstr(e.target.value)}
             rows={2}
             placeholder="Describe what you want done with the text"
-            className="w-full resize-none rounded border border-stone-300 dark:border-stone-700 bg-transparent px-2 py-1.5 text-sm text-stone-900 dark:text-stone-100 focus:outline-none focus:border-accent"
+            className="w-full resize-none rounded border border-[var(--edge-firm)] bg-transparent px-2 py-1.5 text-sm text-[var(--ink-100)] focus:outline-none focus:border-accent"
           />
 
           {status === 'loading' && (
-            <div className="flex items-center gap-2 text-sm text-stone-500 py-6 justify-center">
+            <div className="flex items-center gap-2 text-sm text-[var(--ink-50)] py-6 justify-center">
               <Icon name="autorenew" size={16} className="animate-spin" />
               Working on it
             </div>
@@ -138,10 +138,10 @@ export default function AiAssistPreview(): JSX.Element | null {
 
           {status === 'ready' && result && (
             <div className="flex flex-col gap-1">
-              <span className="text-xs uppercase tracking-wide text-stone-500">Result</span>
+              <span className="text-xs uppercase tracking-wide text-[var(--ink-50)]">Result</span>
               <div
                 data-testid="ai-assist-result"
-                className="whitespace-pre-wrap text-sm text-stone-900 dark:text-stone-100 bg-stone-50 dark:bg-stone-800 rounded px-3 py-2 max-h-72 overflow-y-auto"
+                className="whitespace-pre-wrap text-sm text-[var(--ink-100)] bg-[var(--surface-sunken)] rounded px-3 py-2 max-h-72 overflow-y-auto"
               >
                 {result}
               </div>
@@ -149,7 +149,7 @@ export default function AiAssistPreview(): JSX.Element | null {
           )}
         </div>
 
-        <div className="flex items-center gap-2 px-4 py-3 border-t border-stone-200 dark:border-stone-700">
+        <div className="flex items-center gap-2 px-4 py-3 border-t border-[var(--edge-soft)]">
           {status !== 'ready' ? (
             <button
               data-testid="ai-assist-run"
@@ -170,13 +170,13 @@ export default function AiAssistPreview(): JSX.Element | null {
               </button>
               <button
                 onClick={() => void copy()}
-                className="px-3 py-1.5 rounded border border-stone-300 dark:border-stone-700 text-sm text-stone-800 dark:text-stone-200"
+                className="px-3 py-1.5 rounded border border-[var(--edge-firm)] text-sm text-[var(--ink-90)]"
               >
                 Copy
               </button>
               <button
                 onClick={() => void run(instr)}
-                className="px-3 py-1.5 rounded border border-stone-300 dark:border-stone-700 text-sm text-stone-800 dark:text-stone-200"
+                className="px-3 py-1.5 rounded border border-[var(--edge-firm)] text-sm text-[var(--ink-90)]"
               >
                 Regenerate
               </button>
@@ -184,7 +184,7 @@ export default function AiAssistPreview(): JSX.Element | null {
           )}
           <button
             onClick={close}
-            className="ml-auto px-3 py-1.5 rounded text-sm text-stone-500 hover:text-stone-800 dark:hover:text-stone-200"
+            className="ml-auto px-3 py-1.5 rounded text-sm text-[var(--ink-50)] hover:text-[var(--ink-90)]"
           >
             Discard
           </button>

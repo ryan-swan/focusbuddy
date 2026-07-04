@@ -198,8 +198,8 @@ export default function SlidesMenuBar({ actions }: { actions: SlidesMenuActions 
               ['Present', '▶']
             ] as [string, string][]).map(([label, keys]) => (
               <div key={label} className="flex items-center justify-between text-[13px]">
-                <span className="text-stone-600 dark:text-stone-300">{label}</span>
-                <span className="text-stone-400 dark:text-stone-500 fb-tabular">{keys}</span>
+                <span className="text-[var(--ink-70)]">{label}</span>
+                <span className="text-[var(--ink-40)] fb-tabular">{keys}</span>
               </div>
             ))}
           </div>

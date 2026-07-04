@@ -75,8 +75,8 @@ export default function DocOutline({
       data-testid="doc-outline"
     >
       <div className="flex items-center gap-1.5 px-3 py-2 border-b border-[color:var(--edge-soft)]">
-        <Icon name="format_list_bulleted" size={13} className="text-stone-500 dark:text-stone-400" />
-        <span className="text-[11px] uppercase tracking-wider font-semibold text-stone-500 dark:text-stone-400">
+        <Icon name="format_list_bulleted" size={13} className="text-[var(--ink-50)]" />
+        <span className="text-[11px] uppercase tracking-wider font-semibold text-[var(--ink-50)]">
           Outline
         </span>
         <button onClick={onClose} className="ml-auto icon-btn" aria-label="Hide outline" title="Hide outline">
@@ -85,7 +85,7 @@ export default function DocOutline({
       </div>
       <div className="flex-1 overflow-y-auto py-1">
         {items.length === 0 ? (
-          <div className="px-3 py-4 text-[11px] text-stone-400 dark:text-stone-500 leading-relaxed">
+          <div className="px-3 py-4 text-[11px] text-[var(--ink-40)] leading-relaxed">
             No headings yet. Add a Heading 1, 2 or 3 and it shows up here for one-click navigation.
           </div>
         ) : (
@@ -96,7 +96,7 @@ export default function DocOutline({
               className={`w-full text-left px-3 py-1 text-[12px] truncate transition-colors fb-spring-soft ${
                 it.pos === activePos
                   ? 'text-accent font-medium bg-accent/10'
-                  : 'text-stone-600 dark:text-stone-300 hover:bg-stone-100/70 dark:hover:bg-stone-800/50'
+                  : 'text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]/70'
               }`}
               style={{ paddingLeft: `${10 + (it.level - 1) * 12}px` }}
               title={it.text}

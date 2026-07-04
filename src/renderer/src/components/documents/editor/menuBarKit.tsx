@@ -50,8 +50,8 @@ export function MenuBarShell({ menus, testid }: { menus: MenuDef[]; testid: stri
             onClick={() => setOpenMenu((cur) => (cur === menu.id ? null : menu.id))}
             onMouseEnter={() => setOpenMenu((cur) => (cur ? menu.id : cur))}
             data-testid={`${testid}-${menu.id}`}
-            className={`px-2 py-0.5 rounded text-[13px] text-stone-700 dark:text-stone-200 hover:bg-stone-100 dark:hover:bg-stone-800 ${
-              openMenu === menu.id ? 'bg-stone-100 dark:bg-stone-800' : ''
+            className={`px-2 py-0.5 rounded text-[13px] text-[var(--ink-70)] hover:bg-[var(--surface-sunken)] ${
+              openMenu === menu.id ? 'bg-[var(--surface-sunken)]' : ''
             }`}
           >
             {menu.label}
@@ -76,11 +76,11 @@ function MenuDropdown({
 }): JSX.Element {
   return (
     <div
-      className="absolute left-0 top-full mt-0.5 z-40 min-w-[230px] rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 shadow-xl py-1"
+      className="absolute left-0 top-full mt-0.5 z-40 min-w-[230px] rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-xl py-1"
       data-testid={testid}
     >
       {items.map((it, i) => {
-        if (it.kind === 'sep') return <div key={i} className="my-1 border-t border-stone-100 dark:border-stone-800" />
+        if (it.kind === 'sep') return <div key={i} className="my-1 border-t border-[var(--edge-soft)]" />
         if (it.kind === 'submenu') return <SubmenuRow key={i} label={it.label} icon={it.icon} items={it.items} onRun={onRun} />
         return (
           <button
@@ -89,15 +89,15 @@ function MenuDropdown({
             disabled={it.disabled}
             className={`flex items-center gap-2.5 w-full px-3 py-1.5 text-[13px] text-left ${
               it.disabled
-                ? 'text-stone-300 dark:text-stone-600 cursor-default'
-                : 'text-stone-700 dark:text-stone-200 hover:bg-stone-100 dark:hover:bg-stone-800'
+                ? 'text-[var(--ink-30)] cursor-default'
+                : 'text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]'
             }`}
           >
-            <span className="w-4 shrink-0 text-stone-500 dark:text-stone-400">
+            <span className="w-4 shrink-0 text-[var(--ink-50)]">
               {it.active ? <Icon name="check" size={15} /> : it.icon ? <Icon name={it.icon} size={15} /> : null}
             </span>
             <span className="flex-1 truncate">{it.label}</span>
-            {it.shortcut && <span className="text-[11px] text-stone-400 dark:text-stone-500 fb-tabular">{it.shortcut}</span>}
+            {it.shortcut && <span className="text-[11px] text-[var(--ink-40)] fb-tabular">{it.shortcut}</span>}
           </button>
         )
       })}
@@ -119,13 +119,13 @@ function SubmenuRow({
   const [open, setOpen] = useState(false)
   return (
     <div className="relative" onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}>
-      <button className="flex items-center gap-2.5 w-full px-3 py-1.5 text-[13px] text-left text-stone-700 dark:text-stone-200 hover:bg-stone-100 dark:hover:bg-stone-800">
-        <span className="w-4 shrink-0 text-stone-500 dark:text-stone-400">{icon ? <Icon name={icon} size={15} /> : null}</span>
+      <button className="flex items-center gap-2.5 w-full px-3 py-1.5 text-[13px] text-left text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]">
+        <span className="w-4 shrink-0 text-[var(--ink-50)]">{icon ? <Icon name={icon} size={15} /> : null}</span>
         <span className="flex-1 truncate">{label}</span>
-        <Icon name="chevron_right" size={15} className="text-stone-400 shrink-0" />
+        <Icon name="chevron_right" size={15} className="text-[var(--ink-40)] shrink-0" />
       </button>
       {open && (
-        <div className="absolute left-full top-0 -mt-1 ml-0.5 z-50 min-w-[210px] rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 shadow-xl py-1">
+        <div className="absolute left-full top-0 -mt-1 ml-0.5 z-50 min-w-[210px] rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-xl py-1">
           {items.map((it, i) => {
             if (it.kind !== 'item') return null
             return (
@@ -135,13 +135,13 @@ function SubmenuRow({
                 disabled={it.disabled}
                 className={`flex items-center gap-2.5 w-full px-3 py-1.5 text-[13px] text-left ${
                   it.disabled
-                    ? 'text-stone-300 dark:text-stone-600 cursor-default'
-                    : 'text-stone-700 dark:text-stone-200 hover:bg-stone-100 dark:hover:bg-stone-800'
+                    ? 'text-[var(--ink-30)] cursor-default'
+                    : 'text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]'
                 }`}
               >
-                <span className="w-4 shrink-0 text-stone-500 dark:text-stone-400">{it.active ? <Icon name="check" size={15} /> : null}</span>
+                <span className="w-4 shrink-0 text-[var(--ink-50)]">{it.active ? <Icon name="check" size={15} /> : null}</span>
                 <span className="flex-1 truncate">{it.label}</span>
-                {it.shortcut && <span className="text-[11px] text-stone-400 dark:text-stone-500 fb-tabular">{it.shortcut}</span>}
+                {it.shortcut && <span className="text-[11px] text-[var(--ink-40)] fb-tabular">{it.shortcut}</span>}
               </button>
             )
           })}
@@ -163,11 +163,11 @@ export function MenuModal({
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/30" onMouseDown={onClose}>
       <div
-        className="w-[340px] rounded-xl border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 shadow-2xl p-4"
+        className="w-[340px] rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-2xl p-4"
         onMouseDown={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-[14px] font-semibold text-stone-800 dark:text-stone-100">{title}</h3>
+          <h3 className="text-[14px] font-semibold text-[var(--ink-90)]">{title}</h3>
           <button onClick={onClose} className="icon-btn" title="Close">
             <Icon name="close" size={16} />
           </button>

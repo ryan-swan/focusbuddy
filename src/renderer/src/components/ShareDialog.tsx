@@ -218,23 +218,23 @@ export default function ShareDialog({
       onClose={onClose}
       label={`Share this ${KIND_LABEL[kind]}`}
       z={260}
-      className="w-[460px] max-h-[80vh] rounded-lg bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-700 shadow-2xl flex flex-col"
+      className="w-[460px] max-h-[80vh] rounded-lg bg-[var(--surface-raised)] border border-[var(--edge-soft)] shadow-2xl flex flex-col"
     >
-        <div className="flex items-center gap-2 px-4 py-3 border-b border-stone-200 dark:border-stone-700">
+        <div className="flex items-center gap-2 px-4 py-3 border-b border-[var(--edge-soft)]">
           <div className="h-8 w-8 rounded-full bg-accent/10 inline-flex items-center justify-center">
             <Icon name="share" size={16} className="text-accent" />
           </div>
           <div className="flex-1 min-w-0">
-            <h2 className="text-sm font-semibold text-stone-900 dark:text-stone-100">
+            <h2 className="text-sm font-semibold text-[var(--ink-100)]">
               Share this {KIND_LABEL[kind]}
             </h2>
-            <p className="text-[11px] text-stone-500 dark:text-stone-400 truncate">
+            <p className="text-[11px] text-[var(--ink-50)] truncate">
               {label || '(untitled)'}
             </p>
           </div>
           <button
             onClick={onClose}
-            className="h-7 w-7 rounded inline-flex items-center justify-center text-stone-400 hover:bg-stone-100 dark:hover:bg-stone-800"
+            className="h-7 w-7 rounded inline-flex items-center justify-center text-[var(--ink-40)] hover:bg-[var(--surface-sunken)]"
             aria-label="Close"
           >
             <Icon name="close" size={14} />
@@ -244,7 +244,7 @@ export default function ShareDialog({
         <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-3">
           {/* Scope picker */}
           <div>
-            <label className="block text-[10px] uppercase tracking-wider font-semibold text-stone-500 dark:text-stone-400 mb-1.5">
+            <label className="block text-[10px] uppercase tracking-wider font-semibold text-[var(--ink-50)] mb-1.5">
               Permission
             </label>
             <div className="space-y-1.5">
@@ -253,19 +253,19 @@ export default function ShareDialog({
                 className={`w-full text-left p-2.5 rounded-md border-2 flex items-start gap-2.5 transition-colors ${
                   scope === 'view'
                     ? 'border-accent bg-accent/[0.06]'
-                    : 'border-stone-200 dark:border-stone-700 hover:border-stone-300 dark:hover:border-stone-600'
+                    : 'border-[var(--edge-soft)] hover:border-[var(--edge-firm)]'
                 }`}
               >
                 <Icon
                   name="visibility"
                   size={16}
-                  className={scope === 'view' ? 'text-accent mt-0.5 shrink-0' : 'text-stone-400 mt-0.5 shrink-0'}
+                  className={scope === 'view' ? 'text-accent mt-0.5 shrink-0' : 'text-[var(--ink-40)] mt-0.5 shrink-0'}
                 />
                 <div className="flex-1 min-w-0">
-                  <div className={`text-[13px] font-medium ${scope === 'view' ? 'text-accent' : 'text-stone-800 dark:text-stone-100'}`}>
+                  <div className={`text-[13px] font-medium ${scope === 'view' ? 'text-accent' : 'text-[var(--ink-90)]'}`}>
                     View only
                   </div>
-                  <div className="text-[11px] text-stone-500 dark:text-stone-400 leading-snug">
+                  <div className="text-[11px] text-[var(--ink-50)] leading-snug">
                     Anyone with the link can see this {KIND_LABEL[kind]}. No sign-up needed to view.
                   </div>
                 </div>
@@ -275,19 +275,19 @@ export default function ShareDialog({
                 className={`w-full text-left p-2.5 rounded-md border-2 flex items-start gap-2.5 transition-colors ${
                   scope === 'copy'
                     ? 'border-accent bg-accent/[0.06]'
-                    : 'border-stone-200 dark:border-stone-700 hover:border-stone-300 dark:hover:border-stone-600'
+                    : 'border-[var(--edge-soft)] hover:border-[var(--edge-firm)]'
                 }`}
               >
                 <Icon
                   name="content_copy"
                   size={16}
-                  className={scope === 'copy' ? 'text-accent mt-0.5 shrink-0' : 'text-stone-400 mt-0.5 shrink-0'}
+                  className={scope === 'copy' ? 'text-accent mt-0.5 shrink-0' : 'text-[var(--ink-40)] mt-0.5 shrink-0'}
                 />
                 <div className="flex-1 min-w-0">
-                  <div className={`text-[13px] font-medium ${scope === 'copy' ? 'text-accent' : 'text-stone-800 dark:text-stone-100'}`}>
+                  <div className={`text-[13px] font-medium ${scope === 'copy' ? 'text-accent' : 'text-[var(--ink-90)]'}`}>
                     View + add to their workspace
                   </div>
-                  <div className="text-[11px] text-stone-500 dark:text-stone-400 leading-snug">
+                  <div className="text-[11px] text-[var(--ink-50)] leading-snug">
                     Recipient can sign up and it appears in their <strong>Shared with me</strong> sidebar — they can copy it into their own workspace.
                   </div>
                 </div>
@@ -321,12 +321,12 @@ export default function ShareDialog({
                 Link ready{justCopiedId === fresh.id ? ' — copied!' : ''}
               </div>
               <div className="flex items-center gap-1.5">
-                <code className="flex-1 text-[11px] font-mono bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded px-2 py-1 truncate">
+                <code className="flex-1 text-[11px] font-mono bg-[var(--surface-raised)] border border-[var(--edge-soft)] rounded px-2 py-1 truncate">
                   {viewerUrlFor(fresh.token)}
                 </code>
                 <button
                   onClick={() => void copyToClipboard(viewerUrlFor(fresh.token), fresh.id)}
-                  className="text-[11px] px-2 py-1 rounded text-stone-700 dark:text-stone-200 hover:bg-stone-100 dark:hover:bg-stone-800"
+                  className="text-[11px] px-2 py-1 rounded text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]"
                   title="Copy link"
                 >
                   <Icon name="content_copy" size={12} />
@@ -337,8 +337,8 @@ export default function ShareDialog({
 
           {/* Invite by email — sends a link + lands the share in their inbox */}
           {inviteToken && (
-            <div className="rounded-md border border-stone-200 dark:border-stone-700 p-2.5 space-y-2">
-              <div className="text-[10px] uppercase tracking-wider font-semibold text-stone-500 dark:text-stone-400">
+            <div className="rounded-md border border-[var(--edge-soft)] p-2.5 space-y-2">
+              <div className="text-[10px] uppercase tracking-wider font-semibold text-[var(--ink-50)]">
                 Invite by email
               </div>
               <div className="flex items-center gap-1.5">
@@ -351,7 +351,7 @@ export default function ShareDialog({
                   }}
                   placeholder="name@example.com"
                   data-testid="invite-email"
-                  className="flex-1 text-[12px] px-2 py-1.5 rounded border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 text-stone-800 dark:text-stone-100 outline-none focus:border-accent"
+                  className="flex-1 text-[12px] px-2 py-1.5 rounded border border-[var(--edge-soft)] bg-[var(--surface-raised)] text-[var(--ink-90)] outline-none focus:border-accent"
                 />
                 <button
                   onClick={() => void handleInvite()}
@@ -364,16 +364,16 @@ export default function ShareDialog({
                 </button>
               </div>
               {inviteMsg && (
-                <div className="text-[11px] text-stone-500 dark:text-stone-400">{inviteMsg}</div>
+                <div className="text-[11px] text-[var(--ink-50)]">{inviteMsg}</div>
               )}
               {entityRecipients.length > 0 && (
-                <div className="space-y-0.5 pt-1 border-t border-stone-100 dark:border-stone-800">
+                <div className="space-y-0.5 pt-1 border-t border-[var(--edge-soft)]">
                   {entityRecipients.map((r) => (
                     <div key={r.email} className="flex items-center justify-between gap-2 text-[11px]">
-                      <span className="truncate text-stone-700 dark:text-stone-200">
+                      <span className="truncate text-[var(--ink-70)]">
                         {(r.handle && r.handle.trim()) || r.email}
                       </span>
-                      <span className={r.status === 'accepted' ? 'text-emerald-500' : 'text-stone-400'}>
+                      <span className={r.status === 'accepted' ? 'text-emerald-500' : 'text-[var(--ink-40)]'}>
                         {r.status === 'accepted' ? 'joined' : 'invited'}
                       </span>
                     </div>
@@ -386,7 +386,7 @@ export default function ShareDialog({
           {/* Existing links for this entity */}
           {outgoing.length > 0 && (
             <div>
-              <label className="block text-[10px] uppercase tracking-wider font-semibold text-stone-500 dark:text-stone-400 mb-1.5">
+              <label className="block text-[10px] uppercase tracking-wider font-semibold text-[var(--ink-50)] mb-1.5">
                 Existing links ({outgoing.length})
               </label>
               <div className="space-y-1">
@@ -397,16 +397,16 @@ export default function ShareDialog({
                       key={link.id}
                       className={`flex items-center gap-1.5 px-2 py-1.5 rounded-md border ${
                         link.revoked
-                          ? 'border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800/40 opacity-60'
-                          : 'border-stone-200 dark:border-stone-700 hover:border-stone-300 dark:hover:border-stone-600'
+                          ? 'border-[var(--edge-soft)] bg-[var(--surface-sunken)] opacity-60'
+                          : 'border-[var(--edge-soft)] hover:border-[var(--edge-firm)]'
                       }`}
                     >
                       <Icon
                         name={link.scope === 'view' ? 'visibility' : 'content_copy'}
                         size={11}
-                        className="text-stone-400 shrink-0"
+                        className="text-[var(--ink-40)] shrink-0"
                       />
-                      <code className="flex-1 text-[10px] font-mono text-stone-600 dark:text-stone-400 truncate">
+                      <code className="flex-1 text-[10px] font-mono text-[var(--ink-70)] truncate">
                         {url}
                       </code>
                       {link.revoked && (
@@ -415,7 +415,7 @@ export default function ShareDialog({
                         </span>
                       )}
                       {!link.revoked && link.viewCount > 0 && (
-                        <span className="text-[10px] text-stone-500 dark:text-stone-400 tabular-nums">
+                        <span className="text-[10px] text-[var(--ink-50)] tabular-nums">
                           {link.viewCount} views
                         </span>
                       )}
@@ -455,8 +455,8 @@ export default function ShareDialog({
           )}
 
           {/* Honesty banner about local-mock mode */}
-          <div className="text-[10px] text-stone-500 dark:text-stone-400 leading-relaxed bg-stone-50 dark:bg-stone-800/50 p-2 rounded">
-            <strong className="text-stone-700 dark:text-stone-200">v1 note:</strong>{' '}
+          <div className="text-[10px] text-[var(--ink-50)] leading-relaxed bg-[var(--surface-sunken)] p-2 rounded">
+            <strong className="text-[var(--ink-70)]">v1 note:</strong>{' '}
             The link points to the future hosted viewer. The token is real and
             unique — once the PlexiDesk share service ships, the same link
             will resolve. For now you can share it manually with someone using

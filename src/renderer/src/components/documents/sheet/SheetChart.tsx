@@ -78,9 +78,9 @@ export default function SheetChart({ spec, tab, onRemove }: Props): JSX.Element 
   const { data, series } = buildData(spec, tab)
 
   return (
-    <div className="rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 p-3" data-testid="sheet-chart">
+    <div className="rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-raised)] p-3" data-testid="sheet-chart">
       <div className="flex items-center justify-between mb-1">
-        <span className="text-[12px] font-semibold text-stone-700 dark:text-stone-200">
+        <span className="text-[12px] font-semibold text-[var(--ink-70)]">
           {spec.title || `${spec.type[0].toUpperCase()}${spec.type.slice(1)} chart`}
         </span>
         <button onClick={onRemove} className="icon-btn" title="Remove chart">

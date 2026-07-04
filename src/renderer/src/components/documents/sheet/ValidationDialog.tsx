@@ -84,7 +84,7 @@ export default function ValidationDialog({
     <div className="absolute inset-0 z-40 bg-black/30 flex items-center justify-center" onMouseDown={onClose}>
       <div
         data-testid="sheet-validation-dialog"
-        className="w-[460px] max-w-[92%] rounded-lg bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 shadow-xl p-4 space-y-3"
+        className="w-[460px] max-w-[92%] rounded-lg bg-[var(--surface-raised)] border border-[var(--edge-soft)] shadow-xl p-4 space-y-3"
         onMouseDown={(e) => e.stopPropagation()}
       >
         <div className="flex items-center gap-2 text-[13px] font-semibold">
@@ -94,8 +94,8 @@ export default function ValidationDialog({
             <Icon name="close" size={14} />
           </button>
         </div>
-        <p className="text-[11px] text-stone-500">
-          Applies to <span className="font-mono text-stone-700 dark:text-stone-300">{range}</span>.
+        <p className="text-[11px] text-[var(--ink-50)]">
+          Applies to <span className="font-mono text-[var(--ink-70)]">{range}</span>.
         </p>
 
         <div className="flex items-center gap-2 flex-wrap">
@@ -103,7 +103,7 @@ export default function ValidationDialog({
             value={kind}
             onChange={(e) => setKind(e.target.value as Kind)}
             data-testid="validation-kind"
-            className="text-[12px] bg-stone-50 dark:bg-stone-900 border border-stone-300 dark:border-stone-600 rounded px-2 py-1.5"
+            className="text-[12px] bg-[var(--surface-sunken)] border border-[var(--edge-firm)] rounded px-2 py-1.5"
           >
             <option value="list">List of items (dropdown)</option>
             <option value="number">Number</option>
@@ -117,7 +117,7 @@ export default function ValidationDialog({
             onChange={(e) => setListText(e.target.value)}
             placeholder="Comma-separated, e.g. Open, In progress, Done"
             data-testid="validation-list"
-            className="w-full text-[12px] bg-stone-50 dark:bg-stone-900 border border-stone-300 dark:border-stone-600 rounded px-2 py-1.5"
+            className="w-full text-[12px] bg-[var(--surface-sunken)] border border-[var(--edge-firm)] rounded px-2 py-1.5"
           />
         )}
         {kind === 'number' && (
@@ -125,7 +125,7 @@ export default function ValidationDialog({
             <select
               value={numOp}
               onChange={(e) => setNumOp(e.target.value as NumOp)}
-              className="text-[12px] bg-stone-50 dark:bg-stone-900 border border-stone-300 dark:border-stone-600 rounded px-2 py-1.5"
+              className="text-[12px] bg-[var(--surface-sunken)] border border-[var(--edge-firm)] rounded px-2 py-1.5"
             >
               {NUM_OPS.map((o) => (
                 <option key={o.op} value={o.op}>
@@ -137,21 +137,21 @@ export default function ValidationDialog({
               value={num1}
               onChange={(e) => setNum1(e.target.value)}
               placeholder="value"
-              className="w-20 text-[12px] bg-stone-50 dark:bg-stone-900 border border-stone-300 dark:border-stone-600 rounded px-2 py-1.5"
+              className="w-20 text-[12px] bg-[var(--surface-sunken)] border border-[var(--edge-firm)] rounded px-2 py-1.5"
             />
             {numSpec.second && (
               <input
                 value={num2}
                 onChange={(e) => setNum2(e.target.value)}
                 placeholder="and"
-                className="w-20 text-[12px] bg-stone-50 dark:bg-stone-900 border border-stone-300 dark:border-stone-600 rounded px-2 py-1.5"
+                className="w-20 text-[12px] bg-[var(--surface-sunken)] border border-[var(--edge-firm)] rounded px-2 py-1.5"
               />
             )}
           </div>
         )}
 
         <div className="flex items-center gap-2">
-          <label className="inline-flex items-center gap-1 text-[11px] text-stone-600 dark:text-stone-300">
+          <label className="inline-flex items-center gap-1 text-[11px] text-[var(--ink-70)]">
             <input type="checkbox" checked={strict} onChange={(e) => setStrict(e.target.checked)} />
             Reject invalid entries
           </label>
@@ -161,12 +161,12 @@ export default function ValidationDialog({
         </div>
 
         {validations.length > 0 && (
-          <div className="border-t border-stone-200 dark:border-stone-700 pt-2 space-y-1 max-h-40 overflow-auto">
+          <div className="border-t border-[var(--edge-soft)] pt-2 space-y-1 max-h-40 overflow-auto">
             {validations.map((v) => (
               <div key={v.id} className="flex items-center gap-2 text-[12px]">
-                <span className="font-mono text-stone-500">{v.range}</span>
-                <span className="text-stone-700 dark:text-stone-300">{describe(v)}</span>
-                {v.strict && <span className="text-[10px] text-stone-400">(strict)</span>}
+                <span className="font-mono text-[var(--ink-50)]">{v.range}</span>
+                <span className="text-[var(--ink-70)]">{describe(v)}</span>
+                {v.strict && <span className="text-[10px] text-[var(--ink-40)]">(strict)</span>}
                 <button onClick={() => onRemove(v.id)} className="ml-auto icon-btn" title="Remove rule">
                   <Icon name="delete" size={13} />
                 </button>

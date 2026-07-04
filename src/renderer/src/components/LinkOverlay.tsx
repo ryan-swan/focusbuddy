@@ -531,8 +531,8 @@ export default function LinkOverlay({ ghost }: Props): JSX.Element | null {
               hasError
                 ? 'bg-red-500 border-red-400 text-white'
                 : reactiveOff
-                  ? 'bg-white/90 dark:bg-stone-800/90 border-stone-300 dark:border-stone-600 text-stone-400'
-                  : 'bg-white/90 dark:bg-stone-800/90 border-accent/50 text-accent'
+                  ? 'bg-[var(--surface-raised)]/90 border-[var(--edge-firm)] text-[var(--ink-40)]'
+                  : 'bg-[var(--surface-raised)]/90 border-accent/50 text-accent'
             } ${isRunning ? 'fb-breathing' : ''}`}
           >
             <Icon name={hasError ? 'error' : meta.icon} size={11} />
@@ -603,11 +603,11 @@ function WireEditor({
       data-link-popover
       data-testid="wire-editor"
       onMouseDown={(e) => e.stopPropagation()}
-      className="w-64 rounded-lg bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-700 shadow-xl text-[11px] overflow-hidden"
+      className="w-64 rounded-lg bg-[var(--surface-raised)] border border-[var(--edge-soft)] shadow-xl text-[11px] overflow-hidden"
     >
-      <div className="flex items-center justify-between px-2.5 py-1.5 border-b border-stone-200 dark:border-stone-700">
-        <span className="font-semibold text-stone-700 dark:text-stone-200">Live wire</span>
-        <button onClick={onClose} className="text-stone-400 hover:text-stone-700 dark:hover:text-stone-200" aria-label="Close">
+      <div className="flex items-center justify-between px-2.5 py-1.5 border-b border-[var(--edge-soft)]">
+        <span className="font-semibold text-[var(--ink-70)]">Live wire</span>
+        <button onClick={onClose} className="text-[var(--ink-40)] hover:text-[var(--ink-70)]" aria-label="Close">
           <Icon name="close" size={12} />
         </button>
       </div>
@@ -620,8 +620,8 @@ function WireEditor({
               onClick={() => onChange({ type: t.value })}
               className={`flex flex-col items-center gap-0.5 py-1.5 rounded border transition-colors ${
                 link.type === t.value
-                  ? 'border-accent bg-accent/10 text-stone-900 dark:text-stone-100'
-                  : 'border-stone-200 dark:border-stone-700 text-stone-600 dark:text-stone-400 hover:bg-stone-100 dark:hover:bg-stone-800'
+                  ? 'border-accent bg-accent/10 text-[var(--ink-100)]'
+                  : 'border-[var(--edge-soft)] text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]'
               }`}
               data-testid={`wire-type-${t.value}`}
             >
@@ -630,7 +630,7 @@ function WireEditor({
             </button>
           ))}
         </div>
-        <p className="text-[10px] text-stone-500 dark:text-stone-400 leading-snug">{active.hint}</p>
+        <p className="text-[10px] text-[var(--ink-50)] leading-snug">{active.hint}</p>
 
         {link.type === 'transform' && (
           <div>
@@ -647,7 +647,7 @@ function WireEditor({
                   onRunNow()
                 }
               }}
-              className="w-full px-2 py-1 rounded bg-stone-100 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 text-[11px] text-stone-700 dark:text-stone-200 focus:outline-none focus:border-accent"
+              className="w-full px-2 py-1 rounded bg-[var(--surface-sunken)] border border-[var(--edge-soft)] text-[11px] text-[var(--ink-70)] focus:outline-none focus:border-accent"
               data-testid="wire-verb-input"
             />
             <div className="flex items-center gap-1.5 mt-1.5">
@@ -663,7 +663,7 @@ function WireEditor({
                 <Icon name={running ? 'hourglass_empty' : 'play_arrow'} size={12} />
                 {running ? 'Running…' : 'Run now'}
               </button>
-              <label className="inline-flex items-center gap-1 text-[10px] text-stone-600 dark:text-stone-400 cursor-pointer">
+              <label className="inline-flex items-center gap-1 text-[10px] text-[var(--ink-70)] cursor-pointer">
                 <input
                   type="checkbox"
                   checked={link.enabled}
@@ -678,7 +678,7 @@ function WireEditor({
         )}
 
         {link.type === 'mirror' && (
-          <label className="inline-flex items-center gap-1.5 text-[10px] text-stone-600 dark:text-stone-400 cursor-pointer">
+          <label className="inline-flex items-center gap-1.5 text-[10px] text-[var(--ink-70)] cursor-pointer">
             <input
               type="checkbox"
               checked={link.enabled}
@@ -694,7 +694,7 @@ function WireEditor({
 
         <button
           onClick={onUnlink}
-          className="w-full inline-flex items-center justify-center gap-1 px-2 py-1 rounded border border-stone-200 dark:border-stone-700 text-stone-500 hover:text-red-600 hover:border-red-300 transition-colors"
+          className="w-full inline-flex items-center justify-center gap-1 px-2 py-1 rounded border border-[var(--edge-soft)] text-[var(--ink-50)] hover:text-red-600 hover:border-red-300 transition-colors"
           data-testid="wire-unlink"
         >
           <Icon name="link_off" size={12} />

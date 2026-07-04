@@ -29,10 +29,10 @@ export default function Footer(): JSX.Element {
 
   return (
     <>
-      <footer className="h-7 px-3 flex items-center justify-between text-[11px] text-stone-500 dark:text-stone-400 border-t border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-900 select-none">
+      <footer className="h-7 px-3 flex items-center justify-between text-[11px] text-[var(--ink-50)] border-t border-[var(--edge-soft)] bg-[var(--surface-sunken)] select-none">
         <div className="flex items-center gap-2 truncate">
           <span>© {year} PlexiDesk</span>
-          <span className="text-stone-300 dark:text-stone-700">·</span>
+          <span className="text-[var(--ink-30)]">·</span>
           <Tooltip
             placement="top"
             content={`PlexiDesk ${appVersion}${buildDate ? ` · build ${buildDate}` : ''} — click to check for updates`}
@@ -40,7 +40,7 @@ export default function Footer(): JSX.Element {
             <button
               type="button"
               onClick={() => { void window.api.update.check() }}
-              className="text-stone-400 dark:text-stone-500 font-mono hover:text-stone-700 dark:hover:text-stone-200 transition-colors"
+              className="text-[var(--ink-40)] font-mono hover:text-[var(--ink-70)] transition-colors"
             >
               v{appVersion}
               {buildDate && ` · ${buildDate}`}
@@ -52,28 +52,28 @@ export default function Footer(): JSX.Element {
         <div className="flex items-center gap-1">
           <button
             onClick={() => setShowTerms(true)}
-            className="px-2 py-1 rounded hover:bg-stone-100 dark:hover:bg-stone-800 hover:text-stone-900 dark:hover:text-stone-100 transition-colors"
+            className="px-2 py-1 rounded hover:bg-[var(--surface-sunken)] hover:text-[var(--ink-100)] transition-colors"
           >
             Terms of Use
           </button>
-          <span className="text-stone-300 dark:text-stone-700">·</span>
+          <span className="text-[var(--ink-30)]">·</span>
           <Tooltip placement="top" content="Open the PlexiDesk help centre in your browser — guides for every feature">
             <button
               onClick={() => window.open(HELP_BASE, '_blank', 'noopener,noreferrer')}
-              className="px-2 py-1 rounded hover:bg-stone-100 dark:hover:bg-stone-800 hover:text-stone-900 dark:hover:text-stone-100 transition-colors flex items-center gap-1"
+              className="px-2 py-1 rounded hover:bg-[var(--surface-sunken)] hover:text-[var(--ink-100)] transition-colors flex items-center gap-1"
             >
               <Icon name="help_outline" size={12} />
               Help & support
             </button>
           </Tooltip>
-          <span className="text-stone-300 dark:text-stone-700">·</span>
+          <span className="text-[var(--ink-30)]">·</span>
           <button
             onClick={() => setShowWhatsNew(true)}
             title="See everything that's changed across releases"
-            className="relative px-2 py-1 rounded hover:bg-stone-100 dark:hover:bg-stone-800 hover:text-stone-900 dark:hover:text-stone-100 transition-colors flex items-center gap-1"
+            className="relative px-2 py-1 rounded hover:bg-[var(--surface-sunken)] hover:text-[var(--ink-100)] transition-colors flex items-center gap-1"
           >
             <Icon name="auto_awesome" size={12} className={unseen ? 'text-accent' : ''} />
-            <span className={unseen ? 'text-stone-900 dark:text-stone-100 font-medium' : ''}>
+            <span className={unseen ? 'text-[var(--ink-100)] font-medium' : ''}>
               What's new
             </span>
             {unseen && (

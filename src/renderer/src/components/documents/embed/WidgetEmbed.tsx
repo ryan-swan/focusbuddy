@@ -83,12 +83,12 @@ function TableBody({ tableId }: { tableId: string }): JSX.Element {
     }
   }, [tableId])
 
-  if (error) return <div className="p-2 text-[11px] text-stone-400">{error}</div>
-  if (!table || rows == null) return <div className="p-2 text-[11px] text-stone-400">Loading table…</div>
+  if (error) return <div className="p-2 text-[11px] text-[var(--ink-40)]">{error}</div>
+  if (!table || rows == null) return <div className="p-2 text-[11px] text-[var(--ink-40)]">Loading table…</div>
 
   const cols = table.schema.columns.slice(0, MAX_TABLE_COLS)
   const shown = rows.slice(0, MAX_TABLE_ROWS)
-  if (!cols.length) return <div className="p-2 text-[11px] text-stone-400">This table has no columns yet.</div>
+  if (!cols.length) return <div className="p-2 text-[11px] text-[var(--ink-40)]">This table has no columns yet.</div>
 
   return (
     <div className="p-1.5 overflow-hidden">
@@ -96,7 +96,7 @@ function TableBody({ tableId }: { tableId: string }): JSX.Element {
         <thead>
           <tr>
             {cols.map((c) => (
-              <th key={c.id} className="px-1.5 py-1 font-medium text-stone-500 dark:text-stone-400 border-b border-stone-200 dark:border-stone-700 truncate">
+              <th key={c.id} className="px-1.5 py-1 font-medium text-[var(--ink-50)] border-b border-[var(--edge-soft)] truncate">
                 {c.label}
               </th>
             ))}
@@ -106,7 +106,7 @@ function TableBody({ tableId }: { tableId: string }): JSX.Element {
           {shown.map((r) => (
             <tr key={r.id}>
               {cols.map((c) => (
-                <td key={c.id} className="px-1.5 py-1 text-stone-700 dark:text-stone-200 border-b border-stone-100 dark:border-stone-800 truncate">
+                <td key={c.id} className="px-1.5 py-1 text-[var(--ink-70)] border-b border-[var(--edge-soft)] truncate">
                   {cellText(r.cells[c.id], c)}
                 </td>
               ))}
@@ -114,9 +114,9 @@ function TableBody({ tableId }: { tableId: string }): JSX.Element {
           ))}
         </tbody>
       </table>
-      {rows.length === 0 && <div className="px-1.5 py-1.5 text-[11px] text-stone-400">No rows yet</div>}
+      {rows.length === 0 && <div className="px-1.5 py-1.5 text-[11px] text-[var(--ink-40)]">No rows yet</div>}
       {rows.length > MAX_TABLE_ROWS && (
-        <div className="px-1.5 pt-1 text-[10px] text-stone-400">
+        <div className="px-1.5 pt-1 text-[10px] text-[var(--ink-40)]">
           Showing {MAX_TABLE_ROWS} of {rows.length} rows
         </div>
       )}
@@ -128,13 +128,13 @@ function TaskListBody({ items }: { items: TaskItem[] }): JSX.Element {
   return (
     <div className="p-2 space-y-1 overflow-hidden">
       {items.map((it, i) => (
-        <div key={i} className="flex items-start gap-1.5 text-[12px] text-stone-700 dark:text-stone-200">
+        <div key={i} className="flex items-start gap-1.5 text-[12px] text-[var(--ink-70)]">
           <Icon
             name={it.done ? 'check_box' : 'check_box_outline_blank'}
             size={14}
-            className={it.done ? 'text-accent shrink-0 mt-px' : 'text-stone-400 shrink-0 mt-px'}
+            className={it.done ? 'text-accent shrink-0 mt-px' : 'text-[var(--ink-40)] shrink-0 mt-px'}
           />
-          <span className={it.done ? 'line-through text-stone-400 dark:text-stone-500' : ''}>{it.text}</span>
+          <span className={it.done ? 'line-through text-[var(--ink-40)]' : ''}>{it.text}</span>
         </div>
       ))}
     </div>
@@ -149,7 +149,7 @@ const PREVIEWABLE = new Set<Widget['kind']>(['sticky', 'note', 'markdown', 'card
 
 function EmbedBody({ widget }: { widget: Widget }): JSX.Element {
   if (widget.kind === 'table') {
-    if (!widget.content) return <div className="p-2 text-[11px] text-stone-400">This table widget has no backing table yet.</div>
+    if (!widget.content) return <div className="p-2 text-[11px] text-[var(--ink-40)]">This table widget has no backing table yet.</div>
     return <TableBody tableId={widget.content} />
   }
   if (widget.kind === 'note' || widget.kind === 'markdown') {
@@ -161,7 +161,7 @@ function EmbedBody({ widget }: { widget: Widget }): JSX.Element {
   }
   const entry = WIDGET_CATALOG.find((e) => e.kind === widget.kind)
   return (
-    <div className="p-2 text-[11px] text-stone-400">
+    <div className="p-2 text-[11px] text-[var(--ink-40)]">
       A {entry?.label ?? widget.kind} widget. This kind has no document preview yet; open its desk to see it.
     </div>
   )
@@ -196,12 +196,12 @@ export default function WidgetEmbed({ widgetId }: Props): JSX.Element {
   }, [widgetId])
 
   const shell =
-    'h-full w-full flex flex-col rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 overflow-hidden'
+    'h-full w-full flex flex-col rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-raised)] overflow-hidden'
 
   if (state.phase === 'loading') {
     return (
       <div className={shell} data-testid="widget-embed-loading">
-        <div className="flex-1 flex items-center justify-center gap-1.5 text-[11px] text-stone-400 p-3">
+        <div className="flex-1 flex items-center justify-center gap-1.5 text-[11px] text-[var(--ink-40)] p-3">
           <Icon name="autorenew" size={13} className="animate-spin" />
           <span>Loading widget…</span>
         </div>
@@ -211,7 +211,7 @@ export default function WidgetEmbed({ widgetId }: Props): JSX.Element {
   if (state.phase === 'missing' || state.phase === 'error') {
     return (
       <div className={shell} data-testid="widget-embed-missing">
-        <div className="flex-1 flex flex-col items-center justify-center gap-1 text-[11px] text-stone-400 p-3 text-center">
+        <div className="flex-1 flex flex-col items-center justify-center gap-1 text-[11px] text-[var(--ink-40)] p-3 text-center">
           <Icon name="link_off" size={18} />
           <span>{state.phase === 'missing' ? 'This widget no longer exists' : state.message}</span>
         </div>
@@ -223,13 +223,13 @@ export default function WidgetEmbed({ widgetId }: Props): JSX.Element {
   const entry = WIDGET_CATALOG.find((e) => e.kind === widget.kind)
   return (
     <div className={shell} data-testid="widget-embed">
-      <div className="shrink-0 flex items-center gap-1.5 px-2 py-1.5 border-b border-stone-100 dark:border-stone-800 bg-stone-50/80 dark:bg-stone-800/50">
+      <div className="shrink-0 flex items-center gap-1.5 px-2 py-1.5 border-b border-[var(--edge-soft)] bg-[var(--surface-sunken)]/80">
         <Icon name={entry?.icon ?? 'widgets'} size={14} className="text-accent shrink-0" />
-        <span className="text-[12px] font-medium text-stone-800 dark:text-stone-100 truncate">
+        <span className="text-[12px] font-medium text-[var(--ink-90)] truncate">
           {widget.title || entry?.label || widget.kind}
         </span>
         {deskTitle && (
-          <span className="ml-auto text-[10px] text-stone-400 truncate" title={`From the desk "${deskTitle}"`}>
+          <span className="ml-auto text-[10px] text-[var(--ink-40)] truncate" title={`From the desk "${deskTitle}"`}>
             {deskTitle}
           </span>
         )}

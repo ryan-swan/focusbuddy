@@ -48,11 +48,11 @@ export default function BringMeBack(): JSX.Element | null {
 
   return (
     <div className="fixed bottom-12 left-1/2 -translate-x-1/2 z-[160] pointer-events-none">
-      <div className="pointer-events-auto flex items-center gap-2 px-3 py-2 rounded-full bg-white dark:bg-stone-900 border border-accent/40 shadow-2xl backdrop-blur animate-[fadeInUp_300ms_ease-out] text-sm">
+      <div className="pointer-events-auto flex items-center gap-2 px-3 py-2 rounded-full bg-[var(--surface-raised)] border border-accent/40 shadow-2xl backdrop-blur animate-[fadeInUp_300ms_ease-out] text-sm">
         <Icon name="waving_hand" size={16} className="text-accent" />
-        <span className="text-stone-700 dark:text-stone-300">
+        <span className="text-[var(--ink-70)]">
           Welcome back —{' '}
-          <span className="text-stone-500 dark:text-stone-400 text-xs">
+          <span className="text-[var(--ink-50)] text-xs">
             you were away {fmtAway(drift.driftedForMs!)}
           </span>
         </span>
@@ -71,7 +71,7 @@ export default function BringMeBack(): JSX.Element | null {
         </button>
         <button
           onClick={clearDrift}
-          className="h-6 w-6 inline-flex items-center justify-center rounded-full text-stone-400 dark:text-stone-500 hover:text-stone-700 dark:hover:text-stone-200 hover:bg-stone-100 dark:hover:bg-stone-800"
+          className="h-6 w-6 inline-flex items-center justify-center rounded-full text-[var(--ink-40)] hover:text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]"
           title="Dismiss"
         >
           <Icon name="close" size={13} />

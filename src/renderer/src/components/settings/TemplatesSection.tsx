@@ -45,7 +45,7 @@ export default function TemplatesSection(): JSX.Element {
       <div className="text-[11px] uppercase tracking-[0.12em] text-[var(--ink-50)] font-medium">
         Templates
       </div>
-      <p className="text-[10px] text-[var(--ink-50)] leading-snug">
+      <p className="text-[11px] text-[var(--ink-50)] leading-snug">
         {canApply
           ? 'Apply a template to spawn its widgets onto the task you have open.'
           : 'Open a task first — templates apply to the task you have open.'}

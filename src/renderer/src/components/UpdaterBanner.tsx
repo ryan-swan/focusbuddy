@@ -51,7 +51,7 @@ export default function UpdaterBanner(): JSX.Element | null {
   if (state.kind === 'checking') {
     return (
       <span
-        className="inline-flex items-center gap-1 text-stone-400 dark:text-stone-500"
+        className="inline-flex items-center gap-1 text-[var(--ink-40)]"
         title="Checking for updates…"
       >
         <span className="inline-block h-1.5 w-1.5 rounded-full bg-stone-400 animate-pulse" />

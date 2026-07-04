@@ -39,19 +39,19 @@ export default function ReleaseModal({ entry, onClose }: Props): JSX.Element {
       onClick={onClose}
     >
       <div
-        className="flex max-h-[85vh] w-full max-w-lg flex-col overflow-hidden rounded-xl border border-white/10 bg-white shadow-2xl dark:bg-stone-900"
+        className="flex max-h-[85vh] w-full max-w-lg flex-col overflow-hidden rounded-xl border border-white/10 bg-[var(--surface-raised)] shadow-2xl"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
         aria-label={`What's new in PlexiDesk ${versionLabel}`}
       >
-        <div className="flex items-start justify-between gap-3 border-b border-stone-200/70 px-5 py-4 dark:border-white/10">
+        <div className="flex items-start justify-between gap-3 border-b border-[var(--edge-soft)]/70 px-5 py-4 dark:border-white/10">
           <div>
             <div className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.18em] text-accent">
               <Icon name="auto_awesome" size={14} />
               Updated {versionLabel}
             </div>
-            <h2 className="mt-1 text-lg font-semibold text-stone-900 dark:text-stone-100">
+            <h2 className="mt-1 text-lg font-semibold text-[var(--ink-100)]">
               What&apos;s new
             </h2>
           </div>
@@ -67,12 +67,12 @@ export default function ReleaseModal({ entry, onClose }: Props): JSX.Element {
 
         <div className="overflow-y-auto px-5 py-4">
           {entry.summary && (
-            <p className="text-sm leading-relaxed text-stone-600 dark:text-stone-300">{entry.summary}</p>
+            <p className="text-sm leading-relaxed text-[var(--ink-70)]">{entry.summary}</p>
           )}
 
           <ul className="mt-4 space-y-2.5">
             {entry.highlights.map((h, i) => (
-              <li key={i} className="flex gap-2.5 text-sm text-stone-700 dark:text-stone-200">
+              <li key={i} className="flex gap-2.5 text-sm text-[var(--ink-70)]">
                 <Icon name="check_circle" size={16} className="mt-0.5 shrink-0 text-accent" />
                 <span className="leading-snug">{h}</span>
               </li>
@@ -81,7 +81,7 @@ export default function ReleaseModal({ entry, onClose }: Props): JSX.Element {
 
           {entry.links && entry.links.length > 0 && (
             <div className="mt-5">
-              <div className="text-[11px] font-medium uppercase tracking-[0.16em] text-stone-400">
+              <div className="text-[11px] font-medium uppercase tracking-[0.16em] text-[var(--ink-40)]">
                 Learn more
               </div>
               <div className="mt-2 flex flex-wrap gap-2">
@@ -100,7 +100,7 @@ export default function ReleaseModal({ entry, onClose }: Props): JSX.Element {
           )}
         </div>
 
-        <div className="flex items-center justify-end border-t border-stone-200/70 px-5 py-3 dark:border-white/10">
+        <div className="flex items-center justify-end border-t border-[var(--edge-soft)]/70 px-5 py-3 dark:border-white/10">
           <button onClick={onClose} className="btn-primary text-sm">
             Got it
           </button>

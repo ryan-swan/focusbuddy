@@ -330,7 +330,7 @@ function InsightRow({
       ? 'border-amber-300/60 bg-amber-50/60 dark:bg-amber-950/20 dark:border-amber-900/60'
       : insight.tone === 'win'
         ? 'border-emerald-300/60 bg-emerald-50/60 dark:bg-emerald-950/20 dark:border-emerald-900/60'
-        : 'border-[var(--edge-soft)] bg-[var(--surface-sunken)] dark:border-[var(--edge-firm)]'
+        : 'border-[var(--edge-soft)] bg-[var(--surface-sunken)]'
   const iconName =
     insight.tone === 'flag'
       ? 'priority_high'

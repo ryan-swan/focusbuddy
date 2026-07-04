@@ -64,20 +64,20 @@ export default function MeetingLaunchDialog(): JSX.Element | null {
       onClose={close}
       label="Start a meeting"
       z={300}
-      className="w-[380px] rounded-xl bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-700 shadow-2xl p-4 space-y-3"
+      className="w-[380px] rounded-xl bg-[var(--surface-raised)] border border-[var(--edge-soft)] shadow-2xl p-4 space-y-3"
       testId="meeting-launch-dialog"
     >
         <div className="flex items-center gap-2">
           <Icon name="videocam" size={16} className="text-accent" />
-          <h3 className="text-sm font-semibold text-stone-900 dark:text-stone-100">Start a meeting</h3>
+          <h3 className="text-sm font-semibold text-[var(--ink-100)]">Start a meeting</h3>
         </div>
-        <p className="text-[12px] text-stone-500 dark:text-stone-400">
-          From <span className="font-medium text-stone-700 dark:text-stone-200">{origin.title || 'this item'}</span>. Invite
+        <p className="text-[12px] text-[var(--ink-50)]">
+          From <span className="font-medium text-[var(--ink-70)]">{origin.title || 'this item'}</span>. Invite
           people and choose what access they get to it.
         </p>
 
         <label className="block">
-          <span className="text-[10px] uppercase tracking-wider text-stone-500 dark:text-stone-400 font-medium">
+          <span className="text-[10px] uppercase tracking-wider text-[var(--ink-50)] font-medium">
             Invite people (emails, optional)
           </span>
           <textarea
@@ -85,19 +85,19 @@ export default function MeetingLaunchDialog(): JSX.Element | null {
             onChange={(e) => setAttendees(e.target.value)}
             placeholder="alex@acme.com, sam@acme.com"
             rows={2}
-            className="mt-1 w-full bg-white dark:bg-stone-800 border border-stone-300 dark:border-stone-600 rounded-md px-2 py-1.5 text-sm resize-none"
+            className="mt-1 w-full bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded-md px-2 py-1.5 text-sm resize-none"
             data-testid="launch-attendees"
           />
         </label>
 
         <fieldset className="space-y-1.5">
-          <span className="text-[10px] uppercase tracking-wider text-stone-500 dark:text-stone-400 font-medium">
+          <span className="text-[10px] uppercase tracking-wider text-[var(--ink-50)] font-medium">
             Access for attendees
           </span>
           {MEETING_ACCESS_OPTIONS.map((opt) => (
             <label
               key={opt.level}
-              className="flex items-start gap-2 cursor-pointer select-none rounded-md px-2 py-1 hover:bg-stone-50 dark:hover:bg-stone-800"
+              className="flex items-start gap-2 cursor-pointer select-none rounded-md px-2 py-1 hover:bg-[var(--surface-sunken)]"
             >
               <input
                 type="radio"
@@ -108,8 +108,8 @@ export default function MeetingLaunchDialog(): JSX.Element | null {
                 data-testid={`launch-access-${opt.level}`}
               />
               <span>
-                <span className="block text-sm text-stone-800 dark:text-stone-100">{opt.label}</span>
-                <span className="block text-[11px] text-stone-500 dark:text-stone-400">{opt.hint}</span>
+                <span className="block text-sm text-[var(--ink-90)]">{opt.label}</span>
+                <span className="block text-[11px] text-[var(--ink-50)]">{opt.hint}</span>
               </span>
             </label>
           ))}
@@ -117,13 +117,13 @@ export default function MeetingLaunchDialog(): JSX.Element | null {
 
         {level === 'collaborate' && (
           <label className="block">
-            <span className="text-[10px] uppercase tracking-wider text-stone-500 dark:text-stone-400 font-medium">
+            <span className="text-[10px] uppercase tracking-wider text-[var(--ink-50)] font-medium">
               When the meeting ends
             </span>
             <select
               value={afterAccess}
               onChange={(e) => setAfterAccess(e.target.value as MeetingAfterAccess)}
-              className="mt-1 w-full bg-white dark:bg-stone-800 border border-stone-300 dark:border-stone-600 rounded-md px-2 py-1.5 text-sm"
+              className="mt-1 w-full bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded-md px-2 py-1.5 text-sm"
               data-testid="launch-after-access"
             >
               <option value="downgrade-view">Make it read-only</option>

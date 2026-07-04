@@ -72,12 +72,12 @@ export default function WidgetPickerDialog({ onPick, onClose }: Props): JSX.Elem
       data-testid="widget-picker"
     >
       <div
-        className="w-[460px] max-w-[92%] max-h-[76vh] flex flex-col rounded-xl border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 shadow-2xl"
+        className="w-[460px] max-w-[92%] max-h-[76vh] flex flex-col rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-2xl"
         onMouseDown={(e) => e.stopPropagation()}
       >
         <div className="shrink-0 flex items-center gap-2 px-4 pt-3.5 pb-2.5">
           <Icon name="widgets" size={16} className="text-accent" />
-          <h3 className="text-[14px] font-semibold text-stone-800 dark:text-stone-100">Widget from a desk</h3>
+          <h3 className="text-[14px] font-semibold text-[var(--ink-90)]">Widget from a desk</h3>
           <button onClick={onClose} className="ml-auto icon-btn" title="Close" aria-label="Close">
             <Icon name="close" size={15} />
           </button>
@@ -89,34 +89,34 @@ export default function WidgetPickerDialog({ onPick, onClose }: Props): JSX.Elem
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search widgets or desks…"
             data-testid="widget-picker-search"
-            className="w-full rounded-lg border border-stone-300 dark:border-stone-600 bg-transparent px-2.5 py-1.5 text-[13px] focus:outline-none focus:border-accent"
+            className="w-full rounded-lg border border-[var(--edge-firm)] bg-transparent px-2.5 py-1.5 text-[13px] focus:outline-none focus:border-accent"
           />
         </div>
 
         <div className="flex-1 min-h-0 overflow-auto px-2 pb-2.5">
           {error && <div className="px-2 py-3 text-[12px] text-red-600 dark:text-red-400">{error}</div>}
           {!error && desks == null && (
-            <div className="px-2 py-3 text-[12px] text-stone-400 flex items-center gap-1.5">
+            <div className="px-2 py-3 text-[12px] text-[var(--ink-40)] flex items-center gap-1.5">
               <Icon name="autorenew" size={13} className="animate-spin" />
               <span>Loading desks…</span>
             </div>
           )}
           {!error && desks != null && totalWidgets === 0 && (
-            <div className="px-2 py-3 text-[12px] text-stone-400">
+            <div className="px-2 py-3 text-[12px] text-[var(--ink-40)]">
               No widgets on any desk yet. Add a widget to a desk first, then embed it here.
             </div>
           )}
           {!error && desks != null && totalWidgets > 0 && filtered.length === 0 && (
-            <div className="px-2 py-3 text-[12px] text-stone-400">Nothing matches that search.</div>
+            <div className="px-2 py-3 text-[12px] text-[var(--ink-40)]">Nothing matches that search.</div>
           )}
           {filtered.map((d) => (
             <div key={d.desk.id} className="mb-1.5">
-              <div className="flex items-center gap-1.5 px-2 py-1 text-[10px] uppercase tracking-wide text-stone-400">
+              <div className="flex items-center gap-1.5 px-2 py-1 text-[10px] uppercase tracking-wide text-[var(--ink-40)]">
                 <Icon name="desktop_windows" size={12} />
                 <span className="truncate">{d.desk.title || 'Untitled desk'}</span>
               </div>
               {d.widgets.length === 0 && !query && (
-                <div className="px-2 pb-1 text-[11px] text-stone-400">No embeddable widgets on this desk.</div>
+                <div className="px-2 pb-1 text-[11px] text-[var(--ink-40)]">No embeddable widgets on this desk.</div>
               )}
               {d.widgets.map((w) => {
                 const entry = WIDGET_CATALOG.find((e) => e.kind === w.kind)
@@ -127,12 +127,12 @@ export default function WidgetPickerDialog({ onPick, onClose }: Props): JSX.Elem
                     data-testid={`widget-picker-item-${w.id}`}
                     className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-left hover:bg-accent/[0.07]"
                   >
-                    <Icon name={entry?.icon ?? 'widgets'} size={15} className="text-stone-500 dark:text-stone-400 shrink-0" />
+                    <Icon name={entry?.icon ?? 'widgets'} size={15} className="text-[var(--ink-50)] shrink-0" />
                     <span className="flex-1 min-w-0">
-                      <span className="block text-[13px] text-stone-800 dark:text-stone-100 truncate">{widgetLabel(w)}</span>
-                      <span className="block text-[10px] text-stone-400">{entry?.label ?? w.kind}</span>
+                      <span className="block text-[13px] text-[var(--ink-90)] truncate">{widgetLabel(w)}</span>
+                      <span className="block text-[10px] text-[var(--ink-40)]">{entry?.label ?? w.kind}</span>
                     </span>
-                    <Icon name="add" size={14} className="text-stone-300 dark:text-stone-600 shrink-0" />
+                    <Icon name="add" size={14} className="text-[var(--ink-30)] shrink-0" />
                   </button>
                 )
               })}

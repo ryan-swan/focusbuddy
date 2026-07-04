@@ -72,7 +72,7 @@ export default function FindReplace({ editor, onClose }: Props): JSX.Element {
   return (
     <div
       data-testid="doc-find-replace"
-      className="absolute top-2 right-2 z-40 w-80 rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 shadow-xl p-2 space-y-1.5"
+      className="absolute top-2 right-2 z-40 w-80 rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-xl p-2 space-y-1.5"
     >
       <div className="flex items-center gap-1">
         <input
@@ -85,13 +85,13 @@ export default function FindReplace({ editor, onClose }: Props): JSX.Element {
           }}
           placeholder={regex ? 'Find (regex)' : 'Find'}
           data-testid="doc-find-input"
-          className={`flex-1 bg-stone-50 dark:bg-stone-800 border rounded px-2 py-1 text-[12px] focus:outline-none ${
+          className={`flex-1 bg-[var(--surface-sunken)] border rounded px-2 py-1 text-[12px] focus:outline-none ${
             regexBad
               ? 'border-red-400 focus:border-red-500'
-              : 'border-stone-200 dark:border-stone-700 focus:border-accent'
+              : 'border-[var(--edge-soft)] focus:border-accent'
           }`}
         />
-        <span className="text-[11px] text-stone-400 tabular-nums w-14 text-center" data-testid="doc-find-count">
+        <span className="text-[11px] text-[var(--ink-40)] tabular-nums w-14 text-center" data-testid="doc-find-count">
           {regexBad ? 'regex!' : status.count ? `${status.index}/${status.count}` : '0/0'}
         </span>
         <button onClick={prev} title="Previous (Shift+Enter)" className="icon-btn">
@@ -105,7 +105,7 @@ export default function FindReplace({ editor, onClose }: Props): JSX.Element {
         </button>
       </div>
 
-      <div className="flex items-center gap-2 text-[11px] text-stone-500 dark:text-stone-400">
+      <div className="flex items-center gap-2 text-[11px] text-[var(--ink-50)]">
         <button
           onClick={() => setShowReplace((v) => !v)}
           className="inline-flex items-center gap-0.5 hover:text-accent"
@@ -133,9 +133,9 @@ export default function FindReplace({ editor, onClose }: Props): JSX.Element {
             onChange={(e) => setReplacement(e.target.value)}
             placeholder="Replace with"
             data-testid="doc-replace-input"
-            className="flex-1 bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded px-2 py-1 text-[12px] focus:outline-none focus:border-accent"
+            className="flex-1 bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded px-2 py-1 text-[12px] focus:outline-none focus:border-accent"
           />
-          <button onClick={replaceOne} className="px-2 py-1 rounded text-[11px] border border-stone-300 dark:border-stone-600 hover:bg-stone-100 dark:hover:bg-stone-800">
+          <button onClick={replaceOne} className="px-2 py-1 rounded text-[11px] border border-[var(--edge-firm)] hover:bg-[var(--surface-sunken)]">
             Replace
           </button>
           <button onClick={replaceAll} data-testid="doc-replace-all" className="px-2 py-1 rounded text-[11px] bg-accent text-white">

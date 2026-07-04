@@ -103,14 +103,14 @@ export default function SheetFormulaAssist({
         placeholder={`Describe the calculation for ${activeRef}. e.g. "gross margin: revenue minus cost, divided by revenue, as a percent"`}
         rows={2}
         autoFocus
-        className="w-full bg-white dark:bg-stone-800 border border-stone-300 dark:border-stone-600 rounded-lg px-3 py-2 text-[13px] focus:outline-none focus:border-accent resize-none"
+        className="w-full bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded-lg px-3 py-2 text-[13px] focus:outline-none focus:border-accent resize-none"
       />
 
       {/* Quick-insert reference chips: the active cell and each named column. */}
       <div className="mt-1.5 flex flex-wrap items-center gap-1" data-testid="sheet-formula-chips">
         <button
           onClick={() => insertChip(activeRef)}
-          className="text-[11px] px-2 py-0.5 rounded-full bg-stone-200/70 dark:bg-stone-700/70 hover:bg-accent hover:text-white"
+          className="text-[11px] px-2 py-0.5 rounded-full bg-[var(--surface-sunken)]/70 hover:bg-accent hover:text-white"
         >
           {activeRef}
         </button>
@@ -118,7 +118,7 @@ export default function SheetFormulaAssist({
           <button
             key={i}
             onClick={() => insertChip(`${colLetter(i)} (${h || colLetter(i)})`)}
-            className="text-[11px] px-2 py-0.5 rounded-full bg-stone-200/70 dark:bg-stone-700/70 hover:bg-accent hover:text-white"
+            className="text-[11px] px-2 py-0.5 rounded-full bg-[var(--surface-sunken)]/70 hover:bg-accent hover:text-white"
             title={`Reference column ${colLetter(i)}`}
           >
             {colLetter(i)}
@@ -130,14 +130,14 @@ export default function SheetFormulaAssist({
       {error && <div className="text-[12px] text-red-600 dark:text-red-400 mt-1">{error}</div>}
 
       {preview && (
-        <div className="mt-2 rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 p-2.5" data-testid="sheet-formula-preview">
-          <div className="font-mono text-[13px] text-stone-900 dark:text-stone-100 break-all">{preview.formula}</div>
+        <div className="mt-2 rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-raised)] p-2.5" data-testid="sheet-formula-preview">
+          <div className="font-mono text-[13px] text-[var(--ink-100)] break-all">{preview.formula}</div>
           {preview.explanation && (
-            <div className="text-[12px] text-stone-500 dark:text-stone-400 mt-1">{preview.explanation}</div>
+            <div className="text-[12px] text-[var(--ink-50)] mt-1">{preview.explanation}</div>
           )}
           {(preview.columnsToAdd?.length || preview.tabsToAdd?.length) && (
-            <div className="mt-2 text-[12px] text-stone-600 dark:text-stone-300">
-              <div className="font-semibold text-[11px] uppercase tracking-wider text-stone-400 mb-0.5">
+            <div className="mt-2 text-[12px] text-[var(--ink-70)]">
+              <div className="font-semibold text-[11px] uppercase tracking-wider text-[var(--ink-40)] mb-0.5">
                 Applying will also create
               </div>
               {preview.columnsToAdd?.length ? (
@@ -180,13 +180,13 @@ export default function SheetFormulaAssist({
             <button
               onClick={() => void run()}
               disabled={busy}
-              className="text-[12px] px-3 py-1.5 rounded border border-stone-300 dark:border-stone-600 hover:bg-stone-100 dark:hover:bg-stone-800"
+              className="text-[12px] px-3 py-1.5 rounded border border-[var(--edge-firm)] hover:bg-[var(--surface-sunken)]"
             >
               Re-suggest
             </button>
           </>
         )}
-        <span className="text-[11px] text-stone-400">Previewed before it writes. Cmd+Enter</span>
+        <span className="text-[11px] text-[var(--ink-40)]">Previewed before it writes. Cmd+Enter</span>
       </div>
     </div>
   )
