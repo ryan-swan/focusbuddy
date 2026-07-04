@@ -2,9 +2,11 @@
 // next slide preview, speaker notes and an elapsed timer. Arrow / space / N / P
 // navigate, Esc exits, B blacks out the current slide.
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { DeckTheme, Slide } from '@shared/types'
+import { ANIM_KEYFRAMES_CSS, slideTransitionCss } from '@shared/slideAnim'
 import SlideFace from './SlideFace'
+import MorphFace from './MorphFace'
 import Icon from '../../Icon'
 
 interface Props {
@@ -18,6 +20,11 @@ export default function PresentOverlay({ slides, theme, startIndex, onClose }: P
   const [idx, setIdx] = useState(startIndex)
   const [blank, setBlank] = useState(false)
   const [elapsed, setElapsed] = useState(0)
+  // The slide shown before this one, so a Morph transition knows its source.
+  const prevIdxRef = useRef(startIndex)
+  useEffect(() => {
+    prevIdxRef.current = idx
+  }, [idx])
 
   useEffect(() => {
     const t = setInterval(() => setElapsed((e) => e + 1), 1000)
@@ -41,14 +48,24 @@ export default function PresentOverlay({ slides, theme, startIndex, onClose }: P
   const current = slides[idx]
   const next = slides[idx + 1]
 
+  const prevIdx = prevIdxRef.current
+  const isMorph = current?.transition === 'morph' && prevIdx !== idx && !!slides[prevIdx]
+  const transitionCss = slideTransitionCss(current?.transition)
+
   return (
     <div className="fixed inset-0 z-[200] bg-black text-white flex" data-testid="present-overlay">
+      <style>{ANIM_KEYFRAMES_CSS}</style>
       <div className="flex-1 flex flex-col items-center justify-center p-6">
         {blank ? (
           <div className="w-full max-w-6xl aspect-video bg-black" />
+        ) : isMorph ? (
+          <div className="shadow-2xl" key={`morph-${idx}`}>
+            <MorphFace prev={slides[prevIdx]} cur={current} theme={theme} width={mainW} />
+          </div>
         ) : (
-          <div className="shadow-2xl">
-            <SlideFace slide={current} theme={theme} width={mainW} />
+          // Keyed by idx so the enter animation replays on every navigation.
+          <div className="shadow-2xl" key={idx} style={transitionCss ? { animation: transitionCss } : undefined}>
+            <SlideFace slide={current} theme={theme} width={mainW} animateIn />
           </div>
         )}
         <div className="mt-4 flex items-center gap-4 text-white/70 text-[13px]">

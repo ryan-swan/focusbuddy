@@ -7,6 +7,7 @@
 import { useEffect } from 'react'
 import type { DeckTheme, Slide } from '@shared/types'
 import { SLIDE_W, SLIDE_H } from '@shared/slideThemes'
+import { entranceAnimationCss } from '@shared/slideAnim'
 import SlideElementView from './SlideElementView'
 import { loadGoogleFont, familyLabel } from '../../../lib/googleFonts'
 
@@ -14,9 +15,12 @@ interface Props {
   slide: Slide
   theme: DeckTheme
   width: number
+  // When true, elements with an entrance animation play it (present mode). Give
+  // this component a key that changes per slide so the animation replays.
+  animateIn?: boolean
 }
 
-export default function SlideFace({ slide, theme, width }: Props): JSX.Element {
+export default function SlideFace({ slide, theme, width, animateIn = false }: Props): JSX.Element {
   const scale = width / SLIDE_W
   const height = width * (SLIDE_H / SLIDE_W)
   const bg = slide.background?.type === 'solid' ? slide.background.color : theme.background
@@ -44,7 +48,18 @@ export default function SlideFace({ slide, theme, width }: Props): JSX.Element {
         }}
       >
         {elements.length > 0 ? (
-          elements.map((el) => <SlideElementView key={el.id} el={el} />)
+          elements.map((el, i) => {
+            const anim = animateIn ? entranceAnimationCss(el.anim, i) : undefined
+            // Animate on a full-stage wrapper so opacity/transform never clobber
+            // the element's own rotation transform.
+            return anim ? (
+              <div key={el.id} style={{ position: 'absolute', inset: 0, animation: anim }} data-testid="slide-anim-el">
+                <SlideElementView el={el} />
+              </div>
+            ) : (
+              <SlideElementView key={el.id} el={el} />
+            )
+          })
         ) : (
           // Legacy fallback for an unmigrated slide.
           <div style={{ padding: 80 }}>

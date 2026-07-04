@@ -45,6 +45,8 @@ export default function ElementInspector(props: Props): JSX.Element {
             <option value="none">None</option>
             <option value="fade">Fade</option>
             <option value="slide">Slide</option>
+            <option value="zoom">Zoom</option>
+            <option value="morph">Morph (tween shared objects)</option>
           </select>
         </div>
         <div>
@@ -372,6 +374,31 @@ export default function ElementInspector(props: Props): JSX.Element {
           )}
         </div>
       )}
+
+      <div data-testid="inspector-anim">
+        <div className={labelCls}>Entrance animation</div>
+        <select
+          className={inputCls}
+          data-testid="element-anim"
+          value={el.anim?.type ?? 'none'}
+          onChange={(e) => {
+            const v = e.target.value
+            props.onUpdateElement(el.id, { anim: v === 'none' ? undefined : { ...(el.anim ?? {}), type: v as NonNullable<SlideElement['anim']>['type'] } })
+          }}
+        >
+          <option value="none">None</option>
+          <option value="fadeIn">Fade in</option>
+          <option value="slideUp">Slide up</option>
+          <option value="slideLeft">Slide in</option>
+          <option value="zoomIn">Zoom in</option>
+        </select>
+        {el.anim && (
+          <div className="flex items-center gap-2 mt-1" title="Play order (staggers multiple animations)">
+            <span className="text-[11px] text-[var(--ink-50)]">Order</span>
+            {num(el.anim.order ?? 0, (n) => ({ anim: { ...el.anim!, order: Math.max(0, n) } }))}
+          </div>
+        )}
+      </div>
 
       <div>
         <div className={labelCls}>Arrange</div>
