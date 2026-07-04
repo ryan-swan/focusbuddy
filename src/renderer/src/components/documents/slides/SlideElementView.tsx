@@ -68,7 +68,7 @@ function TextContent({ el }: { el: SlideTextElement }): JSX.Element {
   )
 }
 
-export default function SlideElementView({ el }: { el: SlideElement }): JSX.Element {
+export default function SlideElementView({ el, transitionMs }: { el: SlideElement; transitionMs?: number }): JSX.Element {
   const base: React.CSSProperties = {
     position: 'absolute',
     left: el.x,
@@ -77,7 +77,9 @@ export default function SlideElementView({ el }: { el: SlideElement }): JSX.Elem
     height: el.h,
     transform: el.rotation ? `rotate(${el.rotation}deg)` : undefined,
     opacity: el.opacity != null ? el.opacity : undefined,
-    overflow: 'hidden'
+    overflow: 'hidden',
+    // Morph tween: animate geometry/opacity changes between two slides.
+    ...(transitionMs ? { transition: `left ${transitionMs}ms, top ${transitionMs}ms, width ${transitionMs}ms, height ${transitionMs}ms, opacity ${transitionMs}ms, transform ${transitionMs}ms` } : {})
   }
 
   if (el.type === 'text') {

@@ -1517,7 +1517,15 @@ export type SlideLayout =
   // legacy value, mapped to 'title-content' on migration
   | 'bullets'
 
-export type SlideTransition = 'none' | 'fade' | 'slide'
+export type SlideTransition = 'none' | 'fade' | 'slide' | 'zoom' | 'morph'
+
+// An element entrance animation, played when its slide appears in present mode.
+// `order` staggers multiple animated elements; `durationMs` overrides the default.
+export interface SlideAnim {
+  type: 'fadeIn' | 'slideUp' | 'slideLeft' | 'zoomIn'
+  order?: number
+  durationMs?: number
+}
 
 export interface SlideFill {
   type: 'solid' | 'none' | 'gradient'
@@ -1569,6 +1577,8 @@ interface SlideElementBase {
   shadow?: 'sm' | 'md' | 'lg'
   // Element opacity 0..1. Absent means fully opaque.
   opacity?: number
+  // Entrance animation played when the slide appears in present mode.
+  anim?: SlideAnim
 }
 export interface SlideTextElement extends SlideElementBase {
   type: 'text'
