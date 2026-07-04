@@ -239,8 +239,10 @@ test('DPS-3 — margins: preset Narrow sets 0.5 all sides; custom top=1.5 update
     const margin2 = (body2.page as Record<string, unknown>)?.margin as Record<string, number> | undefined
     expect(margin2?.top, 'custom top margin persisted').toBe(1.5)
 
-    // Visual: the doc-page element's paddingTop must reflect 1.5 * 96 = 144px.
-    const sheet = window.locator('[data-testid="doc-page"]')
+    // Visual: the page content wrapper's paddingTop must reflect 1.5 * 96 = 144px.
+    // (The margin is applied as padding on the flowing-content wrapper, not on the
+    // doc-page frame, which only sizes the paper.)
+    const sheet = window.locator('[data-testid="doc-page-content"]')
     await expect(sheet).toBeVisible()
     const paddingTopPx = await sheet.evaluate((el) => {
       return getComputedStyle(el).paddingTop
