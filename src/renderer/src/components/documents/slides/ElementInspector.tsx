@@ -5,6 +5,7 @@
 
 import type { DeckTheme, Slide, SlideElement, SlideTransition } from '@shared/types'
 import { BUILTIN_THEMES } from '@shared/slideThemes'
+import { CHART_TYPES, type ChartType } from '@shared/chart'
 import Icon from '../../Icon'
 import FontPicker from '../editor/FontPicker'
 
@@ -23,6 +24,8 @@ interface Props {
   onSetBackground: (color: string) => void
   onApplyTheme: (theme: DeckTheme) => void
   onCrop: (id: string) => void
+  onEditChart: (id: string) => void
+  onRefreshChart: (id: string) => void
 }
 
 const labelCls = 'text-[10px] uppercase tracking-wide text-[var(--ink-40)]'
@@ -287,6 +290,51 @@ export default function ElementInspector(props: Props): JSX.Element {
             >
               <Icon name="aspect_ratio" size={14} /> Reset proportions
             </button>
+          )}
+        </div>
+      )}
+
+      {el.type === 'chart' && (
+        <div className="space-y-1.5" data-testid="inspector-chart">
+          <div className={labelCls}>Chart</div>
+          <input
+            className={inputCls}
+            placeholder="Chart title"
+            value={el.chart.title ?? ''}
+            onChange={(e) => props.onUpdateElement(el.id, { chart: { ...el.chart, title: e.target.value } })}
+          />
+          <select
+            className={inputCls}
+            data-testid="chart-type"
+            value={el.chart.type}
+            onChange={(e) => props.onUpdateElement(el.id, { chart: { ...el.chart, type: e.target.value as ChartType } })}
+          >
+            {CHART_TYPES.map((t) => (
+              <option key={t.type} value={t.type}>
+                {t.label}
+              </option>
+            ))}
+          </select>
+          {(el.chart.type === 'bar' || el.chart.type === 'area') && (
+            <button
+              className={`${btn} w-full justify-start gap-1.5 ${el.chart.stacked ? 'bg-accent/15 text-accent' : ''}`}
+              onClick={() => props.onUpdateElement(el.id, { chart: { ...el.chart, stacked: !el.chart.stacked } })}
+            >
+              <Icon name="stacked_bar_chart" size={14} /> Stacked
+            </button>
+          )}
+          <button className={`${btn} w-full justify-start gap-1.5`} data-testid="chart-link" onClick={() => props.onEditChart(el.id)}>
+            <Icon name="table_chart" size={14} /> Link a sheet range…
+          </button>
+          {el.source && (
+            <div className="text-[11px] text-[var(--ink-50)] space-y-1">
+              <div className="truncate" title={el.source.range}>
+                Linked to {el.source.range}
+              </div>
+              <button className={`${btn} w-full justify-start gap-1.5`} data-testid="chart-refresh" onClick={() => props.onRefreshChart(el.id)}>
+                <Icon name="refresh" size={14} /> Refresh from sheet
+              </button>
+            </div>
           )}
         </div>
       )}
