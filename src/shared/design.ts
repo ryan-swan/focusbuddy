@@ -520,6 +520,21 @@ function elementHtml(el: SlideElement): string {
     // Static SVG of the chart from its data snapshot, so exports are faithful.
     return `<div style="${base}">${chartToSvg(el.chart, el.w, el.h)}</div>`
   }
+  if (el.type === 'table') {
+    const accent = el.accent ?? '#e2e8f0'
+    const rows = el.cells
+      .map(
+        (row, r) =>
+          `<tr>${row
+            .map((cell) => {
+              const head = el.headerRow && r === 0
+              return `<td style="border:1px solid ${accent};padding:4px 8px;${head ? `font-weight:700;background:${accent};` : ''}">${cell.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</td>`
+            })
+            .join('')}</tr>`
+      )
+      .join('')
+    return `<div style="${base}"><table style="width:100%;height:100%;border-collapse:collapse;table-layout:fixed;font-size:${el.fontSize ?? 16}px">${rows}</table></div>`
+  }
   // line
   return `<div style="${base}"><svg width="100%" height="100%" viewBox="0 0 ${el.w} ${el.h}" preserveAspectRatio="none">${
     el.arrowEnd

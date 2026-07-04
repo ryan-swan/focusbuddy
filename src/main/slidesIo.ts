@@ -131,6 +131,16 @@ export async function exportPptx(body: SlidesBody, _title: string, outPath: stri
           if (c.stacked && (t === 'bar' || t === 'area')) opts.barGrouping = 'stacked'
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           s.addChart(t as any, chartData, opts)
+        } else if (el.type === 'table') {
+          // A real, editable PowerPoint table.
+          const accent = hex(el.accent, 'E2E8F0')
+          const rows = el.cells.map((row, r) =>
+            row.map((text) => ({
+              text: text ?? '',
+              options: el.headerRow && r === 0 ? { bold: true, fill: { color: accent } } : {}
+            }))
+          )
+          s.addTable(rows, { ...pos, ...frame, border: { type: 'solid', pt: 1, color: accent }, fontSize: (el.fontSize ?? 16) * 0.6, valign: 'middle' })
         }
       }
       if (slide.notes) s.addNotes(slide.notes)
@@ -181,6 +191,18 @@ function slideHtml(slide: Slide, theme: DeckTheme): string {
         return `<svg style="position:absolute;left:${el.x}px;top:${el.y}px" width="${el.w}" height="${el.h}"><line x1="0" y1="0" x2="${el.w}" y2="${el.h}" stroke="${el.stroke}" stroke-width="${el.strokeWidth}"/></svg>`
       if (el.type === 'chart')
         return `<div style="position:absolute;left:${el.x}px;top:${el.y}px;width:${el.w}px;height:${el.h}px">${chartToSvg(el.chart, el.w, el.h)}</div>`
+      if (el.type === 'table') {
+        const accent = el.accent ?? '#e2e8f0'
+        const rows = el.cells
+          .map(
+            (row, r) =>
+              `<tr>${row
+                .map((cell) => `<td style="border:1px solid ${accent};padding:4px 8px;${el.headerRow && r === 0 ? `font-weight:700;background:${accent};` : ''}">${esc(cell)}</td>`)
+                .join('')}</tr>`
+          )
+          .join('')
+        return `<div style="position:absolute;left:${el.x}px;top:${el.y}px;width:${el.w}px;height:${el.h}px"><table style="width:100%;height:100%;border-collapse:collapse;table-layout:fixed;font-size:${el.fontSize ?? 16}px">${rows}</table></div>`
+      }
       // widget: a live desk-widget embed cannot be rendered in a static export
       // (it resolves via renderer IPC), so print an honest labelled frame.
       return `<div style="position:absolute;left:${el.x}px;top:${el.y}px;width:${el.w}px;height:${el.h}px;border:1px solid #d6d3d1;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#a8a29e;font-size:14px">Embedded desk widget</div>`

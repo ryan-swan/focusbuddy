@@ -35,6 +35,7 @@ export interface SlidesMenuActions {
   insertLine: () => void
   insertWidget: () => void
   insertChart: () => void
+  insertTable: () => void
   align: (dir: SlideAlign['dir']) => void
   group: () => void
   ungroup: () => void
@@ -140,6 +141,7 @@ export default function SlidesMenuBar({ actions }: { actions: SlidesMenuActions 
         },
         { kind: 'item', label: 'Line', icon: 'horizontal_rule', run: a.insertLine },
         { kind: 'item', label: 'Chart', icon: 'bar_chart', run: a.insertChart },
+        { kind: 'item', label: 'Table', icon: 'table_chart', run: a.insertTable },
         { kind: 'item', label: 'Widget from a desk', icon: 'widgets', run: a.insertWidget },
         { kind: 'sep' },
         { kind: 'item', label: 'Meeting', icon: 'videocam', run: () => void launchMeeting({ kind: 'slides', id: active?.id ?? '', title: a.title || 'Presentation meeting' }) }

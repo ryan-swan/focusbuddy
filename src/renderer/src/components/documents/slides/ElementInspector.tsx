@@ -296,6 +296,71 @@ export default function ElementInspector(props: Props): JSX.Element {
         </div>
       )}
 
+      {el.type === 'table' && (
+        <div className="space-y-1.5" data-testid="inspector-table">
+          <div className={labelCls}>Table</div>
+          <div className="flex items-center gap-1">
+            <button
+              className={btn}
+              title="Add row"
+              data-testid="table-add-row"
+              onClick={() => {
+                const cols = el.cells[0]?.length ?? 1
+                props.onUpdateElement(el.id, { cells: [...el.cells, new Array(cols).fill('')] })
+              }}
+            >
+              <Icon name="add" size={13} /> Row
+            </button>
+            <button
+              className={btn}
+              title="Add column"
+              data-testid="table-add-col"
+              onClick={() => props.onUpdateElement(el.id, { cells: el.cells.map((r) => [...r, '']) })}
+            >
+              <Icon name="add" size={13} /> Col
+            </button>
+            <button
+              className={btn}
+              title="Remove last row"
+              onClick={() => el.cells.length > 1 && props.onUpdateElement(el.id, { cells: el.cells.slice(0, -1) })}
+            >
+              <Icon name="remove" size={13} /> Row
+            </button>
+            <button
+              className={btn}
+              title="Remove last column"
+              onClick={() => (el.cells[0]?.length ?? 0) > 1 && props.onUpdateElement(el.id, { cells: el.cells.map((r) => r.slice(0, -1)) })}
+            >
+              <Icon name="remove" size={13} /> Col
+            </button>
+          </div>
+          <button
+            className={`${btn} w-full justify-start gap-1.5 ${el.headerRow ? 'bg-accent/15 text-accent' : ''}`}
+            onClick={() => props.onUpdateElement(el.id, { headerRow: !el.headerRow })}
+          >
+            <Icon name="table_rows" size={14} /> Header row
+          </button>
+          <div className="space-y-1 max-h-48 overflow-auto" data-testid="table-cells">
+            {el.cells.map((row, r) => (
+              <div key={r} className="flex gap-1">
+                {row.map((cell, c) => (
+                  <input
+                    key={c}
+                    className="min-w-0 flex-1 bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded px-1 py-0.5 text-[11px] focus:outline-none focus:border-accent"
+                    value={cell}
+                    onChange={(e) => {
+                      const next = el.cells.map((rr) => rr.slice())
+                      next[r][c] = e.target.value
+                      props.onUpdateElement(el.id, { cells: next })
+                    }}
+                  />
+                ))}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {el.type === 'chart' && (
         <div className="space-y-1.5" data-testid="inspector-chart">
           <div className={labelCls}>Chart</div>
