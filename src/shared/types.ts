@@ -1450,6 +1450,7 @@ export interface SheetTab {
   // Sparse per-cell formatting keyed "r,c". Absent = general/default.
   formats?: Record<string, SheetCellFormat>
   colWidths?: Record<number, number> // px; absent = default
+  rowHeights?: Record<number, number> // px; absent = default (0.75cm)
   freeze?: { rows: number; cols: number }
   charts?: SheetChartSpec[]
   pivots?: SheetPivotSpec[]

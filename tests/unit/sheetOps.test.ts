@@ -163,13 +163,21 @@ describe('drag-reorder — moveOrder / reorderRows / reorderColumns', () => {
     // Move the block [0,1] so it lands starting at index 2 (after removal)
     expect(moveOrder(4, 0, 2, 2)).toEqual([2, 3, 0, 1])
   })
-  it('reorderRows carries cells and formats to the new positions', () => {
-    const t = reorderRows(tab(), [2, 0, 1]) // row 2 to top
+  it('reorderRows carries cells, formats and row heights to the new positions', () => {
+    const base = { ...tab(), rowHeights: { 2: 60 } }
+    const t = reorderRows(base, [2, 0, 1]) // row 2 to top
     expect(t.rows[0]).toEqual(['7', '8', '9'])
     expect(t.rows[1]).toEqual(['1', '2', '3'])
     // the bold format on old row 2 (key '2,1') follows to new row 0 -> '0,1'
     expect(t.formats?.['0,1']?.bold).toBe(true)
     expect(t.formats?.['2,1']).toBeUndefined()
+    // the custom height on old row 2 follows to new row 0
+    expect(t.rowHeights?.[0]).toBe(60)
+  })
+  it('insert/delete row shift custom row heights with the rows', () => {
+    const base = { ...tab(), rowHeights: { 2: 60 } }
+    expect(insertRowAt(base, 0).rowHeights?.[3]).toBe(60) // pushed down one
+    expect(deleteRowAt(base, 0).rowHeights?.[1]).toBe(60) // pulled up one
   })
   it('reorderColumns carries headers, cells, formats and widths', () => {
     const base = { ...tab(), colWidths: { 1: 200 } }
