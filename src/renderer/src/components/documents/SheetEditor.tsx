@@ -94,6 +94,31 @@ function measureTextPx(text: string, bold: boolean): number {
   return _measureCtx.measureText(text).width
 }
 
+// Signature help: find the innermost function call the caret sits inside, and
+// which argument (0-based) it is on, so the editor can show that function's
+// parameter list with the current argument highlighted while you type.
+function enclosingCall(text: string, caret: number): { name: string; argIndex: number } | null {
+  let depth = 0
+  let argIndex = 0
+  for (let i = caret - 1; i >= 0; i--) {
+    const ch = text[i]
+    if (ch === ')') depth++
+    else if (ch === '(') {
+      if (depth === 0) {
+        let j = i - 1
+        let name = ''
+        while (j >= 0 && /[A-Za-z0-9_]/.test(text[j])) {
+          name = text[j] + name
+          j--
+        }
+        return name ? { name: name.toUpperCase(), argIndex } : null
+      }
+      depth--
+    } else if (ch === ',' && depth === 0) argIndex++
+  }
+  return null
+}
+
 // Structural edits that also fix formula references, so inserting, deleting or
 // moving rows/columns keeps every formula pointing at the same data. A reference
 // to a genuinely removed line becomes #REF! (never silently repointed). These
@@ -423,6 +448,17 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
     () => (editing && !funcDismissed ? computeFuncMenu(editValue) : null),
     [editing, editValue, funcDismissed]
   )
+  // Signature help: when editing a formula and the name-completion menu is not
+  // showing, if the caret sits inside a known function's parentheses, surface its
+  // parameter list with the current argument highlighted.
+  const signature = ((): { hint: string; argIndex: number } | null => {
+    if (!editing || !editValue.startsWith('=') || funcMenu) return null
+    const caret = editInputRef.current?.selectionStart ?? editValue.length
+    const call = enclosingCall(editValue, caret)
+    if (!call) return null
+    const fn = SHEET_FUNCTIONS.find((f) => f.name === call.name)
+    return fn ? { hint: fn.hint, argIndex: call.argIndex } : null
+  })()
   function handleEditValue(v: string): void {
     // Typing anything locks the current point-mode reference in place.
     pointRef.current = null
@@ -1461,6 +1497,13 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
               onPick={(i) => applyFunc(funcMenu, i)}
             />
           )}
+          {signature && editInputRef.current && (
+            <SignatureHint
+              rect={editInputRef.current.getBoundingClientRect()}
+              hint={signature.hint}
+              argIndex={signature.argIndex}
+            />
+          )}
         </div>
 
         {colMenu && (
@@ -1783,6 +1826,55 @@ function FormulaMenu({
           <span className="block text-[11px] text-[var(--ink-50)] truncate">{f.hint}</span>
         </button>
       ))}
+    </div>
+  )
+}
+
+// Signature help shown under the edit input while the caret is inside a
+// function's parentheses. Parses the catalog hint "NAME(p1, p2, [p3]) — desc"
+// and bolds the parameter matching the current argument position.
+function SignatureHint({
+  rect,
+  hint,
+  argIndex
+}: {
+  rect: DOMRect
+  hint: string
+  argIndex: number
+}): JSX.Element {
+  const top = Math.min(rect.bottom + 2, window.innerHeight - 80)
+  const left = Math.min(rect.left, window.innerWidth - 340)
+  const m = hint.match(/^([A-Za-z0-9_]+)\((.*?)\)(.*)$/)
+  const params = m ? m[2].split(',').map((s) => s.trim()) : []
+  return (
+    <div
+      data-testid="sheet-signature"
+      className="fixed z-[120] max-w-[340px] rounded-md border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-xl px-3 py-1.5 text-[12px] text-[var(--ink-60)]"
+      style={{ top, left }}
+    >
+      {m ? (
+        <span className="font-mono">
+          <span className="text-accent font-semibold">{m[1]}</span>
+          <span>(</span>
+          {params.map((p, i) => (
+            <span key={i}>
+              {i > 0 && ', '}
+              <span
+                className={
+                  i === argIndex
+                    ? 'text-[var(--ink-100)] font-semibold'
+                    : 'text-[var(--ink-50)]'
+                }
+              >
+                {p}
+              </span>
+            </span>
+          ))}
+          <span>)</span>
+        </span>
+      ) : (
+        <span className="font-mono text-[var(--ink-70)]">{hint}</span>
+      )}
     </div>
   )
 }

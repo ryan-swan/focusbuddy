@@ -169,7 +169,30 @@ export const SHEET_FUNCTIONS: Array<{ name: string; hint: string }> = [
   { name: 'WEEKDAY', hint: 'WEEKDAY(date) — 1=Sunday' },
   { name: 'TODAY', hint: 'TODAY() — current date' },
   { name: 'NOW', hint: 'NOW() — current date and time' },
-  { name: 'SPARKLINE', hint: 'SPARKLINE(range, ["line"|"bar"]) — a mini chart inside the cell' }
+  { name: 'SPARKLINE', hint: 'SPARKLINE(range, ["line"|"bar"]) — a mini chart inside the cell' },
+  { name: 'TEXT', hint: 'TEXT(value, format) — format a number/date as text, e.g. "0.00", "0%", "yyyy-mm-dd"' },
+  { name: 'ISBLANK', hint: 'ISBLANK(value) — TRUE if the cell is empty' },
+  { name: 'ISNUMBER', hint: 'ISNUMBER(value) — TRUE if it is a number' },
+  { name: 'ISTEXT', hint: 'ISTEXT(value) — TRUE if it is text' },
+  { name: 'ISLOGICAL', hint: 'ISLOGICAL(value) — TRUE if it is TRUE/FALSE' },
+  { name: 'ISERROR', hint: 'ISERROR(value) — TRUE if the value is an error' },
+  { name: 'ISNA', hint: 'ISNA(value) — TRUE if the value is not available' },
+  { name: 'ISEVEN', hint: 'ISEVEN(number)' },
+  { name: 'ISODD', hint: 'ISODD(number)' },
+  { name: 'ROW', hint: 'ROW(ref) — the row number of a reference' },
+  { name: 'COLUMN', hint: 'COLUMN(ref) — the column number of a reference' },
+  { name: 'ROWS', hint: 'ROWS(range) — number of rows in a range' },
+  { name: 'COLUMNS', hint: 'COLUMNS(range) — number of columns in a range' },
+  { name: 'CHOOSE', hint: 'CHOOSE(index, a, b, …) — pick the index-th value' },
+  { name: 'MROUND', hint: 'MROUND(number, multiple) — round to the nearest multiple' },
+  { name: 'RANK', hint: 'RANK(value, range, [ascending]) — position of a value' },
+  { name: 'HOUR', hint: 'HOUR(datetime)' },
+  { name: 'MINUTE', hint: 'MINUTE(datetime)' },
+  { name: 'SECOND', hint: 'SECOND(datetime)' },
+  { name: 'PMT', hint: 'PMT(rate, nper, pv, [fv], [type]) — loan payment per period' },
+  { name: 'FV', hint: 'FV(rate, nper, pmt, [pv], [type]) — future value' },
+  { name: 'PV', hint: 'PV(rate, nper, pmt, [fv], [type]) — present value' },
+  { name: 'NPV', hint: 'NPV(rate, value1, value2, …) — net present value' }
 ]
 
 // ── References ────────────────────────────────────────────────────────────────
@@ -838,6 +861,42 @@ function collectNumbers(args: Node[], grid: Grid, seen: Set<string>): number[] {
   return out
 }
 
+const MONTH_ABBR = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+// A pragmatic TEXT() formatter covering the common number and date patterns
+// (fixed decimals, %, thousands, $, and a few explicit date layouts). It is not a
+// full Excel format-code engine; unknown patterns fall back to the plain value.
+function textFormat(v: CellValue, fmt: string): string {
+  const f = fmt.trim()
+  const p2 = (n: number): string => String(n).padStart(2, '0')
+  const dateForms: Record<string, (d: Date) => string> = {
+    'yyyy-mm-dd': (d) => `${d.getUTCFullYear()}-${p2(d.getUTCMonth() + 1)}-${p2(d.getUTCDate())}`,
+    'mm/dd/yyyy': (d) => `${p2(d.getUTCMonth() + 1)}/${p2(d.getUTCDate())}/${d.getUTCFullYear()}`,
+    'dd/mm/yyyy': (d) => `${p2(d.getUTCDate())}/${p2(d.getUTCMonth() + 1)}/${d.getUTCFullYear()}`,
+    'd mmm yyyy': (d) => `${d.getUTCDate()} ${MONTH_ABBR[d.getUTCMonth()]} ${d.getUTCFullYear()}`
+  }
+  const dform = dateForms[f.toLowerCase()]
+  if (dform) {
+    const d = parseDate(typeof v === 'number' ? String(v) : String(v))
+    if (d) return dform(d)
+  }
+  if (!/[0#]/.test(f)) return toStr(v) // not a numeric pattern
+  const num = toNum(v)
+  const percent = f.includes('%')
+  const n = percent ? num * 100 : num
+  const dot = f.indexOf('.')
+  const decimals = dot >= 0 ? (f.slice(dot).match(/0/g) || []).length : 0
+  let s = Math.abs(n).toFixed(decimals)
+  if (f.includes(',')) {
+    const [intp, frac] = s.split('.')
+    s = intp.replace(/\B(?=(\d{3})+(?!\d))/g, ',') + (frac ? '.' + frac : '')
+  }
+  if (f.includes('$')) s = '$' + s
+  if (n < 0) s = '-' + s
+  if (percent) s += '%'
+  return s
+}
+
 function evalCall(node: Extract<Node, { k: 'call' }>, grid: Grid, seen: Set<string>): CellValue {
   const name = node.name
   const args = node.args
@@ -1458,6 +1517,151 @@ function evalCall(node: Extract<Node, { k: 'call' }>, grid: Grid, seen: Set<stri
         if (t === 'bar' || t === 'line') valueArgs = args.slice(0, -1)
       }
       return sparklineValues(valueArgs, grid, seen).map(fmtCell).join(' ')
+    }
+    // ── Text formatting ───────────────────────────────────────────────────────
+    case 'TEXT':
+      return textFormat(arg(0), toStr(arg(1)))
+    // ── IS* predicates ────────────────────────────────────────────────────────
+    case 'ISBLANK': {
+      const a = args[0]
+      if (a?.k === 'ref') return cellRaw(gridOf(a), a.r, a.c).trim() === ''
+      try {
+        return evalNode(a, grid, seen) === ''
+      } catch {
+        return false
+      }
+    }
+    case 'ISNUMBER':
+      try {
+        return typeof evalNode(args[0], grid, seen) === 'number'
+      } catch {
+        return false
+      }
+    case 'ISTEXT': {
+      try {
+        const v = evalNode(args[0], grid, seen)
+        return typeof v === 'string' && v !== ''
+      } catch {
+        return false
+      }
+    }
+    case 'ISLOGICAL':
+      try {
+        return typeof evalNode(args[0], grid, seen) === 'boolean'
+      } catch {
+        return false
+      }
+    case 'ISERROR':
+    case 'ISNA':
+      try {
+        evalNode(args[0], grid, seen)
+        return false
+      } catch {
+        return true
+      }
+    case 'ISEVEN':
+      return Math.trunc(toNum(arg(0))) % 2 === 0
+    case 'ISODD':
+      return Math.abs(Math.trunc(toNum(arg(0))) % 2) === 1
+    // ── Reference shape ───────────────────────────────────────────────────────
+    case 'ROW': {
+      const a = args[0]
+      if (a?.k === 'ref') return a.r + 1
+      if (a?.k === 'range') return a.r1 + 1
+      throw new Error('ROW needs a cell reference')
+    }
+    case 'COLUMN': {
+      const a = args[0]
+      if (a?.k === 'ref') return a.c + 1
+      if (a?.k === 'range') return a.c1 + 1
+      throw new Error('COLUMN needs a cell reference')
+    }
+    case 'ROWS': {
+      const a = args[0]
+      if (a?.k === 'range') return Math.abs(a.r2 - a.r1) + 1
+      if (a?.k === 'ref') return 1
+      throw new Error('ROWS needs a range')
+    }
+    case 'COLUMNS': {
+      const a = args[0]
+      if (a?.k === 'range') return Math.abs(a.c2 - a.c1) + 1
+      if (a?.k === 'ref') return 1
+      throw new Error('COLUMNS needs a range')
+    }
+    case 'CHOOSE': {
+      const i = Math.trunc(toNum(arg(0)))
+      const chosen = args[i] // 1-based: args[0] is the index, args[1] the first choice
+      if (!chosen) throw new Error('CHOOSE: index out of range')
+      return evalNode(chosen, grid, seen)
+    }
+    // ── Math ──────────────────────────────────────────────────────────────────
+    case 'MROUND': {
+      const n = toNum(arg(0))
+      const m = toNum(arg(1))
+      return m === 0 ? 0 : Math.round(n / m) * m
+    }
+    case 'RANK': {
+      const v = toNum(arg(0))
+      if (args[1]?.k !== 'range') throw new Error('RANK needs a range')
+      const g = gridOf(args[1])
+      const nums: number[] = []
+      for (const { r, c } of rangeCoords(args[1])) {
+        const n = cellNumeric(g, r, c, seen)
+        if (n !== null) nums.push(n)
+      }
+      const asc = args.length > 2 ? toNum(arg(2)) !== 0 : false
+      const sorted = [...nums].sort((a, b) => (asc ? a - b : b - a))
+      const idx = sorted.indexOf(v)
+      if (idx < 0) throw new Error('RANK: value not in range')
+      return idx + 1
+    }
+    // ── Time parts (dates are epoch-ms / ISO; extracted in UTC to match YEAR) ──
+    case 'HOUR':
+    case 'MINUTE':
+    case 'SECOND': {
+      const d = parseDate(toStr(arg(0)))
+      if (!d) throw new Error(`${name}: bad date/time`)
+      if (name === 'HOUR') return d.getUTCHours()
+      if (name === 'MINUTE') return d.getUTCMinutes()
+      return d.getUTCSeconds()
+    }
+    // ── Financial ─────────────────────────────────────────────────────────────
+    case 'PMT': {
+      const rate = toNum(arg(0))
+      const nper = toNum(arg(1))
+      const pv = toNum(arg(2))
+      const fv = args.length > 3 ? toNum(arg(3)) : 0
+      const type = args.length > 4 ? toNum(arg(4)) : 0
+      if (rate === 0) return -(pv + fv) / nper
+      const pow = Math.pow(1 + rate, nper)
+      return (-(pv * pow + fv) * rate) / ((pow - 1) * (1 + rate * type))
+    }
+    case 'FV': {
+      const rate = toNum(arg(0))
+      const nper = toNum(arg(1))
+      const pmt = toNum(arg(2))
+      const pv = args.length > 3 ? toNum(arg(3)) : 0
+      const type = args.length > 4 ? toNum(arg(4)) : 0
+      if (rate === 0) return -(pv + pmt * nper)
+      const pow = Math.pow(1 + rate, nper)
+      return -(pv * pow + pmt * (1 + rate * type) * ((pow - 1) / rate))
+    }
+    case 'PV': {
+      const rate = toNum(arg(0))
+      const nper = toNum(arg(1))
+      const pmt = toNum(arg(2))
+      const fv = args.length > 3 ? toNum(arg(3)) : 0
+      const type = args.length > 4 ? toNum(arg(4)) : 0
+      if (rate === 0) return -(fv + pmt * nper)
+      const pow = Math.pow(1 + rate, nper)
+      return -(fv + pmt * (1 + rate * type) * ((pow - 1) / rate)) / pow
+    }
+    case 'NPV': {
+      const rate = toNum(arg(0))
+      const vals = collectNumbers(args.slice(1), grid, seen)
+      let npv = 0
+      vals.forEach((v, i) => (npv += v / Math.pow(1 + rate, i + 1)))
+      return npv
     }
     default:
       throw new Error(`unknown function ${name}`)

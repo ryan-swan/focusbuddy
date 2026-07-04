@@ -595,3 +595,44 @@ describe('remapFormulaRefs — structural edits (insert / delete / move)', () =>
     expect(insRow(0)('plain text')).toBe('plain text')
   })
 })
+
+describe('formula engine — expanded library (TEXT, IS*, ref-shape, CHOOSE, financial)', () => {
+  it('TEXT formats numbers (decimals, %, thousands, currency)', () => {
+    expect(displayCell(grid([['=TEXT(1234.5,"0.00")']]), 0, 0)).toBe('1234.50')
+    expect(displayCell(grid([['=TEXT(0.25,"0%")']]), 0, 0)).toBe('25%')
+    expect(displayCell(grid([['=TEXT(1234567,"#,##0")']]), 0, 0)).toBe('1,234,567')
+    expect(displayCell(grid([['=TEXT(1234.5,"$#,##0.00")']]), 0, 0)).toBe('$1,234.50')
+  })
+  it('TEXT formats an ISO date with an explicit pattern', () => {
+    expect(displayCell(grid([['2024-03-05', '=TEXT(A1,"dd/mm/yyyy")']]), 0, 1)).toBe('05/03/2024')
+  })
+  it('IS* predicates', () => {
+    expect(displayCell(grid([['5', '=ISNUMBER(A1)']]), 0, 1)).toBe('TRUE')
+    expect(displayCell(grid([['cat', '=ISNUMBER(A1)']]), 0, 1)).toBe('FALSE')
+    expect(displayCell(grid([['cat', '=ISTEXT(A1)']]), 0, 1)).toBe('TRUE')
+    expect(displayCell(grid([['', '=ISBLANK(A1)']]), 0, 1)).toBe('TRUE')
+    expect(displayCell(grid([['=ISERROR(SQRT(-1))']]), 0, 0)).toBe('TRUE')
+    expect(displayCell(grid([['=ISEVEN(4)']]), 0, 0)).toBe('TRUE')
+    expect(displayCell(grid([['=ISODD(3)']]), 0, 0)).toBe('TRUE')
+  })
+  it('ROW / COLUMN / ROWS / COLUMNS', () => {
+    expect(evaluateFormula(grid([['x']]), 'ROW(B3)')).toBe(3)
+    expect(evaluateFormula(grid([['x']]), 'COLUMN(B3)')).toBe(2)
+    expect(evaluateFormula(grid([['x']]), 'ROWS(A1:A5)')).toBe(5)
+    expect(evaluateFormula(grid([['x']]), 'COLUMNS(A1:C1)')).toBe(3)
+  })
+  it('CHOOSE and MROUND', () => {
+    expect(displayCell(grid([['=CHOOSE(2,"a","b","c")']]), 0, 0)).toBe('b')
+    expect(evaluateFormula(grid([['x']]), 'MROUND(17,5)')).toBe(15)
+  })
+  it('RANK (descending default, ascending on flag)', () => {
+    const g = grid([['10'], ['30'], ['20']])
+    expect(evaluateFormula(g, 'RANK(30,A1:A3)')).toBe(1)
+    expect(evaluateFormula(g, 'RANK(10,A1:A3,1)')).toBe(1)
+  })
+  it('financial PMT / FV / PV / NPV match Excel', () => {
+    expect(evaluateFormula(grid([['x']]), 'PMT(0.1,10,1000)') as number).toBeCloseTo(-162.745, 2)
+    expect(evaluateFormula(grid([['x']]), 'FV(0.1,10,-100)') as number).toBeCloseTo(1593.742, 2)
+    expect(evaluateFormula(grid([['x']]), 'NPV(0.1,100,100,100)') as number).toBeCloseTo(248.685, 2)
+  })
+})
