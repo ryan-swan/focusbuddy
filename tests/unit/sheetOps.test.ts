@@ -13,7 +13,10 @@ import {
   sortByColumn,
   parseTsv,
   rangeToTsv,
-  normalizeRange
+  normalizeRange,
+  reorderRows,
+  reorderColumns,
+  moveOrder
 } from '@renderer/components/documents/sheet/sheetOps'
 import type { SheetTab } from '@shared/types'
 
@@ -146,5 +149,36 @@ describe('clipboard TSV', () => {
     const tsv = rangeToTsv(t, r)
     expect(tsv).toBe('1\t2\n4\t5')
     expect(parseTsv(tsv)).toEqual([['1', '2'], ['4', '5']])
+  })
+})
+
+describe('drag-reorder — moveOrder / reorderRows / reorderColumns', () => {
+  it('moveOrder moves a single line to a new index', () => {
+    // Move index 0 to final position 2: order[newIdx] = oldIdx
+    expect(moveOrder(3, 0, 1, 2)).toEqual([1, 2, 0])
+    // Move index 2 to the front
+    expect(moveOrder(3, 2, 1, 0)).toEqual([2, 0, 1])
+  })
+  it('moveOrder moves a contiguous block', () => {
+    // Move the block [0,1] so it lands starting at index 2 (after removal)
+    expect(moveOrder(4, 0, 2, 2)).toEqual([2, 3, 0, 1])
+  })
+  it('reorderRows carries cells and formats to the new positions', () => {
+    const t = reorderRows(tab(), [2, 0, 1]) // row 2 to top
+    expect(t.rows[0]).toEqual(['7', '8', '9'])
+    expect(t.rows[1]).toEqual(['1', '2', '3'])
+    // the bold format on old row 2 (key '2,1') follows to new row 0 -> '0,1'
+    expect(t.formats?.['0,1']?.bold).toBe(true)
+    expect(t.formats?.['2,1']).toBeUndefined()
+  })
+  it('reorderColumns carries headers, cells, formats and widths', () => {
+    const base = { ...tab(), colWidths: { 1: 200 } }
+    const t = reorderColumns(base, [2, 0, 1]) // col 2 to front
+    expect(t.columns).toEqual(['C', 'A', 'B'])
+    expect(t.rows[0]).toEqual(['3', '1', '2'])
+    // bold on old (row2,col1) -> col1 moved to new index 2 -> key '2,2'
+    expect(t.formats?.['2,2']?.bold).toBe(true)
+    // width on old col 1 -> new col 2
+    expect(t.colWidths?.[2]).toBe(200)
   })
 })

@@ -51,6 +51,8 @@ interface Props {
   onRowHeaderMouseDown?: (r: number, shift: boolean) => void
   onRowHeaderMouseEnter?: (r: number) => void
   onRowHeaderContextMenu?: (r: number, x: number, y: number) => void
+  // The live drop-target while a header is being dragged to reorder it.
+  reorderOver?: { kind: 'col' | 'row'; over: number } | null
   // The fill handle: a live preview rectangle while dragging it, a start hook
   // (mousedown on the handle), and a fill-to-end hook (double-click the handle).
   fillPreview?: CellRange | null
@@ -137,7 +139,7 @@ export default function SheetGrid(props: Props): JSX.Element {
                 }}
                 className={`relative border-b border-r border-[var(--edge-soft)] p-0 ${
                   colFullySelected(c) ? 'bg-accent/20' : 'bg-[var(--surface-sunken)]'
-                }`}
+                } ${props.reorderOver?.kind === 'col' && props.reorderOver.over === c ? 'shadow-[inset_2px_0_0_0_var(--accent)]' : ''}`}
               >
                 <div className="flex items-center">
                   <span
@@ -227,7 +229,7 @@ export default function SheetGrid(props: Props): JSX.Element {
                 }}
                 className={`sticky left-0 z-10 text-center text-[11px] text-[var(--ink-40)] border-b border-r border-[var(--edge-soft)] select-none cursor-pointer hover:text-accent ${
                   rowFullySelected(r) ? 'bg-accent/20' : 'bg-[var(--surface-sunken)]'
-                }`}
+                } ${props.reorderOver?.kind === 'row' && props.reorderOver.over === r ? 'shadow-[inset_0_2px_0_0_var(--accent)]' : ''}`}
               >
                 {r + 1}
               </td>
