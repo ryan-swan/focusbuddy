@@ -51,6 +51,11 @@ interface Props {
   content: unknown
   title: string
   onChange: (body: unknown) => void
+  // Live co-editing only. When true, a change in the content prop's identity is
+  // folded in as a peer's merge. Off by default for the single-user editor, where
+  // our own saves come back as a new identity and folding them would fight local
+  // editing.
+  foldExternal?: boolean
 }
 
 const EXPORT_FORMATS: { id: 'png' | 'pdf'; label: string }[] = [
@@ -80,7 +85,7 @@ const NEUTRAL_THEME: DeckTheme = {
   bodyStyle: { fontSize: 24, color: '#44403c' }
 }
 
-export default function DesignEditor({ content, title, onChange }: Props): JSX.Element {
+export default function DesignEditor({ content, title, onChange, foldExternal = false }: Props): JSX.Element {
   const [design, setDesign] = useState<DesignBody>(() => normalizeDesignBody(content))
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [exportOpen, setExportOpen] = useState(false)
@@ -126,6 +131,25 @@ export default function DesignEditor({ content, title, onChange }: Props): JSX.E
   useEffect(() => {
     void loadBrand()
   }, [loadBrand])
+
+  // Fold live co-editing merges. When the content prop changes identity (a peer's
+  // edit arrived through the CRDT; our own edits reconcile under a private origin
+  // that never refreshes the prop, so this only fires for remote merges), replace
+  // the design with the merged body. We do not push this onto the undo stack — a
+  // peer's edit is not our action to undo. The first run is skipped because the
+  // initial state already reflects the first content.
+  const firstFold = useRef(true)
+  useEffect(() => {
+    if (!foldExternal) return
+    if (firstFold.current) {
+      firstFold.current = false
+      return
+    }
+    const next = normalizeDesignBody(content)
+    designRef.current = next
+    setDesign(next)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [content, foldExternal])
 
   // Ensure every Google font the design (and the brand) uses is loaded, so the
   // canvas renders in the right typeface rather than a fallback.
