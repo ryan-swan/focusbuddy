@@ -48,18 +48,75 @@ let WB: Workbook | null = null
 // the parser behaves exactly as before (a bare name that isn't a cell ref errors).
 let NAMES: Map<string, string> | null = null
 
-// LET binds names to values for the duration of its body. A stack of frames
-// supports nesting and shadowing; a bare identifier that is neither a cell ref
-// nor a named range (a 'name' node) resolves against these frames. LET pushes a
-// frame, evaluates, and pops in a finally, so the stack is balanced even on error.
-const SCOPE: Array<Map<string, CellValue>> = []
-function lookupScope(name: string): CellValue | undefined {
+// LET/LAMBDA scope. A binding is either a value or a lambda (a reusable function
+// with parameter names and a body AST). A stack of frames supports nesting and
+// shadowing; a bare identifier that is neither a cell ref nor a named range (a
+// 'name' node) resolves against these frames. LET/lambda calls push a frame and
+// pop it in a finally, so the stack is balanced even on error.
+type LambdaDef = { params: string[]; body: Node }
+type Binding = { v: CellValue } | { lambda: LambdaDef }
+const SCOPE: Array<Map<string, Binding>> = []
+function lookupBinding(name: string): Binding | undefined {
   const key = name.toLowerCase()
   for (let i = SCOPE.length - 1; i >= 0; i--) {
     const f = SCOPE[i]
     if (f.has(key)) return f.get(key)
   }
   return undefined
+}
+
+// Extract a lambda definition from an inline LAMBDA(...) call node or a name bound
+// to a lambda. Returns null when the node is not a lambda (so the caller treats it
+// as an ordinary value).
+function resolveLambda(n: Node | undefined): LambdaDef | null {
+  if (!n) return null
+  if (n.k === 'call' && n.name === 'LAMBDA') {
+    const params: string[] = []
+    for (let i = 0; i < n.args.length - 1; i++) {
+      const p = n.args[i]
+      if (p.k !== 'name') return null
+      params.push(p.name.toLowerCase())
+    }
+    return { params, body: n.args[n.args.length - 1] ?? { k: 'num', v: 0 } }
+  }
+  if (n.k === 'name') {
+    const b = lookupBinding(n.name)
+    if (b && 'lambda' in b) return b.lambda
+  }
+  return null
+}
+
+// Call a lambda with scalar argument values, binding params in a fresh frame.
+function applyLambda(def: LambdaDef, vals: CellValue[], grid: Grid, seen: Set<string>): CellValue {
+  const frame = new Map<string, Binding>()
+  def.params.forEach((p, i) => frame.set(p, { v: vals[i] ?? '' }))
+  SCOPE.push(frame)
+  try {
+    return evalNode(def.body, grid, seen)
+  } finally {
+    SCOPE.pop()
+  }
+}
+
+// Bind a LET's name/value pairs into a pushed frame, run `evalBody` on the final
+// calculation node, then pop. Shared by the scalar (evalCall) and array
+// (evalArrayCall) LET paths so both bind identically.
+function withLetScope<T>(args: Node[], grid: Grid, seen: Set<string>, evalBody: (body: Node) => T): T {
+  if (args.length < 3 || args.length % 2 === 0) throw new FormulaError('#VALUE!')
+  const frame = new Map<string, Binding>()
+  SCOPE.push(frame)
+  try {
+    for (let i = 0; i < args.length - 1; i += 2) {
+      const nameNode = args[i]
+      if (nameNode.k !== 'name') throw new FormulaError('#NAME?')
+      const valNode = args[i + 1]
+      const lam = resolveLambda(valNode)
+      frame.set(nameNode.name.toLowerCase(), lam ? { lambda: lam } : { v: evalNode(valNode, grid, seen) })
+    }
+    return evalBody(args[args.length - 1])
+  } finally {
+    SCOPE.pop()
+  }
 }
 
 // Build the names map the evaluator consults, from the sheet body's definitions.
@@ -156,6 +213,12 @@ export const SHEET_FUNCTIONS: Array<{ name: string; hint: string }> = [
   { name: 'TAKE', hint: 'TAKE(array, rows, [cols]) — first/last rows/cols (spills)' },
   { name: 'DROP', hint: 'DROP(array, rows, [cols]) — drop rows/cols (spills)' },
   { name: 'TEXTSPLIT', hint: 'TEXTSPLIT(text, colDelim, [rowDelim]) — split text into cells (spills)' },
+  { name: 'LET', hint: 'LET(name, value, …, calculation) — name reusable values in a formula' },
+  { name: 'LAMBDA', hint: 'LAMBDA(param, …, calculation) — a reusable function (use with LET, MAP, REDUCE)' },
+  { name: 'MAP', hint: 'MAP(array, …, LAMBDA(x, …)) — apply a lambda to every cell (spills)' },
+  { name: 'REDUCE', hint: 'REDUCE(init, array, LAMBDA(acc, v, …)) — fold an array to one value' },
+  { name: 'SCAN', hint: 'SCAN(init, array, LAMBDA(acc, v, …)) — running totals (spills)' },
+  { name: 'MAKEARRAY', hint: 'MAKEARRAY(rows, cols, LAMBDA(r, c, …)) — build a block (spills)' },
   { name: 'IFS', hint: 'IFS(cond1, val1, cond2, val2, …) — first true wins' },
   { name: 'SWITCH', hint: 'SWITCH(value, case1, result1, …, [default])' },
   { name: 'REGEXMATCH', hint: 'REGEXMATCH(text, pattern) — TRUE if the pattern matches' },
@@ -884,9 +947,10 @@ function evalNode(node: Node, grid: Grid, seen: Set<string>): CellValue {
     case 'call':
       return evalCall(node, grid, seen)
     case 'name': {
-      const v = lookupScope(node.name)
-      if (v === undefined) throw new FormulaError('#NAME?')
-      return v
+      const b = lookupBinding(node.name)
+      if (!b) throw new FormulaError('#NAME?')
+      if ('lambda' in b) throw new FormulaError('#VALUE!') // a lambda is not a scalar
+      return b.v
     }
   }
 }
@@ -954,25 +1018,28 @@ function evalCall(node: Extract<Node, { k: 'call' }>, grid: Grid, seen: Set<stri
   const gridOf = (n: Node | undefined): Grid =>
     pickGrid(grid, n && (n.k === 'range' || n.k === 'ref') ? n.sheet : undefined)
 
+  // Calling a LET/lambda-bound name, e.g. LET(f, LAMBDA(x, x*2), f(A1)). The name
+  // parses as a call; if it resolves to a lambda in scope, apply it to the args.
+  const bound = lookupBinding(name.toLowerCase())
+  if (bound && 'lambda' in bound) {
+    return applyLambda(bound.lambda, args.map((a) => evalNode(a, grid, seen)), grid, seen)
+  }
+
   switch (name) {
     // LET(name1, value1, [name2, value2, ...], calculation). Binds each name to
     // its value (evaluated with the prior names already in scope), then returns
-    // the final calculation. Names that look like a cell reference are rejected
-    // by the parser (they parse as refs), matching Excel.
-    case 'LET': {
-      if (args.length < 3 || args.length % 2 === 0) throw new FormulaError('#VALUE!')
-      const frame = new Map<string, CellValue>()
-      SCOPE.push(frame)
-      try {
-        for (let i = 0; i < args.length - 1; i += 2) {
-          const nameNode = args[i]
-          if (nameNode.k !== 'name') throw new FormulaError('#NAME?')
-          frame.set(nameNode.name.toLowerCase(), evalNode(args[i + 1], grid, seen))
-        }
-        return evalNode(args[args.length - 1], grid, seen)
-      } finally {
-        SCOPE.pop()
-      }
+    // the final calculation. A value that is a LAMBDA(...) binds a callable
+    // function. Names that look like a cell reference are rejected by the parser.
+    case 'LET':
+      return withLetScope(args, grid, seen, (body) => evalNode(body, grid, seen))
+    // REDUCE(init, array, LAMBDA(acc, value, result)) folds a lambda over an
+    // array to a single value.
+    case 'REDUCE': {
+      const def = resolveLambda(args[2])
+      if (!def) throw new FormulaError('#VALUE!')
+      let acc = evalNode(args[0], grid, seen)
+      for (const v of flattenMatrix(nodeToMatrix(args[1], grid, seen))) acc = applyLambda(def, [acc, v], grid, seen)
+      return acc
     }
     // Aggregates
     case 'SUM':
@@ -1917,6 +1984,10 @@ export function sparklineForCell(
 type Matrix = CellValue[][]
 
 export const SPILL_FUNCTIONS = new Set([
+  'LET',
+  'MAP',
+  'SCAN',
+  'MAKEARRAY',
   'SEQUENCE',
   'TRANSPOSE',
   'UNIQUE',
@@ -1948,24 +2019,72 @@ function fmtCell(v: CellValue): string {
   return v
 }
 
+// Coerce any node to a matrix — a range reads its cells, a nested array call
+// yields its block (so array functions compose, e.g. SORT(VSTACK(...))), and a
+// scalar becomes a 1x1. Module-level so both evalArrayCall and the scalar array
+// helpers (REDUCE) read data the same way.
+function nodeToMatrix(n: Node | undefined, grid: Grid, seen: Set<string>): Matrix {
+  if (!n) return []
+  if (n.k === 'range') return readRange(grid, n, seen)
+  if (n.k === 'call') {
+    const m = evalArrayCall(n, grid, seen)
+    if (m) return m
+  }
+  return [[evalNode(n, grid, seen)]]
+}
+function flattenMatrix(m: Matrix): CellValue[] {
+  const out: CellValue[] = []
+  for (const row of m) for (const v of row) out.push(v)
+  return out
+}
+
 // Evaluate an array-function call to a matrix, or null if it isn't one (or its
 // arguments are the wrong shape, in which case the scalar path reports the error).
 function evalArrayCall(node: Extract<Node, { k: 'call' }>, grid: Grid, seen: Set<string>): Matrix | null {
   const args = node.args
-  // Coerce any argument to a matrix — a range reads its cells, a nested array call
-  // yields its block (so array functions compose, e.g. SORT(VSTACK(...))), and a
-  // scalar becomes a 1x1. This is what makes the new stacking/reshape helpers work
-  // on each other and on the existing SORT/UNIQUE/FILTER.
-  const toMatrix = (n: Node | undefined): Matrix => {
-    if (!n) return []
-    if (n.k === 'range') return readRange(grid, n, seen)
-    if (n.k === 'call') {
-      const m = evalArrayCall(n, grid, seen)
-      if (m) return m
-    }
-    return [[evalNode(n, grid, seen)]]
-  }
+  const toMatrix = (n: Node | undefined): Matrix => nodeToMatrix(n, grid, seen)
   switch (node.name) {
+    // LET in the array path so its calculation can be an array (e.g. a MAP), and
+    // so a LET-bound lambda is in scope when that MAP runs.
+    case 'LET':
+      return withLetScope(args, grid, seen, (body) => nodeToMatrix(body, grid, seen))
+    // MAP(array1, [array2, ...], LAMBDA(a, [b], ...)) applies the lambda to each
+    // cell (zipping multiple arrays), preserving the first array's shape.
+    case 'MAP': {
+      const def = resolveLambda(args[args.length - 1])
+      if (!def) return null
+      const arrays = args.slice(0, -1).map((a) => toMatrix(a))
+      const base = arrays[0] ?? []
+      return base.map((row, r) => row.map((_, c) => applyLambda(def, arrays.map((m) => m[r]?.[c] ?? ''), grid, seen)))
+    }
+    // SCAN(init, array, LAMBDA(acc, value, result)) returns the running totals,
+    // preserving the array's shape.
+    case 'SCAN': {
+      const def = resolveLambda(args[2])
+      if (!def) return null
+      let acc = evalNode(args[0], grid, seen)
+      return toMatrix(args[1]).map((row) =>
+        row.map((v) => {
+          acc = applyLambda(def, [acc, v], grid, seen)
+          return acc
+        })
+      )
+    }
+    // MAKEARRAY(rows, cols, LAMBDA(r, c, ...)) builds a block from a lambda of the
+    // 1-based row/column index.
+    case 'MAKEARRAY': {
+      const rows = Math.max(0, Math.trunc(toNum(evalNode(args[0], grid, seen))))
+      const cols = Math.max(0, Math.trunc(toNum(evalNode(args[1], grid, seen))))
+      const def = resolveLambda(args[2])
+      if (!def) return null
+      const out: Matrix = []
+      for (let r = 0; r < rows; r++) {
+        const row: CellValue[] = []
+        for (let c = 0; c < cols; c++) row.push(applyLambda(def, [r + 1, c + 1], grid, seen))
+        out.push(row)
+      }
+      return out
+    }
     case 'SEQUENCE': {
       const rows = Math.max(0, Math.trunc(toNum(evalNode(args[0], grid, seen))))
       const cols = args.length > 1 ? Math.max(1, Math.trunc(toNum(evalNode(args[1], grid, seen)))) : 1
