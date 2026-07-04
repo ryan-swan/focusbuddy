@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useWidgetStore } from '../stores/widgets'
 import { useNodeStore } from '../stores/nodes'
+import { useSyncStatus } from '../stores/syncStatus'
 
 // Sync indicator — visible at the foot of the sidebar. Reports the last
 // time anything in the workspace was written (widget edit, task change,
@@ -31,6 +32,9 @@ function relativeAge(ts: number): string {
 export default function SyncIndicator(): JSX.Element {
   const widgets = useWidgetStore((s) => s.widgets)
   const nodes = useNodeStore((s) => s.nodes)
+  const syncState = useSyncStatus((s) => s.state)
+  const lastError = useSyncStatus((s) => s.lastError)
+  const lastOkAt = useSyncStatus((s) => s.lastOkAt)
   const [tick, setTick] = useState(0)
   const [history, setHistory] = useState<number[]>(() =>
     new Array(HISTORY_MINUTES).fill(0)
@@ -88,24 +92,61 @@ export default function SyncIndicator(): JSX.Element {
   const maxBucket = Math.max(1, ...history)
   const totalRecent = history.reduce((a, b) => a + b, 0)
 
+  // Honest status. When sync is active (signed in), reflect the real sync
+  // health so a failure or offline state is visible instead of a permanent
+  // green "Synced". When sync is disabled (signed out / flag off / preview
+  // guard), the workspace is still safely saved to local disk, so say that
+  // plainly rather than claiming a sync that isn't happening.
+  const dotClass =
+    syncState === 'error'
+      ? 'bg-rose-500'
+      : syncState === 'offline'
+        ? 'bg-amber-500'
+        : syncState === 'syncing'
+          ? 'bg-sky-500'
+          : 'bg-emerald-500'
+  const showPing = syncState === 'syncing' || syncState === 'ok'
+  const label =
+    syncState === 'error'
+      ? 'Sync error'
+      : syncState === 'offline'
+        ? 'Offline, will retry'
+        : syncState === 'syncing'
+          ? 'Syncing…'
+          : syncState === 'disabled'
+            ? 'Saved locally'
+            : 'Synced'
+  const sub =
+    syncState === 'error'
+      ? (lastError ?? 'Could not reach the server')
+      : syncState === 'ok' && lastOkAt
+        ? relativeAge(lastOkAt)
+        : relativeAge(lastSaveAt)
+  const containerTitle =
+    syncState === 'error'
+      ? `Sync is failing: ${lastError ?? 'the server rejected a request'}. Your work is still saved locally and will re-sync when the connection recovers.`
+      : syncState === 'offline'
+        ? 'Cannot reach the sync server right now. Your work is saved locally and will sync automatically when the connection returns.'
+        : syncState === 'disabled'
+          ? `Saved to this device. ${totalRecent} change${totalRecent === 1 ? '' : 's'} in the last ${HISTORY_MINUTES} min.`
+          : `Synced. ${totalRecent} change${totalRecent === 1 ? '' : 's'} in the last ${HISTORY_MINUTES} min.`
+
   return (
     <div
-      className="mx-2 mb-2 px-2.5 py-2 rounded-md bg-stone-100/60 dark:bg-stone-800/50 border border-stone-200 dark:border-stone-700 flex items-center gap-2"
-      title={`Workspace is saved locally. ${totalRecent} change${
-        totalRecent === 1 ? '' : 's'
-      } in the last ${HISTORY_MINUTES} min.`}
+      className="mx-2 mb-2 px-2.5 py-2 rounded-md bg-[var(--surface-sunken)]/60 border border-[var(--edge-soft)] flex items-center gap-2"
+      title={containerTitle}
+      data-testid="sync-indicator"
+      data-sync-state={syncState}
     >
       <div className="relative inline-flex items-center justify-center h-2 w-2 shrink-0">
-        <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-70 animate-ping" />
-        <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+        {showPing && (
+          <span className={`absolute inline-flex h-full w-full rounded-full opacity-70 animate-ping ${dotClass}`} />
+        )}
+        <span className={`relative inline-flex h-2 w-2 rounded-full ${dotClass}`} />
       </div>
       <div className="flex-1 min-w-0">
-        <div className="text-[10px] font-medium text-stone-700 dark:text-stone-200 leading-tight">
-          Synced
-        </div>
-        <div className="text-[9px] text-stone-500 dark:text-stone-400 leading-tight font-mono">
-          {relativeAge(lastSaveAt)}
-        </div>
+        <div className="text-[10px] font-medium text-[var(--ink-70)] leading-tight">{label}</div>
+        <div className="text-[9px] text-[var(--ink-50)] leading-tight font-mono truncate">{sub}</div>
       </div>
       <svg
         width={48}
