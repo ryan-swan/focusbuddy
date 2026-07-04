@@ -102,12 +102,13 @@ async function orgPut(
   orgId: string,
   id: string,
   body: Record<string, unknown>,
-  baseRev?: number
+  baseRev?: number,
+  itemType: 'timeblock' | 'document' | 'table' | 'row' = 'timeblock'
 ): Promise<{ status: number; json: { ok: boolean; item?: OrgItem; error?: string } }> {
   const res = await fetch(`${SIGNAL_BASE}/workspace/org/items/${id}`, {
     method: 'PUT',
     headers: { Authorization: `Bearer ${token}`, 'x-plexi-org': orgId, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ itemType: 'timeblock', body, baseRev })
+    body: JSON.stringify({ itemType, body, baseRev })
   })
   return { status: res.status, json: await res.json() }
 }
@@ -256,4 +257,63 @@ test('cross-member org sync: push/pull/edit/delete propagate; non-members are re
   // Explicit x-plexi-org: personal behaves identically to the header being unset.
   const aPersonalSyncExplicit = await personalSync(A.token, 0, 'personal')
   expect((aPersonalSyncExplicit.json.items ?? []).map((i) => i.id)).toContain(aPersonalId)
+})
+
+// Rung 2: documents, tables and rows also propagate cross-member. Same store,
+// same membership gating, same tombstone semantics; only the itemType differs.
+test('cross-member org sync: documents, tables and rows propagate and tombstone; non-members refused', async () => {
+  const rand = Math.random().toString(36).slice(2, 8)
+  const A = await signup(`rung2.a.${rand}@example.com`, 'Test-Account-123!')
+  const B = await signup(`rung2.b.${rand}@example.com`, 'Test-Account-123!')
+  const O = await createOrg(A.token, 'Rung2 Org')
+  await addMember(A.token, O, B.email)
+
+  // A creates an org document; B pulls it.
+  const docId = `doc_${Date.now()}`
+  const docBody = { id: docId, doc_type: 'doc', title: 'Shared brief', body: '{}', org_id: O }
+  const putDoc = await orgPut(A.token, O, docId, docBody, undefined, 'document')
+  expect(putDoc.status).toBe(200)
+  expect(putDoc.json.ok).toBe(true)
+  let bSync = await orgSync(B.token, O, 0)
+  const bDoc = (bSync.json.items ?? []).find((i) => i.id === docId)
+  expect(bDoc, 'B receives A org document').toBeTruthy()
+  expect((bDoc?.body as Record<string, unknown>)?.title).toBe('Shared brief')
+
+  // A creates an org table and a row under it; B pulls both.
+  const tableId = `tbl_${Date.now()}`
+  const rowId = `row_${Date.now()}`
+  const putTable = await orgPut(A.token, O, tableId, { id: tableId, title: 'Episodes', schema_json: '{"columns":[]}', org_id: O }, undefined, 'table')
+  expect(putTable.status).toBe(200)
+  const putRow = await orgPut(A.token, O, rowId, { id: rowId, table_id: tableId, cells_json: '{"Title":"Pilot"}', sort_order: 0 }, undefined, 'row')
+  expect(putRow.status).toBe(200)
+  bSync = await orgSync(B.token, O, 0)
+  const ids = (bSync.json.items ?? []).map((i) => i.id)
+  expect(ids, 'B receives table').toContain(tableId)
+  expect(ids, 'B receives row').toContain(rowId)
+
+  // B edits the row (rev bump), A pulls the edit.
+  const rowRev = (bSync.json.items ?? []).find((i) => i.id === rowId)!.rev
+  const editRow = await orgPut(B.token, O, rowId, { id: rowId, table_id: tableId, cells_json: '{"Title":"Recorded"}', sort_order: 0 }, rowRev, 'row')
+  expect(editRow.status).toBe(200)
+  const aSync = await orgSync(A.token, O, 0)
+  const aRow = (aSync.json.items ?? []).find((i) => i.id === rowId)
+  expect((aRow?.body as Record<string, unknown>)?.cells_json).toBe('{"Title":"Recorded"}')
+
+  // A deletes the document; tombstone propagates to B.
+  const delDoc = await orgDelete(A.token, O, docId)
+  expect(delDoc.status).toBe(200)
+  bSync = await orgSync(B.token, O, 0)
+  const bDocAfter = (bSync.json.items ?? []).find((i) => i.id === docId)
+  expect(bDocAfter?.deleted, 'doc tombstone reaches B').toBe(true)
+
+  // Non-member C cannot read or write org docs/tables.
+  const C = await signup(`rung2.c.${rand}@example.com`, 'Test-Account-123!')
+  const cSync = await orgSync(C.token, O, 0)
+  expect(cSync.status).not.toBe(200)
+  const cPut = await orgPut(C.token, O, `evil_${Date.now()}`, { id: 'x', org_id: O }, undefined, 'document')
+  // A non-member cannot write: the org will not even resolve for them
+  // (sharedOrgFor returns null -> 400 No shared org active), which is a
+  // stronger refusal than 403 since it does not confirm the org exists.
+  expect(cPut.status).not.toBe(200)
+  expect(cPut.json.ok).not.toBe(true)
 })

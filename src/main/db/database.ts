@@ -796,6 +796,39 @@ export function getDb(): Database.Database {
   ensureColumn(db, 'vault_entries', 'org_id', "TEXT NOT NULL DEFAULT 'personal'")
   ensureColumn(db, 'fb_knowledge', 'org_id', "TEXT NOT NULL DEFAULT 'personal'")
   ensureColumn(db, 'fb_tables', 'org_id', "TEXT NOT NULL DEFAULT 'personal'")
+  // Cross-member org sync rung 2: documents and tables (and table rows) get the
+  // same sync bookkeeping time_blocks got, so they can flow through the org
+  // workspace store. Documents and fb_tables already carry org_id; fb_rows
+  // deliberately does NOT (a row derives its org scope from its parent table at
+  // push time, the same way a widget derives from its parent node), but it still
+  // needs rev/dirty tracking to be delta-synced as its own item. trashed_at
+  // makes deletes tombstones that propagate. Guarded dirty triggers mirror the
+  // time_blocks one; new rows default needs_sync = 1.
+  ensureColumn(db, 'documents', 'sync_rev', 'INTEGER NOT NULL DEFAULT 0')
+  ensureColumn(db, 'documents', 'needs_sync', 'INTEGER NOT NULL DEFAULT 1')
+  db.exec(`
+    CREATE TRIGGER IF NOT EXISTS documents_mark_dirty AFTER UPDATE ON documents
+    WHEN NEW.needs_sync = OLD.needs_sync AND NEW.sync_rev = OLD.sync_rev AND OLD.needs_sync = 0
+    BEGIN UPDATE documents SET needs_sync = 1 WHERE id = NEW.id; END;
+  `)
+  ensureColumn(db, 'fb_tables', 'trashed_at', 'INTEGER')
+  ensureColumn(db, 'fb_tables', 'sync_rev', 'INTEGER NOT NULL DEFAULT 0')
+  ensureColumn(db, 'fb_tables', 'needs_sync', 'INTEGER NOT NULL DEFAULT 1')
+  db.exec(`
+    CREATE TRIGGER IF NOT EXISTS fb_tables_mark_dirty AFTER UPDATE ON fb_tables
+    WHEN NEW.needs_sync = OLD.needs_sync AND NEW.sync_rev = OLD.sync_rev AND OLD.needs_sync = 0
+    BEGIN UPDATE fb_tables SET needs_sync = 1 WHERE id = NEW.id; END;
+  `)
+  ensureColumn(db, 'fb_rows', 'trashed_at', 'INTEGER')
+  ensureColumn(db, 'fb_rows', 'sync_rev', 'INTEGER NOT NULL DEFAULT 0')
+  ensureColumn(db, 'fb_rows', 'needs_sync', 'INTEGER NOT NULL DEFAULT 1')
+  db.exec(`
+    CREATE TRIGGER IF NOT EXISTS fb_rows_mark_dirty AFTER UPDATE ON fb_rows
+    WHEN NEW.needs_sync = OLD.needs_sync AND NEW.sync_rev = OLD.sync_rev AND OLD.needs_sync = 0
+    BEGIN UPDATE fb_rows SET needs_sync = 1 WHERE id = NEW.id; END;
+  `)
+  db.exec('CREATE INDEX IF NOT EXISTS idx_fb_rows_needs_sync ON fb_rows(needs_sync)')
+
   // Remaining top-level user-content surfaces get the same per-org scoping so
   // switching organisation shows only that org's automations, reports, apps,
   // forms, meetings, signature requests and saved file views. Existing rows

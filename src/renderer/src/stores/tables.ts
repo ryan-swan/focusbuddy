@@ -139,18 +139,22 @@ export const useTablesStore = create<TablesStore>((set, get) => ({
     set({ rows: rowsCopy })
     if (capturedTableId && capturedCells) {
       const tableId = capturedTableId
-      const cells = capturedCells
-      let curId = rowId
+      // Rows are soft-deleted now, so undo restores the SAME row (same id and
+      // sort_order) rather than re-inserting a fresh copy. Redo soft-deletes it
+      // again. Keeping the id stable also means the delete/restore propagates as a
+      // clean tombstone/un-tombstone pair to other org members.
       recordActionWithToast({
         label: 'Delete row',
         undo: async () => {
-          const again = await window.api.tables.createRow({ tableId, cells })
-          curId = again.id
-          set({ rows: { ...get().rows, [tableId]: [...(get().rows[tableId] ?? []), again] } })
+          const restored = await window.api.tables.restoreRow(rowId)
+          if (restored) {
+            const rest = (get().rows[tableId] ?? []).filter((r) => r.id !== rowId)
+            set({ rows: { ...get().rows, [tableId]: [...rest, restored] } })
+          }
         },
         redo: async () => {
-          await window.api.tables.deleteRow(curId)
-          set({ rows: { ...get().rows, [tableId]: (get().rows[tableId] ?? []).filter((r) => r.id !== curId) } })
+          await window.api.tables.deleteRow(rowId)
+          set({ rows: { ...get().rows, [tableId]: (get().rows[tableId] ?? []).filter((r) => r.id !== rowId) } })
         }
       })
     }

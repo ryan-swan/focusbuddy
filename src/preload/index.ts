@@ -1184,6 +1184,8 @@ const api = {
       ipcRenderer.invoke('tables:updateRow', id, patch),
     deleteRow: (id: string): Promise<boolean> =>
       ipcRenderer.invoke('tables:deleteRow', id),
+    restoreRow: (id: string): Promise<FbRow | null> =>
+      ipcRenderer.invoke('tables:restoreRow', id),
     reorderRows: (tableId: string, ids: string[]): Promise<void> =>
       ipcRenderer.invoke('tables:reorderRows', tableId, ids)
   },
@@ -1309,13 +1311,13 @@ const api = {
   // local DB. These expose the local half (collect changes, apply pulls, cursor).
   workspaceSync: {
     pending: (): Promise<{
-      upserts: Array<{ id: string; itemType: 'node' | 'widget' | 'timeblock'; body: Record<string, unknown>; baseRev: number }>
-      deletes: Array<{ id: string; itemType: 'node' | 'widget' | 'timeblock'; baseRev: number }>
+      upserts: Array<{ id: string; itemType: 'node' | 'widget' | 'timeblock' | 'document' | 'table' | 'row'; body: Record<string, unknown>; baseRev: number }>
+      deletes: Array<{ id: string; itemType: 'node' | 'widget' | 'timeblock' | 'document' | 'table' | 'row'; baseRev: number }>
     }> => ipcRenderer.invoke('workspace:pending'),
-    markPushed: (itemType: 'node' | 'widget' | 'timeblock', id: string, rev: number): Promise<void> =>
+    markPushed: (itemType: 'node' | 'widget' | 'timeblock' | 'document' | 'table' | 'row', id: string, rev: number): Promise<void> =>
       ipcRenderer.invoke('workspace:markPushed', itemType, id, rev),
     applyRemote: (
-      items: Array<{ id: string; itemType: 'node' | 'widget' | 'timeblock'; body: Record<string, unknown> | null; rev: number; deleted: boolean }>
+      items: Array<{ id: string; itemType: 'node' | 'widget' | 'timeblock' | 'document' | 'table' | 'row'; body: Record<string, unknown> | null; rev: number; deleted: boolean }>
     ): Promise<{ applied: number }> => ipcRenderer.invoke('workspace:applyRemote', items),
     getCursor: (): Promise<number> => ipcRenderer.invoke('workspace:getCursor'),
     setCursor: (n: number): Promise<void> => ipcRenderer.invoke('workspace:setCursor', n),
@@ -1324,11 +1326,11 @@ const api = {
     pendingOrg: (
       orgId: string
     ): Promise<{
-      upserts: Array<{ id: string; itemType: 'node' | 'widget' | 'timeblock'; body: Record<string, unknown>; baseRev: number }>
-      deletes: Array<{ id: string; itemType: 'node' | 'widget' | 'timeblock'; baseRev: number }>
+      upserts: Array<{ id: string; itemType: 'node' | 'widget' | 'timeblock' | 'document' | 'table' | 'row'; body: Record<string, unknown>; baseRev: number }>
+      deletes: Array<{ id: string; itemType: 'node' | 'widget' | 'timeblock' | 'document' | 'table' | 'row'; baseRev: number }>
     }> => ipcRenderer.invoke('workspace:pendingOrg', orgId),
     applyRemoteOrg: (
-      items: Array<{ id: string; itemType: 'node' | 'widget' | 'timeblock'; body: Record<string, unknown> | null; rev: number; deleted: boolean }>,
+      items: Array<{ id: string; itemType: 'node' | 'widget' | 'timeblock' | 'document' | 'table' | 'row'; body: Record<string, unknown> | null; rev: number; deleted: boolean }>,
       orgId: string
     ): Promise<{ applied: number }> => ipcRenderer.invoke('workspace:applyRemoteOrg', items, orgId),
     getCursorOrg: (orgId: string): Promise<number> => ipcRenderer.invoke('workspace:getCursorOrg', orgId),
