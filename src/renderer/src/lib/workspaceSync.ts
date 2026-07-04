@@ -1,5 +1,6 @@
 import { signalConfig } from './signalConfig'
 import { initPreviewGuard, previewSyncBlocked } from './previewGuard'
+import { useSyncStatus } from '../stores/syncStatus'
 import { useAccountStore } from '../stores/account'
 import { useNodeStore } from '../stores/nodes'
 import { useWidgetStore } from '../stores/widgets'
@@ -43,11 +44,18 @@ async function pullChanges(token: string, since: number): Promise<{ items: Serve
     const res = await fetch(urlFor(`/workspace/sync?since=${since}`), {
       headers: { Authorization: `Bearer ${token}` }
     })
-    if (!res.ok) return null
+    if (!res.ok) {
+      noteServerError()
+      return null
+    }
     const json = (await res.json()) as { ok: boolean; items?: ServerItem[]; now?: number }
-    if (!json.ok) return null
+    if (!json.ok) {
+      noteServerError()
+      return null
+    }
     return { items: json.items ?? [], now: json.now ?? since }
   } catch {
+    noteOffline()
     return null
   }
 }
@@ -75,10 +83,14 @@ async function putItem(
       if (json.item) return { ok: false, conflict: true, item: json.item }
       return { ok: false, conflict: false }
     }
-    if (!res.ok) return { ok: false, conflict: false }
+    if (!res.ok) {
+      noteServerError()
+      return { ok: false, conflict: false }
+    }
     const json = (await res.json()) as { ok: boolean; item?: { rev: number } }
     return json.ok && json.item ? { ok: true, rev: json.item.rev } : { ok: false, conflict: false }
   } catch {
+    noteOffline()
     return { ok: false, conflict: false }
   }
 }
@@ -90,21 +102,49 @@ async function deleteItem(token: string, id: string): Promise<{ ok: boolean; rev
       headers: { Authorization: `Bearer ${token}` }
     })
     if (res.status === 404) return { ok: true, rev: 0 } // server never had it; treat as done
-    if (!res.ok) return { ok: false, rev: 0 }
+    if (!res.ok) {
+      noteServerError()
+      return { ok: false, rev: 0 }
+    }
     const json = (await res.json()) as { ok: boolean; item?: { rev: number } }
     return { ok: !!json.ok, rev: json.item?.rev ?? 0 }
   } catch {
+    noteOffline()
     return { ok: false, rev: 0 }
   }
 }
 
 let running = false
 
+// Per-cycle transport outcome, so the status store can tell "could not reach
+// the server" (offline, transient, keep retrying quietly) from "the server
+// rejected us" (a real error worth surfacing). Reset at the top of each cycle;
+// the fetch helpers set 'offline' on a thrown fetch and 'server' on a non-ok
+// HTTP status.
+let cycleFailure: 'none' | 'offline' | 'server' = 'none'
+function noteOffline(): void {
+  if (cycleFailure === 'none') cycleFailure = 'offline'
+}
+function noteServerError(): void {
+  cycleFailure = 'server' // server errors outrank offline for the cycle verdict
+}
+// Read through a function so TS control-flow analysis does not narrow the
+// module-level let to its last literal assignment (the fetch helpers mutate it
+// asynchronously, which TS cannot see).
+function currentCycleFailure(): 'none' | 'offline' | 'server' {
+  return cycleFailure
+}
+
 // One full push+pull cycle. Returns the number of remote items applied locally.
 export async function syncWorkspaceOnce(): Promise<number> {
   const token = useAccountStore.getState().sessionToken
-  if (!enabled() || !token || running) return 0
+  if (!enabled() || !token || running) {
+    if (!token || previewSyncBlocked()) useSyncStatus.getState().setDisabled()
+    return 0
+  }
   running = true
+  cycleFailure = 'none'
+  useSyncStatus.getState().setSyncing()
   try {
     // ── Push local changes ──
     const pending = await window.api.workspaceSync.pending()
@@ -126,13 +166,26 @@ export async function syncWorkspaceOnce(): Promise<number> {
     // ── Pull remote changes ──
     const since = await window.api.workspaceSync.getCursor()
     const pulled = await pullChanges(token, since)
-    if (!pulled) return 0
+    if (!pulled) {
+      // No pull result: report the transport verdict so a persistent failure
+      // stops being invisible.
+      if (currentCycleFailure() === 'server') useSyncStatus.getState().setError('The server rejected a sync request.')
+      else useSyncStatus.getState().setOffline()
+      return 0
+    }
     let applied = 0
     if (pulled.items.length > 0) {
       const r = await window.api.workspaceSync.applyRemote(pulled.items)
       applied = r.applied
     }
     await window.api.workspaceSync.setCursor(pulled.now)
+
+    // Cycle verdict: a push that hit a server error still lands here (the pull
+    // may have succeeded), so honour any error/offline note from the push loop.
+    const verdict = currentCycleFailure()
+    if (verdict === 'server') useSyncStatus.getState().setError('The server rejected a sync request.')
+    else if (verdict === 'offline') useSyncStatus.getState().setOffline()
+    else useSyncStatus.getState().setOk()
 
     // Refresh the UI from the merged local DB if anything changed.
     if (applied > 0) {
@@ -160,6 +213,7 @@ export function startWorkspaceSync(): void {
 }
 
 export function stopWorkspaceSync(): void {
+  useSyncStatus.getState().setDisabled()
   if (timer != null) {
     window.clearInterval(timer)
     timer = null
