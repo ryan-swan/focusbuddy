@@ -82,9 +82,9 @@ describe('displayCell — failure modes show #ERR, never a fake number', () => {
     expect(displayCell(g, 0, 0)).toBe('#ERR')
   })
 
-  it('flags an unknown function', () => {
+  it('flags an unknown function as #NAME?', () => {
     const g = grid([['=BOGUS(1,2)']])
-    expect(displayCell(g, 0, 0)).toBe('#ERR')
+    expect(displayCell(g, 0, 0)).toBe('#NAME?')
   })
 
   it('flags a malformed formula', () => {
@@ -142,8 +142,8 @@ describe('formula engine — math functions', () => {
     expect(displayCell(grid([['=POWER(3,3)']]), 0, 0)).toBe('27')
     expect(displayCell(grid([['=MOD(10,3)']]), 0, 0)).toBe('1')
   })
-  it('SQRT of a negative shows #ERR (never a fake number)', () => {
-    expect(displayCell(grid([['=SQRT(-4)']]), 0, 0)).toBe('#ERR')
+  it('SQRT of a negative shows #NUM! (never a fake number)', () => {
+    expect(displayCell(grid([['=SQRT(-4)']]), 0, 0)).toBe('#NUM!')
   })
 })
 
@@ -593,6 +593,41 @@ describe('remapFormulaRefs — structural edits (insert / delete / move)', () =>
   it('returns unparseable input unchanged', () => {
     expect(insRow(0)('=SUM(')).toBe('=SUM(')
     expect(insRow(0)('plain text')).toBe('plain text')
+  })
+})
+
+describe('formula engine — typed error values (Excel-style)', () => {
+  it('division by zero is #DIV/0!, not a fake number', () => {
+    expect(displayCell(grid([['=1/0']]), 0, 0)).toBe('#DIV/0!')
+    expect(displayCell(grid([['=MOD(5,0)']]), 0, 0)).toBe('#DIV/0!')
+  })
+  it('domain errors are #NUM!', () => {
+    expect(displayCell(grid([['=SQRT(-1)']]), 0, 0)).toBe('#NUM!')
+    expect(displayCell(grid([['=LN(0)']]), 0, 0)).toBe('#NUM!')
+  })
+  it('VALUE of non-number is #VALUE!', () => {
+    expect(displayCell(grid([['x', '=VALUE(A1)']]), 0, 1)).toBe('#VALUE!')
+  })
+  it('an unknown function is #NAME?', () => {
+    expect(displayCell(grid([['=NOTAFUNC()']]), 0, 0)).toBe('#NAME?')
+  })
+  it('lookup misses are #N/A', () => {
+    // Table in A1:B2; the formula sits in C1 so it never references itself.
+    const g = grid([['a', '1', '=VLOOKUP("z",A1:B2,2,FALSE)'], ['b', '2', '']])
+    expect(displayCell(g, 0, 2)).toBe('#N/A')
+    // MATCH looks in column A (A1:A2); formula in B1.
+    const m = grid([['a', '=MATCH("z",A1:A2,0)'], ['b', '']])
+    expect(displayCell(m, 0, 1)).toBe('#N/A')
+    expect(displayCell(grid([['=NA()']]), 0, 0)).toBe('#N/A')
+  })
+  it('ISNA is true only for #N/A; ISERROR catches any error', () => {
+    expect(displayCell(grid([['=ISNA(NA())']]), 0, 0)).toBe('TRUE')
+    expect(displayCell(grid([['=ISNA(1/0)']]), 0, 0)).toBe('FALSE')
+    expect(displayCell(grid([['=ISERROR(1/0)']]), 0, 0)).toBe('TRUE')
+    expect(displayCell(grid([['=ISERROR(NA())']]), 0, 0)).toBe('TRUE')
+  })
+  it('IFERROR still swallows a typed error to its fallback', () => {
+    expect(displayCell(grid([['=IFERROR(1/0,"safe")']]), 0, 0)).toBe('safe')
   })
 })
 

@@ -410,7 +410,8 @@ export default function SheetGrid(props: Props): JSX.Element {
                 const listValues =
                   validation && validation.rule.kind === 'list' ? validation.rule.values : null
                 const listOpen = !!openList && openList.r === r && openList.c === c
-                const isErr = computed === '#ERR'
+                // Any Excel-style error value (#ERR, #DIV/0!, #N/A, #VALUE!, #NAME?, #NUM!, #REF!, #SPILL!) renders red.
+                const isErr = /^#(ERR|DIV\/0!|N\/A|VALUE!|NAME\?|NUM!|REF!|SPILL!)$/.test(computed)
                 if (fmt?.fontFamily) loadGoogleFont(familyLabel(fmt.fontFamily))
                 const style: React.CSSProperties = {
                   fontWeight: fmt?.bold ? 700 : undefined,
