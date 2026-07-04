@@ -135,6 +135,13 @@ export const SHEET_FUNCTIONS: Array<{ name: string; hint: string }> = [
   { name: 'UNIQUE', hint: 'UNIQUE(range) — distinct rows (spills)' },
   { name: 'SORT', hint: 'SORT(range, [column], [ascending]) — sorted rows (spills)' },
   { name: 'FILTER', hint: 'FILTER(range, conditionColumn) — rows where the condition is true (spills)' },
+  { name: 'VSTACK', hint: 'VSTACK(a, b, …) — stack ranges/arrays vertically (spills)' },
+  { name: 'HSTACK', hint: 'HSTACK(a, b, …) — stack ranges/arrays horizontally (spills)' },
+  { name: 'TOROW', hint: 'TOROW(range) — flatten to a single row (spills)' },
+  { name: 'TOCOL', hint: 'TOCOL(range) — flatten to a single column (spills)' },
+  { name: 'TAKE', hint: 'TAKE(array, rows, [cols]) — first/last rows/cols (spills)' },
+  { name: 'DROP', hint: 'DROP(array, rows, [cols]) — drop rows/cols (spills)' },
+  { name: 'TEXTSPLIT', hint: 'TEXTSPLIT(text, colDelim, [rowDelim]) — split text into cells (spills)' },
   { name: 'IFS', hint: 'IFS(cond1, val1, cond2, val2, …) — first true wins' },
   { name: 'SWITCH', hint: 'SWITCH(value, case1, result1, …, [default])' },
   { name: 'REGEXMATCH', hint: 'REGEXMATCH(text, pattern) — TRUE if the pattern matches' },
@@ -1863,7 +1870,20 @@ export function sparklineForCell(
 
 type Matrix = CellValue[][]
 
-export const SPILL_FUNCTIONS = new Set(['SEQUENCE', 'TRANSPOSE', 'UNIQUE', 'SORT', 'FILTER'])
+export const SPILL_FUNCTIONS = new Set([
+  'SEQUENCE',
+  'TRANSPOSE',
+  'UNIQUE',
+  'SORT',
+  'FILTER',
+  'VSTACK',
+  'HSTACK',
+  'TOROW',
+  'TOCOL',
+  'TAKE',
+  'DROP',
+  'TEXTSPLIT'
+])
 
 function readRange(grid: Grid, node: Extract<Node, { k: 'range' }>, seen: Set<string>): Matrix {
   const g = pickGrid(grid, node.sheet)
@@ -1886,7 +1906,19 @@ function fmtCell(v: CellValue): string {
 // arguments are the wrong shape, in which case the scalar path reports the error).
 function evalArrayCall(node: Extract<Node, { k: 'call' }>, grid: Grid, seen: Set<string>): Matrix | null {
   const args = node.args
-  const asRange = (n: Node | undefined): Extract<Node, { k: 'range' }> | null => (n && n.k === 'range' ? n : null)
+  // Coerce any argument to a matrix — a range reads its cells, a nested array call
+  // yields its block (so array functions compose, e.g. SORT(VSTACK(...))), and a
+  // scalar becomes a 1x1. This is what makes the new stacking/reshape helpers work
+  // on each other and on the existing SORT/UNIQUE/FILTER.
+  const toMatrix = (n: Node | undefined): Matrix => {
+    if (!n) return []
+    if (n.k === 'range') return readRange(grid, n, seen)
+    if (n.k === 'call') {
+      const m = evalArrayCall(n, grid, seen)
+      if (m) return m
+    }
+    return [[evalNode(n, grid, seen)]]
+  }
   switch (node.name) {
     case 'SEQUENCE': {
       const rows = Math.max(0, Math.trunc(toNum(evalNode(args[0], grid, seen))))
@@ -1906,9 +1938,7 @@ function evalArrayCall(node: Extract<Node, { k: 'call' }>, grid: Grid, seen: Set
       return out
     }
     case 'TRANSPOSE': {
-      const rg = asRange(args[0])
-      if (!rg) return null
-      const m = readRange(grid, rg, seen)
+      const m = toMatrix(args[0])
       const rows = m.length
       const cols = m[0]?.length ?? 0
       const out: Matrix = []
@@ -1920,11 +1950,9 @@ function evalArrayCall(node: Extract<Node, { k: 'call' }>, grid: Grid, seen: Set
       return out
     }
     case 'UNIQUE': {
-      const rg = asRange(args[0])
-      if (!rg) return null
       const seenRows = new Set<string>()
       const out: Matrix = []
-      for (const row of readRange(grid, rg, seen)) {
+      for (const row of toMatrix(args[0])) {
         const key = row.map(fmtCell).join(' ')
         if (!seenRows.has(key)) {
           seenRows.add(key)
@@ -1934,9 +1962,7 @@ function evalArrayCall(node: Extract<Node, { k: 'call' }>, grid: Grid, seen: Set
       return out
     }
     case 'SORT': {
-      const rg = asRange(args[0])
-      if (!rg) return null
-      const m = readRange(grid, rg, seen).map((row) => row.slice())
+      const m = toMatrix(args[0]).map((row) => row.slice())
       const col = (args.length > 1 ? Math.max(1, Math.trunc(toNum(evalNode(args[1], grid, seen)))) : 1) - 1
       const asc = args.length > 2 ? toBool(evalNode(args[2], grid, seen)) : true
       m.sort((a, b) => {
@@ -1948,17 +1974,76 @@ function evalArrayCall(node: Extract<Node, { k: 'call' }>, grid: Grid, seen: Set
       return m
     }
     case 'FILTER': {
-      const rg = asRange(args[0])
-      const cond = asRange(args[1])
-      if (!rg || !cond) return null
-      const m = readRange(grid, rg, seen)
-      const cm = readRange(grid, cond, seen)
+      const m = toMatrix(args[0])
+      const cm = toMatrix(args[1])
       const out: Matrix = []
       for (let i = 0; i < m.length; i++) {
         const c = cm[i]?.[0]
         if (c !== undefined && toBool(c)) out.push(m[i])
       }
       return out
+    }
+    case 'VSTACK': {
+      const parts = args.map(toMatrix)
+      const width = Math.max(0, ...parts.map((m) => Math.max(0, ...m.map((r) => r.length))))
+      const out: Matrix = []
+      for (const m of parts)
+        for (const row of m) {
+          const rr = row.slice()
+          while (rr.length < width) rr.push('')
+          out.push(rr)
+        }
+      return out
+    }
+    case 'HSTACK': {
+      const parts = args.map(toMatrix)
+      const height = Math.max(0, ...parts.map((m) => m.length))
+      const out: Matrix = Array.from({ length: height }, () => [] as CellValue[])
+      for (const m of parts) {
+        const w = Math.max(0, ...m.map((r) => r.length))
+        for (let i = 0; i < height; i++) {
+          const src = m[i] ?? []
+          for (let j = 0; j < w; j++) out[i].push(src[j] ?? '')
+        }
+      }
+      return out
+    }
+    case 'TOROW': {
+      const flat: CellValue[] = []
+      for (const row of toMatrix(args[0])) for (const v of row) flat.push(v)
+      return [flat]
+    }
+    case 'TOCOL': {
+      const out: Matrix = []
+      for (const row of toMatrix(args[0])) for (const v of row) out.push([v])
+      return out
+    }
+    case 'TAKE': {
+      const m = toMatrix(args[0])
+      const nr = Math.trunc(toNum(evalNode(args[1], grid, seen)))
+      let rows = nr >= 0 ? m.slice(0, nr) : m.slice(Math.max(0, m.length + nr))
+      if (args.length > 2) {
+        const nc = Math.trunc(toNum(evalNode(args[2], grid, seen)))
+        rows = rows.map((r) => (nc >= 0 ? r.slice(0, nc) : r.slice(Math.max(0, r.length + nc))))
+      }
+      return rows
+    }
+    case 'DROP': {
+      const m = toMatrix(args[0])
+      const nr = Math.trunc(toNum(evalNode(args[1], grid, seen)))
+      let rows = nr >= 0 ? m.slice(nr) : m.slice(0, Math.max(0, m.length + nr))
+      if (args.length > 2) {
+        const nc = Math.trunc(toNum(evalNode(args[2], grid, seen)))
+        rows = rows.map((r) => (nc >= 0 ? r.slice(nc) : r.slice(0, Math.max(0, r.length + nc))))
+      }
+      return rows
+    }
+    case 'TEXTSPLIT': {
+      const text = toStr(evalNode(args[0], grid, seen))
+      const colDelim = (args.length > 1 ? toStr(evalNode(args[1], grid, seen)) : ',') || ','
+      const rowDelim = args.length > 2 ? toStr(evalNode(args[2], grid, seen)) : ''
+      const lines = rowDelim ? text.split(rowDelim) : [text]
+      return lines.map((line) => line.split(colDelim))
     }
     default:
       return null
