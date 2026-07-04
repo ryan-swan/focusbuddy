@@ -88,12 +88,15 @@ export default function WeekTimeGrid({ weekStart }: { weekStart: Date }): JSX.El
   )
   const dragRef = useRef<{
     id: string
-    mode: 'move' | 'resize'
+    mode: 'move' | 'resize' | 'resize-top'
     startClientY: number
     origStartMs: number
     origDur: number
-    dayTop: number
+    origDayIndex: number
   } | null>(null)
+  // Live refs to each day column so a move-drag can hit-test the pointer's X and
+  // reschedule a block onto another day (Google-Calendar-style cross-day drag).
+  const colRefs = useRef<(HTMLDivElement | null)[]>([])
 
   // Convert a y offset within a day column to an absolute time for that day.
   function yToMs(dayIndex: number, y: number): number {
@@ -137,7 +140,7 @@ export default function WeekTimeGrid({ weekStart }: { weekStart: Date }): JSX.El
   function beginDrag(
     e: React.PointerEvent,
     block: TimeBlock,
-    mode: 'move' | 'resize'
+    mode: 'move' | 'resize' | 'resize-top'
   ): void {
     e.stopPropagation()
     e.preventDefault()
@@ -147,7 +150,7 @@ export default function WeekTimeGrid({ weekStart }: { weekStart: Date }): JSX.El
       startClientY: e.clientY,
       origStartMs: block.startMs,
       origDur: block.durationMin,
-      dayTop: 0
+      origDayIndex: Math.floor((block.startMs - weekFrom) / DAY_MS)
     }
     setDrag({ id: block.id, previewStart: block.startMs, previewDur: block.durationMin })
     window.addEventListener('pointermove', onDragMove)
@@ -160,10 +163,27 @@ export default function WeekTimeGrid({ weekStart }: { weekStart: Date }): JSX.El
     const deltaY = e.clientY - d.startClientY
     const deltaMs = (deltaY / HOUR_PX) * 3_600_000
     if (d.mode === 'move') {
-      setDrag({ id: d.id, previewStart: snapMs(d.origStartMs + deltaMs), previewDur: d.origDur })
-    } else {
+      // Cross-day: find the day column under the pointer's X so a block can be
+      // dragged to another day, keeping its time-of-day plus the vertical delta.
+      let targetDay = d.origDayIndex
+      for (let i = 0; i < 7; i++) {
+        const r = colRefs.current[i]?.getBoundingClientRect()
+        if (r && e.clientX >= r.left && e.clientX <= r.right) {
+          targetDay = i
+          break
+        }
+      }
+      const timeOfDay = d.origStartMs - dayStartMs(weekStart, d.origDayIndex)
+      const newStart = snapMs(dayStartMs(weekStart, targetDay) + timeOfDay + deltaMs)
+      setDrag({ id: d.id, previewStart: newStart, previewDur: d.origDur })
+    } else if (d.mode === 'resize') {
       const dur = Math.max(SNAP_MIN, Math.round((d.origDur + deltaMs / 60000) / SNAP_MIN) * SNAP_MIN)
       setDrag({ id: d.id, previewStart: d.origStartMs, previewDur: dur })
+    } else {
+      // resize-top: drag the top edge to start earlier/later, keeping the end fixed.
+      const end = d.origStartMs + d.origDur * 60000
+      const newStart = Math.min(snapMs(d.origStartMs + deltaMs), end - SNAP_MIN * 60000)
+      setDrag({ id: d.id, previewStart: newStart, previewDur: Math.round((end - newStart) / 60000) })
     }
   }
 
@@ -213,9 +233,11 @@ export default function WeekTimeGrid({ weekStart }: { weekStart: Date }): JSX.El
         {DAY_LABELS.map((label, dayIndex) => {
           const dStart = dayStartMs(weekStart, dayIndex)
           const isToday = new Date(dStart).toDateString() === new Date().toDateString()
-          const dayBlocks = blocks.filter(
-            (b) => b.startMs >= dStart && b.startMs < dStart + DAY_MS
-          )
+          // A block being dragged is placed by its PREVIEW start, so a cross-day
+          // drag relocates it into the day column under the pointer live.
+          const effStart = (b: TimeBlock): number =>
+            drag && drag.id === b.id ? drag.previewStart : b.startMs
+          const dayBlocks = blocks.filter((b) => effStart(b) >= dStart && effStart(b) < dStart + DAY_MS)
           return (
             <div key={dayIndex} className="flex flex-col min-w-0">
               <div
@@ -228,6 +250,7 @@ export default function WeekTimeGrid({ weekStart }: { weekStart: Date }): JSX.El
                 {label} {new Date(dStart).getDate()}
               </div>
               <div
+                ref={(el) => (colRefs.current[dayIndex] = el)}
                 className={`relative rounded-lg border ${
                   isToday
                     ? 'border-accent/40 bg-accent/[0.03]'
@@ -360,11 +383,19 @@ export default function WeekTimeGrid({ weekStart }: { weekStart: Date }): JSX.El
                         </button>
                       </div>
 
-                      {/* resize handle */}
+                      {/* resize handles — top edge changes the start, bottom edge
+                          the end, matching Google Calendar. */}
+                      <div
+                        onPointerDown={(e) => beginDrag(e, block, 'resize-top')}
+                        className="absolute top-0 left-0 right-0 h-1.5 cursor-ns-resize"
+                        title="Drag to change the start time"
+                        data-testid="block-resize-top"
+                      />
                       <div
                         onPointerDown={(e) => beginDrag(e, block, 'resize')}
                         className="absolute bottom-0 left-0 right-0 h-1.5 cursor-ns-resize"
-                        title="Drag to change length"
+                        title="Drag to change the end time"
+                        data-testid="block-resize-bottom"
                       />
                     </div>
                   )
