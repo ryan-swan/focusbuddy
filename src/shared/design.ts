@@ -8,6 +8,7 @@
 import type { SlideElement, SlideFill, SlideTextElement, SlideShapeElement } from './types'
 import { type OrgBrandKit, DEFAULT_BRAND_KIT, readableTextOn, contrastRatio, hexToRgb } from './brandKit'
 import { fillToCss, gradient } from './fills'
+import { chartToSvg } from './chart'
 
 export interface DesignBody {
   schemaVersion: 1
@@ -514,6 +515,10 @@ function elementHtml(el: SlideElement): string {
     // Static export cannot include the live widget (it resolves through the
     // renderer's IPC), so export an honest labelled frame instead of a fake.
     return `<div style="${base}border:1px solid #d6d3d1;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#a8a29e;font-size:12px;font-family:system-ui,sans-serif">Embedded desk widget</div>`
+  }
+  if (el.type === 'chart') {
+    // Static SVG of the chart from its data snapshot, so exports are faithful.
+    return `<div style="${base}">${chartToSvg(el.chart, el.w, el.h)}</div>`
   }
   // line
   return `<div style="${base}"><svg width="100%" height="100%" viewBox="0 0 ${el.w} ${el.h}" preserveAspectRatio="none">${

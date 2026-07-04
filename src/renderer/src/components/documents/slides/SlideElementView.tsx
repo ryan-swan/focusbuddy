@@ -7,6 +7,7 @@ import type { SlideElement, SlideTextElement } from '@shared/types'
 import { fillToCss } from '@shared/fills'
 import { cropStyle } from './slideOps'
 import WidgetEmbed from '../embed/WidgetEmbed'
+import PlexiChart from '../../charts/PlexiChart'
 
 // Drop-shadow presets, soft enough to read as depth rather than a hard edge.
 const SHADOW: Record<NonNullable<SlideElement['shadow']>, string> = {
@@ -155,6 +156,21 @@ export default function SlideElementView({ el }: { el: SlideElement }): JSX.Elem
     return (
       <div style={{ ...base, ...frame(el) }}>
         <WidgetEmbed widgetId={el.widgetId} />
+      </div>
+    )
+  }
+  if (el.type === 'chart') {
+    // Rendered through the shared chart core from the element's data snapshot.
+    return (
+      <div style={{ ...base, ...frame(el), background: '#fff', padding: 8 }}>
+        {el.chart.title && (
+          <div style={{ fontSize: 15, fontWeight: 600, color: '#1c1917', marginBottom: 4, textAlign: 'center' }}>
+            {el.chart.title}
+          </div>
+        )}
+        <div style={{ width: '100%', height: el.chart.title ? el.h - 40 : el.h - 16 }}>
+          <PlexiChart chart={el.chart} height={(el.chart.title ? el.h - 40 : el.h - 16)} />
+        </div>
       </div>
     )
   }

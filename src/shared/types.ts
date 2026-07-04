@@ -1,6 +1,7 @@
 // Type-only import (erased at build, no runtime cycle) so a document body can be
 // a PlexiDesign canvas. DesignBody is owned by ./design alongside its helpers.
 import type { DesignBody } from './design'
+import type { ChartCore } from './chart'
 
 export type AxisValue = 1 | 2 | 3 | 4 | 5
 export type NodeKind = 'folder' | 'task'
@@ -1617,12 +1618,22 @@ export interface SlideWidgetElement extends SlideElementBase {
   type: 'widget'
   widgetId: string
 }
+// A chart on a slide, rendered through the shared chart core. It carries a data
+// snapshot so the deck is self-contained (present/export never depend on a live
+// fetch). When `source` is set, the editor can refresh the snapshot from that
+// sheet document's range, so a slide chart can track live sheet data.
+export interface SlideChartElement extends SlideElementBase {
+  type: 'chart'
+  chart: ChartCore
+  source?: { sheetDocId: string; range: string; headerRow?: boolean; headerCol?: boolean }
+}
 export type SlideElement =
   | SlideTextElement
   | SlideImageElement
   | SlideShapeElement
   | SlideLineElement
   | SlideWidgetElement
+  | SlideChartElement
 
 export interface DeckTheme {
   id: string

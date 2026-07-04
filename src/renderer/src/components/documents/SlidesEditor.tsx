@@ -14,6 +14,9 @@ import AiSlidePanel from './slides/AiSlidePanel'
 import SlidesSidePanel, { type SlidesPanelTab } from './slides/SlidesSidePanel'
 import { useSlideAi } from './slides/useSlideAi'
 import CropDialog from './slides/CropDialog'
+import ChartLinkDialog from './slides/ChartLinkDialog'
+import { buildChartData } from '../../lib/chartData'
+import type { SheetTab } from '@shared/types'
 import {
   addElement,
   updateElement,
@@ -61,6 +64,7 @@ export default function SlidesEditor({ body: rawBody, title, onChange }: Props):
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [presenting, setPresenting] = useState(false)
   const [cropId, setCropId] = useState<string | null>(null)
+  const [chartLinkFor, setChartLinkFor] = useState<string | null>(null)
   const [aiOpen, setAiOpen] = useState(false)
   const [galleryOpen, setGalleryOpen] = useState(false)
   const [widgetPickerOpen, setWidgetPickerOpen] = useState(false)
@@ -278,6 +282,70 @@ export default function SlidesEditor({ body: rawBody, title, onChange }: Props):
     mutateSlide((s) => addElement(s, el))
     setSelectedIds([el.id])
   }
+  // Insert a chart. It starts on clearly-labelled placeholder data; the inspector
+  // links it to a real sheet range and refreshes the snapshot from live values.
+  function insertChart(): void {
+    const el: SlideElement = {
+      id: elementId(),
+      type: 'chart',
+      x: 340,
+      y: 170,
+      w: 600,
+      h: 380,
+      z: 10,
+      chart: {
+        type: 'bar',
+        title: 'Chart (sample data — link a sheet)',
+        data: {
+          categories: ['Q1', 'Q2', 'Q3', 'Q4'],
+          series: [{ name: 'Series 1', values: [4, 7, 5, 9] }]
+        }
+      }
+    }
+    mutateSlide((s) => addElement(s, el))
+    setSelectedIds([el.id])
+  }
+  // Resolve a sheet document's first tab and build ChartData from a range on it.
+  async function dataFromSource(source: { sheetDocId: string; range: string; headerRow?: boolean; headerCol?: boolean }): Promise<ReturnType<typeof buildChartData> | null> {
+    const doc = await window.api.documents.get(source.sheetDocId)
+    if (!doc || doc.docType !== 'sheet') return null
+    const sheet = (doc.body as { sheets?: SheetTab[] })?.sheets?.[0]
+    if (!sheet) return null
+    return buildChartData({ range: source.range, headerRow: source.headerRow, headerCol: source.headerCol }, sheet)
+  }
+  // Apply a fresh link: pull the data now, store it as the snapshot + the source.
+  async function linkChart(id: string, source: { sheetDocId: string; range: string; headerRow?: boolean; headerCol?: boolean }, sheetTitle: string): Promise<void> {
+    setChartLinkFor(null)
+    const data = await dataFromSource(source)
+    if (!data) {
+      setStatus('Could not read that sheet range.')
+      return
+    }
+    mutateSlide((s) =>
+      updateElement(s, id, (() => {
+        const e = (s.elements ?? []).find((x) => x.id === id)
+        if (!e || e.type !== 'chart') return {}
+        return { chart: { ...e.chart, data, title: e.chart.title === 'Chart (sample data — link a sheet)' ? sheetTitle : e.chart.title }, source }
+      })())
+    )
+  }
+  // Re-pull a linked chart's data from its source range.
+  async function refreshChart(id: string): Promise<void> {
+    const e = (slide?.elements ?? []).find((x) => x.id === id)
+    if (!e || e.type !== 'chart' || !e.source) return
+    const data = await dataFromSource(e.source)
+    if (!data) {
+      setStatus('Could not refresh: the linked sheet or range is unavailable.')
+      return
+    }
+    mutateSlide((s) =>
+      updateElement(s, id, (() => {
+        const cur = (s.elements ?? []).find((x) => x.id === id)
+        return cur && cur.type === 'chart' ? { chart: { ...cur.chart, data } } : {}
+      })())
+    )
+    setStatus('Chart refreshed from sheet.')
+  }
   function applyLayout(layout: SlideLayout): void {
     mutateSlide((s) => ({ ...s, layout, elements: layoutElements(layout, theme) }))
     setSelectedIds([])
@@ -471,6 +539,7 @@ export default function SlidesEditor({ body: rawBody, title, onChange }: Props):
         { id: 'sl-image', label: 'Insert image', icon: 'image', group: 'Insert', keywords: 'picture photo', run: () => void insertImage() },
         { id: 'sl-line', label: 'Insert line', icon: 'horizontal_rule', group: 'Insert', keywords: 'arrow connector', run: insertLine },
         { id: 'sl-widget', label: 'Insert widget from a desk', icon: 'widgets', group: 'Insert', keywords: 'embed desk canvas', run: () => setWidgetPickerOpen(true) },
+        { id: 'sl-chart', label: 'Insert chart', icon: 'bar_chart', group: 'Insert', keywords: 'graph plot data sheet', run: insertChart },
         { id: 'sl-new', label: 'New slide', icon: 'add_to_photos', group: 'Slide', keywords: 'add template', run: () => setGalleryOpen(true) },
         { id: 'sl-present', label: 'Present deck', icon: 'play_arrow', group: 'Slide', keywords: 'slideshow play', run: () => setPresenting(true) },
         { id: 'sl-ai', label: 'AI: generate or redesign slides', icon: 'auto_awesome', group: 'AI', keywords: 'design make beautiful', run: () => setAiOpen(true) },
@@ -542,6 +611,7 @@ export default function SlidesEditor({ body: rawBody, title, onChange }: Props):
             insertShape,
             insertLine,
             insertWidget: () => setWidgetPickerOpen(true),
+            insertChart,
             align: (dir) => doAlign(dir),
             group: doGroup,
             ungroup: doUngroup,
@@ -693,6 +763,8 @@ export default function SlidesEditor({ body: rawBody, title, onChange }: Props):
           onSetBackground={(color) => mutateSlide((s) => ({ ...s, background: { type: 'solid', color } }))}
           onApplyTheme={applyTheme}
           onCrop={(id) => setCropId(id)}
+          onEditChart={(id) => setChartLinkFor(id)}
+          onRefreshChart={(id) => void refreshChart(id)}
         />
 
         {/* Persistent AI + properties panel */}
@@ -738,6 +810,19 @@ export default function SlidesEditor({ body: rawBody, title, onChange }: Props):
                 setCropId(null)
               }}
               onClose={() => setCropId(null)}
+            />
+          )
+        })()}
+
+      {chartLinkFor &&
+        (() => {
+          const target = (slide.elements ?? []).find((e) => e.id === chartLinkFor)
+          if (!target || target.type !== 'chart') return null
+          return (
+            <ChartLinkDialog
+              current={target.source}
+              onApply={(source, sheetTitle) => void linkChart(chartLinkFor, source, sheetTitle)}
+              onClose={() => setChartLinkFor(null)}
             />
           )
         })()}

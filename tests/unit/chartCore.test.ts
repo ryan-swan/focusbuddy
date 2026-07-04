@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { toRechartsRows, type ChartData } from '../../src/shared/chart'
+import { toRechartsRows, chartToSvg, type ChartData, type ChartCore } from '../../src/shared/chart'
 import { buildChartData, parseRange } from '../../src/renderer/src/lib/chartData'
 import type { SheetTab } from '../../src/shared/types'
 
@@ -52,6 +52,59 @@ describe('parseRange', () => {
   })
   it('returns null for garbage', () => {
     expect(parseRange('nope')).toBeNull()
+  })
+})
+
+describe('chartToSvg (static export renderer)', () => {
+  const data: ChartData = {
+    categories: ['Q1', 'Q2', 'Q3'],
+    series: [
+      { name: 'EU', values: [10, 20, 15] },
+      { name: 'US', values: [5, 8, 12] }
+    ]
+  }
+  const base = (type: ChartCore['type'], extra: Partial<ChartCore> = {}): ChartCore => ({ type, data, ...extra })
+
+  it('emits a sized SVG with a white background', () => {
+    const svg = chartToSvg(base('bar'), 400, 300)
+    expect(svg.startsWith('<svg')).toBe(true)
+    expect(svg).toContain('width="400"')
+    expect(svg).toContain('height="300"')
+    expect(svg).toContain('fill="#ffffff"')
+  })
+
+  it('bar chart draws rects and category + legend labels', () => {
+    const svg = chartToSvg(base('bar'), 400, 300)
+    expect(svg).toContain('<rect')
+    expect(svg).toContain('>Q1<')
+    expect(svg).toContain('>EU<')
+  })
+
+  it('line chart draws a polyline per series', () => {
+    const svg = chartToSvg(base('line'), 400, 300)
+    expect((svg.match(/<polyline/g) || []).length).toBe(2)
+  })
+
+  it('area chart draws filled polygons', () => {
+    const svg = chartToSvg(base('area'), 400, 300)
+    expect(svg).toContain('<polygon')
+  })
+
+  it('pie chart draws arc paths and renders the title', () => {
+    const svg = chartToSvg(base('pie', { title: 'Revenue' }), 400, 300)
+    expect(svg).toContain('<path')
+    expect(svg).toContain('>Revenue<')
+  })
+
+  it('scatter chart draws points', () => {
+    const svg = chartToSvg(base('scatter'), 400, 300)
+    expect(svg).toContain('<circle')
+  })
+
+  it('escapes labels and handles an empty chart without crashing', () => {
+    const svg = chartToSvg({ type: 'bar', data: { categories: ['<x>'], series: [] } }, 200, 150)
+    expect(svg).toContain('&lt;x&gt;')
+    expect(svg.startsWith('<svg')).toBe(true)
   })
 })
 

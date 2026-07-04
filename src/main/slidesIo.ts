@@ -12,6 +12,7 @@ import { readFile, writeFile } from 'fs/promises'
 import type { DeckTheme, Slide, SlidesBody, SlideTextElement } from '@shared/types'
 import { resolveTheme, SLIDE_W, SLIDE_H } from '@shared/slideThemes'
 import { migrateSlidesBody } from '@shared/slidesMigrate'
+import { chartToSvg } from '@shared/chart'
 
 export interface SlidesExportResult {
   ok: boolean
@@ -110,6 +111,26 @@ export async function exportPptx(body: SlidesBody, _title: string, outPath: stri
             valign: 'middle',
             line: { color: 'D6D3D1', width: 1 }
           })
+        } else if (el.type === 'chart') {
+          // A real, editable PowerPoint chart from the snapshot data. Scatter
+          // maps to line (pptx scatter needs paired-axis data we don't carry).
+          const c = el.chart
+          const chartData = c.data.series.map((sr) => ({
+            name: sr.name || 'Series',
+            labels: c.data.categories,
+            values: sr.values.map((v) => (Number.isFinite(v) ? v : 0))
+          }))
+          const t = c.type === 'pie' ? 'pie' : c.type === 'area' ? 'area' : c.type === 'line' || c.type === 'scatter' ? 'line' : 'bar'
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const opts: any = { ...pos, ...frame, showLegend: true, legendPos: 'b' }
+          if (c.title) {
+            opts.showTitle = true
+            opts.title = c.title
+          }
+          if (t === 'bar') opts.barDir = 'col'
+          if (c.stacked && (t === 'bar' || t === 'area')) opts.barGrouping = 'stacked'
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          s.addChart(t as any, chartData, opts)
         }
       }
       if (slide.notes) s.addNotes(slide.notes)
@@ -158,6 +179,8 @@ function slideHtml(slide: Slide, theme: DeckTheme): string {
       }
       if (el.type === 'line')
         return `<svg style="position:absolute;left:${el.x}px;top:${el.y}px" width="${el.w}" height="${el.h}"><line x1="0" y1="0" x2="${el.w}" y2="${el.h}" stroke="${el.stroke}" stroke-width="${el.strokeWidth}"/></svg>`
+      if (el.type === 'chart')
+        return `<div style="position:absolute;left:${el.x}px;top:${el.y}px;width:${el.w}px;height:${el.h}px">${chartToSvg(el.chart, el.w, el.h)}</div>`
       // widget: a live desk-widget embed cannot be rendered in a static export
       // (it resolves via renderer IPC), so print an honest labelled frame.
       return `<div style="position:absolute;left:${el.x}px;top:${el.y}px;width:${el.w}px;height:${el.h}px;border:1px solid #d6d3d1;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#a8a29e;font-size:14px">Embedded desk widget</div>`
