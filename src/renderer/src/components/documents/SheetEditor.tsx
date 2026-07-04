@@ -995,7 +995,7 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
   const applyNumberFormat = (numFmt: SheetNumberFormat): void => applyToSelection({ numFmt })
 
   // ── Charts ────────────────────────────────────────────────────────────────
-  function insertChart(type: 'bar' | 'line' | 'pie'): void {
+  function insertChart(type: 'bar' | 'line' | 'pie' | 'area' | 'scatter'): void {
     const ref = `${colLabel(selection.c0)}${selection.r0 + 1}:${colLabel(selection.c1)}${selection.r1 + 1}`
     const spec: SheetChartSpec = {
       id: `ch-${Date.now().toString(36)}`,

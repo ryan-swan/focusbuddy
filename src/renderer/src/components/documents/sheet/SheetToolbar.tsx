@@ -26,7 +26,7 @@ interface Props {
   onInsertLookup: () => void
   onMacros: () => void
   onQuery: () => void
-  onInsertChart: (type: 'bar' | 'line' | 'pie') => void
+  onInsertChart: (type: 'bar' | 'line' | 'pie' | 'area' | 'scatter') => void
   onImport: () => void
   onExport: (format: 'xlsx' | 'csv') => void
   onAiFill: () => void
@@ -212,7 +212,7 @@ export default function SheetToolbar(props: Props): JSX.Element {
         </button>
         {menu === 'chart' && (
           <div className="absolute left-0 z-50 mt-1 w-36 rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-xl py-1 text-[12px]">
-            {(['bar', 'line', 'pie'] as const).map((t) => (
+            {(['bar', 'line', 'area', 'pie', 'scatter'] as const).map((t) => (
               <button
                 key={t}
                 onClick={() => {
