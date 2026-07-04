@@ -1477,6 +1477,13 @@ export interface SheetTab {
   // below/right of the first, which carries the expand/collapse toggle.
   rowGroups?: Array<{ start: number; end: number; collapsed: boolean }>
   colGroups?: Array<{ start: number; end: number; collapsed: boolean }>
+  // Power-Query-class data shaping: a snapshot SOURCE table plus ordered transform
+  // STEPS. The tab's cells are the applied output; Refresh re-applies the steps.
+  // Typed loosely here so shared/types stays free of the renderer query lib.
+  query?: {
+    source: { columns: string[]; rows: string[][] }
+    steps: unknown[]
+  }
 }
 
 export interface SheetBodyV2 {
