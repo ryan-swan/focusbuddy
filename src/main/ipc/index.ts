@@ -64,6 +64,7 @@ import { getActiveOrgId, setActiveOrgId } from '../db/activeOrg'
 import { generateDocument, processMeetingEnd, generateDesignContent, generateDesignVariations, setConversationSnapshot } from '../ai/anthropic'
 import { generateImage } from '../imageGen'
 import { exportDesign } from '../designExport'
+import { exportMap } from '../mapExport'
 import { searchStockPhotos, fetchImageDataUrl, removeBackground } from '../stockMedia'
 import type { DesignBody } from '@shared/design'
 import { getBrandKit, saveBrandKit, hasBrandKit } from '../db/brandKit'
@@ -837,6 +838,7 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('office:importDocx', () => importDocx())
   ipcMain.handle('design:generateImage', (_e, input: { prompt: string; width?: number; height?: number }) => generateImage(input))
   ipcMain.handle('design:export', (_e, input: { design: DesignBody; title: string; format: 'png' | 'pdf' }) => exportDesign(input))
+  ipcMain.handle('map:export', (_e, input: Parameters<typeof exportMap>[0]) => exportMap(input))
   ipcMain.handle('design:searchPhotos', (_e, input: { query: string; perPage?: number }) => searchStockPhotos(input))
   ipcMain.handle('design:fetchImage', (_e, input: { url: string }) => fetchImageDataUrl(input))
   ipcMain.handle('design:removeBackground', (_e, input: { dataUrl: string }) => removeBackground(input))

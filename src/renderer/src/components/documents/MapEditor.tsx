@@ -302,13 +302,14 @@ interface Props {
   foldExternal?: boolean
 }
 
-function MapInner({ body, onChange, foldExternal = false }: Props): JSX.Element {
+function MapInner({ body, title, onChange, foldExternal = false }: Props): JSX.Element {
   const initial = useMemo(() => normalizeMapBody(body), [])
   const [nodes, setNodes, onNodesChange] = useNodesState<Node<ShapeData>>(toFlowNodes(initial))
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>(toFlowEdges(initial))
   const [color, setColor] = useState(NODE_COLORS[0])
   const [dashed, setDashed] = useState(false)
   const [aiOpen, setAiOpen] = useState(false)
+  const [exportStatus, setExportStatus] = useState<string | null>(null)
   const [widgetPickerOpen, setWidgetPickerOpen] = useState(false)
   const seq = useRef(initial.nodes.length)
   const viewportRef = useRef(initial.viewport ?? { x: 0, y: 0, zoom: 1 })
@@ -454,6 +455,20 @@ function MapInner({ body, onChange, foldExternal = false }: Props): JSX.Element 
     window.setTimeout(() => rf.fitView({ padding: 0.2, duration: 300 }), 50)
   }
 
+  async function exportMapAs(format: 'svg' | 'png' | 'jpg' | 'pdf'): Promise<void> {
+    const map = fromFlow(nodes, edges, viewportRef.current)
+    setExportStatus(`Exporting ${format.toUpperCase()}…`)
+    try {
+      const res = await window.api.map.export({ map, title: title || 'diagram', format })
+      if (res.ok && res.path) setExportStatus(`Saved ${res.path}`)
+      else if (res.error) setExportStatus(res.error)
+      else setExportStatus(null)
+    } catch (e) {
+      setExportStatus(`Could not export: ${(e as Error).message}`)
+    }
+    window.setTimeout(() => setExportStatus(null), 4000)
+  }
+
   const interactive = true
 
   return (
@@ -514,6 +529,7 @@ function MapInner({ body, onChange, foldExternal = false }: Props): JSX.Element 
           AI map
         </button>
         <div className="flex-1" />
+        <ExportMenu onExport={exportMapAs} />
         <button
           onClick={() => rf.fitView({ padding: 0.2, duration: 300 })}
           className="inline-flex items-center gap-1 text-[11px] px-1.5 py-1 rounded text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]"
@@ -522,9 +538,15 @@ function MapInner({ body, onChange, foldExternal = false }: Props): JSX.Element 
           <Icon name="fit_screen" size={14} />
           Fit
         </button>
-        <span className="text-[10px] text-[var(--ink-40)] ml-1">
-          double-click a node to rename · drag a dot to connect · double-click a line to label · ⌫ deletes
-        </span>
+        {exportStatus ? (
+          <span className="text-[10px] text-[var(--ink-60)] ml-1 max-w-[280px] truncate" data-testid="map-export-status" title={exportStatus}>
+            {exportStatus}
+          </span>
+        ) : (
+          <span className="text-[10px] text-[var(--ink-40)] ml-1">
+            double-click a node to rename · drag a dot to connect · double-click a line to label · ⌫ deletes
+          </span>
+        )}
       </div>
 
       {/* Canvas */}
@@ -605,6 +627,50 @@ function TemplateMenu({ onPick }: { onPick: (id: MapTemplateId) => void }): JSX.
                 key={it.id}
                 onClick={() => {
                   onPick(it.id)
+                  setOpen(false)
+                }}
+                className="w-full text-left px-3 py-1.5 text-[12px] hover:bg-[var(--surface-sunken)]"
+              >
+                {it.label}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+function ExportMenu({ onExport }: { onExport: (f: 'svg' | 'png' | 'jpg' | 'pdf') => void }): JSX.Element {
+  const [open, setOpen] = useState(false)
+  const items: { id: 'svg' | 'png' | 'jpg' | 'pdf'; label: string }[] = [
+    { id: 'png', label: 'PNG image' },
+    { id: 'svg', label: 'SVG (vector)' },
+    { id: 'jpg', label: 'JPG image' },
+    { id: 'pdf', label: 'PDF' }
+  ]
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        data-testid="map-export-btn"
+        className="inline-flex items-center gap-1 text-[11px] px-1.5 py-1 rounded text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]"
+        title="Export this diagram"
+      >
+        <Icon name="download" size={14} />
+        Export
+        <Icon name="expand_more" size={12} />
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+          <div className="absolute right-0 z-20 mt-1 w-40 rounded-md border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-lg py-1">
+            {items.map((it) => (
+              <button
+                key={it.id}
+                data-testid={`map-export-${it.id}`}
+                onClick={() => {
+                  onExport(it.id)
                   setOpen(false)
                 }}
                 className="w-full text-left px-3 py-1.5 text-[12px] hover:bg-[var(--surface-sunken)]"
