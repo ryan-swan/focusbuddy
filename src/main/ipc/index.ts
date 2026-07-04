@@ -418,6 +418,7 @@ import {
 } from '../ai/anthropic'
 import { importDocx, exportDocx, exportPdf, pickImage, type PageSetupInput } from '../officeDocx'
 import { importSheet, exportSheet } from '../sheetIo'
+import { runSheetMacro } from '../sheetMacro'
 import { exportSlides, importPptx } from '../slidesIo'
 import { getModelMode, setModelMode } from '../ai/modelRouting'
 import { describeWidgetForAgent } from '../ai/agentInputs'
@@ -854,6 +855,9 @@ export function registerIpcHandlers(): void {
   // ── Spreadsheet interop + AI fill ─────────────────────────────────────────
   ipcMain.handle('sheet:import', () => importSheet())
   ipcMain.handle('sheet:export', (_e, input: Parameters<typeof exportSheet>[0]) => exportSheet(input))
+  ipcMain.handle('sheet:runMacro', (_e, input: { tab: Parameters<typeof runSheetMacro>[0]; code: string }) =>
+    runSheetMacro(input.tab, input.code)
+  )
   ipcMain.handle('ai:suggestSheetColumns', (_e, input: { prompt: string; existing?: string[] }) => {
     recordAiCall()
     return suggestSheetColumns(input)

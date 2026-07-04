@@ -1762,7 +1762,13 @@ const api = {
       rangeRows: number
       auto?: boolean
     }): Promise<{ ok: boolean; rows?: string[][]; error?: string; needsApiKey?: boolean }> =>
-      ipcRenderer.invoke('ai:fillSheetRange', input)
+      ipcRenderer.invoke('ai:fillSheetRange', input),
+    // Run a user macro against a tab in the main-process vm (CSP-clean).
+    runMacro: (input: {
+      tab: import('@shared/types').SheetTab
+      code: string
+    }): Promise<{ tab: import('@shared/types').SheetTab; logs: string[]; error: string | null }> =>
+      ipcRenderer.invoke('sheet:runMacro', input)
   },
   // Slides Office interop (.pptx/.pdf) + AI deck generation.
   slides: {
