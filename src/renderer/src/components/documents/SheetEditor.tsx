@@ -28,6 +28,9 @@ import {
   parseTsv,
   rangeToTsv,
   normalizeRange,
+  reorderRows,
+  reorderColumns,
+  moveOrder,
   type CellRange
 } from './sheet/sheetOps'
 import { extendSeries, canToggleSeries, numericFill } from '../../lib/sheetFill'
@@ -162,6 +165,15 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
   const [status, setStatus] = useState<string | null>(null)
   const [colMenu, setColMenu] = useState<{ c: number; x: number; y: number } | null>(null)
   const [rowMenu, setRowMenu] = useState<{ r: number; x: number; y: number } | null>(null)
+  // The live drop-target indicator while dragging a header to reorder it.
+  const [reorderOver, setReorderOver] = useState<{ kind: 'col' | 'row'; over: number } | null>(null)
+  // A pending reorder that would change formula results, awaiting the user's
+  // choice to auto-fix references or move anyway. `order[newIndex] = oldIndex`.
+  const [moveConfirm, setMoveConfirm] = useState<{
+    kind: 'col' | 'row'
+    order: number[]
+    oldToNew: number[]
+  } | null>(null)
   const [funcIndex, setFuncIndex] = useState(0)
   const [funcDismissed, setFuncDismissed] = useState(false)
   const [namesOpen, setNamesOpen] = useState(false)
@@ -187,6 +199,13 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
   // across row numbers. `anchor` is the header the drag started on so entering
   // another header extends a whole-column / whole-row block from it.
   const headerDrag = useRef<{ kind: 'col' | 'row'; anchor: number } | null>(null)
+  // Header drag-REORDER (distinct from select-drag): armed when the user presses
+  // on an already-selected column/row header and drags it to a new position.
+  // `band` is the moved block, `over` the header currently under the cursor.
+  const reorderArm = useRef<{ kind: 'col' | 'row'; band: [number, number]; moved: boolean; over: number } | null>(null)
+  // Assigned every render (below) with a closure over the current tab + mutators
+  // so the empty-dependency global mouseup listener resolves a reorder correctly.
+  const finalizeReorderRef = useRef<() => void>(() => {})
   // Source selection captured when a fill-handle drag begins, the live preview
   // rectangle (mirrored as a ref so the global mouseup can read it), and a ref to
   // the latest fill executor (kept fresh each render so the mouseup closure isn't
@@ -350,6 +369,13 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
         }
         return
       }
+      // A header drag-reorder resolves here (before clearing drag state) so a
+      // move is applied / confirmed on release.
+      if (reorderArm.current) {
+        finalizeReorderRef.current()
+        reorderArm.current = null
+        setReorderOver(null)
+      }
       dragging.current = false
       headerDrag.current = null
     }
@@ -455,13 +481,28 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
   function selectColumn(c: number, shift: boolean): void {
     setEditing(null)
     const maxR = tab.rows.length - 1
+    const fullCol = selection.r0 === 0 && selection.r1 === maxR
+    // Pressing an already-selected column starts a reorder drag of that block;
+    // the selection is kept until the drop (or a plain click) resolves.
+    if (!shift && fullCol && c >= selection.c0 && c <= selection.c1) {
+      reorderArm.current = { kind: 'col', band: [selection.c0, selection.c1], moved: false, over: c }
+      return
+    }
     const a = shift && headerDrag.current?.kind === 'col' ? headerDrag.current.anchor : c
     headerDrag.current = { kind: 'col', anchor: a }
+    reorderArm.current = null
     setAnchor({ r: 0, c: a })
     setFocus({ r: maxR, c })
     focusGrid()
   }
   function colHeaderEnter(c: number): void {
+    if (reorderArm.current?.kind === 'col') {
+      const [s, e] = reorderArm.current.band
+      if (c < s || c > e) reorderArm.current.moved = true
+      reorderArm.current.over = c
+      setReorderOver({ kind: 'col', over: c })
+      return
+    }
     if (headerDrag.current?.kind !== 'col') return
     setAnchor({ r: 0, c: headerDrag.current.anchor })
     setFocus({ r: tab.rows.length - 1, c })
@@ -469,16 +510,58 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
   function selectRow(r: number, shift: boolean): void {
     setEditing(null)
     const maxC = tab.columns.length - 1
+    const fullRow = selection.c0 === 0 && selection.c1 === maxC
+    if (!shift && fullRow && r >= selection.r0 && r <= selection.r1) {
+      reorderArm.current = { kind: 'row', band: [selection.r0, selection.r1], moved: false, over: r }
+      return
+    }
     const a = shift && headerDrag.current?.kind === 'row' ? headerDrag.current.anchor : r
     headerDrag.current = { kind: 'row', anchor: a }
+    reorderArm.current = null
     setAnchor({ r: a, c: 0 })
     setFocus({ r, c: maxC })
     focusGrid()
   }
   function rowHeaderEnter(r: number): void {
+    if (reorderArm.current?.kind === 'row') {
+      const [s, e] = reorderArm.current.band
+      if (r < s || r > e) reorderArm.current.moved = true
+      reorderArm.current.over = r
+      setReorderOver({ kind: 'row', over: r })
+      return
+    }
     if (headerDrag.current?.kind !== 'row') return
     setAnchor({ r: headerDrag.current.anchor, c: 0 })
     setFocus({ r, c: tab.columns.length - 1 })
+  }
+
+  // Resolve a header drag-reorder on mouseup: compute the new order, and if it
+  // would change any formula's references, ask whether to auto-fix; otherwise
+  // apply the move directly. Kept in a ref so the (empty-dep) global mouseup
+  // listener always calls the current closure (fresh tab + mutateTab).
+  finalizeReorderRef.current = (): void => {
+    const arm = reorderArm.current
+    if (!arm || !arm.moved) return
+    const { kind, band, over } = arm
+    const [s, e] = band
+    if (over >= s && over <= e) return // dropped back onto the block: no move
+    const count = e - s + 1
+    const n = kind === 'col' ? tab.columns.length : tab.rows.length
+    const to = over < s ? over : over - count
+    const order = moveOrder(n, s, count, to)
+    const oldToNew: number[] = []
+    order.forEach((oi, ni) => (oldToNew[oi] = ni))
+    const reordered = kind === 'col' ? reorderColumns(tab, order) : reorderRows(tab, order)
+    const fixed =
+      kind === 'col'
+        ? fixFormulas(reordered, idIndex, (c) => oldToNew[c] ?? c)
+        : fixFormulas(reordered, (r) => oldToNew[r] ?? r, idIndex)
+    const affectsFormulas = JSON.stringify(reordered.rows) !== JSON.stringify(fixed.rows)
+    if (affectsFormulas) {
+      setMoveConfirm({ kind, order, oldToNew })
+    } else {
+      mutateTab((t) => (kind === 'col' ? reorderColumns(t, order) : reorderRows(t, order)))
+    }
   }
 
   // ── Keyboard ──────────────────────────────────────────────────────────────
@@ -1232,6 +1315,7 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
             onRowHeaderMouseDown={selectRow}
             onRowHeaderMouseEnter={rowHeaderEnter}
             onRowHeaderContextMenu={(r, x, y) => setRowMenu({ r, x, y })}
+            reorderOver={reorderOver}
             editInputRef={editInputRef}
             formulaRefMode={inFormulaEdit()}
             fillPreview={fillPreview}
@@ -1283,6 +1367,27 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
             onInsertBelow={() => { mutateTab((t) => insertRowFixed(t, rowMenu.r + 1)); setRowMenu(null) }}
             onDelete={() => { mutateTab((t) => deleteRowFixed(t, rowMenu.r)); setRowMenu(null) }}
             onClose={() => setRowMenu(null)}
+          />
+        )}
+
+        {moveConfirm && (
+          <MoveConfirmDialog
+            kind={moveConfirm.kind}
+            onAutoFix={() => {
+              const { kind, order, oldToNew } = moveConfirm
+              mutateTab((t) =>
+                kind === 'col'
+                  ? fixFormulas(reorderColumns(t, order), idIndex, (c) => oldToNew[c] ?? c)
+                  : fixFormulas(reorderRows(t, order), (r) => oldToNew[r] ?? r, idIndex)
+              )
+              setMoveConfirm(null)
+            }}
+            onMoveAnyway={() => {
+              const { kind, order } = moveConfirm
+              mutateTab((t) => (kind === 'col' ? reorderColumns(t, order) : reorderRows(t, order)))
+              setMoveConfirm(null)
+            }}
+            onCancel={() => setMoveConfirm(null)}
           />
         )}
 
@@ -1454,6 +1559,71 @@ function RowHeaderMenu({
       >
         <Icon name="delete" size={13} /> Delete row
       </button>
+    </div>
+  )
+}
+
+// Shown when a drag-reorder would change formula results. Offers to auto-fix the
+// references so the move is non-breaking, to move anyway (leaving formulas as
+// written), or to cancel.
+function MoveConfirmDialog({
+  kind,
+  onAutoFix,
+  onMoveAnyway,
+  onCancel
+}: {
+  kind: 'col' | 'row'
+  onAutoFix: () => void
+  onMoveAnyway: () => void
+  onCancel: () => void
+}): JSX.Element {
+  const noun = kind === 'col' ? 'column' : 'row'
+  useEffect(() => {
+    function onKey(e: KeyboardEvent): void {
+      if (e.key === 'Escape') onCancel()
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [onCancel])
+  return (
+    <div className="fixed inset-0 z-[130] flex items-center justify-center bg-black/30" onMouseDown={onCancel}>
+      <div
+        data-testid="sheet-move-confirm"
+        className="w-[380px] rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-2xl p-4"
+        onMouseDown={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center gap-2 mb-2">
+          <Icon name="functions" size={16} className="text-accent" />
+          <h3 className="text-[13px] font-semibold text-[var(--ink-100)]">This move affects formulas</h3>
+        </div>
+        <p className="text-[12px] text-[var(--ink-60)] leading-relaxed">
+          Moving this {noun} changes where some formulas point. You can auto-fix the references so
+          every result stays the same, or move without changing the formula text.
+        </p>
+        <div className="mt-4 flex items-center justify-end gap-2">
+          <button
+            onClick={onCancel}
+            className="text-[12px] px-3 py-1.5 rounded-md text-[var(--ink-50)] hover:text-[var(--ink-80)]"
+            data-testid="sheet-move-cancel"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onMoveAnyway}
+            className="text-[12px] px-3 py-1.5 rounded-md border border-[var(--edge-soft)] hover:bg-[var(--surface-sunken)]"
+            data-testid="sheet-move-anyway"
+          >
+            Move without fixing
+          </button>
+          <button
+            onClick={onAutoFix}
+            className="btn-primary text-[12px] px-3 py-1.5"
+            data-testid="sheet-move-autofix"
+          >
+            Auto-fix &amp; move
+          </button>
+        </div>
+      </div>
     </div>
   )
 }

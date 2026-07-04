@@ -136,6 +136,67 @@ export function deleteColAt(tab: SheetTab, index: number): SheetTab {
   }
 }
 
+// Reorder the format map / column widths through an explicit new-order array,
+// where order[newIndex] = oldIndex. Used by row/column drag-reorder.
+function reorderFormats(
+  formats: Record<string, SheetCellFormat> | undefined,
+  order: number[],
+  axis: 'row' | 'col'
+): Record<string, SheetCellFormat> | undefined {
+  if (!formats) return formats
+  const oldToNew: number[] = []
+  order.forEach((oldIdx, newIdx) => (oldToNew[oldIdx] = newIdx))
+  const next: Record<string, SheetCellFormat> = {}
+  for (const [key, fmt] of Object.entries(formats)) {
+    const { r, c } = parseFmtKey(key)
+    const nr = axis === 'row' ? oldToNew[r] ?? r : r
+    const nc = axis === 'col' ? oldToNew[c] ?? c : c
+    next[fmtKey(nr, nc)] = fmt
+  }
+  return next
+}
+
+// Reorder rows to match `order` (order[newIndex] = oldIndex). Formula references
+// are not rewritten here; the editor does that via remapFormulaRefs so a reorder
+// can keep formulas pointing at the same data.
+export function reorderRows(tab: SheetTab, order: number[]): SheetTab {
+  return {
+    ...tab,
+    rows: order.map((oi) => tab.rows[oi] ?? new Array(tab.columns.length).fill('')),
+    formats: reorderFormats(tab.formats, order, 'row')
+  }
+}
+
+// Reorder columns to match `order` (order[newIndex] = oldIndex), carrying each
+// column's header, cells, format and width to its new position.
+export function reorderColumns(tab: SheetTab, order: number[]): SheetTab {
+  const oldToNew: number[] = []
+  order.forEach((oldIdx, newIdx) => (oldToNew[oldIdx] = newIdx))
+  const widths = tab.colWidths
+    ? Object.fromEntries(
+        Object.entries(tab.colWidths).map(([k, w]) => [oldToNew[Number(k)] ?? Number(k), w])
+      )
+    : tab.colWidths
+  return {
+    ...tab,
+    columns: order.map((oi) => tab.columns[oi] ?? colLabel(oi)),
+    rows: tab.rows.map((row) => order.map((oi) => row[oi] ?? '')),
+    formats: reorderFormats(tab.formats, order, 'col'),
+    colWidths: widths
+  }
+}
+
+// Build the new-order array for moving a contiguous block of `count` lines that
+// starts at `from` so the block lands starting at index `to` (0-based, in the
+// final array). order[newIndex] = oldIndex.
+export function moveOrder(n: number, from: number, count: number, to: number): number[] {
+  const order = Array.from({ length: n }, (_, i) => i)
+  const block = order.splice(from, count)
+  const clampedTo = Math.max(0, Math.min(to, order.length))
+  order.splice(clampedTo, 0, ...block)
+  return order
+}
+
 // Merge a format patch into every cell of a range.
 export function applyFormat(tab: SheetTab, range: CellRange, patch: Partial<SheetCellFormat>): SheetTab {
   const formats = { ...(tab.formats ?? {}) }
