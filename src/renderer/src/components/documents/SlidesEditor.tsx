@@ -282,6 +282,27 @@ export default function SlidesEditor({ body: rawBody, title, onChange }: Props):
     mutateSlide((s) => addElement(s, el))
     setSelectedIds([el.id])
   }
+  // Insert a 3x3 table with a header row; edit cells + rows/cols from the inspector.
+  function insertTable(): void {
+    const el: SlideElement = {
+      id: elementId(),
+      type: 'table',
+      x: 240,
+      y: 200,
+      w: 800,
+      h: 300,
+      z: 10,
+      headerRow: true,
+      accent: theme.accent,
+      cells: [
+        ['Column 1', 'Column 2', 'Column 3'],
+        ['', '', ''],
+        ['', '', '']
+      ]
+    }
+    mutateSlide((s) => addElement(s, el))
+    setSelectedIds([el.id])
+  }
   // Insert a chart. It starts on clearly-labelled placeholder data; the inspector
   // links it to a real sheet range and refreshes the snapshot from live values.
   function insertChart(): void {
@@ -540,6 +561,7 @@ export default function SlidesEditor({ body: rawBody, title, onChange }: Props):
         { id: 'sl-line', label: 'Insert line', icon: 'horizontal_rule', group: 'Insert', keywords: 'arrow connector', run: insertLine },
         { id: 'sl-widget', label: 'Insert widget from a desk', icon: 'widgets', group: 'Insert', keywords: 'embed desk canvas', run: () => setWidgetPickerOpen(true) },
         { id: 'sl-chart', label: 'Insert chart', icon: 'bar_chart', group: 'Insert', keywords: 'graph plot data sheet', run: insertChart },
+        { id: 'sl-table', label: 'Insert table', icon: 'table_chart', group: 'Insert', keywords: 'grid rows columns cells', run: insertTable },
         { id: 'sl-new', label: 'New slide', icon: 'add_to_photos', group: 'Slide', keywords: 'add template', run: () => setGalleryOpen(true) },
         { id: 'sl-present', label: 'Present deck', icon: 'play_arrow', group: 'Slide', keywords: 'slideshow play', run: () => setPresenting(true) },
         { id: 'sl-ai', label: 'AI: generate or redesign slides', icon: 'auto_awesome', group: 'AI', keywords: 'design make beautiful', run: () => setAiOpen(true) },
@@ -612,6 +634,7 @@ export default function SlidesEditor({ body: rawBody, title, onChange }: Props):
             insertLine,
             insertWidget: () => setWidgetPickerOpen(true),
             insertChart,
+            insertTable,
             align: (dir) => doAlign(dir),
             group: doGroup,
             ungroup: doUngroup,

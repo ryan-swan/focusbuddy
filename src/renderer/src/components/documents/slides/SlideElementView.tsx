@@ -161,6 +161,40 @@ export default function SlideElementView({ el, transitionMs }: { el: SlideElemen
       </div>
     )
   }
+  if (el.type === 'table') {
+    const fs = el.fontSize ?? 16
+    const accent = el.accent ?? '#e2e8f0'
+    return (
+      <div style={{ ...base, ...frame(el) }}>
+        <table style={{ width: '100%', height: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', fontSize: fs }}>
+          <tbody>
+            {el.cells.map((row, r) => (
+              <tr key={r}>
+                {row.map((cell, c) => {
+                  const isHeader = el.headerRow && r === 0
+                  return (
+                    <td
+                      key={c}
+                      style={{
+                        border: `1px solid ${accent}`,
+                        padding: '4px 8px',
+                        fontWeight: isHeader ? 700 : 400,
+                        background: isHeader ? accent : 'transparent',
+                        verticalAlign: 'middle',
+                        overflow: 'hidden'
+                      }}
+                    >
+                      {cell}
+                    </td>
+                  )
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    )
+  }
   if (el.type === 'chart') {
     // Rendered through the shared chart core from the element's data snapshot.
     return (

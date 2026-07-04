@@ -1637,6 +1637,16 @@ export interface SlideChartElement extends SlideElementBase {
   chart: ChartCore
   source?: { sheetDocId: string; range: string; headerRow?: boolean; headerCol?: boolean }
 }
+// A native table: a grid of cell text. The first row is styled as a header when
+// headerRow is set. Column widths are fractions of the element width (they sum to
+// ~1); absent means equal columns.
+export interface SlideTableElement extends SlideElementBase {
+  type: 'table'
+  cells: string[][]
+  headerRow?: boolean
+  fontSize?: number
+  accent?: string // header fill / border tint
+}
 export type SlideElement =
   | SlideTextElement
   | SlideImageElement
@@ -1644,6 +1654,7 @@ export type SlideElement =
   | SlideLineElement
   | SlideWidgetElement
   | SlideChartElement
+  | SlideTableElement
 
 export interface DeckTheme {
   id: string
