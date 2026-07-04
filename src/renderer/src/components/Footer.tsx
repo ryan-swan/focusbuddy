@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useSyncStatus } from '../stores/syncStatus'
 import { CHANGELOG, hasUnseenChanges } from '../lib/changelog'
 import Icon from './Icon'
 import Tooltip from './Tooltip'
@@ -7,6 +8,56 @@ import WhatsNewPanel from './WhatsNewPanel'
 import TermsModal from './TermsModal'
 import UpdaterBanner from './UpdaterBanner'
 import TrialBadge from './TrialBadge'
+
+// Compact, always-visible sync status. The full SyncIndicator lives in the
+// desk-view sidebar, but the primary IA is the segment shells which replace
+// that sidebar, so the honest sync state also rides in the global footer where
+// it is visible everywhere. "Saved locally" when signed out (work is on disk);
+// a real error is shown so a persistent sync failure is never invisible.
+function FooterSyncChip(): JSX.Element {
+  const state = useSyncStatus((s) => s.state)
+  const lastError = useSyncStatus((s) => s.lastError)
+  const dot =
+    state === 'error'
+      ? 'bg-rose-500'
+      : state === 'offline'
+        ? 'bg-amber-500'
+        : state === 'syncing'
+          ? 'bg-sky-500'
+          : 'bg-emerald-500'
+  const label =
+    state === 'error'
+      ? 'Sync error'
+      : state === 'offline'
+        ? 'Offline'
+        : state === 'syncing'
+          ? 'Syncing'
+          : state === 'disabled'
+            ? 'Saved locally'
+            : 'Synced'
+  const title =
+    state === 'error'
+      ? `Sync is failing: ${lastError ?? 'the server rejected a request'}. Your work is saved locally and will re-sync when the connection recovers.`
+      : state === 'offline'
+        ? 'Cannot reach the sync server. Your work is saved locally and will sync when the connection returns.'
+        : state === 'disabled'
+          ? 'Your work is saved to this device.'
+          : 'Your workspace is synced.'
+  return (
+    <>
+      <span className="text-[var(--ink-30)]">·</span>
+      <span
+        className="inline-flex items-center gap-1"
+        title={title}
+        data-testid="footer-sync-chip"
+        data-sync-state={state}
+      >
+        <span className={`h-1.5 w-1.5 rounded-full ${dot}`} />
+        <span className="text-[var(--ink-50)]">{label}</span>
+      </span>
+    </>
+  )
+}
 
 export default function Footer(): JSX.Element {
   const [showWhatsNew, setShowWhatsNew] = useState(false)
@@ -48,6 +99,7 @@ export default function Footer(): JSX.Element {
           </Tooltip>
           <UpdaterBanner />
           <TrialBadge />
+          <FooterSyncChip />
         </div>
         <div className="flex items-center gap-1">
           <button
