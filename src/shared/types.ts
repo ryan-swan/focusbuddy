@@ -1405,12 +1405,24 @@ export type SheetCondOp =
 export interface SheetCondRule {
   id: string
   range: string // A1 range on the owning tab, e.g. 'B2:B20'
+  // 'compare' (default) paints cells whose value satisfies op/value. The scale /
+  // bar / icon kinds instead map every numeric cell in the range onto a gradient,
+  // proportional bar, or threshold icon computed from the range's min..max.
+  kind?: 'compare' | 'colorScale' | 'dataBar' | 'iconSet'
   op: SheetCondOp
   value?: string // comparison operand (number or text depending on op)
   value2?: string // upper bound for 'between'
-  bg?: string // fill colour to apply when matched
-  color?: string // text colour to apply when matched
+  bg?: string // fill colour to apply when matched (compare)
+  color?: string // text colour to apply when matched (compare)
   bold?: boolean
+  // colorScale: 2-colour (min/max) or 3-colour when midColor is set.
+  minColor?: string
+  midColor?: string
+  maxColor?: string
+  // dataBar
+  barColor?: string
+  // iconSet
+  iconSet?: 'arrows' | 'traffic' | 'triangles'
 }
 
 // Data validation — constrains what a cell in its range may contain. 'list'
