@@ -93,6 +93,32 @@ export default function ElementInspector(props: Props): JSX.Element {
         </div>
       </div>
 
+      <div>
+        <div className={labelCls}>Rotation & opacity</div>
+        <div className="mt-1 flex items-center gap-2">
+          <div className="flex items-center gap-1" title="Rotation (degrees)">
+            <Icon name="rotate_right" size={13} className="text-[var(--ink-40)]" />
+            <input
+              type="number"
+              data-testid="element-rotation"
+              className={numCls}
+              value={Math.round(el.rotation ?? 0)}
+              onChange={(e) => props.onUpdateElement(el.id, { rotation: Number(e.target.value) })}
+            />
+          </div>
+          <input
+            type="range"
+            min={0}
+            max={100}
+            data-testid="element-opacity"
+            title="Opacity"
+            className="flex-1"
+            value={Math.round((el.opacity ?? 1) * 100)}
+            onChange={(e) => props.onUpdateElement(el.id, { opacity: Number(e.target.value) / 100 })}
+          />
+        </div>
+      </div>
+
       {el.type === 'text' && (
         <div className="space-y-1.5">
           <div className={labelCls}>Text</div>
@@ -156,6 +182,45 @@ export default function ElementInspector(props: Props): JSX.Element {
               <input type="color" className="absolute inset-0 opacity-0 cursor-pointer" onChange={(e) => props.onUpdateElement(el.id, { border: { color: e.target.value, width: 2 } })} />
             </label>
           </div>
+          {el.fill?.type === 'gradient' ? (
+            <div className="flex items-center gap-1.5" data-testid="shape-gradient">
+              <input
+                type="color"
+                title="Gradient start"
+                value={el.fill.color ?? '#6d5dfc'}
+                onChange={(e) => props.onUpdateElement(el.id, { fill: { type: 'gradient', color: e.target.value, color2: el.fill?.color2 ?? '#22d3ee', angle: el.fill?.angle ?? 135 } })}
+                className="h-6 w-7 rounded cursor-pointer bg-transparent"
+              />
+              <input
+                type="color"
+                title="Gradient end"
+                value={el.fill.color2 ?? '#22d3ee'}
+                onChange={(e) => props.onUpdateElement(el.id, { fill: { type: 'gradient', color: el.fill?.color ?? '#6d5dfc', color2: e.target.value, angle: el.fill?.angle ?? 135 } })}
+                className="h-6 w-7 rounded cursor-pointer bg-transparent"
+              />
+              <input
+                type="number"
+                title="Angle (degrees)"
+                value={el.fill.angle ?? 135}
+                onChange={(e) => props.onUpdateElement(el.id, { fill: { type: 'gradient', color: el.fill?.color ?? '#6d5dfc', color2: el.fill?.color2 ?? '#22d3ee', angle: Number(e.target.value) } })}
+                className={numCls}
+              />
+              <button
+                className="text-[10px] text-[var(--ink-40)] hover:text-accent"
+                onClick={() => props.onUpdateElement(el.id, { fill: { type: 'solid', color: el.fill?.color ?? '#6d5dfc' } })}
+              >
+                solid
+              </button>
+            </div>
+          ) : (
+            <button
+              data-testid="shape-gradient-toggle"
+              className="text-[10px] text-[var(--ink-50)] hover:text-accent inline-flex items-center gap-1"
+              onClick={() => props.onUpdateElement(el.id, { fill: { type: 'gradient', color: (el.fill?.type === 'solid' && el.fill.color) || '#6d5dfc', color2: '#22d3ee', angle: 135 } })}
+            >
+              <Icon name="gradient" size={12} /> Gradient fill
+            </button>
+          )}
         </div>
       )}
 
