@@ -851,6 +851,7 @@ function PageSheet({ editor, page }: { editor: Editor; page: PageSetup }): JSX.E
             create the real gaps that align it to each sheet. */}
         <div
           className="relative"
+          data-testid="doc-page-content"
           style={{
             paddingTop: geom.mTop,
             paddingBottom: geom.mBottom,
