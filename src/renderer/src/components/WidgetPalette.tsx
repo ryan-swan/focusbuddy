@@ -110,18 +110,18 @@ export default function WidgetPalette({
       {open && popoverPos && createPortal(
         <div
           ref={popoverRef}
-          className="fixed z-[200] w-[340px] max-h-[60vh] overflow-y-auto rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 shadow-xl"
+          className="fixed z-[200] w-[340px] max-h-[60vh] overflow-y-auto rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-xl"
           style={{ top: popoverPos.top, left: popoverPos.left }}
           role="dialog"
           aria-label="Desk objects"
         >
-          <div className="sticky top-0 bg-white dark:bg-stone-900 px-3 py-2 border-b border-stone-200 dark:border-stone-700 flex items-center justify-between">
-            <span className="text-[11px] uppercase tracking-[0.12em] text-stone-500 dark:text-stone-400 font-semibold">
+          <div className="sticky top-0 bg-[var(--surface-raised)] px-3 py-2 border-b border-[var(--edge-soft)] flex items-center justify-between">
+            <span className="text-[11px] uppercase tracking-[0.12em] text-[var(--ink-50)] font-semibold">
               Desk objects
             </span>
             <button
               onClick={() => setOpen(false)}
-              className="h-5 w-5 inline-flex items-center justify-center text-stone-500 hover:text-stone-900 dark:hover:text-stone-100"
+              className="h-5 w-5 inline-flex items-center justify-center text-[var(--ink-50)] hover:text-[var(--ink-100)]"
               aria-label="Close picker"
             >
               <Icon name="close" size={12} />
@@ -133,7 +133,7 @@ export default function WidgetPalette({
               if (items.length === 0) return null
               return (
                 <div key={cat}>
-                  <div className="text-[9px] uppercase tracking-[0.14em] text-stone-500 dark:text-stone-400 font-semibold mb-1.5">
+                  <div className="text-[9px] uppercase tracking-[0.14em] text-[var(--ink-50)] font-semibold mb-1.5">
                     {cat}
                   </div>
                   <div className="grid grid-cols-3 gap-1.5">
@@ -148,7 +148,7 @@ export default function WidgetPalette({
                               promptUpgrade(`The ${entry.label} widget is a Pro feature.`)
                               setOpen(false)
                             }}
-                            className="relative flex flex-col items-center gap-1 px-2 py-2 rounded-md border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800/50 text-stone-400 dark:text-stone-500 text-[10px] leading-tight cursor-pointer transition-colors hover:border-accent/40"
+                            className="relative flex flex-col items-center gap-1 px-2 py-2 rounded-md border border-[var(--edge-soft)] bg-[var(--surface-sunken)] text-[var(--ink-40)] text-[10px] leading-tight cursor-pointer transition-colors hover:border-accent/40"
                             data-testid={`palette-locked-${entry.kind}`}
                           >
                             <span className="absolute top-1 right-1 text-accent">
@@ -172,10 +172,10 @@ export default function WidgetPalette({
                             e.dataTransfer.setData(DRAG_MIME, entry.kind)
                             e.dataTransfer.effectAllowed = 'copy'
                           }}
-                          className="flex flex-col items-center gap-1 px-2 py-2 rounded-md border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 hover:border-accent hover:bg-accent/5 dark:hover:bg-accent/10 text-stone-700 dark:text-stone-300 text-[10px] leading-tight cursor-grab active:cursor-grabbing transition-colors"
+                          className="flex flex-col items-center gap-1 px-2 py-2 rounded-md border border-[var(--edge-soft)] bg-[var(--surface-raised)] hover:border-accent hover:bg-accent/5 dark:hover:bg-accent/10 text-[var(--ink-70)] text-[10px] leading-tight cursor-grab active:cursor-grabbing transition-colors"
                           data-testid={`palette-add-${entry.kind}`}
                         >
-                          <Icon name={entry.icon} size={18} className="text-stone-600 dark:text-stone-400" />
+                          <Icon name={entry.icon} size={18} className="text-[var(--ink-70)]" />
                           <span className="font-medium text-center">{entry.label}</span>
                         </button>
                       )
@@ -185,8 +185,8 @@ export default function WidgetPalette({
               )
             })}
             {onBringSynced && (
-              <div className="border-t border-stone-200 dark:border-stone-700 pt-2">
-                <div className="text-[9px] uppercase tracking-[0.14em] text-stone-500 dark:text-stone-400 font-semibold mb-1.5">
+              <div className="border-t border-[var(--edge-soft)] pt-2">
+                <div className="text-[9px] uppercase tracking-[0.14em] text-[var(--ink-50)] font-semibold mb-1.5">
                   From elsewhere
                 </div>
                 <button
@@ -194,13 +194,13 @@ export default function WidgetPalette({
                     onBringSynced()
                     setOpen(false)
                   }}
-                  className="w-full flex items-center gap-2 px-2 py-2 rounded-md border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 hover:border-accent hover:bg-accent/5 dark:hover:bg-accent/10 text-stone-700 dark:text-stone-300 text-[11px]"
+                  className="w-full flex items-center gap-2 px-2 py-2 rounded-md border border-[var(--edge-soft)] bg-[var(--surface-raised)] hover:border-accent hover:bg-accent/5 dark:hover:bg-accent/10 text-[var(--ink-70)] text-[11px]"
                   data-testid="palette-bring-synced"
                 >
                   <Icon name="link" size={14} className="text-accent" />
                   <div className="flex-1 text-left">
                     <div className="font-medium">Bring a synced widget…</div>
-                    <div className="text-[9px] text-stone-500 dark:text-stone-400">
+                    <div className="text-[9px] text-[var(--ink-50)]">
                       Live-linked copy from another task — edits mirror both ways
                     </div>
                   </div>
@@ -208,8 +208,8 @@ export default function WidgetPalette({
               </div>
             )}
             {onImport && (
-              <div className="border-t border-stone-200 dark:border-stone-700 pt-2">
-                <div className="text-[9px] uppercase tracking-[0.14em] text-stone-500 dark:text-stone-400 font-semibold mb-1.5">
+              <div className="border-t border-[var(--edge-soft)] pt-2">
+                <div className="text-[9px] uppercase tracking-[0.14em] text-[var(--ink-50)] font-semibold mb-1.5">
                   Import
                 </div>
                 <button
@@ -217,20 +217,20 @@ export default function WidgetPalette({
                     onImport()
                     setOpen(false)
                   }}
-                  className="w-full flex items-center gap-2 px-2 py-2 rounded-md border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 hover:border-accent hover:bg-accent/5 dark:hover:bg-accent/10 text-stone-700 dark:text-stone-300 text-[11px]"
+                  className="w-full flex items-center gap-2 px-2 py-2 rounded-md border border-[var(--edge-soft)] bg-[var(--surface-raised)] hover:border-accent hover:bg-accent/5 dark:hover:bg-accent/10 text-[var(--ink-70)] text-[11px]"
                   data-testid="palette-import-file"
                 >
-                  <Icon name="upload_file" size={14} className="text-stone-600 dark:text-stone-400" />
+                  <Icon name="upload_file" size={14} className="text-[var(--ink-70)]" />
                   <div className="flex-1 text-left">
                     <div className="font-medium">Import file…</div>
-                    <div className="text-[9px] text-stone-500 dark:text-stone-400">
+                    <div className="text-[9px] text-[var(--ink-50)]">
                       .txt / .md → note · .csv / .json → table
                     </div>
                   </div>
                 </button>
               </div>
             )}
-            <div className="text-[10px] text-stone-500 dark:text-stone-400 leading-snug border-t border-stone-200 dark:border-stone-700 pt-2 -mb-1">
+            <div className="text-[10px] text-[var(--ink-50)] leading-snug border-t border-[var(--edge-soft)] pt-2 -mb-1">
               Tip: drag any tile onto the canvas to place it where you want, or click to add at the centre.
             </div>
           </div>

@@ -33,7 +33,7 @@ export default function PrivacyHelpSection(): JSX.Element {
             your documents, messages, or files, and no third-party trackers. Turning this off stops it immediately.
           </span>
         </label>
-        <p className="mt-2 text-[10px] text-[var(--ink-50)] leading-relaxed">
+        <p className="mt-2 text-[11px] text-[var(--ink-50)] leading-relaxed">
           Your work stays on this device. Only items you explicitly share, and your email address, are sent to our
           server. AI features send the text you ask them to act on to the AI provider when you use them.
         </p>
@@ -59,7 +59,7 @@ export default function PrivacyHelpSection(): JSX.Element {
             <Icon name="sell" size={14} /> Plans &amp; pricing
           </button>
         </div>
-        <p className="mt-2 text-[10px] text-[var(--ink-50)] leading-relaxed">
+        <p className="mt-2 text-[11px] text-[var(--ink-50)] leading-relaxed">
           Stuck on something? The guides cover the common questions.
         </p>
       </div>

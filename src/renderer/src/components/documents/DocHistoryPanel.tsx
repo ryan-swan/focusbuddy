@@ -82,22 +82,22 @@ export function DocHistoryPanelHost(): JSX.Element | null {
             close()
           }
         }}
-        className="w-[min(360px,90vw)] h-full bg-white dark:bg-stone-900 border-l border-stone-200 dark:border-stone-700 shadow-2xl flex flex-col"
+        className="w-[min(360px,90vw)] h-full bg-[var(--surface-raised)] border-l border-[var(--edge-soft)] shadow-2xl flex flex-col"
       >
-        <div className="px-4 py-3 border-b border-stone-200 dark:border-stone-800 flex items-center justify-between">
+        <div className="px-4 py-3 border-b border-[var(--edge-soft)] flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Icon name="history" size={16} className="text-accent" />
-            <span className="text-[13px] font-semibold text-stone-900 dark:text-stone-100">Version history</span>
+            <span className="text-[13px] font-semibold text-[var(--ink-100)]">Version history</span>
           </div>
-          <button onClick={close} aria-label="Close" className="p-1 rounded text-stone-400 hover:text-stone-700 dark:hover:text-stone-200">
+          <button onClick={close} aria-label="Close" className="p-1 rounded text-[var(--ink-40)] hover:text-[var(--ink-70)]">
             <Icon name="close" size={15} />
           </button>
         </div>
         <div className="flex-1 overflow-auto p-3">
           {items === null ? (
-            <p className="text-[12px] text-stone-500 dark:text-stone-400 px-1 py-2">Loading versions…</p>
+            <p className="text-[12px] text-[var(--ink-50)] px-1 py-2">Loading versions…</p>
           ) : items.length === 0 ? (
-            <p className="text-[12px] text-stone-500 dark:text-stone-400 px-1 py-2 leading-relaxed">
+            <p className="text-[12px] text-[var(--ink-50)] px-1 py-2 leading-relaxed">
               No versions yet. A version is saved automatically every few minutes while you edit, so
               this list fills up as you work.
             </p>
@@ -106,21 +106,21 @@ export function DocHistoryPanelHost(): JSX.Element | null {
               {items.map((snap, i) => (
                 <li
                   key={snap.id}
-                  className="group flex items-center gap-2 rounded-lg border border-stone-200 dark:border-stone-700 px-3 py-2"
+                  className="group flex items-center gap-2 rounded-lg border border-[var(--edge-soft)] px-3 py-2"
                 >
                   <div className="flex-1 min-w-0">
-                    <div className="text-[12.5px] text-stone-800 dark:text-stone-200">
+                    <div className="text-[12.5px] text-[var(--ink-90)]">
                       {whenLabel(snap.at)}
-                      {i === 0 && <span className="ml-1.5 text-[10px] text-stone-400">newest</span>}
+                      {i === 0 && <span className="ml-1.5 text-[10px] text-[var(--ink-40)]">newest</span>}
                     </div>
                     {snap.label && (
-                      <div className="text-[11px] text-stone-500 dark:text-stone-400">{snap.label}</div>
+                      <div className="text-[11px] text-[var(--ink-50)]">{snap.label}</div>
                     )}
                   </div>
                   <button
                     onClick={() => void restore(snap.id)}
                     disabled={busyId !== null}
-                    className="text-[11px] px-2 py-1 rounded border border-stone-300 dark:border-stone-600 text-stone-600 dark:text-stone-300 hover:border-accent hover:text-accent disabled:opacity-50"
+                    className="text-[11px] px-2 py-1 rounded border border-[var(--edge-firm)] text-[var(--ink-70)] hover:border-accent hover:text-accent disabled:opacity-50"
                     data-testid="doc-history-restore"
                   >
                     {busyId === snap.id ? 'Restoring…' : 'Restore'}
@@ -130,7 +130,7 @@ export function DocHistoryPanelHost(): JSX.Element | null {
             </ul>
           )}
         </div>
-        <p className="px-4 py-2.5 border-t border-stone-200 dark:border-stone-800 text-[11px] text-stone-500 dark:text-stone-400">
+        <p className="px-4 py-2.5 border-t border-[var(--edge-soft)] text-[11px] text-[var(--ink-50)]">
           Restoring saves the current state first, so you can always come back.
         </p>
       </div>

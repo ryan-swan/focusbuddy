@@ -381,7 +381,7 @@ export default function DocEditor({
         <div className="max-w-3xl mx-auto px-8 pt-6">
           {/* Google-Docs-style menu bar sits above the formatting toolbar. Every
               item is wired to a real editor command, store action or export. */}
-          <div className="mb-1.5 pb-1.5 border-b border-stone-100 dark:border-stone-800">
+          <div className="mb-1.5 pb-1.5 border-b border-[var(--edge-soft)]">
             <DocMenuBar
               editor={editor}
               title={title}
@@ -415,21 +415,21 @@ export default function DocEditor({
             onExportPdf={() => void exportPdf()}
           />
 
-          <div className="flex items-center gap-2 mt-2 mb-3 text-[11px] text-stone-500 dark:text-stone-400 flex-wrap">
+          <div className="flex items-center gap-2 mt-2 mb-3 text-[11px] text-[var(--ink-50)] flex-wrap">
             <ReadingMeta editor={editor} />
 
             {/* Continuous vs Page, then orientation + paper when on a page. */}
-            <span className="inline-flex rounded-full border border-stone-200 dark:border-stone-700 overflow-hidden" data-testid="doc-layout-toggle">
+            <span className="inline-flex rounded-full border border-[var(--edge-soft)] overflow-hidden" data-testid="doc-layout-toggle">
               <button
                 onClick={() => setPageView(false)}
-                className={`px-2 py-1 ${!pageView ? 'bg-accent/10 text-accent' : 'hover:bg-stone-100/70 dark:hover:bg-stone-800/50'}`}
+                className={`px-2 py-1 ${!pageView ? 'bg-accent/10 text-accent' : 'hover:bg-[var(--surface-sunken)]/70'}`}
                 title="Continuous view — one flowing column"
               >
                 Continuous
               </button>
               <button
                 onClick={() => setPageView(true)}
-                className={`px-2 py-1 ${pageView ? 'bg-accent/10 text-accent' : 'hover:bg-stone-100/70 dark:hover:bg-stone-800/50'}`}
+                className={`px-2 py-1 ${pageView ? 'bg-accent/10 text-accent' : 'hover:bg-[var(--surface-sunken)]/70'}`}
                 title="Page view — paper sheets with margins"
                 data-testid="doc-pageview-btn"
               >
@@ -440,7 +440,7 @@ export default function DocEditor({
               <>
                 <button
                   onClick={() => updatePageSetup({ orientation: page.orientation === 'portrait' ? 'landscape' : 'portrait' })}
-                  className="inline-flex items-center gap-1 px-2 py-1 rounded-full hover:bg-stone-100/70 dark:hover:bg-stone-800/50 fb-spring-soft"
+                  className="inline-flex items-center gap-1 px-2 py-1 rounded-full hover:bg-[var(--surface-sunken)]/70 fb-spring-soft"
                   title="Toggle portrait / landscape"
                   data-testid="doc-orientation-btn"
                 >
@@ -449,7 +449,7 @@ export default function DocEditor({
                 </button>
                 <button
                   onClick={() => updatePageSetup({ size: page.size === 'letter' ? 'a4' : 'letter' })}
-                  className="px-2 py-1 rounded-full hover:bg-stone-100/70 dark:hover:bg-stone-800/50 fb-spring-soft"
+                  className="px-2 py-1 rounded-full hover:bg-[var(--surface-sunken)]/70 fb-spring-soft"
                   title="Paper size"
                   data-testid="doc-paper-btn"
                 >
@@ -458,7 +458,7 @@ export default function DocEditor({
                 <div className="relative">
                   <button
                     onClick={() => setShowMargins((v) => !v)}
-                    className="inline-flex items-center gap-1 px-2 py-1 rounded-full hover:bg-stone-100/70 dark:hover:bg-stone-800/50 fb-spring-soft"
+                    className="inline-flex items-center gap-1 px-2 py-1 rounded-full hover:bg-[var(--surface-sunken)]/70 fb-spring-soft"
                     title="Page margins"
                     data-testid="doc-margins-btn"
                   >
@@ -486,7 +486,7 @@ export default function DocEditor({
                 className={`inline-flex items-center gap-1 px-2 py-1 rounded-full fb-spring-soft ${
                   panelOpen && panelTab === 'outline'
                     ? 'text-accent bg-accent/10'
-                    : 'hover:bg-stone-100/70 dark:hover:bg-stone-800/50'
+                    : 'hover:bg-[var(--surface-sunken)]/70'
                 }`}
                 title="Show the document outline"
                 data-testid="doc-outline-toggle"
@@ -505,7 +505,7 @@ export default function DocEditor({
                 className={`inline-flex items-center gap-1 px-2 py-1 rounded-full fb-spring-soft ${
                   panelOpen && panelTab === 'comments'
                     ? 'text-accent bg-accent/10'
-                    : 'hover:bg-stone-100/70 dark:hover:bg-stone-800/50'
+                    : 'hover:bg-[var(--surface-sunken)]/70'
                 }`}
                 title="Show comments"
                 data-testid="doc-comments-toggle"
@@ -524,7 +524,7 @@ export default function DocEditor({
                 className={`inline-flex items-center gap-1 px-2 py-1 rounded-full fb-spring-soft ${
                   panelOpen && panelTab === 'ai'
                     ? 'text-accent bg-accent/10'
-                    : 'hover:bg-stone-100/70 dark:hover:bg-stone-800/50'
+                    : 'hover:bg-[var(--surface-sunken)]/70'
                 }`}
                 title="Show the AI assistant"
                 data-testid="doc-assistant-toggle"
@@ -534,7 +534,7 @@ export default function DocEditor({
               </button>
               <button
                 onClick={() => setFocusMode(true)}
-                className="inline-flex items-center gap-1 px-2 py-1 rounded-full hover:bg-stone-100/70 dark:hover:bg-stone-800/50 fb-spring-soft"
+                className="inline-flex items-center gap-1 px-2 py-1 rounded-full hover:bg-[var(--surface-sunken)]/70 fb-spring-soft"
                 title="Enter focus mode — dims everything but the line you're writing"
                 data-testid="doc-focus-toggle"
               >
@@ -548,16 +548,16 @@ export default function DocEditor({
 
       {focusMode && (
         <div
-          className="fixed top-3 left-1/2 -translate-x-1/2 z-[120] fb-glass-chrome rounded-full border border-[color:var(--glass-chrome-border)] shadow-lg flex items-center gap-2 px-3 py-1.5 text-[11px] text-stone-600 dark:text-stone-300"
+          className="fixed top-3 left-1/2 -translate-x-1/2 z-[120] fb-glass-chrome rounded-full border border-[color:var(--glass-chrome-border)] shadow-lg flex items-center gap-2 px-3 py-1.5 text-[11px] text-[var(--ink-70)]"
           data-testid="doc-focus-bar"
         >
           <Icon name="center_focus_strong" size={13} className="text-accent" />
           <span className="font-medium">Focus</span>
-          <span className="w-px h-3 bg-stone-300/60 dark:bg-stone-600/60" />
+          <span className="w-px h-3 bg-[var(--edge-firm)]/60" />
           <ReadingMeta editor={editor} />
           <button
             onClick={() => setFocusMode(false)}
-            className="inline-flex items-center gap-1 hover:text-stone-900 dark:hover:text-stone-100"
+            className="inline-flex items-center gap-1 hover:text-[var(--ink-100)]"
             title="Exit focus mode (Esc)"
           >
             <Icon name="close" size={12} />
@@ -572,11 +572,11 @@ export default function DocEditor({
 
       <div className="max-w-3xl mx-auto px-8">
       {(busyOffice || officeMsg) && (
-        <div className="mb-3 text-[12px] text-stone-500 dark:text-stone-400 flex items-center gap-1.5" data-testid="doc-office-status">
+        <div className="mb-3 text-[12px] text-[var(--ink-50)] flex items-center gap-1.5" data-testid="doc-office-status">
           {busyOffice && <Icon name="autorenew" size={13} className="animate-spin" />}
           <span>{busyOffice ?? officeMsg}</span>
           {officeMsg && !busyOffice && (
-            <button onClick={() => setOfficeMsg(null)} className="text-stone-400 hover:text-stone-600">
+            <button onClick={() => setOfficeMsg(null)} className="text-[var(--ink-40)] hover:text-[var(--ink-70)]">
               <Icon name="close" size={12} />
             </button>
           )}
@@ -602,7 +602,7 @@ export default function DocEditor({
                   key={a}
                   onClick={() => void ai.run(a)}
                   disabled={ai.busy}
-                  className="text-[11px] px-2 py-1 rounded-full border border-stone-300 dark:border-stone-600 hover:bg-accent/10 hover:border-accent disabled:opacity-50"
+                  className="text-[11px] px-2 py-1 rounded-full border border-[var(--edge-firm)] hover:bg-accent/10 hover:border-accent disabled:opacity-50"
                 >
                   {a}
                 </button>
@@ -623,16 +623,16 @@ export default function DocEditor({
             }
             rows={2}
             autoFocus
-            className="w-full bg-white dark:bg-stone-800 border border-stone-300 dark:border-stone-600 rounded-lg px-3 py-2 text-[13px] focus:outline-none focus:border-accent resize-none"
+            className="w-full bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded-lg px-3 py-2 text-[13px] focus:outline-none focus:border-accent resize-none"
           />
 
           {ai.error && <div className="text-[12px] text-red-600 dark:text-red-400 mt-1">{ai.error}</div>}
 
           {ai.previewHtml != null && (
             <div className="mt-2">
-              <div className="text-[10px] uppercase tracking-wider text-stone-400 mb-1">Preview</div>
+              <div className="text-[10px] uppercase tracking-wider text-[var(--ink-40)] mb-1">Preview</div>
               <div
-                className="prose prose-sm prose-stone dark:prose-invert max-w-none max-h-60 overflow-auto rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 p-3"
+                className="prose prose-sm prose-stone dark:prose-invert max-w-none max-h-60 overflow-auto rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-base)] p-3"
                 data-testid="doc-ai-preview"
                 dangerouslySetInnerHTML={{ __html: sanitizeHtml(ai.previewHtml) }}
               />
@@ -656,13 +656,13 @@ export default function DocEditor({
                 <button
                   onClick={() => void ai.run(aiInstruction || (ai.mode === 'rewrite' ? 'Improve writing' : ''))}
                   disabled={ai.busy}
-                  className="text-[12px] px-3 py-1.5 rounded border border-stone-300 dark:border-stone-600 hover:bg-stone-100 dark:hover:bg-stone-800"
+                  className="text-[12px] px-3 py-1.5 rounded border border-[var(--edge-firm)] hover:bg-[var(--surface-sunken)]"
                 >
                   Regenerate
                 </button>
               </>
             )}
-            <span className="text-[11px] text-stone-400">Previewed before it touches the document. Cmd+Enter</span>
+            <span className="text-[11px] text-[var(--ink-40)]">Previewed before it touches the document. Cmd+Enter</span>
           </div>
         </div>
       )}
@@ -741,7 +741,7 @@ function MarginMenu({
     <>
       <div className="fixed inset-0 z-30" onClick={onClose} />
       <div
-        className="absolute left-0 mt-1.5 z-40 w-56 rounded-xl border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 shadow-lg p-2 text-stone-700 dark:text-stone-200"
+        className="absolute left-0 mt-1.5 z-40 w-56 rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-lg p-2 text-[var(--ink-70)]"
         data-testid="doc-margins-menu"
       >
         {MARGIN_PRESETS.map((p) => {
@@ -751,18 +751,18 @@ function MarginMenu({
               key={p.id}
               onClick={() => onPick({ ...p.margin })}
               data-testid={`doc-margin-preset-${p.id}`}
-              className={`w-full text-left px-2 py-1.5 rounded-md text-[12px] ${active ? 'bg-accent/10 text-accent' : 'hover:bg-stone-100 dark:hover:bg-stone-800'}`}
+              className={`w-full text-left px-2 py-1.5 rounded-md text-[12px] ${active ? 'bg-accent/10 text-accent' : 'hover:bg-[var(--surface-sunken)]'}`}
             >
               {p.label}
             </button>
           )
         })}
-        <div className="mt-1.5 pt-1.5 border-t border-stone-200 dark:border-stone-700">
-          <p className="px-2 text-[10px] uppercase tracking-[0.1em] text-stone-400 mb-1">Custom (inches)</p>
+        <div className="mt-1.5 pt-1.5 border-t border-[var(--edge-soft)]">
+          <p className="px-2 text-[10px] uppercase tracking-[0.1em] text-[var(--ink-40)] mb-1">Custom (inches)</p>
           <div className="grid grid-cols-2 gap-1.5 px-1">
             {sides.map((s) => (
               <label key={s.key} className="flex items-center gap-1 text-[11px]">
-                <span className="w-12 text-stone-500">{s.label}</span>
+                <span className="w-12 text-[var(--ink-50)]">{s.label}</span>
                 <input
                   type="number"
                   min={0}
@@ -774,7 +774,7 @@ function MarginMenu({
                     const v = Number(e.target.value)
                     if (Number.isFinite(v)) onPick({ ...margin, [s.key]: Math.max(0, Math.min(4, v)) })
                   }}
-                  className="w-full rounded border border-stone-300 dark:border-stone-600 bg-transparent px-1.5 py-0.5"
+                  className="w-full rounded border border-[var(--edge-firm)] bg-transparent px-1.5 py-0.5"
                 />
               </label>
             ))}
@@ -839,7 +839,7 @@ function PageSheet({ editor, page }: { editor: Editor; page: PageSetup }): JSX.E
             <span
               key={i}
               data-testid="doc-page-break"
-              className="absolute right-2 text-stone-500 dark:text-stone-400 fb-tabular"
+              className="absolute right-2 text-[var(--ink-50)] fb-tabular"
               style={{ top: (i + 1) * stride - PAGE_GAP + Math.round((PAGE_GAP - 10) / 2), fontSize: 9, letterSpacing: '0.04em' }}
             >
               Page {i + 2}

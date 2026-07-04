@@ -37,33 +37,33 @@ export default function BrandKitModal({ onClose }: { onClose: () => void }): JSX
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40" onClick={onClose}>
       <div
-        className="w-[460px] max-h-[88vh] overflow-auto rounded-2xl bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-700 shadow-2xl p-5"
+        className="w-[460px] max-h-[88vh] overflow-auto rounded-2xl bg-[var(--surface-raised)] border border-[var(--edge-soft)] shadow-2xl p-5"
         onClick={(e) => e.stopPropagation()}
         data-testid="brand-kit-modal"
       >
         <div className="flex items-center gap-2 mb-3">
           <Icon name="palette" size={18} className="text-accent" />
-          <h2 className="text-[15px] font-semibold text-stone-900 dark:text-stone-100">Brand kit</h2>
-          <button onClick={onClose} className="ml-auto text-stone-400 hover:text-stone-600">
+          <h2 className="text-[15px] font-semibold text-[var(--ink-100)]">Brand kit</h2>
+          <button onClick={onClose} className="ml-auto text-[var(--ink-40)] hover:text-[var(--ink-70)]">
             <Icon name="close" size={16} />
           </button>
         </div>
-        <p className="text-[12px] text-stone-500 dark:text-stone-400 mb-4">
+        <p className="text-[12px] text-[var(--ink-50)] mb-4">
           Set your logo, colors and fonts once. PlexiDesign and other surfaces use them so everything looks like you.
         </p>
 
         {/* Logo */}
         <div className="mb-4">
-          <div className="text-[11px] uppercase tracking-wide text-stone-400 mb-1.5">Logo</div>
+          <div className="text-[11px] uppercase tracking-wide text-[var(--ink-40)] mb-1.5">Logo</div>
           <div className="flex items-center gap-3">
-            <div className="w-16 h-16 rounded-lg border border-stone-200 dark:border-stone-700 flex items-center justify-center overflow-hidden bg-stone-50 dark:bg-stone-800">
+            <div className="w-16 h-16 rounded-lg border border-[var(--edge-soft)] flex items-center justify-center overflow-hidden bg-[var(--surface-sunken)]">
               {draft.logoUrl ? (
                 <img src={draft.logoUrl} alt="Logo" className="max-w-full max-h-full object-contain" data-testid="brand-logo-preview" />
               ) : (
-                <Icon name="image" size={20} className="text-stone-300" />
+                <Icon name="image" size={20} className="text-[var(--ink-30)]" />
               )}
             </div>
-            <button onClick={() => void pickLogo()} data-testid="brand-pick-logo" className="text-[12px] px-2.5 py-1.5 rounded-lg border border-stone-300 dark:border-stone-600 hover:border-accent">
+            <button onClick={() => void pickLogo()} data-testid="brand-pick-logo" className="text-[12px] px-2.5 py-1.5 rounded-lg border border-[var(--edge-firm)] hover:border-accent">
               {draft.logoUrl ? 'Replace' : 'Upload'}
             </button>
             {draft.logoUrl && (
@@ -98,7 +98,7 @@ export default function BrandKitModal({ onClose }: { onClose: () => void }): JSX
         )}
 
         <div className="flex justify-end gap-2">
-          <button onClick={onClose} className="text-[13px] px-3 py-1.5 rounded-lg border border-stone-300 dark:border-stone-600 hover:bg-stone-100 dark:hover:bg-stone-800">
+          <button onClick={onClose} className="text-[13px] px-3 py-1.5 rounded-lg border border-[var(--edge-firm)] hover:bg-[var(--surface-sunken)]">
             Cancel
           </button>
           <button onClick={() => void onSave()} disabled={saving} data-testid="brand-save" className="btn-primary text-[13px] px-4 py-1.5 disabled:opacity-50">
@@ -113,10 +113,10 @@ export default function BrandKitModal({ onClose }: { onClose: () => void }): JSX
 function ColorField({ label, value, onChange, testid }: { label: string; value: string; onChange: (c: string) => void; testid: string }): JSX.Element {
   return (
     <label className="block">
-      <span className="text-[11px] text-stone-500">{label}</span>
+      <span className="text-[11px] text-[var(--ink-50)]">{label}</span>
       <div className="mt-1 flex items-center gap-2">
-        <input type="color" value={value.startsWith('#') ? value : '#000000'} data-testid={testid} onChange={(e) => onChange(e.target.value)} className="w-9 h-8 rounded border border-stone-300 dark:border-stone-600 cursor-pointer" />
-        <input value={value} onChange={(e) => onChange(e.target.value)} className="flex-1 min-w-0 rounded border border-stone-300 dark:border-stone-600 bg-transparent px-2 py-1 text-[12px] fb-tabular" />
+        <input type="color" value={value.startsWith('#') ? value : '#000000'} data-testid={testid} onChange={(e) => onChange(e.target.value)} className="w-9 h-8 rounded border border-[var(--edge-firm)] cursor-pointer" />
+        <input value={value} onChange={(e) => onChange(e.target.value)} className="flex-1 min-w-0 rounded border border-[var(--edge-firm)] bg-transparent px-2 py-1 text-[12px] fb-tabular" />
       </div>
     </label>
   )
@@ -126,7 +126,7 @@ function FontField({ label, value, onChange, testid }: { label: string; value: s
   const current = familyLabel(value)
   return (
     <label className="block">
-      <span className="text-[11px] text-stone-500">{label}</span>
+      <span className="text-[11px] text-[var(--ink-50)]">{label}</span>
       <select
         value={current}
         data-testid={testid}
@@ -134,7 +134,7 @@ function FontField({ label, value, onChange, testid }: { label: string; value: s
           loadGoogleFont(e.target.value)
           onChange(fontFamilyValue(e.target.value))
         }}
-        className="mt-1 w-full rounded border border-stone-300 dark:border-stone-600 bg-transparent px-2 py-1.5 text-[12px]"
+        className="mt-1 w-full rounded border border-[var(--edge-firm)] bg-transparent px-2 py-1.5 text-[12px]"
         style={{ fontFamily: value }}
       >
         {!GOOGLE_FONTS.includes(current) && current !== 'Default' && <option value={current}>{current}</option>}

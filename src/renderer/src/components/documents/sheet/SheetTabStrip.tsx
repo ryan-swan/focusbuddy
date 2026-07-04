@@ -18,14 +18,14 @@ export default function SheetTabStrip({ body, onSwitch, onAdd, onRename, onDelet
   const [editing, setEditing] = useState<number | null>(null)
 
   return (
-    <div className="flex items-center gap-1 px-2 py-1 border-t border-stone-200 dark:border-stone-700 bg-stone-50/60 dark:bg-stone-900/60" data-testid="sheet-tab-strip">
+    <div className="flex items-center gap-1 px-2 py-1 border-t border-[var(--edge-soft)] bg-[var(--surface-sunken)]/60" data-testid="sheet-tab-strip">
       {body.sheets.map((s, i) => (
         <div
           key={s.id}
           className={`group inline-flex items-center gap-1 rounded-md px-2 py-1 text-[12px] cursor-pointer ${
             i === active
-              ? 'bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 text-accent font-medium'
-              : 'text-stone-500 dark:text-stone-400 hover:bg-stone-100 dark:hover:bg-stone-800/60'
+              ? 'bg-[var(--surface-raised)] border border-[var(--edge-soft)] text-accent font-medium'
+              : 'text-[var(--ink-50)] hover:bg-[var(--surface-sunken)]'
           }`}
           onClick={() => onSwitch(i)}
           onDoubleClick={() => setEditing(i)}
@@ -53,7 +53,7 @@ export default function SheetTabStrip({ body, onSwitch, onAdd, onRename, onDelet
                 e.stopPropagation()
                 onDelete(i)
               }}
-              className="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 text-stone-400 hover:text-red-500"
+              className="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 text-[var(--ink-40)] hover:text-red-500"
               title="Delete sheet"
             >
               <Icon name="close" size={11} />

@@ -595,7 +595,7 @@ export default function WebViewWidget({ widget, inline = false }: Props): JSX.El
                   setResMenuOpen((v) => !v)
                 }}
                 onMouseDown={(e) => e.stopPropagation()}
-                className={`h-6 w-6 inline-flex items-center justify-center rounded text-[var(--ink-70)] hover:bg-[var(--surface-sunken)] ${resMenuOpen ? 'bg-stone-200' : ''}`}
+                className={`h-6 w-6 inline-flex items-center justify-center rounded text-[var(--ink-70)] hover:bg-[var(--surface-sunken)] ${resMenuOpen ? 'bg-[var(--surface-sunken)]' : ''}`}
                 title="Resize to a stored resolution"
                 aria-label="Resize to a stored resolution"
               >

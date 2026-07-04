@@ -593,7 +593,7 @@ export default function DesignEditor({ content, title, onChange }: Props): JSX.E
   return (
     <div className="flex flex-col h-full" data-testid="design-editor">
       {/* Menu bar — real design-canvas actions. */}
-      <div className="px-2 pt-1.5 pb-1 border-b border-stone-100 dark:border-stone-800">
+      <div className="px-2 pt-1.5 pb-1 border-b border-[var(--edge-soft)]">
         <DesignMenuBar
           actions={{
             title,
@@ -611,13 +611,13 @@ export default function DesignEditor({ content, title, onChange }: Props): JSX.E
         />
       </div>
       {/* Toolbar */}
-      <div className="flex items-center gap-1.5 px-3 py-2 border-b border-stone-200 dark:border-stone-700 flex-wrap text-[12px]">
+      <div className="flex items-center gap-1.5 px-3 py-2 border-b border-[var(--edge-soft)] flex-wrap text-[12px]">
         <button
           onClick={undo}
           disabled={past.length === 0}
           data-testid="design-undo"
           title="Undo (Cmd/Ctrl+Z)"
-          className="inline-flex items-center px-2 py-1.5 rounded-lg hover:bg-stone-100 dark:hover:bg-stone-800 disabled:opacity-30"
+          className="inline-flex items-center px-2 py-1.5 rounded-lg hover:bg-[var(--surface-sunken)] disabled:opacity-30"
         >
           <Icon name="undo" size={15} />
         </button>
@@ -626,14 +626,14 @@ export default function DesignEditor({ content, title, onChange }: Props): JSX.E
           disabled={future.length === 0}
           data-testid="design-redo"
           title="Redo (Cmd/Ctrl+Shift+Z)"
-          className="inline-flex items-center px-2 py-1.5 rounded-lg hover:bg-stone-100 dark:hover:bg-stone-800 disabled:opacity-30"
+          className="inline-flex items-center px-2 py-1.5 rounded-lg hover:bg-[var(--surface-sunken)] disabled:opacity-30"
         >
           <Icon name="redo" size={15} />
         </button>
-        <span className="w-px h-5 bg-stone-200 dark:bg-stone-700 mx-1" />
+        <span className="w-px h-5 bg-[var(--edge-soft)] mx-1" />
         <ToolBtn icon="dashboard" label="Templates" active={panel === 'templates'} onClick={() => setPanel((p) => (p === 'templates' ? 'none' : 'templates'))} testid="design-templates-btn" />
         <ToolBtn icon="aspect_ratio" label={size.label} active={panel === 'size'} onClick={() => setPanel((p) => (p === 'size' ? 'none' : 'size'))} testid="design-size-btn" />
-        <span className="w-px h-5 bg-stone-200 dark:bg-stone-700 mx-1" />
+        <span className="w-px h-5 bg-[var(--edge-soft)] mx-1" />
         <ToolBtn icon="title" label="Text" onClick={addText} testid="design-add-text" />
         <ToolBtn icon="rectangle" label="Rect" onClick={() => addShape('rect')} testid="design-add-rect" />
         <ToolBtn icon="circle" label="Ellipse" onClick={() => addShape('ellipse')} testid="design-add-ellipse" />
@@ -641,13 +641,13 @@ export default function DesignEditor({ content, title, onChange }: Props): JSX.E
         <ToolBtn icon="rounded_corner" label="Round" onClick={() => addShape('roundRect')} testid="design-add-roundrect" />
         <ToolBtn icon="horizontal_rule" label="Line" onClick={addLine} testid="design-add-line" />
         <ToolBtn icon="image" label="Image" onClick={() => void addImageFromFile()} testid="design-add-image" />
-        <span className="w-px h-5 bg-stone-200 dark:bg-stone-700 mx-1" />
+        <span className="w-px h-5 bg-[var(--edge-soft)] mx-1" />
         <ToolBtn icon="auto_awesome" label="AI design" active={panel === 'ai'} onClick={() => setPanel((p) => (p === 'ai' ? 'none' : 'ai'))} testid="design-ai-btn" />
         <ToolBtn icon="photo_library" label="Stock" active={panel === 'stock'} onClick={() => setPanel((p) => (p === 'stock' ? 'none' : 'stock'))} testid="design-stock-btn" />
         <ToolBtn icon="badge" label="Logo" onClick={placeLogo} testid="design-add-logo" />
         <ToolBtn icon="palette" label="Brandify" onClick={brandify} testid="design-brandify" />
         <ToolBtn icon="tune" label="Brand kit" onClick={() => setBrandOpen(true)} testid="design-brand-kit-btn" />
-        <span className="w-px h-5 bg-stone-200 dark:bg-stone-700 mx-1" />
+        <span className="w-px h-5 bg-[var(--edge-soft)] mx-1" />
         <ToolBtn
           icon="auto_awesome"
           label="Assistant"
@@ -660,13 +660,13 @@ export default function DesignEditor({ content, title, onChange }: Props): JSX.E
           {exportOpen && (
             <>
               <div className="fixed inset-0 z-30" onClick={() => setExportOpen(false)} />
-              <div className="absolute left-0 mt-1 z-40 w-36 rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 shadow-lg p-1" data-testid="design-export-menu">
+              <div className="absolute left-0 mt-1 z-40 w-36 rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-lg p-1" data-testid="design-export-menu">
                 {EXPORT_FORMATS.map((f) => (
                   <button
                     key={f.id}
                     onClick={() => void exportAs(f.id)}
                     data-testid={`design-export-${f.id}`}
-                    className="w-full text-left px-2.5 py-1.5 rounded-md text-[12px] hover:bg-stone-100 dark:hover:bg-stone-800"
+                    className="w-full text-left px-2.5 py-1.5 rounded-md text-[12px] hover:bg-[var(--surface-sunken)]"
                   >
                     {f.label}
                   </button>
@@ -682,14 +682,14 @@ export default function DesignEditor({ content, title, onChange }: Props): JSX.E
         <Panel title="Start from a template">
           {CATEGORIES.map((cat) => (
             <div key={cat.id} className="mb-2">
-              <div className="text-[10px] uppercase tracking-wide text-stone-400 mb-1">{cat.label}</div>
+              <div className="text-[10px] uppercase tracking-wide text-[var(--ink-40)] mb-1">{cat.label}</div>
               <div className="flex flex-wrap gap-1.5">
                 {templatesForCategory(cat.id).map((t) => (
                   <button
                     key={t.id}
                     onClick={() => applyTemplate(t.id)}
                     data-testid={`design-template-${t.id}`}
-                    className="px-2.5 py-1.5 rounded-lg border border-stone-200 dark:border-stone-700 hover:border-accent hover:bg-accent/5 text-[12px]"
+                    className="px-2.5 py-1.5 rounded-lg border border-[var(--edge-soft)] hover:border-accent hover:bg-accent/5 text-[12px]"
                   >
                     {t.label}
                   </button>
@@ -703,16 +703,16 @@ export default function DesignEditor({ content, title, onChange }: Props): JSX.E
         <Panel title="Canvas size">
           {CATEGORIES.map((cat) => (
             <div key={cat.id} className="mb-2">
-              <div className="text-[10px] uppercase tracking-wide text-stone-400 mb-1">{cat.label}</div>
+              <div className="text-[10px] uppercase tracking-wide text-[var(--ink-40)] mb-1">{cat.label}</div>
               <div className="flex flex-wrap gap-1.5">
                 {DESIGN_SIZES.filter((s) => s.category === cat.id).map((s) => (
                   <button
                     key={s.id}
                     onClick={() => changeSize(s)}
                     data-testid={`design-size-${s.id}`}
-                    className="px-2.5 py-1.5 rounded-lg border border-stone-200 dark:border-stone-700 hover:border-accent hover:bg-accent/5 text-[12px]"
+                    className="px-2.5 py-1.5 rounded-lg border border-[var(--edge-soft)] hover:border-accent hover:bg-accent/5 text-[12px]"
                   >
-                    {s.label} <span className="text-stone-400">{s.w}×{s.h}</span>
+                    {s.label} <span className="text-[var(--ink-40)]">{s.w}×{s.h}</span>
                   </button>
                 ))}
               </div>
@@ -724,7 +724,7 @@ export default function DesignEditor({ content, title, onChange }: Props): JSX.E
         <Panel title="Generate with AI">
           <div className="space-y-2">
             <div>
-              <div className="text-[11px] text-stone-500 mb-1">Describe the design — AI writes on-brand copy and lays it out. Generate variations to pick from a set of on-brand options.</div>
+              <div className="text-[11px] text-[var(--ink-50)] mb-1">Describe the design — AI writes on-brand copy and lays it out. Generate variations to pick from a set of on-brand options.</div>
               <div className="flex gap-1.5">
                 <input
                   value={aiPrompt}
@@ -732,18 +732,18 @@ export default function DesignEditor({ content, title, onChange }: Props): JSX.E
                   placeholder="e.g. a launch announcement for our new pricing"
                   data-testid="design-ai-prompt"
                   onKeyDown={(e) => e.key === 'Enter' && void generateVariations()}
-                  className="flex-1 rounded-lg border border-stone-300 dark:border-stone-600 bg-transparent px-2.5 py-1.5 text-[12px] focus:outline-none focus:border-accent"
+                  className="flex-1 rounded-lg border border-[var(--edge-firm)] bg-transparent px-2.5 py-1.5 text-[12px] focus:outline-none focus:border-accent"
                 />
                 <button onClick={() => void generateVariations()} disabled={!!busy} data-testid="design-ai-variations" className="btn-primary text-[12px] px-3 py-1.5 disabled:opacity-50">
                   Variations
                 </button>
-                <button onClick={() => void generateDesign()} disabled={!!busy} data-testid="design-ai-go" className="text-[12px] px-3 py-1.5 rounded-lg border border-stone-300 dark:border-stone-600 hover:border-accent disabled:opacity-50">
+                <button onClick={() => void generateDesign()} disabled={!!busy} data-testid="design-ai-go" className="text-[12px] px-3 py-1.5 rounded-lg border border-[var(--edge-firm)] hover:border-accent disabled:opacity-50">
                   One
                 </button>
               </div>
             </div>
             <div>
-              <div className="text-[11px] text-stone-500 mb-1">Generate an image to place on the canvas (OpenAI gpt-image-1).</div>
+              <div className="text-[11px] text-[var(--ink-50)] mb-1">Generate an image to place on the canvas (OpenAI gpt-image-1).</div>
               <div className="flex gap-1.5">
                 <input
                   value={imgPrompt}
@@ -751,9 +751,9 @@ export default function DesignEditor({ content, title, onChange }: Props): JSX.E
                   placeholder="e.g. a minimal abstract gradient background"
                   data-testid="design-image-prompt"
                   onKeyDown={(e) => e.key === 'Enter' && void generateImage()}
-                  className="flex-1 rounded-lg border border-stone-300 dark:border-stone-600 bg-transparent px-2.5 py-1.5 text-[12px] focus:outline-none focus:border-accent"
+                  className="flex-1 rounded-lg border border-[var(--edge-firm)] bg-transparent px-2.5 py-1.5 text-[12px] focus:outline-none focus:border-accent"
                 />
-                <button onClick={() => void generateImage()} disabled={!!busy} data-testid="design-image-go" className="text-[12px] px-3 py-1.5 rounded-lg border border-stone-300 dark:border-stone-600 hover:border-accent disabled:opacity-50">
+                <button onClick={() => void generateImage()} disabled={!!busy} data-testid="design-image-go" className="text-[12px] px-3 py-1.5 rounded-lg border border-[var(--edge-firm)] hover:border-accent disabled:opacity-50">
                   Image
                 </button>
               </div>
@@ -770,7 +770,7 @@ export default function DesignEditor({ content, title, onChange }: Props): JSX.E
               placeholder="Search free photos (e.g. mountains, office, coffee)"
               data-testid="design-stock-query"
               onKeyDown={(e) => e.key === 'Enter' && void searchStock()}
-              className="flex-1 rounded-lg border border-stone-300 dark:border-stone-600 bg-transparent px-2.5 py-1.5 text-[12px] focus:outline-none focus:border-accent"
+              className="flex-1 rounded-lg border border-[var(--edge-firm)] bg-transparent px-2.5 py-1.5 text-[12px] focus:outline-none focus:border-accent"
             />
             <button onClick={() => void searchStock()} disabled={!!busy} data-testid="design-stock-go" className="btn-primary text-[12px] px-3 py-1.5 disabled:opacity-50">
               Search
@@ -783,23 +783,23 @@ export default function DesignEditor({ content, title, onChange }: Props): JSX.E
                   key={p.id}
                   onClick={() => void insertStock(p)}
                   title={p.alt || `Photo by ${p.photographer}`}
-                  className="aspect-square rounded-md overflow-hidden border border-stone-200 dark:border-stone-700 hover:border-accent"
+                  className="aspect-square rounded-md overflow-hidden border border-[var(--edge-soft)] hover:border-accent"
                 >
                   <img src={p.thumb} alt={p.alt} className="w-full h-full object-cover" />
                 </button>
               ))}
             </div>
           )}
-          <p className="text-[10px] text-stone-400 mt-1.5">Photos from Pexels. A free Pexels API key (Settings → API Keys) enables search.</p>
+          <p className="text-[10px] text-[var(--ink-40)] mt-1.5">Photos from Pexels. A free Pexels API key (Settings → API Keys) enables search.</p>
         </Panel>
       )}
 
       {(busy || status) && (
-        <div className="px-3 py-1.5 text-[12px] text-stone-500 dark:text-stone-400 flex items-center gap-1.5" data-testid="design-status">
+        <div className="px-3 py-1.5 text-[12px] text-[var(--ink-50)] flex items-center gap-1.5" data-testid="design-status">
           {busy && <Icon name="autorenew" size={13} className="animate-spin" />}
           <span>{busy ?? status}</span>
           {status && !busy && (
-            <button onClick={() => setStatus(null)} className="text-stone-400 hover:text-stone-600">
+            <button onClick={() => setStatus(null)} className="text-[var(--ink-40)] hover:text-[var(--ink-70)]">
               <Icon name="close" size={12} />
             </button>
           )}
@@ -830,8 +830,8 @@ export default function DesignEditor({ content, title, onChange }: Props): JSX.E
         </div>
 
         {selected && (
-          <div className="w-56 shrink-0 border-l border-stone-200 dark:border-stone-700 p-3 overflow-auto text-[12px]" data-testid="design-inspector">
-            <div className="text-[10px] uppercase tracking-wide text-stone-400 mb-2">{selected.type}</div>
+          <div className="w-56 shrink-0 border-l border-[var(--edge-soft)] p-3 overflow-auto text-[12px]" data-testid="design-inspector">
+            <div className="text-[10px] uppercase tracking-wide text-[var(--ink-40)] mb-2">{selected.type}</div>
             {selected.type === 'shape' && (
               <Field label="Fill">
                 <ColorInput
@@ -852,7 +852,7 @@ export default function DesignEditor({ content, title, onChange }: Props): JSX.E
                       loadGoogleFont(fam)
                       mutate((s) => updateElement(s, selected.id, { fontFamily: fontFamilyValue(fam) }))
                     }}
-                    className="w-full rounded border border-stone-300 dark:border-stone-600 bg-transparent px-1.5 py-1"
+                    className="w-full rounded border border-[var(--edge-firm)] bg-transparent px-1.5 py-1"
                     style={{ fontFamily: selected.fontFamily }}
                   >
                     {!GOOGLE_FONTS.includes(familyLabel(selected.fontFamily)) && familyLabel(selected.fontFamily) !== 'Default' && (
@@ -884,7 +884,7 @@ export default function DesignEditor({ content, title, onChange }: Props): JSX.E
                         onClick={() => mutate((s) => updateElement(s, selected.id, { paragraphs: selected.paragraphs.map((p) => ({ ...p, align: a })) }))}
                         data-testid={`design-align-text-${a}`}
                         className={`flex-1 px-2 py-1 rounded border text-[11px] ${
-                          (selected.paragraphs[0]?.align ?? 'left') === a ? 'border-accent text-accent' : 'border-stone-300 dark:border-stone-600 hover:bg-stone-100 dark:hover:bg-stone-800'
+                          (selected.paragraphs[0]?.align ?? 'left') === a ? 'border-accent text-accent' : 'border-[var(--edge-firm)] hover:bg-[var(--surface-sunken)]'
                         }`}
                       >
                         <Icon name={`format_align_${a}`} size={13} />
@@ -897,19 +897,19 @@ export default function DesignEditor({ content, title, onChange }: Props): JSX.E
                     <button
                       onClick={() => mutate((s) => updateElement(s, selected.id, { paragraphs: selected.paragraphs.map((p) => ({ ...p, runs: p.runs.map((r) => ({ ...r, bold: !r.bold })) })) }))}
                       data-testid="design-bold"
-                      className={`flex-1 px-2 py-1 rounded border text-[12px] font-bold ${selected.paragraphs[0]?.runs[0]?.bold ? 'border-accent text-accent' : 'border-stone-300 dark:border-stone-600'}`}
+                      className={`flex-1 px-2 py-1 rounded border text-[12px] font-bold ${selected.paragraphs[0]?.runs[0]?.bold ? 'border-accent text-accent' : 'border-[var(--edge-firm)]'}`}
                     >
                       B
                     </button>
                     <button
                       onClick={() => mutate((s) => updateElement(s, selected.id, { paragraphs: selected.paragraphs.map((p) => ({ ...p, runs: p.runs.map((r) => ({ ...r, italic: !r.italic })) })) }))}
-                      className={`flex-1 px-2 py-1 rounded border text-[12px] italic ${selected.paragraphs[0]?.runs[0]?.italic ? 'border-accent text-accent' : 'border-stone-300 dark:border-stone-600'}`}
+                      className={`flex-1 px-2 py-1 rounded border text-[12px] italic ${selected.paragraphs[0]?.runs[0]?.italic ? 'border-accent text-accent' : 'border-[var(--edge-firm)]'}`}
                     >
                       I
                     </button>
                     <button
                       onClick={() => mutate((s) => updateElement(s, selected.id, { paragraphs: selected.paragraphs.map((p) => ({ ...p, runs: p.runs.map((r) => ({ ...r, underline: !r.underline })) })) }))}
-                      className={`flex-1 px-2 py-1 rounded border text-[12px] underline ${selected.paragraphs[0]?.runs[0]?.underline ? 'border-accent text-accent' : 'border-stone-300 dark:border-stone-600'}`}
+                      className={`flex-1 px-2 py-1 rounded border text-[12px] underline ${selected.paragraphs[0]?.runs[0]?.underline ? 'border-accent text-accent' : 'border-[var(--edge-firm)]'}`}
                     >
                       U
                     </button>
@@ -927,7 +927,7 @@ export default function DesignEditor({ content, title, onChange }: Props): JSX.E
                         paragraphs: selected.paragraphs.map((p) => ({ ...p, runs: p.runs.map((r) => ({ ...r, fontSize: fs })) }))
                       }))
                     }}
-                    className="w-full rounded border border-stone-300 dark:border-stone-600 bg-transparent px-1.5 py-1"
+                    className="w-full rounded border border-[var(--edge-firm)] bg-transparent px-1.5 py-1"
                   />
                 </Field>
               </>
@@ -937,7 +937,7 @@ export default function DesignEditor({ content, title, onChange }: Props): JSX.E
                 onClick={() => void removeBgSelected()}
                 disabled={!!busy}
                 data-testid="design-remove-bg"
-                className="w-full mb-2 px-2 py-1.5 rounded-lg border border-stone-300 dark:border-stone-600 text-[12px] hover:border-accent disabled:opacity-50 inline-flex items-center justify-center gap-1.5"
+                className="w-full mb-2 px-2 py-1.5 rounded-lg border border-[var(--edge-firm)] text-[12px] hover:border-accent disabled:opacity-50 inline-flex items-center justify-center gap-1.5"
               >
                 <Icon name="auto_awesome" size={14} /> Remove background
               </button>
@@ -959,13 +959,13 @@ export default function DesignEditor({ content, title, onChange }: Props): JSX.E
                 value={Math.round(selected.rotation ?? 0)}
                 data-testid="design-rotation"
                 onChange={(e) => mutate((s) => updateElement(s, selected.id, { rotation: Math.round(Number(e.target.value) || 0) }))}
-                className="w-full rounded border border-stone-300 dark:border-stone-600 bg-transparent px-1.5 py-1"
+                className="w-full rounded border border-[var(--edge-firm)] bg-transparent px-1.5 py-1"
               />
             </Field>
 
             {selectedIds.length > 1 && (
-              <div className="mt-2 pt-2 border-t border-stone-200 dark:border-stone-700" data-testid="design-arrange">
-                <div className="text-[10px] uppercase tracking-wide text-stone-400 mb-1.5">Arrange {selectedIds.length}</div>
+              <div className="mt-2 pt-2 border-t border-[var(--edge-soft)]" data-testid="design-arrange">
+                <div className="text-[10px] uppercase tracking-wide text-[var(--ink-40)] mb-1.5">Arrange {selectedIds.length}</div>
                 <div className="grid grid-cols-6 gap-1">
                   {([
                     ['left', 'align_horizontal_left'],
@@ -975,24 +975,24 @@ export default function DesignEditor({ content, title, onChange }: Props): JSX.E
                     ['vcenter', 'align_vertical_center'],
                     ['bottom', 'align_vertical_bottom']
                   ] as [AlignEdge, string][]).map(([edge, icon]) => (
-                    <button key={edge} onClick={() => align(edge)} data-testid={`design-align-${edge}`} title={`Align ${edge}`} className="px-1.5 py-1 rounded border border-stone-300 dark:border-stone-600 hover:bg-stone-100 dark:hover:bg-stone-800">
+                    <button key={edge} onClick={() => align(edge)} data-testid={`design-align-${edge}`} title={`Align ${edge}`} className="px-1.5 py-1 rounded border border-[var(--edge-firm)] hover:bg-[var(--surface-sunken)]">
                       <Icon name={icon} size={13} />
                     </button>
                   ))}
                 </div>
                 <div className="flex gap-1 mt-1.5">
-                  <button onClick={() => distribute('h')} disabled={selectedIds.length < 3} className="flex-1 px-2 py-1 rounded border border-stone-300 dark:border-stone-600 text-[11px] hover:bg-stone-100 dark:hover:bg-stone-800 disabled:opacity-40">
+                  <button onClick={() => distribute('h')} disabled={selectedIds.length < 3} className="flex-1 px-2 py-1 rounded border border-[var(--edge-firm)] text-[11px] hover:bg-[var(--surface-sunken)] disabled:opacity-40">
                     Distribute H
                   </button>
-                  <button onClick={() => distribute('v')} disabled={selectedIds.length < 3} className="flex-1 px-2 py-1 rounded border border-stone-300 dark:border-stone-600 text-[11px] hover:bg-stone-100 dark:hover:bg-stone-800 disabled:opacity-40">
+                  <button onClick={() => distribute('v')} disabled={selectedIds.length < 3} className="flex-1 px-2 py-1 rounded border border-[var(--edge-firm)] text-[11px] hover:bg-[var(--surface-sunken)] disabled:opacity-40">
                     Distribute V
                   </button>
                 </div>
                 <div className="flex gap-1 mt-1.5">
-                  <button onClick={group} data-testid="design-group" className="flex-1 px-2 py-1 rounded border border-stone-300 dark:border-stone-600 text-[11px] hover:bg-stone-100 dark:hover:bg-stone-800">
+                  <button onClick={group} data-testid="design-group" className="flex-1 px-2 py-1 rounded border border-[var(--edge-firm)] text-[11px] hover:bg-[var(--surface-sunken)]">
                     Group
                   </button>
-                  <button onClick={ungroup} className="flex-1 px-2 py-1 rounded border border-stone-300 dark:border-stone-600 text-[11px] hover:bg-stone-100 dark:hover:bg-stone-800">
+                  <button onClick={ungroup} className="flex-1 px-2 py-1 rounded border border-[var(--edge-firm)] text-[11px] hover:bg-[var(--surface-sunken)]">
                     Ungroup
                   </button>
                 </div>
@@ -1000,13 +1000,13 @@ export default function DesignEditor({ content, title, onChange }: Props): JSX.E
             )}
 
             <div className="flex gap-1 mt-3">
-              <button onClick={() => mutate((s) => reorderZ(s, selected.id, 'forward'))} className="flex-1 px-2 py-1 rounded border border-stone-300 dark:border-stone-600 hover:bg-stone-100 dark:hover:bg-stone-800" title="Bring forward">
+              <button onClick={() => mutate((s) => reorderZ(s, selected.id, 'forward'))} className="flex-1 px-2 py-1 rounded border border-[var(--edge-firm)] hover:bg-[var(--surface-sunken)]" title="Bring forward">
                 <Icon name="flip_to_front" size={14} />
               </button>
-              <button onClick={() => mutate((s) => reorderZ(s, selected.id, 'back'))} className="flex-1 px-2 py-1 rounded border border-stone-300 dark:border-stone-600 hover:bg-stone-100 dark:hover:bg-stone-800" title="Send back">
+              <button onClick={() => mutate((s) => reorderZ(s, selected.id, 'back'))} className="flex-1 px-2 py-1 rounded border border-[var(--edge-firm)] hover:bg-[var(--surface-sunken)]" title="Send back">
                 <Icon name="flip_to_back" size={14} />
               </button>
-              <button onClick={duplicateSelected} data-testid="design-duplicate" className="flex-1 px-2 py-1 rounded border border-stone-300 dark:border-stone-600 hover:bg-stone-100 dark:hover:bg-stone-800" title="Duplicate (Cmd/Ctrl+D)">
+              <button onClick={duplicateSelected} data-testid="design-duplicate" className="flex-1 px-2 py-1 rounded border border-[var(--edge-firm)] hover:bg-[var(--surface-sunken)]" title="Duplicate (Cmd/Ctrl+D)">
                 <Icon name="content_copy" size={14} />
               </button>
               <button
@@ -1022,8 +1022,8 @@ export default function DesignEditor({ content, title, onChange }: Props): JSX.E
         )}
 
         {!selected && (
-          <div className="w-56 shrink-0 border-l border-stone-200 dark:border-stone-700 p-3 text-[12px]" data-testid="design-canvas-inspector">
-            <div className="text-[10px] uppercase tracking-wide text-stone-400 mb-2">Canvas</div>
+          <div className="w-56 shrink-0 border-l border-[var(--edge-soft)] p-3 text-[12px]" data-testid="design-canvas-inspector">
+            <div className="text-[10px] uppercase tracking-wide text-[var(--ink-40)] mb-2">Canvas</div>
             <Field label="Background">
               <ColorInput
                 value={design.background?.type === 'solid' ? design.background.color ?? '#ffffff' : '#ffffff'}
@@ -1031,7 +1031,7 @@ export default function DesignEditor({ content, title, onChange }: Props): JSX.E
                 testid="design-bg-color"
               />
             </Field>
-            <p className="text-[11px] text-stone-400 mt-2">Select an element to edit it, or use the toolbar to add one.</p>
+            <p className="text-[11px] text-[var(--ink-40)] mt-2">Select an element to edit it, or use the toolbar to add one.</p>
           </div>
         )}
 
@@ -1060,12 +1060,12 @@ export default function DesignEditor({ content, title, onChange }: Props): JSX.E
 
       {variations.length > 0 && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 p-6" onClick={() => setVariations([])} data-testid="design-variations-modal">
-          <div className="w-full max-w-4xl max-h-[88vh] overflow-auto rounded-2xl bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-700 shadow-2xl p-5" onClick={(e) => e.stopPropagation()}>
+          <div className="w-full max-w-4xl max-h-[88vh] overflow-auto rounded-2xl bg-[var(--surface-raised)] border border-[var(--edge-soft)] shadow-2xl p-5" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center gap-2 mb-3">
               <Icon name="auto_awesome" size={18} className="text-accent" />
-              <h2 className="text-[15px] font-semibold text-stone-900 dark:text-stone-100">Pick a design</h2>
-              <span className="text-[12px] text-stone-400">{variations.length} on-brand options</span>
-              <button onClick={() => setVariations([])} className="ml-auto text-stone-400 hover:text-stone-600">
+              <h2 className="text-[15px] font-semibold text-[var(--ink-100)]">Pick a design</h2>
+              <span className="text-[12px] text-[var(--ink-40)]">{variations.length} on-brand options</span>
+              <button onClick={() => setVariations([])} className="ml-auto text-[var(--ink-40)] hover:text-[var(--ink-70)]">
                 <Icon name="close" size={16} />
               </button>
             </div>
@@ -1075,7 +1075,7 @@ export default function DesignEditor({ content, title, onChange }: Props): JSX.E
                   key={i}
                   onClick={() => applyVariation(v)}
                   data-testid={`design-variation-${i}`}
-                  className="rounded-lg overflow-hidden border border-stone-200 dark:border-stone-700 hover:border-accent hover:ring-2 hover:ring-accent/30 transition"
+                  className="rounded-lg overflow-hidden border border-[var(--edge-soft)] hover:border-accent hover:ring-2 hover:ring-accent/30 transition"
                   title="Use this design"
                 >
                   <DesignThumb design={v} width={232} />
@@ -1114,7 +1114,7 @@ function ToolBtn({ icon, label, onClick, active, testid }: { icon: string; label
     <button
       onClick={onClick}
       data-testid={testid}
-      className={`inline-flex items-center gap-1 px-2 py-1.5 rounded-lg ${active ? 'bg-accent/10 text-accent' : 'hover:bg-stone-100 dark:hover:bg-stone-800'}`}
+      className={`inline-flex items-center gap-1 px-2 py-1.5 rounded-lg ${active ? 'bg-accent/10 text-accent' : 'hover:bg-[var(--surface-sunken)]'}`}
     >
       <Icon name={icon} size={15} /> <span>{label}</span>
     </button>
@@ -1123,8 +1123,8 @@ function ToolBtn({ icon, label, onClick, active, testid }: { icon: string; label
 
 function Panel({ title, children }: { title: string; children: React.ReactNode }): JSX.Element {
   return (
-    <div className="px-3 py-2.5 border-b border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-900/50">
-      <div className="text-[11px] font-medium text-stone-600 dark:text-stone-300 mb-1.5">{title}</div>
+    <div className="px-3 py-2.5 border-b border-[var(--edge-soft)] bg-[var(--surface-sunken)]">
+      <div className="text-[11px] font-medium text-[var(--ink-70)] mb-1.5">{title}</div>
       {children}
     </div>
   )
@@ -1133,7 +1133,7 @@ function Panel({ title, children }: { title: string; children: React.ReactNode }
 function Field({ label, children }: { label: string; children: React.ReactNode }): JSX.Element {
   return (
     <label className="block mb-2">
-      <span className="text-[11px] text-stone-500">{label}</span>
+      <span className="text-[11px] text-[var(--ink-50)]">{label}</span>
       <div className="mt-1">{children}</div>
     </label>
   )
@@ -1146,7 +1146,7 @@ function ColorInput({ value, onChange, testid }: { value: string; onChange: (c: 
       value={value.startsWith('#') ? value : '#000000'}
       data-testid={testid}
       onChange={(e) => onChange(e.target.value)}
-      className="w-full h-7 rounded border border-stone-300 dark:border-stone-600 bg-transparent cursor-pointer"
+      className="w-full h-7 rounded border border-[var(--edge-firm)] bg-transparent cursor-pointer"
     />
   )
 }

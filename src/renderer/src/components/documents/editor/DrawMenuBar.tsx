@@ -100,7 +100,7 @@ export default function DrawMenuBar({ actions }: { actions: DrawMenuActions }): 
       <MenuBarShell menus={menus} testid="draw-menubar" />
       {shortcutsOpen && (
         <MenuModal title="How to draw" onClose={() => setShortcutsOpen(false)}>
-          <ul className="space-y-1.5 text-[13px] text-stone-600 dark:text-stone-300 list-disc pl-4">
+          <ul className="space-y-1.5 text-[13px] text-[var(--ink-70)] list-disc pl-4">
             <li>Add a shape from the Insert menu or the toolbar.</li>
             <li>Double-click a node to rename it.</li>
             <li>Drag from a node&apos;s dot to connect it to another.</li>

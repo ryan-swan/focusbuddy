@@ -53,7 +53,7 @@ const SlashMenuList = forwardRef<SlashListHandle, Props>(function SlashMenuList(
 
   if (items.length === 0) {
     return (
-      <div className="w-64 rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 shadow-xl p-2 text-[12px] text-stone-400">
+      <div className="w-64 rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-xl p-2 text-[12px] text-[var(--ink-40)]">
         No matching command
       </div>
     )
@@ -62,7 +62,7 @@ const SlashMenuList = forwardRef<SlashListHandle, Props>(function SlashMenuList(
   return (
     <div
       data-testid="doc-slash-menu"
-      className="w-64 max-h-72 overflow-auto rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 shadow-xl py-1"
+      className="w-64 max-h-72 overflow-auto rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-xl py-1"
     >
       {items.map((item, i) => (
         <button
@@ -70,17 +70,17 @@ const SlashMenuList = forwardRef<SlashListHandle, Props>(function SlashMenuList(
           onMouseEnter={() => setSelected(i)}
           onClick={() => command(item)}
           className={`w-full flex items-center gap-2.5 px-2.5 py-1.5 text-left ${
-            i === selected ? 'bg-accent/10' : 'hover:bg-stone-100 dark:hover:bg-stone-800'
+            i === selected ? 'bg-accent/10' : 'hover:bg-[var(--surface-sunken)]'
           }`}
         >
-          <span className="h-7 w-7 shrink-0 inline-flex items-center justify-center rounded border border-stone-200 dark:border-stone-700 text-stone-600 dark:text-stone-300">
+          <span className="h-7 w-7 shrink-0 inline-flex items-center justify-center rounded border border-[var(--edge-soft)] text-[var(--ink-70)]">
             <Icon name={item.icon} size={15} />
           </span>
           <span className="min-w-0">
-            <span className="block text-[12.5px] font-medium text-stone-800 dark:text-stone-100">
+            <span className="block text-[12.5px] font-medium text-[var(--ink-90)]">
               {item.title}
             </span>
-            <span className="block text-[11px] text-stone-400 truncate">{item.subtitle}</span>
+            <span className="block text-[11px] text-[var(--ink-40)] truncate">{item.subtitle}</span>
           </span>
         </button>
       ))}

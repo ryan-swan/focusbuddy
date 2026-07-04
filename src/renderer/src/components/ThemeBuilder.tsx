@@ -88,17 +88,17 @@ export default function ThemeBuilder({
     <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
       <div
         ref={ref}
-        className="w-full max-w-md max-h-[86vh] overflow-y-auto rounded-xl fb-glass-pillow border border-[color:var(--glass-pillow-border)] bg-stone-50/95 dark:bg-stone-900/95"
+        className="w-full max-w-md max-h-[86vh] overflow-y-auto rounded-xl fb-glass-pillow border border-[color:var(--glass-pillow-border)] bg-[var(--surface-sunken)]/95"
         data-testid="theme-builder"
       >
-        <div className="sticky top-0 z-10 px-4 py-3 border-b border-stone-200 dark:border-stone-700 bg-stone-50/90 dark:bg-stone-900/90 backdrop-blur flex items-center justify-between">
+        <div className="sticky top-0 z-10 px-4 py-3 border-b border-[var(--edge-soft)] bg-[var(--surface-sunken)]/90 backdrop-blur flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Icon name="palette" size={18} className="text-accent" />
             <div>
-              <div className="text-sm font-semibold text-stone-900 dark:text-stone-100">
+              <div className="text-sm font-semibold text-[var(--ink-100)]">
                 Theme studio
               </div>
-              <div className="text-[10px] text-stone-500 dark:text-stone-400">
+              <div className="text-[10px] text-[var(--ink-50)]">
                 Free for everyone. Changes apply live.
               </div>
             </div>
@@ -106,7 +106,7 @@ export default function ThemeBuilder({
           <div className="flex items-center gap-1">
             <button
               onClick={onResetCustomization}
-              className="text-[10px] px-2 py-1 rounded border border-stone-200 dark:border-stone-700 text-stone-500 dark:text-stone-400 hover:bg-stone-100 dark:hover:bg-stone-700"
+              className="text-[10px] px-2 py-1 rounded border border-[var(--edge-soft)] text-[var(--ink-50)] hover:bg-[var(--surface-sunken)]"
               data-testid="themestudio-reset"
               title="Reset background, glass and icon customisations to default"
             >
@@ -121,7 +121,7 @@ export default function ThemeBuilder({
         <div className="p-4 space-y-5">
           {/* Base theme */}
           <section>
-            <div className="text-[11px] uppercase tracking-[0.12em] text-stone-500 dark:text-stone-400 font-semibold mb-2">
+            <div className="text-[11px] uppercase tracking-[0.12em] text-[var(--ink-50)] font-semibold mb-2">
               Base theme
             </div>
             <div className="grid grid-cols-5 gap-1.5">
@@ -135,8 +135,8 @@ export default function ThemeBuilder({
                   }}
                   className={`flex flex-col items-center gap-1 py-2 rounded-md border text-[10px] transition-colors ${
                     mode === o.value
-                      ? 'border-accent bg-accent/10 text-stone-900 dark:text-stone-100'
-                      : 'border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 text-stone-700 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-700'
+                      ? 'border-accent bg-accent/10 text-[var(--ink-100)]'
+                      : 'border-[var(--edge-soft)] bg-[var(--surface-raised)] text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]'
                   }`}
                   data-testid={`themestudio-mode-${o.value}`}
                 >
@@ -144,7 +144,7 @@ export default function ThemeBuilder({
                     name={o.icon}
                     size={16}
                     className={
-                      mode === o.value ? 'text-accent' : 'text-stone-500 dark:text-stone-400'
+                      mode === o.value ? 'text-accent' : 'text-[var(--ink-50)]'
                     }
                   />
                   <span>{o.label}</span>
@@ -152,13 +152,13 @@ export default function ThemeBuilder({
               ))}
             </div>
             {mode === 'atelier' && (
-              <p className="text-[10px] text-stone-500 dark:text-stone-400 mt-1.5 leading-snug">
+              <p className="text-[10px] text-[var(--ink-50)] mt-1.5 leading-snug">
                 Atelier locks its heritage-gold accent for cohesion. Switch to another base
                 theme to use a custom accent.
               </p>
             )}
             {mode === 'gemstone' && (
-              <p className="text-[10px] text-stone-500 dark:text-stone-400 mt-1.5 leading-snug">
+              <p className="text-[10px] text-[var(--ink-50)] mt-1.5 leading-snug">
                 Gemstone re-tints its sparkle and refraction to your accent. The Emerald, Ruby
                 and Sapphire accents below are tuned to it.
               </p>
@@ -167,7 +167,7 @@ export default function ThemeBuilder({
 
           {/* Accent */}
           <section>
-            <div className="text-[11px] uppercase tracking-[0.12em] text-stone-500 dark:text-stone-400 font-semibold mb-2">
+            <div className="text-[11px] uppercase tracking-[0.12em] text-[var(--ink-50)] font-semibold mb-2">
               Accent colour
             </div>
             <div className="grid grid-cols-5 gap-1.5 mb-2.5">
@@ -182,8 +182,8 @@ export default function ThemeBuilder({
                   title={o.label}
                   className={`flex flex-col items-center gap-1 py-2 rounded-md border transition-colors ${
                     accent === o.value
-                      ? 'border-stone-700 dark:border-stone-300 bg-stone-100 dark:bg-stone-700'
-                      : 'border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 hover:bg-stone-100 dark:hover:bg-stone-700'
+                      ? 'border-stone-700 dark:border-stone-300 bg-[var(--surface-sunken)]'
+                      : 'border-[var(--edge-soft)] bg-[var(--surface-raised)] hover:bg-[var(--surface-sunken)]'
                   }`}
                   data-testid={`themestudio-accent-${o.value}`}
                 >
@@ -191,7 +191,7 @@ export default function ThemeBuilder({
                     className="h-5 w-5 rounded-full border-2 border-white dark:border-stone-900 shadow"
                     style={{ backgroundColor: o.preview }}
                   />
-                  <span className="text-[10px] text-stone-600 dark:text-stone-400">{o.label}</span>
+                  <span className="text-[10px] text-[var(--ink-70)]">{o.label}</span>
                 </button>
               ))}
             </div>
@@ -201,11 +201,11 @@ export default function ThemeBuilder({
               className={`flex items-center gap-3 rounded-lg border p-2.5 transition-colors ${
                 customActive
                   ? 'border-accent bg-accent/[0.06]'
-                  : 'border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800'
+                  : 'border-[var(--edge-soft)] bg-[var(--surface-raised)]'
               }`}
             >
               <label
-                className="relative h-9 w-9 rounded-md overflow-hidden border border-stone-300 dark:border-stone-600 cursor-pointer shrink-0"
+                className="relative h-9 w-9 rounded-md overflow-hidden border border-[var(--edge-firm)] cursor-pointer shrink-0"
                 title="Pick any colour"
               >
                 <span
@@ -225,7 +225,7 @@ export default function ThemeBuilder({
                 />
               </label>
               <div className="min-w-0 flex-1">
-                <div className="text-xs font-medium text-stone-800 dark:text-stone-200">
+                <div className="text-xs font-medium text-[var(--ink-90)]">
                   Custom colour
                 </div>
                 <input
@@ -238,7 +238,7 @@ export default function ThemeBuilder({
                     if (isValidHex(next)) onCustomAccentChange(next)
                   }}
                   placeholder="#7c3aed"
-                  className="mt-0.5 w-28 px-1.5 py-0.5 rounded bg-stone-100 dark:bg-stone-900 border border-stone-200 dark:border-stone-700 text-[11px] font-mono text-stone-700 dark:text-stone-300 focus:outline-none focus:border-accent"
+                  className="mt-0.5 w-28 px-1.5 py-0.5 rounded bg-[var(--surface-sunken)] border border-[var(--edge-soft)] text-[11px] font-mono text-[var(--ink-70)] focus:outline-none focus:border-accent"
                   data-testid="themestudio-custom-hex"
                 />
               </div>
@@ -253,7 +253,7 @@ export default function ThemeBuilder({
 
           {/* Font */}
           <section>
-            <div className="text-[11px] uppercase tracking-[0.12em] text-stone-500 dark:text-stone-400 font-semibold mb-2">
+            <div className="text-[11px] uppercase tracking-[0.12em] text-[var(--ink-50)] font-semibold mb-2">
               Interface font
             </div>
             <div className="space-y-1.5">
@@ -266,13 +266,13 @@ export default function ThemeBuilder({
                     className={`w-full text-left rounded-lg border p-2.5 transition-colors ${
                       active
                         ? 'border-accent bg-accent/[0.06]'
-                        : 'border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 hover:bg-stone-100 dark:hover:bg-stone-700'
+                        : 'border-[var(--edge-soft)] bg-[var(--surface-raised)] hover:bg-[var(--surface-sunken)]'
                     }`}
                     data-testid={`themestudio-font-${o.value}`}
                   >
                     <div className="flex items-center justify-between">
                       <span
-                        className="text-sm font-semibold text-stone-900 dark:text-stone-100"
+                        className="text-sm font-semibold text-[var(--ink-100)]"
                         style={{ fontFamily: o.stack }}
                       >
                         {o.label}
@@ -282,12 +282,12 @@ export default function ThemeBuilder({
                       )}
                     </div>
                     <div
-                      className="text-[15px] text-stone-700 dark:text-stone-300 mt-0.5"
+                      className="text-[15px] text-[var(--ink-70)] mt-0.5"
                       style={{ fontFamily: o.stack }}
                     >
                       The quick brown fox jumps over 1,234
                     </div>
-                    <div className="text-[10px] text-stone-500 dark:text-stone-400 mt-1 leading-snug">
+                    <div className="text-[10px] text-[var(--ink-50)] mt-1 leading-snug">
                       {o.note}
                     </div>
                   </button>
@@ -298,7 +298,7 @@ export default function ThemeBuilder({
 
           {/* Text size — app-wide, like the browser's Ctrl-+ */}
           <section>
-            <div className="text-[11px] uppercase tracking-[0.12em] text-stone-500 dark:text-stone-400 font-semibold mb-2">
+            <div className="text-[11px] uppercase tracking-[0.12em] text-[var(--ink-50)] font-semibold mb-2">
               Text size
             </div>
             <div className="grid grid-cols-5 gap-1.5">
@@ -314,8 +314,8 @@ export default function ThemeBuilder({
                     }}
                     className={`flex flex-col items-center gap-0.5 py-2 rounded-md border transition-colors ${
                       active
-                        ? 'border-accent bg-accent/10 text-stone-900 dark:text-stone-100'
-                        : 'border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 text-stone-700 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-700'
+                        ? 'border-accent bg-accent/10 text-[var(--ink-100)]'
+                        : 'border-[var(--edge-soft)] bg-[var(--surface-raised)] text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]'
                     }`}
                     data-testid={`themestudio-uiscale-${o.value}`}
                   >
@@ -327,7 +327,7 @@ export default function ThemeBuilder({
                 )
               })}
             </div>
-            <p className="text-[10px] text-stone-500 dark:text-stone-400 mt-1.5 leading-snug">
+            <p className="text-[10px] text-[var(--ink-50)] mt-1.5 leading-snug">
               Makes everything in the app larger or smaller, the same as your browser's zoom. Affects all menus,
               lists, and buttons.
             </p>
@@ -335,7 +335,7 @@ export default function ThemeBuilder({
 
           {/* Canvas background */}
           <section>
-            <div className="text-[11px] uppercase tracking-[0.12em] text-stone-500 dark:text-stone-400 font-semibold mb-2">
+            <div className="text-[11px] uppercase tracking-[0.12em] text-[var(--ink-50)] font-semibold mb-2">
               Canvas background
             </div>
             <div className="grid grid-cols-3 gap-1.5 mb-2.5">
@@ -351,8 +351,8 @@ export default function ThemeBuilder({
                   onClick={() => onCustomizationChange({ deskBgMode: o.value })}
                   className={`flex flex-col items-center gap-1 py-2 rounded-md border text-[10px] transition-colors ${
                     c.deskBgMode === o.value
-                      ? 'border-accent bg-accent/10 text-stone-900 dark:text-stone-100'
-                      : 'border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 text-stone-700 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-700'
+                      ? 'border-accent bg-accent/10 text-[var(--ink-100)]'
+                      : 'border-[var(--edge-soft)] bg-[var(--surface-raised)] text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]'
                   }`}
                   data-testid={`themestudio-bg-${o.value}`}
                 >
@@ -360,7 +360,7 @@ export default function ThemeBuilder({
                     name={o.icon}
                     size={16}
                     className={
-                      c.deskBgMode === o.value ? 'text-accent' : 'text-stone-500 dark:text-stone-400'
+                      c.deskBgMode === o.value ? 'text-accent' : 'text-[var(--ink-50)]'
                     }
                   />
                   <span>{o.label}</span>
@@ -380,7 +380,7 @@ export default function ThemeBuilder({
             {c.deskBgMode === 'gradient' && (
               <div className="space-y-2.5">
                 <div
-                  className="h-12 rounded-lg border border-stone-200 dark:border-stone-700"
+                  className="h-12 rounded-lg border border-[var(--edge-soft)]"
                   style={{
                     background: `linear-gradient(${c.gradAngle}deg, ${c.gradFrom}, ${c.gradTo})`
                   }}
@@ -418,10 +418,10 @@ export default function ThemeBuilder({
 
           {/* Glass & depth */}
           <section>
-            <div className="text-[11px] uppercase tracking-[0.12em] text-stone-500 dark:text-stone-400 font-semibold mb-2">
+            <div className="text-[11px] uppercase tracking-[0.12em] text-[var(--ink-50)] font-semibold mb-2">
               Glass &amp; depth
             </div>
-            <p className="text-[10px] text-stone-500 dark:text-stone-400 mb-2 leading-snug">
+            <p className="text-[10px] text-[var(--ink-50)] mb-2 leading-snug">
               Tunes the frosted-glass blur and translucency on the sidebar, toolbar, popovers
               and dialogs all at once.
             </p>
@@ -449,11 +449,11 @@ export default function ThemeBuilder({
 
           {/* Icons */}
           <section>
-            <div className="text-[11px] uppercase tracking-[0.12em] text-stone-500 dark:text-stone-400 font-semibold mb-2">
+            <div className="text-[11px] uppercase tracking-[0.12em] text-[var(--ink-50)] font-semibold mb-2">
               Icons
             </div>
             <div className="flex items-center gap-2 mb-2.5">
-              <span className="text-[11px] text-stone-600 dark:text-stone-400 w-14 shrink-0">
+              <span className="text-[11px] text-[var(--ink-70)] w-14 shrink-0">
                 Weight
               </span>
               <div className="grid grid-cols-4 gap-1 flex-1">
@@ -463,8 +463,8 @@ export default function ThemeBuilder({
                     onClick={() => onCustomizationChange({ iconWeight: w.value })}
                     className={`py-1 rounded text-[10px] border transition-colors ${
                       c.iconWeight === w.value
-                        ? 'border-accent bg-accent/10 text-stone-900 dark:text-stone-100'
-                        : 'border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 text-stone-600 dark:text-stone-400 hover:bg-stone-100 dark:hover:bg-stone-700'
+                        ? 'border-accent bg-accent/10 text-[var(--ink-100)]'
+                        : 'border-[var(--edge-soft)] bg-[var(--surface-raised)] text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]'
                     }`}
                     data-testid={`themestudio-icon-weight-${w.value}`}
                   >
@@ -474,7 +474,7 @@ export default function ThemeBuilder({
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-[11px] text-stone-600 dark:text-stone-400 w-14 shrink-0">
+              <span className="text-[11px] text-[var(--ink-70)] w-14 shrink-0">
                 Style
               </span>
               <div className="grid grid-cols-2 gap-1 flex-1">
@@ -489,8 +489,8 @@ export default function ThemeBuilder({
                     onClick={() => onCustomizationChange({ iconFilled: o.val })}
                     className={`py-1 rounded text-[10px] border transition-colors ${
                       c.iconFilled === o.val
-                        ? 'border-accent bg-accent/10 text-stone-900 dark:text-stone-100'
-                        : 'border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 text-stone-600 dark:text-stone-400 hover:bg-stone-100 dark:hover:bg-stone-700'
+                        ? 'border-accent bg-accent/10 text-[var(--ink-100)]'
+                        : 'border-[var(--edge-soft)] bg-[var(--surface-raised)] text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]'
                     }`}
                     data-testid={`themestudio-icon-fill-${o.val ? 'filled' : 'outlined'}`}
                   >
@@ -501,7 +501,7 @@ export default function ThemeBuilder({
             </div>
             {/* Live sample — these icons pass no explicit weight/fill, so they
                 reflect the global choice immediately. */}
-            <div className="flex items-center gap-4 mt-3 px-1 text-stone-600 dark:text-stone-300">
+            <div className="flex items-center gap-4 mt-3 px-1 text-[var(--ink-70)]">
               {['home', 'folder', 'settings', 'favorite', 'bolt', 'check_circle'].map((n) => (
                 <Icon key={n} name={n} size={22} />
               ))}
@@ -528,9 +528,9 @@ function SwatchRow({
   compact?: boolean
 }): JSX.Element {
   return (
-    <div className="flex items-center gap-2.5 rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 p-2">
+    <div className="flex items-center gap-2.5 rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-raised)] p-2">
       <label
-        className="relative h-8 w-8 rounded-md overflow-hidden border border-stone-300 dark:border-stone-600 cursor-pointer shrink-0"
+        className="relative h-8 w-8 rounded-md overflow-hidden border border-[var(--edge-firm)] cursor-pointer shrink-0"
         title={label}
       >
         <span className="absolute inset-0" style={{ backgroundColor: value }} />
@@ -544,14 +544,14 @@ function SwatchRow({
         />
       </label>
       <div className="min-w-0 flex-1">
-        <div className="text-[11px] text-stone-600 dark:text-stone-400">{label}</div>
+        <div className="text-[11px] text-[var(--ink-70)]">{label}</div>
         {!compact && (
           <input
             type="text"
             value={value}
             spellCheck={false}
             onChange={(e) => onChange(e.target.value)}
-            className="mt-0.5 w-24 px-1.5 py-0.5 rounded bg-stone-100 dark:bg-stone-900 border border-stone-200 dark:border-stone-700 text-[11px] font-mono text-stone-700 dark:text-stone-300 focus:outline-none focus:border-accent"
+            className="mt-0.5 w-24 px-1.5 py-0.5 rounded bg-[var(--surface-sunken)] border border-[var(--edge-soft)] text-[11px] font-mono text-[var(--ink-70)] focus:outline-none focus:border-accent"
             data-testid={`${testid}-hex`}
           />
         )}
@@ -583,8 +583,8 @@ function SliderRow({
   return (
     <div className="py-1">
       <div className="flex items-center justify-between mb-1">
-        <span className="text-[11px] text-stone-600 dark:text-stone-400">{label}</span>
-        <span className="text-[10px] font-mono text-stone-500 dark:text-stone-400">
+        <span className="text-[11px] text-[var(--ink-70)]">{label}</span>
+        <span className="text-[10px] font-mono text-[var(--ink-50)]">
           {value}
           {suffix ?? ''}
         </span>

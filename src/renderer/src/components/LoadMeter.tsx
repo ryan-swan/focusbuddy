@@ -72,7 +72,7 @@ export default function LoadMeter(): JSX.Element {
       <button
         ref={btnRef}
         onClick={() => setOpen((v) => !v)}
-        className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors ${
+        className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md hover:bg-[var(--surface-sunken)] transition-colors ${
           overloaded ? 'animate-pulse' : ''
         }`}
         title={`Cognitive load: ${tier.label} (${load.toFixed(1)} weighted) — click to park widgets`}
@@ -87,7 +87,7 @@ export default function LoadMeter(): JSX.Element {
           {Math.round(load)}
         </span>
         {archived.length > 0 && (
-          <span className="text-[10px] text-stone-500 dark:text-stone-400">
+          <span className="text-[10px] text-[var(--ink-50)]">
             +{archived.length}
           </span>
         )}
@@ -161,13 +161,13 @@ function LoadMeterPopover({
   return (
     <div
       ref={ref}
-      className="fixed z-[180] w-80 rounded-lg bg-stone-50 dark:bg-stone-900 border border-stone-200 dark:border-stone-700 shadow-2xl backdrop-blur"
+      className="fixed z-[180] w-80 rounded-lg bg-[var(--surface-sunken)] border border-[var(--edge-soft)] shadow-2xl backdrop-blur"
       style={style}
     >
-      <div className="px-3 py-2 border-b border-stone-200 dark:border-stone-700 flex items-center justify-between">
+      <div className="px-3 py-2 border-b border-[var(--edge-soft)] flex items-center justify-between">
         <div className="flex items-center gap-1.5">
           <Icon name="speed" size={14} className={tier.color} />
-          <span className="text-[12px] font-semibold text-stone-900 dark:text-stone-100">
+          <span className="text-[12px] font-semibold text-[var(--ink-100)]">
             Cognitive load
           </span>
         </div>
@@ -175,15 +175,15 @@ function LoadMeterPopover({
       </div>
 
       <div className="px-3 py-3">
-        <div className="h-2 w-full rounded-full bg-stone-200 dark:bg-stone-800 overflow-hidden mb-2">
+        <div className="h-2 w-full rounded-full bg-[var(--surface-sunken)] overflow-hidden mb-2">
           <div
             className={`h-full ${tier.bg} transition-all duration-300`}
             style={{ width: `${gaugePct}%` }}
           />
         </div>
-        <div className="flex items-baseline justify-between text-[11px] text-stone-600 dark:text-stone-400">
+        <div className="flex items-baseline justify-between text-[11px] text-[var(--ink-70)]">
           <span>
-            <span className="font-semibold text-stone-900 dark:text-stone-100 tabular-nums">
+            <span className="font-semibold text-[var(--ink-100)] tabular-nums">
               {visibleCount}
             </span>{' '}
             widget{visibleCount === 1 ? '' : 's'} visible
@@ -199,14 +199,14 @@ function LoadMeterPopover({
           <Icon name="inventory_2" size={14} />
           <span>Park everything except the active widget</span>
         </button>
-        <p className="mt-1.5 text-[10px] text-stone-500 dark:text-stone-500 text-center leading-snug">
+        <p className="mt-1.5 text-[10px] text-[var(--ink-50)] text-center leading-snug">
           Hides widgets from the canvas — restore any of them below or later.
         </p>
       </div>
 
       {archived.length > 0 && (
-        <div className="border-t border-stone-200 dark:border-stone-700 px-3 py-2 max-h-56 overflow-auto">
-          <div className="text-[10px] uppercase tracking-wider text-stone-500 dark:text-stone-400 mb-1.5">
+        <div className="border-t border-[var(--edge-soft)] px-3 py-2 max-h-56 overflow-auto">
+          <div className="text-[10px] uppercase tracking-wider text-[var(--ink-50)] mb-1.5">
             Parked ({archived.length})
           </div>
           <div className="space-y-0.5">
@@ -214,17 +214,17 @@ function LoadMeterPopover({
               <button
                 key={w.id}
                 onClick={() => void onRestore(w.id)}
-                className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-left text-xs text-stone-700 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors group"
+                className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-left text-xs text-[var(--ink-70)] hover:bg-[var(--surface-sunken)] transition-colors group"
               >
                 <Icon
                   name="unarchive"
                   size={13}
-                  className="text-stone-400 dark:text-stone-500 group-hover:text-accent shrink-0"
+                  className="text-[var(--ink-40)] group-hover:text-accent shrink-0"
                 />
                 <span className="truncate flex-1">
-                  {w.title || <em className="text-stone-400 dark:text-stone-500">{w.kind}</em>}
+                  {w.title || <em className="text-[var(--ink-40)]">{w.kind}</em>}
                 </span>
-                <span className="text-[10px] text-stone-400 dark:text-stone-500 font-mono shrink-0">
+                <span className="text-[10px] text-[var(--ink-40)] font-mono shrink-0">
                   {w.kind}
                 </span>
               </button>

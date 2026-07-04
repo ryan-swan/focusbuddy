@@ -183,7 +183,7 @@ export default function ApiKeysSection({ onKeySaved }: Props): JSX.Element {
         onKeySaved={onKeySaved}
       />
 
-      <div className="text-[10px] text-[var(--ink-50)] leading-relaxed">
+      <div className="text-[11px] text-[var(--ink-50)] leading-relaxed">
         Each key is encrypted with the macOS Keychain and stored locally only.
         When you use your own key, prompts go direct from this Mac to Anthropic /
         OpenAI. On PlexiDesk credits, AI prompts route through PlexiDesk's server
@@ -294,7 +294,7 @@ function AiSourceSection(): JSX.Element {
             } disabled:opacity-50`}
           >
             <div className="font-medium">{m.label}</div>
-            <div className="text-[10px] text-[var(--ink-50)] mt-0.5 leading-snug">
+            <div className="text-[11px] text-[var(--ink-50)] mt-0.5 leading-snug">
               {m.sub}
             </div>
           </button>
@@ -352,7 +352,7 @@ function AiSourceSection(): JSX.Element {
       )}
 
       {note && (
-        <div className="text-[10px] text-[var(--ink-50)] mb-2 leading-snug">
+        <div className="text-[11px] text-[var(--ink-50)] mb-2 leading-snug">
           {note}
         </div>
       )}
@@ -431,7 +431,7 @@ function VoiceProviderToggle(): JSX.Element {
           data-testid="voice-provider-cloud"
         >
           <div className="font-medium">Cloud</div>
-          <div className="text-[10px] text-[var(--ink-50)] mt-0.5">
+          <div className="text-[11px] text-[var(--ink-50)] mt-0.5">
             OpenAI Whisper · fastest · paid per minute
           </div>
         </button>
@@ -446,13 +446,13 @@ function VoiceProviderToggle(): JSX.Element {
           data-testid="voice-provider-local"
         >
           <div className="font-medium">Local</div>
-          <div className="text-[10px] text-[var(--ink-50)] mt-0.5">
+          <div className="text-[11px] text-[var(--ink-50)] mt-0.5">
             Whisper tiny · offline · free · ~80MB
           </div>
         </button>
       </div>
       {status && (
-        <div className="text-[10px] text-[var(--ink-50)] mt-2 leading-snug">
+        <div className="text-[11px] text-[var(--ink-50)] mt-2 leading-snug">
           {status}
         </div>
       )}
@@ -562,7 +562,7 @@ function ApiKeyRow({
           <span className="text-xs text-[var(--ink-70)]">
             {config.label}
           </span>
-          <span className="text-[10px] text-[var(--ink-50)] leading-snug">
+          <span className="text-[11px] text-[var(--ink-50)] leading-snug">
             {config.purpose}
           </span>
         </div>
@@ -633,7 +633,7 @@ function ApiKeyRow({
             <button
               type="button"
               onClick={() => setShow(!show)}
-              className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] uppercase tracking-wider text-[var(--ink-50)] hover:text-[var(--ink-70)] px-1.5 py-0.5"
+              className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[11px] uppercase tracking-wider text-[var(--ink-50)] hover:text-[var(--ink-70)] px-1.5 py-0.5"
             >
               {show ? 'Hide' : 'Show'}
             </button>

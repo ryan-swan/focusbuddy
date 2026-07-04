@@ -68,9 +68,9 @@ export default function Toolbar({
     `h-7 min-w-7 px-1 inline-flex items-center justify-center rounded text-[13px] ${
       active
         ? 'bg-accent/15 text-accent'
-        : 'text-stone-600 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800'
+        : 'text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]'
     }`
-  const Divider = (): JSX.Element => <div className="w-px h-5 bg-stone-200 dark:bg-stone-700 mx-0.5" />
+  const Divider = (): JSX.Element => <div className="w-px h-5 bg-[var(--edge-soft)] mx-0.5" />
 
   // Which heading level (if any) the cursor is in, for the heading-style control.
   const currentHeadingLevel =
@@ -95,12 +95,12 @@ export default function Toolbar({
 
   const wordCount = editor.storage.characterCount?.words?.() ?? 0
 
-  const sel = 'h-7 bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded text-[11px] px-1 text-stone-600 dark:text-stone-300 focus:outline-none'
+  const sel = 'h-7 bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded text-[11px] px-1 text-[var(--ink-70)] focus:outline-none'
 
   return (
     <div
       data-testid="doc-toolbar"
-      className="sticky top-0 z-20 -mx-2 px-2 py-1.5 mb-4 flex items-center gap-0.5 flex-wrap bg-paper/95 backdrop-blur border-b border-stone-200/70 dark:border-stone-800/70"
+      className="sticky top-0 z-20 -mx-2 px-2 py-1.5 mb-4 flex items-center gap-0.5 flex-wrap bg-paper/95 backdrop-blur border-b border-[var(--edge-soft)]/70"
     >
       <button className={btn(false)} title="Undo" onClick={() => editor.chain().focus().undo().run()}>
         <Icon name="undo" size={15} />
@@ -300,21 +300,21 @@ export default function Toolbar({
       )}
 
       <div className="ml-auto flex items-center gap-1.5">
-        <span className="text-[11px] text-stone-400 tabular-nums">{wordCount} words</span>
+        <span className="text-[11px] text-[var(--ink-40)] tabular-nums">{wordCount} words</span>
         <div ref={officeRef} className="relative">
           <button className={btn(officeOpen)} title="Open or export Office files" onClick={() => setOfficeOpen((v) => !v)}>
             <Icon name="folder_open" size={15} />
           </button>
           {officeOpen && (
-            <div className="absolute right-0 z-50 mt-1 w-48 rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 shadow-xl py-1 text-[12px]">
-              <button onClick={() => { setOfficeOpen(false); onImportDocx() }} className="w-full flex items-center gap-2 px-3 py-1.5 text-left hover:bg-stone-100 dark:hover:bg-stone-800">
-                <Icon name="upload_file" size={14} className="text-stone-400" /> Import Word (.docx)
+            <div className="absolute right-0 z-50 mt-1 w-48 rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-xl py-1 text-[12px]">
+              <button onClick={() => { setOfficeOpen(false); onImportDocx() }} className="w-full flex items-center gap-2 px-3 py-1.5 text-left hover:bg-[var(--surface-sunken)]">
+                <Icon name="upload_file" size={14} className="text-[var(--ink-40)]" /> Import Word (.docx)
               </button>
-              <button onClick={() => { setOfficeOpen(false); onExportDocx() }} className="w-full flex items-center gap-2 px-3 py-1.5 text-left hover:bg-stone-100 dark:hover:bg-stone-800">
-                <Icon name="description" size={14} className="text-stone-400" /> Export Word (.docx)
+              <button onClick={() => { setOfficeOpen(false); onExportDocx() }} className="w-full flex items-center gap-2 px-3 py-1.5 text-left hover:bg-[var(--surface-sunken)]">
+                <Icon name="description" size={14} className="text-[var(--ink-40)]" /> Export Word (.docx)
               </button>
-              <button onClick={() => { setOfficeOpen(false); onExportPdf() }} className="w-full flex items-center gap-2 px-3 py-1.5 text-left hover:bg-stone-100 dark:hover:bg-stone-800">
-                <Icon name="picture_as_pdf" size={14} className="text-stone-400" /> Export PDF
+              <button onClick={() => { setOfficeOpen(false); onExportPdf() }} className="w-full flex items-center gap-2 px-3 py-1.5 text-left hover:bg-[var(--surface-sunken)]">
+                <Icon name="picture_as_pdf" size={14} className="text-[var(--ink-40)]" /> Export PDF
               </button>
             </div>
           )}
@@ -374,7 +374,7 @@ function StylesPanel({
 
   const tiny = 'h-6 w-6 inline-flex items-center justify-center rounded text-[12px]'
   const numCls =
-    'w-11 bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded px-1 py-0.5 text-[11px] focus:outline-none'
+    'w-11 bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded px-1 py-0.5 text-[11px] focus:outline-none'
 
   function applyRow(active: boolean, label: string, icon: string, onClick: () => void, testid: string): JSX.Element {
     return (
@@ -382,10 +382,10 @@ function StylesPanel({
         onClick={onClick}
         data-testid={testid}
         className={`w-full flex items-center gap-2 px-2 py-1.5 rounded text-[13px] ${
-          active ? 'bg-accent/10 text-accent' : 'hover:bg-stone-100 dark:hover:bg-stone-800'
+          active ? 'bg-accent/10 text-accent' : 'hover:bg-[var(--surface-sunken)]'
         }`}
       >
-        <Icon name={icon} size={14} className="text-stone-400" />
+        <Icon name={icon} size={14} className="text-[var(--ink-40)]" />
         {label}
       </button>
     )
@@ -398,7 +398,7 @@ function StylesPanel({
       <div
         key={h.level}
         data-testid={`doc-style-row-${h.level}`}
-        className={`flex items-center gap-1 px-2 py-1 rounded ${active ? 'bg-accent/10' : 'hover:bg-stone-100 dark:hover:bg-stone-800'}`}
+        className={`flex items-center gap-1 px-2 py-1 rounded ${active ? 'bg-accent/10' : 'hover:bg-[var(--surface-sunken)]'}`}
       >
         <button
           onClick={() => onApplyLevel(h.level)}
@@ -408,14 +408,14 @@ function StylesPanel({
         >
           {h.label}
         </button>
-        <button className={`${tiny} ${s.bold ? 'bg-accent/15 text-accent' : 'text-stone-500 hover:bg-stone-100 dark:hover:bg-stone-800'}`} title="Bold" onClick={() => onSet(h.level, { bold: !s.bold })}>
+        <button className={`${tiny} ${s.bold ? 'bg-accent/15 text-accent' : 'text-[var(--ink-50)] hover:bg-[var(--surface-sunken)]'}`} title="Bold" onClick={() => onSet(h.level, { bold: !s.bold })}>
           <Icon name="format_bold" size={13} />
         </button>
-        <button className={`${tiny} ${s.italic ? 'bg-accent/15 text-accent' : 'text-stone-500 hover:bg-stone-100 dark:hover:bg-stone-800'}`} title="Italic" onClick={() => onSet(h.level, { italic: !s.italic })}>
+        <button className={`${tiny} ${s.italic ? 'bg-accent/15 text-accent' : 'text-[var(--ink-50)] hover:bg-[var(--surface-sunken)]'}`} title="Italic" onClick={() => onSet(h.level, { italic: !s.italic })}>
           <Icon name="format_italic" size={13} />
         </button>
         <input type="number" min={10} max={96} value={s.fontSize ?? ''} placeholder={String(h.preview)} title="Size" onChange={(e) => onSet(h.level, { fontSize: e.target.value === '' ? undefined : Number(e.target.value) })} className={numCls} />
-        <input type="color" value={s.color ?? '#1c1917'} title="Colour" onChange={(e) => onSet(h.level, { color: e.target.value })} className="h-6 w-6 rounded cursor-pointer p-0 border border-stone-200 dark:border-stone-700" />
+        <input type="color" value={s.color ?? '#1c1917'} title="Colour" onChange={(e) => onSet(h.level, { color: e.target.value })} className="h-6 w-6 rounded cursor-pointer p-0 border border-[var(--edge-soft)]" />
       </div>
     )
   }
@@ -424,19 +424,19 @@ function StylesPanel({
     <div
       ref={ref}
       data-testid="doc-styles-panel"
-      className="absolute z-50 mt-1 left-0 w-[340px] max-h-[70vh] overflow-auto rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 shadow-xl p-2 font-normal"
+      className="absolute z-50 mt-1 left-0 w-[340px] max-h-[70vh] overflow-auto rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-xl p-2 font-normal"
     >
       {applyRow(currentHeadingLevel === null && !editor.isActive('blockquote') && !editor.isActive('codeBlock') && !editor.isActive('bulletList') && !editor.isActive('orderedList'), 'Normal text', 'notes', () => onApplyLevel(0), 'doc-style-row-0')}
-      <div className="my-1 border-t border-stone-100 dark:border-stone-800" />
+      <div className="my-1 border-t border-[var(--edge-soft)]" />
       {HEADINGS.map(headingRow)}
-      <div className="my-1 border-t border-stone-100 dark:border-stone-800" />
+      <div className="my-1 border-t border-[var(--edge-soft)]" />
       {applyRow(editor.isActive('bulletList'), 'Bulleted list', 'format_list_bulleted', () => editor.chain().focus().toggleBulletList().run(), 'doc-style-bullet')}
       {applyRow(editor.isActive('orderedList'), 'Numbered list', 'format_list_numbered', () => editor.chain().focus().toggleOrderedList().run(), 'doc-style-ordered')}
       {applyRow(editor.isActive('taskList'), 'Checklist', 'checklist', () => editor.chain().focus().toggleTaskList().run(), 'doc-style-task')}
       {applyRow(editor.isActive('blockquote'), 'Quote', 'format_quote', () => editor.chain().focus().toggleBlockquote().run(), 'doc-style-quote')}
       {applyRow(editor.isActive('codeBlock'), 'Code block', 'code', () => editor.chain().focus().toggleCodeBlock().run(), 'doc-style-code')}
       {applyRow(editor.isActive('link'), 'Hyperlink', 'link', onOpenLink, 'doc-style-link')}
-      <div className="text-[10px] text-stone-400 px-2 pt-1.5 border-t border-stone-100 dark:border-stone-800 mt-1">
+      <div className="text-[10px] text-[var(--ink-40)] px-2 pt-1.5 border-t border-[var(--edge-soft)] mt-1">
         Click a name to apply it. Editing a heading row updates every heading of that level.
       </div>
     </div>

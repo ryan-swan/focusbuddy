@@ -101,22 +101,22 @@ function TierPickerModal({ onClose }: { onClose: () => void }): JSX.Element {
       onClose={onClose}
       label="Pick a plan"
       z={9999}
-      className="bg-white dark:bg-stone-900 rounded-xl shadow-2xl border border-stone-200 dark:border-stone-700 max-w-md w-full p-6"
+      className="bg-[var(--surface-raised)] rounded-xl shadow-2xl border border-[var(--edge-soft)] max-w-md w-full p-6"
       testId="tier-picker-modal"
     >
         <div className="flex items-center justify-between mb-2">
-          <h2 className="text-base font-semibold text-stone-900 dark:text-stone-100">
+          <h2 className="text-base font-semibold text-[var(--ink-100)]">
             Pick a plan
           </h2>
           <button
             onClick={onClose}
-            className="h-6 w-6 inline-flex items-center justify-center text-stone-500 hover:text-stone-900 dark:hover:text-stone-100"
+            className="h-6 w-6 inline-flex items-center justify-center text-[var(--ink-50)] hover:text-[var(--ink-100)]"
             aria-label="Close"
           >
             <Icon name="close" size={14} />
           </button>
         </div>
-        <p className="text-xs text-stone-600 dark:text-stone-400 mb-4 leading-relaxed">
+        <p className="text-xs text-[var(--ink-70)] mb-4 leading-relaxed">
           Your 14-day open trial is the full Top-tier experience.
           When it ends, you can stay on the restricted Free plan, or
           upgrade to keep AI features, multi-device sync, and the rest
@@ -137,10 +137,10 @@ function TierPickerModal({ onClose }: { onClose: () => void }): JSX.Element {
             blurb="Everything in Pro + per-seat admin, shared decks, audit log."
           />
         </div>
-        <div className="flex items-center justify-end gap-2 pt-3 border-t border-stone-200 dark:border-stone-800">
+        <div className="flex items-center justify-end gap-2 pt-3 border-t border-[var(--edge-soft)]">
           <button
             onClick={stayOnFree}
-            className="text-xs px-3 py-1.5 rounded-md text-stone-600 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors"
+            className="text-xs px-3 py-1.5 rounded-md text-[var(--ink-70)] hover:bg-[var(--surface-sunken)] transition-colors"
             data-testid="stay-on-free"
           >
             Stay on Free
@@ -171,10 +171,10 @@ function TierRow({
       className={`rounded-md border px-3 py-2 ${
         highlight
           ? 'border-accent/40 bg-accent/5'
-          : 'border-stone-200 dark:border-stone-800'
+          : 'border-[var(--edge-soft)]'
       }`}
     >
-      <div className="text-[11px] font-semibold text-stone-900 dark:text-stone-100">
+      <div className="text-[11px] font-semibold text-[var(--ink-100)]">
         {name}
         {highlight && (
           <span className="ml-2 text-[9px] uppercase tracking-wider text-accent">
@@ -182,7 +182,7 @@ function TierRow({
           </span>
         )}
       </div>
-      <div className="text-[10px] text-stone-500 dark:text-stone-400 leading-snug mt-0.5">
+      <div className="text-[10px] text-[var(--ink-50)] leading-snug mt-0.5">
         {blurb}
       </div>
     </div>

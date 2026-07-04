@@ -109,7 +109,7 @@ export default function TwoFactorSettings(): JSX.Element | null {
             <Icon name="lock" size={13} />
             Two-factor authentication
           </div>
-          <div className="text-[10px] text-[var(--ink-50)]">
+          <div className="text-[11px] text-[var(--ink-50)]">
             {enabled ? 'On. A code is required at each new sign-in.' : 'Off. Add a code from an authenticator app.'}
           </div>
         </div>
@@ -134,7 +134,7 @@ export default function TwoFactorSettings(): JSX.Element | null {
           <div className="font-mono text-[12px] tracking-[0.15em] text-[var(--ink-100)] break-all select-all bg-[var(--surface-raised)] rounded px-2 py-1.5 border border-[var(--edge-soft)]">
             {secret}
           </div>
-          <div className="text-[10px] text-[var(--ink-50)] break-all select-all">{otpauth}</div>
+          <div className="text-[11px] text-[var(--ink-50)] break-all select-all">{otpauth}</div>
           <input
             type="text"
             inputMode="numeric"

@@ -105,17 +105,17 @@ export default function HistoryPanel({ taskId, onClose }: Props): JSX.Element {
     <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
       <div
         ref={ref}
-        className="w-full max-w-3xl max-h-[86vh] overflow-hidden rounded-xl fb-glass-pillow border border-[color:var(--glass-pillow-border)] bg-stone-50/95 dark:bg-stone-900/95 flex flex-col"
+        className="w-full max-w-3xl max-h-[86vh] overflow-hidden rounded-xl fb-glass-pillow border border-[color:var(--glass-pillow-border)] bg-[var(--surface-sunken)]/95 flex flex-col"
         data-testid="history-panel"
       >
-        <div className="px-4 py-3 border-b border-stone-200 dark:border-stone-700 flex items-center justify-between">
+        <div className="px-4 py-3 border-b border-[var(--edge-soft)] flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Icon name="history" size={18} className="text-accent" />
             <div>
-              <div className="text-sm font-semibold text-stone-900 dark:text-stone-100">
+              <div className="text-sm font-semibold text-[var(--ink-100)]">
                 Time travel
               </div>
-              <div className="text-[10px] text-stone-500 dark:text-stone-400">
+              <div className="text-[10px] text-[var(--ink-50)]">
                 Scrub {taskTitle}&rsquo;s history, then restore or branch a past state.
               </div>
             </div>
@@ -127,7 +127,7 @@ export default function HistoryPanel({ taskId, onClose }: Props): JSX.Element {
 
         {snaps.length === 0 ? (
           <div
-            className="flex-1 flex flex-col items-center justify-center gap-2 p-10 text-stone-400 dark:text-stone-500"
+            className="flex-1 flex flex-col items-center justify-center gap-2 p-10 text-[var(--ink-40)]"
             data-testid="history-empty"
           >
             <Icon name="history_toggle_off" size={28} />
@@ -136,28 +136,28 @@ export default function HistoryPanel({ taskId, onClose }: Props): JSX.Element {
         ) : (
           <div className="flex-1 min-h-0 flex">
             {/* Timeline list */}
-            <div className="w-56 shrink-0 border-r border-stone-200 dark:border-stone-700 overflow-y-auto">
+            <div className="w-56 shrink-0 border-r border-[var(--edge-soft)] overflow-y-auto">
               {snaps.map((s, i) => (
                 <button
                   key={s.id}
                   onClick={() => setIndex(i)}
-                  className={`w-full text-left px-3 py-2 border-b border-stone-100 dark:border-stone-800 transition-colors ${
+                  className={`w-full text-left px-3 py-2 border-b border-[var(--edge-soft)] transition-colors ${
                     i === index
                       ? 'bg-accent/10'
-                      : 'hover:bg-stone-100 dark:hover:bg-stone-800'
+                      : 'hover:bg-[var(--surface-sunken)]'
                   }`}
                   data-testid={`history-snap-${s.id}`}
                 >
                   <div className="flex items-center justify-between">
-                    <span className="text-[12px] font-medium text-stone-800 dark:text-stone-200">
+                    <span className="text-[12px] font-medium text-[var(--ink-90)]">
                       {when(s.at)}
                     </span>
-                    <span className="text-[10px] text-stone-400 dark:text-stone-500">
+                    <span className="text-[10px] text-[var(--ink-40)]">
                       {s.widgetCount} item{s.widgetCount === 1 ? '' : 's'}
                     </span>
                   </div>
                   {s.label && (
-                    <div className="text-[10px] text-stone-500 dark:text-stone-400 mt-0.5">
+                    <div className="text-[10px] text-[var(--ink-50)] mt-0.5">
                       {s.label}
                     </div>
                   )}
@@ -168,13 +168,13 @@ export default function HistoryPanel({ taskId, onClose }: Props): JSX.Element {
             {/* Preview + actions */}
             <div className="flex-1 min-w-0 flex flex-col p-4 gap-3">
               <div
-                className="flex-1 min-h-0 rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-950 overflow-hidden flex items-center justify-center"
+                className="flex-1 min-h-0 rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-raised)] overflow-hidden flex items-center justify-center"
                 data-testid="history-preview"
               >
                 {preview ? (
                   <DeskMiniature widgets={preview} width={previewBox.w} height={previewBox.h} />
                 ) : (
-                  <span className="text-[11px] text-stone-400">Loading…</span>
+                  <span className="text-[11px] text-[var(--ink-40)]">Loading…</span>
                 )}
               </div>
 
@@ -189,9 +189,9 @@ export default function HistoryPanel({ taskId, onClose }: Props): JSX.Element {
                   className="w-full h-1 accent-accent cursor-pointer"
                   data-testid="history-scrubber"
                 />
-                <div className="flex items-center justify-between text-[9px] text-stone-400 dark:text-stone-500 mt-1">
+                <div className="flex items-center justify-between text-[9px] text-[var(--ink-40)] mt-1">
                   <span>oldest</span>
-                  <span className="text-stone-600 dark:text-stone-300">
+                  <span className="text-[var(--ink-70)]">
                     {selected ? when(selected.at) : ''}
                   </span>
                   <span>now</span>
@@ -211,14 +211,14 @@ export default function HistoryPanel({ taskId, onClose }: Props): JSX.Element {
                 <button
                   onClick={() => void branch()}
                   disabled={busy}
-                  className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-md border border-stone-300 dark:border-stone-600 text-stone-700 dark:text-stone-200 text-[12px] hover:bg-stone-100 dark:hover:bg-stone-800 disabled:opacity-60"
+                  className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-md border border-[var(--edge-firm)] text-[var(--ink-70)] text-[12px] hover:bg-[var(--surface-sunken)] disabled:opacity-60"
                   data-testid="history-branch"
                 >
                   <Icon name="alt_route" size={14} />
                   Branch
                 </button>
               </div>
-              <p className="text-[10px] text-stone-400 dark:text-stone-500 leading-snug -mt-1">
+              <p className="text-[10px] text-[var(--ink-40)] leading-snug -mt-1">
                 Restoring first saves your current desk as a snapshot, so you can always come back.
               </p>
             </div>

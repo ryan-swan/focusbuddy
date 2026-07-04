@@ -60,7 +60,7 @@ export default function AiSlidePanel({ theme, slideSummary, onApply, onClose }: 
               key={m}
               onClick={() => setMode(m)}
               className={`text-[11px] px-2 py-0.5 rounded-full border capitalize ${
-                mode === m ? 'border-accent bg-accent/15 text-accent' : 'border-stone-300 dark:border-stone-600'
+                mode === m ? 'border-accent bg-accent/15 text-accent' : 'border-[var(--edge-firm)]'
               }`}
             >
               {m === 'deck' ? 'New deck' : m}
@@ -84,7 +84,7 @@ export default function AiSlidePanel({ theme, slideSummary, onApply, onClose }: 
               ? 'What slides to add…'
               : 'How to redesign this slide…'
         }
-        className="w-full bg-white dark:bg-stone-800 border border-stone-300 dark:border-stone-600 rounded-lg px-3 py-2 text-[13px] focus:outline-none focus:border-accent resize-none"
+        className="w-full bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded-lg px-3 py-2 text-[13px] focus:outline-none focus:border-accent resize-none"
       />
       {mode === 'redesign' && (slideSummary?.trim().length ?? 0) > 0 && (
         <button
@@ -106,7 +106,7 @@ export default function AiSlidePanel({ theme, slideSummary, onApply, onClose }: 
       {preview && (
         <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
           {preview.slides.slice(0, 12).map((s) => (
-            <div key={s.id} className="shrink-0 rounded overflow-hidden border border-stone-200 dark:border-stone-700">
+            <div key={s.id} className="shrink-0 rounded overflow-hidden border border-[var(--edge-soft)]">
               <SlideFace slide={s} theme={previewTheme} width={160} />
             </div>
           ))}
@@ -123,12 +123,12 @@ export default function AiSlidePanel({ theme, slideSummary, onApply, onClose }: 
             <button onClick={() => onApply(mode, preview)} data-testid="slides-ai-apply" className="btn-primary text-[12px] px-3 py-1.5">
               {mode === 'deck' ? 'Use deck' : mode === 'append' ? `Add ${preview.slides.length} slides` : 'Apply redesign'}
             </button>
-            <button onClick={() => void run()} disabled={busy} className="text-[12px] px-3 py-1.5 rounded border border-stone-300 dark:border-stone-600 hover:bg-stone-100 dark:hover:bg-stone-800">
+            <button onClick={() => void run()} disabled={busy} className="text-[12px] px-3 py-1.5 rounded border border-[var(--edge-firm)] hover:bg-[var(--surface-sunken)]">
               Regenerate
             </button>
           </>
         )}
-        <span className="text-[11px] text-stone-400">Previewed before it changes your deck. Cmd+Enter</span>
+        <span className="text-[11px] text-[var(--ink-40)]">Previewed before it changes your deck. Cmd+Enter</span>
       </div>
     </div>
   )

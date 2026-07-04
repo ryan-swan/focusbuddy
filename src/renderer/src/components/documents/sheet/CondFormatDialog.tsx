@@ -60,7 +60,7 @@ export default function CondFormatDialog({ range, rules, onAdd, onRemove, onClos
     <div className="absolute inset-0 z-40 bg-black/30 flex items-center justify-center" onMouseDown={onClose}>
       <div
         data-testid="sheet-condformat-dialog"
-        className="w-[460px] max-w-[92%] rounded-lg bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 shadow-xl p-4 space-y-3"
+        className="w-[460px] max-w-[92%] rounded-lg bg-[var(--surface-raised)] border border-[var(--edge-soft)] shadow-xl p-4 space-y-3"
         onMouseDown={(e) => e.stopPropagation()}
       >
         <div className="flex items-center gap-2 text-[13px] font-semibold">
@@ -71,8 +71,8 @@ export default function CondFormatDialog({ range, rules, onAdd, onRemove, onClos
           </button>
         </div>
 
-        <p className="text-[11px] text-stone-500">
-          Applies to <span className="font-mono text-stone-700 dark:text-stone-300">{range}</span>. Cells whose
+        <p className="text-[11px] text-[var(--ink-50)]">
+          Applies to <span className="font-mono text-[var(--ink-70)]">{range}</span>. Cells whose
           value matches the rule are painted.
         </p>
 
@@ -81,7 +81,7 @@ export default function CondFormatDialog({ range, rules, onAdd, onRemove, onClos
             value={op}
             onChange={(e) => setOp(e.target.value as SheetCondOp)}
             data-testid="condformat-op"
-            className="text-[12px] bg-stone-50 dark:bg-stone-900 border border-stone-300 dark:border-stone-600 rounded px-2 py-1.5"
+            className="text-[12px] bg-[var(--surface-sunken)] border border-[var(--edge-firm)] rounded px-2 py-1.5"
           >
             {OPS.map((o) => (
               <option key={o.op} value={o.op}>
@@ -95,7 +95,7 @@ export default function CondFormatDialog({ range, rules, onAdd, onRemove, onClos
               onChange={(e) => setValue(e.target.value)}
               placeholder="value"
               data-testid="condformat-value"
-              className="w-24 text-[12px] bg-stone-50 dark:bg-stone-900 border border-stone-300 dark:border-stone-600 rounded px-2 py-1.5"
+              className="w-24 text-[12px] bg-[var(--surface-sunken)] border border-[var(--edge-firm)] rounded px-2 py-1.5"
             />
           )}
           {spec.needsSecond && (
@@ -103,13 +103,13 @@ export default function CondFormatDialog({ range, rules, onAdd, onRemove, onClos
               value={value2}
               onChange={(e) => setValue2(e.target.value)}
               placeholder="and"
-              className="w-24 text-[12px] bg-stone-50 dark:bg-stone-900 border border-stone-300 dark:border-stone-600 rounded px-2 py-1.5"
+              className="w-24 text-[12px] bg-[var(--surface-sunken)] border border-[var(--edge-firm)] rounded px-2 py-1.5"
             />
           )}
         </div>
 
         <div className="flex items-center gap-2">
-          <span className="text-[11px] text-stone-500">Fill</span>
+          <span className="text-[11px] text-[var(--ink-50)]">Fill</span>
           {SWATCHES.map((s) => (
             <button
               key={s}
@@ -119,7 +119,7 @@ export default function CondFormatDialog({ range, rules, onAdd, onRemove, onClos
               aria-label={`Fill ${s}`}
             />
           ))}
-          <label className="ml-2 inline-flex items-center gap-1 text-[11px] text-stone-600 dark:text-stone-300">
+          <label className="ml-2 inline-flex items-center gap-1 text-[11px] text-[var(--ink-70)]">
             <input type="checkbox" checked={bold} onChange={(e) => setBold(e.target.checked)} />
             Bold
           </label>
@@ -133,12 +133,12 @@ export default function CondFormatDialog({ range, rules, onAdd, onRemove, onClos
         </div>
 
         {rules.length > 0 && (
-          <div className="border-t border-stone-200 dark:border-stone-700 pt-2 space-y-1 max-h-40 overflow-auto">
+          <div className="border-t border-[var(--edge-soft)] pt-2 space-y-1 max-h-40 overflow-auto">
             {rules.map((r) => (
               <div key={r.id} className="flex items-center gap-2 text-[12px]">
                 <span className="h-3.5 w-3.5 rounded border border-black/10" style={{ backgroundColor: r.bg }} />
-                <span className="font-mono text-stone-500">{r.range}</span>
-                <span className="text-stone-700 dark:text-stone-300">
+                <span className="font-mono text-[var(--ink-50)]">{r.range}</span>
+                <span className="text-[var(--ink-70)]">
                   {OPS.find((o) => o.op === r.op)?.label}
                   {r.value ? ` ${r.value}` : ''}
                   {r.value2 ? ` – ${r.value2}` : ''}

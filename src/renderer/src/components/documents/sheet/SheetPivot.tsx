@@ -24,11 +24,11 @@ export default function SheetPivot({ spec, tab, onRemove }: Props): JSX.Element 
 
   return (
     <div
-      className="rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 p-3"
+      className="rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-raised)] p-3"
       data-testid="sheet-pivot"
     >
       <div className="flex items-center justify-between mb-1.5">
-        <span className="text-[12px] font-semibold text-stone-700 dark:text-stone-200">
+        <span className="text-[12px] font-semibold text-[var(--ink-70)]">
           {spec.title || (result ? `${spec.agg} of ${result.valueFieldLabel}` : 'Pivot')}
         </span>
         <button onClick={onRemove} className="icon-btn" title="Remove pivot">
@@ -36,43 +36,43 @@ export default function SheetPivot({ spec, tab, onRemove }: Props): JSX.Element 
         </button>
       </div>
       {!result ? (
-        <div className="text-[12px] text-stone-400">Could not read the pivot's source range.</div>
+        <div className="text-[12px] text-[var(--ink-40)]">Could not read the pivot's source range.</div>
       ) : (
         <div className="overflow-auto">
           <table className="text-[11px] border-collapse">
             <thead>
-              <tr className="border-b border-stone-200 dark:border-stone-700">
-                <th className="text-left px-2 py-1 text-stone-500 font-medium">{result.rowFieldLabel}</th>
+              <tr className="border-b border-[var(--edge-soft)]">
+                <th className="text-left px-2 py-1 text-[var(--ink-50)] font-medium">{result.rowFieldLabel}</th>
                 {result.colFieldLabel != null &&
                   result.colKeys.map((ck) => (
-                    <th key={ck} className="text-right px-2 py-1 text-stone-500 font-medium">
+                    <th key={ck} className="text-right px-2 py-1 text-[var(--ink-50)] font-medium">
                       {ck || '(blank)'}
                     </th>
                   ))}
-                <th className="text-right px-2 py-1 text-stone-500 font-medium">
+                <th className="text-right px-2 py-1 text-[var(--ink-50)] font-medium">
                   {result.agg === 'count' ? 'Count' : 'Total'}
                 </th>
               </tr>
             </thead>
             <tbody>
               {result.rows.map((row) => (
-                <tr key={row.key} className="border-b border-stone-100 dark:border-stone-800">
-                  <td className="px-2 py-1 text-stone-700 dark:text-stone-200">{row.key || '(blank)'}</td>
+                <tr key={row.key} className="border-b border-[var(--edge-soft)]">
+                  <td className="px-2 py-1 text-[var(--ink-70)]">{row.key || '(blank)'}</td>
                   {result.colFieldLabel != null &&
                     row.cells.map((c, i) => (
-                      <td key={i} className="px-2 py-1 text-right text-stone-700 dark:text-stone-200">
+                      <td key={i} className="px-2 py-1 text-right text-[var(--ink-70)]">
                         {fmt(c)}
                       </td>
                     ))}
-                  <td className="px-2 py-1 text-right font-medium text-stone-800 dark:text-stone-100">
+                  <td className="px-2 py-1 text-right font-medium text-[var(--ink-90)]">
                     {fmt(row.total)}
                   </td>
                 </tr>
               ))}
-              <tr className="border-t-2 border-stone-300 dark:border-stone-600">
-                <td className="px-2 py-1 font-semibold text-stone-700 dark:text-stone-200">Grand total</td>
+              <tr className="border-t-2 border-[var(--edge-firm)]">
+                <td className="px-2 py-1 font-semibold text-[var(--ink-70)]">Grand total</td>
                 {result.colFieldLabel != null && result.colKeys.map((ck) => <td key={ck} />)}
-                <td className="px-2 py-1 text-right font-semibold text-stone-800 dark:text-stone-100">
+                <td className="px-2 py-1 text-right font-semibold text-[var(--ink-90)]">
                   {fmt(result.grandTotal)}
                 </td>
               </tr>

@@ -211,13 +211,13 @@ export default function CanvasAIAssistantRail({ projectId }: Props): JSX.Element
   return (
     <aside className="absolute top-3 right-3 bottom-3 z-30 w-[280px] fb-glass-chrome rounded-xl border border-[color:var(--glass-chrome-border)] shadow-xl flex flex-col overflow-hidden">
       <div className="flex items-center justify-between px-3 py-2.5 border-b border-[color:var(--glass-chrome-border)]">
-        <div className="flex items-center gap-1.5 text-[11px] font-semibold text-stone-800 dark:text-stone-100">
+        <div className="flex items-center gap-1.5 text-[11px] font-semibold text-[var(--ink-90)]">
           <Icon name="auto_awesome" size={13} className="text-accent" />
           <span>AI Assistant</span>
         </div>
         <button
           onClick={() => setCollapsed(true)}
-          className="h-5 w-5 inline-flex items-center justify-center text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-100"
+          className="h-5 w-5 inline-flex items-center justify-center text-[var(--ink-50)] hover:text-[var(--ink-100)]"
           title="Hide assistant"
           aria-label="Hide assistant"
         >
@@ -228,7 +228,7 @@ export default function CanvasAIAssistantRail({ projectId }: Props): JSX.Element
       <div className="flex-1 overflow-y-auto px-3 py-3 space-y-4">
         {/* Workspace Health ring */}
         <section>
-          <div className="text-[10px] uppercase tracking-[0.12em] text-stone-500 dark:text-stone-400 font-semibold mb-2">
+          <div className="text-[10px] uppercase tracking-[0.12em] text-[var(--ink-50)] font-semibold mb-2">
             Workspace Health
           </div>
           <div className="flex items-center gap-3">
@@ -241,7 +241,7 @@ export default function CanvasAIAssistantRail({ projectId }: Props): JSX.Element
                   fill="none"
                   stroke="currentColor"
                   strokeWidth={ringStroke}
-                  className="text-stone-300/40 dark:text-stone-600/40"
+                  className="text-[var(--ink-30)]/40"
                 />
                 <circle
                   cx={40}
@@ -263,10 +263,10 @@ export default function CanvasAIAssistantRail({ projectId }: Props): JSX.Element
                 />
               </svg>
               <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <div className="text-[14px] font-semibold tabular-nums text-stone-900 dark:text-stone-100 leading-none">
+                <div className="text-[14px] font-semibold tabular-nums text-[var(--ink-100)] leading-none">
                   {health.pct}%
                 </div>
-                <div className="text-[8px] uppercase tracking-wider text-stone-500 dark:text-stone-400 mt-0.5">
+                <div className="text-[8px] uppercase tracking-wider text-[var(--ink-50)] mt-0.5">
                   on track
                 </div>
               </div>
@@ -275,7 +275,7 @@ export default function CanvasAIAssistantRail({ projectId }: Props): JSX.Element
               {health.dims.map((d) => (
                 <li
                   key={d.label}
-                  className="flex items-center gap-1.5 text-[10px] text-stone-700 dark:text-stone-200"
+                  className="flex items-center gap-1.5 text-[10px] text-[var(--ink-70)]"
                 >
                   <Icon
                     name={
@@ -291,7 +291,7 @@ export default function CanvasAIAssistantRail({ projectId }: Props): JSX.Element
                         ? 'text-emerald-500'
                         : d.status === 'warn'
                           ? 'text-amber-500'
-                          : 'text-stone-400'
+                          : 'text-[var(--ink-40)]'
                     }
                   />
                   <span>{d.label}</span>
@@ -303,11 +303,11 @@ export default function CanvasAIAssistantRail({ projectId }: Props): JSX.Element
 
         {/* Next Best Actions */}
         <section>
-          <div className="text-[10px] uppercase tracking-[0.12em] text-stone-500 dark:text-stone-400 font-semibold mb-2">
+          <div className="text-[10px] uppercase tracking-[0.12em] text-[var(--ink-50)] font-semibold mb-2">
             Next Best Actions
           </div>
           {nextActions.length === 0 ? (
-            <div className="text-[11px] text-stone-500 dark:text-stone-400 italic">
+            <div className="text-[11px] text-[var(--ink-50)] italic">
               All clear — pick up the next thing whenever you're ready.
             </div>
           ) : (
@@ -318,7 +318,7 @@ export default function CanvasAIAssistantRail({ projectId }: Props): JSX.Element
                     onClick={() => {
                       if (a.nodeId) goTask(a.nodeId)
                     }}
-                    className="w-full text-left flex items-center gap-1.5 px-1.5 py-1 rounded hover:bg-accent/10 text-[11px] text-stone-700 dark:text-stone-200"
+                    className="w-full text-left flex items-center gap-1.5 px-1.5 py-1 rounded hover:bg-accent/10 text-[11px] text-[var(--ink-70)]"
                   >
                     <Icon name="add" size={11} className="text-accent" />
                     <span className="truncate flex-1">{a.label}</span>
@@ -331,16 +331,16 @@ export default function CanvasAIAssistantRail({ projectId }: Props): JSX.Element
 
         {/* AI Suggestions */}
         <section>
-          <div className="text-[10px] uppercase tracking-[0.12em] text-stone-500 dark:text-stone-400 font-semibold mb-2">
+          <div className="text-[10px] uppercase tracking-[0.12em] text-[var(--ink-50)] font-semibold mb-2">
             AI Suggestions
           </div>
           <ul className="space-y-1.5">
             {STATIC_SUGGESTIONS.map((s) => (
               <li
                 key={s.id}
-                className="flex items-center gap-1.5 p-1.5 rounded-md bg-stone-50/40 dark:bg-stone-800/30 border border-stone-200/60 dark:border-stone-700/60"
+                className="flex items-center gap-1.5 p-1.5 rounded-md bg-[var(--surface-sunken)]/40 border border-[var(--edge-soft)]/60"
               >
-                <span className="text-[11px] text-stone-700 dark:text-stone-200 flex-1 truncate">
+                <span className="text-[11px] text-[var(--ink-70)] flex-1 truncate">
                   {s.label}
                 </span>
                 <button
@@ -362,7 +362,7 @@ export default function CanvasAIAssistantRail({ projectId }: Props): JSX.Element
           </div>
         )}
         {response && (
-          <div className="p-2.5 rounded-md bg-stone-50 dark:bg-stone-800/40 border border-stone-200 dark:border-stone-700 text-[11px] text-stone-700 dark:text-stone-200 leading-relaxed whitespace-pre-wrap">
+          <div className="p-2.5 rounded-md bg-[var(--surface-sunken)] border border-[var(--edge-soft)] text-[11px] text-[var(--ink-70)] leading-relaxed whitespace-pre-wrap">
             {response.text}
           </div>
         )}
@@ -381,7 +381,7 @@ export default function CanvasAIAssistantRail({ projectId }: Props): JSX.Element
             }
           }}
           placeholder="Ask anything…"
-          className="flex-1 px-2.5 py-1.5 bg-stone-50/40 dark:bg-stone-800/40 border border-stone-200/60 dark:border-stone-700/60 rounded text-[11px] text-stone-900 dark:text-stone-100 placeholder:text-stone-400 dark:placeholder:text-stone-500 focus:outline-none focus:border-accent"
+          className="flex-1 px-2.5 py-1.5 bg-[var(--surface-sunken)]/40 border border-[var(--edge-soft)]/60 rounded text-[11px] text-[var(--ink-100)] placeholder:text-[var(--ink-40)] focus:outline-none focus:border-accent"
         />
         <button
           onClick={() => {

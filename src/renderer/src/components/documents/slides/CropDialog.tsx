@@ -64,8 +64,8 @@ export default function CropDialog({
         if (e.target === e.currentTarget) onClose()
       }}
     >
-      <div className="rounded-xl bg-white dark:bg-stone-900 p-4 shadow-2xl" onMouseDown={(e) => e.stopPropagation()}>
-        <div className="text-[12px] font-semibold mb-2 text-stone-700 dark:text-stone-200">Crop image</div>
+      <div className="rounded-xl bg-[var(--surface-raised)] p-4 shadow-2xl" onMouseDown={(e) => e.stopPropagation()}>
+        <div className="text-[12px] font-semibold mb-2 text-[var(--ink-70)]">Crop image</div>
         <div
           className="relative overflow-hidden rounded"
           style={{ width: boxW, height: boxH, backgroundImage: `url(${el.src})`, backgroundSize: '100% 100%' }}
@@ -95,13 +95,13 @@ export default function CropDialog({
         <div className="flex items-center gap-2 mt-3 justify-end">
           <button
             onClick={() => setWin({ x: 0, y: 0, w: boxW, h: boxH })}
-            className="text-[12px] px-2 py-1 rounded border border-stone-300 dark:border-stone-600 hover:bg-stone-100 dark:hover:bg-stone-800"
+            className="text-[12px] px-2 py-1 rounded border border-[var(--edge-firm)] hover:bg-[var(--surface-sunken)]"
           >
             Reset
           </button>
           <button
             onClick={onClose}
-            className="text-[12px] px-2 py-1 rounded border border-stone-300 dark:border-stone-600 hover:bg-stone-100 dark:hover:bg-stone-800"
+            className="text-[12px] px-2 py-1 rounded border border-[var(--edge-firm)] hover:bg-[var(--surface-sunken)]"
           >
             Cancel
           </button>

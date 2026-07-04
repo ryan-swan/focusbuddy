@@ -29,7 +29,7 @@ function Toggle({
     <label className="flex items-start justify-between gap-3 py-1.5 cursor-pointer">
       <div className="min-w-0">
         <div className="text-xs text-[var(--ink-70)]">{label}</div>
-        <div className="text-[10px] text-[var(--ink-50)] leading-snug">{desc}</div>
+        <div className="text-[11px] text-[var(--ink-50)] leading-snug">{desc}</div>
       </div>
       <input
         type="checkbox"
@@ -66,11 +66,11 @@ function Slider({
     <div className={`py-1.5 ${disabled ? 'opacity-40 pointer-events-none' : ''}`}>
       <div className="flex items-center justify-between">
         <span className="text-xs text-[var(--ink-70)]">{label}</span>
-        <span className="text-[10px] font-mono text-[var(--ink-50)]">
+        <span className="text-[11px] font-mono text-[var(--ink-50)]">
           {format(value)}
         </span>
       </div>
-      <div className="text-[10px] text-[var(--ink-50)] leading-snug mb-1">{desc}</div>
+      <div className="text-[11px] text-[var(--ink-50)] leading-snug mb-1">{desc}</div>
       <input
         type="range"
         min={min}
@@ -235,7 +235,7 @@ function NavPreview({ nav }: { nav: NavPrefs }): JSX.Element {
           style={{ willChange: 'transform' }}
         />
       </div>
-      <div className="text-[10px] text-[var(--ink-50)] mt-1 text-center">
+      <div className="text-[11px] text-[var(--ink-50)] mt-1 text-center">
         Flick the dot — it slingshots and glides exactly like your canvas. (Auto-demos when idle.)
       </div>
     </div>
@@ -254,7 +254,7 @@ export default function NavigationSection(): JSX.Element {
         </div>
         <button
           onClick={() => resetNavPrefs()}
-          className="text-[10px] text-[var(--ink-50)] hover:text-[var(--ink-90)] inline-flex items-center gap-0.5"
+          className="text-[11px] text-[var(--ink-50)] hover:text-[var(--ink-90)] inline-flex items-center gap-0.5"
           title="Reset all navigation settings to defaults"
         >
           <Icon name="restart_alt" size={12} />
@@ -265,7 +265,7 @@ export default function NavigationSection(): JSX.Element {
       <NavPreview nav={nav} />
 
       {/* Click-drag pan */}
-      <div className="mt-3 text-[10px] uppercase tracking-wider text-[var(--ink-40)]">
+      <div className="mt-3 text-[11px] uppercase tracking-wider text-[var(--ink-40)]">
         Click-drag pan
       </div>
       <Toggle
@@ -322,7 +322,7 @@ export default function NavigationSection(): JSX.Element {
       </div>
 
       {/* Edge pan */}
-      <div className="mt-3 text-[10px] uppercase tracking-wider text-[var(--ink-40)]">
+      <div className="mt-3 text-[11px] uppercase tracking-wider text-[var(--ink-40)]">
         Edge pan
       </div>
       <Toggle
@@ -344,7 +344,7 @@ export default function NavigationSection(): JSX.Element {
       />
 
       {/* Trackpad / wheel + zoom */}
-      <div className="mt-3 text-[10px] uppercase tracking-wider text-[var(--ink-40)]">
+      <div className="mt-3 text-[11px] uppercase tracking-wider text-[var(--ink-40)]">
         Trackpad &amp; zoom
       </div>
       <Slider

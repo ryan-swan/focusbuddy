@@ -163,11 +163,11 @@ export function PromptDialogHost(): JSX.Element | null {
         tabIndex={-1}
         onMouseDown={(e) => e.stopPropagation()}
         onKeyDown={onKeyDown}
-        className="w-[min(440px,90vw)] rounded-xl border border-stone-200 dark:border-white/10 bg-white dark:bg-stone-900 shadow-2xl p-4"
+        className="w-[min(440px,90vw)] rounded-xl border border-[var(--edge-soft)] dark:border-white/10 bg-[var(--surface-raised)] shadow-2xl p-4"
         data-testid="prompt-dialog"
       >
-        <div className="text-[14px] font-semibold text-stone-900 dark:text-stone-100">{req.title}</div>
-        {req.label && <div className="text-[12px] text-stone-500 dark:text-stone-400 mt-0.5">{req.label}</div>}
+        <div className="text-[14px] font-semibold text-[var(--ink-100)]">{req.title}</div>
+        {req.label && <div className="text-[12px] text-[var(--ink-50)] mt-0.5">{req.label}</div>}
         {req.confirmOnly ? null : req.multiline ? (
           <textarea
             ref={(el) => (fieldRef.current = el)}
@@ -175,7 +175,7 @@ export function PromptDialogHost(): JSX.Element | null {
             onChange={(e) => setValue(e.target.value)}
             placeholder={req.placeholder}
             rows={6}
-            className="mt-3 w-full bg-white dark:bg-stone-800 border border-stone-300 dark:border-stone-600 rounded-lg px-3 py-2 text-[13px] font-mono focus:outline-none focus:border-accent resize-y"
+            className="mt-3 w-full bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded-lg px-3 py-2 text-[13px] font-mono focus:outline-none focus:border-accent resize-y"
             data-testid="prompt-dialog-input"
           />
         ) : (
@@ -184,14 +184,14 @@ export function PromptDialogHost(): JSX.Element | null {
             value={value}
             onChange={(e) => setValue(e.target.value)}
             placeholder={req.placeholder}
-            className="mt-3 w-full bg-white dark:bg-stone-800 border border-stone-300 dark:border-stone-600 rounded-lg px-3 py-2 text-[13px] focus:outline-none focus:border-accent"
+            className="mt-3 w-full bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded-lg px-3 py-2 text-[13px] focus:outline-none focus:border-accent"
             data-testid="prompt-dialog-input"
           />
         )}
         <div className="mt-3 flex items-center justify-end gap-2">
           <button
             onClick={cancel}
-            className="px-3 py-1.5 rounded-lg text-[13px] text-stone-600 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800"
+            className="px-3 py-1.5 rounded-lg text-[13px] text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]"
           >
             Cancel
           </button>

@@ -517,12 +517,12 @@ export default function SlidesEditor({ body: rawBody, title, onChange }: Props):
     [selectedIds, slideIdx, body, anyGrouped]
   )
 
-  if (!slide) return <div className="p-6 text-stone-400">Empty deck.</div>
+  if (!slide) return <div className="p-6 text-[var(--ink-40)]">Empty deck.</div>
 
   return (
     <div className="h-full flex flex-col">
       {/* Google-Slides-style menu bar above the toolbar, wired to real deck ops. */}
-      <div className="px-2 pt-1.5 pb-1 border-b border-stone-100 dark:border-stone-800">
+      <div className="px-2 pt-1.5 pb-1 border-b border-[var(--edge-soft)]">
         <SlidesMenuBar
           actions={{
             title,
@@ -569,24 +569,24 @@ export default function SlidesEditor({ body: rawBody, title, onChange }: Props):
 
       <div className="flex-1 flex min-h-0">
         {/* Rail */}
-        <div className="w-40 shrink-0 border-r border-stone-200 dark:border-stone-800 overflow-auto p-2 space-y-2">
+        <div className="w-40 shrink-0 border-r border-[var(--edge-soft)] overflow-auto p-2 space-y-2">
           {slides.map((s, i) => (
             <div key={s.id} className="group relative">
               <button
                 onClick={() => { setSel(i); setSelectedIds([]) }}
-                className={`block w-full rounded-md overflow-hidden border-2 ${i === slideIdx ? 'border-accent' : 'border-stone-200 dark:border-stone-700'}`}
+                className={`block w-full rounded-md overflow-hidden border-2 ${i === slideIdx ? 'border-accent' : 'border-[var(--edge-soft)]'}`}
               >
                 <SlideFace slide={s} theme={theme} width={140} />
               </button>
               <span className="absolute top-1 left-1 text-[9px] font-semibold text-white bg-black/40 rounded px-1">{i + 1}</span>
               <div className="absolute top-0.5 right-0.5 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 flex flex-col gap-0.5">
-                <button onClick={() => moveSlide(i, -1)} className="bg-white/90 dark:bg-stone-900/90 rounded p-0.5" title="Move up"><Icon name="keyboard_arrow_up" size={12} /></button>
-                <button onClick={() => moveSlide(i, 1)} className="bg-white/90 dark:bg-stone-900/90 rounded p-0.5" title="Move down"><Icon name="keyboard_arrow_down" size={12} /></button>
-                <button onClick={() => deleteSlide(i)} className="bg-white/90 dark:bg-stone-900/90 rounded p-0.5 text-red-500" title="Delete"><Icon name="close" size={12} /></button>
+                <button onClick={() => moveSlide(i, -1)} className="bg-[var(--surface-raised)]/90 rounded p-0.5" title="Move up"><Icon name="keyboard_arrow_up" size={12} /></button>
+                <button onClick={() => moveSlide(i, 1)} className="bg-[var(--surface-raised)]/90 rounded p-0.5" title="Move down"><Icon name="keyboard_arrow_down" size={12} /></button>
+                <button onClick={() => deleteSlide(i)} className="bg-[var(--surface-raised)]/90 rounded p-0.5 text-red-500" title="Delete"><Icon name="close" size={12} /></button>
               </div>
             </div>
           ))}
-          <button onClick={() => setGalleryOpen(true)} className="w-full aspect-video rounded-md border-2 border-dashed border-stone-300 dark:border-stone-600 text-stone-400 hover:text-accent hover:border-accent flex items-center justify-center" data-testid="slides-add">
+          <button onClick={() => setGalleryOpen(true)} className="w-full aspect-video rounded-md border-2 border-dashed border-[var(--edge-firm)] text-[var(--ink-40)] hover:text-accent hover:border-accent flex items-center justify-center" data-testid="slides-add">
             <Icon name="add" size={20} />
           </button>
         </div>
@@ -594,9 +594,9 @@ export default function SlidesEditor({ body: rawBody, title, onChange }: Props):
         {/* Canvas column */}
         <div ref={canvasWrap} className="flex-1 min-w-0 overflow-auto bg-stone-100 dark:bg-stone-950/40 p-4">
           {status && (
-            <div className="mb-2 text-[12px] text-stone-500 dark:text-stone-400 flex items-center gap-1.5" data-testid="slides-status">
+            <div className="mb-2 text-[12px] text-[var(--ink-50)] flex items-center gap-1.5" data-testid="slides-status">
               <span>{status}</span>
-              <button onClick={() => setStatus(null)} className="text-stone-400 hover:text-stone-600"><Icon name="close" size={12} /></button>
+              <button onClick={() => setStatus(null)} className="text-[var(--ink-40)] hover:text-[var(--ink-70)]"><Icon name="close" size={12} /></button>
             </div>
           )}
           {aiOpen && <AiSlidePanel theme={theme} slideSummary={slideSummary} onApply={applyAi} onClose={() => setAiOpen(false)} />}
@@ -606,22 +606,22 @@ export default function SlidesEditor({ body: rawBody, title, onChange }: Props):
                 className="inline-flex items-center gap-0.5 fb-glass-panel rounded-full border border-[color:var(--glass-panel-border)] px-1.5 py-1 shadow-sm"
                 data-testid="slides-align-bar"
               >
-                <span className="text-[10px] text-stone-500 dark:text-stone-400 px-1.5">{selectedIds.length} selected</span>
+                <span className="text-[10px] text-[var(--ink-50)] px-1.5">{selectedIds.length} selected</span>
                 <AlignBtn icon="align_horizontal_left" title="Align left edges" onClick={() => doAlign('left')} />
                 <AlignBtn icon="align_horizontal_center" title="Align horizontal centres" onClick={() => doAlign('centerX')} />
                 <AlignBtn icon="align_horizontal_right" title="Align right edges" onClick={() => doAlign('right')} />
-                <span className="w-px h-4 bg-stone-300/50 dark:bg-stone-600/50 mx-0.5" />
+                <span className="w-px h-4 bg-[var(--edge-firm)]/50 mx-0.5" />
                 <AlignBtn icon="align_vertical_top" title="Align top edges" onClick={() => doAlign('top')} />
                 <AlignBtn icon="align_vertical_center" title="Align vertical centres" onClick={() => doAlign('middleY')} />
                 <AlignBtn icon="align_vertical_bottom" title="Align bottom edges" onClick={() => doAlign('bottom')} />
                 {selectedIds.length >= 3 && (
                   <>
-                    <span className="w-px h-4 bg-stone-300/50 dark:bg-stone-600/50 mx-0.5" />
+                    <span className="w-px h-4 bg-[var(--edge-firm)]/50 mx-0.5" />
                     <AlignBtn icon="horizontal_distribute" title="Distribute horizontally" onClick={() => doDistribute('h')} />
                     <AlignBtn icon="vertical_distribute" title="Distribute vertically" onClick={() => doDistribute('v')} />
                   </>
                 )}
-                <span className="w-px h-4 bg-stone-300/50 dark:bg-stone-600/50 mx-0.5" />
+                <span className="w-px h-4 bg-[var(--edge-firm)]/50 mx-0.5" />
                 <AlignBtn icon="group_work" title="Group (⌘G)" onClick={doGroup} testid="slides-group" />
                 {anyGrouped && <AlignBtn icon="category" title="Ungroup (⇧⌘G)" onClick={doUngroup} testid="slides-ungroup" />}
               </div>
@@ -647,13 +647,13 @@ export default function SlidesEditor({ body: rawBody, title, onChange }: Props):
           </div>
           {/* Speaker notes */}
           <div className="max-w-3xl mx-auto mt-3">
-            <div className="text-[11px] uppercase tracking-wide text-stone-400 mb-1">Speaker notes</div>
+            <div className="text-[11px] uppercase tracking-wide text-[var(--ink-40)] mb-1">Speaker notes</div>
             <textarea
               value={slide.notes}
               onChange={(e) => mutateSlide((s) => ({ ...s, notes: e.target.value }))}
               rows={2}
               placeholder="What to actually say on this slide"
-              className="w-full bg-white dark:bg-stone-800 border border-stone-300 dark:border-stone-600 rounded-lg px-3 py-2 text-[13px] focus:outline-none focus:border-accent resize-none"
+              className="w-full bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded-lg px-3 py-2 text-[13px] focus:outline-none focus:border-accent resize-none"
             />
           </div>
         </div>
@@ -762,7 +762,7 @@ function AlignBtn({
       onClick={onClick}
       title={title}
       data-testid={testid}
-      className="h-6 w-6 inline-flex items-center justify-center rounded-full text-stone-600 dark:text-stone-300 hover:bg-accent/10 hover:text-accent fb-spring-soft"
+      className="h-6 w-6 inline-flex items-center justify-center rounded-full text-[var(--ink-70)] hover:bg-accent/10 hover:text-accent fb-spring-soft"
     >
       <Icon name={icon} size={14} />
     </button>

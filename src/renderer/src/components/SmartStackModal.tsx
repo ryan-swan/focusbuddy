@@ -210,16 +210,16 @@ export default function SmartStackModal({ onClose }: Props): JSX.Element {
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="bg-white dark:bg-stone-900 w-full max-w-lg mx-4 rounded-lg shadow-2xl border border-stone-200 dark:border-stone-700 overflow-hidden flex flex-col max-h-[85vh]"
+        className="bg-[var(--surface-raised)] w-full max-w-lg mx-4 rounded-lg shadow-2xl border border-[var(--edge-soft)] overflow-hidden flex flex-col max-h-[85vh]"
       >
-        <div className="px-5 py-4 border-b border-stone-200 dark:border-stone-700 flex items-center justify-between gap-2 shrink-0">
+        <div className="px-5 py-4 border-b border-[var(--edge-soft)] flex items-center justify-between gap-2 shrink-0">
           <div className="flex items-center gap-2">
             <Icon name="hub" size={18} className="text-accent" />
-            <h3 className="text-base font-semibold text-stone-900 dark:text-stone-100">
+            <h3 className="text-base font-semibold text-[var(--ink-100)]">
               Smart Stack
             </h3>
             {state.stage === 'ready' && state.fromCache && (
-              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-stone-100 dark:bg-stone-800 text-stone-500 dark:text-stone-400">
+              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[var(--surface-sunken)] text-[var(--ink-50)]">
                 cached
               </span>
             )}
@@ -242,7 +242,7 @@ export default function SmartStackModal({ onClose }: Props): JSX.Element {
 
         <div className="px-5 py-4 overflow-y-auto">
           {state.stage === 'loading' && (
-            <div className="py-8 flex flex-col items-center justify-center text-stone-500 dark:text-stone-400">
+            <div className="py-8 flex flex-col items-center justify-center text-[var(--ink-50)]">
               <Icon name="hub" size={32} className="text-accent mb-2 animate-pulse" />
               <p className="text-sm">Finding groups in your widgets…</p>
             </div>
@@ -251,9 +251,9 @@ export default function SmartStackModal({ onClose }: Props): JSX.Element {
           {state.stage === 'error' && (
             <div className="py-6 flex flex-col items-center text-center gap-2">
               <Icon name="warning" size={24} className="text-amber-600 dark:text-amber-400" />
-              <p className="text-sm text-stone-800 dark:text-stone-200">{state.message}</p>
+              <p className="text-sm text-[var(--ink-90)]">{state.message}</p>
               {state.needsApiKey && (
-                <p className="text-[12px] text-stone-500 dark:text-stone-400">
+                <p className="text-[12px] text-[var(--ink-50)]">
                   Open <strong>Settings → AI · API keys</strong> to paste your Anthropic key.
                 </p>
               )}
@@ -262,7 +262,7 @@ export default function SmartStackModal({ onClose }: Props): JSX.Element {
 
           {(state.stage === 'ready' || state.stage === 'applying') && (
             <>
-              <p className="text-[12px] text-stone-500 dark:text-stone-400 mb-3 leading-relaxed">
+              <p className="text-[12px] text-[var(--ink-50)] mb-3 leading-relaxed">
                 {state.stage === 'applying'
                   ? 'Creating sections…'
                   : 'Here\'s what I\'d group together. Uncheck any you don\'t want.'}
@@ -278,7 +278,7 @@ export default function SmartStackModal({ onClose }: Props): JSX.Element {
                       className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
                         checked
                           ? 'border-accent bg-accent/5'
-                          : 'border-stone-200 dark:border-stone-700 hover:bg-stone-50 dark:hover:bg-stone-800/50 opacity-60'
+                          : 'border-[var(--edge-soft)] hover:bg-[var(--surface-sunken)] opacity-60'
                       }`}
                     >
                       <input
@@ -293,15 +293,15 @@ export default function SmartStackModal({ onClose }: Props): JSX.Element {
                             className="h-2.5 w-2.5 rounded-full shrink-0"
                             style={{ backgroundColor: color }}
                           />
-                          <span className="text-sm font-semibold text-stone-900 dark:text-stone-100 truncate">
+                          <span className="text-sm font-semibold text-[var(--ink-100)] truncate">
                             {g.name}
                           </span>
-                          <span className="text-[10px] text-stone-500 dark:text-stone-400 font-mono shrink-0">
+                          <span className="text-[10px] text-[var(--ink-50)] font-mono shrink-0">
                             {memberWidgets.length} widget{memberWidgets.length === 1 ? '' : 's'}
                           </span>
                         </div>
                         {g.reason && (
-                          <p className="text-[11px] text-stone-600 dark:text-stone-400 leading-snug mb-1.5">
+                          <p className="text-[11px] text-[var(--ink-70)] leading-snug mb-1.5">
                             {g.reason}
                           </p>
                         )}
@@ -309,10 +309,10 @@ export default function SmartStackModal({ onClose }: Props): JSX.Element {
                           {memberWidgets.map((w) => (
                             <span
                               key={w.id}
-                              className="text-[10px] px-1.5 py-0.5 rounded bg-stone-100 dark:bg-stone-800 text-stone-600 dark:text-stone-400 truncate max-w-[160px]"
+                              className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--surface-sunken)] text-[var(--ink-70)] truncate max-w-[160px]"
                               title={w.title || w.content?.slice(0, 80)}
                             >
-                              {w.title || <em className="not-italic text-stone-400 dark:text-stone-500">{w.kind}</em>}
+                              {w.title || <em className="not-italic text-[var(--ink-40)]">{w.kind}</em>}
                             </span>
                           ))}
                         </div>
@@ -325,7 +325,7 @@ export default function SmartStackModal({ onClose }: Props): JSX.Element {
           )}
         </div>
 
-        <div className="px-5 py-3 border-t border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 flex justify-end gap-2 shrink-0">
+        <div className="px-5 py-3 border-t border-[var(--edge-soft)] bg-[var(--surface-sunken)] flex justify-end gap-2 shrink-0">
           <button
             onClick={onClose}
             disabled={state.stage === 'applying'}

@@ -42,11 +42,11 @@ export default function SlidesToolbar(props: Props): JSX.Element {
     return () => document.removeEventListener('mousedown', onDown)
   }, [])
 
-  const btn = 'h-7 px-2 inline-flex items-center gap-1 rounded text-[12px] text-stone-600 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800'
-  const Divider = (): JSX.Element => <div className="w-px h-5 bg-stone-200 dark:bg-stone-700 mx-0.5" />
+  const btn = 'h-7 px-2 inline-flex items-center gap-1 rounded text-[12px] text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]'
+  const Divider = (): JSX.Element => <div className="w-px h-5 bg-[var(--edge-soft)] mx-0.5" />
 
   return (
-    <div ref={ref} className="flex items-center gap-0.5 flex-wrap px-2 py-1.5 border-b border-stone-200 dark:border-stone-700" data-testid="slides-toolbar">
+    <div ref={ref} className="flex items-center gap-0.5 flex-wrap px-2 py-1.5 border-b border-[var(--edge-soft)]" data-testid="slides-toolbar">
       <button className={`${btn} disabled:opacity-40`} onClick={props.onUndo} disabled={!props.canUndo} title="Undo" data-testid="slides-undo"><Icon name="undo" size={15} /></button>
       <button className={`${btn} disabled:opacity-40`} onClick={props.onRedo} disabled={!props.canRedo} title="Redo" data-testid="slides-redo"><Icon name="redo" size={15} /></button>
       <Divider />
@@ -55,11 +55,11 @@ export default function SlidesToolbar(props: Props): JSX.Element {
       <div className="relative">
         <button className={btn} onClick={() => setMenu(menu === 'shape' ? null : 'shape')}><Icon name="category" size={15} /> Shape</button>
         {menu === 'shape' && (
-          <div className="absolute left-0 z-50 mt-1 w-36 rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 shadow-xl py-1 text-[12px]">
+          <div className="absolute left-0 z-50 mt-1 w-36 rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-xl py-1 text-[12px]">
             {([['rect', 'Rectangle'], ['roundRect', 'Rounded'], ['ellipse', 'Ellipse'], ['triangle', 'Triangle']] as const).map(([s, label]) => (
-              <button key={s} onClick={() => { props.onInsertShape(s); setMenu(null) }} className="w-full text-left px-3 py-1.5 hover:bg-stone-100 dark:hover:bg-stone-800">{label}</button>
+              <button key={s} onClick={() => { props.onInsertShape(s); setMenu(null) }} className="w-full text-left px-3 py-1.5 hover:bg-[var(--surface-sunken)]">{label}</button>
             ))}
-            <button onClick={() => { props.onInsertLine(); setMenu(null) }} className="w-full text-left px-3 py-1.5 hover:bg-stone-100 dark:hover:bg-stone-800">Line / arrow</button>
+            <button onClick={() => { props.onInsertLine(); setMenu(null) }} className="w-full text-left px-3 py-1.5 hover:bg-[var(--surface-sunken)]">Line / arrow</button>
           </div>
         )}
       </div>
@@ -68,9 +68,9 @@ export default function SlidesToolbar(props: Props): JSX.Element {
       <div className="relative">
         <button className={btn} onClick={() => setMenu(menu === 'layout' ? null : 'layout')}><Icon name="dashboard" size={15} /> Layout</button>
         {menu === 'layout' && (
-          <div className="absolute left-0 z-50 mt-1 w-44 rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 shadow-xl py-1 text-[12px]">
+          <div className="absolute left-0 z-50 mt-1 w-44 rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-xl py-1 text-[12px]">
             {LAYOUTS.map((l) => (
-              <button key={l.id} onClick={() => { props.onApplyLayout(l.id); setMenu(null) }} className="w-full text-left px-3 py-1.5 hover:bg-stone-100 dark:hover:bg-stone-800">{l.label}</button>
+              <button key={l.id} onClick={() => { props.onApplyLayout(l.id); setMenu(null) }} className="w-full text-left px-3 py-1.5 hover:bg-[var(--surface-sunken)]">{l.label}</button>
             ))}
           </div>
         )}
@@ -80,10 +80,10 @@ export default function SlidesToolbar(props: Props): JSX.Element {
         <div className="relative">
           <button className={btn} onClick={() => setMenu(menu === 'io' ? null : 'io')}><Icon name="folder_open" size={15} /></button>
           {menu === 'io' && (
-            <div className="absolute right-0 z-50 mt-1 w-44 rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 shadow-xl py-1 text-[12px]">
-              <button onClick={() => { props.onImport(); setMenu(null) }} className="w-full text-left px-3 py-1.5 hover:bg-stone-100 dark:hover:bg-stone-800"><Icon name="upload_file" size={14} className="inline mr-1.5 text-stone-400" /> Import .pptx</button>
-              <button onClick={() => { props.onExport('pptx'); setMenu(null) }} className="w-full text-left px-3 py-1.5 hover:bg-stone-100 dark:hover:bg-stone-800"><Icon name="slideshow" size={14} className="inline mr-1.5 text-stone-400" /> Export .pptx</button>
-              <button onClick={() => { props.onExport('pdf'); setMenu(null) }} className="w-full text-left px-3 py-1.5 hover:bg-stone-100 dark:hover:bg-stone-800"><Icon name="picture_as_pdf" size={14} className="inline mr-1.5 text-stone-400" /> Export PDF</button>
+            <div className="absolute right-0 z-50 mt-1 w-44 rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-xl py-1 text-[12px]">
+              <button onClick={() => { props.onImport(); setMenu(null) }} className="w-full text-left px-3 py-1.5 hover:bg-[var(--surface-sunken)]"><Icon name="upload_file" size={14} className="inline mr-1.5 text-[var(--ink-40)]" /> Import .pptx</button>
+              <button onClick={() => { props.onExport('pptx'); setMenu(null) }} className="w-full text-left px-3 py-1.5 hover:bg-[var(--surface-sunken)]"><Icon name="slideshow" size={14} className="inline mr-1.5 text-[var(--ink-40)]" /> Export .pptx</button>
+              <button onClick={() => { props.onExport('pdf'); setMenu(null) }} className="w-full text-left px-3 py-1.5 hover:bg-[var(--surface-sunken)]"><Icon name="picture_as_pdf" size={14} className="inline mr-1.5 text-[var(--ink-40)]" /> Export PDF</button>
             </div>
           )}
         </div>

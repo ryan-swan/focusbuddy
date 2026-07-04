@@ -170,17 +170,17 @@ export default function MakeTaskDialog({
       onClose={onClose}
       label="Make this a task"
       z={250}
-      className="w-[380px] rounded-lg bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-700 shadow-2xl p-4"
+      className="w-[380px] rounded-lg bg-[var(--surface-raised)] border border-[var(--edge-soft)] shadow-2xl p-4"
     >
         <div className="flex items-center gap-1.5 mb-3">
           <Icon name="task_alt" size={16} className="text-accent" />
-          <h2 className="text-sm font-semibold text-stone-900 dark:text-stone-100">
+          <h2 className="text-sm font-semibold text-[var(--ink-100)]">
             Make this a task
           </h2>
         </div>
         <div className="space-y-3">
           <div>
-            <label className="block text-[10px] uppercase tracking-wider text-stone-500 dark:text-stone-400 mb-1">
+            <label className="block text-[10px] uppercase tracking-wider text-[var(--ink-50)] mb-1">
               Task title
             </label>
             <input
@@ -190,12 +190,12 @@ export default function MakeTaskDialog({
               onKeyDown={(e) => {
                 if (e.key === 'Enter') void handleSubmit()
               }}
-              className="w-full text-sm px-2.5 py-1.5 rounded border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-800 text-stone-900 dark:text-stone-100 focus:outline-none focus:border-accent"
+              className="w-full text-sm px-2.5 py-1.5 rounded border border-[var(--edge-firm)] bg-[var(--surface-raised)] text-[var(--ink-100)] focus:outline-none focus:border-accent"
               placeholder="What is the task?"
             />
           </div>
           <div>
-            <label className="block text-[10px] uppercase tracking-wider text-stone-500 dark:text-stone-400 mb-1">
+            <label className="block text-[10px] uppercase tracking-wider text-[var(--ink-50)] mb-1">
               Folder
             </label>
             {folderSel === NEW_FOLDER_VALUE ? (
@@ -208,12 +208,12 @@ export default function MakeTaskDialog({
                     if (e.key === 'Enter') void handleSubmit()
                   }}
                   placeholder="New folder name — e.g. Q3 outreach"
-                  className="w-full text-sm px-2.5 py-1.5 rounded border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-800 text-stone-900 dark:text-stone-100 focus:outline-none focus:border-accent"
+                  className="w-full text-sm px-2.5 py-1.5 rounded border border-[var(--edge-firm)] bg-[var(--surface-raised)] text-[var(--ink-100)] focus:outline-none focus:border-accent"
                 />
                 <button
                   type="button"
                   onClick={() => setFolderSel(currentFolderId || folders[0]?.id || NEW_FOLDER_VALUE)}
-                  className="text-[11px] text-stone-500 hover:text-stone-700 dark:hover:text-stone-300"
+                  className="text-[11px] text-[var(--ink-50)] hover:text-[var(--ink-70)]"
                 >
                   ← Pick an existing folder
                 </button>
@@ -224,9 +224,9 @@ export default function MakeTaskDialog({
                   value={folderQuery}
                   onChange={(e) => setFolderQuery(e.target.value)}
                   placeholder="Search folders…"
-                  className="w-full text-sm px-2.5 py-1.5 rounded border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-800 text-stone-900 dark:text-stone-100 focus:outline-none focus:border-accent"
+                  className="w-full text-sm px-2.5 py-1.5 rounded border border-[var(--edge-firm)] bg-[var(--surface-raised)] text-[var(--ink-100)] focus:outline-none focus:border-accent"
                 />
-                <div className="mt-1 max-h-40 overflow-auto rounded border border-stone-200 dark:border-stone-700">
+                <div className="mt-1 max-h-40 overflow-auto rounded border border-[var(--edge-soft)]">
                   {folders
                     .filter((f: FbNode) =>
                       (f.title || '').toLowerCase().includes(folderQuery.trim().toLowerCase())
@@ -239,12 +239,12 @@ export default function MakeTaskDialog({
                         className={`w-full text-left px-2.5 py-1.5 text-sm flex items-center justify-between gap-2 ${
                           folderSel === f.id
                             ? 'bg-accent/15 text-accent'
-                            : 'text-stone-800 dark:text-stone-100 hover:bg-stone-100 dark:hover:bg-stone-800'
+                            : 'text-[var(--ink-90)] hover:bg-[var(--surface-sunken)]'
                         }`}
                       >
                         <span className="truncate">{f.title || '(untitled folder)'}</span>
                         {f.id === currentFolderId && (
-                          <span className="text-[9px] uppercase tracking-wider text-stone-400 shrink-0">
+                          <span className="text-[9px] uppercase tracking-wider text-[var(--ink-40)] shrink-0">
                             current
                           </span>
                         )}
@@ -253,7 +253,7 @@ export default function MakeTaskDialog({
                   {folders.filter((f: FbNode) =>
                     (f.title || '').toLowerCase().includes(folderQuery.trim().toLowerCase())
                   ).length === 0 && (
-                    <div className="px-2.5 py-1.5 text-[11px] text-stone-400">No folders match.</div>
+                    <div className="px-2.5 py-1.5 text-[11px] text-[var(--ink-40)]">No folders match.</div>
                   )}
                   <button
                     type="button"
@@ -261,7 +261,7 @@ export default function MakeTaskDialog({
                       setFolderSel(NEW_FOLDER_VALUE)
                       if (folderQuery.trim()) setNewFolderName(folderQuery.trim())
                     }}
-                    className="w-full text-left px-2.5 py-1.5 text-sm text-accent border-t border-stone-200 dark:border-stone-700 hover:bg-accent/5"
+                    className="w-full text-left px-2.5 py-1.5 text-sm text-accent border-t border-[var(--edge-soft)] hover:bg-accent/5"
                   >
                     + Create new folder{folderQuery.trim() ? ` "${folderQuery.trim()}"` : '…'}
                   </button>
@@ -270,7 +270,7 @@ export default function MakeTaskDialog({
             )}
           </div>
           {sourceWidget && (
-            <div className="pt-1 border-t border-stone-200 dark:border-stone-700 space-y-1.5">
+            <div className="pt-1 border-t border-[var(--edge-soft)] space-y-1.5">
               <label className="flex items-start gap-2 cursor-pointer">
                 <input
                   type="checkbox"
@@ -279,16 +279,16 @@ export default function MakeTaskDialog({
                   className="mt-0.5 accent-accent"
                 />
                 <div className="flex-1">
-                  <div className="text-[12px] text-stone-800 dark:text-stone-100">
+                  <div className="text-[12px] text-[var(--ink-90)]">
                     Copy this widget into the new task
                   </div>
-                  <div className="text-[10px] text-stone-500 dark:text-stone-400 leading-tight">
+                  <div className="text-[10px] text-[var(--ink-50)] leading-tight">
                     Bring this widget onto the new task. Choose whether it stays in sync or becomes its own copy.
                   </div>
                 </div>
               </label>
               {copyWidget && (
-                <div className="ml-6 space-y-1.5 pl-0.5 border-l-2 border-stone-200 dark:border-stone-700">
+                <div className="ml-6 space-y-1.5 pl-0.5 border-l-2 border-[var(--edge-soft)]">
                   <label className="flex items-start gap-2 cursor-pointer pl-2">
                     <input
                       type="radio"
@@ -298,10 +298,10 @@ export default function MakeTaskDialog({
                       className="mt-0.5 accent-accent"
                     />
                     <div className="flex-1">
-                      <div className="text-[12px] text-stone-800 dark:text-stone-100">
-                        🔗 Keep in sync <span className="text-stone-400">(live)</span>
+                      <div className="text-[12px] text-[var(--ink-90)]">
+                        🔗 Keep in sync <span className="text-[var(--ink-40)]">(live)</span>
                       </div>
-                      <div className="text-[10px] text-stone-500 dark:text-stone-400 leading-tight">
+                      <div className="text-[10px] text-[var(--ink-50)] leading-tight">
                         Content, title and colour mirror both ways. Unlink anytime from the widget menu.
                       </div>
                     </div>
@@ -315,10 +315,10 @@ export default function MakeTaskDialog({
                       className="mt-0.5 accent-accent"
                     />
                     <div className="flex-1">
-                      <div className="text-[12px] text-stone-800 dark:text-stone-100">
-                        Independent copy <span className="text-stone-400">(point-in-time)</span>
+                      <div className="text-[12px] text-[var(--ink-90)]">
+                        Independent copy <span className="text-[var(--ink-40)]">(point-in-time)</span>
                       </div>
-                      <div className="text-[10px] text-stone-500 dark:text-stone-400 leading-tight">
+                      <div className="text-[10px] text-[var(--ink-50)] leading-tight">
                         A snapshot of the current state. The two never affect each other.
                       </div>
                     </div>
@@ -333,10 +333,10 @@ export default function MakeTaskDialog({
                   className="mt-0.5 accent-accent"
                 />
                 <div className="flex-1">
-                  <div className="text-[12px] text-stone-800 dark:text-stone-100">
+                  <div className="text-[12px] text-[var(--ink-90)]">
                     Switch to the new task
                   </div>
-                  <div className="text-[10px] text-stone-500 dark:text-stone-400 leading-tight">
+                  <div className="text-[10px] text-[var(--ink-50)] leading-tight">
                     Otherwise it just appears in your sidebar — you'll stay on the current desk.
                   </div>
                 </div>
@@ -350,7 +350,7 @@ export default function MakeTaskDialog({
         <div className="flex justify-end gap-2 mt-4">
           <button
             onClick={onClose}
-            className="text-xs px-3 py-1.5 rounded text-stone-600 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800"
+            className="text-xs px-3 py-1.5 rounded text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]"
           >
             Cancel
           </button>

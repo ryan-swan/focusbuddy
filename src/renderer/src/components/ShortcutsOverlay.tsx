@@ -71,10 +71,10 @@ function QuickAddEditor(): JSX.Element {
   return (
     <div>
       <div className="flex items-baseline justify-between mb-1.5">
-        <div className="text-[11px] uppercase tracking-[0.12em] text-stone-500 dark:text-stone-400 font-semibold">
+        <div className="text-[11px] uppercase tracking-[0.12em] text-[var(--ink-50)] font-semibold">
           Canvas quick-add (single letter, when not typing) — click a key to rebind
         </div>
-        <button onClick={reset} className="text-[11px] text-stone-400 hover:text-accent">
+        <button onClick={reset} className="text-[11px] text-[var(--ink-40)] hover:text-accent">
           Reset to defaults
         </button>
       </div>
@@ -89,13 +89,13 @@ function QuickAddEditor(): JSX.Element {
                 className={`shrink-0 min-w-[64px] text-center px-1.5 py-0.5 rounded border text-[11px] font-mono ${
                   active
                     ? 'border-accent text-accent bg-accent/10 animate-pulse'
-                    : 'border-stone-300 dark:border-stone-600 bg-stone-100 dark:bg-stone-800 text-stone-700 dark:text-stone-200 hover:border-accent'
+                    : 'border-[var(--edge-firm)] bg-[var(--surface-sunken)] text-[var(--ink-70)] hover:border-accent'
                 }`}
                 data-testid={`rebind-${entry.kind}`}
               >
                 {active ? 'press key…' : (key ?? 'off')}
               </button>
-              <span className="text-[12.5px] text-stone-700 dark:text-stone-300 leading-relaxed">
+              <span className="text-[12.5px] text-[var(--ink-70)] leading-relaxed">
                 Add {entry.label}
               </span>
             </div>
@@ -109,16 +109,16 @@ function QuickAddEditor(): JSX.Element {
 function Section({ title, rows }: { title: string; rows: Row[] }): JSX.Element {
   return (
     <div>
-      <div className="text-[11px] uppercase tracking-[0.12em] text-stone-500 dark:text-stone-400 font-semibold mb-1.5">
+      <div className="text-[11px] uppercase tracking-[0.12em] text-[var(--ink-50)] font-semibold mb-1.5">
         {title}
       </div>
       <div className="space-y-1">
         {rows.map((r) => (
           <div key={r.keys + r.label} className="flex items-baseline gap-3">
-            <kbd className="shrink-0 min-w-[64px] text-center px-1.5 py-0.5 rounded border border-stone-300 dark:border-stone-600 bg-stone-100 dark:bg-stone-800 text-[11px] font-mono text-stone-700 dark:text-stone-200">
+            <kbd className="shrink-0 min-w-[64px] text-center px-1.5 py-0.5 rounded border border-[var(--edge-firm)] bg-[var(--surface-sunken)] text-[11px] font-mono text-[var(--ink-70)]">
               {r.keys}
             </kbd>
-            <span className="text-[12.5px] text-stone-700 dark:text-stone-300 leading-relaxed">{r.label}</span>
+            <span className="text-[12.5px] text-[var(--ink-70)] leading-relaxed">{r.label}</span>
           </div>
         ))}
       </div>
@@ -152,17 +152,17 @@ export default function ShortcutsOverlay({ onClose }: { onClose: () => void }): 
             onClose()
           }
         }}
-        className="w-[min(640px,92vw)] max-h-[80vh] overflow-auto rounded-xl border border-stone-200 dark:border-white/10 bg-white dark:bg-stone-900 shadow-2xl p-5 focus:outline-none"
+        className="w-[min(640px,92vw)] max-h-[80vh] overflow-auto rounded-xl border border-[var(--edge-soft)] dark:border-white/10 bg-[var(--surface-raised)] shadow-2xl p-5 focus:outline-none"
       >
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <Icon name="keyboard" size={18} className="text-accent" />
-            <h2 className="text-[15px] font-semibold text-stone-900 dark:text-stone-100">Keyboard shortcuts</h2>
+            <h2 className="text-[15px] font-semibold text-[var(--ink-100)]">Keyboard shortcuts</h2>
           </div>
           <button
             onClick={onClose}
             aria-label="Close"
-            className="p-1 rounded text-stone-400 hover:text-stone-700 dark:hover:text-stone-200"
+            className="p-1 rounded text-[var(--ink-40)] hover:text-[var(--ink-70)]"
           >
             <Icon name="close" size={16} />
           </button>
@@ -174,7 +174,7 @@ export default function ShortcutsOverlay({ onClose }: { onClose: () => void }): 
             <QuickAddEditor />
           </div>
         </div>
-        <p className="mt-4 text-[11px] text-stone-500 dark:text-stone-400">
+        <p className="mt-4 text-[11px] text-[var(--ink-50)]">
           Inside a document, spreadsheet or deck, this key shows that editor's own commands instead.
         </p>
       </div>

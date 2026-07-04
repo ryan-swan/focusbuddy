@@ -98,23 +98,23 @@ export default function MindmapStartingKit({
 
   return (
     <div
-      className="absolute top-3 left-1/2 -translate-x-1/2 z-[180] w-[min(620px,92vw)] rounded-xl border border-stone-200 dark:border-stone-700 bg-white/95 dark:bg-stone-900/95 backdrop-blur shadow-2xl"
+      className="absolute top-3 left-1/2 -translate-x-1/2 z-[180] w-[min(620px,92vw)] rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-raised)]/95 backdrop-blur shadow-2xl"
       onMouseDown={(e) => e.stopPropagation()}
       data-testid="mindmap-starting-kit"
     >
-      <div className="flex items-center gap-2 px-4 py-2.5 border-b border-stone-200 dark:border-stone-700">
+      <div className="flex items-center gap-2 px-4 py-2.5 border-b border-[var(--edge-soft)]">
         <Icon name="auto_awesome" size={15} className="text-accent" />
         <div className="flex-1 min-w-0">
-          <div className="text-[13px] font-semibold text-stone-900 dark:text-stone-100 truncate">
+          <div className="text-[13px] font-semibold text-[var(--ink-100)] truncate">
             Starting kit for “{nodeLabel}”
           </div>
           {intent && (
-            <div className="text-[10px] text-stone-500 dark:text-stone-400 truncate">{intent}</div>
+            <div className="text-[10px] text-[var(--ink-50)] truncate">{intent}</div>
           )}
         </div>
         <button
           onClick={onDismiss}
-          className="h-6 w-6 inline-flex items-center justify-center rounded text-stone-500 hover:bg-stone-200 dark:hover:bg-stone-700"
+          className="h-6 w-6 inline-flex items-center justify-center rounded text-[var(--ink-50)] hover:bg-[var(--surface-sunken)]"
           aria-label="Dismiss starting kit"
         >
           <Icon name="close" size={14} />
@@ -123,20 +123,20 @@ export default function MindmapStartingKit({
 
       <div className="p-3 max-h-[52vh] overflow-y-auto">
         {stage === 'loading' && (
-          <div className="flex items-center gap-2 py-6 justify-center text-[12px] text-stone-500">
+          <div className="flex items-center gap-2 py-6 justify-center text-[12px] text-[var(--ink-50)]">
             <Icon name="progress_activity" size={16} className="animate-spin" />
             Thinking up the right widgets &amp; tabs…
           </div>
         )}
         {stage === 'error' && (
-          <div className="py-5 text-center text-[12px] text-stone-500">
+          <div className="py-5 text-center text-[12px] text-[var(--ink-50)]">
             Couldn’t generate suggestions right now. You can still add a browser below, or use the
             + Add menu.
           </div>
         )}
         {stage === 'ready' && (
           <>
-            <div className="text-[10px] uppercase tracking-wide text-stone-500 dark:text-stone-400 font-semibold mb-1.5">
+            <div className="text-[10px] uppercase tracking-wide text-[var(--ink-50)] font-semibold mb-1.5">
               Suggested widgets
             </div>
             <div className="grid grid-cols-2 gap-1.5 mb-3">
@@ -149,20 +149,20 @@ export default function MindmapStartingKit({
                     className={`flex items-start gap-2 text-left px-2.5 py-2 rounded-lg border transition-colors ${
                       on
                         ? 'border-accent bg-accent/5'
-                        : 'border-stone-200 dark:border-stone-700 hover:border-stone-300'
+                        : 'border-[var(--edge-soft)] hover:border-[var(--edge-firm)]'
                     }`}
                     data-testid={`kit-widget-${s.kind}`}
                   >
                     <Icon
                       name={on ? 'check_circle' : 'radio_button_unchecked'}
                       size={14}
-                      className={on ? 'text-accent mt-0.5' : 'text-stone-400 mt-0.5'}
+                      className={on ? 'text-accent mt-0.5' : 'text-[var(--ink-40)] mt-0.5'}
                     />
                     <div className="min-w-0">
-                      <div className="text-[12px] font-medium text-stone-900 dark:text-stone-100 truncate">
+                      <div className="text-[12px] font-medium text-[var(--ink-100)] truncate">
                         {s.title || s.kind}
                       </div>
-                      <div className="text-[10px] text-stone-500 dark:text-stone-400 leading-tight line-clamp-2">
+                      <div className="text-[10px] text-[var(--ink-50)] leading-tight line-clamp-2">
                         {s.reason || s.kind}
                       </div>
                     </div>
@@ -173,7 +173,7 @@ export default function MindmapStartingKit({
           </>
         )}
 
-        <div className="text-[10px] uppercase tracking-wide text-stone-500 dark:text-stone-400 font-semibold mb-1.5">
+        <div className="text-[10px] uppercase tracking-wide text-[var(--ink-50)] font-semibold mb-1.5">
           Open a browser
         </div>
         <div className="flex flex-wrap gap-1.5">
@@ -185,8 +185,8 @@ export default function MindmapStartingKit({
                 onClick={() => toggleApp(a.id)}
                 className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full border text-[11px] transition-colors ${
                   on
-                    ? 'border-accent bg-accent/5 text-stone-900 dark:text-stone-100'
-                    : 'border-stone-200 dark:border-stone-700 text-stone-700 dark:text-stone-300 hover:border-stone-300'
+                    ? 'border-accent bg-accent/5 text-[var(--ink-100)]'
+                    : 'border-[var(--edge-soft)] text-[var(--ink-70)] hover:border-[var(--edge-firm)]'
                 }`}
                 data-testid={`kit-app-${a.id}`}
                 title={a.url}
@@ -200,10 +200,10 @@ export default function MindmapStartingKit({
         </div>
       </div>
 
-      <div className="flex items-center justify-between gap-2 px-3 py-2 border-t border-stone-200 dark:border-stone-700">
+      <div className="flex items-center justify-between gap-2 px-3 py-2 border-t border-[var(--edge-soft)]">
         <button
           onClick={onDismiss}
-          className="text-[11px] px-2 py-1 rounded text-stone-500 hover:text-stone-800 dark:hover:text-stone-200"
+          className="text-[11px] px-2 py-1 rounded text-[var(--ink-50)] hover:text-[var(--ink-90)]"
         >
           Not now
         </button>

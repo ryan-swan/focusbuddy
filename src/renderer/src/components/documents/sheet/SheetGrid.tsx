@@ -91,7 +91,7 @@ export default function SheetGrid(props: Props): JSX.Element {
   const freezeHeader = (tab.freeze?.rows ?? 1) >= 1
 
   return (
-    <div className="h-full overflow-auto border border-stone-200 dark:border-stone-700 rounded-lg" data-testid="sheet-grid">
+    <div className="h-full overflow-auto border border-[var(--edge-soft)] rounded-lg" data-testid="sheet-grid">
       <table className="border-collapse text-[13px]" style={{ tableLayout: 'fixed' }}>
         <colgroup>
           <col style={{ width: ROW_HEADER_W }} />
@@ -101,7 +101,7 @@ export default function SheetGrid(props: Props): JSX.Element {
         </colgroup>
         <thead>
           <tr className={freezeHeader ? 'sticky top-0 z-20' : ''}>
-            <th className="sticky left-0 z-30 bg-stone-100 dark:bg-stone-800 border-b border-r border-stone-200 dark:border-stone-700" />
+            <th className="sticky left-0 z-30 bg-[var(--surface-sunken)] border-b border-r border-[var(--edge-soft)]" />
             {tab.columns.map((col, c) => (
               <th
                 key={c}
@@ -110,10 +110,10 @@ export default function SheetGrid(props: Props): JSX.Element {
                   e.preventDefault()
                   props.onHeaderContextMenu(c, e.clientX, e.clientY)
                 }}
-                className="relative border-b border-r border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800/60 p-0"
+                className="relative border-b border-r border-[var(--edge-soft)] bg-[var(--surface-sunken)] p-0"
               >
                 <div className="flex items-center">
-                  <span className="px-1 text-[10px] text-stone-400 select-none">{colLabel(c)}</span>
+                  <span className="px-1 text-[10px] text-[var(--ink-40)] select-none">{colLabel(c)}</span>
                   <input
                     value={col}
                     onChange={(e) => props.onHeaderRename(c, e.target.value)}
@@ -146,7 +146,7 @@ export default function SheetGrid(props: Props): JSX.Element {
                     className={`absolute right-1.5 top-1/2 -translate-y-1/2 z-10 ${
                       props.filters?.[c]?.length
                         ? 'text-accent'
-                        : 'text-stone-400 hover:text-stone-600'
+                        : 'text-[var(--ink-40)] hover:text-[var(--ink-70)]'
                     }`}
                   >
                     <Icon name="filter_alt" size={13} />
@@ -175,7 +175,7 @@ export default function SheetGrid(props: Props): JSX.Element {
             if (props.hiddenRows?.has(r)) return null
             return (
             <tr key={r}>
-              <td className="sticky left-0 z-10 bg-stone-100 dark:bg-stone-800 text-center text-[11px] text-stone-400 border-b border-r border-stone-200 dark:border-stone-700 select-none">
+              <td className="sticky left-0 z-10 bg-[var(--surface-sunken)] text-center text-[11px] text-[var(--ink-40)] border-b border-r border-[var(--edge-soft)] select-none">
                 {r + 1}
               </td>
               {tab.columns.map((_, c) => {
@@ -237,7 +237,7 @@ export default function SheetGrid(props: Props): JSX.Element {
                     }}
                     onMouseEnter={() => props.onCellMouseEnter(r, c)}
                     onDoubleClick={() => props.onCellDoubleClick(r, c)}
-                    className={`relative border-b border-r border-stone-200 dark:border-stone-700 p-0 align-top ${
+                    className={`relative border-b border-r border-[var(--edge-soft)] p-0 align-top ${
                       selected ? 'bg-accent/[0.10]' : inFillPreview ? 'bg-accent/[0.06]' : ''
                     } ${isActive ? 'outline outline-2 -outline-offset-1 outline-accent' : ''}`}
                   >
@@ -276,7 +276,7 @@ export default function SheetGrid(props: Props): JSX.Element {
                           e.stopPropagation()
                           setOpenList(listOpen ? null : { r, c })
                         }}
-                        className="absolute bottom-0 right-0 z-10 flex h-4 w-4 items-center justify-center text-stone-400 hover:text-stone-600"
+                        className="absolute bottom-0 right-0 z-10 flex h-4 w-4 items-center justify-center text-[var(--ink-40)] hover:text-[var(--ink-70)]"
                       >
                         <span className="text-[9px] leading-none">▾</span>
                       </button>
@@ -284,7 +284,7 @@ export default function SheetGrid(props: Props): JSX.Element {
                     {listValues && listOpen && (
                       <>
                         <div className="fixed inset-0 z-20" onMouseDown={() => setOpenList(null)} />
-                        <div className="absolute left-0 top-full z-30 min-w-full max-h-40 overflow-auto rounded-md border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 shadow-lg py-1">
+                        <div className="absolute left-0 top-full z-30 min-w-full max-h-40 overflow-auto rounded-md border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-lg py-1">
                           {listValues.map((v) => (
                             <button
                               key={v}
@@ -295,7 +295,7 @@ export default function SheetGrid(props: Props): JSX.Element {
                                 props.onSetCell?.(r, c, v)
                                 setOpenList(null)
                               }}
-                              className="block w-full text-left px-3 py-1 text-[12px] hover:bg-stone-100 dark:hover:bg-stone-700 whitespace-nowrap"
+                              className="block w-full text-left px-3 py-1 text-[12px] hover:bg-[var(--surface-sunken)] whitespace-nowrap"
                             >
                               {v}
                             </button>
@@ -392,7 +392,7 @@ function SparklineCell({
         width={w}
         height={h}
         viewBox={`0 0 ${w} ${h}`}
-        className="text-stone-300 dark:text-stone-600"
+        className="text-[var(--ink-30)]"
         aria-hidden="true"
       >
         <line x1={0} y1={h - 2} x2={w} y2={h - 2} stroke="currentColor" strokeWidth={1} strokeDasharray="2 2" />
@@ -482,15 +482,15 @@ function FilterDropdown({
       <div className="fixed inset-0 z-30" onMouseDown={onClose} />
       <div
         data-testid="sheet-filter-dropdown"
-        className="absolute left-0 top-full z-40 mt-0.5 w-48 rounded-md border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 shadow-lg"
+        className="absolute left-0 top-full z-40 mt-0.5 w-48 rounded-md border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-lg"
         onMouseDown={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between px-2 py-1 border-b border-stone-100 dark:border-stone-700 text-[11px]">
+        <div className="flex items-center justify-between px-2 py-1 border-b border-[var(--edge-soft)] text-[11px]">
           <button className="text-accent hover:underline" onMouseDown={() => onApply([])}>
             Select all
           </button>
           <button
-            className="text-stone-500 hover:underline"
+            className="text-[var(--ink-50)] hover:underline"
             onMouseDown={() => onApply(values.slice())}
           >
             Clear
@@ -500,7 +500,7 @@ function FilterDropdown({
           {values.map((v) => (
             <label
               key={v}
-              className="flex items-center gap-2 px-2 py-1 text-[12px] hover:bg-stone-100 dark:hover:bg-stone-700 cursor-pointer"
+              className="flex items-center gap-2 px-2 py-1 text-[12px] hover:bg-[var(--surface-sunken)] cursor-pointer"
             >
               <input type="checkbox" checked={!hide.has(v)} onChange={() => toggle(v)} />
               <span className="truncate">{v === '' ? '(blanks)' : v}</span>

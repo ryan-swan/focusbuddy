@@ -78,7 +78,7 @@ function ShapeNode({ id, data, selected }: NodeProps): JSX.Element {
 
   // Each shape is a positioned box; non-rectangular shapes use clip-path or SVG.
   const baseText =
-    'flex items-center justify-center text-center text-[12px] font-medium px-3 py-2 select-none text-stone-900 dark:text-stone-900'
+    'flex items-center justify-center text-center text-[12px] font-medium px-3 py-2 select-none text-[var(--ink-100)]'
   let inner: JSX.Element
 
   if (d.shape === 'widget') {
@@ -171,7 +171,7 @@ function ShapeNode({ id, data, selected }: NodeProps): JSX.Element {
     // process (rectangle)
     inner = (
       <div
-        className={`${baseText} rounded-md bg-white dark:bg-stone-100 ${ring}`}
+        className={`${baseText} rounded-md bg-[var(--surface-raised)] ${ring}`}
         style={{ minWidth: 110, minHeight: 46, border: `2px solid ${d.color}` }}
         onDoubleClick={() => setEditing(true)}
       >
@@ -224,7 +224,7 @@ function NodeLabel({
           }
           e.stopPropagation()
         }}
-        className="bg-white text-stone-900 text-[12px] text-center rounded px-1 outline-none border border-accent w-[90%]"
+        className="bg-white text-[var(--ink-100)] text-[12px] text-center rounded px-1 outline-none border border-accent w-[90%]"
         onClick={(e) => e.stopPropagation()}
       />
     )
@@ -431,9 +431,9 @@ function MapInner({ body, onChange }: Props): JSX.Element {
   const interactive = true
 
   return (
-    <div className="h-full w-full flex flex-col bg-white dark:bg-stone-900">
+    <div className="h-full w-full flex flex-col bg-[var(--surface-raised)]">
       {/* Menu bar — real diagram actions (add shapes, fit view). */}
-      <div className="shrink-0 px-2 pt-1.5 pb-1 border-b border-stone-100 dark:border-stone-800">
+      <div className="shrink-0 px-2 pt-1.5 pb-1 border-b border-[var(--edge-soft)]">
         <DrawMenuBar
           actions={{
             shapes: SHAPE_TOOLS.map((t) => ({ shape: t.shape, label: t.label })),
@@ -444,20 +444,20 @@ function MapInner({ body, onChange }: Props): JSX.Element {
         />
       </div>
       {/* Toolbar */}
-      <div className="shrink-0 flex items-center gap-1 px-2 py-1.5 border-b border-stone-200 dark:border-stone-700 bg-stone-50/80 dark:bg-stone-800/60 flex-wrap">
+      <div className="shrink-0 flex items-center gap-1 px-2 py-1.5 border-b border-[var(--edge-soft)] bg-[var(--surface-sunken)]/80 flex-wrap">
         {SHAPE_TOOLS.map((t) => (
           <button
             key={t.shape}
             onClick={() => addNode(t.shape)}
             data-testid={`map-add-${t.shape}`}
-            className="inline-flex items-center gap-1 text-[11px] px-1.5 py-1 rounded text-stone-600 dark:text-stone-300 hover:bg-stone-200 dark:hover:bg-stone-700"
+            className="inline-flex items-center gap-1 text-[11px] px-1.5 py-1 rounded text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]"
             title={`Add ${t.label}`}
           >
             <Icon name={t.icon} size={14} />
             {t.label}
           </button>
         ))}
-        <div className="w-px h-4 bg-stone-300 dark:bg-stone-600 mx-0.5" />
+        <div className="w-px h-4 bg-[var(--edge-firm)] mx-0.5" />
         {NODE_COLORS.map((c) => (
           <button
             key={c}
@@ -470,13 +470,13 @@ function MapInner({ body, onChange }: Props): JSX.Element {
         ))}
         <button
           onClick={() => setDashed((v) => !v)}
-          className={`ml-1 inline-flex items-center gap-1 text-[11px] px-1.5 py-1 rounded ${dashed ? 'bg-stone-200 dark:bg-stone-700 text-stone-800 dark:text-stone-100' : 'text-stone-600 dark:text-stone-300 hover:bg-stone-200 dark:hover:bg-stone-700'}`}
+          className={`ml-1 inline-flex items-center gap-1 text-[11px] px-1.5 py-1 rounded ${dashed ? 'bg-[var(--surface-sunken)] text-[var(--ink-90)]' : 'text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]'}`}
           title="Draw new connectors dashed"
         >
           <Icon name="more_horiz" size={14} />
           Dashed
         </button>
-        <div className="w-px h-4 bg-stone-300 dark:bg-stone-600 mx-0.5" />
+        <div className="w-px h-4 bg-[var(--edge-firm)] mx-0.5" />
         <TemplateMenu onPick={applyTemplate} />
         <button
           onClick={() => setAiOpen(true)}
@@ -490,13 +490,13 @@ function MapInner({ body, onChange }: Props): JSX.Element {
         <div className="flex-1" />
         <button
           onClick={() => rf.fitView({ padding: 0.2, duration: 300 })}
-          className="inline-flex items-center gap-1 text-[11px] px-1.5 py-1 rounded text-stone-600 dark:text-stone-300 hover:bg-stone-200 dark:hover:bg-stone-700"
+          className="inline-flex items-center gap-1 text-[11px] px-1.5 py-1 rounded text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]"
           title="Fit the whole map in view"
         >
           <Icon name="fit_screen" size={14} />
           Fit
         </button>
-        <span className="text-[10px] text-stone-400 ml-1">
+        <span className="text-[10px] text-[var(--ink-40)] ml-1">
           double-click a node to rename · drag a dot to connect · double-click a line to label · ⌫ deletes
         </span>
       </div>
@@ -525,11 +525,11 @@ function MapInner({ body, onChange }: Props): JSX.Element {
         >
           <Background gap={16} color="#e7e5e4" />
           <Controls showInteractive={false} />
-          <MiniMap pannable zoomable className="!bg-stone-100 dark:!bg-stone-800" />
+          <MiniMap pannable zoomable className="!bg-[var(--surface-sunken)]" />
         </ReactFlow>
         {nodes.length === 0 && (
           <div className="absolute inset-0 grid place-items-center pointer-events-none">
-            <span className="text-[12px] text-stone-400">
+            <span className="text-[12px] text-[var(--ink-40)]">
               Add a shape from the toolbar, pick a template, or generate a map with AI
             </span>
           </div>
@@ -563,7 +563,7 @@ function TemplateMenu({ onPick }: { onPick: (id: MapTemplateId) => void }): JSX.
     <div className="relative">
       <button
         onClick={() => setOpen((v) => !v)}
-        className="inline-flex items-center gap-1 text-[11px] px-1.5 py-1 rounded text-stone-600 dark:text-stone-300 hover:bg-stone-200 dark:hover:bg-stone-700"
+        className="inline-flex items-center gap-1 text-[11px] px-1.5 py-1 rounded text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]"
         title="Start from a template"
       >
         <Icon name="dashboard" size={14} />
@@ -573,7 +573,7 @@ function TemplateMenu({ onPick }: { onPick: (id: MapTemplateId) => void }): JSX.
       {open && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute z-20 mt-1 w-40 rounded-md border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 shadow-lg py-1">
+          <div className="absolute z-20 mt-1 w-40 rounded-md border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-lg py-1">
             {items.map((it) => (
               <button
                 key={it.id}
@@ -581,7 +581,7 @@ function TemplateMenu({ onPick }: { onPick: (id: MapTemplateId) => void }): JSX.
                   onPick(it.id)
                   setOpen(false)
                 }}
-                className="w-full text-left px-3 py-1.5 text-[12px] hover:bg-stone-100 dark:hover:bg-stone-700"
+                className="w-full text-left px-3 py-1.5 text-[12px] hover:bg-[var(--surface-sunken)]"
               >
                 {it.label}
               </button>
@@ -629,14 +629,14 @@ function AiMapPanel({
   return (
     <div className="absolute inset-0 z-30 bg-black/30 flex items-center justify-center" onClick={onClose}>
       <div
-        className="w-[440px] max-w-[90%] rounded-lg bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 shadow-xl p-4 space-y-2"
+        className="w-[440px] max-w-[90%] rounded-lg bg-[var(--surface-raised)] border border-[var(--edge-soft)] shadow-xl p-4 space-y-2"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center gap-2 text-[13px] font-semibold">
           <Icon name="auto_awesome" size={15} className="text-accent" />
           Generate a map with AI
         </div>
-        <p className="text-[11px] text-stone-500">
+        <p className="text-[11px] text-[var(--ink-50)]">
           Describe a process, decision flow, or structure. The model returns the steps and
           connections; PlexiMaps lays them out for you.
         </p>
@@ -649,11 +649,11 @@ function AiMapPanel({
           }}
           rows={4}
           placeholder="e.g. The customer onboarding process from signup to first value, with an approval step"
-          className="w-full bg-stone-50 dark:bg-stone-900 border border-stone-300 dark:border-stone-600 rounded px-2 py-1.5 text-[12px] focus:outline-none focus:border-accent"
+          className="w-full bg-[var(--surface-sunken)] border border-[var(--edge-firm)] rounded px-2 py-1.5 text-[12px] focus:outline-none focus:border-accent"
         />
         {error && <div className="text-[11px] text-red-600 dark:text-red-400">{error}</div>}
         <div className="flex items-center justify-end gap-2">
-          <button onClick={onClose} className="text-[12px] px-3 py-1.5 text-stone-500 hover:text-stone-700">
+          <button onClick={onClose} className="text-[12px] px-3 py-1.5 text-[var(--ink-50)] hover:text-[var(--ink-70)]">
             Cancel
           </button>
           <button
@@ -665,7 +665,7 @@ function AiMapPanel({
             {busy ? 'Generating…' : 'Generate'}
           </button>
         </div>
-        <p className="text-[10px] text-stone-400">This replaces the current map. Cmd/Ctrl+Enter to run.</p>
+        <p className="text-[10px] text-[var(--ink-40)]">This replaces the current map. Cmd/Ctrl+Enter to run.</p>
       </div>
     </div>
   )

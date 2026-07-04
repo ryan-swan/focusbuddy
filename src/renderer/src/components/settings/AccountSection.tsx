@@ -53,7 +53,7 @@ export default function AccountSection(): JSX.Element {
               >
                 {account.handle || account.email}
               </div>
-              <div className="text-[10px] text-[var(--ink-50)] truncate">
+              <div className="text-[11px] text-[var(--ink-50)] truncate">
                 {account.email}
                 <span className="mx-1.5 text-[var(--ink-40)]">·</span>
                 <span data-testid="account-plan">{planLabel} plan</span>
@@ -69,7 +69,7 @@ export default function AccountSection(): JSX.Element {
               {busy ? 'Signing out…' : 'Sign out'}
             </button>
           </div>
-          <p className="text-[10px] text-[var(--ink-50)] leading-relaxed">
+          <p className="text-[11px] text-[var(--ink-50)] leading-relaxed">
             Your local data stays on this device. Signing out keeps it; it only
             disconnects shared-item sync and your plan until you sign back in.
           </p>

@@ -44,7 +44,7 @@ export default function LinkPopover({ editor, onClose }: Props): JSX.Element {
     <div
       ref={ref}
       data-testid="doc-link-popover"
-      className="absolute z-50 mt-1 w-72 rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 shadow-xl p-2"
+      className="absolute z-50 mt-1 w-72 rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-xl p-2"
     >
       <div className="flex items-center gap-1">
         <input
@@ -56,7 +56,7 @@ export default function LinkPopover({ editor, onClose }: Props): JSX.Element {
             if (e.key === 'Escape') onClose()
           }}
           placeholder="Paste or type a URL"
-          className="flex-1 bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded px-2 py-1 text-[12px] focus:outline-none focus:border-accent"
+          className="flex-1 bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded px-2 py-1 text-[12px] focus:outline-none focus:border-accent"
         />
         <button onClick={apply} className="px-2 py-1 rounded bg-accent text-white text-[12px]">
           Apply

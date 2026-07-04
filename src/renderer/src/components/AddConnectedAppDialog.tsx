@@ -158,10 +158,10 @@ export default function AddConnectedAppDialog({ onClose, onAdded }: Props): JSX.
         onClick={(e) => e.stopPropagation()}
         className="fb-glass-pillow w-full max-w-2xl mx-4 rounded-[20px] overflow-hidden flex flex-col max-h-[85vh] fb-spring-soft"
       >
-        <div className="px-5 py-4 border-b border-stone-200 dark:border-stone-700 flex items-center justify-between gap-2 shrink-0">
+        <div className="px-5 py-4 border-b border-[var(--edge-soft)] flex items-center justify-between gap-2 shrink-0">
           <div className="flex items-center gap-2">
             <Icon name="apps" size={18} className="text-accent" />
-            <h3 className="text-base font-semibold text-stone-900 dark:text-stone-100">
+            <h3 className="text-base font-semibold text-[var(--ink-100)]">
               Add a Connected App
             </h3>
           </div>
@@ -170,7 +170,7 @@ export default function AddConnectedAppDialog({ onClose, onAdded }: Props): JSX.
           </button>
         </div>
 
-        <div className="px-5 pt-3 shrink-0 flex gap-1 border-b border-stone-200 dark:border-stone-700">
+        <div className="px-5 pt-3 shrink-0 flex gap-1 border-b border-[var(--edge-soft)]">
           <TabBtn active={tab === 'standard'} onClick={() => setTab('standard')}>
             <Icon name="grid_view" size={13} />
             <span>Standard</span>
@@ -192,7 +192,7 @@ export default function AddConnectedAppDialog({ onClose, onAdded }: Props): JSX.
                 <Icon
                   name="search"
                   size={14}
-                  className="absolute left-2.5 top-1/2 -translate-y-1/2 text-stone-400 dark:text-stone-500"
+                  className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--ink-40)]"
                 />
                 <input
                   type="text"
@@ -200,7 +200,7 @@ export default function AddConnectedAppDialog({ onClose, onAdded }: Props): JSX.
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Search apps…"
-                  className="w-full bg-white dark:bg-stone-800 border border-stone-300 dark:border-stone-600 rounded-md pl-7 pr-3 py-1.5 text-sm text-stone-900 dark:text-stone-100 focus:outline-none focus:border-stone-700 dark:focus:border-stone-400 focus:ring-2 focus:ring-stone-200 dark:focus:ring-stone-700"
+                  className="w-full bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded-md pl-7 pr-3 py-1.5 text-sm text-[var(--ink-100)] focus:outline-none focus:border-[var(--edge-firm)] focus:ring-2 focus:ring-[var(--edge-firm)]"
                 />
               </div>
 
@@ -217,7 +217,7 @@ export default function AddConnectedAppDialog({ onClose, onAdded }: Props): JSX.
                   if (items.length === 0) return null
                   return (
                     <div key={cat} className="mb-4 last:mb-0">
-                      <div className="text-[10px] uppercase tracking-wider text-stone-500 dark:text-stone-400 font-semibold mb-2">
+                      <div className="text-[10px] uppercase tracking-wider text-[var(--ink-50)] font-semibold mb-2">
                         {cat}
                       </div>
                       <PresetGrid
@@ -232,7 +232,7 @@ export default function AddConnectedAppDialog({ onClose, onAdded }: Props): JSX.
               )}
 
               {q && visiblePresets.length === 0 && (
-                <p className="text-center text-sm text-stone-500 dark:text-stone-400 py-6">
+                <p className="text-center text-sm text-[var(--ink-50)] py-6">
                   No standard apps match.{' '}
                   <button
                     onClick={() => {
@@ -251,7 +251,7 @@ export default function AddConnectedAppDialog({ onClose, onAdded }: Props): JSX.
           {tab === 'custom' && (
             <div className="space-y-3 max-w-md">
               <div>
-                <label className="block text-[11px] uppercase tracking-wider text-stone-500 dark:text-stone-400 font-medium mb-1.5">
+                <label className="block text-[11px] uppercase tracking-wider text-[var(--ink-50)] font-medium mb-1.5">
                   URL
                 </label>
                 <input
@@ -260,19 +260,19 @@ export default function AddConnectedAppDialog({ onClose, onAdded }: Props): JSX.
                   value={customUrl}
                   onChange={(e) => setCustomUrl(e.target.value)}
                   placeholder="https://example.com"
-                  className="w-full bg-white dark:bg-stone-800 border border-stone-300 dark:border-stone-600 rounded-md px-3 py-2 text-sm text-stone-900 dark:text-stone-100 focus:outline-none focus:border-stone-700 dark:focus:border-stone-400 focus:ring-2 focus:ring-stone-200 dark:focus:ring-stone-700"
+                  className="w-full bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded-md px-3 py-2 text-sm text-[var(--ink-100)] focus:outline-none focus:border-[var(--edge-firm)] focus:ring-2 focus:ring-[var(--edge-firm)]"
                 />
               </div>
               <div>
-                <label className="block text-[11px] uppercase tracking-wider text-stone-500 dark:text-stone-400 font-medium mb-1.5">
-                  Name <span className="normal-case text-stone-400">(optional)</span>
+                <label className="block text-[11px] uppercase tracking-wider text-[var(--ink-50)] font-medium mb-1.5">
+                  Name <span className="normal-case text-[var(--ink-40)]">(optional)</span>
                 </label>
                 <input
                   type="text"
                   value={customTitle}
                   onChange={(e) => setCustomTitle(e.target.value)}
                   placeholder={customUrl ? hostnameOf(ensureHttps(customUrl)) : 'My App'}
-                  className="w-full bg-white dark:bg-stone-800 border border-stone-300 dark:border-stone-600 rounded-md px-3 py-2 text-sm text-stone-900 dark:text-stone-100 focus:outline-none focus:border-stone-700 dark:focus:border-stone-400 focus:ring-2 focus:ring-stone-200 dark:focus:ring-stone-700"
+                  className="w-full bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded-md px-3 py-2 text-sm text-[var(--ink-100)] focus:outline-none focus:border-[var(--edge-firm)] focus:ring-2 focus:ring-[var(--edge-firm)]"
                 />
               </div>
               <button
@@ -283,7 +283,7 @@ export default function AddConnectedAppDialog({ onClose, onAdded }: Props): JSX.
                 <Icon name="add" size={14} />
                 <span>{customBusy ? 'Adding…' : 'Add to sidebar'}</span>
               </button>
-              <p className="text-[11px] text-stone-500 dark:text-stone-400 leading-relaxed">
+              <p className="text-[11px] text-[var(--ink-50)] leading-relaxed">
                 Custom apps render as a full-pane browser. Sessions persist in the Electron
                 profile, so you stay logged in across app restarts.
               </p>
@@ -293,13 +293,13 @@ export default function AddConnectedAppDialog({ onClose, onAdded }: Props): JSX.
           {tab === 'local' && (
             <div className="space-y-3 max-w-md">
               {!picked && (
-                <div className="rounded-lg border border-dashed border-stone-300 dark:border-stone-700 p-5 text-center">
+                <div className="rounded-lg border border-dashed border-[var(--edge-firm)] p-5 text-center">
                   <Icon
                     name="desktop_mac"
                     size={24}
-                    className="text-stone-400 dark:text-stone-500 mx-auto mb-2"
+                    className="text-[var(--ink-40)] mx-auto mb-2"
                   />
-                  <p className="text-[12px] text-stone-600 dark:text-stone-300 leading-snug mb-3">
+                  <p className="text-[12px] text-[var(--ink-70)] leading-snug mb-3">
                     Pick a Mac app from your <span className="font-mono">/Applications</span>{' '}
                     folder. It can't render inside the canvas, but it shows up in the
                     sidebar with its real icon and drag-to-canvas spawns a one-click
@@ -322,7 +322,7 @@ export default function AddConnectedAppDialog({ onClose, onAdded }: Props): JSX.
 
               {picked && (
                 <>
-                  <div className="flex items-center gap-3 p-3 rounded-lg border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800/40">
+                  <div className="flex items-center gap-3 p-3 rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-sunken)]">
                     {picked.iconPngBase64 ? (
                       <img
                         src={`data:image/png;base64,${picked.iconPngBase64}`}
@@ -335,14 +335,14 @@ export default function AddConnectedAppDialog({ onClose, onAdded }: Props): JSX.
                       </span>
                     )}
                     <div className="min-w-0 flex-1">
-                      <div className="text-sm font-medium text-stone-900 dark:text-stone-100 truncate">
+                      <div className="text-sm font-medium text-[var(--ink-100)] truncate">
                         {picked.title}
                       </div>
-                      <div className="text-[10px] text-stone-500 dark:text-stone-400 truncate font-mono">
+                      <div className="text-[10px] text-[var(--ink-50)] truncate font-mono">
                         {picked.appPath}
                       </div>
                       {picked.bundleId && (
-                        <div className="text-[10px] text-stone-400 dark:text-stone-500 truncate font-mono">
+                        <div className="text-[10px] text-[var(--ink-40)] truncate font-mono">
                           {picked.bundleId}
                         </div>
                       )}
@@ -359,14 +359,14 @@ export default function AddConnectedAppDialog({ onClose, onAdded }: Props): JSX.
                     </button>
                   </div>
                   <div>
-                    <label className="block text-[11px] uppercase tracking-wider text-stone-500 dark:text-stone-400 font-medium mb-1.5">
+                    <label className="block text-[11px] uppercase tracking-wider text-[var(--ink-50)] font-medium mb-1.5">
                       Display name
                     </label>
                     <input
                       type="text"
                       value={localTitle}
                       onChange={(e) => setLocalTitle(e.target.value)}
-                      className="w-full bg-white dark:bg-stone-800 border border-stone-300 dark:border-stone-600 rounded-md px-3 py-2 text-sm text-stone-900 dark:text-stone-100 focus:outline-none focus:border-stone-700 dark:focus:border-stone-400 focus:ring-2 focus:ring-stone-200 dark:focus:ring-stone-700"
+                      className="w-full bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded-md px-3 py-2 text-sm text-[var(--ink-100)] focus:outline-none focus:border-[var(--edge-firm)] focus:ring-2 focus:ring-[var(--edge-firm)]"
                     />
                   </div>
                   <button
@@ -380,7 +380,7 @@ export default function AddConnectedAppDialog({ onClose, onAdded }: Props): JSX.
                 </>
               )}
 
-              <p className="text-[11px] text-stone-500 dark:text-stone-400 leading-relaxed">
+              <p className="text-[11px] text-[var(--ink-50)] leading-relaxed">
                 Local apps launch the real Mac app when clicked. Dragging one onto a
                 canvas creates a launcher tile bound to that task.
               </p>
@@ -406,8 +406,8 @@ function TabBtn({
       onClick={onClick}
       className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border-b-2 -mb-px transition-colors ${
         active
-          ? 'border-accent text-stone-900 dark:text-stone-100'
-          : 'border-transparent text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-100'
+          ? 'border-accent text-[var(--ink-100)]'
+          : 'border-transparent text-[var(--ink-50)] hover:text-[var(--ink-100)]'
       }`}
     >
       {children}
@@ -441,7 +441,7 @@ function PresetGrid({
             className={`flex items-center gap-2 p-2.5 rounded-lg border text-left transition-colors ${
               already
                 ? 'border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-950/30 cursor-default'
-                : 'border-stone-200 dark:border-stone-700 hover:border-accent hover:bg-accent/5'
+                : 'border-[var(--edge-soft)] hover:border-accent hover:bg-accent/5'
             }`}
           >
             <span
@@ -451,10 +451,10 @@ function PresetGrid({
               <Icon name={p.icon} size={16} />
             </span>
             <div className="flex-1 min-w-0">
-              <div className="text-xs font-medium text-stone-900 dark:text-stone-100 truncate">
+              <div className="text-xs font-medium text-[var(--ink-100)] truncate">
                 {p.title}
               </div>
-              <div className="text-[10px] text-stone-500 dark:text-stone-400 truncate">
+              <div className="text-[10px] text-[var(--ink-50)] truncate">
                 {already ? 'already added' : busy ? 'adding…' : new URL(p.url).hostname.replace(/^www\./, '')}
               </div>
             </div>

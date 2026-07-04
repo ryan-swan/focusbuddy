@@ -92,7 +92,7 @@ export default function ComposeDialog({ initial, onClose, onSent }: Props): JSX.
   }
 
   const inputCls =
-    'w-full text-[13px] px-2.5 py-1.5 rounded border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-800 text-stone-900 dark:text-stone-100 focus:outline-none focus:border-accent'
+    'w-full text-[13px] px-2.5 py-1.5 rounded border border-[var(--edge-firm)] bg-[var(--surface-raised)] text-[var(--ink-100)] focus:outline-none focus:border-accent'
 
   return createPortal(
     <Modal
@@ -101,14 +101,14 @@ export default function ComposeDialog({ initial, onClose, onSent }: Props): JSX.
       }}
       label={initial?.subject?.toLowerCase().startsWith('re:') ? 'Reply' : 'New message'}
       z={260}
-      className="w-[560px] max-w-[92vw] max-h-[88vh] flex flex-col rounded-lg bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-700 shadow-2xl"
+      className="w-[560px] max-w-[92vw] max-h-[88vh] flex flex-col rounded-lg bg-[var(--surface-raised)] border border-[var(--edge-soft)] shadow-2xl"
     >
-        <div className="flex items-center gap-2 px-4 py-3 border-b border-stone-200 dark:border-stone-700">
+        <div className="flex items-center gap-2 px-4 py-3 border-b border-[var(--edge-soft)]">
           <Icon name="edit" size={16} className="text-accent" />
-          <h2 className="text-sm font-semibold text-stone-900 dark:text-stone-100">
+          <h2 className="text-sm font-semibold text-[var(--ink-100)]">
             {initial?.subject?.toLowerCase().startsWith('re:') ? 'Reply' : 'New message'}
           </h2>
-          <span className="ml-auto text-[11px] text-stone-400 truncate max-w-[240px]">
+          <span className="ml-auto text-[11px] text-[var(--ink-40)] truncate max-w-[240px]">
             from {fromAddress}
           </span>
         </div>
@@ -123,7 +123,7 @@ export default function ComposeDialog({ initial, onClose, onSent }: Props): JSX.
             </div>
           )}
           <div className="flex items-center gap-2">
-            <label className="w-10 text-[11px] uppercase tracking-wider text-stone-500 shrink-0">
+            <label className="w-10 text-[11px] uppercase tracking-wider text-[var(--ink-50)] shrink-0">
               To
             </label>
             <input
@@ -137,7 +137,7 @@ export default function ComposeDialog({ initial, onClose, onSent }: Props): JSX.
               <button
                 type="button"
                 onClick={() => setShowCc(true)}
-                className="text-[11px] text-stone-500 hover:text-stone-700 dark:hover:text-stone-300 shrink-0"
+                className="text-[11px] text-[var(--ink-50)] hover:text-[var(--ink-70)] shrink-0"
               >
                 Cc/Bcc
               </button>
@@ -146,13 +146,13 @@ export default function ComposeDialog({ initial, onClose, onSent }: Props): JSX.
           {showCc && (
             <>
               <div className="flex items-center gap-2">
-                <label className="w-10 text-[11px] uppercase tracking-wider text-stone-500 shrink-0">
+                <label className="w-10 text-[11px] uppercase tracking-wider text-[var(--ink-50)] shrink-0">
                   Cc
                 </label>
                 <input value={cc} onChange={(e) => setCc(e.target.value)} className={inputCls} />
               </div>
               <div className="flex items-center gap-2">
-                <label className="w-10 text-[11px] uppercase tracking-wider text-stone-500 shrink-0">
+                <label className="w-10 text-[11px] uppercase tracking-wider text-[var(--ink-50)] shrink-0">
                   Bcc
                 </label>
                 <input value={bcc} onChange={(e) => setBcc(e.target.value)} className={inputCls} />
@@ -160,7 +160,7 @@ export default function ComposeDialog({ initial, onClose, onSent }: Props): JSX.
             </>
           )}
           <div className="flex items-center gap-2">
-            <label className="w-10 text-[11px] uppercase tracking-wider text-stone-500 shrink-0">
+            <label className="w-10 text-[11px] uppercase tracking-wider text-[var(--ink-50)] shrink-0">
               Subj
             </label>
             <input
@@ -175,12 +175,12 @@ export default function ComposeDialog({ initial, onClose, onSent }: Props): JSX.
             onChange={(e) => setBody(e.target.value)}
             rows={12}
             placeholder="Write your message…"
-            className="w-full text-[13px] px-2.5 py-2 rounded border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-800 text-stone-900 dark:text-stone-100 focus:outline-none focus:border-accent resize-none leading-relaxed"
+            className="w-full text-[13px] px-2.5 py-2 rounded border border-[var(--edge-firm)] bg-[var(--surface-raised)] text-[var(--ink-100)] focus:outline-none focus:border-accent resize-none leading-relaxed"
           />
           {error && <div className="text-[12px] text-red-600 dark:text-red-400">{error}</div>}
         </div>
 
-        <div className="flex items-center gap-2 px-4 py-3 border-t border-stone-200 dark:border-stone-700">
+        <div className="flex items-center gap-2 px-4 py-3 border-t border-[var(--edge-soft)]">
           <button
             onClick={() => void handleSend()}
             disabled={busy}
@@ -189,11 +189,11 @@ export default function ComposeDialog({ initial, onClose, onSent }: Props): JSX.
             <Icon name={busy ? 'hourglass_top' : 'send'} size={14} />
             {busy ? 'Sending…' : 'Send'}
           </button>
-          <span className="text-[10px] text-stone-400">⌘↵ to send</span>
+          <span className="text-[10px] text-[var(--ink-40)]">⌘↵ to send</span>
           <button
             onClick={onClose}
             disabled={busy}
-            className="ml-auto text-[13px] px-3 py-1.5 rounded text-stone-600 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800 disabled:opacity-60"
+            className="ml-auto text-[13px] px-3 py-1.5 rounded text-[var(--ink-70)] hover:bg-[var(--surface-sunken)] disabled:opacity-60"
           >
             Discard
           </button>

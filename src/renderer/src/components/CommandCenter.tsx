@@ -651,13 +651,13 @@ export default function CommandCenter({
         >
           <button
             onClick={openPalette}
-            className="h-7 px-2.5 inline-flex items-center gap-1.5 rounded-full hover:bg-stone-100/80 dark:hover:bg-stone-800/60 text-[12px] text-stone-700 dark:text-stone-200"
+            className="h-7 px-2.5 inline-flex items-center gap-1.5 rounded-full hover:bg-[var(--surface-sunken)]/80 text-[12px] text-[var(--ink-70)]"
             title="Open command palette (⌘K)"
           >
-            <Icon name="search" size={13} className="text-stone-500" />
+            <Icon name="search" size={13} className="text-[var(--ink-50)]" />
             <span>Search · ⌘K</span>
           </button>
-          <span className="w-px h-4 bg-stone-300/60 dark:bg-stone-600/60" />
+          <span className="w-px h-4 bg-[var(--edge-firm)]/60" />
           {contextActions.map((a) => (
             <PillButton
               key={a.id}
@@ -685,11 +685,11 @@ export default function CommandCenter({
             aria-modal="true"
           >
             <div
-              className="w-[520px] max-w-[88vw] max-h-[60vh] flex flex-col rounded-xl bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-700 shadow-2xl overflow-hidden"
+              className="w-[520px] max-w-[88vw] max-h-[60vh] flex flex-col rounded-xl bg-[var(--surface-raised)] border border-[var(--edge-soft)] shadow-2xl overflow-hidden"
               onMouseDown={(e) => e.stopPropagation()}
             >
-              <div className="flex items-center gap-2 px-3 py-2.5 border-b border-stone-200 dark:border-stone-700">
-                <Icon name="search" size={14} className="text-stone-500 dark:text-stone-400 shrink-0" />
+              <div className="flex items-center gap-2 px-3 py-2.5 border-b border-[var(--edge-soft)]">
+                <Icon name="search" size={14} className="text-[var(--ink-50)] shrink-0" />
                 {editorScope && editorCommands.length > 0 && (
                   <span
                     className="shrink-0 inline-flex items-center gap-1 text-[11px] font-medium text-accent bg-accent/10 border border-accent/20 rounded-md px-1.5 py-0.5"
@@ -712,15 +712,15 @@ export default function CommandCenter({
                       ? `Command the ${editorScope.toLowerCase()}, or search everything…`
                       : 'Search everything — tasks, notes, docs, files, actions…'
                   }
-                  className="flex-1 bg-transparent text-[13px] text-stone-900 dark:text-stone-100 placeholder:text-stone-400 dark:placeholder:text-stone-500 focus:outline-none"
+                  className="flex-1 bg-transparent text-[13px] text-[var(--ink-100)] placeholder:text-[var(--ink-40)] focus:outline-none"
                 />
-                <kbd className="text-[10px] font-mono text-stone-400 dark:text-stone-500 bg-stone-100 dark:bg-stone-800 px-1.5 py-0.5 rounded">
+                <kbd className="text-[10px] font-mono text-[var(--ink-40)] bg-[var(--surface-sunken)] px-1.5 py-0.5 rounded">
                   Esc
                 </kbd>
               </div>
               <div className="flex-1 overflow-y-auto">
                 {results.length === 0 ? (
-                  <div className="px-3 py-8 text-center text-[12px] text-stone-500 dark:text-stone-400">
+                  <div className="px-3 py-8 text-center text-[12px] text-[var(--ink-50)]">
                     Nothing matches "{query}". Try a folder name, task name, or "body double", "calendar", "vault".
                   </div>
                 ) : (
@@ -735,7 +735,7 @@ export default function CommandCenter({
                         className={`w-full flex items-center gap-2 px-3 py-2 text-left ${
                           i === highlightIdx
                             ? 'bg-accent/10'
-                            : 'hover:bg-stone-50 dark:hover:bg-stone-800/50'
+                            : 'hover:bg-[var(--surface-sunken)]'
                         }`}
                       >
                         <Icon
@@ -744,30 +744,30 @@ export default function CommandCenter({
                           className={
                             i === highlightIdx
                               ? 'text-accent shrink-0'
-                              : 'text-stone-500 dark:text-stone-400 shrink-0'
+                              : 'text-[var(--ink-50)] shrink-0'
                           }
                         />
                         <div className="flex-1 min-w-0">
                           <div
                             className={`text-[13px] truncate ${
                               i === highlightIdx
-                                ? 'text-stone-900 dark:text-stone-100 font-medium'
-                                : 'text-stone-800 dark:text-stone-200'
+                                ? 'text-[var(--ink-100)] font-medium'
+                                : 'text-[var(--ink-90)]'
                             }`}
                           >
                             {r.label}
                           </div>
-                          <div className="text-[10px] text-stone-500 dark:text-stone-400 truncate">
+                          <div className="text-[10px] text-[var(--ink-50)] truncate">
                             {r.hint}
                           </div>
                         </div>
                         {r.shortcut && (
-                          <kbd className="text-[9px] font-mono text-stone-500 dark:text-stone-400 bg-stone-100 dark:bg-stone-800 px-1 py-0.5 rounded shrink-0">
+                          <kbd className="text-[9px] font-mono text-[var(--ink-50)] bg-[var(--surface-sunken)] px-1 py-0.5 rounded shrink-0">
                             {r.shortcut}
                           </kbd>
                         )}
                         {i === highlightIdx && (
-                          <kbd className="text-[9px] font-mono text-stone-400 dark:text-stone-500 bg-stone-100 dark:bg-stone-800 px-1 py-0.5 rounded shrink-0">
+                          <kbd className="text-[9px] font-mono text-[var(--ink-40)] bg-[var(--surface-sunken)] px-1 py-0.5 rounded shrink-0">
                             ↵
                           </kbd>
                         )}
@@ -776,7 +776,7 @@ export default function CommandCenter({
                   </div>
                 )}
               </div>
-              <div className="px-3 py-2 border-t border-stone-200 dark:border-stone-700 text-[10px] text-stone-500 dark:text-stone-400 flex items-center justify-between">
+              <div className="px-3 py-2 border-t border-[var(--edge-soft)] text-[10px] text-[var(--ink-50)] flex items-center justify-between">
                 <span>
                   <kbd className="font-mono">↑↓</kbd> navigate ·{' '}
                   <kbd className="font-mono">↵</kbd> run
@@ -811,8 +811,8 @@ function PillButton({
       title={title}
       className={`h-7 px-2.5 inline-flex items-center gap-1 rounded-full text-[12px] ${
         disabled
-          ? 'text-stone-400 dark:text-stone-600 cursor-not-allowed'
-          : 'text-stone-700 dark:text-stone-200 hover:bg-stone-100/80 dark:hover:bg-stone-800/60'
+          ? 'text-[var(--ink-40)] cursor-not-allowed'
+          : 'text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]/80'
       }`}
     >
       <Icon name={icon} size={13} />

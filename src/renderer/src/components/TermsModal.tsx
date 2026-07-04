@@ -21,12 +21,12 @@ export default function TermsModal({ onClose }: Props): JSX.Element {
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="bg-white dark:bg-stone-900 w-full max-w-lg mx-4 rounded-lg shadow-2xl border border-stone-200 dark:border-stone-700 overflow-hidden flex flex-col max-h-[85vh]"
+        className="bg-[var(--surface-raised)] w-full max-w-lg mx-4 rounded-lg shadow-2xl border border-[var(--edge-soft)] overflow-hidden flex flex-col max-h-[85vh]"
       >
-        <div className="px-5 py-4 border-b border-stone-200 dark:border-stone-700 flex items-center justify-between gap-2 shrink-0">
+        <div className="px-5 py-4 border-b border-[var(--edge-soft)] flex items-center justify-between gap-2 shrink-0">
           <div className="flex items-center gap-2">
-            <Icon name="gavel" size={18} className="text-stone-600 dark:text-stone-300" />
-            <h3 className="text-base font-semibold text-stone-900 dark:text-stone-100">
+            <Icon name="gavel" size={18} className="text-[var(--ink-70)]" />
+            <h3 className="text-base font-semibold text-[var(--ink-100)]">
               Terms of Use
             </h3>
           </div>
@@ -35,9 +35,9 @@ export default function TermsModal({ onClose }: Props): JSX.Element {
           </button>
         </div>
 
-        <div className="overflow-y-auto px-5 py-4 space-y-4 text-sm text-stone-700 dark:text-stone-300 leading-relaxed">
+        <div className="overflow-y-auto px-5 py-4 space-y-4 text-sm text-[var(--ink-70)] leading-relaxed">
           <section>
-            <h4 className="text-stone-900 dark:text-stone-100 font-semibold mb-1.5">1. Your data is yours</h4>
+            <h4 className="text-[var(--ink-100)] font-semibold mb-1.5">1. Your data is yours</h4>
             <p>
               PlexiDesk stores everything locally on your machine — tasks, widgets, browsing
               history, chat messages, preferences. No data is sent to PlexiDesk servers; there are
@@ -46,7 +46,7 @@ export default function TermsModal({ onClose }: Props): JSX.Element {
           </section>
 
           <section>
-            <h4 className="text-stone-900 dark:text-stone-100 font-semibold mb-1.5">2. AI features use your own API key</h4>
+            <h4 className="text-[var(--ink-100)] font-semibold mb-1.5">2. AI features use your own API key</h4>
             <p>
               Open <strong>Settings → AI · API keys</strong> to paste your Anthropic API key.
               It's encrypted with your system keychain and never leaves this Mac except as
@@ -57,7 +57,7 @@ export default function TermsModal({ onClose }: Props): JSX.Element {
           </section>
 
           <section>
-            <h4 className="text-stone-900 dark:text-stone-100 font-semibold mb-1.5">3. AI output is best-effort</h4>
+            <h4 className="text-[var(--ink-100)] font-semibold mb-1.5">3. AI output is best-effort</h4>
             <p>
               The assistant can be wrong, miss context, or hallucinate. Treat its suggestions as a
               starting point — not as advice or instruction. Verify anything important before
@@ -66,7 +66,7 @@ export default function TermsModal({ onClose }: Props): JSX.Element {
           </section>
 
           <section>
-            <h4 className="text-stone-900 dark:text-stone-100 font-semibold mb-1.5">4. Embedded browsers and third-party sites</h4>
+            <h4 className="text-[var(--ink-100)] font-semibold mb-1.5">4. Embedded browsers and third-party sites</h4>
             <p>
               Pages you open in browser widgets are loaded directly from the source. Their terms,
               cookies, and tracking are governed by those sites, not PlexiDesk. Avoid logging in
@@ -75,7 +75,7 @@ export default function TermsModal({ onClose }: Props): JSX.Element {
           </section>
 
           <section>
-            <h4 className="text-stone-900 dark:text-stone-100 font-semibold mb-1.5">5. No warranty</h4>
+            <h4 className="text-[var(--ink-100)] font-semibold mb-1.5">5. No warranty</h4>
             <p>
               The software is provided "as is," without warranty of any kind. The author is not
               liable for lost work, missed deadlines, or any indirect damages. Keep your own
@@ -84,7 +84,7 @@ export default function TermsModal({ onClose }: Props): JSX.Element {
           </section>
 
           <section>
-            <h4 className="text-stone-900 dark:text-stone-100 font-semibold mb-1.5">6. ADHD-friendly disclaimer</h4>
+            <h4 className="text-[var(--ink-100)] font-semibold mb-1.5">6. ADHD-friendly disclaimer</h4>
             <p>
               PlexiDesk is a productivity tool, not a medical or therapeutic device. It is not a
               replacement for medication, therapy, or professional support for ADHD or executive
@@ -93,12 +93,12 @@ export default function TermsModal({ onClose }: Props): JSX.Element {
             </p>
           </section>
 
-          <section className="text-[11px] text-stone-500 dark:text-stone-400 pt-2 border-t border-stone-200 dark:border-stone-700">
+          <section className="text-[11px] text-[var(--ink-50)] pt-2 border-t border-[var(--edge-soft)]">
             Last updated 23 May 2026.
           </section>
         </div>
 
-        <div className="px-5 py-3 border-t border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 shrink-0 flex justify-end">
+        <div className="px-5 py-3 border-t border-[var(--edge-soft)] bg-[var(--surface-sunken)] shrink-0 flex justify-end">
           <button onClick={onClose} className="btn-ghost">
             Close
           </button>

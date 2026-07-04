@@ -25,17 +25,17 @@ interface Props {
   onCrop: (id: string) => void
 }
 
-const labelCls = 'text-[10px] uppercase tracking-wide text-stone-400'
-const inputCls = 'w-full bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded px-1.5 py-1 text-[12px] focus:outline-none'
-const numCls = 'w-16 bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded px-1.5 py-1 text-[12px] focus:outline-none'
+const labelCls = 'text-[10px] uppercase tracking-wide text-[var(--ink-40)]'
+const inputCls = 'w-full bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded px-1.5 py-1 text-[12px] focus:outline-none'
+const numCls = 'w-16 bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded px-1.5 py-1 text-[12px] focus:outline-none'
 
 export default function ElementInspector(props: Props): JSX.Element {
   const el = props.selected
-  const btn = 'h-7 min-w-7 px-1.5 inline-flex items-center justify-center rounded text-[12px] text-stone-600 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800 border border-stone-200 dark:border-stone-700'
+  const btn = 'h-7 min-w-7 px-1.5 inline-flex items-center justify-center rounded text-[12px] text-[var(--ink-70)] hover:bg-[var(--surface-sunken)] border border-[var(--edge-soft)]'
 
   if (!el) {
     return (
-      <div className="w-60 shrink-0 border-l border-stone-200 dark:border-stone-800 p-3 space-y-3 overflow-auto">
+      <div className="w-60 shrink-0 border-l border-[var(--edge-soft)] p-3 space-y-3 overflow-auto">
         <div>
           <div className={labelCls}>Slide transition</div>
           <select className={inputCls} value={props.slide.transition ?? 'none'} onChange={(e) => props.onSetTransition(e.target.value as SlideTransition)}>
@@ -56,7 +56,7 @@ export default function ElementInspector(props: Props): JSX.Element {
                 key={t.id}
                 onClick={() => props.onApplyTheme(t)}
                 className={`flex items-center gap-2 px-2 py-1.5 rounded border text-[12px] text-left ${
-                  props.currentThemeId === t.id ? 'border-accent bg-accent/10 text-accent' : 'border-stone-200 dark:border-stone-700'
+                  props.currentThemeId === t.id ? 'border-accent bg-accent/10 text-accent' : 'border-[var(--edge-soft)]'
                 }`}
               >
                 <span className="h-4 w-4 rounded-full shrink-0" style={{ background: t.accent }} />
@@ -65,7 +65,7 @@ export default function ElementInspector(props: Props): JSX.Element {
             ))}
           </div>
         </div>
-        <p className="text-[11px] text-stone-400">Select an element to edit it, or use the toolbar to insert one.</p>
+        <p className="text-[11px] text-[var(--ink-40)]">Select an element to edit it, or use the toolbar to insert one.</p>
       </div>
     )
   }
@@ -80,7 +80,7 @@ export default function ElementInspector(props: Props): JSX.Element {
   )
 
   return (
-    <div className="w-60 shrink-0 border-l border-stone-200 dark:border-stone-800 p-3 space-y-3 overflow-auto" data-testid="element-inspector">
+    <div className="w-60 shrink-0 border-l border-[var(--edge-soft)] p-3 space-y-3 overflow-auto" data-testid="element-inspector">
       <div className="text-[12px] font-semibold capitalize">{el.type}</div>
 
       <div>
@@ -230,7 +230,7 @@ export default function ElementInspector(props: Props): JSX.Element {
         <div className="space-y-1.5" data-testid="inspector-frame">
           <div className={labelCls}>Frame</div>
           <div className="flex items-center gap-2">
-            <span className="text-[11px] text-stone-500 dark:text-stone-400">Radius</span>
+            <span className="text-[11px] text-[var(--ink-50)]">Radius</span>
             {num(el.cornerRadius ?? 0, (n) => ({ cornerRadius: Math.max(0, n) }))}
           </div>
           <select

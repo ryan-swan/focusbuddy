@@ -94,18 +94,18 @@ export default function SyncWidgetPicker({ targetTaskId, onClose }: Props): JSX.
       onMouseDown={onClose}
     >
       <div
-        className="w-[min(520px,94vw)] max-h-[78vh] flex flex-col rounded-xl border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 shadow-2xl"
+        className="w-[min(520px,94vw)] max-h-[78vh] flex flex-col rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-2xl"
         onMouseDown={(e) => e.stopPropagation()}
         data-testid="sync-widget-picker"
       >
-        <div className="flex items-center gap-2 px-4 py-2.5 border-b border-stone-200 dark:border-stone-700">
+        <div className="flex items-center gap-2 px-4 py-2.5 border-b border-[var(--edge-soft)]">
           {step === 'widget' && (
             <button
               onClick={() => {
                 setStep('task')
                 setPicked(null)
               }}
-              className="h-6 w-6 inline-flex items-center justify-center rounded text-stone-500 hover:bg-stone-200 dark:hover:bg-stone-700"
+              className="h-6 w-6 inline-flex items-center justify-center rounded text-[var(--ink-50)] hover:bg-[var(--surface-sunken)]"
               aria-label="Back to tasks"
             >
               <Icon name="arrow_back" size={14} />
@@ -113,10 +113,10 @@ export default function SyncWidgetPicker({ targetTaskId, onClose }: Props): JSX.
           )}
           <Icon name="link" size={15} className="text-accent" />
           <div className="flex-1 min-w-0">
-            <div className="text-[13px] font-semibold text-stone-900 dark:text-stone-100">
+            <div className="text-[13px] font-semibold text-[var(--ink-100)]">
               {step === 'task' ? 'Bring a synced widget' : `Pick a widget from “${picked?.title}”`}
             </div>
-            <div className="text-[10px] text-stone-500 dark:text-stone-400">
+            <div className="text-[10px] text-[var(--ink-50)]">
               {step === 'task'
                 ? 'Choose where to copy from — the copy stays in sync with the original.'
                 : 'A live-linked copy lands on your canvas.'}
@@ -124,7 +124,7 @@ export default function SyncWidgetPicker({ targetTaskId, onClose }: Props): JSX.
           </div>
           <button
             onClick={onClose}
-            className="h-6 w-6 inline-flex items-center justify-center rounded text-stone-500 hover:bg-stone-200 dark:hover:bg-stone-700"
+            className="h-6 w-6 inline-flex items-center justify-center rounded text-[var(--ink-50)] hover:bg-[var(--surface-sunken)]"
             aria-label="Close"
           >
             <Icon name="close" size={14} />
@@ -139,12 +139,12 @@ export default function SyncWidgetPicker({ targetTaskId, onClose }: Props): JSX.
                 value={taskQuery}
                 onChange={(e) => setTaskQuery(e.target.value)}
                 placeholder="Search tasks…"
-                className="w-full h-8 px-2.5 text-[12px] rounded-md bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 focus:outline-none focus:border-accent"
+                className="w-full h-8 px-2.5 text-[12px] rounded-md bg-[var(--surface-sunken)] border border-[var(--edge-soft)] focus:outline-none focus:border-accent"
               />
             </div>
             <div className="p-2 overflow-y-auto">
               {tasks.length === 0 && (
-                <div className="px-3 py-6 text-center text-[12px] text-stone-400">
+                <div className="px-3 py-6 text-center text-[12px] text-[var(--ink-40)]">
                   No other tasks to bring from.
                 </div>
               )}
@@ -152,19 +152,19 @@ export default function SyncWidgetPicker({ targetTaskId, onClose }: Props): JSX.
                 <button
                   key={t.id}
                   onClick={() => void openTask(t)}
-                  className="w-full flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-stone-100 dark:hover:bg-stone-800 text-left"
+                  className="w-full flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-[var(--surface-sunken)] text-left"
                   data-testid={`sync-pick-task-${t.id}`}
                 >
-                  <Icon name="task_alt" size={14} className="text-stone-500 shrink-0" />
-                  <span className="flex-1 min-w-0 truncate text-[12px] text-stone-900 dark:text-stone-100">
+                  <Icon name="task_alt" size={14} className="text-[var(--ink-50)] shrink-0" />
+                  <span className="flex-1 min-w-0 truncate text-[12px] text-[var(--ink-100)]">
                     {t.title || '(untitled task)'}
                   </span>
                   {t.parentId && folderById.get(t.parentId) && (
-                    <span className="text-[10px] text-stone-400 truncate max-w-[120px]">
+                    <span className="text-[10px] text-[var(--ink-40)] truncate max-w-[120px]">
                       {folderById.get(t.parentId)}
                     </span>
                   )}
-                  <Icon name="chevron_right" size={14} className="text-stone-400 shrink-0" />
+                  <Icon name="chevron_right" size={14} className="text-[var(--ink-40)] shrink-0" />
                 </button>
               ))}
             </div>
@@ -174,10 +174,10 @@ export default function SyncWidgetPicker({ targetTaskId, onClose }: Props): JSX.
         {step === 'widget' && (
           <div className="p-2 overflow-y-auto">
             {widgets === null && (
-              <div className="px-3 py-6 text-center text-[12px] text-stone-400">Loading…</div>
+              <div className="px-3 py-6 text-center text-[12px] text-[var(--ink-40)]">Loading…</div>
             )}
             {widgets && widgets.length === 0 && (
-              <div className="px-3 py-6 text-center text-[12px] text-stone-400">
+              <div className="px-3 py-6 text-center text-[12px] text-[var(--ink-40)]">
                 No bringable widgets on that task.
               </div>
             )}
@@ -189,15 +189,15 @@ export default function SyncWidgetPicker({ targetTaskId, onClose }: Props): JSX.
                   key={w.id}
                   onClick={() => void bringIn(w)}
                   disabled={busyId !== null}
-                  className="w-full flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-stone-100 dark:hover:bg-stone-800 text-left disabled:opacity-50"
+                  className="w-full flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-[var(--surface-sunken)] text-left disabled:opacity-50"
                   data-testid={`sync-pick-widget-${w.id}`}
                 >
                   <Icon name={entry?.icon ?? 'widgets'} size={15} className="text-accent shrink-0" />
                   <div className="flex-1 min-w-0">
-                    <div className="text-[12px] text-stone-900 dark:text-stone-100 truncate">
+                    <div className="text-[12px] text-[var(--ink-100)] truncate">
                       {label}
                     </div>
-                    <div className="text-[10px] text-stone-500 dark:text-stone-400">
+                    <div className="text-[10px] text-[var(--ink-50)]">
                       {entry?.label ?? w.kind}
                       {w.syncGroupId ? ' · already synced' : ''}
                     </div>
@@ -205,7 +205,7 @@ export default function SyncWidgetPicker({ targetTaskId, onClose }: Props): JSX.
                   <Icon
                     name={busyId === w.id ? 'progress_activity' : 'add_link'}
                     size={14}
-                    className={`text-stone-400 shrink-0 ${busyId === w.id ? 'animate-spin' : ''}`}
+                    className={`text-[var(--ink-40)] shrink-0 ${busyId === w.id ? 'animate-spin' : ''}`}
                   />
                 </button>
               )

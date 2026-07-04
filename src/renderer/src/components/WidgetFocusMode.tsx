@@ -120,18 +120,18 @@ export default function WidgetFocusMode(): JSX.Element | null {
       onClick={() => setFocused(null)}
     >
       <div
-        className={`bg-white dark:bg-stone-900 shadow-2xl w-full h-full flex flex-col overflow-hidden border border-stone-200 dark:border-stone-700 ${
+        className={`bg-[var(--surface-raised)] shadow-2xl w-full h-full flex flex-col overflow-hidden border border-[var(--edge-soft)] ${
           maximized ? '' : 'rounded-lg'
         }`}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="px-4 py-2.5 border-b border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 flex items-center gap-2 shrink-0">
-          <Icon name={entry?.icon ?? 'apps'} size={18} className="text-stone-600 dark:text-stone-300" />
-          <h3 className="text-sm font-semibold text-stone-900 dark:text-stone-100 flex-1 truncate">
+        <div className="px-4 py-2.5 border-b border-[var(--edge-soft)] bg-[var(--surface-sunken)] flex items-center gap-2 shrink-0">
+          <Icon name={entry?.icon ?? 'apps'} size={18} className="text-[var(--ink-70)]" />
+          <h3 className="text-sm font-semibold text-[var(--ink-100)] flex-1 truncate">
             {widget.title || entry?.label || 'Widget'}
           </h3>
-          <span className="text-[11px] text-stone-500 dark:text-stone-400 hidden sm:inline">
-            press <kbd className="px-1 py-0.5 rounded bg-stone-200 dark:bg-stone-700 text-stone-700 dark:text-stone-300">Esc</kbd> to close
+          <span className="text-[11px] text-[var(--ink-50)] hidden sm:inline">
+            press <kbd className="px-1 py-0.5 rounded bg-[var(--surface-sunken)] text-[var(--ink-70)]">Esc</kbd> to close
           </span>
           <button
             onClick={() => setMaximized((v) => !v)}

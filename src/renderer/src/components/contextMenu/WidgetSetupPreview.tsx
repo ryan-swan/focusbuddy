@@ -127,14 +127,14 @@ export default function WidgetSetupPreview(): JSX.Element | null {
     >
       <div
         data-testid="widget-setup-preview"
-        className="w-full max-w-lg max-h-[85vh] overflow-hidden flex flex-col rounded-lg bg-white dark:bg-stone-900 shadow-2xl border border-stone-200 dark:border-stone-700"
+        className="w-full max-w-lg max-h-[85vh] overflow-hidden flex flex-col rounded-lg bg-[var(--surface-raised)] shadow-2xl border border-[var(--edge-soft)]"
       >
-        <div className="flex items-center gap-2 px-4 py-3 border-b border-stone-200 dark:border-stone-700">
+        <div className="flex items-center gap-2 px-4 py-3 border-b border-[var(--edge-soft)]">
           <Icon name="auto_awesome" size={18} className="text-accent" />
-          <span className="font-medium text-stone-900 dark:text-stone-100">Set up with AI</span>
+          <span className="font-medium text-[var(--ink-100)]">Set up with AI</span>
           <button
             onClick={close}
-            className="ml-auto h-7 w-7 inline-flex items-center justify-center rounded hover:bg-stone-100 dark:hover:bg-stone-800 text-stone-500"
+            className="ml-auto h-7 w-7 inline-flex items-center justify-center rounded hover:bg-[var(--surface-sunken)] text-[var(--ink-50)]"
             aria-label="Close"
           >
             <Icon name="close" size={16} />
@@ -151,19 +151,19 @@ export default function WidgetSetupPreview(): JSX.Element | null {
                 if (e.key === 'Enter') void run(prompt)
               }}
               placeholder="Optional: tell the AI what to focus on, then press Enter"
-              className="flex-1 rounded border border-stone-300 dark:border-stone-700 bg-transparent px-2 py-1.5 text-sm text-stone-900 dark:text-stone-100 focus:outline-none focus:border-accent"
+              className="flex-1 rounded border border-[var(--edge-firm)] bg-transparent px-2 py-1.5 text-sm text-[var(--ink-100)] focus:outline-none focus:border-accent"
             />
             <button
               onClick={() => void run(prompt)}
               disabled={status === 'loading'}
-              className="px-3 py-1.5 rounded border border-stone-300 dark:border-stone-700 text-sm text-stone-800 dark:text-stone-200 disabled:opacity-50"
+              className="px-3 py-1.5 rounded border border-[var(--edge-firm)] text-sm text-[var(--ink-90)] disabled:opacity-50"
             >
               Redraft
             </button>
           </div>
 
           {status === 'loading' && (
-            <div className="flex items-center gap-2 text-sm text-stone-500 py-6 justify-center">
+            <div className="flex items-center gap-2 text-sm text-[var(--ink-50)] py-6 justify-center">
               <Icon name="autorenew" size={16} className="animate-spin" />
               Drafting suggestions
             </div>
@@ -178,11 +178,11 @@ export default function WidgetSetupPreview(): JSX.Element | null {
           {status === 'ready' && structured && (
             <div className="flex flex-col gap-2">
               {structured.summary && (
-                <p className="text-sm text-stone-700 dark:text-stone-200">{structured.summary}</p>
+                <p className="text-sm text-[var(--ink-70)]">{structured.summary}</p>
               )}
               {structured.applyAs === 'page-doc' && (
-                <div className="rounded-md border border-stone-200 dark:border-stone-700 p-3">
-                  <div className="text-[10px] uppercase tracking-wide text-stone-400 mb-1.5">
+                <div className="rounded-md border border-[var(--edge-soft)] p-3">
+                  <div className="text-[10px] uppercase tracking-wide text-[var(--ink-40)] mb-1.5">
                     Page outline
                   </div>
                   {(() => {
@@ -190,20 +190,20 @@ export default function WidgetSetupPreview(): JSX.Element | null {
                     return headings.length ? (
                       <ul className="space-y-1">
                         {headings.map((h, i) => (
-                          <li key={i} className="text-sm text-stone-800 dark:text-stone-100">
+                          <li key={i} className="text-sm text-[var(--ink-90)]">
                             {h}
                           </li>
                         ))}
                       </ul>
                     ) : (
-                      <span className="text-sm text-stone-500">A starter document.</span>
+                      <span className="text-sm text-[var(--ink-50)]">A starter document.</span>
                     )
                   })()}
                 </div>
               )}
               {structured.applyAs === 'webview-url' && (
-                <div className="rounded-md border border-stone-200 dark:border-stone-700 p-3">
-                  <div className="text-[10px] uppercase tracking-wide text-stone-400 mb-1.5">
+                <div className="rounded-md border border-[var(--edge-soft)] p-3">
+                  <div className="text-[10px] uppercase tracking-wide text-[var(--ink-40)] mb-1.5">
                     Open this address
                   </div>
                   <div className="text-sm text-accent break-all">{structured.url}</div>
@@ -214,14 +214,14 @@ export default function WidgetSetupPreview(): JSX.Element | null {
 
           {status === 'ready' && !structured && (
             <div className="flex flex-col gap-1">
-              <span className="text-xs uppercase tracking-wide text-stone-500">
+              <span className="text-xs uppercase tracking-wide text-[var(--ink-50)]">
                 Proposed {noun}, tick the ones to add
               </span>
               <div data-testid="widget-setup-items" className="flex flex-col">
                 {items.map((it) => (
                   <label
                     key={it.id}
-                    className="flex items-start gap-2 py-1.5 px-1 rounded hover:bg-stone-50 dark:hover:bg-stone-800 cursor-pointer"
+                    className="flex items-start gap-2 py-1.5 px-1 rounded hover:bg-[var(--surface-sunken)] cursor-pointer"
                   >
                     <input
                       type="checkbox"
@@ -230,7 +230,7 @@ export default function WidgetSetupPreview(): JSX.Element | null {
                       className="mt-1"
                       data-testid={`widget-setup-item-${it.id}`}
                     />
-                    <span className="text-sm text-stone-900 dark:text-stone-100">{it.text}</span>
+                    <span className="text-sm text-[var(--ink-100)]">{it.text}</span>
                   </label>
                 ))}
               </div>
@@ -238,7 +238,7 @@ export default function WidgetSetupPreview(): JSX.Element | null {
           )}
         </div>
 
-        <div className="flex items-center gap-2 px-4 py-3 border-t border-stone-200 dark:border-stone-700">
+        <div className="flex items-center gap-2 px-4 py-3 border-t border-[var(--edge-soft)]">
           <button
             data-testid="widget-setup-add"
             onClick={() => void add()}
@@ -249,7 +249,7 @@ export default function WidgetSetupPreview(): JSX.Element | null {
           </button>
           <button
             onClick={close}
-            className="ml-auto px-3 py-1.5 rounded text-sm text-stone-500 hover:text-stone-800 dark:hover:text-stone-200"
+            className="ml-auto px-3 py-1.5 rounded text-sm text-[var(--ink-50)] hover:text-[var(--ink-90)]"
           >
             Cancel
           </button>

@@ -53,12 +53,12 @@ export default function WhatsNewPanel({ onClose }: Props): JSX.Element {
       <div
         ref={ref}
         onClick={(e) => e.stopPropagation()}
-        className="bg-white dark:bg-stone-900 w-full max-w-lg mx-4 rounded-lg shadow-2xl border border-stone-200 dark:border-stone-700 overflow-hidden flex flex-col max-h-[85vh]"
+        className="bg-[var(--surface-raised)] w-full max-w-lg mx-4 rounded-lg shadow-2xl border border-[var(--edge-soft)] overflow-hidden flex flex-col max-h-[85vh]"
       >
-        <div className="px-5 py-4 border-b border-stone-200 dark:border-stone-700 flex items-center justify-between gap-2 shrink-0">
+        <div className="px-5 py-4 border-b border-[var(--edge-soft)] flex items-center justify-between gap-2 shrink-0">
           <div className="flex items-center gap-2">
             <Icon name="auto_awesome" size={18} className="text-accent" />
-            <h3 className="text-base font-semibold text-stone-900 dark:text-stone-100">
+            <h3 className="text-base font-semibold text-[var(--ink-100)]">
               What's new in PlexiDesk
             </h3>
           </div>
@@ -74,7 +74,7 @@ export default function WhatsNewPanel({ onClose }: Props): JSX.Element {
               <article key={`${entry.date}-${i}`} className="relative">
                 {/* Timeline dot */}
                 <div className="absolute -left-1 top-1.5 w-2 h-2 rounded-full bg-accent" />
-                <div className="pl-4 border-l-2 border-stone-200 dark:border-stone-700 ml-0">
+                <div className="pl-4 border-l-2 border-[var(--edge-soft)] ml-0">
                   <div className="flex items-center gap-2 flex-wrap mb-1">
                     {tag && (
                       <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${tag.cls}`}>
@@ -82,28 +82,28 @@ export default function WhatsNewPanel({ onClose }: Props): JSX.Element {
                       </span>
                     )}
                     <span
-                      className="text-[11px] text-stone-500 dark:text-stone-400 font-mono"
+                      className="text-[11px] text-[var(--ink-50)] font-mono"
                       title={new Date(entry.date).toLocaleString()}
                     >
                       {formatAbsoluteDate(entry.date)}
-                      <span className="ml-1.5 text-stone-400 dark:text-stone-500">
+                      <span className="ml-1.5 text-[var(--ink-40)]">
                         · {formatRelativeTime(entry.date)}
                       </span>
                     </span>
                   </div>
-                  <h4 className="text-sm font-semibold text-stone-900 dark:text-stone-100 mb-2">
+                  <h4 className="text-sm font-semibold text-[var(--ink-100)] mb-2">
                     {entry.title}
                   </h4>
                   <ul className="space-y-1.5">
                     {entry.highlights.map((h, hi) => (
                       <li
                         key={hi}
-                        className="text-[13px] text-stone-700 dark:text-stone-300 leading-relaxed flex gap-2"
+                        className="text-[13px] text-[var(--ink-70)] leading-relaxed flex gap-2"
                       >
                         <Icon
                           name="arrow_right"
                           size={14}
-                          className="text-stone-400 dark:text-stone-500 mt-0.5 shrink-0"
+                          className="text-[var(--ink-40)] mt-0.5 shrink-0"
                         />
                         <span>{h}</span>
                       </li>
@@ -115,7 +115,7 @@ export default function WhatsNewPanel({ onClose }: Props): JSX.Element {
           })}
         </div>
 
-        <div className="px-5 py-3 border-t border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-[11px] text-stone-500 dark:text-stone-400 shrink-0 flex justify-between items-center">
+        <div className="px-5 py-3 border-t border-[var(--edge-soft)] bg-[var(--surface-sunken)] text-[11px] text-[var(--ink-50)] shrink-0 flex justify-between items-center">
           <span>You're up to date.</span>
           <button onClick={onClose} className="btn-ghost">
             Close

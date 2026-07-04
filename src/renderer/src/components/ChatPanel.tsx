@@ -157,15 +157,15 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
 
   return (
     <aside className="h-full flex flex-col fb-glass-chrome border-l border-[color:var(--glass-chrome-border)]">
-      <div className="px-3 py-3 border-b border-stone-200 dark:border-stone-700 flex items-center justify-between gap-2">
+      <div className="px-3 py-3 border-b border-[var(--edge-soft)] flex items-center justify-between gap-2">
         <div className="min-w-0">
           <div className="flex items-center gap-1.5">
-            <Icon name="smart_toy" size={16} className="text-stone-600 dark:text-stone-400" />
-            <h2 className="text-[13px] font-semibold tracking-tight text-stone-900 dark:text-stone-100 uppercase">
+            <Icon name="smart_toy" size={16} className="text-[var(--ink-70)]" />
+            <h2 className="text-[13px] font-semibold tracking-tight text-[var(--ink-100)] uppercase">
               Assistant
             </h2>
           </div>
-          <p className="text-[11px] text-stone-500 dark:text-stone-400 truncate flex items-center gap-1.5">
+          <p className="text-[11px] text-[var(--ink-50)] truncate flex items-center gap-1.5">
             <span className="truncate">
               {activeTask ? activeTask.title : 'no task selected'}
             </span>
@@ -173,7 +173,7 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
                 the default auto mode the chip is just noise in a narrow header. */}
             {modelMode !== 'auto' && (
               <span
-                className="font-mono text-[9px] px-1 py-0.5 rounded bg-stone-200 dark:bg-stone-700 text-stone-600 dark:text-stone-300 shrink-0"
+                className="font-mono text-[9px] px-1 py-0.5 rounded bg-[var(--surface-sunken)] text-[var(--ink-70)] shrink-0"
                 title={`Locked to ${modelMode}. Change in Settings.`}
               >
                 {modelMode}
@@ -233,10 +233,10 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
       </div>
 
       {hasApiKey === false && (
-        <div className="m-3 p-3 rounded-md bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/50 text-xs text-stone-800 dark:text-stone-200 leading-relaxed flex gap-2">
+        <div className="m-3 p-3 rounded-md bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/50 text-xs text-[var(--ink-90)] leading-relaxed flex gap-2">
           <Icon name="key" size={16} className="text-amber-700 dark:text-amber-400 mt-0.5" />
           <div>
-            <strong className="text-stone-900 dark:text-stone-100">No API key yet.</strong> Open{' '}
+            <strong className="text-[var(--ink-100)]">No API key yet.</strong> Open{' '}
             <strong>Settings → AI · API keys</strong> and paste your Anthropic API key.
             It's encrypted with your system keychain and only this Mac can read it.
           </div>
@@ -250,7 +250,7 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
       >
         {messages.length === 0 && (
           <div className="mt-1 px-0.5">
-            <p className="text-[12.5px] text-stone-500 dark:text-stone-400 leading-relaxed mb-3">
+            <p className="text-[12.5px] text-[var(--ink-50)] leading-relaxed mb-3">
               Ask anything about your task. The assistant sees your active task and can research, plan, draft, and act on
               it. Try one of these to start:
             </p>
@@ -265,7 +265,7 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
                   key={s.text}
                   onClick={() => setDraft(s.text)}
                   data-testid="chat-suggestion"
-                  className="w-full text-left text-[12.5px] px-3 py-2 rounded-lg border border-stone-200 dark:border-stone-700 text-stone-700 dark:text-stone-300 hover:border-accent hover:bg-stone-50 dark:hover:bg-stone-800/50 transition-colors flex items-center gap-2"
+                  className="w-full text-left text-[12.5px] px-3 py-2 rounded-lg border border-[var(--edge-soft)] text-[var(--ink-70)] hover:border-accent hover:bg-[var(--surface-sunken)] transition-colors flex items-center gap-2"
                 >
                   <Icon name={s.icon} size={14} className="text-accent shrink-0" />
                   <span>{s.text}</span>
@@ -286,7 +286,7 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
                 className={`max-w-[92%] rounded-lg px-3 py-2 text-sm leading-relaxed ${
                   m.role === 'user'
                     ? 'ml-auto bg-stone-900 dark:bg-stone-100 text-stone-50 dark:text-stone-900 whitespace-pre-wrap'
-                    : 'bg-white dark:bg-stone-800 text-stone-900 dark:text-stone-100 border border-stone-200 dark:border-stone-700 md-rendered'
+                    : 'bg-[var(--surface-raised)] text-[var(--ink-100)] border border-[var(--edge-soft)] md-rendered'
                 }`}
               >
                 {m.role === 'assistant' ? (
@@ -327,14 +327,14 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
           )
         })}
         {sending && (
-          <div className="bg-white dark:bg-stone-800 text-stone-500 dark:text-stone-400 text-sm italic rounded-lg px-3 py-2 border border-stone-200 dark:border-stone-700 w-fit flex items-center gap-1.5">
+          <div className="bg-[var(--surface-raised)] text-[var(--ink-50)] text-sm italic rounded-lg px-3 py-2 border border-[var(--edge-soft)] w-fit flex items-center gap-1.5">
             <Icon name="more_horiz" size={16} />
             <span>thinking</span>
           </div>
         )}
       </div>
 
-      <form onSubmit={handleSend} className="p-3 border-t border-stone-200 dark:border-stone-700">
+      <form onSubmit={handleSend} className="p-3 border-t border-[var(--edge-soft)]">
         <textarea
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
@@ -346,7 +346,7 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
           }}
           rows={3}
           placeholder="Ask the assistant… (⌘⏎ to send)"
-          className="w-full resize-none bg-white dark:bg-stone-800 text-stone-900 dark:text-stone-100 border border-stone-300 dark:border-stone-600 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-stone-700 dark:focus:border-stone-400 focus:ring-2 focus:ring-stone-200 dark:focus:ring-stone-700"
+          className="w-full resize-none bg-[var(--surface-raised)] text-[var(--ink-100)] border border-[var(--edge-firm)] rounded-md px-3 py-2 text-sm focus:outline-none focus:border-[var(--edge-firm)] focus:ring-2 focus:ring-[var(--edge-firm)]"
         />
         <div className="flex justify-end mt-2">
           <button type="submit" disabled={!draft.trim() || sending} className="btn-primary">
@@ -544,21 +544,21 @@ function ProposalCards({
             key={p.id}
             onClick={() => void applyOne(p)}
             disabled={isBusy}
-            className="text-left rounded-md border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800/60 hover:border-accent hover:bg-accent/5 px-2.5 py-1.5 transition-colors group"
+            className="text-left rounded-md border border-[var(--edge-soft)] bg-[var(--surface-raised)] hover:border-accent hover:bg-accent/5 px-2.5 py-1.5 transition-colors group"
           >
             <div className="flex items-center gap-2">
               <span className="h-6 w-6 rounded-md inline-flex items-center justify-center bg-accent/10 text-accent shrink-0">
                 <Icon name={desc.icon} size={13} />
               </span>
               <div className="min-w-0 flex-1">
-                <div className="text-[10px] uppercase tracking-wider text-stone-500 dark:text-stone-400">
+                <div className="text-[10px] uppercase tracking-wider text-[var(--ink-50)]">
                   {desc.verb}
                 </div>
-                <div className="text-[12px] font-medium text-stone-900 dark:text-stone-100 truncate">
+                <div className="text-[12px] font-medium text-[var(--ink-100)] truncate">
                   {desc.subject}
                 </div>
                 {p.reason && (
-                  <div className="text-[10px] text-stone-500 dark:text-stone-400 mt-0.5 leading-snug">
+                  <div className="text-[10px] text-[var(--ink-50)] mt-0.5 leading-snug">
                     {p.reason}
                   </div>
                 )}

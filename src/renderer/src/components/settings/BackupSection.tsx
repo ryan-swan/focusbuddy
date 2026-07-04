@@ -77,7 +77,7 @@ export default function BackupSection(): JSX.Element {
       <div className="text-[11px] uppercase tracking-[0.12em] text-[var(--ink-50)] font-medium">
         Backup &amp; data
       </div>
-      <p className="text-[10px] text-[var(--ink-50)] leading-snug">
+      <p className="text-[11px] text-[var(--ink-50)] leading-snug">
         Everything you make is stored in one local database. Export a portable snapshot to keep
         it safe or move it to another machine. The app also keeps automatic snapshots and rotates
         the last seven.
@@ -102,7 +102,7 @@ export default function BackupSection(): JSX.Element {
         </button>
       </div>
 
-      <div className="flex items-center justify-between text-[10px] text-[var(--ink-50)]">
+      <div className="flex items-center justify-between text-[11px] text-[var(--ink-50)]">
         <span>
           {info ? `${info.count} snapshot${info.count === 1 ? '' : 's'} · last ${relativeTime(info.lastBackupMs)}` : 'Checking…'}
         </span>
@@ -126,7 +126,7 @@ export default function BackupSection(): JSX.Element {
         </div>
       )}
 
-      <p className="text-[10px] text-[var(--ink-40)] leading-snug">
+      <p className="text-[11px] text-[var(--ink-40)] leading-snug">
         Restoring replaces all current data. Your current data is snapshotted first, so a restore
         is itself reversible. API keys are stored in your system keychain and are not included in a
         backup, so re-enter them after restoring on a new machine.

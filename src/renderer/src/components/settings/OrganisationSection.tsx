@@ -73,7 +73,7 @@ export default function OrganisationSection({ onManage }: Props): JSX.Element {
               >
                 {org.name}
               </div>
-              <div className="text-[10px] text-[var(--ink-50)] truncate">
+              <div className="text-[11px] text-[var(--ink-50)] truncate">
                 {org.memberCount} member{org.memberCount === 1 ? '' : 's'}
                 <span className="mx-1.5 text-[var(--ink-40)]">·</span>
                 <span className="capitalize">{org.role}</span>

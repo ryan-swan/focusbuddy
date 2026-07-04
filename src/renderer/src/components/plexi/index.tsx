@@ -64,12 +64,12 @@ export function DashboardHeader({
   return (
     <header className="flex items-start justify-between gap-4 flex-wrap mb-5">
       <div className="min-w-0">
-        <h1 className="fb-display-hero text-[22px] leading-tight text-stone-900 dark:text-stone-50 flex items-center gap-2">
+        <h1 className="fb-display-hero text-[22px] leading-tight text-[var(--ink-100)] flex items-center gap-2">
           {greeting ?? title}
           {greeting && <span className="text-[20px]">👋</span>}
         </h1>
         {(subtitle || greeting) && (
-          <p className="mt-1 text-[13px] text-stone-500 dark:text-stone-400">{subtitle ?? title}</p>
+          <p className="mt-1 text-[13px] text-[var(--ink-50)]">{subtitle ?? title}</p>
         )}
       </div>
       {actions && <div className="flex items-center gap-2 shrink-0">{actions}</div>}
@@ -113,9 +113,9 @@ export function StatTile({
         )}
       </div>
       <div>
-        <div className="fb-display fb-tabular text-[24px] leading-none text-stone-900 dark:text-stone-50">{value}</div>
-        <div className="mt-1 text-[12px] text-stone-500 dark:text-stone-400">{label}</div>
-        {hint && <div className="text-[11px] text-stone-400 dark:text-stone-500">{hint}</div>}
+        <div className="fb-display fb-tabular text-[24px] leading-none text-[var(--ink-100)]">{value}</div>
+        <div className="mt-1 text-[12px] text-[var(--ink-50)]">{label}</div>
+        {hint && <div className="text-[11px] text-[var(--ink-40)]">{hint}</div>}
       </div>
     </div>
   )
@@ -141,7 +141,7 @@ export function RailCard({
     <section className={`${PLEXI_CARD} ${className}`}>
       {title && (
         <div className="flex items-center justify-between gap-2 px-4 pt-3.5 pb-2">
-          <h3 className="text-[13px] font-semibold text-stone-800 dark:text-stone-100 flex items-center gap-1.5">
+          <h3 className="text-[13px] font-semibold text-[var(--ink-90)] flex items-center gap-1.5">
             {icon && <Icon name={icon} size={15} className={TONE_TEXT[tone]} />}
             {title}
           </h3>

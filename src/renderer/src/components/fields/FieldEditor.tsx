@@ -121,8 +121,8 @@ function ShortText({ def, value, variant, onCommit, autoFocus }: SubProps<string
       }}
       className={
         variant === 'cell'
-          ? 'w-full bg-transparent px-2 py-1 text-[12px] outline-none focus:bg-white dark:focus:bg-stone-900'
-          : 'w-full bg-white dark:bg-stone-800 border border-stone-300 dark:border-stone-700 rounded px-2 py-1.5 text-sm focus:outline-none focus:border-stone-700'
+          ? 'w-full bg-transparent px-2 py-1 text-[12px] outline-none focus:bg-[var(--surface-raised)]'
+          : 'w-full bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded px-2 py-1.5 text-sm focus:outline-none focus:border-[var(--edge-firm)]'
       }
     />
   )
@@ -143,8 +143,8 @@ function LongText({ def, value, variant, onCommit }: SubProps<string>): JSX.Elem
       rows={variant === 'cell' ? 1 : 4}
       className={
         variant === 'cell'
-          ? 'w-full bg-transparent px-2 py-1 text-[12px] outline-none resize-none focus:bg-white dark:focus:bg-stone-900'
-          : 'w-full bg-white dark:bg-stone-800 border border-stone-300 dark:border-stone-700 rounded px-2 py-1.5 text-sm focus:outline-none focus:border-stone-700 resize-y'
+          ? 'w-full bg-transparent px-2 py-1 text-[12px] outline-none resize-none focus:bg-[var(--surface-raised)]'
+          : 'w-full bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded px-2 py-1.5 text-sm focus:outline-none focus:border-[var(--edge-firm)] resize-y'
       }
     />
   )
@@ -164,7 +164,7 @@ function NumberInput({
   return (
     <div className="inline-flex items-center gap-1 w-full">
       {config.prefix && (
-        <span className="text-[11px] text-stone-500 dark:text-stone-400">
+        <span className="text-[11px] text-[var(--ink-50)]">
           {config.prefix}
         </span>
       )}
@@ -181,12 +181,12 @@ function NumberInput({
         }}
         className={
           variant === 'cell'
-            ? 'flex-1 bg-transparent px-1 py-1 text-[12px] outline-none text-right focus:bg-white dark:focus:bg-stone-900'
-            : 'flex-1 bg-white dark:bg-stone-800 border border-stone-300 dark:border-stone-700 rounded px-2 py-1.5 text-sm focus:outline-none focus:border-stone-700 text-right'
+            ? 'flex-1 bg-transparent px-1 py-1 text-[12px] outline-none text-right focus:bg-[var(--surface-raised)]'
+            : 'flex-1 bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded px-2 py-1.5 text-sm focus:outline-none focus:border-[var(--edge-firm)] text-right'
         }
       />
       {config.suffix && (
-        <span className="text-[11px] text-stone-500 dark:text-stone-400">
+        <span className="text-[11px] text-[var(--ink-50)]">
           {config.suffix}
         </span>
       )}
@@ -205,7 +205,7 @@ function CheckboxInput({ def, value, onCommit }: SubProps<boolean>): JSX.Element
         className="h-3.5 w-3.5 rounded accent-emerald-600 cursor-pointer"
       />
       {config.label && (
-        <span className="text-[12px] text-stone-700 dark:text-stone-300">
+        <span className="text-[12px] text-[var(--ink-70)]">
           {config.label}
         </span>
       )}
@@ -241,7 +241,7 @@ function SingleSelect({
     <div ref={ref} className="relative w-full">
       <button
         onClick={() => setOpen((v) => !v)}
-        className="w-full text-left px-2 py-1 text-[12px] hover:bg-stone-50 dark:hover:bg-stone-800 rounded inline-flex items-center gap-1"
+        className="w-full text-left px-2 py-1 text-[12px] hover:bg-[var(--surface-sunken)] rounded inline-flex items-center gap-1"
       >
         {selected ? (
           <span
@@ -251,17 +251,17 @@ function SingleSelect({
             {selected.label}
           </span>
         ) : (
-          <span className="text-stone-400">—</span>
+          <span className="text-[var(--ink-40)]">—</span>
         )}
       </button>
       {open && (
-        <div className="absolute z-50 mt-1 left-0 min-w-[160px] rounded border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 shadow-lg py-1">
+        <div className="absolute z-50 mt-1 left-0 min-w-[160px] rounded border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-lg py-1">
           <button
             onClick={() => {
               onCommit(null)
               setOpen(false)
             }}
-            className="block w-full text-left text-[11px] px-2 py-1 hover:bg-stone-100 dark:hover:bg-stone-800 text-stone-400"
+            className="block w-full text-left text-[11px] px-2 py-1 hover:bg-[var(--surface-sunken)] text-[var(--ink-40)]"
           >
             (none)
           </button>
@@ -272,7 +272,7 @@ function SingleSelect({
                 onCommit(opt.id)
                 setOpen(false)
               }}
-              className="block w-full text-left px-2 py-1 hover:bg-stone-100 dark:hover:bg-stone-800"
+              className="block w-full text-left px-2 py-1 hover:bg-[var(--surface-sunken)]"
             >
               <span
                 className="px-1.5 py-0.5 rounded text-[11px]"
@@ -314,10 +314,10 @@ function MultiSelect({
     <div ref={ref} className="relative w-full">
       <button
         onClick={() => setOpen((v) => !v)}
-        className="w-full text-left px-2 py-1 text-[12px] hover:bg-stone-50 dark:hover:bg-stone-800 rounded inline-flex flex-wrap items-center gap-1"
+        className="w-full text-left px-2 py-1 text-[12px] hover:bg-[var(--surface-sunken)] rounded inline-flex flex-wrap items-center gap-1"
       >
         {selected.length === 0 ? (
-          <span className="text-stone-400">—</span>
+          <span className="text-[var(--ink-40)]">—</span>
         ) : (
           selected.map((opt) => (
             <span
@@ -331,16 +331,16 @@ function MultiSelect({
         )}
       </button>
       {open && (
-        <div className="absolute z-50 mt-1 left-0 min-w-[160px] rounded border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 shadow-lg py-1 max-h-60 overflow-y-auto">
+        <div className="absolute z-50 mt-1 left-0 min-w-[160px] rounded border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-lg py-1 max-h-60 overflow-y-auto">
           {options.map((opt) => {
             const checked = value.includes(opt.id)
             return (
               <button
                 key={opt.id}
                 onClick={() => toggle(opt.id)}
-                className="block w-full text-left px-2 py-1 hover:bg-stone-100 dark:hover:bg-stone-800 inline-flex items-center gap-1.5"
+                className="block w-full text-left px-2 py-1 hover:bg-[var(--surface-sunken)] inline-flex items-center gap-1.5"
               >
-                <span className="h-3 w-3 rounded-sm inline-flex items-center justify-center border border-stone-300 dark:border-stone-600">
+                <span className="h-3 w-3 rounded-sm inline-flex items-center justify-center border border-[var(--edge-firm)]">
                   {checked && <Icon name="check" size={10} />}
                 </span>
                 <span
@@ -353,7 +353,7 @@ function MultiSelect({
             )
           })}
           {options.length === 0 && (
-            <div className="px-2 py-1 text-[11px] text-stone-400">
+            <div className="px-2 py-1 text-[11px] text-[var(--ink-40)]">
               No options defined
             </div>
           )}
@@ -381,8 +381,8 @@ function DateInput({ def, value, variant, onCommit }: SubProps<number | null>): 
       }}
       className={
         variant === 'cell'
-          ? 'w-full bg-transparent px-1 py-1 text-[12px] outline-none focus:bg-white dark:focus:bg-stone-900'
-          : 'w-full bg-white dark:bg-stone-800 border border-stone-300 dark:border-stone-700 rounded px-2 py-1.5 text-sm focus:outline-none focus:border-stone-700'
+          ? 'w-full bg-transparent px-1 py-1 text-[12px] outline-none focus:bg-[var(--surface-raised)]'
+          : 'w-full bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded px-2 py-1.5 text-sm focus:outline-none focus:border-[var(--edge-firm)]'
       }
     />
   )
@@ -416,7 +416,7 @@ function Attachment({
       ))}
       <button
         onClick={() => inputRef.current?.click()}
-        className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded border border-dashed border-stone-300 dark:border-stone-700 text-stone-600 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-stone-800"
+        className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded border border-dashed border-[var(--edge-firm)] text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]"
       >
         <Icon name="add" size={10} />
         attach
@@ -449,7 +449,7 @@ function AttachmentChip({
     }
   }, [fileId])
   return (
-    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] bg-stone-100 dark:bg-stone-800 border border-stone-200 dark:border-stone-700">
+    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] bg-[var(--surface-sunken)] border border-[var(--edge-soft)]">
       <Icon name="attach_file" size={10} />
       <a
         href={`fb-file://${fileId}`}
@@ -461,7 +461,7 @@ function AttachmentChip({
       </a>
       <button
         onClick={onRemove}
-        className="text-stone-400 hover:text-red-600"
+        className="text-[var(--ink-40)] hover:text-red-600"
         title="Remove"
       >
         <Icon name="close" size={10} />
@@ -514,7 +514,7 @@ function ButtonField({ def }: SubProps<unknown>): JSX.Element {
         <span>{busy ? 'Running…' : config.label ?? 'Run'}</span>
       </button>
       {result !== null && (
-        <div className="text-[10px] text-stone-600 dark:text-stone-300 whitespace-pre-wrap break-words max-h-32 overflow-y-auto bg-stone-50 dark:bg-stone-800/40 rounded px-1.5 py-1">
+        <div className="text-[10px] text-[var(--ink-70)] whitespace-pre-wrap break-words max-h-32 overflow-y-auto bg-[var(--surface-sunken)] rounded px-1.5 py-1">
           {result}
         </div>
       )}
@@ -624,7 +624,7 @@ function RelationField({
     <div ref={ref} className="relative w-full">
       <div className="flex flex-wrap items-center gap-1">
         {linked.length === 0 && (
-          <span className="text-stone-400 text-[11px]">—</span>
+          <span className="text-[var(--ink-40)] text-[11px]">—</span>
         )}
         {linked.map((row) => (
           <span
@@ -646,8 +646,8 @@ function RelationField({
           onClick={() => setOpen((v) => !v)}
           className={
             variant === 'cell'
-              ? 'inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded border border-dashed border-stone-300 dark:border-stone-700 text-stone-600 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-stone-800'
-              : 'inline-flex items-center gap-0.5 text-[11px] px-2 py-0.5 rounded border border-dashed border-stone-300 dark:border-stone-700 text-stone-600 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-stone-800'
+              ? 'inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded border border-dashed border-[var(--edge-firm)] text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]'
+              : 'inline-flex items-center gap-0.5 text-[11px] px-2 py-0.5 rounded border border-dashed border-[var(--edge-firm)] text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]'
           }
         >
           <Icon name="add" size={10} />
@@ -655,12 +655,12 @@ function RelationField({
         </button>
       </div>
       {open && (
-        <div className="absolute z-50 mt-1 left-0 min-w-[200px] max-h-64 overflow-y-auto rounded border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 shadow-lg py-1">
-          <div className="px-2 py-1 text-[10px] uppercase tracking-wider text-stone-400 border-b border-stone-100 dark:border-stone-800">
+        <div className="absolute z-50 mt-1 left-0 min-w-[200px] max-h-64 overflow-y-auto rounded border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-lg py-1">
+          <div className="px-2 py-1 text-[10px] uppercase tracking-wider text-[var(--ink-40)] border-b border-[var(--edge-soft)]">
             {table.title} — pick {multi ? 'records' : 'a record'}
           </div>
           {available.length === 0 && (
-            <div className="px-2 py-2 text-[11px] text-stone-400 text-center">
+            <div className="px-2 py-2 text-[11px] text-[var(--ink-40)] text-center">
               {rows.length === 0 ? 'No rows in target table yet.' : 'All rows linked.'}
             </div>
           )}
@@ -668,7 +668,7 @@ function RelationField({
             <button
               key={row.id}
               onClick={() => toggle(row.id)}
-              className="w-full text-left px-2 py-1 hover:bg-stone-100 dark:hover:bg-stone-800 text-[11px] text-stone-700 dark:text-stone-200 truncate"
+              className="w-full text-left px-2 py-1 hover:bg-[var(--surface-sunken)] text-[11px] text-[var(--ink-70)] truncate"
             >
               {rowLabel(row)}
             </button>
