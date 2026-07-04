@@ -456,6 +456,43 @@ describe('array formulas — spill map', () => {
     expect(m.get('1,2')).toBe('q')
   })
 
+  it('VSTACK stacks ranges vertically', () => {
+    const g = grid([['1', '3', '=VSTACK(A1:A2,B1:B2)'], ['2', '4', '']])
+    const m = buildSpillMap(g)
+    expect([m.get('0,2'), m.get('1,2'), m.get('2,2'), m.get('3,2')]).toEqual(['1', '2', '3', '4'])
+  })
+  it('HSTACK stacks ranges horizontally', () => {
+    const g = grid([['1', '3', '=HSTACK(A1:A2,B1:B2)'], ['2', '4', '']])
+    const m = buildSpillMap(g)
+    expect([m.get('0,2'), m.get('0,3'), m.get('1,2'), m.get('1,3')]).toEqual(['1', '3', '2', '4'])
+  })
+  it('TOROW / TOCOL flatten a block', () => {
+    const gr = grid([['a', 'b', '=TOROW(A1:B2)'], ['c', 'd', '']])
+    const mr = buildSpillMap(gr)
+    expect([mr.get('0,2'), mr.get('0,3'), mr.get('0,4'), mr.get('0,5')]).toEqual(['a', 'b', 'c', 'd'])
+    const gc = grid([['a', 'b', '=TOCOL(A1:B2)'], ['c', 'd', '']])
+    const mc = buildSpillMap(gc)
+    expect([mc.get('0,2'), mc.get('1,2'), mc.get('2,2'), mc.get('3,2')]).toEqual(['a', 'b', 'c', 'd'])
+  })
+  it('TAKE / DROP slice rows', () => {
+    const t = grid([['1', '', '=TAKE(A1:A3,2)'], ['2', '', ''], ['3', '', '']])
+    const mt = buildSpillMap(t)
+    expect([mt.get('0,2'), mt.get('1,2'), mt.has('2,2')]).toEqual(['1', '2', false])
+    const d = grid([['1', '', '=DROP(A1:A3,1)'], ['2', '', ''], ['3', '', '']])
+    const md = buildSpillMap(d)
+    expect([md.get('0,2'), md.get('1,2')]).toEqual(['2', '3'])
+  })
+  it('TEXTSPLIT splits text into a row', () => {
+    const g = grid([['a,b,c', '=TEXTSPLIT(A1,",")']])
+    const m = buildSpillMap(g)
+    expect([m.get('0,1'), m.get('0,2'), m.get('0,3')]).toEqual(['a', 'b', 'c'])
+  })
+  it('array functions compose: SORT(VSTACK(...))', () => {
+    const g = grid([['3', '2', '=SORT(VSTACK(A1:A2,B1:B2))'], ['1', '4', '']])
+    const m = buildSpillMap(g)
+    expect([m.get('0,2'), m.get('1,2'), m.get('2,2'), m.get('3,2')]).toEqual(['1', '2', '3', '4'])
+  })
+
   it('a blocked spill reports #SPILL! and writes no targets', () => {
     const g = grid([['=SEQUENCE(3,1)'], ['blocker'], ['']])
     const m = buildSpillMap(g)
