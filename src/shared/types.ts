@@ -1379,11 +1379,12 @@ export interface SheetCellFormat {
 
 export interface SheetChartSpec {
   id: string
-  type: 'bar' | 'line' | 'pie'
+  type: 'bar' | 'line' | 'pie' | 'area' | 'scatter'
   range: string // e.g. 'A1:C10' on the owning tab
   title?: string
   headerRow?: boolean // first row holds series labels
   headerCol?: boolean // first column holds category labels
+  stacked?: boolean // stack bars/areas instead of grouping
 }
 
 // Conditional formatting — a rule paints cells in its A1 range whose computed
