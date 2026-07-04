@@ -20,6 +20,19 @@ export interface Grid {
 
 export type CellValue = number | string | boolean
 
+// Excel-style typed errors. A formula surfaces the specific error a user expects
+// (#DIV/0!, #N/A, #VALUE!, #NAME?, #NUM!) instead of a generic marker, while
+// keeping the honesty rule: an error is a real, visible error, never a fake value.
+// Any other thrown Error still falls back to the generic #ERR.
+export type FormulaErrorCode = '#DIV/0!' | '#N/A' | '#VALUE!' | '#NAME?' | '#NUM!' | '#REF!' | '#ERR'
+export class FormulaError extends Error {
+  code: FormulaErrorCode
+  constructor(code: FormulaErrorCode) {
+    super(code)
+    this.code = code
+  }
+}
+
 // ── Cross-sheet workbook context ────────────────────────────────────────────
 // A formula may reference another tab: =Sheet2!A1 or =SUM('My Tab'!A1:A9). The
 // evaluator resolves the named tab's grid from this context, which is set for the
@@ -175,8 +188,9 @@ export const SHEET_FUNCTIONS: Array<{ name: string; hint: string }> = [
   { name: 'ISNUMBER', hint: 'ISNUMBER(value) — TRUE if it is a number' },
   { name: 'ISTEXT', hint: 'ISTEXT(value) — TRUE if it is text' },
   { name: 'ISLOGICAL', hint: 'ISLOGICAL(value) — TRUE if it is TRUE/FALSE' },
-  { name: 'ISERROR', hint: 'ISERROR(value) — TRUE if the value is an error' },
-  { name: 'ISNA', hint: 'ISNA(value) — TRUE if the value is not available' },
+  { name: 'ISERROR', hint: 'ISERROR(value) — TRUE if the value is any error' },
+  { name: 'ISNA', hint: 'ISNA(value) — TRUE only if the value is #N/A' },
+  { name: 'NA', hint: 'NA() — the #N/A error value' },
   { name: 'ISEVEN', hint: 'ISEVEN(number)' },
   { name: 'ISODD', hint: 'ISODD(number)' },
   { name: 'ROW', hint: 'ROW(ref) — the row number of a reference' },
@@ -831,7 +845,7 @@ function evalNode(node: Node, grid: Grid, seen: Set<string>): CellValue {
         case '+': r = a + b; break
         case '-': r = a - b; break
         case '*': r = a * b; break
-        case '/': r = a / b; break
+        case '/': if (b === 0) throw new FormulaError('#DIV/0!'); r = a / b; break
         case '^': r = Math.pow(a, b); break
         default: throw new Error(`bad op ${node.op}`)
       }
@@ -1016,14 +1030,14 @@ function evalCall(node: Extract<Node, { k: 'call' }>, grid: Grid, seen: Set<stri
       return Math.abs(toNum(arg(0)))
     case 'SQRT': {
       const x = toNum(arg(0))
-      if (x < 0) throw new Error('SQRT of negative')
+      if (x < 0) throw new FormulaError('#NUM!')
       return Math.sqrt(x)
     }
     case 'POWER':
       return Math.pow(toNum(arg(0)), toNum(arg(1)))
     case 'MOD': {
       const b = toNum(arg(1))
-      if (b === 0) throw new Error('MOD by zero')
+      if (b === 0) throw new FormulaError('#DIV/0!')
       return toNum(arg(0)) % b
     }
     // Text
@@ -1066,7 +1080,7 @@ function evalCall(node: Extract<Node, { k: 'call' }>, grid: Grid, seen: Set<stri
         name === 'SEARCH'
           ? hay.toLowerCase().indexOf(needle.toLowerCase(), start - 1)
           : hay.indexOf(needle, start - 1)
-      if (idx < 0) throw new Error(`${name}: not found`)
+      if (idx < 0) throw new FormulaError('#VALUE!')
       return idx + 1
     }
     case 'SUBSTITUTE': {
@@ -1110,7 +1124,7 @@ function evalCall(node: Extract<Node, { k: 'call' }>, grid: Grid, seen: Set<stri
       return toStr(arg(0)) === toStr(arg(1))
     case 'VALUE': {
       const n = Number(toStr(arg(0)).replace(/[\s,$%]/g, ''))
-      if (!Number.isFinite(n)) throw new Error('VALUE: not a number')
+      if (!Number.isFinite(n)) throw new FormulaError('#VALUE!')
       return n
     }
     case 'TEXTJOIN': {
@@ -1244,18 +1258,18 @@ function evalCall(node: Extract<Node, { k: 'call' }>, grid: Grid, seen: Set<stri
       return Math.exp(toNum(arg(0)))
     case 'LN': {
       const x = toNum(arg(0))
-      if (x <= 0) throw new Error('LN domain')
+      if (x <= 0) throw new FormulaError('#NUM!')
       return Math.log(x)
     }
     case 'LOG10': {
       const x = toNum(arg(0))
-      if (x <= 0) throw new Error('LOG10 domain')
+      if (x <= 0) throw new FormulaError('#NUM!')
       return Math.log10(x)
     }
     case 'LOG': {
       const x = toNum(arg(0))
       const base = args.length > 1 ? toNum(arg(1)) : 10
-      if (x <= 0) throw new Error('LOG domain')
+      if (x <= 0) throw new FormulaError('#NUM!')
       return Math.log(x) / Math.log(base)
     }
     // Date
@@ -1286,14 +1300,14 @@ function evalCall(node: Extract<Node, { k: 'call' }>, grid: Grid, seen: Set<stri
       if (type === 0) {
         for (let i = 0; i < coords.length; i++)
           if (compare('=', cellValue(g, coords[i].r, coords[i].c, seen), key)) return i + 1
-        throw new Error('MATCH: not found')
+        throw new FormulaError('#N/A')
       }
       let best = -1
       for (let i = 0; i < coords.length; i++) {
         const v = cellValue(g, coords[i].r, coords[i].c, seen)
         if (type === 1 ? compare('<=', v, key) : compare('>=', v, key)) best = i
       }
-      if (best < 0) throw new Error('MATCH: not found')
+      if (best < 0) throw new FormulaError('#N/A')
       return best + 1
     }
     case 'INDEX': {
@@ -1315,7 +1329,7 @@ function evalCall(node: Extract<Node, { k: 'call' }>, grid: Grid, seen: Set<stri
         rr = rg.r1 + (a1 - 1)
         cc = rg.c1 + ((args.length > 2 ? toNum(arg(2)) : 1) - 1)
       }
-      if (rr < rg.r1 || rr > rg.r2 || cc < rg.c1 || cc > rg.c2) throw new Error('INDEX out of range')
+      if (rr < rg.r1 || rr > rg.r2 || cc < rg.c1 || cc > rg.c2) throw new FormulaError('#REF!')
       return cellValue(g, rr, cc, seen)
     }
     case 'VLOOKUP':
@@ -1327,7 +1341,7 @@ function evalCall(node: Extract<Node, { k: 'call' }>, grid: Grid, seen: Set<stri
       const idx = toNum(arg(2))
       const exact = args.length > 3 ? !toBool(arg(3)) : true
       const horizontal = name === 'HLOOKUP'
-      if (idx < 1) throw new Error(`${name}: bad index`)
+      if (idx < 1) throw new FormulaError('#VALUE!')
       const lineVal = (i: number): CellValue =>
         horizontal ? cellValue(g, rg.r1, i, seen) : cellValue(g, i, rg.c1, seen)
       const resultVal = (i: number): CellValue =>
@@ -1335,14 +1349,14 @@ function evalCall(node: Extract<Node, { k: 'call' }>, grid: Grid, seen: Set<stri
       const lo = horizontal ? rg.c1 : rg.r1
       const hi = horizontal ? rg.c2 : rg.r2
       const lim = horizontal ? rg.r1 + idx - 1 : rg.c1 + idx - 1
-      if (lim > (horizontal ? rg.r2 : rg.c2)) throw new Error(`${name}: index out of range`)
+      if (lim > (horizontal ? rg.r2 : rg.c2)) throw new FormulaError('#REF!')
       for (let i = lo; i <= hi; i++) if (compare('=', lineVal(i), key)) return resultVal(i)
       if (!exact) {
         let best = -1
         for (let i = lo; i <= hi; i++) if (compare('<=', lineVal(i), key)) best = i
         if (best >= 0) return resultVal(best)
       }
-      throw new Error(`${name}: not found`)
+      throw new FormulaError('#N/A')
     }
     // ── Lookup (modern) ─────────────────────────────────────────────────────
     case 'XLOOKUP': {
@@ -1358,10 +1372,10 @@ function evalCall(node: Extract<Node, { k: 'call' }>, grid: Grid, seen: Set<stri
       if (found < 0 && mode !== 0) found = nearestIndex(lvals, key, mode === 1 ? 'up' : 'down')
       if (found < 0) {
         if (args.length > 3) return arg(3)
-        throw new Error('XLOOKUP: not found')
+        throw new FormulaError('#N/A')
       }
       const rc = rcoords[found]
-      if (!rc) throw new Error('XLOOKUP: return range shorter than lookup range')
+      if (!rc) throw new FormulaError('#VALUE!')
       return cellValue(rgGrid, rc.r, rc.c, seen)
     }
     case 'XMATCH': {
@@ -1373,20 +1387,20 @@ function evalCall(node: Extract<Node, { k: 'call' }>, grid: Grid, seen: Set<stri
       const vals = coords.map(({ r, c }) => cellValue(g, r, c, seen))
       let found = vals.findIndex((v) => compare('=', v, key))
       if (found < 0 && mode !== 0) found = nearestIndex(vals, key, mode === 1 ? 'up' : 'down')
-      if (found < 0) throw new Error('XMATCH: not found')
+      if (found < 0) throw new FormulaError('#N/A')
       return found + 1
     }
     // ── Logical (multi-branch) ──────────────────────────────────────────────
     case 'IFS': {
       for (let i = 0; i + 1 < args.length; i += 2) if (toBool(arg(i))) return arg(i + 1)
-      throw new Error('IFS: no condition matched')
+      throw new FormulaError('#N/A')
     }
     case 'SWITCH': {
       const subject = arg(0)
       let i = 1
       for (; i + 1 < args.length; i += 2) if (compare('=', subject, arg(i))) return arg(i + 1)
       if (i < args.length) return arg(i) // trailing default
-      throw new Error('SWITCH: no case matched')
+      throw new FormulaError('#N/A')
     }
     case 'INDIRECT':
       // Resolve a reference held as text, e.g. INDIRECT("A1") or INDIRECT("S2!B3").
@@ -1424,7 +1438,7 @@ function evalCall(node: Extract<Node, { k: 'call' }>, grid: Grid, seen: Set<stri
     case 'SMALL': {
       const ns = collectNumbers([args[0]], grid, seen).slice().sort((a, b) => (name === 'LARGE' ? b - a : a - b))
       const k = Math.trunc(toNum(arg(1)))
-      if (k < 1 || k > ns.length) throw new Error(`${name}: k out of range`)
+      if (k < 1 || k > ns.length) throw new FormulaError('#NUM!')
       return ns[k - 1]
     }
     case 'COUNTUNIQUE': {
@@ -1445,26 +1459,6 @@ function evalCall(node: Extract<Node, { k: 'call' }>, grid: Grid, seen: Set<stri
     }
     case 'SUMSQ':
       return collectNumbers(args, grid, seen).reduce((a, b) => a + b * b, 0)
-    case 'SIGN':
-      return Math.sign(toNum(arg(0)))
-    case 'EXP':
-      return Math.exp(toNum(arg(0)))
-    case 'LN': {
-      const x = toNum(arg(0))
-      if (x <= 0) throw new Error('LN needs a positive number')
-      return Math.log(x)
-    }
-    case 'LOG': {
-      const x = toNum(arg(0))
-      const base = args.length > 1 ? toNum(arg(1)) : 10
-      if (x <= 0 || base <= 0 || base === 1) throw new Error('LOG: bad argument')
-      return Math.log(x) / Math.log(base)
-    }
-    case 'LOG10': {
-      const x = toNum(arg(0))
-      if (x <= 0) throw new Error('LOG10 needs a positive number')
-      return Math.log10(x)
-    }
     // ── Dates ───────────────────────────────────────────────────────────────
     case 'DATE': {
       const dt = new Date(Date.UTC(toNum(arg(0)), toNum(arg(1)) - 1, toNum(arg(2))))
@@ -1552,13 +1546,21 @@ function evalCall(node: Extract<Node, { k: 'call' }>, grid: Grid, seen: Set<stri
         return false
       }
     case 'ISERROR':
-    case 'ISNA':
       try {
         evalNode(args[0], grid, seen)
         return false
       } catch {
         return true
       }
+    case 'ISNA':
+      try {
+        evalNode(args[0], grid, seen)
+        return false
+      } catch (e) {
+        return e instanceof FormulaError && e.code === '#N/A'
+      }
+    case 'NA':
+      throw new FormulaError('#N/A')
     case 'ISEVEN':
       return Math.trunc(toNum(arg(0))) % 2 === 0
     case 'ISODD':
@@ -1591,7 +1593,7 @@ function evalCall(node: Extract<Node, { k: 'call' }>, grid: Grid, seen: Set<stri
     case 'CHOOSE': {
       const i = Math.trunc(toNum(arg(0)))
       const chosen = args[i] // 1-based: args[0] is the index, args[1] the first choice
-      if (!chosen) throw new Error('CHOOSE: index out of range')
+      if (!chosen) throw new FormulaError('#VALUE!')
       return evalNode(chosen, grid, seen)
     }
     // ── Math ──────────────────────────────────────────────────────────────────
@@ -1664,7 +1666,7 @@ function evalCall(node: Extract<Node, { k: 'call' }>, grid: Grid, seen: Set<stri
       return npv
     }
     default:
-      throw new Error(`unknown function ${name}`)
+      throw new FormulaError('#NAME?')
   }
 }
 
@@ -1767,12 +1769,12 @@ export function displayCell(
     const v = evalNode(parse(raw.slice(1)), grid, new Set([`${gridId(grid)}:${r},${c}`]))
     if (typeof v === 'boolean') return v ? 'TRUE' : 'FALSE'
     if (typeof v === 'number') {
-      if (!Number.isFinite(v)) return '#ERR'
+      if (!Number.isFinite(v)) return '#NUM!'
       return String(Math.round(v * 1e6) / 1e6)
     }
     return v
-  } catch {
-    return '#ERR'
+  } catch (e) {
+    return e instanceof FormulaError ? e.code : '#ERR'
   } finally {
     WB = null
     NAMES = null
