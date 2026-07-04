@@ -21,12 +21,12 @@
  */
 
 import { test, expect } from '@playwright/test'
-import { launchApp, waitForReady } from './_helpers'
+import { launchApp, waitForReady, gotoView } from './_helpers'
 
 // ── Shared setup ──────────────────────────────────────────────────────────────
 
 async function openSlidesDoc(window: import('@playwright/test').Page): Promise<void> {
-  await window.getByRole('button', { name: /^Documents$/i }).click()
+  await gotoView(window, 'goDocuments')
   await expect(window.getByRole('heading', { name: 'Documents', level: 1 })).toBeVisible({ timeout: 8_000 })
   const blankRow = window.locator('text=Or start blank:').locator('..')
   await blankRow.locator('button', { hasText: 'Slides' }).first().click()

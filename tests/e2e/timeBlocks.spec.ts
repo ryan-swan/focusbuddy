@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { launchApp, type LaunchedApp, waitForReady } from './_helpers'
+import { launchApp, type LaunchedApp, waitForReady, gotoView } from './_helpers'
 
 // Calendar time-blocking. Two layers: the backend round-trip (real SQLite —
 // create, range query, reschedule, complete, delete) and the week-grid UI
@@ -76,7 +76,7 @@ test('TB-2 — booking a block from the week grid renders it and it persists', a
   await waitForReady(window)
 
   // Open the Calendar view, switch to Week.
-  await window.getByRole('button', { name: /^Calendar$/ }).first().click()
+  await gotoView(window, 'goCalendar')
   await window.locator('[data-testid="calendar-mode-week"]').click()
   await expect(window.locator('[data-testid="week-time-grid"]')).toBeVisible({ timeout: 6000 })
 
@@ -91,7 +91,7 @@ test('TB-2 — booking a block from the week grid renders it and it persists', a
   // It persisted: reload, return to Week, the block is still there.
   await window.reload()
   await waitForReady(window)
-  await window.getByRole('button', { name: /^Calendar$/ }).first().click()
+  await gotoView(window, 'goCalendar')
   await window.locator('[data-testid="calendar-mode-week"]').click()
   await expect(window.locator('[data-testid="time-block"]')).toHaveCount(1, { timeout: 6000 })
 })
@@ -110,7 +110,7 @@ test('TB-3 — dragging a task onto a day column books a block for that task', a
   await window.reload()
   await waitForReady(window)
 
-  await window.getByRole('button', { name: /^Calendar$/ }).first().click()
+  await gotoView(window, 'goCalendar')
   await window.locator('[data-testid="calendar-mode-week"]').click()
   await expect(window.locator('[data-testid="week-time-grid"]')).toBeVisible({ timeout: 6000 })
 

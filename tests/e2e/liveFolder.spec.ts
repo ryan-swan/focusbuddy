@@ -23,7 +23,7 @@
  */
 
 import { test, expect } from '@playwright/test'
-import { launchApp, waitForReady } from './_helpers'
+import { launchApp, waitForReady, gotoView } from './_helpers'
 
 // ── LF-1: boot smoke ────────────────────────────────────────────────────────
 
@@ -82,11 +82,11 @@ test('LF-2 — Files view: "Collaborate live" item exists in the folder right-cl
     expect(created).toBeTruthy()
 
     // Navigate away from Files and back to force a store.refresh() on mount.
-    await window.getByRole('button', { name: /^Home$/i }).first().click().catch(() => {})
+    await gotoView(window, 'goHome')
     await window.waitForTimeout(400)
 
     // Navigate back to Files — the useEffect refresh fires on mount.
-    await window.getByRole('button', { name: /^Files$/i }).click()
+    await gotoView(window, 'goFiles')
     await expect(window.locator('[data-testid="files-view"]')).toBeVisible({ timeout: 5_000 })
     // Allow the refresh to complete and the list to render.
     await window.waitForTimeout(1200)
@@ -159,13 +159,9 @@ test('LF-3 — goLiveFolder: navigating to livefolder view renders LiveFolderVie
       window.dispatchEvent(event)
     })
 
-    // Navigate away and back to trigger the persisted view load.
-    // Use sidebar navigation that forces a re-mount.
-    const homeBtn = window.getByRole('button', { name: /^Home$/i }).first()
-    if (await homeBtn.isVisible().catch(() => false)) {
-      await homeBtn.click()
-      await window.waitForTimeout(300)
-    }
+    // Navigate away and back to trigger the persisted view load, forcing a
+    // re-mount through the view store.
+    await gotoView(window, 'goHome')
 
     // Set the persisted view to livefolder and reload the view store by
     // clicking a sidebar nav item that always triggers goHome, then verifying
@@ -219,9 +215,7 @@ test('LF-3 — goLiveFolder: navigating to livefolder view renders LiveFolderVie
       // (meta !== null). When signed out / fake id, we stay in the loading branch.
       // Confirm the app is still alive.
       await window.waitForTimeout(500)
-      await expect(
-        window.getByRole('heading', { name: /^(focusbuddy|haptyx|plexidesk)$/i, level: 2 })
-      ).toBeVisible({ timeout: 3_000 })
+      await expect(window.locator('[data-testid="footer-sync-chip"]')).toBeVisible({ timeout: 3_000 })
     }
 
     const realErrors = uncaught.filter(
@@ -247,7 +241,7 @@ test('LF-4 — DocumentsView: shared-live-list absent when signed out (regressio
   try {
     await waitForReady(window)
 
-    await window.getByRole('button', { name: /^Documents$/i }).click()
+    await gotoView(window, 'goDocuments')
     await expect(window.getByRole('heading', { name: 'Documents', level: 1 })).toBeVisible({ timeout: 8_000 })
 
     // No account → shared=[] → section must not be rendered.

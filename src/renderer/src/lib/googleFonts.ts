@@ -1,8 +1,9 @@
 // Google Fonts catalogue + on-demand loader, shared by the document, spreadsheet
-// and slide editors. A font's stylesheet is injected the first time it is shown
-// or chosen (CSP already allows fonts.googleapis.com / fonts.gstatic.com), so we
-// never ship every font up front. The list is a broad curated set of the most
-// used Google families plus the app's bundled ones.
+// and slide editors. The core type stack is self-hosted (bundled via @fontsource
+// / material-symbols and imported from main.tsx), and the main renderer CSP is
+// deliberately strict (no fonts.googleapis.com) so the app renders offline. So
+// loadGoogleFont never re-fetches a self-hosted family — that would only inject a
+// CSP-blocked <link> and spam the console for a font that is already present.
 
 export const GENERIC_FONTS = [
   { label: 'Default', value: '' },
@@ -34,11 +35,25 @@ export const GOOGLE_FONTS: string[] = [
 
 const loaded = new Set<string>()
 
+// Families that ship with the app (bundled @fontsource / material-symbols and
+// imported in main.tsx). These render without any network, and the renderer CSP
+// blocks fonts.googleapis.com, so a CDN fetch for them is both pointless and
+// noisy — skip it. Keep in sync with the imports in main.tsx / the type stack.
+const SELF_HOSTED = new Set([
+  'Inter',
+  'JetBrains Mono',
+  'Lexend',
+  'Atkinson Hyperlegible',
+  'Patrick Hand',
+  'Material Symbols Outlined'
+])
+
 // Inject the @font-face stylesheet for a family if not already loaded. No weight
 // axis is requested so the call always succeeds even for single-weight families;
-// bold/italic synthesise. Generic CSS stacks (containing a comma) are ignored.
+// bold/italic synthesise. Generic CSS stacks (containing a comma) and the
+// self-hosted families are ignored.
 export function loadGoogleFont(family: string): void {
-  if (!family || family.includes(',') || loaded.has(family)) return
+  if (!family || family.includes(',') || loaded.has(family) || SELF_HOSTED.has(family)) return
   loaded.add(family)
   const id = 'gf-' + family.replace(/[^a-z0-9]+/gi, '-').toLowerCase()
   if (document.getElementById(id)) return

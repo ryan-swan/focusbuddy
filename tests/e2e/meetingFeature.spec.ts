@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { launchApp, waitForReady, openProduct } from './_helpers'
+import { launchApp, waitForReady, openProduct, gotoView } from './_helpers'
 import type { LaunchedApp } from './_helpers'
 
 // Tests for the "start/schedule a meeting from anywhere" feature.
@@ -70,7 +70,7 @@ test('MF-2 — calendar block composer meeting toggle reveals invitees field', a
   await waitForReady(window)
 
   // Open Calendar and switch to Week view.
-  await window.getByRole('button', { name: /^Calendar$/i }).first().click()
+  await gotoView(window, 'goCalendar')
   await window.locator('[data-testid="calendar-mode-week"]').click()
   await expect(window.locator('[data-testid="week-time-grid"]')).toBeVisible({ timeout: 6000 })
 
@@ -95,7 +95,7 @@ test('MF-3 — scheduling a meeting block creates it with meeting data', async (
   await waitForReady(window)
 
   // Navigate to Calendar week view.
-  await window.getByRole('button', { name: /^Calendar$/i }).first().click()
+  await gotoView(window, 'goCalendar')
   await window.locator('[data-testid="calendar-mode-week"]').click()
   await expect(window.locator('[data-testid="week-time-grid"]')).toBeVisible({ timeout: 6000 })
 

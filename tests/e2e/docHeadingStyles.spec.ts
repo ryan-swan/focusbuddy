@@ -26,12 +26,12 @@
  */
 
 import { test, expect, type Page } from '@playwright/test'
-import { launchApp, waitForReady } from './_helpers'
+import { launchApp, waitForReady, gotoView } from './_helpers'
 
 // ── Navigation helpers ────────────────────────────────────────────────────────
 
 async function openDocumentsHub(window: Page): Promise<void> {
-  await window.getByRole('button', { name: /^Documents$/i }).click()
+  await gotoView(window, 'goDocuments')
   await expect(window.getByRole('heading', { name: 'Documents', level: 1 })).toBeVisible({
     timeout: 8_000
   })

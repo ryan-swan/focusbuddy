@@ -26,14 +26,14 @@
  */
 
 import { test, expect, type Page } from '@playwright/test'
-import { launchApp, type LaunchedApp, waitForReady } from './_helpers'
+import { launchApp, type LaunchedApp, waitForReady, gotoView } from './_helpers'
 
 // ── Navigation helpers ────────────────────────────────────────────────────────
 
 async function openDocumentsHub(window: Page): Promise<void> {
   // .first() because the home-dashboard card may render a second "Documents"
   // shortcut button alongside the sidebar nav entry.
-  await window.getByRole('button', { name: /^Documents$/i }).first().click()
+  await gotoView(window, 'goDocuments')
   await expect(window.getByRole('heading', { name: 'Documents', level: 1 })).toBeVisible({
     timeout: 8_000
   })
