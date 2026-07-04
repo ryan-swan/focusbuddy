@@ -73,7 +73,7 @@ export default function LocalAppLauncherWidget({ widget, inline = false }: Props
     <button
       onClick={handleLaunch}
       disabled={launching}
-      className="h-full w-full flex flex-col items-center justify-center gap-2 p-3 hover:bg-stone-50 dark:hover:bg-stone-800/60 transition-colors disabled:opacity-70"
+      className="h-full w-full flex flex-col items-center justify-center gap-2 p-3 hover:bg-[var(--surface-sunken)] transition-colors disabled:opacity-70"
     >
       <div className="relative">
         {sourceApp.iconPngBase64 ? (
@@ -89,16 +89,16 @@ export default function LocalAppLauncherWidget({ widget, inline = false }: Props
         )}
         {running === true && (
           <span
-            className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full bg-emerald-500 border-2 border-white dark:border-stone-900"
+            className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full bg-emerald-500 border-2 border-[var(--surface-raised)]"
             title="Running"
           />
         )}
       </div>
       <div className="min-w-0 text-center px-1">
-        <div className="text-[12px] font-medium text-stone-900 dark:text-stone-100 truncate">
+        <div className="text-[12px] font-medium text-[var(--ink-100)] truncate">
           {sourceApp.title}
         </div>
-        <div className="text-[10px] text-stone-500 dark:text-stone-400">
+        <div className="text-[10px] text-[var(--ink-50)]">
           {launching
             ? 'launching…'
             : running === true
@@ -114,11 +114,11 @@ export default function LocalAppLauncherWidget({ widget, inline = false }: Props
     </button>
   ) : (
     <div className="h-full w-full flex flex-col items-center justify-center gap-1 p-3 text-center">
-      <Icon name="broken_image" size={22} className="text-stone-400" />
-      <div className="text-[11px] text-stone-500 dark:text-stone-400">
+      <Icon name="broken_image" size={22} className="text-[var(--ink-40)]" />
+      <div className="text-[11px] text-[var(--ink-50)]">
         Linked app was removed.
       </div>
-      <div className="text-[10px] text-stone-400 dark:text-stone-500">
+      <div className="text-[10px] text-[var(--ink-40)]">
         Re-add it from the sidebar and drop onto the canvas.
       </div>
     </div>

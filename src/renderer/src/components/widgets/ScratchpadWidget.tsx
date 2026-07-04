@@ -162,22 +162,22 @@ export default function ScratchpadWidget({ widget, inline = false }: Props): JSX
   const body = (
     <div className="h-full w-full flex flex-col bg-[#fcfbf7] dark:bg-stone-900">
       {/* Toolbar */}
-      <div className="shrink-0 flex items-center gap-1.5 px-2 py-1 border-b border-stone-200 dark:border-stone-700 bg-stone-50/80 dark:bg-stone-800/60">
+      <div className="shrink-0 flex items-center gap-1.5 px-2 py-1 border-b border-[var(--edge-soft)] bg-[var(--surface-sunken)]/80">
         <button
           onClick={() => setTool('pen')}
-          className={`icon-btn ${tool === 'pen' ? '!text-accent' : 'text-stone-500'}`}
+          className={`icon-btn ${tool === 'pen' ? '!text-accent' : 'text-[var(--ink-50)]'}`}
           title="Pen"
         >
           <Icon name="edit" size={15} />
         </button>
         <button
           onClick={() => setTool('eraser')}
-          className={`icon-btn ${tool === 'eraser' ? '!text-accent' : 'text-stone-500'}`}
+          className={`icon-btn ${tool === 'eraser' ? '!text-accent' : 'text-[var(--ink-50)]'}`}
           title="Eraser"
         >
           <Icon name="ink_eraser" size={15} />
         </button>
-        <div className="w-px h-4 bg-stone-300 dark:bg-stone-600 mx-0.5" />
+        <div className="w-px h-4 bg-[var(--surface-sunken)] mx-0.5" />
         {COLORS.map((c) => (
           <button
             key={c}
@@ -186,20 +186,20 @@ export default function ScratchpadWidget({ widget, inline = false }: Props): JSX
               setTool('pen')
             }}
             className={`h-4 w-4 rounded-full border ${
-              color === c && tool === 'pen' ? 'ring-2 ring-offset-1 ring-stone-400' : 'border-black/10'
+              color === c && tool === 'pen' ? 'ring-2 ring-offset-1 ring-[var(--edge-firm)]' : 'border-black/10'
             }`}
             style={{ backgroundColor: c }}
             title={c}
             aria-label={`Colour ${c}`}
           />
         ))}
-        <div className="w-px h-4 bg-stone-300 dark:bg-stone-600 mx-0.5" />
+        <div className="w-px h-4 bg-[var(--surface-sunken)] mx-0.5" />
         {SIZES.map((s) => (
           <button
             key={s}
             onClick={() => setSize(s)}
-            className={`h-6 w-6 inline-flex items-center justify-center rounded hover:bg-stone-200 dark:hover:bg-stone-700 ${
-              size === s ? 'bg-stone-200 dark:bg-stone-700' : ''
+            className={`h-6 w-6 inline-flex items-center justify-center rounded hover:bg-[var(--surface-sunken)] ${
+              size === s ? 'bg-[var(--surface-sunken)]' : ''
             }`}
             title={`${s}px`}
           >
@@ -207,7 +207,7 @@ export default function ScratchpadWidget({ widget, inline = false }: Props): JSX
           </button>
         ))}
         <div className="flex-1" />
-        <button onClick={clearAll} className="icon-btn text-stone-500 hover:!text-red-600" title="Clear">
+        <button onClick={clearAll} className="icon-btn text-[var(--ink-50)] hover:!text-red-600" title="Clear">
           <Icon name="delete_sweep" size={16} />
         </button>
       </div>

@@ -90,22 +90,22 @@ export default function RecentNotesCard({ taskIds }: Props): JSX.Element {
   }
 
   return (
-    <div className="rounded-xl border border-stone-200 dark:border-stone-700 bg-white/85 dark:bg-stone-900/85 backdrop-blur p-4 fb-glass-soft">
+    <div className="rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-raised)]/85 backdrop-blur p-4 fb-glass-soft">
       <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.12em] text-stone-500 dark:text-stone-400 font-semibold">
+        <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.12em] text-[var(--ink-50)] font-semibold">
           <Icon name="sticky_note_2" size={12} />
           <span>Recent Notes</span>
         </div>
-        <span className="text-[10px] text-stone-400 dark:text-stone-500 tabular-nums">
+        <span className="text-[10px] text-[var(--ink-40)] tabular-nums">
           {noteWidgets.length === 0 ? '' : `${noteWidgets.length}`}
         </span>
       </div>
       {loading ? (
-        <div className="text-center py-6 text-[11px] text-stone-500 dark:text-stone-400">
+        <div className="text-center py-6 text-[11px] text-[var(--ink-50)]">
           Loading notes…
         </div>
       ) : noteWidgets.length === 0 ? (
-        <div className="text-center py-6 text-[11px] text-stone-500 dark:text-stone-400">
+        <div className="text-center py-6 text-[11px] text-[var(--ink-50)]">
           No notes yet. Drop a sticky or page widget on any task to start.
         </div>
       ) : (
@@ -116,7 +116,7 @@ export default function RecentNotesCard({ taskIds }: Props): JSX.Element {
               <button
                 key={w.id}
                 onClick={() => jumpTo(w)}
-                className="w-full flex items-start gap-2 p-2 rounded-md hover:bg-stone-50 dark:hover:bg-stone-800/60 text-left transition-colors"
+                className="w-full flex items-start gap-2 p-2 rounded-md hover:bg-[var(--surface-sunken)] text-left transition-colors"
                 title={summary}
               >
                 <Icon
@@ -130,19 +130,19 @@ export default function RecentNotesCard({ taskIds }: Props): JSX.Element {
                           : 'edit_note'
                   }
                   size={13}
-                  className="text-stone-400 dark:text-stone-500 mt-0.5 shrink-0"
+                  className="text-[var(--ink-40)] mt-0.5 shrink-0"
                 />
                 <div className="flex-1 min-w-0">
-                  <div className="text-[12px] font-medium text-stone-800 dark:text-stone-100 truncate">
+                  <div className="text-[12px] font-medium text-[var(--ink-90)] truncate">
                     {w.title || summary.slice(0, 32) || 'Untitled note'}
                   </div>
                   {summary && w.title && (
-                    <div className="text-[10px] text-stone-500 dark:text-stone-400 truncate">
+                    <div className="text-[10px] text-[var(--ink-50)] truncate">
                       {summary}
                     </div>
                   )}
                 </div>
-                <div className="text-[9px] text-stone-400 dark:text-stone-500 font-mono shrink-0">
+                <div className="text-[9px] text-[var(--ink-40)] font-mono shrink-0">
                   {relativeAge(w.updatedAt ?? 0)}
                 </div>
               </button>

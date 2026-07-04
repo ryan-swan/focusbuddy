@@ -185,7 +185,7 @@ export default function FilesView(): JSX.Element {
   return (
     <div
       data-testid="files-view"
-      className="h-full flex flex-col bg-white dark:bg-stone-950"
+      className="h-full flex flex-col bg-[var(--surface-raised)]"
       onDragOver={(e) => {
         if (e.dataTransfer.types.includes('Files')) {
           e.preventDefault()
@@ -209,7 +209,7 @@ export default function FilesView(): JSX.Element {
 
       <div className={`flex-1 overflow-auto px-4 py-3 relative ${dropActive ? 'ring-2 ring-accent ring-inset' : ''}`}>
         {store.loading ? (
-          <div className="text-[13px] text-stone-400 py-10 text-center">Loading…</div>
+          <div className="text-[13px] text-[var(--ink-40)] py-10 text-center">Loading…</div>
         ) : sorted.length === 0 ? (
           <EmptyState onAddFiles={() => void store.importFiles()} onNewFolder={() => void store.createFolder('New folder')} />
         ) : store.viewMode === 'list' ? (
@@ -283,8 +283,8 @@ function Toolbar({ onNewFolder, onAddFiles, onAddDoc }: { onNewFolder: () => voi
   const redo = useFileManagerStore((s) => s.redo)
   const canUndo = useFileManagerStore((s) => s.past.length > 0)
   const canRedo = useFileManagerStore((s) => s.future.length > 0)
-  const btn = 'h-8 px-2.5 inline-flex items-center gap-1.5 rounded-lg text-[12px] text-stone-600 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800'
-  const iconBtn = 'h-8 w-8 inline-flex items-center justify-center rounded-lg text-stone-500 hover:bg-stone-100 dark:hover:bg-stone-800 disabled:opacity-40'
+  const btn = 'h-8 px-2.5 inline-flex items-center gap-1.5 rounded-lg text-[12px] text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]'
+  const iconBtn = 'h-8 w-8 inline-flex items-center justify-center rounded-lg text-[var(--ink-50)] hover:bg-[var(--surface-sunken)] disabled:opacity-40'
   const modes: Array<{ id: FileViewMode; icon: string; title: string }> = [
     { id: 'list', icon: 'view_list', title: 'List' },
     { id: 'small', icon: 'grid_view', title: 'Small icons' },
@@ -292,11 +292,11 @@ function Toolbar({ onNewFolder, onAddFiles, onAddDoc }: { onNewFolder: () => voi
     { id: 'preview', icon: 'photo_library', title: 'Large preview' }
   ]
   return (
-    <div className="flex items-center gap-1 px-4 py-2 border-b border-stone-200 dark:border-stone-800">
-      <h1 className="text-[15px] font-semibold text-stone-800 dark:text-stone-100 mr-2">Files</h1>
+    <div className="flex items-center gap-1 px-4 py-2 border-b border-[var(--edge-soft)]">
+      <h1 className="text-[15px] font-semibold text-[var(--ink-90)] mr-2">Files</h1>
       <button className={iconBtn} onClick={() => void undo()} disabled={!canUndo} title="Undo" data-testid="files-undo"><Icon name="undo" size={16} /></button>
       <button className={iconBtn} onClick={() => void redo()} disabled={!canRedo} title="Redo" data-testid="files-redo"><Icon name="redo" size={16} /></button>
-      <span className="w-px h-5 bg-stone-200 dark:bg-stone-700 mx-1" />
+      <span className="w-px h-5 bg-[var(--surface-sunken)] mx-1" />
       <button className={btn} onClick={onNewFolder} data-testid="files-new-folder"><Icon name="create_new_folder" size={16} /> New folder</button>
       <button className={btn} onClick={onAddFiles} data-testid="files-add-files"><Icon name="upload_file" size={16} /> Add files</button>
       <button className={btn} onClick={onAddDoc} data-testid="files-add-doc"><Icon name="post_add" size={16} /> Add document</button>
@@ -306,7 +306,7 @@ function Toolbar({ onNewFolder, onAddFiles, onAddDoc }: { onNewFolder: () => voi
           <select
             value={sortKey}
             onChange={(e) => setSort(e.target.value as FileSortKey)}
-            className="h-8 rounded-lg border border-stone-200 dark:border-stone-700 bg-transparent text-[12px] px-2 text-stone-600 dark:text-stone-300"
+            className="h-8 rounded-lg border border-[var(--edge-soft)] bg-transparent text-[12px] px-2 text-[var(--ink-70)]"
             title="Sort by"
             data-testid="files-sort-select"
           >
@@ -317,7 +317,7 @@ function Toolbar({ onNewFolder, onAddFiles, onAddDoc }: { onNewFolder: () => voi
             <option value="modified">Date modified</option>
           </select>
         )}
-        <div className="flex items-center rounded-lg border border-stone-200 dark:border-stone-700 overflow-hidden">
+        <div className="flex items-center rounded-lg border border-[var(--edge-soft)] overflow-hidden">
           {modes.map((m) => (
             <button
               key={m.id}
@@ -325,7 +325,7 @@ function Toolbar({ onNewFolder, onAddFiles, onAddDoc }: { onNewFolder: () => voi
               data-testid={`files-view-${m.id}`}
               onClick={() => setViewMode(m.id)}
               className={`h-8 w-8 inline-flex items-center justify-center ${
-                viewMode === m.id ? 'bg-accent/15 text-accent' : 'text-stone-500 hover:bg-stone-100 dark:hover:bg-stone-800'
+                viewMode === m.id ? 'bg-accent/15 text-accent' : 'text-[var(--ink-50)] hover:bg-[var(--surface-sunken)]'
               }`}
             >
               <Icon name={m.icon} size={16} />
@@ -361,17 +361,17 @@ function Breadcrumbs({
           onMove(dragged, id)
         }
       }}
-      className="px-1.5 py-0.5 rounded text-[12px] text-stone-500 dark:text-stone-400 hover:text-accent hover:bg-stone-100 dark:hover:bg-stone-800"
+      className="px-1.5 py-0.5 rounded text-[12px] text-[var(--ink-50)] hover:text-accent hover:bg-[var(--surface-sunken)]"
     >
       {label}
     </button>
   )
   return (
-    <div className="flex items-center gap-0.5 px-4 py-1.5 border-b border-stone-100 dark:border-stone-800/60">
+    <div className="flex items-center gap-0.5 px-4 py-1.5 border-b border-[var(--edge-soft)]">
       {crumb('Files', null, 'files-crumb-root')}
       {crumbs.map((c) => (
         <span key={c.id} className="flex items-center gap-0.5">
-          <Icon name="chevron_right" size={14} className="text-stone-300" />
+          <Icon name="chevron_right" size={14} className="text-[var(--ink-30)]" />
           {crumb(c.name, c.id)}
         </span>
       ))}
@@ -414,7 +414,7 @@ function ListView(
     <table className="w-full text-[13px]" data-testid="files-list">
       <thead>
         <tr
-          className="text-left text-stone-400 border-b border-stone-200 dark:border-stone-700"
+          className="text-left text-[var(--ink-40)] border-b border-[var(--edge-soft)]"
           onContextMenu={(e) => {
             e.preventDefault()
             setHeaderMenu({ x: e.clientX, y: e.clientY })
@@ -426,7 +426,7 @@ function ListView(
               data-testid={`files-col-${c.key}`}
               style={{ width: c.width }}
               onClick={() => props.onSort(c.key)}
-              className="font-medium text-[11px] uppercase tracking-wide px-2 py-1.5 cursor-pointer select-none hover:text-stone-600 dark:hover:text-stone-200"
+              className="font-medium text-[11px] uppercase tracking-wide px-2 py-1.5 cursor-pointer select-none hover:text-[var(--ink-70)]"
             >
               <span className="inline-flex items-center gap-0.5">
                 {c.label}
@@ -488,8 +488,8 @@ function ListRow({ entry, ...h }: { entry: FileEntry } & RowHandlers & { onRenam
       onClick={() => h.onSelect(entry.id)}
       onDoubleClick={() => h.onOpen(entry)}
       onContextMenu={(e) => h.onContext(e, entry)}
-      className={`border-b border-stone-100 dark:border-stone-800/60 cursor-default ${
-        selected ? 'bg-accent/10' : over ? 'bg-accent/15' : 'hover:bg-stone-50 dark:hover:bg-stone-900/40'
+      className={`border-b border-[var(--edge-soft)] cursor-default ${
+        selected ? 'bg-accent/10' : over ? 'bg-accent/15' : 'hover:bg-[var(--surface-sunken)]'
       }`}
     >
       <td className="px-2 py-1.5">
@@ -497,19 +497,19 @@ function ListRow({ entry, ...h }: { entry: FileEntry } & RowHandlers & { onRenam
           {thumb ? (
             <img src={thumb} alt="" className="h-5 w-5 object-cover rounded-sm shrink-0" />
           ) : (
-            <Icon name={iconFor(entry)} size={18} className={isFolder ? 'text-accent' : 'text-stone-400'} />
+            <Icon name={iconFor(entry)} size={18} className={isFolder ? 'text-accent' : 'text-[var(--ink-40)]'} />
           )}
           {h.renaming === entry.id ? (
             <RenameInput initial={entry.name} onCommit={(name) => h.onRenameCommit(entry.id, name)} onCancel={h.onRenameCancel} />
           ) : (
-            <span className="truncate text-stone-800 dark:text-stone-100">{entry.name}</span>
+            <span className="truncate text-[var(--ink-90)]">{entry.name}</span>
           )}
         </div>
       </td>
-      <td className="px-2 py-1.5 text-stone-500 dark:text-stone-400">{typeLabel(entry)}</td>
-      <td className="px-2 py-1.5 text-stone-500 dark:text-stone-400 tabular-nums">{formatSize(entry)}</td>
-      <td className="px-2 py-1.5 text-stone-500 dark:text-stone-400">{formatDate(entry.createdAt)}</td>
-      <td className="px-2 py-1.5 text-stone-500 dark:text-stone-400">{formatDate(entry.updatedAt)}</td>
+      <td className="px-2 py-1.5 text-[var(--ink-50)]">{typeLabel(entry)}</td>
+      <td className="px-2 py-1.5 text-[var(--ink-50)] tabular-nums">{formatSize(entry)}</td>
+      <td className="px-2 py-1.5 text-[var(--ink-50)]">{formatDate(entry.createdAt)}</td>
+      <td className="px-2 py-1.5 text-[var(--ink-50)]">{formatDate(entry.updatedAt)}</td>
     </tr>
   )
 }
@@ -571,23 +571,23 @@ function GridTile({ entry, mode, ...h }: { entry: FileEntry; mode: FileViewMode 
       onDoubleClick={() => h.onOpen(entry)}
       onContextMenu={(e) => h.onContext(e, entry)}
       className={`flex flex-col items-stretch rounded-lg border p-1.5 text-left transition ${
-        selected ? 'border-accent bg-accent/10' : over ? 'border-accent bg-accent/15' : 'border-transparent hover:bg-stone-100 dark:hover:bg-stone-900/50'
+        selected ? 'border-accent bg-accent/10' : over ? 'border-accent bg-accent/15' : 'border-transparent hover:bg-[var(--surface-sunken)]'
       }`}
     >
       <div
-        className="flex items-center justify-center rounded-md bg-stone-100 dark:bg-stone-900 overflow-hidden mb-1"
+        className="flex items-center justify-center rounded-md bg-[var(--surface-sunken)] overflow-hidden mb-1"
         style={{ height: previewH }}
       >
         {thumb ? (
           <img src={thumb} alt="" className="w-full h-full object-cover" />
         ) : (
-          <Icon name={iconFor(entry)} size={iconSize} className={isFolder ? 'text-accent' : 'text-stone-400'} />
+          <Icon name={iconFor(entry)} size={iconSize} className={isFolder ? 'text-accent' : 'text-[var(--ink-40)]'} />
         )}
       </div>
       {h.renaming === entry.id ? (
         <RenameInput initial={entry.name} onCommit={(name) => h.onRenameCommit(entry.id, name)} onCancel={h.onRenameCancel} />
       ) : (
-        <span className="text-[12px] text-stone-700 dark:text-stone-200 truncate px-0.5" title={entry.name}>
+        <span className="text-[12px] text-[var(--ink-70)] truncate px-0.5" title={entry.name}>
           {entry.name}
         </span>
       )}
@@ -614,19 +614,19 @@ function RenameInput({ initial, onCommit, onCancel }: { initial: string; onCommi
         else if (e.key === 'Escape') onCancel()
       }}
       onBlur={(e) => onCommit(e.target.value)}
-      className="min-w-0 flex-1 bg-white dark:bg-stone-800 border border-accent rounded px-1 py-0.5 text-[12px] focus:outline-none"
+      className="min-w-0 flex-1 bg-[var(--surface-raised)] border border-accent rounded px-1 py-0.5 text-[12px] focus:outline-none"
     />
   )
 }
 
 function EmptyState({ onAddFiles, onNewFolder }: { onAddFiles: () => void; onNewFolder: () => void }): JSX.Element {
   return (
-    <div className="flex flex-col items-center justify-center text-center py-20 text-stone-400" data-testid="files-empty">
-      <Icon name="folder_open" size={48} className="text-stone-300 dark:text-stone-700 mb-3" />
-      <p className="text-[14px] text-stone-500 dark:text-stone-400">This folder is empty</p>
+    <div className="flex flex-col items-center justify-center text-center py-20 text-[var(--ink-40)]" data-testid="files-empty">
+      <Icon name="folder_open" size={48} className="text-[var(--ink-30)] mb-3" />
+      <p className="text-[14px] text-[var(--ink-50)]">This folder is empty</p>
       <p className="text-[12px] mb-4">Drag files in, or use the buttons below.</p>
       <div className="flex gap-2">
-        <button onClick={onNewFolder} className="text-[12px] px-3 py-1.5 rounded-lg border border-stone-300 dark:border-stone-600 text-stone-600 dark:text-stone-300">New folder</button>
+        <button onClick={onNewFolder} className="text-[12px] px-3 py-1.5 rounded-lg border border-[var(--edge-firm)] text-[var(--ink-70)]">New folder</button>
         <button onClick={onAddFiles} className="btn-primary text-[12px] px-3 py-1.5">Add files</button>
       </div>
     </div>
@@ -644,24 +644,24 @@ function DocPickerModal({
 }): JSX.Element {
   return (
     <div className="fixed inset-0 z-[250] bg-black/40 flex items-center justify-center" onMouseDown={onClose}>
-      <div className="w-[420px] max-w-[92vw] max-h-[80vh] overflow-auto rounded-xl border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 shadow-2xl p-4" onMouseDown={(e) => e.stopPropagation()}>
+      <div className="w-[420px] max-w-[92vw] max-h-[80vh] overflow-auto rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-2xl p-4" onMouseDown={(e) => e.stopPropagation()}>
         <div className="flex items-center gap-2 mb-3">
           <Icon name="post_add" size={16} className="text-accent" />
-          <span className="text-[14px] font-semibold text-stone-800 dark:text-stone-100">File an existing document here</span>
+          <span className="text-[14px] font-semibold text-[var(--ink-90)]">File an existing document here</span>
           <button onClick={onClose} className="ml-auto icon-btn"><Icon name="close" size={15} /></button>
         </div>
         {docs.length === 0 ? (
-          <p className="text-[13px] text-stone-500 dark:text-stone-400">Every document is already filed in a folder. Create new docs from the Documents area.</p>
+          <p className="text-[13px] text-[var(--ink-50)]">Every document is already filed in a folder. Create new docs from the Documents area.</p>
         ) : (
           <div className="space-y-0.5">
             {docs.map((d) => (
               <button
                 key={d.id}
                 onClick={() => onPick(d.id)}
-                className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-left text-[13px] hover:bg-stone-100 dark:hover:bg-stone-800"
+                className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-left text-[13px] hover:bg-[var(--surface-sunken)]"
               >
-                <Icon name={d.docType === 'sheet' ? 'table_chart' : d.docType === 'slides' ? 'slideshow' : 'description'} size={16} className="text-stone-400" />
-                <span className="truncate text-stone-700 dark:text-stone-200">{d.title || 'Untitled'}</span>
+                <Icon name={d.docType === 'sheet' ? 'table_chart' : d.docType === 'slides' ? 'slideshow' : 'description'} size={16} className="text-[var(--ink-40)]" />
+                <span className="truncate text-[var(--ink-70)]">{d.title || 'Untitled'}</span>
               </button>
             ))}
           </div>

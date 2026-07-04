@@ -123,9 +123,9 @@ export default function InboxView(): JSX.Element {
     return (
       <div className="h-full flex items-center justify-center desk-paper no-tod px-6">
         <div className="text-center max-w-sm">
-          <Icon name="inbox" size={32} className="text-stone-400 dark:text-stone-500 mx-auto mb-3" />
-          <h1 className="text-lg font-semibold text-stone-900 dark:text-stone-100 mb-1">PlexiInbox</h1>
-          <p className="text-[13px] text-stone-500 dark:text-stone-400 mb-4">
+          <Icon name="inbox" size={32} className="text-[var(--ink-40)] mx-auto mb-3" />
+          <h1 className="text-lg font-semibold text-[var(--ink-100)] mb-1">PlexiInbox</h1>
+          <p className="text-[13px] text-[var(--ink-50)] mb-4">
             Sign in to see your PlexiDesk notifications here, chat messages, shared folders and
             files, and contact requests. Email is in Mail.
           </p>
@@ -146,12 +146,12 @@ export default function InboxView(): JSX.Element {
     <div className="h-full overflow-auto desk-paper no-tod">
       <div className="max-w-2xl mx-auto px-6 py-6">
         <header className="flex items-center gap-3 mb-4">
-          <div className="inline-flex items-center justify-center h-10 w-10 rounded-xl bg-white/80 dark:bg-stone-900/80 border border-stone-200 dark:border-stone-700 shadow-sm shrink-0">
+          <div className="inline-flex items-center justify-center h-10 w-10 rounded-xl bg-white/80 dark:bg-stone-900/80 border border-[var(--edge-soft)] shadow-sm shrink-0">
             <Icon name="inbox" size={20} className="text-accent" />
           </div>
           <div className="flex-1 min-w-0">
-            <h1 className="text-xl font-semibold text-stone-900 dark:text-stone-100">PlexiInbox</h1>
-            <p className="text-[12px] text-stone-500 dark:text-stone-400">
+            <h1 className="text-xl font-semibold text-[var(--ink-100)]">PlexiInbox</h1>
+            <p className="text-[12px] text-[var(--ink-50)]">
               Your PlexiDesk notifications: chat, shared items, and contact requests. Email is in Mail.
             </p>
           </div>
@@ -173,29 +173,29 @@ export default function InboxView(): JSX.Element {
         )}
 
         {rows.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-stone-300 dark:border-stone-700 p-10 text-center">
-            <Icon name="inbox" size={26} className="text-stone-400 dark:text-stone-500 mx-auto mb-2" />
-            <p className="text-sm text-stone-600 dark:text-stone-300">Your PlexiInbox is clear.</p>
-            <p className="text-[12px] text-stone-500 dark:text-stone-400 mt-1">
+          <div className="rounded-xl border border-dashed border-[var(--edge-firm)] p-10 text-center">
+            <Icon name="inbox" size={26} className="text-[var(--ink-40)] mx-auto mb-2" />
+            <p className="text-sm text-[var(--ink-70)]">Your PlexiInbox is clear.</p>
+            <p className="text-[12px] text-[var(--ink-50)] mt-1">
               No new chat, shared items, or contact requests right now. Email lives in Mail.
             </p>
           </div>
         ) : (
-          <div className="rounded-xl border border-stone-200 dark:border-stone-700 bg-white/85 dark:bg-stone-900/85 overflow-hidden divide-y divide-stone-100 dark:divide-stone-800">
+          <div className="rounded-xl border border-[var(--edge-soft)] bg-white/85 dark:bg-stone-900/85 overflow-hidden divide-y divide-[var(--edge-soft)]">
             {rows.map((r) => (
               <div
                 key={r.key}
                 onClick={r.onClick}
                 data-testid="inbox-item"
                 className={`px-4 py-3 flex items-start gap-3 transition-colors ${
-                  r.onClick ? 'cursor-pointer hover:bg-stone-50 dark:hover:bg-stone-800/50' : ''
+                  r.onClick ? 'cursor-pointer hover:bg-[var(--surface-sunken)]' : ''
                 }`}
               >
                 <div
                   className={`h-8 w-8 rounded-lg inline-flex items-center justify-center shrink-0 ${
                     r.unread > 0
                       ? 'bg-accent/15 text-accent'
-                      : 'bg-stone-100 dark:bg-stone-800 text-stone-500 dark:text-stone-400'
+                      : 'bg-[var(--surface-sunken)] text-[var(--ink-50)]'
                   }`}
                 >
                   <Icon name={r.icon} size={15} />
@@ -205,13 +205,13 @@ export default function InboxView(): JSX.Element {
                     <span
                       className={`text-[13px] truncate ${
                         r.unread > 0
-                          ? 'font-semibold text-stone-900 dark:text-stone-100'
-                          : 'font-medium text-stone-800 dark:text-stone-200'
+                          ? 'font-semibold text-[var(--ink-100)]'
+                          : 'font-medium text-[var(--ink-90)]'
                       }`}
                     >
                       {r.title}
                     </span>
-                    <span className="ml-auto shrink-0 text-[10px] text-stone-400 dark:text-stone-500">
+                    <span className="ml-auto shrink-0 text-[10px] text-[var(--ink-40)]">
                       {relTime(r.ts)}
                     </span>
                     {!r.contactId && r.unread > 0 && (
@@ -221,7 +221,7 @@ export default function InboxView(): JSX.Element {
                     )}
                   </div>
                   {r.preview && (
-                    <div className="text-[12px] text-stone-500 dark:text-stone-400 truncate mt-0.5">
+                    <div className="text-[12px] text-[var(--ink-50)] truncate mt-0.5">
                       {r.preview}
                     </div>
                   )}
@@ -240,7 +240,7 @@ export default function InboxView(): JSX.Element {
                       <button
                         onClick={() => void declineContact(r.contactId!)}
                         data-testid="contact-decline"
-                        className="text-[11px] text-stone-500 dark:text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 px-2 py-1"
+                        className="text-[11px] text-[var(--ink-50)] hover:text-[var(--ink-70)] px-2 py-1"
                       >
                         Decline
                       </button>
@@ -277,11 +277,11 @@ function TakeoverCard({
           <Icon name="lock_open" size={15} />
         </div>
         <div className="flex-1 min-w-0">
-          <div className="text-[13px] font-semibold text-stone-900 dark:text-stone-100">
+          <div className="text-[13px] font-semibold text-[var(--ink-100)]">
             {takeover.requesterHandle ?? 'Someone'} wants to edit “{takeover.docTitle ?? 'a document'}”
           </div>
           {takeover.message && (
-            <div className="text-[12px] text-stone-600 dark:text-stone-300 mt-0.5">“{takeover.message}”</div>
+            <div className="text-[12px] text-[var(--ink-70)] mt-0.5">“{takeover.message}”</div>
           )}
           {rejecting ? (
             <div className="flex items-center gap-2 mt-2">
@@ -290,12 +290,12 @@ function TakeoverCard({
                 onChange={(e) => setMessage(e.target.value)}
                 placeholder="Reason (optional)"
                 data-testid="takeover-reject-message"
-                className="flex-1 bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-lg px-2.5 py-1 text-[12px] focus:outline-none focus:border-accent"
+                className="flex-1 bg-[var(--surface-raised)] border border-[var(--edge-soft)] rounded-lg px-2.5 py-1 text-[12px] focus:outline-none focus:border-accent"
               />
               <button
                 onClick={() => onRespond(false, message)}
                 data-testid="takeover-reject-send"
-                className="text-[11px] px-2.5 py-1 rounded-md border border-stone-300 dark:border-stone-600 text-stone-600 dark:text-stone-300"
+                className="text-[11px] px-2.5 py-1 rounded-md border border-[var(--edge-firm)] text-[var(--ink-70)]"
               >
                 Send decline
               </button>
@@ -312,7 +312,7 @@ function TakeoverCard({
               <button
                 onClick={() => setRejecting(true)}
                 data-testid="takeover-reject"
-                className="text-[11px] px-2 py-1 text-stone-500 dark:text-stone-400 hover:text-stone-700 dark:hover:text-stone-200"
+                className="text-[11px] px-2 py-1 text-[var(--ink-50)] hover:text-[var(--ink-70)]"
               >
                 Decline
               </button>

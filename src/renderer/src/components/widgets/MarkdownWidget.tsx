@@ -300,8 +300,8 @@ export default function MarkdownWidget({ widget, inline = false }: Props): JSX.E
   }
 
   const body = (
-    <div ref={containerRef} className="relative h-full w-full flex flex-col bg-white dark:bg-stone-900">
-      <div className="px-2 py-1 border-b border-stone-200 dark:border-stone-700 flex items-center gap-0.5 flex-wrap bg-stone-50 dark:bg-stone-800/50">
+    <div ref={containerRef} className="relative h-full w-full flex flex-col bg-[var(--surface-raised)]">
+      <div className="px-2 py-1 border-b border-[var(--edge-soft)] flex items-center gap-0.5 flex-wrap bg-[var(--surface-sunken)]">
         {TOOLBAR.map((b) => {
           const active = editor ? b.isActive?.(editor) ?? false : false
           return (
@@ -317,14 +317,14 @@ export default function MarkdownWidget({ widget, inline = false }: Props): JSX.E
               className={`inline-flex items-center justify-center h-6 w-6 rounded transition-colors ${
                 active
                   ? 'bg-accent/15 text-accent'
-                  : 'text-stone-500 dark:text-stone-400 hover:bg-stone-200 dark:hover:bg-stone-700 hover:text-stone-900 dark:hover:text-stone-100'
+                  : 'text-[var(--ink-50)] hover:bg-[var(--surface-sunken)] hover:text-[var(--ink-100)]'
               }`}
             >
               <Icon name={b.icon} size={13} />
             </button>
           )
         })}
-        <span className="mx-0.5 h-4 w-px bg-stone-300 dark:bg-stone-600" aria-hidden />
+        <span className="mx-0.5 h-4 w-px bg-[var(--surface-sunken)]" aria-hidden />
         <button
           type="button"
           onMouseDown={(e) => e.preventDefault()}
@@ -334,7 +334,7 @@ export default function MarkdownWidget({ widget, inline = false }: Props): JSX.E
           }}
           title="Export as HTML"
           data-testid="md-export-html"
-          className="inline-flex items-center justify-center h-6 w-6 rounded text-stone-500 dark:text-stone-400 hover:bg-stone-200 dark:hover:bg-stone-700 hover:text-stone-900 dark:hover:text-stone-100 transition-colors"
+          className="inline-flex items-center justify-center h-6 w-6 rounded text-[var(--ink-50)] hover:bg-[var(--surface-sunken)] hover:text-[var(--ink-100)] transition-colors"
         >
           <Icon name="html" size={13} />
         </button>
@@ -347,7 +347,7 @@ export default function MarkdownWidget({ widget, inline = false }: Props): JSX.E
           }}
           title="Export as PDF"
           data-testid="md-export-pdf"
-          className="inline-flex items-center justify-center h-6 w-6 rounded text-stone-500 dark:text-stone-400 hover:bg-stone-200 dark:hover:bg-stone-700 hover:text-stone-900 dark:hover:text-stone-100 transition-colors"
+          className="inline-flex items-center justify-center h-6 w-6 rounded text-[var(--ink-50)] hover:bg-[var(--surface-sunken)] hover:text-[var(--ink-100)] transition-colors"
         >
           <Icon name="picture_as_pdf" size={13} />
         </button>
@@ -355,14 +355,14 @@ export default function MarkdownWidget({ widget, inline = false }: Props): JSX.E
       {exportMsg && (
         <div
           data-testid="md-export-status"
-          className="px-3 py-1 text-[10px] text-stone-500 dark:text-stone-400 border-b border-stone-100 dark:border-stone-800 bg-stone-50/60 dark:bg-stone-800/30"
+          className="px-3 py-1 text-[10px] text-[var(--ink-50)] border-b border-[var(--edge-soft)] bg-[var(--surface-sunken)]/60"
         >
           {exportMsg}
         </div>
       )}
 
       <div
-        className="flex-1 overflow-auto md-rendered tiptap-editor px-4 py-3 text-stone-900 dark:text-stone-100"
+        className="flex-1 overflow-auto md-rendered tiptap-editor px-4 py-3 text-[var(--ink-100)]"
         onMouseDown={(e) => e.stopPropagation()}
         onContextMenu={(e) => {
           if (e.shiftKey) return
@@ -388,7 +388,7 @@ export default function MarkdownWidget({ widget, inline = false }: Props): JSX.E
           <div className="fixed inset-0 z-40" onMouseDown={() => setSlashOpen(false)} />
           <div
             data-testid="md-slash-menu"
-            className="absolute z-50 w-52 max-h-64 overflow-auto rounded-md border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 shadow-lg py-1"
+            className="absolute z-50 w-52 max-h-64 overflow-auto rounded-md border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-lg py-1"
             style={{ top: slashPos.top, left: slashPos.left }}
           >
             <SlashItem icon="title" label="Heading 1" shortcut="#" onClick={() => applyBlock((e) => e.chain().focus().toggleHeading({ level: 1 }).run())} />
@@ -443,11 +443,11 @@ function SlashItem({
         e.stopPropagation()
         onClick()
       }}
-      className="w-full flex items-center gap-2 px-2.5 py-1.5 text-left text-[12px] text-stone-700 dark:text-stone-200 hover:bg-accent/10 hover:text-accent"
+      className="w-full flex items-center gap-2 px-2.5 py-1.5 text-left text-[12px] text-[var(--ink-70)] hover:bg-accent/10 hover:text-accent"
     >
       <Icon name={icon} size={13} />
       <span className="flex-1">{label}</span>
-      {shortcut && <span className="text-[10px] text-stone-400 dark:text-stone-500">{shortcut}</span>}
+      {shortcut && <span className="text-[10px] text-[var(--ink-40)]">{shortcut}</span>}
     </button>
   )
 }

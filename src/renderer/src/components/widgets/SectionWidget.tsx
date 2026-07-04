@@ -280,7 +280,7 @@ export default function SectionWidget({
                   setEditing(false)
                 }
               }}
-              className="bg-white/95 text-stone-900 px-1.5 py-0.5 rounded text-xs w-40 focus:outline-none"
+              className="bg-[var(--surface-raised)]/95 text-[var(--ink-100)] px-1.5 py-0.5 rounded text-xs w-40 focus:outline-none"
             />
           ) : (
             <span
@@ -316,7 +316,7 @@ export default function SectionWidget({
                 }}
                 title={`Layout: ${opt.label}`}
                 className={`h-4 w-4 inline-flex items-center justify-center rounded ${
-                  opt.value === layout ? 'bg-white/30' : 'hover:bg-white/15'
+                  opt.value === layout ? 'bg-[var(--surface-raised)]/30' : 'hover:bg-[var(--surface-raised)]/15'
                 }`}
               >
                 <Icon name={opt.icon} size={11} className="text-white" />
@@ -351,7 +351,7 @@ export default function SectionWidget({
                 e.stopPropagation()
                 linkDrag.start(widget.id)
               }}
-              className="h-4 w-4 inline-flex items-center justify-center rounded hover:bg-white/20 cursor-cell"
+              className="h-4 w-4 inline-flex items-center justify-center rounded hover:bg-[var(--surface-raised)]/20 cursor-cell"
               title="Click, then click another widget to connect them"
               aria-label="Link from this section"
             >
@@ -364,7 +364,7 @@ export default function SectionWidget({
               void togglePin(widget.id)
             }}
             onMouseDown={(e) => e.stopPropagation()}
-            className="h-4 w-4 inline-flex items-center justify-center rounded hover:bg-white/20"
+            className="h-4 w-4 inline-flex items-center justify-center rounded hover:bg-[var(--surface-raised)]/20"
             title={isPinned ? 'Unpin from screen' : 'Pin to screen'}
             aria-label={isPinned ? 'Unpin' : 'Pin'}
           >
@@ -389,7 +389,7 @@ export default function SectionWidget({
               }
             }}
             onMouseDown={(e) => e.stopPropagation()}
-            className="h-4 w-4 inline-flex items-center justify-center rounded hover:bg-white/20"
+            className="h-4 w-4 inline-flex items-center justify-center rounded hover:bg-[var(--surface-raised)]/20"
             title="Remove section"
             aria-label="Remove"
           >
@@ -685,7 +685,7 @@ function CompactChildView({
           pointerEvents: 'auto',
           ...dragStyle
         }}
-        className="group flex items-center gap-2 px-3 rounded-md bg-white border border-stone-200 hover:border-stone-400 hover:shadow-sm cursor-pointer transition-colors"
+        className="group flex items-center gap-2 px-3 rounded-md bg-[var(--surface-raised)] border border-[var(--edge-soft)] hover:border-[var(--edge-firm)] hover:shadow-sm cursor-pointer transition-colors"
         onPointerDown={onPointerDown}
         onClick={handleOpen}
         title="Drag out of the section to move it back to the desk"
@@ -696,13 +696,13 @@ function CompactChildView({
         >
           <Icon name={entry?.icon ?? 'apps'} size={16} className="" style={{ color }} />
         </span>
-        <span className="text-sm text-stone-900 truncate flex-1">{title}</span>
+        <span className="text-sm text-[var(--ink-100)] truncate flex-1">{title}</span>
         <button
           onClick={(e) => {
             e.stopPropagation()
             onEject()
           }}
-          className="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 text-stone-500 hover:text-amber-700 transition-opacity"
+          className="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 text-[var(--ink-50)] hover:text-amber-700 transition-opacity"
           title="Remove from section"
         >
           <Icon name="layers_clear" size={14} />
@@ -731,7 +731,7 @@ function CompactChildView({
     >
       <button
         onClick={handleOpen}
-        className="w-full h-full flex flex-col items-center justify-center gap-1 rounded-md bg-white border border-stone-200 hover:border-stone-400 hover:shadow-md transition-colors p-2"
+        className="w-full h-full flex flex-col items-center justify-center gap-1 rounded-md bg-[var(--surface-raised)] border border-[var(--edge-soft)] hover:border-[var(--edge-firm)] hover:shadow-md transition-colors p-2"
         title={title}
       >
         <span
@@ -740,14 +740,14 @@ function CompactChildView({
         >
           <Icon name={entry?.icon ?? 'apps'} size={22} style={{ color }} />
         </span>
-        <span className="text-[10px] text-stone-700 truncate w-full text-center">{title}</span>
+        <span className="text-[10px] text-[var(--ink-70)] truncate w-full text-center">{title}</span>
       </button>
       <button
         onClick={(e) => {
           e.stopPropagation()
           onEject()
         }}
-        className="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 absolute -top-1 -right-1 h-4 w-4 rounded-full bg-white border border-stone-300 text-stone-500 hover:text-amber-700 inline-flex items-center justify-center transition-opacity"
+        className="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 absolute -top-1 -right-1 h-4 w-4 rounded-full bg-[var(--surface-raised)] border border-[var(--edge-firm)] text-[var(--ink-50)] hover:text-amber-700 inline-flex items-center justify-center transition-opacity"
         title="Remove from section"
       >
         <Icon name="layers_clear" size={9} />

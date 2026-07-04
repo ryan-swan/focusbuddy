@@ -68,19 +68,19 @@ export default function OfficeTeamsDialog({ onClose }: { onClose: () => void }):
     <div className="fixed inset-0 z-[300] bg-black/40 flex items-center justify-center" onMouseDown={onClose}>
       <div
         data-testid="office-teams-dialog"
-        className="w-[520px] max-w-[94vw] rounded-xl border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 shadow-2xl p-4"
+        className="w-[520px] max-w-[94vw] rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-2xl p-4"
         onMouseDown={(e) => e.stopPropagation()}
       >
         <div className="flex items-center gap-2 mb-3">
           <Icon name="groups" size={16} className="text-accent" />
-          <span className="text-[14px] font-semibold text-stone-800 dark:text-stone-100">Teams</span>
+          <span className="text-[14px] font-semibold text-[var(--ink-90)]">Teams</span>
           <button onClick={onClose} className="ml-auto icon-btn" aria-label="Close">
             <Icon name="close" size={15} />
           </button>
         </div>
 
         {!token ? (
-          <div className="text-[12px] text-stone-500 py-4">Sign in to create and manage teams.</div>
+          <div className="text-[12px] text-[var(--ink-50)] py-4">Sign in to create and manage teams.</div>
         ) : (
           <div className="grid grid-cols-2 gap-4">
             {/* Left: team list + create */}
@@ -94,7 +94,7 @@ export default function OfficeTeamsDialog({ onClose }: { onClose: () => void }):
                   }}
                   placeholder="New team name"
                   data-testid="office-team-name"
-                  className="flex-1 min-w-0 bg-stone-50 dark:bg-stone-800 border border-stone-300 dark:border-stone-600 rounded px-2 py-1.5 text-[12px] focus:outline-none focus:border-accent"
+                  className="flex-1 min-w-0 bg-[var(--surface-sunken)] border border-[var(--edge-firm)] rounded px-2 py-1.5 text-[12px] focus:outline-none focus:border-accent"
                 />
                 <button
                   onClick={() => void create()}
@@ -107,7 +107,7 @@ export default function OfficeTeamsDialog({ onClose }: { onClose: () => void }):
               </div>
               <div className="max-h-64 overflow-auto">
                 {teams.length === 0 ? (
-                  <div className="text-[12px] text-stone-400 px-1 py-2">No teams yet.</div>
+                  <div className="text-[12px] text-[var(--ink-40)] px-1 py-2">No teams yet.</div>
                 ) : (
                   teams.map((t) => (
                     <button
@@ -115,12 +115,12 @@ export default function OfficeTeamsDialog({ onClose }: { onClose: () => void }):
                       onClick={() => void openTeam(t)}
                       data-testid={`office-team-${t.name}`}
                       className={`w-full flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-[12.5px] ${
-                        selected?.id === t.id ? 'bg-accent/[0.12] text-accent' : 'hover:bg-stone-100 dark:hover:bg-stone-800'
+                        selected?.id === t.id ? 'bg-accent/[0.12] text-accent' : 'hover:bg-[var(--surface-sunken)]'
                       }`}
                     >
-                      <Icon name="group" size={14} className="text-stone-400 shrink-0" />
+                      <Icon name="group" size={14} className="text-[var(--ink-40)] shrink-0" />
                       <span className="truncate flex-1">{t.name}</span>
-                      <span className="text-[10px] text-stone-400">{t.memberCount}</span>
+                      <span className="text-[10px] text-[var(--ink-40)]">{t.memberCount}</span>
                     </button>
                   ))
                 )}
@@ -128,12 +128,12 @@ export default function OfficeTeamsDialog({ onClose }: { onClose: () => void }):
             </div>
 
             {/* Right: selected team members + add */}
-            <div className="border-l border-stone-100 dark:border-stone-800 pl-4">
+            <div className="border-l border-[var(--edge-soft)] pl-4">
               {!selected ? (
-                <div className="text-[12px] text-stone-400 py-2">Pick a team to see its members.</div>
+                <div className="text-[12px] text-[var(--ink-40)] py-2">Pick a team to see its members.</div>
               ) : (
                 <>
-                  <div className="text-[12px] font-medium text-stone-700 dark:text-stone-200 mb-2">{selected.name}</div>
+                  <div className="text-[12px] font-medium text-[var(--ink-70)] mb-2">{selected.name}</div>
                   {selected.role === 'owner' && (
                     <div className="flex items-center gap-1.5 mb-2">
                       <input
@@ -144,7 +144,7 @@ export default function OfficeTeamsDialog({ onClose }: { onClose: () => void }):
                         }}
                         placeholder="Add by handle, e.g. @alex"
                         data-testid="office-team-add-handle"
-                        className="flex-1 min-w-0 bg-stone-50 dark:bg-stone-800 border border-stone-300 dark:border-stone-600 rounded px-2 py-1.5 text-[12px] focus:outline-none focus:border-accent"
+                        className="flex-1 min-w-0 bg-[var(--surface-sunken)] border border-[var(--edge-firm)] rounded px-2 py-1.5 text-[12px] focus:outline-none focus:border-accent"
                       />
                       <button
                         onClick={() => void add()}
@@ -156,13 +156,13 @@ export default function OfficeTeamsDialog({ onClose }: { onClose: () => void }):
                       </button>
                     </div>
                   )}
-                  {msg && <div className="text-[11px] text-stone-500 mb-1">{msg}</div>}
+                  {msg && <div className="text-[11px] text-[var(--ink-50)] mb-1">{msg}</div>}
                   <div className="max-h-56 overflow-auto space-y-0.5">
                     {members.map((m) => (
                       <div key={m.accountId} className="flex items-center gap-2 text-[12px] px-1 py-1">
-                        <Icon name="person" size={13} className="text-stone-400" />
+                        <Icon name="person" size={13} className="text-[var(--ink-40)]" />
                         <span className="truncate flex-1">{m.handle || m.accountId}</span>
-                        {m.role === 'owner' && <span className="text-[10px] text-stone-400">owner</span>}
+                        {m.role === 'owner' && <span className="text-[10px] text-[var(--ink-40)]">owner</span>}
                       </div>
                     ))}
                   </div>

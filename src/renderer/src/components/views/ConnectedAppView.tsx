@@ -151,9 +151,9 @@ export default function ConnectedAppView({ appId }: Props): JSX.Element {
   }
 
   return (
-    <div className="h-full flex flex-col bg-white dark:bg-stone-900">
+    <div className="h-full flex flex-col bg-[var(--surface-raised)]">
       {/* Toolbar */}
-      <div className="px-3 py-2 border-b border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-900 flex items-center gap-1 shrink-0">
+      <div className="px-3 py-2 border-b border-[var(--edge-soft)] bg-[var(--surface-sunken)] flex items-center gap-1 shrink-0">
         <span
           className="h-7 w-7 rounded-md inline-flex items-center justify-center shrink-0 mr-1"
           style={
@@ -165,10 +165,10 @@ export default function ConnectedAppView({ appId }: Props): JSX.Element {
           <Icon name={app.icon || 'apps'} size={14} />
         </span>
         <div className="flex-1 min-w-0">
-          <div className="text-sm font-semibold text-stone-900 dark:text-stone-100 truncate">
+          <div className="text-sm font-semibold text-[var(--ink-100)] truncate">
             {app.title}
           </div>
-          <div className="text-[10px] text-stone-500 dark:text-stone-400 truncate font-mono">
+          <div className="text-[10px] text-[var(--ink-50)] truncate font-mono">
             {currentTitle ? `${currentTitle} · ` : ''}
             {(() => {
               try {

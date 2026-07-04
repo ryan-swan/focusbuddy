@@ -65,7 +65,7 @@ export default function RecentView(): JSX.Element {
               <span>Last opened</span>
             </div>
             {recent.map((d) => {
-              const ti = TYPE_ICON[d.docType as DocType] ?? { icon: 'draft', tint: 'text-stone-400', label: 'File' }
+              const ti = TYPE_ICON[d.docType as DocType] ?? { icon: 'draft', tint: 'text-[var(--ink-40)]', label: 'File' }
               return (
                 <button
                   key={d.id}

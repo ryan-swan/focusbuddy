@@ -58,17 +58,17 @@ export default function DesignsView(): JSX.Element {
       <div className="max-w-5xl mx-auto px-6 py-6">
         <div className="flex items-center gap-2.5 mb-1">
           <Icon name="palette" size={22} className="text-accent" />
-          <h1 className="text-[20px] font-semibold text-stone-900 dark:text-stone-100">PlexiDesign</h1>
+          <h1 className="text-[20px] font-semibold text-[var(--ink-100)]">PlexiDesign</h1>
         </div>
-        <p className="text-[13px] text-stone-500 dark:text-stone-400 mb-5">
+        <p className="text-[13px] text-[var(--ink-50)] mb-5">
           Create any design at any size. Start blank, start from an on-brand template, or generate options with AI inside the studio.
         </p>
 
         {/* Start a blank design at a size */}
         {CATEGORIES.map((cat) => (
           <div key={cat.id} className="mb-5">
-            <div className="flex items-center gap-1.5 text-[12px] font-medium text-stone-600 dark:text-stone-300 mb-2">
-              <Icon name={cat.icon} size={15} className="text-stone-400" /> {cat.label}
+            <div className="flex items-center gap-1.5 text-[12px] font-medium text-[var(--ink-70)] mb-2">
+              <Icon name={cat.icon} size={15} className="text-[var(--ink-40)]" /> {cat.label}
             </div>
             <div className="flex flex-wrap gap-2">
               {DESIGN_SIZES.filter((s) => s.category === cat.id).map((s) => (
@@ -77,16 +77,16 @@ export default function DesignsView(): JSX.Element {
                   disabled={busy}
                   onClick={() => void create(blankDesign(s), s.label)}
                   data-testid={`designs-size-${s.id}`}
-                  className="group flex flex-col items-center gap-1.5 w-[112px] rounded-xl border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 p-2.5 hover:border-accent hover:shadow-sm transition disabled:opacity-50"
+                  className="group flex flex-col items-center gap-1.5 w-[112px] rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-raised)] p-2.5 hover:border-accent hover:shadow-sm transition disabled:opacity-50"
                 >
                   <div className="flex items-center justify-center w-full h-12">
                     <div
-                      className="bg-stone-100 dark:bg-stone-700 group-hover:bg-accent/15 rounded"
+                      className="bg-[var(--surface-sunken)] group-hover:bg-accent/15 rounded"
                       style={{ width: Math.min(56, (s.w / Math.max(s.w, s.h)) * 56), height: Math.min(44, (s.h / Math.max(s.w, s.h)) * 44) }}
                     />
                   </div>
-                  <div className="text-[11px] text-stone-700 dark:text-stone-200 text-center leading-tight">{s.label}</div>
-                  <div className="text-[10px] text-stone-400 fb-tabular">{s.w}×{s.h}</div>
+                  <div className="text-[11px] text-[var(--ink-70)] text-center leading-tight">{s.label}</div>
+                  <div className="text-[10px] text-[var(--ink-40)] fb-tabular">{s.w}×{s.h}</div>
                 </button>
               ))}
             </div>
@@ -101,7 +101,7 @@ export default function DesignsView(): JSX.Element {
                       disabled={busy || !size}
                       onClick={() => size && void create(designFromTemplate(t, size, brand), t.label)}
                       data-testid={`designs-template-${t.id}`}
-                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-stone-200 dark:border-stone-700 text-[12px] text-stone-700 dark:text-stone-200 hover:border-accent hover:bg-accent/5 disabled:opacity-50"
+                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-[var(--edge-soft)] text-[12px] text-[var(--ink-70)] hover:border-accent hover:bg-accent/5 disabled:opacity-50"
                     >
                       <Icon name="auto_awesome" size={12} className="text-accent" /> {t.label}
                     </button>
@@ -114,26 +114,26 @@ export default function DesignsView(): JSX.Element {
 
         {/* Existing designs */}
         <div className="mt-2">
-          <h2 className="text-[13px] font-medium text-stone-600 dark:text-stone-300 mb-2">Your designs</h2>
+          <h2 className="text-[13px] font-medium text-[var(--ink-70)] mb-2">Your designs</h2>
           {designs.length === 0 ? (
-            <p className="text-[12px] text-stone-400">No designs yet. Pick a size or template above to start.</p>
+            <p className="text-[12px] text-[var(--ink-40)]">No designs yet. Pick a size or template above to start.</p>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
               {designs.map((d) => (
                 <div
                   key={d.id}
-                  className="group flex items-center gap-2 rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 px-3 py-2.5 hover:border-accent cursor-pointer"
+                  className="group flex items-center gap-2 rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-raised)] px-3 py-2.5 hover:border-accent cursor-pointer"
                   onClick={() => goDocument(d.id)}
                   data-testid={`designs-open-${d.id}`}
                 >
                   <Icon name="palette" size={16} className="text-accent shrink-0" />
-                  <span className="flex-1 min-w-0 truncate text-[13px] text-stone-800 dark:text-stone-100">{d.title || 'Untitled design'}</span>
+                  <span className="flex-1 min-w-0 truncate text-[13px] text-[var(--ink-90)]">{d.title || 'Untitled design'}</span>
                   <button
                     onClick={(e) => {
                       e.stopPropagation()
                       void remove(d.id)
                     }}
-                    className="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 text-stone-400 hover:text-red-500"
+                    className="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 text-[var(--ink-40)] hover:text-red-500"
                     title="Delete"
                   >
                     <Icon name="delete" size={14} />

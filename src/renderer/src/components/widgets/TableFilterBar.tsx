@@ -132,7 +132,7 @@ export default function TableFilterBar({
   }
 
   return (
-    <div className="px-2.5 py-1.5 border-b border-stone-200 dark:border-stone-700 bg-stone-50/40 dark:bg-stone-900/40 flex items-center gap-1.5 text-[11px]">
+    <div className="px-2.5 py-1.5 border-b border-[var(--edge-soft)] bg-[var(--surface-sunken)]/40 flex items-center gap-1.5 text-[11px]">
       {/* ── Filter ── */}
       <div ref={filterRef} className="relative">
         <button
@@ -144,7 +144,7 @@ export default function TableFilterBar({
           className={`inline-flex items-center gap-1 px-2 py-1 rounded-md font-medium transition-colors ${
             rules.length > 0
               ? 'bg-accent/15 text-accent'
-              : 'text-stone-500 dark:text-stone-400 hover:text-stone-800 dark:hover:text-stone-100 hover:bg-stone-100 dark:hover:bg-stone-800/60'
+              : 'text-[var(--ink-50)] hover:text-[var(--ink-90)] hover:bg-[var(--surface-sunken)]'
           }`}
           title="Filter rows by any column"
         >
@@ -159,24 +159,24 @@ export default function TableFilterBar({
         {filterOpen && (
           <div
             data-testid="table-filter-panel"
-            className="absolute left-0 top-full mt-1 z-50 w-[360px] max-w-[88vw] rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 shadow-xl p-2.5 space-y-2"
+            className="absolute left-0 top-full mt-1 z-50 w-[360px] max-w-[88vw] rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-xl p-2.5 space-y-2"
           >
             {rules.length === 0 ? (
-              <div className="text-[11px] text-stone-500 dark:text-stone-400 px-1 py-2">
+              <div className="text-[11px] text-[var(--ink-50)] px-1 py-2">
                 No filters yet. Add one to show only the rows you want.
               </div>
             ) : (
               <div className="space-y-1.5">
                 {rules.map((rule, i) => (
                   <div key={rule.id} className="flex items-start gap-1">
-                    <div className="w-12 shrink-0 pt-1 text-[10px] uppercase tracking-wide text-stone-400">
+                    <div className="w-12 shrink-0 pt-1 text-[10px] uppercase tracking-wide text-[var(--ink-40)]">
                       {i === 0 ? (
                         'Where'
                       ) : i === 1 ? (
                         <select
                           value={filter?.conjunction ?? 'and'}
                           onChange={(e) => setConjunction(e.target.value as 'and' | 'or')}
-                          className="bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded px-1 py-0.5 text-[10px] text-stone-600 dark:text-stone-300 lowercase"
+                          className="bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded px-1 py-0.5 text-[10px] text-[var(--ink-70)] lowercase"
                         >
                           <option value="and">and</option>
                           <option value="or">or</option>
@@ -194,7 +194,7 @@ export default function TableFilterBar({
                     />
                     <button
                       onClick={() => removeRule(rule.id)}
-                      className="shrink-0 mt-1 h-5 w-5 inline-flex items-center justify-center rounded text-stone-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30"
+                      className="shrink-0 mt-1 h-5 w-5 inline-flex items-center justify-center rounded text-[var(--ink-40)] hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30"
                       title="Remove filter"
                     >
                       <Icon name="close" size={12} />
@@ -203,7 +203,7 @@ export default function TableFilterBar({
                 ))}
               </div>
             )}
-            <div className="flex items-center justify-between pt-1 border-t border-stone-100 dark:border-stone-800">
+            <div className="flex items-center justify-between pt-1 border-t border-[var(--edge-soft)]">
               <button
                 onClick={addRule}
                 disabled={filterableColumns.length === 0}
@@ -215,7 +215,7 @@ export default function TableFilterBar({
               {rules.length > 0 && (
                 <button
                   onClick={() => updateFilter(undefined)}
-                  className="px-1.5 py-1 rounded text-stone-500 dark:text-stone-400 hover:bg-stone-100 dark:hover:bg-stone-800"
+                  className="px-1.5 py-1 rounded text-[var(--ink-50)] hover:bg-[var(--surface-sunken)]"
                 >
                   Clear all
                 </button>
@@ -236,7 +236,7 @@ export default function TableFilterBar({
           className={`inline-flex items-center gap-1 px-2 py-1 rounded-md font-medium transition-colors ${
             groupCol
               ? 'bg-accent/15 text-accent'
-              : 'text-stone-500 dark:text-stone-400 hover:text-stone-800 dark:hover:text-stone-100 hover:bg-stone-100 dark:hover:bg-stone-800/60'
+              : 'text-[var(--ink-50)] hover:text-[var(--ink-90)] hover:bg-[var(--surface-sunken)]'
           }`}
           title="Group rows by a column"
         >
@@ -255,27 +255,27 @@ export default function TableFilterBar({
         {groupOpen && (
           <div
             data-testid="table-group-panel"
-            className="absolute left-0 top-full mt-1 z-50 w-48 rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 shadow-xl py-1"
+            className="absolute left-0 top-full mt-1 z-50 w-48 rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-xl py-1"
           >
             <button
               onClick={() => setGroupColumn(null)}
-              className={`w-full flex items-center gap-2 px-2.5 py-1.5 text-left hover:bg-stone-100 dark:hover:bg-stone-800 ${
-                !groupCol ? 'text-accent font-medium' : 'text-stone-700 dark:text-stone-200'
+              className={`w-full flex items-center gap-2 px-2.5 py-1.5 text-left hover:bg-[var(--surface-sunken)] ${
+                !groupCol ? 'text-accent font-medium' : 'text-[var(--ink-70)]'
               }`}
             >
-              <Icon name="block" size={12} className="text-stone-400" />
+              <Icon name="block" size={12} className="text-[var(--ink-40)]" />
               <span>No grouping</span>
             </button>
-            <div className="my-1 border-t border-stone-100 dark:border-stone-800" />
+            <div className="my-1 border-t border-[var(--edge-soft)]" />
             {groupableColumns.map((col) => (
               <button
                 key={col.id}
                 onClick={() => setGroupColumn(col.id)}
-                className={`w-full flex items-center gap-2 px-2.5 py-1.5 text-left hover:bg-stone-100 dark:hover:bg-stone-800 ${
-                  groupCol?.id === col.id ? 'text-accent font-medium' : 'text-stone-700 dark:text-stone-200'
+                className={`w-full flex items-center gap-2 px-2.5 py-1.5 text-left hover:bg-[var(--surface-sunken)] ${
+                  groupCol?.id === col.id ? 'text-accent font-medium' : 'text-[var(--ink-70)]'
                 }`}
               >
-                <Icon name={FIELD_TYPE_ICONS[col.type]} size={12} className="text-stone-400" />
+                <Icon name={FIELD_TYPE_ICONS[col.type]} size={12} className="text-[var(--ink-40)]" />
                 <span className="truncate">{col.label}</span>
               </button>
             ))}
@@ -284,7 +284,7 @@ export default function TableFilterBar({
       </div>
 
       {/* Row count — surfaces how many rows the filter is hiding. */}
-      <span className="ml-auto text-[10px] text-stone-400 dark:text-stone-500 tabular-nums shrink-0">
+      <span className="ml-auto text-[10px] text-[var(--ink-40)] tabular-nums shrink-0">
         {isFiltered ? `${filteredCount} of ${totalCount} rows` : `${totalCount} ${totalCount === 1 ? 'row' : 'rows'}`}
       </span>
     </div>
@@ -314,7 +314,7 @@ function FilterRuleEditor({
         <select
           value={rule.columnId}
           onChange={(e) => onColumn(e.target.value)}
-          className="flex-1 min-w-0 bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded px-1.5 py-1 text-[11px] text-stone-700 dark:text-stone-200"
+          className="flex-1 min-w-0 bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded px-1.5 py-1 text-[11px] text-[var(--ink-70)]"
         >
           {columns.map((c) => (
             <option key={c.id} value={c.id}>
@@ -325,7 +325,7 @@ function FilterRuleEditor({
         <select
           value={rule.operator}
           onChange={(e) => onOperator(e.target.value as FilterOperator)}
-          className="flex-1 min-w-0 bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded px-1.5 py-1 text-[11px] text-stone-700 dark:text-stone-200"
+          className="flex-1 min-w-0 bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded px-1.5 py-1 text-[11px] text-[var(--ink-70)]"
         >
           {operators.map((op) => (
             <option key={op} value={op}>
@@ -360,7 +360,7 @@ function FilterValueEditor({
       return (
         <div className="flex flex-wrap gap-1">
           {options.length === 0 && (
-            <span className="text-[10px] text-stone-400">No options defined</span>
+            <span className="text-[10px] text-[var(--ink-40)]">No options defined</span>
           )}
           {options.map((o) => {
             const on = selected.includes(o.id)
@@ -373,7 +373,7 @@ function FilterValueEditor({
                 className={`px-1.5 py-0.5 rounded text-[10px] border ${
                   on
                     ? 'border-accent bg-accent/15 text-accent'
-                    : 'border-stone-200 dark:border-stone-700 text-stone-600 dark:text-stone-300'
+                    : 'border-[var(--edge-soft)] text-[var(--ink-70)]'
                 }`}
               >
                 {o.label}
@@ -387,7 +387,7 @@ function FilterValueEditor({
       <select
         value={typeof rule.value === 'string' ? rule.value : ''}
         onChange={(e) => onValue(e.target.value || null)}
-        className="w-full bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded px-1.5 py-1 text-[11px] text-stone-700 dark:text-stone-200"
+        className="w-full bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded px-1.5 py-1 text-[11px] text-[var(--ink-70)]"
       >
         <option value="">Select…</option>
         {options.map((o) => (
@@ -406,7 +406,7 @@ function FilterValueEditor({
         value={typeof rule.value === 'number' ? rule.value : ''}
         onChange={(e) => onValue(e.target.value === '' ? null : Number(e.target.value))}
         placeholder="Value"
-        className="w-full bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded px-1.5 py-1 text-[11px] text-stone-700 dark:text-stone-200"
+        className="w-full bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded px-1.5 py-1 text-[11px] text-[var(--ink-70)]"
       />
     )
   }
@@ -424,7 +424,7 @@ function FilterValueEditor({
           const [y, m, d] = e.target.value.split('-').map(Number)
           onValue(Date.UTC(y, m - 1, d))
         }}
-        className="w-full bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded px-1.5 py-1 text-[11px] text-stone-700 dark:text-stone-200"
+        className="w-full bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded px-1.5 py-1 text-[11px] text-[var(--ink-70)]"
       />
     )
   }
@@ -436,7 +436,7 @@ function FilterValueEditor({
       value={typeof rule.value === 'string' ? rule.value : ''}
       onChange={(e) => onValue(e.target.value)}
       placeholder="Value"
-      className="w-full bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded px-1.5 py-1 text-[11px] text-stone-700 dark:text-stone-200"
+      className="w-full bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded px-1.5 py-1 text-[11px] text-[var(--ink-70)]"
     />
   )
 }

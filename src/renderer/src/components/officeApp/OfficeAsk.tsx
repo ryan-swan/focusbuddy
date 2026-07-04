@@ -124,10 +124,10 @@ export default function OfficeAsk({ onClose }: { onClose: () => void }): JSX.Ele
       data-testid="office-ask-modal"
     >
       <div
-        className="w-[600px] max-w-[92vw] max-h-[78vh] flex flex-col rounded-xl border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 shadow-2xl"
+        className="w-[600px] max-w-[92vw] max-h-[78vh] flex flex-col rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-2xl"
         onMouseDown={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center gap-2 px-3 py-2.5 border-b border-stone-200 dark:border-stone-700">
+        <div className="flex items-center gap-2 px-3 py-2.5 border-b border-[var(--edge-soft)]">
           <Icon name="auto_awesome" size={15} className="text-accent shrink-0" />
           <input
             autoFocus
@@ -139,7 +139,7 @@ export default function OfficeAsk({ onClose }: { onClose: () => void }): JSX.Ele
             }}
             placeholder={hasThread ? 'Ask a follow-up…' : 'Ask your workspace… e.g. what did we agree on Acme pricing?'}
             data-testid="office-ask-input"
-            className="flex-1 bg-transparent text-[13px] text-stone-900 dark:text-stone-100 placeholder:text-stone-400 focus:outline-none"
+            className="flex-1 bg-transparent text-[13px] text-[var(--ink-100)] placeholder:text-[var(--ink-40)] focus:outline-none"
           />
           <button
             onClick={() => void ask()}
@@ -155,25 +155,25 @@ export default function OfficeAsk({ onClose }: { onClose: () => void }): JSX.Ele
         </div>
 
         <div className="flex-1 overflow-auto p-3">
-          {msg && <div className="mb-2 text-[12px] text-stone-500 dark:text-stone-400">{msg}</div>}
+          {msg && <div className="mb-2 text-[12px] text-[var(--ink-50)]">{msg}</div>}
 
           {turns.map((turn, i) => (
             <div key={i} className="mb-4 last:mb-0">
-              <div className="flex items-start gap-1.5 mb-1 text-[12px] font-medium text-stone-500 dark:text-stone-400">
+              <div className="flex items-start gap-1.5 mb-1 text-[12px] font-medium text-[var(--ink-50)]">
                 <Icon name="help" size={13} className="shrink-0 mt-0.5" />
                 <span>{turn.question}</span>
               </div>
-              <div data-testid="office-ask-answer" className="text-[13px] leading-relaxed text-stone-800 dark:text-stone-100 whitespace-pre-wrap">
+              <div data-testid="office-ask-answer" className="text-[13px] leading-relaxed text-[var(--ink-90)] whitespace-pre-wrap">
                 {turn.answer}
               </div>
               {turn.answer.trim().length > 0 && (
                 <div className="mt-2 flex items-center gap-1.5" data-testid="office-ask-create">
-                  <span className="text-[11px] text-stone-400">Turn this into</span>
+                  <span className="text-[11px] text-[var(--ink-40)]">Turn this into</span>
                   <button
                     onClick={() => void makeDoc(turn)}
                     disabled={busy}
                     data-testid="office-ask-make-doc"
-                    className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-full border border-stone-200 dark:border-stone-700 hover:border-accent hover:text-accent disabled:opacity-50"
+                    className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-full border border-[var(--edge-soft)] hover:border-accent hover:text-accent disabled:opacity-50"
                   >
                     <Icon name="description" size={13} /> Document
                   </button>
@@ -181,7 +181,7 @@ export default function OfficeAsk({ onClose }: { onClose: () => void }): JSX.Ele
                     onClick={() => void makeDeck(turn)}
                     disabled={busy}
                     data-testid="office-ask-make-deck"
-                    className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-full border border-stone-200 dark:border-stone-700 hover:border-accent hover:text-accent disabled:opacity-50"
+                    className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-full border border-[var(--edge-soft)] hover:border-accent hover:text-accent disabled:opacity-50"
                   >
                     <Icon name="slideshow" size={13} /> Deck
                   </button>
@@ -189,19 +189,19 @@ export default function OfficeAsk({ onClose }: { onClose: () => void }): JSX.Ele
               )}
               {turn.sources.length > 0 && (
                 <div className="mt-2" data-testid="office-ask-sources">
-                  <div className="text-[10px] uppercase tracking-wider text-stone-400 mb-1.5">From your documents</div>
+                  <div className="text-[10px] uppercase tracking-wider text-[var(--ink-40)] mb-1.5">From your documents</div>
                   <div className="space-y-1">
                     {turn.sources.map((s) => (
                       <button
                         key={s.docId}
                         onClick={() => openSource(s.docId)}
                         data-testid={`office-ask-source-${s.title}`}
-                        className="w-full flex items-start gap-2 text-left rounded-lg border border-stone-200 dark:border-stone-700 px-2.5 py-1.5 hover:border-accent hover:bg-accent/[0.04]"
+                        className="w-full flex items-start gap-2 text-left rounded-lg border border-[var(--edge-soft)] px-2.5 py-1.5 hover:border-accent hover:bg-accent/[0.04]"
                       >
                         <Icon name={docIcon(s.docType)} size={14} className="text-accent shrink-0 mt-0.5" />
                         <span className="min-w-0">
-                          <span className="block text-[12.5px] font-medium text-stone-800 dark:text-stone-100 truncate">{s.title}</span>
-                          {s.snippet && <span className="block text-[11px] text-stone-500 dark:text-stone-400 line-clamp-2">{s.snippet}</span>}
+                          <span className="block text-[12.5px] font-medium text-[var(--ink-90)] truncate">{s.title}</span>
+                          {s.snippet && <span className="block text-[11px] text-[var(--ink-50)] line-clamp-2">{s.snippet}</span>}
                         </span>
                       </button>
                     ))}
@@ -211,9 +211,9 @@ export default function OfficeAsk({ onClose }: { onClose: () => void }): JSX.Ele
             </div>
           ))}
 
-          {busy && <div className="text-[12px] text-stone-400">Reading your documents…</div>}
+          {busy && <div className="text-[12px] text-[var(--ink-40)]">Reading your documents…</div>}
           {!hasThread && !busy && !msg && (
-            <div className="text-[12px] text-stone-400 dark:text-stone-500">
+            <div className="text-[12px] text-[var(--ink-40)]">
               Answers are drawn only from your own documents, with the sources shown so you can check them. Ask a follow-up to keep the thread.
             </div>
           )}

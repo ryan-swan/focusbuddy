@@ -130,11 +130,11 @@ export default function FileWidget({ widget, inline = false }: Props): JSX.Eleme
         className={`h-full w-full flex flex-col items-center justify-center gap-3 p-4 text-center ${
           dropping
             ? 'bg-accent/10 ring-2 ring-accent ring-inset'
-            : 'bg-stone-50 dark:bg-stone-900'
+            : 'bg-[var(--surface-sunken)]'
         }`}
       >
-        <Icon name="upload_file" size={28} className="text-stone-400" />
-        <div className="text-[12px] text-stone-600 dark:text-stone-300">
+        <Icon name="upload_file" size={28} className="text-[var(--ink-40)]" />
+        <div className="text-[12px] text-[var(--ink-70)]">
           Drop a file or paste a link
         </div>
         <button
@@ -157,20 +157,20 @@ export default function FileWidget({ widget, inline = false }: Props): JSX.Eleme
               }
             }}
             placeholder="https://docs.google.com/…"
-            className="flex-1 min-w-0 text-[11px] px-2 py-1.5 rounded-md bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 focus:outline-none focus:ring-2 focus:ring-accent"
+            className="flex-1 min-w-0 text-[11px] px-2 py-1.5 rounded-md bg-[var(--surface-raised)] border border-[var(--edge-soft)] focus:outline-none focus:ring-2 focus:ring-accent"
             data-testid="file-url-input"
           />
           <button
             type="button"
             onClick={handleUrlSubmit}
             disabled={!urlDraft.trim()}
-            className="text-[11px] px-3 py-1.5 rounded-md bg-stone-200 dark:bg-stone-700 text-stone-800 dark:text-stone-100 hover:bg-stone-300 dark:hover:bg-stone-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            className="text-[11px] px-3 py-1.5 rounded-md bg-[var(--surface-sunken)] text-[var(--ink-90)] hover:bg-[var(--surface-sunken)] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             data-testid="file-url-submit"
           >
             Add
           </button>
         </div>
-        <div className="text-[10px] text-stone-400">
+        <div className="text-[10px] text-[var(--ink-40)]">
           Local file or any cloud link
         </div>
       </div>
@@ -200,7 +200,7 @@ export default function FileWidget({ widget, inline = false }: Props): JSX.Eleme
             selectionText: (widget.title || url).slice(0, 200)
           })
         }}
-        className="h-full w-full bg-stone-50 dark:bg-stone-900 hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors flex flex-col items-center justify-center gap-3 p-4 text-center group"
+        className="h-full w-full bg-[var(--surface-sunken)] hover:bg-[var(--surface-sunken)] transition-colors flex flex-col items-center justify-center gap-3 p-4 text-center group"
         data-testid="file-open-url"
         title={`Open ${url} in browser`}
       >
@@ -214,10 +214,10 @@ export default function FileWidget({ widget, inline = false }: Props): JSX.Eleme
             ;(e.target as HTMLImageElement).style.visibility = 'hidden'
           }}
         />
-        <div className="text-[12px] font-medium text-stone-800 dark:text-stone-100 truncate max-w-full">
+        <div className="text-[12px] font-medium text-[var(--ink-90)] truncate max-w-full">
           {widget.title || host}
         </div>
-        <div className="text-[10px] text-stone-500 truncate max-w-full">{host}</div>
+        <div className="text-[10px] text-[var(--ink-50)] truncate max-w-full">{host}</div>
         <div className="text-[10px] text-accent opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity inline-flex items-center gap-1">
           <Icon name="open_in_new" size={12} />
           Open in browser
@@ -250,7 +250,7 @@ export default function FileWidget({ widget, inline = false }: Props): JSX.Eleme
   const url = `fb-file://${fileId}`
   const body = (
     <div
-      className="h-full w-full bg-stone-50 dark:bg-stone-900 overflow-hidden"
+      className="h-full w-full bg-[var(--surface-sunken)] overflow-hidden"
       onContextMenu={(e) => {
         if (e.shiftKey) return
         e.preventDefault()
@@ -310,7 +310,7 @@ function FileRenderer({
         <img
           src={url}
           alt={file?.originalName ?? ''}
-          className="w-full h-full object-contain cursor-pointer bg-stone-100 dark:bg-stone-950"
+          className="w-full h-full object-contain cursor-pointer bg-[var(--surface-sunken)]"
           draggable={false}
           onClick={onOpen}
           onLoad={(e) => {
@@ -360,7 +360,7 @@ function FileRenderer({
       return (
         <div className="h-full w-full flex flex-col items-center justify-center gap-2 p-4">
           <Icon name="music_note" size={32} className="text-accent" />
-          <div className="text-[12px] font-medium text-stone-800 dark:text-stone-100 truncate max-w-full">
+          <div className="text-[12px] font-medium text-[var(--ink-90)] truncate max-w-full">
             {file?.originalName ?? 'Audio'}
           </div>
           <audio src={url} controls className="w-full" preload="metadata" />
@@ -417,7 +417,7 @@ function GenericFilePreview({
     <button
       type="button"
       onClick={onOpen}
-      className="h-full w-full flex flex-col bg-stone-100 dark:bg-stone-950 hover:bg-stone-200/70 dark:hover:bg-stone-800/70 transition-colors group relative"
+      className="h-full w-full flex flex-col bg-[var(--surface-sunken)] hover:bg-[var(--surface-sunken)]/70 transition-colors group relative"
       data-testid="file-open-local"
       title={file ? `Open ${file.originalName} in default app` : 'Open file'}
     >
@@ -435,29 +435,29 @@ function GenericFilePreview({
           <Icon
             name="hourglass_empty"
             size={36}
-            className="text-stone-400 animate-pulse"
+            className="text-[var(--ink-40)] animate-pulse"
           />
         ) : (
           // QuickLook couldn't preview this file — fall back to a stylised
           // generic-doc icon at large size so the widget still feels
           // intentional rather than broken.
-          <Icon name="description" size={64} className="text-stone-400" />
+          <Icon name="description" size={64} className="text-[var(--ink-40)]" />
         )}
       </div>
       {/* Footer strip — slim, high-contrast, never dominates the thumb. */}
-      <div className="shrink-0 border-t border-stone-200 dark:border-stone-800 bg-white/80 dark:bg-stone-900/80 backdrop-blur-sm px-2 py-1 flex items-center justify-between gap-2">
+      <div className="shrink-0 border-t border-[var(--edge-soft)] bg-[var(--surface-raised)]/80 backdrop-blur-sm px-2 py-1 flex items-center justify-between gap-2">
         <div className="min-w-0 flex-1 text-left">
-          <div className="text-[11px] font-medium text-stone-800 dark:text-stone-100 truncate">
+          <div className="text-[11px] font-medium text-[var(--ink-90)] truncate">
             {file?.originalName ?? 'File'}
           </div>
           {file && (
-            <div className="text-[9px] text-stone-500 leading-tight">
+            <div className="text-[9px] text-[var(--ink-50)] leading-tight">
               {formatBytes(file.sizeBytes)}
               {file.ext && ` · ${file.ext.replace(/^\./, '').toUpperCase()}`}
             </div>
           )}
         </div>
-        <div className="text-[10px] text-stone-500 group-hover:text-accent transition-colors inline-flex items-center gap-0.5 shrink-0">
+        <div className="text-[10px] text-[var(--ink-50)] group-hover:text-accent transition-colors inline-flex items-center gap-0.5 shrink-0">
           <Icon name="open_in_new" size={12} />
         </div>
       </div>

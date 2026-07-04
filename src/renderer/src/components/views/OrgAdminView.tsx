@@ -263,11 +263,11 @@ export default function OrgAdminView(): JSX.Element {
               key={o.id}
               onClick={() => setSelId(o.id)}
               data-testid={`org-pick-${o.id}`}
-              className={`inline-flex items-center gap-1.5 text-[12px] px-2.5 py-1 rounded-full border ${o.id === selId ? 'border-accent text-accent bg-accent/[0.06]' : 'border-stone-200 dark:border-stone-700 hover:border-accent'}`}
+              className={`inline-flex items-center gap-1.5 text-[12px] px-2.5 py-1 rounded-full border ${o.id === selId ? 'border-accent text-accent bg-accent/[0.06]' : 'border-[var(--edge-soft)] hover:border-accent'}`}
             >
               <Icon name={o.personal ? 'person' : 'apartment'} size={13} />
               {o.name}
-              <span className="text-[10px] text-stone-400">{o.role}</span>
+              <span className="text-[10px] text-[var(--ink-40)]">{o.role}</span>
             </button>
           ))}
           <span className="inline-flex items-center gap-1 ml-1">
@@ -279,7 +279,7 @@ export default function OrgAdminView(): JSX.Element {
               }}
               placeholder="New organization…"
               data-testid="org-new-name"
-              className="bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded px-2 py-1 text-[12px] focus:outline-none focus:border-accent w-40"
+              className="bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded px-2 py-1 text-[12px] focus:outline-none focus:border-accent w-40"
             />
             <button onClick={() => void doCreate()} disabled={!newOrg.trim()} className="icon-btn disabled:opacity-40" title="Create" data-testid="org-create">
               <Icon name="add" size={15} />
@@ -287,7 +287,7 @@ export default function OrgAdminView(): JSX.Element {
           </span>
         </div>
 
-        {msg && <div className="mb-3 text-[12px] text-stone-500 dark:text-stone-400">{msg}</div>}
+        {msg && <div className="mb-3 text-[12px] text-[var(--ink-50)]">{msg}</div>}
 
         {detail && (
           <div className={`${PLEXI_CARD} p-4`}>
@@ -296,19 +296,19 @@ export default function OrgAdminView(): JSX.Element {
                 <input
                   defaultValue={detail.org.name}
                   onBlur={(e) => void doRename(e.target.value)}
-                  className="text-[15px] font-semibold bg-transparent border-b border-transparent hover:border-stone-300 focus:border-accent focus:outline-none"
+                  className="text-[15px] font-semibold bg-transparent border-b border-transparent hover:border-[var(--edge-firm)] focus:border-accent focus:outline-none"
                   data-testid="org-rename"
                 />
               ) : (
                 <span className="text-[15px] font-semibold">{detail.org.name}</span>
               )}
-              <span className="text-[11px] text-stone-400">you are {detail.role}</span>
+              <span className="text-[11px] text-[var(--ink-40)]">you are {detail.role}</span>
             </div>
 
             {/* Company working hours */}
-            <div className="mb-3 pb-3 border-b border-stone-200 dark:border-stone-800 flex items-center gap-2 flex-wrap" data-testid="org-hours">
-              <Icon name="schedule" size={15} className="text-stone-400" />
-              <span className="text-[12px] text-stone-600 dark:text-stone-300">Company working hours</span>
+            <div className="mb-3 pb-3 border-b border-[var(--edge-soft)] flex items-center gap-2 flex-wrap" data-testid="org-hours">
+              <Icon name="schedule" size={15} className="text-[var(--ink-40)]" />
+              <span className="text-[12px] text-[var(--ink-70)]">Company working hours</span>
               {canAdmin ? (
                 <span className="inline-flex items-center gap-1.5">
                   <input
@@ -317,21 +317,21 @@ export default function OrgAdminView(): JSX.Element {
                     key={`hs-${orgHours.start}`}
                     onBlur={(e) => void saveHours({ start: numOrNull(e.target.value) ?? 9, end: orgHours.end })}
                     data-testid="org-hours-start"
-                    className="w-14 text-[12px] text-center bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded px-1.5 py-0.5 focus:outline-none"
+                    className="w-14 text-[12px] text-center bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded px-1.5 py-0.5 focus:outline-none"
                   />
-                  <span className="text-[11px] text-stone-400">to</span>
+                  <span className="text-[11px] text-[var(--ink-40)]">to</span>
                   <input
                     type="number" min={0} max={24}
                     defaultValue={orgHours.end}
                     key={`he-${orgHours.end}`}
                     onBlur={(e) => void saveHours({ start: orgHours.start, end: numOrNull(e.target.value) ?? 17 })}
                     data-testid="org-hours-end"
-                    className="w-14 text-[12px] text-center bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded px-1.5 py-0.5 focus:outline-none"
+                    className="w-14 text-[12px] text-center bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded px-1.5 py-0.5 focus:outline-none"
                   />
-                  <span className="text-[11px] text-stone-400">local · inherited by every office and person</span>
+                  <span className="text-[11px] text-[var(--ink-40)]">local · inherited by every office and person</span>
                 </span>
               ) : (
-                <span className="text-[12px] text-stone-500">{orgHours.start}:00 – {orgHours.end}:00 local</span>
+                <span className="text-[12px] text-[var(--ink-50)]">{orgHours.start}:00 – {orgHours.end}:00 local</span>
               )}
             </div>
 
@@ -342,7 +342,7 @@ export default function OrgAdminView(): JSX.Element {
                 const isOpen = openProfile === m.accountId
                 const prof = profiles[m.accountId]
                 return (
-                  <div key={m.accountId} className="border-b border-stone-100 dark:border-white/[0.04] last:border-0" data-testid={`org-member-${m.accountId}`}>
+                  <div key={m.accountId} className="border-b border-[var(--edge-soft)] dark:border-white/[0.04] last:border-0" data-testid={`org-member-${m.accountId}`}>
                     <div className="flex items-center gap-2 py-1">
                       {editable && (
                         <button
@@ -354,18 +354,18 @@ export default function OrgAdminView(): JSX.Element {
                           <Icon name={isOpen ? 'expand_more' : 'chevron_right'} size={15} />
                         </button>
                       )}
-                      <span className="text-[13px] text-stone-800 dark:text-stone-100 flex-1 truncate">
+                      <span className="text-[13px] text-[var(--ink-90)] flex-1 truncate">
                         {m.handle}
-                        {m.accountId === myId && <span className="text-[11px] text-stone-400"> (you)</span>}
-                        {prof?.title && <span className="text-[11px] text-stone-400"> · {prof.title}</span>}
-                        {prof?.officeId && <span className="text-[11px] text-stone-400"> · {officeName(prof.officeId)}</span>}
+                        {m.accountId === myId && <span className="text-[11px] text-[var(--ink-40)]"> (you)</span>}
+                        {prof?.title && <span className="text-[11px] text-[var(--ink-40)]"> · {prof.title}</span>}
+                        {prof?.officeId && <span className="text-[11px] text-[var(--ink-40)]"> · {officeName(prof.officeId)}</span>}
                       </span>
                       {canAdmin ? (
                         <select
                           value={m.role}
                           onChange={(e) => void doRole(m.accountId, e.target.value as OrgRole)}
                           data-testid={`org-role-${m.accountId}`}
-                          className="text-[12px] bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded px-1.5 py-0.5 focus:outline-none"
+                          className="text-[12px] bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded px-1.5 py-0.5 focus:outline-none"
                         >
                           {ROLE_OPTIONS.map((r) => (
                             <option key={r} value={r}>
@@ -374,7 +374,7 @@ export default function OrgAdminView(): JSX.Element {
                           ))}
                         </select>
                       ) : (
-                        <span className="text-[12px] text-stone-500">{m.role}</span>
+                        <span className="text-[12px] text-[var(--ink-50)]">{m.role}</span>
                       )}
                       {editable && (
                         <button onClick={() => void doRemove(m.accountId)} className="icon-btn" title={m.accountId === myId ? 'Leave' : 'Remove'} data-testid={`org-remove-${m.accountId}`}>
@@ -404,13 +404,13 @@ export default function OrgAdminView(): JSX.Element {
 
             {/* Pending invites */}
             {detail.invites.length > 0 && (
-              <div className="mt-3 pt-3 border-t border-stone-200 dark:border-stone-800">
-                <div className="text-[10px] uppercase tracking-wide text-stone-400 mb-1">Pending invites</div>
+              <div className="mt-3 pt-3 border-t border-[var(--edge-soft)]">
+                <div className="text-[10px] uppercase tracking-wide text-[var(--ink-40)] mb-1">Pending invites</div>
                 {detail.invites.map((iv) => (
                   <div key={iv.id} className="flex items-center gap-2 py-0.5 text-[12px]">
-                    <Icon name="mail" size={13} className="text-stone-400" />
-                    <span className="flex-1 truncate text-stone-600 dark:text-stone-300">{iv.email}</span>
-                    <span className="text-[11px] text-stone-400">{iv.role}</span>
+                    <Icon name="mail" size={13} className="text-[var(--ink-40)]" />
+                    <span className="flex-1 truncate text-[var(--ink-70)]">{iv.email}</span>
+                    <span className="text-[11px] text-[var(--ink-40)]">{iv.role}</span>
                     {canAdmin && (
                       <button onClick={() => void doRevoke(iv.id)} className="icon-btn" title="Revoke">
                         <Icon name="close" size={13} />
@@ -423,7 +423,7 @@ export default function OrgAdminView(): JSX.Element {
 
             {/* Invite domain policy */}
             {canAdmin && !detail.org.personal && (
-              <div className="mt-3 pt-3 border-t border-stone-200 dark:border-stone-800">
+              <div className="mt-3 pt-3 border-t border-[var(--edge-soft)]">
                 <label className="flex items-start gap-2 cursor-pointer select-none">
                   <input
                     type="checkbox"
@@ -432,17 +432,17 @@ export default function OrgAdminView(): JSX.Element {
                     className="mt-0.5 accent-accent"
                     data-testid="org-allow-external"
                   />
-                  <span className="text-[12px] text-stone-700 dark:text-stone-200">
+                  <span className="text-[12px] text-[var(--ink-70)]">
                     Allow inviting people outside{' '}
                     {invitePolicy.domain ? `@${invitePolicy.domain}` : 'the organization domain'}.
                     {!invitePolicy.allowExternalInvite && (
-                      <span className="block text-[11px] text-stone-500 dark:text-stone-400">
+                      <span className="block text-[11px] text-[var(--ink-50)]">
                         Off: only people at {invitePolicy.domain ? `@${invitePolicy.domain}` : 'your domain'} can be
                         invited, and sharing outside is flagged.
                       </span>
                     )}
                     {!invitePolicy.domain && (
-                      <span className="block text-[11px] text-stone-500 dark:text-stone-400">
+                      <span className="block text-[11px] text-[var(--ink-50)]">
                         Set an SSO domain below to enforce this.
                       </span>
                     )}
@@ -453,7 +453,7 @@ export default function OrgAdminView(): JSX.Element {
 
             {/* Invite */}
             {canAdmin && (
-              <div className="mt-3 pt-3 border-t border-stone-200 dark:border-stone-800 flex items-center gap-1.5">
+              <div className="mt-3 pt-3 border-t border-[var(--edge-soft)] flex items-center gap-1.5">
                 <input
                   value={inviteEmail}
                   onChange={(e) => setInviteEmail(e.target.value)}
@@ -462,12 +462,12 @@ export default function OrgAdminView(): JSX.Element {
                   }}
                   placeholder="Invite by email…"
                   data-testid="org-invite-email"
-                  className="flex-1 bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded px-2 py-1 text-[12px] focus:outline-none focus:border-accent"
+                  className="flex-1 bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded px-2 py-1 text-[12px] focus:outline-none focus:border-accent"
                 />
                 <select
                   value={inviteRole}
                   onChange={(e) => setInviteRole(e.target.value as OrgRole)}
-                  className="text-[12px] bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded px-1.5 py-1 focus:outline-none"
+                  className="text-[12px] bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded px-1.5 py-1 focus:outline-none"
                 >
                   <option value="admin">admin</option>
                   <option value="member">member</option>
@@ -487,11 +487,11 @@ export default function OrgAdminView(): JSX.Element {
             <div className="flex items-center gap-2 mb-3">
               <Icon name="location_city" size={16} className="text-accent" />
               <h2 className="text-[14px] font-semibold">Offices &amp; locations</h2>
-              <span className="text-[11px] text-stone-400">where people sit · drives the People Map</span>
+              <span className="text-[11px] text-[var(--ink-40)]">where people sit · drives the People Map</span>
             </div>
 
             {offices.length === 0 && (
-              <p className="text-[12px] text-stone-500 dark:text-stone-400 mb-2">
+              <p className="text-[12px] text-[var(--ink-50)] mb-2">
                 No offices yet. Add one (including a “Remote” location) so workers can be placed on the map.
               </p>
             )}
@@ -503,7 +503,7 @@ export default function OrgAdminView(): JSX.Element {
             </div>
 
             {canAdmin && (
-              <div className="mt-3 pt-3 border-t border-stone-200 dark:border-stone-800 flex items-center gap-1.5">
+              <div className="mt-3 pt-3 border-t border-[var(--edge-soft)] flex items-center gap-1.5">
                 <input
                   value={newOffice}
                   onChange={(e) => setNewOffice(e.target.value)}
@@ -512,7 +512,7 @@ export default function OrgAdminView(): JSX.Element {
                   }}
                   placeholder="New office or location name…"
                   data-testid="org-office-new"
-                  className="flex-1 bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded px-2 py-1 text-[12px] focus:outline-none focus:border-accent"
+                  className="flex-1 bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded px-2 py-1 text-[12px] focus:outline-none focus:border-accent"
                 />
                 <button onClick={() => void addOffice()} disabled={!newOffice.trim()} className="btn-primary text-[12px] px-2.5 py-1 disabled:opacity-50" data-testid="org-office-add">
                   Add office
@@ -527,10 +527,10 @@ export default function OrgAdminView(): JSX.Element {
             <div className="flex items-center gap-2 mb-3">
               <Icon name="history" size={16} className="text-accent" />
               <h2 className="text-[14px] font-semibold">Audit log</h2>
-              <span className="text-[11px] text-stone-400">membership, role, and sign-in activity</span>
+              <span className="text-[11px] text-[var(--ink-40)]">membership, role, and sign-in activity</span>
             </div>
             {audit.length === 0 ? (
-              <p className="text-[12px] text-stone-500 dark:text-stone-400">No activity recorded yet.</p>
+              <p className="text-[12px] text-[var(--ink-50)]">No activity recorded yet.</p>
             ) : (
               <div className="space-y-1 max-h-[360px] overflow-auto">
                 {audit.map((e) => {
@@ -538,9 +538,9 @@ export default function OrgAdminView(): JSX.Element {
                   return (
                     <div
                       key={e.id}
-                      className="flex items-center gap-2 text-[12px] py-1 border-b border-stone-100 dark:border-stone-800 last:border-0"
+                      className="flex items-center gap-2 text-[12px] py-1 border-b border-[var(--edge-soft)] last:border-0"
                     >
-                      <span className="text-stone-400 dark:text-stone-500 fb-tabular shrink-0 w-[130px]">
+                      <span className="text-[var(--ink-40)] fb-tabular shrink-0 w-[130px]">
                         {new Date(e.createdAt).toLocaleString(undefined, {
                           month: 'short',
                           day: 'numeric',
@@ -548,8 +548,8 @@ export default function OrgAdminView(): JSX.Element {
                           minute: '2-digit'
                         })}
                       </span>
-                      <span className="font-medium text-stone-700 dark:text-stone-200 shrink-0">{who}</span>
-                      <span className="text-stone-500 dark:text-stone-400">{humanizeAudit(e.action)}</span>
+                      <span className="font-medium text-[var(--ink-70)] shrink-0">{who}</span>
+                      <span className="text-[var(--ink-50)]">{humanizeAudit(e.action)}</span>
                     </div>
                   )
                 })}
@@ -563,16 +563,16 @@ export default function OrgAdminView(): JSX.Element {
             <div className="flex items-center gap-2 mb-3">
               <Icon name="vpn_key" size={16} className="text-accent" />
               <h2 className="text-[14px] font-semibold">Single sign-on (SSO)</h2>
-              <span className="text-[11px] text-stone-400">WorkOS, sign in with your identity provider</span>
+              <span className="text-[11px] text-[var(--ink-40)]">WorkOS, sign in with your identity provider</span>
             </div>
             {!sso.configured ? (
-              <p className="text-[12px] text-stone-500 dark:text-stone-400 leading-relaxed">
+              <p className="text-[12px] text-[var(--ink-50)] leading-relaxed">
                 SSO is not enabled on this server yet. Once WorkOS is configured server-side, set your connection here
                 and your team can sign in with your identity provider.
               </p>
             ) : (
               <div className="space-y-2">
-                <p className="text-[11px] text-stone-500 dark:text-stone-400 leading-relaxed">
+                <p className="text-[11px] text-[var(--ink-50)] leading-relaxed">
                   Paste your WorkOS connection id and the email domain your team signs in with. People with that domain
                   can then use Sign in with SSO.
                 </p>
@@ -581,14 +581,14 @@ export default function OrgAdminView(): JSX.Element {
                   onChange={(e) => setSsoConn(e.target.value)}
                   placeholder="WorkOS connection id (conn_…)"
                   data-testid="org-sso-conn"
-                  className="w-full bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded px-2 py-1 text-[12px] focus:outline-none focus:border-accent"
+                  className="w-full bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded px-2 py-1 text-[12px] focus:outline-none focus:border-accent"
                 />
                 <input
                   value={ssoDomain}
                   onChange={(e) => setSsoDomain(e.target.value)}
                   placeholder="Email domain (acme.com)"
                   data-testid="org-sso-domain"
-                  className="w-full bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded px-2 py-1 text-[12px] focus:outline-none focus:border-accent"
+                  className="w-full bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded px-2 py-1 text-[12px] focus:outline-none focus:border-accent"
                 />
                 <div className="flex items-center gap-2">
                   <button
@@ -671,9 +671,9 @@ function ProfileEditor({
   const [photoBust, setPhotoBust] = useState(0)
   const [uploading, setUploading] = useState(false)
   if (!profile) {
-    return <div className="pl-7 pb-2 text-[11px] text-stone-400">Loading profile…</div>
+    return <div className="pl-7 pb-2 text-[11px] text-[var(--ink-40)]">Loading profile…</div>
   }
-  const field = 'text-[12px] bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded px-2 py-1 focus:outline-none focus:border-accent'
+  const field = 'text-[12px] bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded px-2 py-1 focus:outline-none focus:border-accent'
   const photoSrc = absolutePhotoUrl(`/orgs/${profile.orgId}/members/${profile.accountId}/photo`) + (photoBust ? `?v=${photoBust}` : '')
   return (
     <div className="pl-7 pb-3 grid grid-cols-2 gap-2" data-testid="org-profile-editor">
@@ -681,7 +681,7 @@ function ProfileEditor({
         <img
           src={photoSrc}
           alt=""
-          className="h-11 w-11 rounded-full object-cover bg-stone-100 dark:bg-stone-800 ring-1 ring-black/10"
+          className="h-11 w-11 rounded-full object-cover bg-[var(--surface-sunken)] ring-1 ring-black/10"
           onError={(e) => {
             e.currentTarget.style.visibility = 'hidden'
           }}
@@ -690,13 +690,13 @@ function ProfileEditor({
           }}
         />
         <label className="flex flex-col gap-0.5">
-          <span className="text-[10px] uppercase tracking-wide text-stone-400">Photo</span>
+          <span className="text-[10px] uppercase tracking-wide text-[var(--ink-40)]">Photo</span>
           <input
             type="file"
             accept="image/png,image/jpeg,image/webp,image/gif"
             data-testid="profile-photo"
             disabled={uploading}
-            className="text-[11px] text-stone-500"
+            className="text-[11px] text-[var(--ink-50)]"
             onChange={async (e) => {
               const f = e.target.files?.[0]
               if (!f) return
@@ -711,15 +711,15 @@ function ProfileEditor({
         </label>
       </div>
       <label className="flex flex-col gap-0.5">
-        <span className="text-[10px] uppercase tracking-wide text-stone-400">Title</span>
+        <span className="text-[10px] uppercase tracking-wide text-[var(--ink-40)]">Title</span>
         <input defaultValue={profile.title ?? ''} onBlur={(e) => onSave({ title: e.target.value || null })} className={field} data-testid="profile-title" placeholder="e.g. Senior Engineer" />
       </label>
       <label className="flex flex-col gap-0.5">
-        <span className="text-[10px] uppercase tracking-wide text-stone-400">Department</span>
+        <span className="text-[10px] uppercase tracking-wide text-[var(--ink-40)]">Department</span>
         <input defaultValue={profile.department ?? ''} onBlur={(e) => onSave({ department: e.target.value || null })} className={field} placeholder="e.g. Engineering" />
       </label>
       <label className="flex flex-col gap-0.5">
-        <span className="text-[10px] uppercase tracking-wide text-stone-400">Office</span>
+        <span className="text-[10px] uppercase tracking-wide text-[var(--ink-40)]">Office</span>
         <select value={profile.officeId ?? ''} onChange={(e) => onSave({ officeId: e.target.value || null })} className={field} data-testid="profile-office">
           <option value="">— none —</option>
           {offices.map((o) => (
@@ -730,7 +730,7 @@ function ProfileEditor({
         </select>
       </label>
       <label className="flex flex-col gap-0.5">
-        <span className="text-[10px] uppercase tracking-wide text-stone-400">Reports to</span>
+        <span className="text-[10px] uppercase tracking-wide text-[var(--ink-40)]">Reports to</span>
         <select value={profile.managerAccountId ?? ''} onChange={(e) => onSave({ managerAccountId: e.target.value || null })} className={field} data-testid="profile-manager">
           <option value="">— no manager —</option>
           {members.map((m) => (
@@ -741,25 +741,25 @@ function ProfileEditor({
         </select>
       </label>
       <div className="col-span-2 flex items-center gap-2">
-        <span className="text-[10px] uppercase tracking-wide text-stone-400">Personal hours</span>
+        <span className="text-[10px] uppercase tracking-wide text-[var(--ink-40)]">Personal hours</span>
         <input
           type="number" min={0} max={24}
           defaultValue={hourStr(profile.workStart)}
           key={`pws-${profile.workStart}`}
           onBlur={(e) => onSave({ workStart: numOrNull(e.target.value) })}
           placeholder="start"
-          className="w-16 text-[12px] text-center bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded px-1.5 py-0.5 focus:outline-none"
+          className="w-16 text-[12px] text-center bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded px-1.5 py-0.5 focus:outline-none"
         />
-        <span className="text-[11px] text-stone-400">to</span>
+        <span className="text-[11px] text-[var(--ink-40)]">to</span>
         <input
           type="number" min={0} max={24}
           defaultValue={hourStr(profile.workEnd)}
           key={`pwe-${profile.workEnd}`}
           onBlur={(e) => onSave({ workEnd: numOrNull(e.target.value) })}
           placeholder="end"
-          className="w-16 text-[12px] text-center bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded px-1.5 py-0.5 focus:outline-none"
+          className="w-16 text-[12px] text-center bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded px-1.5 py-0.5 focus:outline-none"
         />
-        <span className="text-[11px] text-stone-400">blank = inherit office, then company</span>
+        <span className="text-[11px] text-[var(--ink-40)]">blank = inherit office, then company</span>
       </div>
     </div>
   )
@@ -778,19 +778,19 @@ function OfficeRow({
   onSave: (patch: OfficeInput) => void
   onDelete: () => void
 }): JSX.Element {
-  const field = 'text-[12px] bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded px-2 py-1 focus:outline-none focus:border-accent'
-  const small = 'w-16 text-[12px] text-center bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded px-1.5 py-0.5 focus:outline-none'
+  const field = 'text-[12px] bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded px-2 py-1 focus:outline-none focus:border-accent'
+  const small = 'w-16 text-[12px] text-center bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded px-1.5 py-0.5 focus:outline-none'
   if (!canAdmin) {
     return (
-      <div className="text-[12px] text-stone-600 dark:text-stone-300 flex items-center gap-2">
-        <Icon name="business" size={13} className="text-stone-400" />
+      <div className="text-[12px] text-[var(--ink-70)] flex items-center gap-2">
+        <Icon name="business" size={13} className="text-[var(--ink-40)]" />
         {office.name}
-        <span className="text-[11px] text-stone-400">{office.kind}{office.city ? ` · ${office.city}` : ''}</span>
+        <span className="text-[11px] text-[var(--ink-40)]">{office.kind}{office.city ? ` · ${office.city}` : ''}</span>
       </div>
     )
   }
   return (
-    <div className="rounded-lg border border-stone-200/70 dark:border-white/10 p-2" data-testid={`office-row-${office.id}`}>
+    <div className="rounded-lg border border-[var(--edge-soft)]/70 dark:border-white/10 p-2" data-testid={`office-row-${office.id}`}>
       <div className="flex items-center gap-2 flex-wrap">
         <input defaultValue={office.name} onBlur={(e) => onSave({ name: e.target.value })} className={`${field} flex-1 min-w-[120px] font-medium`} data-testid="office-name" />
         <select defaultValue={office.kind} onChange={(e) => onSave({ kind: e.target.value as OfficeKind })} className={field}>
@@ -804,7 +804,7 @@ function OfficeRow({
           <Icon name="delete" size={14} />
         </button>
       </div>
-      <div className="mt-2 flex items-center gap-2 flex-wrap text-[11px] text-stone-400">
+      <div className="mt-2 flex items-center gap-2 flex-wrap text-[11px] text-[var(--ink-40)]">
         <input defaultValue={office.city ?? ''} onBlur={(e) => onSave({ city: e.target.value || null })} placeholder="City" className={`${field} w-28`} />
         <span>lat</span>
         <input defaultValue={office.lat == null ? '' : String(office.lat)} onBlur={(e) => onSave({ lat: numOrNull(e.target.value) })} placeholder="lat" className={small} />

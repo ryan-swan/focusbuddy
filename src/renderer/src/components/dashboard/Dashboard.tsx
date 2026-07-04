@@ -251,14 +251,14 @@ export default function Dashboard({
         {/* Header — suppressed when the parent view renders its own */}
         {!hideHeader && (
           <div className="flex items-center gap-3 mb-2">
-            <div className="inline-flex items-center justify-center h-10 w-10 rounded-xl bg-white/80 dark:bg-stone-900/80 border border-stone-200 dark:border-stone-700 shadow-sm shrink-0">
+            <div className="inline-flex items-center justify-center h-10 w-10 rounded-xl bg-[var(--surface-raised)]/80 border border-[var(--edge-soft)] shadow-sm shrink-0">
               <Icon name={icon} size={20} className="text-accent" />
             </div>
             <div className="flex-1 min-w-0">
-              <h1 className="text-xl font-semibold text-stone-900 dark:text-stone-100 truncate">
+              <h1 className="text-xl font-semibold text-[var(--ink-100)] truncate">
                 {title}
               </h1>
-              <p className="text-[12px] text-stone-500 dark:text-stone-400 truncate">
+              <p className="text-[12px] text-[var(--ink-50)] truncate">
                 {subtitle ?? todayLabel}
               </p>
             </div>
@@ -327,11 +327,11 @@ export default function Dashboard({
         {/* Column chooser — visible in edit mode so the layout can be set to
             one, two or three columns. Persisted per dashboard key. */}
         {editing && (
-          <div className="flex items-center gap-2 rounded-xl border border-stone-200 dark:border-stone-700 bg-white/60 dark:bg-stone-900/60 px-3 py-2">
-            <span className="text-[11px] uppercase tracking-[0.12em] text-stone-500 dark:text-stone-400 font-semibold">
+          <div className="flex items-center gap-2 rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-raised)]/60 px-3 py-2">
+            <span className="text-[11px] uppercase tracking-[0.12em] text-[var(--ink-50)] font-semibold">
               Columns
             </span>
-            <div className="inline-flex rounded-lg border border-stone-200 dark:border-stone-700 overflow-hidden">
+            <div className="inline-flex rounded-lg border border-[var(--edge-soft)] overflow-hidden">
               {([1, 2, 3] as DashboardColumns[]).map((n) => (
                 <button
                   key={n}
@@ -341,14 +341,14 @@ export default function Dashboard({
                   className={`px-3 py-1 text-xs font-medium transition-colors ${
                     columns === n
                       ? 'bg-accent text-white'
-                      : 'text-stone-600 dark:text-stone-300 hover:bg-accent/10'
+                      : 'text-[var(--ink-70)] hover:bg-accent/10'
                   }`}
                 >
                   {n}
                 </button>
               ))}
             </div>
-            <span className="text-[11px] text-stone-400 dark:text-stone-500">
+            <span className="text-[11px] text-[var(--ink-40)]">
               Cards flow into this many columns. Narrow windows fall back to one.
             </span>
           </div>
@@ -457,12 +457,12 @@ export default function Dashboard({
 
         {/* Add-card palette (edit mode only) */}
         {editing && (
-          <div className="rounded-xl border border-dashed border-stone-300 dark:border-stone-700 p-4">
-            <div className="text-[10px] uppercase tracking-[0.12em] text-stone-500 dark:text-stone-400 font-semibold mb-2">
+          <div className="rounded-xl border border-dashed border-[var(--edge-firm)] p-4">
+            <div className="text-[10px] uppercase tracking-[0.12em] text-[var(--ink-50)] font-semibold mb-2">
               {hidden.length === 0 ? 'All cards added' : 'Add a card'}
             </div>
             {hidden.length === 0 ? (
-              <p className="text-xs text-stone-500 dark:text-stone-400">
+              <p className="text-xs text-[var(--ink-50)]">
                 Every available card is on this dashboard. Drag to reorder, click × to remove.
               </p>
             ) : (
@@ -473,7 +473,7 @@ export default function Dashboard({
                     <button
                       key={k}
                       onClick={() => addCard(k)}
-                      className="flex items-start gap-2 p-2 rounded-lg border border-stone-200 dark:border-stone-700 hover:border-accent hover:bg-accent/5 transition-colors text-left"
+                      className="flex items-start gap-2 p-2 rounded-lg border border-[var(--edge-soft)] hover:border-accent hover:bg-accent/5 transition-colors text-left"
                     >
                       <Icon
                         name={meta.icon}
@@ -481,10 +481,10 @@ export default function Dashboard({
                         className="text-accent shrink-0 mt-0.5"
                       />
                       <div className="min-w-0">
-                        <div className="text-xs font-medium text-stone-900 dark:text-stone-100">
+                        <div className="text-xs font-medium text-[var(--ink-100)]">
                           {meta.label}
                         </div>
-                        <div className="text-[10px] text-stone-500 dark:text-stone-400 leading-snug">
+                        <div className="text-[10px] text-[var(--ink-50)] leading-snug">
                           {meta.description}
                         </div>
                       </div>
@@ -498,13 +498,13 @@ export default function Dashboard({
 
         {/* Empty state — user removed every card */}
         {!editing && cardIds.length === 0 && (
-          <div className="rounded-xl border border-stone-200 dark:border-stone-700 bg-white/85 dark:bg-stone-900/85 backdrop-blur p-6 text-center">
+          <div className="rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-raised)]/85 backdrop-blur p-6 text-center">
             <Icon
               name="dashboard_customize"
               size={28}
-              className="text-stone-400 dark:text-stone-500 mx-auto mb-2"
+              className="text-[var(--ink-40)] mx-auto mb-2"
             />
-            <p className="text-sm text-stone-600 dark:text-stone-300 mb-3">
+            <p className="text-sm text-[var(--ink-70)] mb-3">
               This dashboard is empty. Click <strong>Customize</strong> to add cards back.
             </p>
             <button onClick={() => setEditing(true)} className="btn-primary mx-auto">

@@ -74,9 +74,9 @@ export default function CollaborationsView(): JSX.Element {
     return (
       <div className="h-full flex items-center justify-center desk-paper no-tod px-6">
         <div className="text-center max-w-sm">
-          <Icon name="group" size={32} className="text-stone-400 dark:text-stone-500 mx-auto mb-3" />
-          <h1 className="text-lg font-semibold text-stone-900 dark:text-stone-100 mb-1">Collaborations</h1>
-          <p className="text-[13px] text-stone-500 dark:text-stone-400 mb-4">
+          <Icon name="group" size={32} className="text-[var(--ink-40)] mx-auto mb-3" />
+          <h1 className="text-lg font-semibold text-[var(--ink-100)] mb-1">Collaborations</h1>
+          <p className="text-[13px] text-[var(--ink-50)] mb-4">
             Sign in to see the desks, folders and documents shared live with you, and to collaborate
             on them in real time.
           </p>
@@ -93,12 +93,12 @@ export default function CollaborationsView(): JSX.Element {
     <div className="h-full overflow-auto desk-paper no-tod" data-testid="collaborations-view">
       <div className="max-w-2xl mx-auto px-6 py-6">
         <header className="flex items-center gap-3 mb-4">
-          <div className="inline-flex items-center justify-center h-10 w-10 rounded-xl bg-white/80 dark:bg-stone-900/80 border border-stone-200 dark:border-stone-700 shadow-sm shrink-0">
+          <div className="inline-flex items-center justify-center h-10 w-10 rounded-xl bg-white/80 dark:bg-stone-900/80 border border-[var(--edge-soft)] shadow-sm shrink-0">
             <Icon name="group" size={20} className="text-accent" />
           </div>
           <div className="flex-1 min-w-0">
-            <h1 className="text-xl font-semibold text-stone-900 dark:text-stone-100">Collaborations</h1>
-            <p className="text-[12px] text-stone-500 dark:text-stone-400">
+            <h1 className="text-xl font-semibold text-[var(--ink-100)]">Collaborations</h1>
+            <p className="text-[12px] text-[var(--ink-50)]">
               Desks, folders and documents shared live with you. Open one to work on it together.
             </p>
           </div>
@@ -108,12 +108,12 @@ export default function CollaborationsView(): JSX.Element {
         </header>
 
         {loading ? (
-          <div className="text-[13px] text-stone-400 dark:text-stone-500 px-1 py-8 text-center">Loading…</div>
+          <div className="text-[13px] text-[var(--ink-40)] px-1 py-8 text-center">Loading…</div>
         ) : items.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-stone-300 dark:border-stone-700 p-10 text-center">
-            <Icon name="group" size={26} className="text-stone-400 dark:text-stone-500 mx-auto mb-2" />
-            <p className="text-sm text-stone-600 dark:text-stone-300">Nothing shared live yet.</p>
-            <p className="text-[12px] text-stone-500 dark:text-stone-400 mt-1">
+          <div className="rounded-xl border border-dashed border-[var(--edge-firm)] p-10 text-center">
+            <Icon name="group" size={26} className="text-[var(--ink-40)] mx-auto mb-2" />
+            <p className="text-sm text-[var(--ink-70)]">Nothing shared live yet.</p>
+            <p className="text-[12px] text-[var(--ink-50)] mt-1">
               Right-click a desk in the sidebar, or a folder in Files, and choose <em>Collaborate
               live</em> to share it. Anything shared with you shows up here.
             </p>
@@ -127,21 +127,21 @@ export default function CollaborationsView(): JSX.Element {
                   key={d.id}
                   onClick={() => open(d)}
                   data-testid="collaboration-item"
-                  className="flex items-center gap-3 rounded-xl border border-stone-200 dark:border-stone-700 bg-white/70 dark:bg-stone-900/70 px-3.5 py-3 cursor-pointer hover:border-accent/50 hover:shadow-sm transition"
+                  className="flex items-center gap-3 rounded-xl border border-[var(--edge-soft)] bg-white/70 dark:bg-stone-900/70 px-3.5 py-3 cursor-pointer hover:border-accent/50 hover:shadow-sm transition"
                 >
                   <div className="h-9 w-9 rounded-lg bg-accent/10 text-accent inline-flex items-center justify-center shrink-0">
                     <Icon name={meta.icon} size={17} />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="text-[13px] font-medium text-stone-900 dark:text-stone-100 truncate">
+                    <div className="text-[13px] font-medium text-[var(--ink-100)] truncate">
                       {d.title || `Untitled ${meta.label.toLowerCase()}`}
                     </div>
-                    <div className="text-[11px] text-stone-400 dark:text-stone-500 truncate">
+                    <div className="text-[11px] text-[var(--ink-40)] truncate">
                       {meta.label} · {d.lock ? `Being edited by ${d.lock.handle}` : 'Free to edit'} ·{' '}
                       {relTime(d.updatedAt)}
                     </div>
                   </div>
-                  <Icon name="chevron_right" size={16} className="text-stone-300 dark:text-stone-600 shrink-0" />
+                  <Icon name="chevron_right" size={16} className="text-[var(--ink-30)] shrink-0" />
                 </div>
               )
             })}

@@ -22,10 +22,14 @@ import {
 import { searchGifs } from '../gifSearch'
 import {
   collectPending,
+  collectPendingOrg,
   markPushed,
   applyRemote,
+  applyRemoteOrg,
   getSyncCursor,
   setSyncCursor,
+  getSyncCursorOrg,
+  setSyncCursorOrg,
   type RemoteItem
 } from '../db/workspaceSync'
 import { invalidateAnthropicClient } from '../ai/anthropic'
@@ -2207,7 +2211,7 @@ export function registerIpcHandlers(): void {
   // signal URL + token); these expose the local-DB half: what to push, what to
   // mark pushed, applying pulled rows, and the pull cursor.
   ipcMain.handle('workspace:pending', () => collectPending())
-  ipcMain.handle('workspace:markPushed', (_e, itemType: 'node' | 'widget', id: string, rev: number) =>
+  ipcMain.handle('workspace:markPushed', (_e, itemType: 'node' | 'widget' | 'timeblock', id: string, rev: number) =>
     markPushed(itemType, id, rev)
   )
   ipcMain.handle('workspace:applyRemote', (_e, items: RemoteItem[]) =>
@@ -2215,6 +2219,19 @@ export function registerIpcHandlers(): void {
   )
   ipcMain.handle('workspace:getCursor', () => getSyncCursor())
   ipcMain.handle('workspace:setCursor', (_e, n: number) => setSyncCursor(typeof n === 'number' ? n : 0))
+
+  // Org-shared workspace sync — cross-member time blocks (first slice). Separate
+  // handlers from the personal ones so the two scopes can never be confused. The
+  // renderer supplies the active org id; the server independently re-checks the
+  // membership from the x-plexi-org header, so this id only ever narrows scope.
+  ipcMain.handle('workspace:pendingOrg', (_e, orgId: string) => collectPendingOrg(String(orgId || '')))
+  ipcMain.handle('workspace:applyRemoteOrg', (_e, items: RemoteItem[], orgId: string) =>
+    applyRemoteOrg(Array.isArray(items) ? items : [], String(orgId || ''))
+  )
+  ipcMain.handle('workspace:getCursorOrg', (_e, orgId: string) => getSyncCursorOrg(String(orgId || '')))
+  ipcMain.handle('workspace:setCursorOrg', (_e, orgId: string, n: number) =>
+    setSyncCursorOrg(String(orgId || ''), typeof n === 'number' ? n : 0)
+  )
 
   // Validate the stored key by sending a 1-token "ping" prompt. Costs
   // roughly $0.0001 on Haiku — small enough that a "Test" button click is

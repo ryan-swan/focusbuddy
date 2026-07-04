@@ -60,8 +60,8 @@ export default function StatsCard({ taskIds, nodes }: Props): JSX.Element {
   ).length
 
   return (
-    <div className="rounded-xl border border-stone-200 dark:border-stone-700 bg-white/85 dark:bg-stone-900/85 backdrop-blur p-4">
-      <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.12em] text-stone-500 dark:text-stone-400 font-semibold mb-3">
+    <div className="rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-raised)]/85 backdrop-blur p-4">
+      <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.12em] text-[var(--ink-50)] font-semibold mb-3">
         <Icon name="today" size={12} />
         <span>Today</span>
       </div>
@@ -105,16 +105,16 @@ function Stat({
       <Icon
         name={icon}
         size={16}
-        className={`mb-1 ${accent ? 'text-accent' : 'text-stone-400 dark:text-stone-500'}`}
+        className={`mb-1 ${accent ? 'text-accent' : 'text-[var(--ink-40)]'}`}
       />
       <div
         className={`text-xl font-semibold tabular-nums ${
-          accent ? 'text-stone-900 dark:text-stone-100' : 'text-stone-400 dark:text-stone-600'
+          accent ? 'text-[var(--ink-100)]' : 'text-[var(--ink-40)]'
         }`}
       >
         {value}
       </div>
-      <div className="text-[10px] uppercase tracking-wider text-stone-500 dark:text-stone-400 mt-0.5">
+      <div className="text-[10px] uppercase tracking-wider text-[var(--ink-50)] mt-0.5">
         {label}
       </div>
     </div>

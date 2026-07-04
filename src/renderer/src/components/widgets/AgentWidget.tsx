@@ -231,45 +231,45 @@ export default function AgentWidget({ widget }: Props): JSX.Element {
 
   const body = (
     <div
-      className="h-full w-full flex flex-col bg-white dark:bg-stone-900 text-stone-800 dark:text-stone-200"
+      className="h-full w-full flex flex-col bg-[var(--surface-raised)] text-[var(--ink-90)]"
       onMouseDown={(e) => e.stopPropagation()}
       data-testid="agent-widget"
     >
       {/* Profile selector — the agent's role / expertise. */}
-      <div className="relative px-2.5 pt-2 pb-1.5 border-b border-stone-200 dark:border-stone-800">
+      <div className="relative px-2.5 pt-2 pb-1.5 border-b border-[var(--edge-soft)]">
         <button
           onClick={() => setProfileMenu((v) => !v)}
-          className="w-full flex items-center gap-1.5 px-2 py-1 rounded-md border border-stone-200 dark:border-stone-700 hover:border-accent/50 bg-stone-50 dark:bg-stone-800 text-left"
+          className="w-full flex items-center gap-1.5 px-2 py-1 rounded-md border border-[var(--edge-soft)] hover:border-accent/50 bg-[var(--surface-sunken)] text-left"
           data-testid="agent-profile-button"
           title={profile.systemPrompt}
         >
           <Icon name={profile.icon} size={14} className="text-accent shrink-0" />
           <span className="flex-1 min-w-0">
             <span className="block text-[11px] font-medium truncate">{profile.name}</span>
-            <span className="block text-[9px] text-stone-500 dark:text-stone-400 truncate">
+            <span className="block text-[9px] text-[var(--ink-50)] truncate">
               {profile.blurb}
             </span>
           </span>
-          <Icon name="expand_more" size={14} className="text-stone-400 shrink-0" />
+          <Icon name="expand_more" size={14} className="text-[var(--ink-40)] shrink-0" />
         </button>
         {profileMenu && (
           <>
             <div className="fixed inset-0 z-10" onClick={() => setProfileMenu(false)} />
-            <div className="absolute left-2.5 right-2.5 top-full mt-1 z-20 max-h-64 overflow-y-auto rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 shadow-xl py-1">
-              <div className="sticky top-0 bg-white dark:bg-stone-900 px-2 pb-1.5 pt-0.5 border-b border-stone-100 dark:border-stone-800">
+            <div className="absolute left-2.5 right-2.5 top-full mt-1 z-20 max-h-64 overflow-y-auto rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-xl py-1">
+              <div className="sticky top-0 bg-[var(--surface-raised)] px-2 pb-1.5 pt-0.5 border-b border-[var(--edge-soft)]">
                 <input
                   autoFocus
                   value={profileQuery}
                   onChange={(e) => setProfileQuery(e.target.value)}
                   placeholder="Search roles…"
-                  className="w-full px-2 py-1 rounded bg-stone-100 dark:bg-stone-800 text-[11px] focus:outline-none focus:ring-1 focus:ring-accent"
+                  className="w-full px-2 py-1 rounded bg-[var(--surface-sunken)] text-[11px] focus:outline-none focus:ring-1 focus:ring-accent"
                   data-testid="agent-profile-search"
                 />
               </div>
               {profileList.map((p) => (
                 <div
                   key={p.id}
-                  className={`group flex items-center gap-2 px-2 py-1.5 cursor-pointer hover:bg-stone-100 dark:hover:bg-stone-800 ${
+                  className={`group flex items-center gap-2 px-2 py-1.5 cursor-pointer hover:bg-[var(--surface-sunken)] ${
                     p.id === profile.id ? 'bg-accent/10' : ''
                   }`}
                   onClick={() => {
@@ -281,7 +281,7 @@ export default function AgentWidget({ widget }: Props): JSX.Element {
                   <Icon name={p.icon} size={14} className="text-accent shrink-0" />
                   <div className="flex-1 min-w-0">
                     <div className="text-[11px] font-medium truncate">{p.name}</div>
-                    <div className="text-[9px] text-stone-500 dark:text-stone-400 truncate">{p.blurb}</div>
+                    <div className="text-[9px] text-[var(--ink-50)] truncate">{p.blurb}</div>
                   </div>
                   {!p.builtIn && (
                     <button
@@ -290,7 +290,7 @@ export default function AgentWidget({ widget }: Props): JSX.Element {
                         if (edit.profileId === p.id) set({ profileId: undefined })
                         removeProfile(p.id)
                       }}
-                      className="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 text-stone-400 hover:text-red-600"
+                      className="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 text-[var(--ink-40)] hover:text-red-600"
                       title="Delete profile"
                     >
                       <Icon name="delete" size={12} />
@@ -303,7 +303,7 @@ export default function AgentWidget({ widget }: Props): JSX.Element {
                   setProfileMenu(false)
                   setProfileDialog(true)
                 }}
-                className="w-full flex items-center gap-2 px-2 py-1.5 border-t border-stone-200 dark:border-stone-700 text-[11px] text-accent hover:bg-accent/5"
+                className="w-full flex items-center gap-2 px-2 py-1.5 border-t border-[var(--edge-soft)] text-[11px] text-accent hover:bg-accent/5"
                 data-testid="agent-profile-create"
               >
                 <Icon name="add" size={14} />
@@ -315,15 +315,15 @@ export default function AgentWidget({ widget }: Props): JSX.Element {
       </div>
 
       {/* Instruction */}
-      <div className="p-2.5 border-b border-stone-200 dark:border-stone-800">
+      <div className="p-2.5 border-b border-[var(--edge-soft)]">
         <textarea
           value={edit.instruction}
           onChange={(e) => set({ instruction: e.target.value })}
           placeholder="Standing instruction, e.g. keep a running summary of the wired notes"
-          className="w-full h-12 resize-none bg-stone-50 dark:bg-stone-800 rounded-md px-2 py-1.5 text-[12px] leading-snug focus:outline-none focus:ring-1 focus:ring-accent placeholder:text-stone-400"
+          className="w-full h-12 resize-none bg-[var(--surface-sunken)] rounded-md px-2 py-1.5 text-[12px] leading-snug focus:outline-none focus:ring-1 focus:ring-accent placeholder:text-[var(--ink-40)]"
           data-testid="agent-instruction"
         />
-        <div className="mt-1.5 flex items-center gap-1 text-[10px] text-stone-500 dark:text-stone-400">
+        <div className="mt-1.5 flex items-center gap-1 text-[10px] text-[var(--ink-50)]">
           <Icon name="cable" size={12} />
           <span data-testid="agent-input-count">
             {inputs.length === 0
@@ -372,7 +372,7 @@ export default function AgentWidget({ widget }: Props): JSX.Element {
             </button>
             <button
               onClick={dismissSuggestion}
-              className="text-stone-400 hover:text-stone-600 shrink-0"
+              className="text-[var(--ink-40)] hover:text-[var(--ink-70)] shrink-0"
               aria-label="Dismiss suggestion"
             >
               <Icon name="close" size={12} />
@@ -390,11 +390,11 @@ export default function AgentWidget({ widget }: Props): JSX.Element {
             <div className="flex items-center gap-1.5">
               <Icon name="psychology" size={13} className="text-accent shrink-0" />
               <span className="flex-1 font-medium truncate">{specialist.name}</span>
-              <button onClick={() => setSpecialist(null)} className="text-stone-400 hover:text-stone-600" aria-label="Dismiss">
+              <button onClick={() => setSpecialist(null)} className="text-[var(--ink-40)] hover:text-[var(--ink-70)]" aria-label="Dismiss">
                 <Icon name="close" size={12} />
               </button>
             </div>
-            <div className="text-stone-500 dark:text-stone-400 mt-0.5">{specialist.blurb}</div>
+            <div className="text-[var(--ink-50)] mt-0.5">{specialist.blurb}</div>
             <div className="flex items-center gap-1.5 mt-1.5">
               <button
                 onClick={() => replaceWithProfile(specialist)}
@@ -419,7 +419,7 @@ export default function AgentWidget({ widget }: Props): JSX.Element {
           <button
             onClick={() => void makeSpecialist()}
             disabled={specialistBusy}
-            className="mt-1.5 inline-flex items-center gap-1 text-[9px] text-stone-500 hover:text-accent disabled:opacity-60"
+            className="mt-1.5 inline-flex items-center gap-1 text-[9px] text-[var(--ink-50)] hover:text-accent disabled:opacity-60"
             data-testid="agent-make-specialist"
           >
             <Icon name={specialistBusy ? 'hourglass_empty' : 'auto_awesome'} size={11} />
@@ -429,7 +429,7 @@ export default function AgentWidget({ widget }: Props): JSX.Element {
       </div>
 
       {/* Controls */}
-      <div className="px-2.5 py-2 flex items-center gap-1.5 border-b border-stone-200 dark:border-stone-800">
+      <div className="px-2.5 py-2 flex items-center gap-1.5 border-b border-[var(--edge-soft)]">
         <div className="grid grid-cols-3 gap-1 flex-1">
           {TRIGGERS.map((t) => (
             <button
@@ -437,8 +437,8 @@ export default function AgentWidget({ widget }: Props): JSX.Element {
               onClick={() => set({ trigger: t.value })}
               className={`flex items-center justify-center gap-1 py-1 rounded text-[10px] border transition-colors ${
                 edit.trigger === t.value
-                  ? 'border-accent bg-accent/10 text-stone-900 dark:text-stone-100'
-                  : 'border-stone-200 dark:border-stone-700 text-stone-600 dark:text-stone-400 hover:bg-stone-100 dark:hover:bg-stone-800'
+                  ? 'border-accent bg-accent/10 text-[var(--ink-100)]'
+                  : 'border-[var(--edge-soft)] text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]'
               }`}
               data-testid={`agent-trigger-${t.value}`}
               title={t.label}
@@ -450,9 +450,9 @@ export default function AgentWidget({ widget }: Props): JSX.Element {
         </div>
       </div>
 
-      <div className="px-2.5 py-1.5 flex items-center gap-2 border-b border-stone-200 dark:border-stone-800">
+      <div className="px-2.5 py-1.5 flex items-center gap-2 border-b border-[var(--edge-soft)]">
         {edit.trigger === 'interval' && (
-          <label className="flex items-center gap-1 text-[10px] text-stone-600 dark:text-stone-400">
+          <label className="flex items-center gap-1 text-[10px] text-[var(--ink-70)]">
             every
             <input
               type="number"
@@ -461,13 +461,13 @@ export default function AgentWidget({ widget }: Props): JSX.Element {
               onChange={(e) =>
                 set({ intervalSec: Math.max(MIN_INTERVAL_SEC, Number(e.target.value) || MIN_INTERVAL_SEC) })
               }
-              className="w-12 px-1 py-0.5 rounded bg-stone-100 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 text-[10px] focus:outline-none focus:border-accent"
+              className="w-12 px-1 py-0.5 rounded bg-[var(--surface-sunken)] border border-[var(--edge-soft)] text-[10px] focus:outline-none focus:border-accent"
               data-testid="agent-interval"
             />
             s
           </label>
         )}
-        <label className="flex items-center gap-1 text-[10px] text-stone-600 dark:text-stone-400 cursor-pointer">
+        <label className="flex items-center gap-1 text-[10px] text-[var(--ink-70)] cursor-pointer">
           <input
             type="checkbox"
             checked={edit.enabled}
@@ -504,14 +504,14 @@ export default function AgentWidget({ widget }: Props): JSX.Element {
             {cfg.lastOutput}
           </div>
         ) : (
-          <div className="text-[11px] text-stone-400 dark:text-stone-500" data-testid="agent-output">
+          <div className="text-[11px] text-[var(--ink-40)]" data-testid="agent-output">
             {running ? 'Thinking…' : 'No output yet. Wire in some inputs, give an instruction, then Run.'}
           </div>
         )}
       </div>
 
       {/* Footer: last run + tiny history */}
-      <div className="px-2.5 py-1 border-t border-stone-200 dark:border-stone-800 flex items-center justify-between text-[9px] text-stone-400 dark:text-stone-500">
+      <div className="px-2.5 py-1 border-t border-[var(--edge-soft)] flex items-center justify-between text-[9px] text-[var(--ink-40)]">
         <span data-testid="agent-status">
           {running ? 'running' : cfg.lastRunAt ? `ran ${timeAgo(cfg.lastRunAt)}` : 'never run'}
         </span>

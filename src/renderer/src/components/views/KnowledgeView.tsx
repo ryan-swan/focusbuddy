@@ -213,7 +213,7 @@ function Editor({
         />
         <button
           onClick={onDelete}
-          className="p-1.5 rounded-md text-stone-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30"
+          className="p-1.5 rounded-md text-[var(--ink-40)] hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30"
           title="Delete entry"
           data-testid="brain-delete"
         >

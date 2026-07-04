@@ -1318,7 +1318,22 @@ const api = {
       items: Array<{ id: string; itemType: 'node' | 'widget' | 'timeblock'; body: Record<string, unknown> | null; rev: number; deleted: boolean }>
     ): Promise<{ applied: number }> => ipcRenderer.invoke('workspace:applyRemote', items),
     getCursor: (): Promise<number> => ipcRenderer.invoke('workspace:getCursor'),
-    setCursor: (n: number): Promise<void> => ipcRenderer.invoke('workspace:setCursor', n)
+    setCursor: (n: number): Promise<void> => ipcRenderer.invoke('workspace:setCursor', n),
+    // Org-shared variants (cross-member time blocks). The active org id selects
+    // the scope and its own cursor; markPushed is shared (it keys by id only).
+    pendingOrg: (
+      orgId: string
+    ): Promise<{
+      upserts: Array<{ id: string; itemType: 'node' | 'widget' | 'timeblock'; body: Record<string, unknown>; baseRev: number }>
+      deletes: Array<{ id: string; itemType: 'node' | 'widget' | 'timeblock'; baseRev: number }>
+    }> => ipcRenderer.invoke('workspace:pendingOrg', orgId),
+    applyRemoteOrg: (
+      items: Array<{ id: string; itemType: 'node' | 'widget' | 'timeblock'; body: Record<string, unknown> | null; rev: number; deleted: boolean }>,
+      orgId: string
+    ): Promise<{ applied: number }> => ipcRenderer.invoke('workspace:applyRemoteOrg', items, orgId),
+    getCursorOrg: (orgId: string): Promise<number> => ipcRenderer.invoke('workspace:getCursorOrg', orgId),
+    setCursorOrg: (orgId: string, n: number): Promise<void> =>
+      ipcRenderer.invoke('workspace:setCursorOrg', orgId, n)
   },
   // Mail (IMAP) — the user's own mailbox, connected straight from the desktop.
   // The password never crosses this boundary on read; the renderer only ever

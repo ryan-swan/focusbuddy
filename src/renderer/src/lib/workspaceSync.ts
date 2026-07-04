@@ -5,6 +5,7 @@ import { useAccountStore } from '../stores/account'
 import { useNodeStore } from '../stores/nodes'
 import { useWidgetStore } from '../stores/widgets'
 import { useTimeBlockStore } from '../stores/timeBlocks'
+import { useOrgStore, PERSONAL_ORG_ID } from '../stores/org'
 
 // Renderer half of multi-device workspace sync. It owns the network (it has the
 // signal URL + session token); the main process owns the local SQLite and exposes
@@ -114,6 +115,150 @@ async function deleteItem(token: string, id: string): Promise<{ ok: boolean; rev
   }
 }
 
+// ── Org-shared transport (cross-member time blocks) ──────────────────────────
+// Same fetch shapes as the personal helpers above, but against /workspace/org/*
+// and carrying the active org in x-plexi-org. The global signal-header
+// interceptor also stamps this header; setting it explicitly keeps these calls
+// correct even if that interceptor is not installed (tests, early boot). The
+// server independently re-checks membership, so the header can only narrow scope.
+function orgHeaders(token: string, orgId: string): Record<string, string> {
+  return { Authorization: `Bearer ${token}`, 'x-plexi-org': orgId }
+}
+
+async function pullChangesOrg(
+  token: string,
+  orgId: string,
+  since: number
+): Promise<{ items: ServerItem[]; now: number } | null> {
+  try {
+    const res = await fetch(urlFor(`/workspace/org/sync?since=${since}`), {
+      headers: orgHeaders(token, orgId)
+    })
+    if (!res.ok) {
+      noteServerError()
+      return null
+    }
+    const json = (await res.json()) as { ok: boolean; items?: ServerItem[]; now?: number }
+    if (!json.ok) {
+      noteServerError()
+      return null
+    }
+    return { items: json.items ?? [], now: json.now ?? since }
+  } catch {
+    noteOffline()
+    return null
+  }
+}
+
+async function putItemOrg(
+  token: string,
+  orgId: string,
+  id: string,
+  itemType: 'node' | 'widget' | 'timeblock',
+  body: Record<string, unknown>,
+  baseRev: number
+): Promise<PutResult> {
+  try {
+    const res = await fetch(urlFor(`/workspace/org/items/${id}`), {
+      method: 'PUT',
+      headers: { ...orgHeaders(token, orgId), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ itemType, body, baseRev: baseRev || undefined })
+    })
+    if (res.status === 409) {
+      const json = (await res.json()) as { item?: ServerItem }
+      if (json.item) return { ok: false, conflict: true, item: json.item }
+      return { ok: false, conflict: false }
+    }
+    if (!res.ok) {
+      noteServerError()
+      return { ok: false, conflict: false }
+    }
+    const json = (await res.json()) as { ok: boolean; item?: { rev: number } }
+    return json.ok && json.item ? { ok: true, rev: json.item.rev } : { ok: false, conflict: false }
+  } catch {
+    noteOffline()
+    return { ok: false, conflict: false }
+  }
+}
+
+async function deleteItemOrg(
+  token: string,
+  orgId: string,
+  id: string
+): Promise<{ ok: boolean; rev: number }> {
+  try {
+    const res = await fetch(urlFor(`/workspace/org/items/${id}`), {
+      method: 'DELETE',
+      headers: orgHeaders(token, orgId)
+    })
+    if (res.status === 404) return { ok: true, rev: 0 } // server never had it; treat as done
+    if (!res.ok) {
+      noteServerError()
+      return { ok: false, rev: 0 }
+    }
+    const json = (await res.json()) as { ok: boolean; item?: { rev: number } }
+    return { ok: !!json.ok, rev: json.item?.rev ?? 0 }
+  } catch {
+    noteOffline()
+    return { ok: false, rev: 0 }
+  }
+}
+
+// One full push+pull cycle against the ORG endpoint for the active shared org.
+// Mirrors the personal cycle but only time blocks are org-shared this slice, so
+// the only store refreshed on change is the calendar.
+async function syncOrgWorkspaceOnce(token: string, orgId: string): Promise<number> {
+  // ── Push local changes ──
+  const pending = await window.api.workspaceSync.pendingOrg(orgId)
+  for (const u of pending.upserts) {
+    const res = await putItemOrg(token, orgId, u.id, u.itemType, u.body, u.baseRev)
+    if (res.ok) await window.api.workspaceSync.markPushed(u.itemType, u.id, res.rev)
+    else if (res.conflict) {
+      // Server is newer: take its copy (last-write-wins, server wins).
+      await window.api.workspaceSync.applyRemoteOrg(
+        [
+          {
+            id: res.item.id,
+            itemType: res.item.itemType,
+            body: res.item.body,
+            rev: res.item.rev,
+            deleted: res.item.deleted
+          }
+        ],
+        orgId
+      )
+    }
+  }
+  for (const d of pending.deletes) {
+    const res = await deleteItemOrg(token, orgId, d.id)
+    if (res.ok) await window.api.workspaceSync.markPushed(d.itemType, d.id, res.rev || d.baseRev)
+  }
+
+  // ── Pull remote changes ──
+  const since = await window.api.workspaceSync.getCursorOrg(orgId)
+  const pulled = await pullChangesOrg(token, orgId, since)
+  if (!pulled) {
+    if (currentCycleFailure() === 'server') useSyncStatus.getState().setError('The server rejected a sync request.')
+    else useSyncStatus.getState().setOffline()
+    return 0
+  }
+  let applied = 0
+  if (pulled.items.length > 0) {
+    const r = await window.api.workspaceSync.applyRemoteOrg(pulled.items, orgId)
+    applied = r.applied
+  }
+  await window.api.workspaceSync.setCursorOrg(orgId, pulled.now)
+
+  const verdict = currentCycleFailure()
+  if (verdict === 'server') useSyncStatus.getState().setError('The server rejected a sync request.')
+  else if (verdict === 'offline') useSyncStatus.getState().setOffline()
+  else useSyncStatus.getState().setOk()
+
+  // Only time blocks are org-shared this slice, so refresh the calendar alone.
+  if (applied > 0) await useTimeBlockStore.getState().reload()
+  return applied
+}
+
 let running = false
 
 // Per-cycle transport outcome, so the status store can tell "could not reach
@@ -146,6 +291,16 @@ export async function syncWorkspaceOnce(): Promise<number> {
   cycleFailure = 'none'
   useSyncStatus.getState().setSyncing()
   try {
+    // Scope selection: the active org decides which single loop runs this cycle.
+    // Personal keeps the existing per-account path exactly. A real shared org runs
+    // the org loop instead (one loop per interval to avoid a double push). Read
+    // from the same store the x-plexi-org interceptor uses, so the branch and the
+    // header can never disagree.
+    const activeOrg = useOrgStore.getState().activeOrgId || PERSONAL_ORG_ID
+    if (activeOrg !== PERSONAL_ORG_ID) {
+      return await syncOrgWorkspaceOnce(token, activeOrg)
+    }
+
     // ── Push local changes ──
     const pending = await window.api.workspaceSync.pending()
     for (const u of pending.upserts) {

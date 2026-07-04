@@ -139,15 +139,15 @@ export default function ChartWidget({ widget }: Props): JSX.Element {
 
   return (
     <WidgetFrame widget={widget} headerLabel={headerLabel} headerAccent="bg-indigo-300/50">
-      <div className="h-full w-full flex flex-col bg-white dark:bg-stone-900" data-testid="chart-widget">
+      <div className="h-full w-full flex flex-col bg-[var(--surface-raised)]" data-testid="chart-widget">
         {/* Toolbar: title, type quick-switch, edit toggle. */}
-        <div className="shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 border-b border-stone-200 dark:border-stone-700">
+        <div className="shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 border-b border-[var(--edge-soft)]">
           <Icon name={CHART_TYPE_ICONS[config.type]} size={15} className="text-indigo-500 shrink-0" />
           <input
             value={config.title ?? ''}
             onChange={(e) => save({ ...config, title: e.target.value })}
             placeholder="Untitled chart"
-            className="flex-1 min-w-0 bg-transparent text-[13px] font-semibold text-stone-800 dark:text-stone-100 outline-none placeholder-stone-300 dark:placeholder-stone-600"
+            className="flex-1 min-w-0 bg-transparent text-[13px] font-semibold text-[var(--ink-90)] outline-none placeholder:text-[var(--ink-30)]"
           />
           <button
             onClick={() => {
@@ -210,10 +210,10 @@ function ChartCanvas({
     const val = computed.kpi
     return (
       <div className="h-full w-full flex flex-col items-center justify-center">
-        <div className="text-[42px] leading-none font-bold tabular-nums text-stone-900 dark:text-stone-50">
+        <div className="text-[42px] leading-none font-bold tabular-nums text-[var(--ink-100)]">
           {val === null ? '—' : formatNumber(val)}
         </div>
-        <div className="mt-2 text-[12px] text-stone-500 dark:text-stone-400 text-center px-3">
+        <div className="mt-2 text-[12px] text-[var(--ink-50)] text-center px-3">
           {seriesLabel(s, columns)}
         </div>
       </div>
@@ -268,17 +268,17 @@ function ChartCanvas({
   return (
     <ResponsiveContainer width="100%" height="100%">
       {config.type === 'line' ? (
-        <LineChart data={computed.data} className="text-stone-500 dark:text-stone-400">
+        <LineChart data={computed.data} className="text-[var(--ink-50)]">
           {common}
           {seriesEls}
         </LineChart>
       ) : config.type === 'area' ? (
-        <AreaChart data={computed.data} className="text-stone-500 dark:text-stone-400">
+        <AreaChart data={computed.data} className="text-[var(--ink-50)]">
           {common}
           {seriesEls}
         </AreaChart>
       ) : (
-        <BarChart data={computed.data} className="text-stone-500 dark:text-stone-400">
+        <BarChart data={computed.data} className="text-[var(--ink-50)]">
           {common}
           {seriesEls}
         </BarChart>
@@ -290,8 +290,8 @@ function ChartCanvas({
 function EmptyState({ icon, text }: { icon: string; text: string }): JSX.Element {
   return (
     <div className="h-full w-full flex flex-col items-center justify-center text-center px-6">
-      <Icon name={icon} size={26} className="text-stone-300 dark:text-stone-600" />
-      <p className="mt-2 text-[12px] text-stone-500 dark:text-stone-400 leading-relaxed max-w-[240px]">{text}</p>
+      <Icon name={icon} size={26} className="text-[var(--ink-30)]" />
+      <p className="mt-2 text-[12px] text-[var(--ink-50)] leading-relaxed max-w-[240px]">{text}</p>
     </div>
   )
 }
@@ -315,12 +315,12 @@ function ChartConfigPanel({
   onChange: (next: ChartConfig) => void
 }): JSX.Element {
   const selectCls =
-    'text-[11px] bg-stone-50 dark:bg-stone-800 border border-stone-300 dark:border-stone-700 rounded px-1.5 py-1 text-stone-900 dark:text-stone-100 focus:outline-none focus:border-accent'
+    'text-[11px] bg-[var(--surface-sunken)] border border-[var(--edge-firm)] rounded px-1.5 py-1 text-[var(--ink-100)] focus:outline-none focus:border-accent'
 
   return (
-    <div className="shrink-0 border-b border-stone-200 dark:border-stone-700 bg-stone-50/60 dark:bg-stone-900/60 px-2.5 py-2 space-y-2">
+    <div className="shrink-0 border-b border-[var(--edge-soft)] bg-[var(--surface-sunken)]/60 px-2.5 py-2 space-y-2">
       <div className="flex flex-wrap items-center gap-2">
-        <label className="text-[10px] uppercase tracking-wider text-stone-400">Table</label>
+        <label className="text-[10px] uppercase tracking-wider text-[var(--ink-40)]">Table</label>
         <select
           value={config.tableId ?? ''}
           onChange={(e) => onChange({ ...config, tableId: e.target.value || null, xColumnId: null, series: [] })}
@@ -335,8 +335,8 @@ function ChartConfigPanel({
           ))}
         </select>
 
-        <label className="text-[10px] uppercase tracking-wider text-stone-400 ml-1">Type</label>
-        <div className="inline-flex rounded-md border border-stone-300 dark:border-stone-700 overflow-hidden">
+        <label className="text-[10px] uppercase tracking-wider text-[var(--ink-40)] ml-1">Type</label>
+        <div className="inline-flex rounded-md border border-[var(--edge-firm)] overflow-hidden">
           {CHART_TYPES.map((t) => (
             <button
               key={t}
@@ -344,7 +344,7 @@ function ChartConfigPanel({
               className={`px-1.5 py-1 text-[11px] inline-flex items-center gap-1 ${
                 config.type === t
                   ? 'bg-indigo-500 text-white'
-                  : 'text-stone-600 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800'
+                  : 'text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]'
               }`}
               title={CHART_TYPE_LABELS[t]}
             >
@@ -356,7 +356,7 @@ function ChartConfigPanel({
 
       {config.type !== 'kpi' && (
         <div className="flex flex-wrap items-center gap-2">
-          <label className="text-[10px] uppercase tracking-wider text-stone-400">Group by</label>
+          <label className="text-[10px] uppercase tracking-wider text-[var(--ink-40)]">Group by</label>
           <select
             value={config.xColumnId ?? ''}
             onChange={(e) => onChange({ ...config, xColumnId: e.target.value || null })}
@@ -377,7 +377,7 @@ function ChartConfigPanel({
       {/* Series editor. KPI uses a single series; the others allow several. */}
       <div className="space-y-1.5">
         <div className="flex items-center justify-between">
-          <label className="text-[10px] uppercase tracking-wider text-stone-400">
+          <label className="text-[10px] uppercase tracking-wider text-[var(--ink-40)]">
             {config.type === 'kpi' ? 'Metric' : 'Values'}
           </label>
           {(config.type !== 'kpi' || config.series.length === 0) && (
@@ -398,7 +398,7 @@ function ChartConfigPanel({
         </div>
 
         {config.series.length === 0 ? (
-          <p className="text-[11px] text-stone-400 dark:text-stone-500">
+          <p className="text-[11px] text-[var(--ink-40)]">
             No value yet. Add one to draw the chart.
           </p>
         ) : (
@@ -419,7 +419,7 @@ function ChartConfigPanel({
                   </option>
                 ))}
               </select>
-              <span className="text-[11px] text-stone-400">of</span>
+              <span className="text-[11px] text-[var(--ink-40)]">of</span>
               <select
                 value={s.columnId}
                 onChange={(e) => {
@@ -437,7 +437,7 @@ function ChartConfigPanel({
               </select>
               <button
                 onClick={() => onChange({ ...config, series: config.series.filter((_, j) => j !== i) })}
-                className="text-stone-400 hover:text-red-600 p-0.5"
+                className="text-[var(--ink-40)] hover:text-red-600 p-0.5"
                 title="Remove value"
               >
                 <Icon name="close" size={12} />

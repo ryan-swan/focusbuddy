@@ -39,13 +39,13 @@ export default function TemplatesSection(): JSX.Element {
 
   return (
     <div
-      className="px-3 py-3 border-t border-stone-200 dark:border-stone-700 space-y-2"
+      className="px-3 py-3 border-t border-[var(--edge-soft)] space-y-2"
       data-testid="settings-section-templates"
     >
-      <div className="text-[11px] uppercase tracking-[0.12em] text-stone-500 dark:text-stone-400 font-medium">
+      <div className="text-[11px] uppercase tracking-[0.12em] text-[var(--ink-50)] font-medium">
         Templates
       </div>
-      <p className="text-[10px] text-stone-500 dark:text-stone-400 leading-snug">
+      <p className="text-[10px] text-[var(--ink-50)] leading-snug">
         {canApply
           ? 'Apply a template to spawn its widgets onto the task you have open.'
           : 'Open a task first — templates apply to the task you have open.'}
@@ -59,7 +59,7 @@ export default function TemplatesSection(): JSX.Element {
             disabled={!canApply || busyId === tpl.id}
             onClick={() => void apply(tpl.id)}
             data-testid={`settings-template-${tpl.id}`}
-            className="group w-full flex items-center gap-1.5 px-2 py-1.5 rounded hover:bg-stone-100 dark:hover:bg-stone-800 text-left disabled:cursor-not-allowed"
+            className="group w-full flex items-center gap-1.5 px-2 py-1.5 rounded hover:bg-[var(--surface-sunken)] text-left disabled:cursor-not-allowed"
             title={
               tpl.description
                 ? `${tpl.description}\n\nApply to the active task.`
@@ -68,15 +68,15 @@ export default function TemplatesSection(): JSX.Element {
           >
             <Icon name="layers" size={14} className="text-accent shrink-0" />
             <div className="flex-1 min-w-0">
-              <div className="text-[12px] text-stone-800 dark:text-stone-100 truncate">
+              <div className="text-[12px] text-[var(--ink-90)] truncate">
                 {tpl.name}
               </div>
-              <div className="text-[9px] text-stone-500 dark:text-stone-400">
+              <div className="text-[9px] text-[var(--ink-50)]">
                 {tpl.widgets.length} widget{tpl.widgets.length === 1 ? '' : 's'}
               </div>
             </div>
             {busyId === tpl.id && (
-              <span className="text-[9px] text-stone-500 dark:text-stone-400">Applying…</span>
+              <span className="text-[9px] text-[var(--ink-50)]">Applying…</span>
             )}
           </button>
         ))}

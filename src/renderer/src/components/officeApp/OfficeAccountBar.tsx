@@ -43,12 +43,12 @@ export default function OfficeAccountBar(): JSX.Element {
 
   if (account) {
     return (
-      <div className="px-3 py-2 border-t border-stone-200 dark:border-stone-800 flex items-center gap-2 text-[12px]">
+      <div className="px-3 py-2 border-t border-[var(--edge-soft)] flex items-center gap-2 text-[12px]">
         <Icon name="account_circle" size={16} className="text-accent shrink-0" />
-        <span className="truncate text-stone-600 dark:text-stone-300">{account.handle || account.email}</span>
+        <span className="truncate text-[var(--ink-70)]">{account.handle || account.email}</span>
         <button
           onClick={() => void signOut()}
-          className="ml-auto text-stone-400 hover:text-stone-600 dark:hover:text-stone-200"
+          className="ml-auto text-[var(--ink-40)] hover:text-[var(--ink-70)]"
           title="Sign out"
         >
           Sign out
@@ -58,7 +58,7 @@ export default function OfficeAccountBar(): JSX.Element {
   }
 
   return (
-    <div className="border-t border-stone-200 dark:border-stone-800">
+    <div className="border-t border-[var(--edge-soft)]">
       {!open ? (
         <button
           onClick={() => setOpen(true)}
@@ -70,7 +70,7 @@ export default function OfficeAccountBar(): JSX.Element {
         </button>
       ) : (
         <div className="p-3 space-y-1.5">
-          <div className="flex items-center gap-2 text-[11px] uppercase tracking-wider text-stone-400">
+          <div className="flex items-center gap-2 text-[11px] uppercase tracking-wider text-[var(--ink-40)]">
             {mode === 'signin' ? 'Sign in' : 'Create account'}
             <button onClick={() => setOpen(false)} className="ml-auto icon-btn" aria-label="Close">
               <Icon name="close" size={12} />
@@ -81,7 +81,7 @@ export default function OfficeAccountBar(): JSX.Element {
             placeholder="Email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="w-full bg-white dark:bg-stone-800 border border-stone-300 dark:border-stone-600 rounded px-2 py-1 text-[12px] focus:outline-none focus:border-accent"
+            className="w-full bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded px-2 py-1 text-[12px] focus:outline-none focus:border-accent"
           />
           <input
             type="password"
@@ -91,7 +91,7 @@ export default function OfficeAccountBar(): JSX.Element {
             onKeyDown={(e) => {
               if (e.key === 'Enter') void submit()
             }}
-            className="w-full bg-white dark:bg-stone-800 border border-stone-300 dark:border-stone-600 rounded px-2 py-1 text-[12px] focus:outline-none focus:border-accent"
+            className="w-full bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded px-2 py-1 text-[12px] focus:outline-none focus:border-accent"
           />
           {error && <div className="text-[11px] text-red-600 dark:text-red-400">{error}</div>}
           <button
@@ -107,7 +107,7 @@ export default function OfficeAccountBar(): JSX.Element {
               setMode(mode === 'signin' ? 'signup' : 'signin')
               setError(null)
             }}
-            className="w-full text-[11px] text-stone-500 hover:text-accent"
+            className="w-full text-[11px] text-[var(--ink-50)] hover:text-accent"
           >
             {mode === 'signin' ? 'No account? Create one' : 'Have an account? Sign in'}
           </button>

@@ -134,7 +134,7 @@ export default function TimerWidget({ widget, inline = false }: Props): JSX.Elem
   const display = isDone ? "Time's up" : fmt(remaining)
 
   const body = (
-    <div className="h-full w-full bg-stone-50 flex flex-col">
+    <div className="h-full w-full bg-[var(--surface-sunken)] flex flex-col">
       <div className="flex-1 flex flex-col items-center justify-center p-4 gap-3 relative">
         <div
           className={`relative ${isUrgent ? 'animate-pulse' : ''}`}
@@ -162,18 +162,18 @@ export default function TimerWidget({ widget, inline = false }: Props): JSX.Elem
             <div
               className={`font-mono font-semibold ${
                 inline ? 'text-5xl' : 'text-2xl'
-              } ${isDone ? 'text-red-600' : isUrgent ? 'text-red-600' : 'text-stone-900'}`}
+              } ${isDone ? 'text-red-600' : isUrgent ? 'text-red-600' : 'text-[var(--ink-100)]'}`}
             >
               {display}
             </div>
-            <div className="text-[10px] uppercase tracking-widest text-stone-500 mt-1">
+            <div className="text-[10px] uppercase tracking-widest text-[var(--ink-50)] mt-1">
               of {fmt(data.targetSec)}
             </div>
           </div>
         </div>
 
         {data.state === 'idle' && (
-          <div className="flex items-center gap-1 text-xs text-stone-700">
+          <div className="flex items-center gap-1 text-xs text-[var(--ink-70)]">
             <input
               type="number"
               min={0}
@@ -184,7 +184,7 @@ export default function TimerWidget({ widget, inline = false }: Props): JSX.Elem
               onKeyDown={(e) => {
                 if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
               }}
-              className="w-12 text-center bg-white border border-stone-300 rounded px-1 py-0.5"
+              className="w-12 text-center bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded px-1 py-0.5"
             />
             <span>min</span>
             <input
@@ -199,7 +199,7 @@ export default function TimerWidget({ widget, inline = false }: Props): JSX.Elem
               onKeyDown={(e) => {
                 if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
               }}
-              className="w-12 text-center bg-white border border-stone-300 rounded px-1 py-0.5"
+              className="w-12 text-center bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded px-1 py-0.5"
             />
             <span>sec</span>
           </div>
@@ -214,7 +214,7 @@ export default function TimerWidget({ widget, inline = false }: Props): JSX.Elem
           </button>
         )}
         {data.state === 'running' && (
-          <button onClick={handlePause} className="btn-ghost border border-stone-300">
+          <button onClick={handlePause} className="btn-ghost border border-[var(--edge-firm)]">
             <Icon name="pause" size={14} />
             <span>Pause</span>
           </button>

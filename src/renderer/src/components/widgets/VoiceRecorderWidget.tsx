@@ -503,7 +503,7 @@ export default function VoiceRecorderWidget({ widget, inline = false }: Props): 
 
   // ────────────────────────────────────────────────────────────────────────
   const body = (
-    <div className="h-full w-full bg-stone-50 dark:bg-stone-900 flex flex-col overflow-hidden relative">
+    <div className="h-full w-full bg-[var(--surface-sunken)] flex flex-col overflow-hidden relative">
       {phase === 'idle' && (
         <IdleState onStart={(m) => void startRecording(m)} />
       )}
@@ -654,7 +654,7 @@ function IdleState({
       >
         <Icon name="mic" size={24} />
       </div>
-      <div className="text-[12px] text-stone-600 dark:text-stone-300 text-center">
+      <div className="text-[12px] text-[var(--ink-70)] text-center">
         Record → AI transcribes, summarises, suggests tasks.
       </div>
       <div className="flex gap-2">
@@ -670,7 +670,7 @@ function IdleState({
         <button
           type="button"
           onClick={() => onStart('video')}
-          className="text-[11px] px-3 py-1.5 rounded-md bg-stone-200 dark:bg-stone-700 text-stone-800 dark:text-stone-100 hover:opacity-90 inline-flex items-center gap-1.5"
+          className="text-[11px] px-3 py-1.5 rounded-md bg-[var(--surface-sunken)] text-[var(--ink-90)] hover:opacity-90 inline-flex items-center gap-1.5"
           data-testid="voice-start-video"
         >
           <Icon name="videocam" size={14} />
@@ -713,7 +713,7 @@ function RecordingState({
           </div>
           <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-red-500 animate-ping" />
         </div>
-        <div className="text-[12px] font-mono text-stone-700 dark:text-stone-200 tabular-nums">
+        <div className="text-[12px] font-mono text-[var(--ink-70)] tabular-nums">
           {formatDuration(durationSec)}
         </div>
         <div className="flex-1" />
@@ -728,11 +728,11 @@ function RecordingState({
         </button>
       </div>
       <div
-        className="flex-1 min-h-0 overflow-y-auto text-[11px] leading-relaxed text-stone-600 dark:text-stone-400 italic whitespace-pre-wrap"
+        className="flex-1 min-h-0 overflow-y-auto text-[11px] leading-relaxed text-[var(--ink-70)] italic whitespace-pre-wrap"
         data-testid="voice-live-caption"
       >
         {liveCaption || (
-          <span className="not-italic text-[10px] text-stone-400 dark:text-stone-500">
+          <span className="not-italic text-[10px] text-[var(--ink-40)]">
             Live captions (browser STT, not stored) appear here as you speak.
             The authoritative transcript runs on Whisper after Stop.
           </span>
@@ -745,8 +745,8 @@ function RecordingState({
 function BusyState({ label }: { label: string }): JSX.Element {
   return (
     <div className="flex-1 flex flex-col items-center justify-center gap-2 p-4">
-      <Icon name="autorenew" size={20} className="text-stone-400 animate-spin" />
-      <div className="text-[11px] text-stone-500 dark:text-stone-400">{label}</div>
+      <Icon name="autorenew" size={20} className="text-[var(--ink-40)] animate-spin" />
+      <div className="text-[11px] text-[var(--ink-50)]">{label}</div>
     </div>
   )
 }
@@ -767,9 +767,9 @@ function ErrorState({
   return (
     <div className="flex-1 flex flex-col items-center justify-center gap-2 p-4 text-center">
       <Icon name="error_outline" size={20} className="text-red-500" />
-      <div className="text-[11px] text-stone-700 dark:text-stone-200">{message}</div>
+      <div className="text-[11px] text-[var(--ink-70)]">{message}</div>
       {reason === 'no_key' && (
-        <div className="text-[10px] text-stone-500 dark:text-stone-400 leading-snug max-w-[260px]">
+        <div className="text-[10px] text-[var(--ink-50)] leading-snug max-w-[260px]">
           Open Settings → AI · API keys to add the missing key, or switch the
           transcription provider to Local.
         </div>
@@ -778,7 +778,7 @@ function ErrorState({
         {canRetry && (
           <button
             onClick={onRetry}
-            className="text-[11px] px-2.5 py-1 rounded-md bg-stone-200 dark:bg-stone-700 hover:opacity-90"
+            className="text-[11px] px-2.5 py-1 rounded-md bg-[var(--surface-sunken)] hover:opacity-90"
           >
             Try again
           </button>
@@ -815,14 +815,14 @@ function ReadyState({
 }): JSX.Element {
   return (
     <div className="flex-1 flex flex-col min-h-0">
-      <div className="px-2 py-1.5 border-b border-stone-200 dark:border-stone-800 flex items-center gap-1 flex-wrap">
+      <div className="px-2 py-1.5 border-b border-[var(--edge-soft)] flex items-center gap-1 flex-wrap">
         <ModeButton current={state.mode} value="summary" label="Summary" onClick={onSwitchMode} />
         <ModeButton current={state.mode} value="cleaned" label="Cleaned" onClick={onSwitchMode} />
         <ModeButton current={state.mode} value="diarised" label="Speakers" onClick={onSwitchMode} />
         <ModeButton current={state.mode} value="full" label="Full" onClick={onSwitchMode} />
         <div className="flex-1" />
         {state.durationSec !== null && (
-          <span className="text-[10px] font-mono tabular-nums text-stone-500 dark:text-stone-400">
+          <span className="text-[10px] font-mono tabular-nums text-[var(--ink-50)]">
             {formatDuration(Math.round(state.durationSec))}
             {state.language && ` · ${state.language}`}
           </span>
@@ -834,21 +834,21 @@ function ReadyState({
               ? 'Record a new video note (replaces this one)'
               : 'Record a new voice note (replaces this one)'
           }
-          className="h-5 w-5 rounded inline-flex items-center justify-center text-stone-500 hover:bg-stone-200 dark:hover:bg-stone-800"
+          className="h-5 w-5 rounded inline-flex items-center justify-center text-[var(--ink-50)] hover:bg-[var(--surface-sunken)]"
         >
           <Icon name={state.captureMode === 'video' ? 'videocam' : 'mic'} size={13} />
         </button>
       </div>
 
       <div
-        className="flex-1 min-h-0 overflow-y-auto px-3 py-2 text-[12px] text-stone-800 dark:text-stone-100 whitespace-pre-wrap leading-relaxed"
+        className="flex-1 min-h-0 overflow-y-auto px-3 py-2 text-[12px] text-[var(--ink-90)] whitespace-pre-wrap leading-relaxed"
         data-testid="voice-processed-text"
       >
         {state.processedText || state.transcript || '(empty)'}
       </div>
 
       {mediaUrl && (
-        <div className="px-2 py-1 border-t border-stone-200 dark:border-stone-800">
+        <div className="px-2 py-1 border-t border-[var(--edge-soft)]">
           {state.captureMode === 'video' ? (
             <video
               src={mediaUrl}
@@ -863,9 +863,9 @@ function ReadyState({
       )}
 
       {state.proposals.length > 0 && (
-        <div className="border-t border-stone-200 dark:border-stone-800 px-2 py-1.5 max-h-[140px] overflow-y-auto">
+        <div className="border-t border-[var(--edge-soft)] px-2 py-1.5 max-h-[140px] overflow-y-auto">
           <div className="flex items-center justify-between mb-1">
-            <span className="text-[10px] uppercase tracking-[0.12em] text-stone-500 dark:text-stone-400 font-semibold">
+            <span className="text-[10px] uppercase tracking-[0.12em] text-[var(--ink-50)] font-semibold">
               AI proposed actions · {state.proposals.length}
             </span>
             <button
@@ -879,19 +879,19 @@ function ReadyState({
             {state.proposals.map((p) => (
               <li
                 key={p.id}
-                className="flex items-start gap-1.5 text-[11px] bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded px-2 py-1"
+                className="flex items-start gap-1.5 text-[11px] bg-[var(--surface-raised)] border border-[var(--edge-soft)] rounded px-2 py-1"
               >
                 <Icon
                   name={iconForProposal(p)}
                   size={12}
-                  className="text-stone-500 mt-0.5 shrink-0"
+                  className="text-[var(--ink-50)] mt-0.5 shrink-0"
                 />
                 <div className="flex-1 min-w-0">
-                  <div className="font-medium text-stone-800 dark:text-stone-100 truncate">
+                  <div className="font-medium text-[var(--ink-90)] truncate">
                     {labelForProposal(p)}
                   </div>
                   {p.reason && (
-                    <div className="text-[10px] text-stone-500 dark:text-stone-400 truncate">
+                    <div className="text-[10px] text-[var(--ink-50)] truncate">
                       {p.reason}
                     </div>
                   )}
@@ -904,7 +904,7 @@ function ReadyState({
                 </button>
                 <button
                   onClick={() => onDismiss(p.id)}
-                  className="text-[10px] text-stone-400 hover:text-stone-700 dark:hover:text-stone-200"
+                  className="text-[10px] text-[var(--ink-40)] hover:text-[var(--ink-70)]"
                   title="Dismiss"
                 >
                   ✕
@@ -915,16 +915,16 @@ function ReadyState({
         </div>
       )}
 
-      <div className="px-2 py-1.5 border-t border-stone-200 dark:border-stone-800 flex items-center justify-between gap-2">
+      <div className="px-2 py-1.5 border-t border-[var(--edge-soft)] flex items-center justify-between gap-2">
         <button
           onClick={onOpenDestinationPicker}
-          className="text-[11px] inline-flex items-center gap-1 px-2 py-1 rounded-md bg-stone-200 dark:bg-stone-700 text-stone-800 dark:text-stone-100 hover:opacity-90"
+          className="text-[11px] inline-flex items-center gap-1 px-2 py-1 rounded-md bg-[var(--surface-sunken)] text-[var(--ink-90)] hover:opacity-90"
           data-testid="voice-send-to"
         >
           <Icon name="ios_share" size={12} />
           Send to…
         </button>
-        <span className="text-[10px] text-stone-400 dark:text-stone-500">
+        <span className="text-[10px] text-[var(--ink-40)]">
           {state.processedText.length || state.transcript.length} chars
         </span>
       </div>
@@ -950,7 +950,7 @@ function ModeButton({
       className={`text-[10px] px-2 py-0.5 rounded transition-colors ${
         active
           ? 'bg-accent text-white'
-          : 'text-stone-600 dark:text-stone-300 hover:bg-stone-200 dark:hover:bg-stone-700'
+          : 'text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]'
       }`}
       data-testid={`voice-mode-${value}`}
     >
@@ -983,16 +983,16 @@ function DestinationPicker({
       onClick={onClose}
     >
       <div
-        className="bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-700 rounded-lg shadow-xl w-full max-w-[320px] p-2"
+        className="bg-[var(--surface-raised)] border border-[var(--edge-soft)] rounded-lg shadow-xl w-full max-w-[320px] p-2"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-1.5 px-1">
-          <span className="text-[10px] uppercase tracking-[0.12em] text-stone-500 dark:text-stone-400 font-semibold">
+          <span className="text-[10px] uppercase tracking-[0.12em] text-[var(--ink-50)] font-semibold">
             Where should this text go?
           </span>
           <button
             onClick={onClose}
-            className="h-5 w-5 inline-flex items-center justify-center text-stone-400 hover:text-stone-700 dark:hover:text-stone-200"
+            className="h-5 w-5 inline-flex items-center justify-center text-[var(--ink-40)] hover:text-[var(--ink-70)]"
           >
             <Icon name="close" size={11} />
           </button>
@@ -1003,7 +1003,7 @@ function DestinationPicker({
             className={`flex-1 text-[10px] px-2 py-1 rounded transition-colors ${
               tab === 'new'
                 ? 'bg-accent text-white'
-                : 'text-stone-600 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800'
+                : 'text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]'
             }`}
             data-testid="voice-dest-tab-new"
           >
@@ -1014,7 +1014,7 @@ function DestinationPicker({
             className={`flex-1 text-[10px] px-2 py-1 rounded transition-colors ${
               tab === 'existing'
                 ? 'bg-accent text-white'
-                : 'text-stone-600 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800'
+                : 'text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]'
             }`}
             data-testid="voice-dest-tab-existing"
             disabled={appendableWidgets.length === 0}
@@ -1033,10 +1033,10 @@ function DestinationPicker({
               <button
                 key={d.kind}
                 onClick={() => onPickNew(d.kind)}
-                className="flex flex-col items-center gap-0.5 px-2 py-2 rounded-md border border-stone-200 dark:border-stone-700 hover:border-accent hover:bg-accent/5 dark:hover:bg-accent/10 text-stone-700 dark:text-stone-300"
+                className="flex flex-col items-center gap-0.5 px-2 py-2 rounded-md border border-[var(--edge-soft)] hover:border-accent hover:bg-accent/5 dark:hover:bg-accent/10 text-[var(--ink-70)]"
                 data-testid={`voice-dest-${d.kind}`}
               >
-                <Icon name={d.icon} size={16} className="text-stone-600 dark:text-stone-400" />
+                <Icon name={d.icon} size={16} className="text-[var(--ink-70)]" />
                 <span className="text-[10px] font-medium">{d.label}</span>
               </button>
             ))}
@@ -1047,19 +1047,19 @@ function DestinationPicker({
               <button
                 key={w.id}
                 onClick={() => onPickAppend(w)}
-                className="w-full flex items-center gap-1.5 px-2 py-1.5 rounded-md border border-stone-200 dark:border-stone-700 hover:border-accent hover:bg-accent/5 dark:hover:bg-accent/10 text-left"
+                className="w-full flex items-center gap-1.5 px-2 py-1.5 rounded-md border border-[var(--edge-soft)] hover:border-accent hover:bg-accent/5 dark:hover:bg-accent/10 text-left"
                 data-testid={`voice-dest-append-${w.id}`}
               >
                 <Icon
                   name={iconForKind(w.kind)}
                   size={13}
-                  className="text-stone-500 dark:text-stone-400 shrink-0"
+                  className="text-[var(--ink-50)] shrink-0"
                 />
                 <div className="flex-1 min-w-0">
-                  <div className="text-[11px] font-medium text-stone-800 dark:text-stone-100 truncate">
+                  <div className="text-[11px] font-medium text-[var(--ink-90)] truncate">
                     {w.title || w.kind}
                   </div>
-                  <div className="text-[10px] text-stone-500 dark:text-stone-400 truncate">
+                  <div className="text-[10px] text-[var(--ink-50)] truncate">
                     {(w.content || '').slice(0, 80) || 'empty'}
                   </div>
                 </div>

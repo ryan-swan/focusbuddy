@@ -55,9 +55,9 @@ export default function FocusSessionCard({ nodes }: Props): JSX.Element {
   }
 
   return (
-    <div className="rounded-xl border border-stone-200 dark:border-stone-700 bg-white/85 dark:bg-stone-900/85 backdrop-blur p-4 fb-glass-soft">
+    <div className="rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-raised)]/85 backdrop-blur p-4 fb-glass-soft">
       <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.12em] text-stone-500 dark:text-stone-400 font-semibold">
+        <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.12em] text-[var(--ink-50)] font-semibold">
           <Icon name="hourglass_empty" size={12} />
           <span>Focus Session</span>
         </div>
@@ -86,11 +86,11 @@ export default function FocusSessionCard({ nodes }: Props): JSX.Element {
         )}
       </div>
       <div className="flex items-center justify-center my-2">
-        <div className="text-[44px] font-semibold tabular-nums text-stone-900 dark:text-stone-100 leading-none tracking-tight">
+        <div className="text-[44px] font-semibold tabular-nums text-[var(--ink-100)] leading-none tracking-tight">
           {fmtClock(displaySec)}
         </div>
       </div>
-      <div className="text-center text-[11px] text-stone-500 dark:text-stone-400 mb-3 truncate px-2">
+      <div className="text-center text-[11px] text-[var(--ink-50)] mb-3 truncate px-2">
         {active
           ? 'Deep work · stay with it'
           : candidateTask
@@ -101,7 +101,7 @@ export default function FocusSessionCard({ nodes }: Props): JSX.Element {
         {active ? (
           <button
             onClick={() => void finishSession('done')}
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-md bg-stone-100 dark:bg-stone-800 hover:bg-stone-200 dark:hover:bg-stone-700 text-[12px] font-medium text-stone-800 dark:text-stone-100"
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-md bg-[var(--surface-sunken)] hover:bg-[var(--surface-sunken)] text-[12px] font-medium text-[var(--ink-90)]"
           >
             <Icon name="stop_circle" size={14} />
             <span>End session</span>

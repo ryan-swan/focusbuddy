@@ -210,7 +210,7 @@ export function ChatComposer({
   const canSend = (draft.trim().length > 0 || pending !== null) && !busy
 
   return (
-    <div className="px-4 py-3 border-t border-stone-200 dark:border-stone-800">
+    <div className="px-4 py-3 border-t border-[var(--edge-soft)]">
       {error && (
         <div className="mb-2 text-[11px] text-rose-500" data-testid="composer-error">
           {error}
@@ -304,7 +304,7 @@ export function ChatComposer({
         </button>
         {mentionCandidates.length > 0 && (
           <div
-            className="absolute bottom-full mb-1 left-0 z-40 min-w-[180px] rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 shadow-lg py-1"
+            className="absolute bottom-full mb-1 left-0 z-40 min-w-[180px] rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-lg py-1"
             role="listbox"
             data-testid="mention-popover"
           >
@@ -320,7 +320,7 @@ export function ChatComposer({
                 className={`w-full text-left px-2.5 py-1 text-[12.5px] ${
                   i === mentionIdx
                     ? 'bg-accent/10 text-accent'
-                    : 'text-stone-700 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800'
+                    : 'text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]'
                 }`}
               >
                 @{h}
@@ -363,7 +363,7 @@ export function ChatComposer({
           placeholder={recording ? 'Recording… tap stop when done' : 'Write a message…'}
           rows={1}
           data-testid="message-composer"
-          className="flex-1 resize-none bg-white dark:bg-stone-800 border border-stone-300 dark:border-stone-600 rounded-lg px-3 py-2 text-[13px] focus:outline-none focus:border-accent"
+          className="flex-1 resize-none bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded-lg px-3 py-2 text-[13px] focus:outline-none focus:border-accent"
         />
         <button
           onClick={() => void submit()}

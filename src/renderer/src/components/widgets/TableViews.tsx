@@ -133,7 +133,7 @@ export function ListView({
       {rows.map((row) => (
         <div
           key={row.id}
-          className="group rounded-md border border-stone-200 dark:border-stone-700 hover:border-accent/40 bg-white/40 dark:bg-stone-800/30 px-3 py-2 transition-colors"
+          className="group rounded-md border border-[var(--edge-soft)] hover:border-accent/40 bg-[var(--surface-raised)]/40 px-3 py-2 transition-colors"
         >
           <div className="flex items-start gap-2">
             <div className="flex-1 min-w-0">
@@ -152,7 +152,7 @@ export function ListView({
                       key={c.id}
                       className="inline-flex items-center gap-1 text-[11px] min-w-0"
                     >
-                      <span className="text-stone-400 dark:text-stone-500 uppercase tracking-wider">
+                      <span className="text-[var(--ink-40)] uppercase tracking-wider">
                         {c.label}
                       </span>
                       <div className="max-w-[220px]">
@@ -170,7 +170,7 @@ export function ListView({
             </div>
             <button
               onClick={() => deleteRow(row.id)}
-              className="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 text-stone-400 hover:text-red-500 transition-opacity"
+              className="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 text-[var(--ink-40)] hover:text-red-500 transition-opacity"
               title="Delete row"
               aria-label="Delete row"
             >
@@ -207,10 +207,10 @@ export function CardsView({
         {rows.map((row) => (
           <div
             key={row.id}
-            className="group rounded-lg border border-stone-200 dark:border-stone-700 hover:border-accent/40 bg-white/50 dark:bg-stone-800/40 p-3 flex flex-col gap-1.5 transition-colors"
+            className="group rounded-lg border border-[var(--edge-soft)] hover:border-accent/40 bg-[var(--surface-raised)]/50 p-3 flex flex-col gap-1.5 transition-colors"
           >
             {titleCol && (
-              <div className="text-[13px] font-medium text-stone-800 dark:text-stone-100">
+              <div className="text-[13px] font-medium text-[var(--ink-90)]">
                 <FieldEditor
                   def={titleCol}
                   value={row.cells[titleCol.id] ?? defaultValue(titleCol.type)}
@@ -221,7 +221,7 @@ export function CardsView({
             )}
             {detailCols.map((c) => (
               <div key={c.id} className="flex flex-col gap-0.5">
-                <span className="text-[9px] uppercase tracking-wider text-stone-400 dark:text-stone-500">
+                <span className="text-[9px] uppercase tracking-wider text-[var(--ink-40)]">
                   {c.label}
                 </span>
                 <FieldEditor
@@ -234,7 +234,7 @@ export function CardsView({
             ))}
             <button
               onClick={() => deleteRow(row.id)}
-              className="self-end mt-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 text-stone-400 hover:text-red-500 transition-opacity"
+              className="self-end mt-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 text-[var(--ink-40)] hover:text-red-500 transition-opacity"
               title="Delete row"
               aria-label="Delete row"
             >
@@ -244,7 +244,7 @@ export function CardsView({
         ))}
         <button
           onClick={addRow}
-          className="rounded-lg border-2 border-dashed border-stone-300 dark:border-stone-700 hover:border-accent text-stone-400 hover:text-accent flex items-center justify-center min-h-[110px] transition-colors"
+          className="rounded-lg border-2 border-dashed border-[var(--edge-firm)] hover:border-accent text-[var(--ink-40)] hover:text-accent flex items-center justify-center min-h-[110px] transition-colors"
         >
           <Icon name="add" size={20} />
         </button>
@@ -305,14 +305,14 @@ export function KanbanView({
     <div className="px-3 py-2">
       {/* Per-view config bar: which column drives the lanes */}
       {selectCols.length > 1 && (
-        <div className="mb-2 flex items-center gap-1.5 text-[11px] text-stone-500 dark:text-stone-400">
+        <div className="mb-2 flex items-center gap-1.5 text-[11px] text-[var(--ink-50)]">
           <span>Lanes:</span>
           <select
             value={groupCol.id}
             onChange={(e) =>
               setViewConfig({ ...viewConfig, kanbanColumnId: e.target.value })
             }
-            className="bg-transparent border border-stone-200 dark:border-stone-700 rounded px-1.5 py-0.5 text-stone-700 dark:text-stone-200"
+            className="bg-transparent border border-[var(--edge-soft)] rounded px-1.5 py-0.5 text-[var(--ink-70)]"
           >
             {selectCols.map((c) => (
               <option key={c.id} value={c.id}>
@@ -331,7 +331,7 @@ export function KanbanView({
           return (
             <div
               key={laneId}
-              className="shrink-0 w-[240px] rounded-md bg-stone-50/60 dark:bg-stone-800/40 border border-stone-200 dark:border-stone-700 flex flex-col"
+              className="shrink-0 w-[240px] rounded-md bg-[var(--surface-sunken)]/60 border border-[var(--edge-soft)] flex flex-col"
               onDragOver={(e) => {
                 if (e.dataTransfer.types.includes('text/fb-row-id')) {
                   e.preventDefault()
@@ -349,15 +349,15 @@ export function KanbanView({
                 )
               }}
             >
-              <div className="px-2.5 py-1.5 border-b border-stone-200 dark:border-stone-700 flex items-center gap-1.5">
+              <div className="px-2.5 py-1.5 border-b border-[var(--edge-soft)] flex items-center gap-1.5">
                 <span
                   className="inline-block h-2 w-2 rounded-full shrink-0"
                   style={{ backgroundColor: accent }}
                 />
-                <span className="text-[11px] font-medium text-stone-700 dark:text-stone-200 truncate flex-1">
+                <span className="text-[11px] font-medium text-[var(--ink-70)] truncate flex-1">
                   {label}
                 </span>
-                <span className="text-[10px] text-stone-400 dark:text-stone-500 font-mono">
+                <span className="text-[10px] text-[var(--ink-40)] font-mono">
                   {laneRows.length}
                 </span>
               </div>
@@ -370,10 +370,10 @@ export function KanbanView({
                       e.dataTransfer.setData('text/fb-row-id', row.id)
                       e.dataTransfer.effectAllowed = 'move'
                     }}
-                    className="group rounded border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 p-2 hover:border-accent/40 cursor-grab active:cursor-grabbing transition-colors"
+                    className="group rounded border border-[var(--edge-soft)] bg-[var(--surface-raised)] p-2 hover:border-accent/40 cursor-grab active:cursor-grabbing transition-colors"
                   >
                     {titleCol && (
-                      <div className="text-[12px] text-stone-800 dark:text-stone-100">
+                      <div className="text-[12px] text-[var(--ink-90)]">
                         <FieldEditor
                           def={titleCol}
                           value={
@@ -387,7 +387,7 @@ export function KanbanView({
                     <div className="flex items-center justify-end mt-1">
                       <button
                         onClick={() => deleteRow(row.id)}
-                        className="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 text-stone-400 hover:text-red-500 transition-opacity"
+                        className="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 text-[var(--ink-40)] hover:text-red-500 transition-opacity"
                         title="Delete row"
                         aria-label="Delete row"
                       >
@@ -398,7 +398,7 @@ export function KanbanView({
                 ))}
                 <button
                   onClick={addRow}
-                  className="w-full text-[11px] py-1 rounded text-stone-400 hover:text-accent hover:bg-accent/5 inline-flex items-center justify-center gap-1"
+                  className="w-full text-[11px] py-1 rounded text-[var(--ink-40)] hover:text-accent hover:bg-accent/5 inline-flex items-center justify-center gap-1"
                 >
                   <Icon name="add" size={11} />
                   Add
@@ -492,37 +492,37 @@ export function CalendarView({
         <div className="flex items-center gap-1">
           <button
             onClick={() => setMonthOffset((o) => o - 1)}
-            className="h-6 w-6 inline-flex items-center justify-center text-stone-500 hover:text-stone-900 dark:hover:text-stone-100"
+            className="h-6 w-6 inline-flex items-center justify-center text-[var(--ink-50)] hover:text-[var(--ink-100)]"
             aria-label="Previous month"
           >
             <Icon name="chevron_left" size={16} />
           </button>
-          <span className="text-[12px] font-medium text-stone-800 dark:text-stone-100 min-w-[110px] text-center">
+          <span className="text-[12px] font-medium text-[var(--ink-90)] min-w-[110px] text-center">
             {monthName}
           </span>
           <button
             onClick={() => setMonthOffset((o) => o + 1)}
-            className="h-6 w-6 inline-flex items-center justify-center text-stone-500 hover:text-stone-900 dark:hover:text-stone-100"
+            className="h-6 w-6 inline-flex items-center justify-center text-[var(--ink-50)] hover:text-[var(--ink-100)]"
             aria-label="Next month"
           >
             <Icon name="chevron_right" size={16} />
           </button>
           <button
             onClick={() => setMonthOffset(0)}
-            className="text-[10px] px-1.5 py-0.5 rounded text-stone-500 hover:text-accent ml-1"
+            className="text-[10px] px-1.5 py-0.5 rounded text-[var(--ink-50)] hover:text-accent ml-1"
           >
             Today
           </button>
         </div>
         {dateCols.length > 1 && (
-          <div className="text-[11px] text-stone-500 dark:text-stone-400 inline-flex items-center gap-1.5">
+          <div className="text-[11px] text-[var(--ink-50)] inline-flex items-center gap-1.5">
             <span>Date:</span>
             <select
               value={dateCol.id}
               onChange={(e) =>
                 setViewConfig({ ...viewConfig, calendarColumnId: e.target.value })
               }
-              className="bg-transparent border border-stone-200 dark:border-stone-700 rounded px-1.5 py-0.5 text-stone-700 dark:text-stone-200"
+              className="bg-transparent border border-[var(--edge-soft)] rounded px-1.5 py-0.5 text-[var(--ink-70)]"
             >
               {dateCols.map((c) => (
                 <option key={c.id} value={c.id}>
@@ -533,11 +533,11 @@ export function CalendarView({
           </div>
         )}
       </div>
-      <div className="grid grid-cols-7 gap-px bg-stone-200 dark:bg-stone-700 border border-stone-200 dark:border-stone-700 rounded overflow-hidden text-[11px]">
+      <div className="grid grid-cols-7 gap-px bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded overflow-hidden text-[11px]">
         {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => (
           <div
             key={d}
-            className="bg-stone-50 dark:bg-stone-800 px-1.5 py-1 text-stone-500 dark:text-stone-400 text-[10px] uppercase tracking-wider font-medium"
+            className="bg-[var(--surface-sunken)] px-1.5 py-1 text-[var(--ink-50)] text-[10px] uppercase tracking-wider font-medium"
           >
             {d}
           </div>
@@ -555,15 +555,15 @@ export function CalendarView({
               key={i}
               className={`min-h-[64px] p-1 ${
                 inMonth
-                  ? 'bg-white dark:bg-stone-900'
-                  : 'bg-stone-50/60 dark:bg-stone-800/40'
+                  ? 'bg-[var(--surface-raised)]'
+                  : 'bg-[var(--surface-sunken)]/60'
               }`}
             >
               <div
                 className={`text-[10px] mb-1 flex items-center justify-between ${
                   inMonth
-                    ? 'text-stone-700 dark:text-stone-200'
-                    : 'text-stone-300 dark:text-stone-600'
+                    ? 'text-[var(--ink-70)]'
+                    : 'text-[var(--ink-30)]'
                 }`}
               >
                 <span
@@ -578,7 +578,7 @@ export function CalendarView({
                 {inMonth && (
                   <button
                     onClick={addRow}
-                    className="opacity-0 hover:opacity-100 text-stone-400 hover:text-accent text-[10px]"
+                    className="opacity-0 hover:opacity-100 text-[var(--ink-40)] hover:text-accent text-[10px]"
                     title={`Add row on ${d.toLocaleDateString()}`}
                   >
                     +
@@ -596,7 +596,7 @@ export function CalendarView({
                   </div>
                 ))}
                 {dayRows.length > 3 && (
-                  <div className="text-[9px] text-stone-400 dark:text-stone-500">
+                  <div className="text-[9px] text-[var(--ink-40)]">
                     +{dayRows.length - 3} more
                   </div>
                 )}
@@ -656,11 +656,11 @@ export function GanttView({
 
   if (dated.length === 0) {
     return (
-      <div className="px-3 py-6 text-center text-[12px] text-stone-500 dark:text-stone-400">
+      <div className="px-3 py-6 text-center text-[12px] text-[var(--ink-50)]">
         <Icon
           name="timeline"
           size={22}
-          className="text-stone-300 dark:text-stone-600 mx-auto mb-1.5"
+          className="text-[var(--ink-30)] mx-auto mb-1.5"
         />
         Add start + end dates to your rows to see them on the timeline.
         <div className="mt-2">
@@ -701,14 +701,14 @@ export function GanttView({
   return (
     <div className="px-3 py-2">
       {dateCols.length > 2 && (
-        <div className="mb-2 flex items-center gap-2 text-[11px] text-stone-500 dark:text-stone-400">
+        <div className="mb-2 flex items-center gap-2 text-[11px] text-[var(--ink-50)]">
           <span>Start:</span>
           <select
             value={startCol.id}
             onChange={(e) =>
               setViewConfig({ ...viewConfig, ganttStartColumnId: e.target.value })
             }
-            className="bg-transparent border border-stone-200 dark:border-stone-700 rounded px-1.5 py-0.5 text-stone-700 dark:text-stone-200"
+            className="bg-transparent border border-[var(--edge-soft)] rounded px-1.5 py-0.5 text-[var(--ink-70)]"
           >
             {dateCols.map((c) => (
               <option key={c.id} value={c.id}>
@@ -722,7 +722,7 @@ export function GanttView({
             onChange={(e) =>
               setViewConfig({ ...viewConfig, ganttEndColumnId: e.target.value })
             }
-            className="bg-transparent border border-stone-200 dark:border-stone-700 rounded px-1.5 py-0.5 text-stone-700 dark:text-stone-200"
+            className="bg-transparent border border-[var(--edge-soft)] rounded px-1.5 py-0.5 text-[var(--ink-70)]"
           >
             {dateCols.map((c) => (
               <option key={c.id} value={c.id}>
@@ -733,11 +733,11 @@ export function GanttView({
         </div>
       )}
       {/* Axis */}
-      <div className="relative h-5 mb-1 border-b border-stone-200 dark:border-stone-700">
+      <div className="relative h-5 mb-1 border-b border-[var(--edge-soft)]">
         {axis.map((a, i) => (
           <div
             key={i}
-            className="absolute top-0 text-[9px] uppercase tracking-wider text-stone-400 dark:text-stone-500"
+            className="absolute top-0 text-[9px] uppercase tracking-wider text-[var(--ink-40)]"
             style={{ left: `${a.pct}%` }}
           >
             {a.label}
@@ -751,11 +751,11 @@ export function GanttView({
           const width = Math.max(2, pct(end) - left)
           return (
             <div key={row.id} className="flex items-center gap-2 group">
-              <div className="w-32 shrink-0 text-[11px] text-stone-700 dark:text-stone-200 truncate">
+              <div className="w-32 shrink-0 text-[11px] text-[var(--ink-70)] truncate">
                 {getCellString(row, titleCol) || '(untitled)'}
               </div>
               <div className="relative flex-1 h-6">
-                <div className="absolute inset-y-1 left-0 right-0 rounded bg-stone-100 dark:bg-stone-800/50" />
+                <div className="absolute inset-y-1 left-0 right-0 rounded bg-[var(--surface-sunken)]" />
                 <div
                   className="absolute top-1 bottom-1 rounded bg-accent/85 shadow-sm flex items-center px-1.5"
                   style={{ left: `${left}%`, width: `${width}%`, minWidth: 6 }}
@@ -781,11 +781,11 @@ export function GanttView({
 
 function EmptyState({ onAdd }: { onAdd: () => void }): JSX.Element {
   return (
-    <div className="py-8 text-center text-[12px] text-stone-400 dark:text-stone-500">
+    <div className="py-8 text-center text-[12px] text-[var(--ink-40)]">
       <Icon
         name="layers_clear"
         size={20}
-        className="text-stone-300 dark:text-stone-600 mx-auto mb-1"
+        className="text-[var(--ink-30)] mx-auto mb-1"
       />
       <div>No rows yet.</div>
       <button
@@ -802,7 +802,7 @@ function AddRowFooter({ onAdd }: { onAdd: () => void }): JSX.Element {
   return (
     <button
       onClick={onAdd}
-      className="w-full inline-flex items-center justify-center gap-1 text-[12px] py-1.5 rounded text-stone-500 dark:text-stone-400 hover:text-accent hover:bg-accent/5 transition-colors"
+      className="w-full inline-flex items-center justify-center gap-1 text-[12px] py-1.5 rounded text-[var(--ink-50)] hover:text-accent hover:bg-accent/5 transition-colors"
     >
       <Icon name="add" size={14} />
       <span>Add row</span>
@@ -822,13 +822,13 @@ function ConfigureHint({
   onAdd: () => void
 }): JSX.Element {
   return (
-    <div className="px-3 py-6 text-center text-[12px] text-stone-500 dark:text-stone-400 max-w-md mx-auto">
+    <div className="px-3 py-6 text-center text-[12px] text-[var(--ink-50)] max-w-md mx-auto">
       <Icon
         name={icon}
         size={24}
-        className="text-stone-300 dark:text-stone-600 mx-auto mb-1.5"
+        className="text-[var(--ink-30)] mx-auto mb-1.5"
       />
-      <div className="font-medium text-stone-700 dark:text-stone-200 mb-1">{title}</div>
+      <div className="font-medium text-[var(--ink-70)] mb-1">{title}</div>
       <div className="leading-relaxed">{body}</div>
       <button
         onClick={onAdd}

@@ -95,11 +95,11 @@ export default function PlexiOfficeApp(): JSX.Element {
   const appVersion = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : 'dev'
 
   return (
-    <div className="h-screen w-screen flex flex-col bg-desk-50 dark:bg-stone-950 text-stone-900 dark:text-stone-100">
+    <div className="h-screen w-screen flex flex-col bg-desk-50 dark:bg-stone-950 text-[var(--ink-100)]">
       <div className="flex-1 min-h-0 flex">
       {/* Sidebar — branding, new-document actions, the document list */}
-      <aside className="w-64 shrink-0 flex flex-col border-r border-stone-200 dark:border-stone-800 bg-white/70 dark:bg-stone-900/60">
-        <div className="px-4 py-3 flex items-center gap-2 border-b border-stone-200 dark:border-stone-800">
+      <aside className="w-64 shrink-0 flex flex-col border-r border-[var(--edge-soft)] bg-white/70 dark:bg-stone-900/60">
+        <div className="px-4 py-3 flex items-center gap-2 border-b border-[var(--edge-soft)]">
           <Icon name="auto_awesome" size={16} className="text-accent" />
           <span className="font-semibold text-[14px]">PlexiOffice</span>
           <button
@@ -113,7 +113,7 @@ export default function PlexiOfficeApp(): JSX.Element {
           <button
             onClick={() => setTeamsOpen(true)}
             data-testid="office-teams-btn"
-            className="icon-btn text-stone-400 hover:text-accent"
+            className="icon-btn text-[var(--ink-40)] hover:text-accent"
             title="Teams"
           >
             <Icon name="groups" size={16} />
@@ -121,7 +121,7 @@ export default function PlexiOfficeApp(): JSX.Element {
           <button
             onClick={() => setSettingsOpen(true)}
             data-testid="office-settings-btn"
-            className="icon-btn text-stone-400 hover:text-accent"
+            className="icon-btn text-[var(--ink-40)] hover:text-accent"
             title="Settings — AI · API keys"
           >
             <Icon name="settings" size={16} />
@@ -155,14 +155,14 @@ export default function PlexiOfficeApp(): JSX.Element {
         {liveDocId ? (
           <LiveDocEditorView liveDocId={liveDocId} onBack={() => setLiveDocId(null)} />
         ) : !active ? (
-          <div className="flex-1 flex flex-col items-center justify-center text-center text-stone-400">
-            <Icon name="draft" size={40} className="mb-3 text-stone-300 dark:text-stone-600" />
+          <div className="flex-1 flex flex-col items-center justify-center text-center text-[var(--ink-40)]">
+            <Icon name="draft" size={40} className="mb-3 text-[var(--ink-30)]" />
             <div className="text-[14px]">Pick a document, or create a new one.</div>
             <div className="text-[12px] mt-1">Your documents sync with PlexiDesk.</div>
           </div>
         ) : (
           <>
-            <header className="shrink-0 flex items-center gap-2 px-4 py-2 border-b border-stone-200 dark:border-stone-800">
+            <header className="shrink-0 flex items-center gap-2 px-4 py-2 border-b border-[var(--edge-soft)]">
               <button onClick={() => close()} className="icon-btn" title="Back to list">
                 <Icon name="arrow_back" size={16} />
               </button>
@@ -194,7 +194,7 @@ export default function PlexiOfficeApp(): JSX.Element {
               <button
                 onClick={() => void collaborate()}
                 data-testid="office-collaborate-btn"
-                className="inline-flex items-center gap-1.5 rounded-lg border border-stone-200 dark:border-stone-700 px-2.5 py-1 text-[12px] hover:border-accent hover:text-accent"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--edge-soft)] px-2.5 py-1 text-[12px] hover:border-accent hover:text-accent"
                 title="Collaborate live on this document"
               >
                 <Icon name="group" size={14} />
@@ -203,7 +203,7 @@ export default function PlexiOfficeApp(): JSX.Element {
               <button
                 onClick={() => setShareTarget({ kind: 'document', doc: active })}
                 data-testid="office-share-btn"
-                className="inline-flex items-center gap-1.5 rounded-lg border border-stone-200 dark:border-stone-700 px-2.5 py-1 text-[12px] hover:border-accent hover:text-accent"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--edge-soft)] px-2.5 py-1 text-[12px] hover:border-accent hover:text-accent"
                 title="Share this document"
               >
                 <Icon name="share" size={14} />
@@ -253,7 +253,7 @@ export default function PlexiOfficeApp(): JSX.Element {
           data-testid="office-settings-modal"
         >
           <div
-            className="w-[480px] max-w-[92vw] max-h-[82vh] overflow-auto rounded-xl border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 shadow-2xl p-4"
+            className="w-[480px] max-w-[92vw] max-h-[82vh] overflow-auto rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-2xl p-4"
             onMouseDown={(e) => e.stopPropagation()}
           >
             <div className="flex items-center gap-2 mb-2">
@@ -263,7 +263,7 @@ export default function PlexiOfficeApp(): JSX.Element {
                 <Icon name="close" size={15} />
               </button>
             </div>
-            <p className="text-[12px] text-stone-500 dark:text-stone-400 mb-3">
+            <p className="text-[12px] text-[var(--ink-50)] mb-3">
               AI features here (slides generation, document rewrites, auto-filing) run on Anthropic. Paste your own key
               from console.anthropic.com to enable them.
             </p>
@@ -274,15 +274,15 @@ export default function PlexiOfficeApp(): JSX.Element {
 
       {/* Footer — version pill (click to check for updates) + the shared updater
           banner, mirroring PlexiDesk so updates are visible here too. */}
-      <footer className="h-7 shrink-0 px-3 flex items-center gap-2 text-[11px] text-stone-500 dark:text-stone-400 border-t border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-900 select-none">
+      <footer className="h-7 shrink-0 px-3 flex items-center gap-2 text-[11px] text-[var(--ink-50)] border-t border-[var(--edge-soft)] bg-[var(--surface-sunken)] select-none">
         <span>PlexiOffice</span>
-        <span className="text-stone-300 dark:text-stone-700">·</span>
+        <span className="text-[var(--ink-30)]">·</span>
         <button
           type="button"
           onClick={() => void window.api.update.check()}
           title="Click to check for updates"
           data-testid="office-version"
-          className="font-mono hover:text-stone-700 dark:hover:text-stone-200 transition-colors"
+          className="font-mono hover:text-[var(--ink-70)] transition-colors"
         >
           v{appVersion}
         </button>

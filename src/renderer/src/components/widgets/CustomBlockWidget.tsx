@@ -188,19 +188,19 @@ export default function CustomBlockWidget({ widget, inline = false }: Props): JS
   }
 
   const content = (
-    <div className="flex flex-col h-full w-full bg-white dark:bg-stone-900">
+    <div className="flex flex-col h-full w-full bg-[var(--surface-raised)]">
       {/* Toolbar */}
       <div
-        className="shrink-0 flex items-center gap-1.5 px-2 py-1 border-b border-stone-200 dark:border-stone-700"
+        className="shrink-0 flex items-center gap-1.5 px-2 py-1 border-b border-[var(--edge-soft)]"
         onMouseDown={(e) => e.stopPropagation()}
       >
         <input
           value={data.title}
           onChange={(e) => setData((d) => ({ ...d, title: e.target.value }))}
-          className="flex-1 min-w-0 bg-transparent text-[13px] font-semibold text-stone-900 dark:text-stone-100 focus:outline-none"
+          className="flex-1 min-w-0 bg-transparent text-[13px] font-semibold text-[var(--ink-100)] focus:outline-none"
           placeholder="Block title"
         />
-        <div className="flex items-center rounded-full bg-stone-100 dark:bg-stone-800 p-0.5 text-[11px]">
+        <div className="flex items-center rounded-full bg-[var(--surface-sunken)] p-0.5 text-[11px]">
           {(['design', 'use'] as const).map((m) => (
             <button
               key={m}
@@ -210,8 +210,8 @@ export default function CustomBlockWidget({ widget, inline = false }: Props): JS
               }}
               className={`px-2 py-0.5 rounded-full capitalize transition-colors ${
                 mode === m
-                  ? 'bg-white dark:bg-stone-700 text-stone-900 dark:text-stone-100 shadow-sm'
-                  : 'text-stone-500'
+                  ? 'bg-[var(--surface-raised)] text-[var(--ink-100)] shadow-sm'
+                  : 'text-[var(--ink-50)]'
               }`}
             >
               {m}
@@ -221,7 +221,7 @@ export default function CustomBlockWidget({ widget, inline = false }: Props): JS
         <div className="relative">
           <button
             onClick={() => setTplMenu((v) => !v)}
-            className="h-6 w-6 inline-flex items-center justify-center rounded text-stone-500 hover:bg-stone-200 dark:hover:bg-stone-700"
+            className="h-6 w-6 inline-flex items-center justify-center rounded text-[var(--ink-50)] hover:bg-[var(--surface-sunken)]"
             title="Templates"
             aria-label="Templates"
           >
@@ -229,7 +229,7 @@ export default function CustomBlockWidget({ widget, inline = false }: Props): JS
           </button>
           {tplMenu && (
             <div
-              className="absolute right-0 top-7 z-20 w-56 rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 shadow-xl py-1 text-[12px]"
+              className="absolute right-0 top-7 z-20 w-56 rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-xl py-1 text-[12px]"
               onMouseDown={(e) => e.stopPropagation()}
             >
               <button
@@ -237,30 +237,30 @@ export default function CustomBlockWidget({ widget, inline = false }: Props): JS
                   doSaveTemplate()
                   setTplMenu(false)
                 }}
-                className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-stone-100 dark:hover:bg-stone-700 text-stone-800 dark:text-stone-200"
+                className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-[var(--surface-sunken)] text-[var(--ink-90)]"
               >
                 <Icon name="bookmark_add" size={14} />
                 Save as template…
               </button>
               {templates.length > 0 && (
-                <div className="my-1 h-px bg-stone-200 dark:bg-stone-700" />
+                <div className="my-1 h-px bg-[var(--surface-sunken)]" />
               )}
               <div className="max-h-48 overflow-y-auto">
                 {templates.map((t) => (
                   <div
                     key={t.id}
-                    className="group/tpl flex items-center px-3 py-1.5 hover:bg-stone-100 dark:hover:bg-stone-700"
+                    className="group/tpl flex items-center px-3 py-1.5 hover:bg-[var(--surface-sunken)]"
                   >
                     <button
                       onClick={() => applyTemplate(t.id)}
-                      className="flex-1 text-left truncate text-stone-800 dark:text-stone-200"
+                      className="flex-1 text-left truncate text-[var(--ink-90)]"
                       title={`Insert "${t.name}"`}
                     >
                       {t.name}
                     </button>
                     <button
                       onClick={() => deleteTemplate(t.id)}
-                      className="opacity-0 group-hover/tpl:opacity-100 group-focus-within/tpl:opacity-100 text-stone-400 hover:text-rose-500"
+                      className="opacity-0 group-hover/tpl:opacity-100 group-focus-within/tpl:opacity-100 text-[var(--ink-40)] hover:text-rose-500"
                       aria-label="Delete template"
                     >
                       <Icon name="delete" size={13} />
@@ -268,7 +268,7 @@ export default function CustomBlockWidget({ widget, inline = false }: Props): JS
                   </div>
                 ))}
                 {templates.length === 0 && (
-                  <div className="px-3 py-2 text-[11px] text-stone-400">No templates yet.</div>
+                  <div className="px-3 py-2 text-[11px] text-[var(--ink-40)]">No templates yet.</div>
                 )}
               </div>
             </div>
@@ -279,14 +279,14 @@ export default function CustomBlockWidget({ widget, inline = false }: Props): JS
       {/* Field palette (design mode) */}
       {mode === 'design' && (
         <div
-          className="shrink-0 flex flex-wrap gap-1 px-2 py-1.5 border-b border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800/40"
+          className="shrink-0 flex flex-wrap gap-1 px-2 py-1.5 border-b border-[var(--edge-soft)] bg-[var(--surface-sunken)]"
           onMouseDown={(e) => e.stopPropagation()}
         >
           {FIELD_TYPES.map((t) => (
             <button
               key={t.type}
               onClick={() => addField(t.type)}
-              className="inline-flex items-center gap-1 px-1.5 py-1 rounded border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 hover:border-accent text-[10px] text-stone-700 dark:text-stone-300"
+              className="inline-flex items-center gap-1 px-1.5 py-1 rounded border border-[var(--edge-soft)] bg-[var(--surface-raised)] hover:border-accent text-[10px] text-[var(--ink-70)]"
               title={`Add ${t.label}`}
             >
               <Icon name={t.icon} size={13} />
@@ -299,7 +299,7 @@ export default function CustomBlockWidget({ widget, inline = false }: Props): JS
       {/* Selected-field config bar (design mode) */}
       {mode === 'design' && sel && (
         <div
-          className="shrink-0 flex items-center gap-1.5 px-2 py-1.5 border-b border-stone-200 dark:border-stone-700 bg-accent/5"
+          className="shrink-0 flex items-center gap-1.5 px-2 py-1.5 border-b border-[var(--edge-soft)] bg-accent/5"
           onMouseDown={(e) => e.stopPropagation()}
         >
           {sel.type !== 'divider' && (
@@ -307,7 +307,7 @@ export default function CustomBlockWidget({ widget, inline = false }: Props): JS
               value={sel.label}
               onChange={(e) => patchField(sel.id, { label: e.target.value })}
               placeholder="Label"
-              className="flex-1 min-w-0 bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded px-2 py-1 text-[12px] focus:outline-none focus:border-accent"
+              className="flex-1 min-w-0 bg-[var(--surface-raised)] border border-[var(--edge-soft)] rounded px-2 py-1 text-[12px] focus:outline-none focus:border-accent"
             />
           )}
           {sel.type === 'select' && (
@@ -317,11 +317,11 @@ export default function CustomBlockWidget({ widget, inline = false }: Props): JS
                 patchField(sel.id, { options: e.target.value.split(',').map((s) => s.trim()).filter(Boolean) })
               }
               placeholder="Option A, Option B"
-              className="flex-1 min-w-0 bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded px-2 py-1 text-[12px] focus:outline-none focus:border-accent"
+              className="flex-1 min-w-0 bg-[var(--surface-raised)] border border-[var(--edge-soft)] rounded px-2 py-1 text-[12px] focus:outline-none focus:border-accent"
             />
           )}
           {sel.type !== 'divider' && sel.type !== 'heading' && (
-            <label className="flex items-center gap-1 text-[11px] text-stone-600 dark:text-stone-400 whitespace-nowrap">
+            <label className="flex items-center gap-1 text-[11px] text-[var(--ink-70)] whitespace-nowrap">
               <input
                 type="checkbox"
                 checked={!!sel.required}
@@ -336,7 +336,7 @@ export default function CustomBlockWidget({ widget, inline = false }: Props): JS
               setFields((fs) => fs.filter((f) => f.id !== sel.id))
               setSelected(null)
             }}
-            className="h-6 w-6 inline-flex items-center justify-center rounded text-stone-500 hover:text-rose-500 hover:bg-rose-500/10"
+            className="h-6 w-6 inline-flex items-center justify-center rounded text-[var(--ink-50)] hover:text-rose-500 hover:bg-rose-500/10"
             title="Delete field"
             aria-label="Delete field"
           >
@@ -355,7 +355,7 @@ export default function CustomBlockWidget({ widget, inline = false }: Props): JS
         onMouseDown={() => mode === 'design' && setSelected(null)}
       >
         {data.fields.length === 0 && (
-          <div className="absolute inset-0 flex items-center justify-center text-[12px] text-stone-400 pointer-events-none">
+          <div className="absolute inset-0 flex items-center justify-center text-[12px] text-[var(--ink-40)] pointer-events-none">
             {mode === 'design'
               ? 'Add fields from the palette, then drag to arrange them.'
               : 'This block has no fields yet.'}
@@ -367,7 +367,7 @@ export default function CustomBlockWidget({ widget, inline = false }: Props): JS
             style={{ position: 'absolute', left: f.x, top: f.y, width: f.w, height: f.h }}
             className={
               mode === 'design'
-                ? `rounded border ${selected === f.id ? 'border-accent ring-1 ring-accent/40' : 'border-stone-200 dark:border-stone-700'} bg-white/70 dark:bg-stone-800/40`
+                ? `rounded border ${selected === f.id ? 'border-accent ring-1 ring-accent/40' : 'border-[var(--edge-soft)]'} bg-[var(--surface-raised)]/70`
                 : ''
             }
             onMouseDown={(e) => {
@@ -384,7 +384,7 @@ export default function CustomBlockWidget({ widget, inline = false }: Props): JS
                 className="absolute -top-0.5 left-0 right-0 h-4 cursor-move flex items-center justify-center"
                 title="Drag to move"
               >
-                <Icon name="drag_indicator" size={12} className="text-stone-400 rotate-90" />
+                <Icon name="drag_indicator" size={12} className="text-[var(--ink-40)] rotate-90" />
               </div>
             )}
             {mode === 'design' && f.type === 'divider' && (
@@ -406,7 +406,7 @@ export default function CustomBlockWidget({ widget, inline = false }: Props): JS
                 className="absolute bottom-0 right-0 h-3 w-3 cursor-nwse-resize"
                 title="Resize"
               >
-                <span className="absolute bottom-0.5 right-0.5 h-1.5 w-1.5 border-r-2 border-b-2 border-stone-400" />
+                <span className="absolute bottom-0.5 right-0.5 h-1.5 w-1.5 border-r-2 border-b-2 border-[var(--edge-firm)]" />
               </div>
             )}
           </div>
@@ -438,24 +438,24 @@ function FieldControl({
   const disabled = mode === 'design'
   const stop = (e: React.SyntheticEvent): void => e.stopPropagation()
   const inputCls =
-    'w-full bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded px-2 py-1 text-[12px] text-stone-900 dark:text-stone-100 focus:outline-none focus:border-accent disabled:bg-stone-50 dark:disabled:bg-stone-800/40'
+    'w-full bg-[var(--surface-raised)] border border-[var(--edge-soft)] rounded px-2 py-1 text-[12px] text-[var(--ink-100)] focus:outline-none focus:border-accent disabled:bg-[var(--surface-sunken)]'
   const labelEl =
     field.type !== 'divider' && field.type !== 'heading' && field.type !== 'checkbox' ? (
-      <div className="text-[10px] uppercase tracking-wide text-stone-500 dark:text-stone-400 mb-0.5 truncate">
+      <div className="text-[10px] uppercase tracking-wide text-[var(--ink-50)] mb-0.5 truncate">
         {field.label}
         {field.required && <span className="text-rose-500"> *</span>}
       </div>
     ) : null
 
   if (field.type === 'heading') {
-    return <div className="text-[15px] font-semibold text-stone-900 dark:text-stone-100 truncate">{field.label}</div>
+    return <div className="text-[15px] font-semibold text-[var(--ink-100)] truncate">{field.label}</div>
   }
   if (field.type === 'divider') {
-    return <div className="h-px w-full bg-stone-300 dark:bg-stone-600 mt-1.5" />
+    return <div className="h-px w-full bg-[var(--surface-sunken)] mt-1.5" />
   }
   if (field.type === 'checkbox') {
     return (
-      <label className="flex items-center gap-2 text-[12px] text-stone-800 dark:text-stone-200">
+      <label className="flex items-center gap-2 text-[12px] text-[var(--ink-90)]">
         <input
           type="checkbox"
           checked={field.value === true}

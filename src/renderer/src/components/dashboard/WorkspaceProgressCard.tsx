@@ -97,8 +97,8 @@ export default function WorkspaceProgressCard({
   const dash = (stats.pct / 100) * C
 
   return (
-    <div className="rounded-xl border border-stone-200 dark:border-stone-700 bg-white/85 dark:bg-stone-900/85 backdrop-blur p-4 fb-glass-soft">
-      <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.12em] text-stone-500 dark:text-stone-400 font-semibold mb-3">
+    <div className="rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-raised)]/85 backdrop-blur p-4 fb-glass-soft">
+      <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.12em] text-[var(--ink-50)] font-semibold mb-3">
         <Icon name="trending_up" size={12} />
         <span>This week</span>
       </div>
@@ -112,7 +112,7 @@ export default function WorkspaceProgressCard({
               fill="none"
               stroke="currentColor"
               strokeWidth={STROKE}
-              className="text-stone-200 dark:text-stone-700"
+              className="text-[var(--ink-30)]"
             />
             <circle
               cx={72}
@@ -134,10 +134,10 @@ export default function WorkspaceProgressCard({
             />
           </svg>
           <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <div className="text-2xl font-semibold text-stone-900 dark:text-stone-100 tabular-nums leading-none">
+            <div className="text-2xl font-semibold text-[var(--ink-100)] tabular-nums leading-none">
               {stats.pct}%
             </div>
-            <div className="text-[9px] uppercase tracking-wider text-stone-500 dark:text-stone-400 mt-1">
+            <div className="text-[9px] uppercase tracking-wider text-[var(--ink-50)] mt-1">
               complete
             </div>
           </div>
@@ -222,26 +222,26 @@ function Stat({
 }): JSX.Element {
   const valueCls =
     tone === 'positive'
-      ? 'text-stone-900 dark:text-stone-100'
+      ? 'text-[var(--ink-100)]'
       : tone === 'warn'
         ? 'text-amber-700 dark:text-amber-400'
-        : 'text-stone-700 dark:text-stone-200'
+        : 'text-[var(--ink-70)]'
   const iconCls =
     tone === 'positive'
       ? 'text-accent'
       : tone === 'warn'
         ? 'text-amber-600 dark:text-amber-400'
-        : 'text-stone-400 dark:text-stone-500'
+        : 'text-[var(--ink-40)]'
   return (
     <div className="min-w-0">
-      <div className="flex items-center gap-1 text-[10px] uppercase tracking-wider text-stone-500 dark:text-stone-400">
+      <div className="flex items-center gap-1 text-[10px] uppercase tracking-wider text-[var(--ink-50)]">
         <Icon name={icon} size={11} className={iconCls} />
         <span className="truncate">{label}</span>
       </div>
       <div className={`text-lg font-semibold tabular-nums leading-tight mt-0.5 ${valueCls}`}>
         {value}
       </div>
-      <div className="text-[10px] text-stone-500 dark:text-stone-400 truncate">{sub}</div>
+      <div className="text-[10px] text-[var(--ink-50)] truncate">{sub}</div>
     </div>
   )
 }

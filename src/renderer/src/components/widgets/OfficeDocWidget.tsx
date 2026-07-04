@@ -85,7 +85,7 @@ export default function OfficeDocWidget({ widget, inline = false }: Props): JSX.
     body = <div className="h-full w-full flex items-center justify-center text-[11px] text-red-500">{error}</div>
   } else if (!doc) {
     body = (
-      <div className="h-full w-full flex items-center justify-center text-[11px] text-stone-500">
+      <div className="h-full w-full flex items-center justify-center text-[11px] text-[var(--ink-50)]">
         Loading {meta.label.toLowerCase()}…
       </div>
     )
@@ -104,7 +104,7 @@ export default function OfficeDocWidget({ widget, inline = false }: Props): JSX.
   // not hijack them when the document widget is focused.
   const wrapped = (
     <div
-      className="h-full w-full overflow-auto bg-white dark:bg-stone-900"
+      className="h-full w-full overflow-auto bg-[var(--surface-raised)]"
       onContextMenu={(e) => e.stopPropagation()}
     >
       {body}

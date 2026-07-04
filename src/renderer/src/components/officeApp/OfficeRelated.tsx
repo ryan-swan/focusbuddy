@@ -43,7 +43,7 @@ export default function OfficeRelated({ docId }: { docId: string }): JSX.Element
       <button
         onClick={() => void toggle()}
         data-testid="office-related-btn"
-        className="inline-flex items-center gap-1.5 rounded-lg border border-stone-200 dark:border-stone-700 px-2.5 py-1 text-[12px] hover:border-accent hover:text-accent"
+        className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--edge-soft)] px-2.5 py-1 text-[12px] hover:border-accent hover:text-accent"
         title="Documents related to this one"
       >
         <Icon name="hub" size={14} />
@@ -53,13 +53,13 @@ export default function OfficeRelated({ docId }: { docId: string }): JSX.Element
         <>
           <div className="fixed inset-0 z-40" onClick={() => setPanel(false)} />
           <div
-            className="absolute right-0 mt-1 w-80 max-h-[60vh] overflow-auto z-50 rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 shadow-xl p-1"
+            className="absolute right-0 mt-1 w-80 max-h-[60vh] overflow-auto z-50 rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-xl p-1"
             data-testid="office-related-panel"
           >
             {busy ? (
-              <div className="px-3 py-2 text-[12px] text-stone-400">Finding related…</div>
+              <div className="px-3 py-2 text-[12px] text-[var(--ink-40)]">Finding related…</div>
             ) : !items || items.length === 0 ? (
-              <div className="px-3 py-2 text-[12px] text-stone-400">No related documents found.</div>
+              <div className="px-3 py-2 text-[12px] text-[var(--ink-40)]">No related documents found.</div>
             ) : (
               items.map((r) => (
                 <button
@@ -69,12 +69,12 @@ export default function OfficeRelated({ docId }: { docId: string }): JSX.Element
                     setPanel(false)
                   }}
                   data-testid={`office-related-item-${r.title}`}
-                  className="w-full flex items-start gap-2 text-left rounded-md px-2.5 py-1.5 hover:bg-stone-100 dark:hover:bg-stone-800"
+                  className="w-full flex items-start gap-2 text-left rounded-md px-2.5 py-1.5 hover:bg-[var(--surface-sunken)]"
                 >
                   <Icon name={docIcon(r.docType)} size={14} className="text-accent shrink-0 mt-0.5" />
                   <span className="min-w-0">
-                    <span className="block text-[12.5px] font-medium text-stone-800 dark:text-stone-100 truncate">{r.title}</span>
-                    {r.snippet && <span className="block text-[11px] text-stone-500 dark:text-stone-400 line-clamp-2">{r.snippet}</span>}
+                    <span className="block text-[12.5px] font-medium text-[var(--ink-90)] truncate">{r.title}</span>
+                    {r.snippet && <span className="block text-[11px] text-[var(--ink-50)] line-clamp-2">{r.snippet}</span>}
                   </span>
                 </button>
               ))

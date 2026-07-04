@@ -100,11 +100,11 @@ export default function OfficeDocAddDialog({ docType, onPicked, onClose }: Props
     <div className="fixed inset-0 z-[300] bg-black/40 flex items-center justify-center" onMouseDown={onClose}>
       <div
         data-testid="office-add-dialog"
-        className="w-[440px] max-w-[92vw] rounded-xl border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 shadow-2xl p-4"
+        className="w-[440px] max-w-[92vw] rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-2xl p-4"
         onMouseDown={(e) => e.stopPropagation()}
       >
         <div className="flex items-center gap-2 mb-3">
-          <span className="text-[14px] font-semibold text-stone-800 dark:text-stone-100">Add {meta.label.toLowerCase()}</span>
+          <span className="text-[14px] font-semibold text-[var(--ink-90)]">Add {meta.label.toLowerCase()}</span>
           <button onClick={onClose} className="ml-auto icon-btn" aria-label="Close">
             <Icon name="close" size={15} />
           </button>
@@ -117,42 +117,42 @@ export default function OfficeDocAddDialog({ docType, onPicked, onClose }: Props
             onClick={() => void createNew()}
             disabled={!!busy}
             data-testid="office-add-new"
-            className="flex flex-col items-start gap-1 rounded-lg border border-stone-200 dark:border-stone-700 p-3 hover:border-accent hover:bg-accent/[0.04] disabled:opacity-50 text-left"
+            className="flex flex-col items-start gap-1 rounded-lg border border-[var(--edge-soft)] p-3 hover:border-accent hover:bg-accent/[0.04] disabled:opacity-50 text-left"
           >
             <Icon name="add" size={18} className="text-accent" />
-            <span className="text-[13px] font-medium text-stone-800 dark:text-stone-100">Create new</span>
-            <span className="text-[11px] text-stone-500 dark:text-stone-400">Start blank with our editor</span>
+            <span className="text-[13px] font-medium text-[var(--ink-90)]">Create new</span>
+            <span className="text-[11px] text-[var(--ink-50)]">Start blank with our editor</span>
           </button>
           {meta.importLabel && (
           <button
             onClick={() => void importFile()}
             disabled={!!busy}
             data-testid="office-add-import"
-            className="flex flex-col items-start gap-1 rounded-lg border border-stone-200 dark:border-stone-700 p-3 hover:border-accent hover:bg-accent/[0.04] disabled:opacity-50 text-left"
+            className="flex flex-col items-start gap-1 rounded-lg border border-[var(--edge-soft)] p-3 hover:border-accent hover:bg-accent/[0.04] disabled:opacity-50 text-left"
           >
             <Icon name="upload_file" size={18} className="text-accent" />
-            <span className="text-[13px] font-medium text-stone-800 dark:text-stone-100">Import a file</span>
-            <span className="text-[11px] text-stone-500 dark:text-stone-400">{meta.importLabel}, formatting kept</span>
+            <span className="text-[13px] font-medium text-[var(--ink-90)]">Import a file</span>
+            <span className="text-[11px] text-[var(--ink-50)]">{meta.importLabel}, formatting kept</span>
           </button>
           )}
         </div>
 
         <div className="mt-3">
-          <div className="text-[11px] uppercase tracking-wide text-stone-400 mb-1">Place an existing one</div>
+          <div className="text-[11px] uppercase tracking-wide text-[var(--ink-40)] mb-1">Place an existing one</div>
           {existing !== null && existing.length > 0 && (
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder={`Search ${meta.label.toLowerCase()}s…`}
               data-testid="office-add-search"
-              className="w-full mb-1.5 bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded px-2 py-1 text-[12px] focus:outline-none focus:border-accent"
+              className="w-full mb-1.5 bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded px-2 py-1 text-[12px] focus:outline-none focus:border-accent"
             />
           )}
-          <div className="max-h-48 overflow-auto rounded-lg border border-stone-200 dark:border-stone-700 divide-y divide-stone-100 dark:divide-stone-800">
+          <div className="max-h-48 overflow-auto rounded-lg border border-[var(--edge-soft)] divide-y divide-[var(--edge-soft)]">
             {filtered === null ? (
-              <div className="px-3 py-2 text-[12px] text-stone-400">Loading…</div>
+              <div className="px-3 py-2 text-[12px] text-[var(--ink-40)]">Loading…</div>
             ) : filtered.length === 0 ? (
-              <div className="px-3 py-2 text-[12px] text-stone-400">
+              <div className="px-3 py-2 text-[12px] text-[var(--ink-40)]">
                 {existing && existing.length > 0 ? 'No matches.' : `No ${meta.label.toLowerCase()}s yet.`}
               </div>
             ) : (
@@ -161,17 +161,17 @@ export default function OfficeDocAddDialog({ docType, onPicked, onClose }: Props
                   key={d.id}
                   onClick={() => onPicked(d.id)}
                   disabled={!!busy}
-                  className="w-full flex items-center gap-2 px-3 py-1.5 text-left hover:bg-stone-100 dark:hover:bg-stone-800 disabled:opacity-50"
+                  className="w-full flex items-center gap-2 px-3 py-1.5 text-left hover:bg-[var(--surface-sunken)] disabled:opacity-50"
                 >
-                  <Icon name="description" size={14} className="text-stone-400" />
-                  <span className="text-[12.5px] text-stone-700 dark:text-stone-200 truncate">{d.title || 'Untitled'}</span>
+                  <Icon name="description" size={14} className="text-[var(--ink-40)]" />
+                  <span className="text-[12.5px] text-[var(--ink-70)] truncate">{d.title || 'Untitled'}</span>
                 </button>
               ))
             )}
           </div>
         </div>
 
-        {busy && <div className="mt-2 text-[12px] text-stone-500 dark:text-stone-400">{busy}</div>}
+        {busy && <div className="mt-2 text-[12px] text-[var(--ink-50)]">{busy}</div>}
       </div>
     </div>
   )

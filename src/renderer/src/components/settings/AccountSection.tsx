@@ -35,8 +35,8 @@ export default function AccountSection(): JSX.Element {
     effectiveTier === 'team' ? 'Team' : effectiveTier === 'pro' ? 'Pro' : 'Free'
 
   return (
-    <div className="px-3 py-3 border-t border-stone-200 dark:border-stone-700 space-y-3">
-      <div className="text-[11px] uppercase tracking-[0.12em] text-stone-500 dark:text-stone-400 font-medium">
+    <div className="px-3 py-3 border-t border-[var(--edge-soft)] space-y-3">
+      <div className="text-[11px] uppercase tracking-[0.12em] text-[var(--ink-50)] font-medium">
         Account
       </div>
 
@@ -48,14 +48,14 @@ export default function AccountSection(): JSX.Element {
             </div>
             <div className="min-w-0 flex-1">
               <div
-                className="text-[12px] font-medium text-stone-900 dark:text-stone-100 truncate"
+                className="text-[12px] font-medium text-[var(--ink-100)] truncate"
                 data-testid="account-identity"
               >
                 {account.handle || account.email}
               </div>
-              <div className="text-[10px] text-stone-500 dark:text-stone-400 truncate">
+              <div className="text-[10px] text-[var(--ink-50)] truncate">
                 {account.email}
-                <span className="mx-1.5 text-stone-400 dark:text-stone-600">·</span>
+                <span className="mx-1.5 text-[var(--ink-40)]">·</span>
                 <span data-testid="account-plan">{planLabel} plan</span>
               </div>
             </div>
@@ -63,13 +63,13 @@ export default function AccountSection(): JSX.Element {
               onClick={() => void handleSignOut()}
               disabled={busy}
               data-testid="account-signout"
-              className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-[11px] border border-stone-200 dark:border-stone-700 text-stone-600 dark:text-stone-300 hover:border-accent hover:text-accent transition-colors disabled:opacity-50"
+              className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-[11px] border border-[var(--edge-soft)] text-[var(--ink-70)] hover:border-accent hover:text-accent transition-colors disabled:opacity-50"
             >
               <Icon name="logout" size={13} />
               {busy ? 'Signing out…' : 'Sign out'}
             </button>
           </div>
-          <p className="text-[10px] text-stone-500 dark:text-stone-400 leading-relaxed">
+          <p className="text-[10px] text-[var(--ink-50)] leading-relaxed">
             Your local data stays on this device. Signing out keeps it; it only
             disconnects shared-item sync and your plan until you sign back in.
           </p>
@@ -77,7 +77,7 @@ export default function AccountSection(): JSX.Element {
         </div>
       ) : (
         <div className="space-y-2.5">
-          <p className="text-[11px] text-stone-600 dark:text-stone-300 leading-relaxed">
+          <p className="text-[11px] text-[var(--ink-70)] leading-relaxed">
             You are using PlexiDesk locally without an account. Sign in to sync
             shared folders and tasks across devices and to apply your plan.
           </p>
