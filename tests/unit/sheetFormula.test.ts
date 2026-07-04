@@ -708,3 +708,60 @@ describe('formula engine — expanded library (TEXT, IS*, ref-shape, CHOOSE, fin
     expect(evaluateFormula(grid([['x']]), 'NPV(0.1,100,100,100)') as number).toBeCloseTo(248.685, 2)
   })
 })
+
+describe('LET — name bindings', () => {
+  it('binds a name and uses it in the calculation', () => {
+    const g = grid([['=LET(x, 5, x*2)']])
+    expect(displayCell(g, 0, 0)).toBe('10')
+  })
+
+  it('binds multiple names, each seeing the earlier ones', () => {
+    const g = grid([['=LET(a, 3, b, a+1, a*b)']])
+    expect(displayCell(g, 0, 0)).toBe('12') // a=3, b=4 -> 12
+  })
+
+  it('a later binding shadows an earlier one within the same LET body', () => {
+    const g = grid([['=LET(x, 2, y, x*10, x, 99, x+y)']])
+    // x=2, y=20, then x rebound to 99 -> 99+20 = 119
+    expect(displayCell(g, 0, 0)).toBe('119')
+  })
+
+  it('binds a value computed from a cell reference', () => {
+    const g = grid([['4', '=LET(w, A1, w*w)']])
+    expect(displayCell(g, 0, 1)).toBe('16')
+  })
+
+  it('nests LET with inner shadowing that does not leak out', () => {
+    const g = grid([['=LET(x, 1, LET(x, 5, x) + x)']])
+    // inner x=5 for the inner body; outer x=1 for the trailing + x -> 6
+    expect(displayCell(g, 0, 0)).toBe('6')
+  })
+
+  it('supports names inside functions and ranges', () => {
+    const g = grid([
+      ['1', '2', '3'],
+      ['=LET(total, SUM(A1:C1), avg, total/3, avg)', '', '']
+    ])
+    expect(displayCell(g, 1, 0)).toBe('2') // total=6, avg=2
+  })
+
+  it('an unbound name is a #NAME? error', () => {
+    const g = grid([['=LET(x, 1, y)']])
+    expect(displayCell(g, 0, 0)).toBe('#NAME?')
+  })
+
+  it('rejects a wrong argument count with #VALUE!', () => {
+    const g = grid([['=LET(x, 1)']]) // no calculation
+    expect(displayCell(g, 0, 0)).toBe('#VALUE!')
+  })
+
+  it('round-trips through the serializer (fill rewrite preserves LET names)', () => {
+    // =LET(v, A1, v+B1) filled one row down shifts the refs but not the name.
+    expect(rewriteFormulaRefs('=LET(v, A1, v+B1)', 1, 0)).toBe('=LET(v, A2, v+B2)')
+  })
+
+  it('a bare unknown identifier outside LET is #NAME?', () => {
+    const g = grid([['=foobar+1']])
+    expect(displayCell(g, 0, 0)).toBe('#NAME?')
+  })
+})
