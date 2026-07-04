@@ -455,6 +455,16 @@ function MapInner({ body, title, onChange, foldExternal = false }: Props): JSX.E
     window.setTimeout(() => rf.fitView({ padding: 0.2, duration: 300 }), 50)
   }
 
+  // Re-run the layered auto-layout on the current graph (the engine that lays out
+  // AI-generated maps), then fit the result. Gives a one-click tidy-up.
+  function arrangeMap(): void {
+    const body = fromFlow(nodes, edges, viewportRef.current)
+    const laid = autoLayout(body.nodes, body.edges)
+    const posById = new Map(laid.map((n) => [n.id, { x: n.x, y: n.y }]))
+    setNodes((ns) => ns.map((n) => (posById.has(n.id) ? { ...n, position: posById.get(n.id)! } : n)))
+    window.setTimeout(() => rf.fitView({ padding: 0.2, duration: 300 }), 60)
+  }
+
   async function exportMapAs(format: 'svg' | 'png' | 'jpg' | 'pdf'): Promise<void> {
     const map = fromFlow(nodes, edges, viewportRef.current)
     setExportStatus(`Exporting ${format.toUpperCase()}…`)
@@ -529,6 +539,15 @@ function MapInner({ body, title, onChange, foldExternal = false }: Props): JSX.E
           AI map
         </button>
         <div className="flex-1" />
+        <button
+          onClick={arrangeMap}
+          data-testid="map-arrange"
+          className="inline-flex items-center gap-1 text-[11px] px-1.5 py-1 rounded text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]"
+          title="Auto-arrange the diagram into a clean layered layout"
+        >
+          <Icon name="account_tree" size={14} />
+          Arrange
+        </button>
         <ExportMenu onExport={exportMapAs} />
         <button
           onClick={() => rf.fitView({ padding: 0.2, duration: 300 })}
