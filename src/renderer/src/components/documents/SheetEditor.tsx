@@ -287,21 +287,35 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
   // Rows hidden by the active column filters (by displayed value). null when no
   // filter is set, so the common path does no work. r stays the true data index.
   const hiddenRows = useMemo(() => {
-    const filters = tab.filters
-    if (!filters) return null
-    const cols = Object.keys(filters)
-      .map(Number)
-      .filter((c) => filters[c]?.length)
-    if (!cols.length) return null
-    const grid = { columns: tab.columns, rows: tab.rows }
     const set = new Set<number>()
-    for (let r = 0; r < tab.rows.length; r++) {
-      const rowValues: Record<number, string> = {}
-      for (const c of cols) rowValues[c] = displayCell(grid, r, c, workbook)
-      if (isRowHidden(rowValues, filters)) set.add(r)
+    // Collapsed outline groups hide their members below the first row.
+    for (const g of tab.rowGroups ?? []) {
+      if (g.collapsed) for (let r = g.start + 1; r <= g.end; r++) set.add(r)
     }
-    return set
+    const filters = tab.filters
+    const cols = filters
+      ? Object.keys(filters)
+          .map(Number)
+          .filter((c) => filters[c]?.length)
+      : []
+    if (cols.length && filters) {
+      const grid = { columns: tab.columns, rows: tab.rows }
+      for (let r = 0; r < tab.rows.length; r++) {
+        const rowValues: Record<number, string> = {}
+        for (const c of cols) rowValues[c] = displayCell(grid, r, c, workbook)
+        if (isRowHidden(rowValues, filters)) set.add(r)
+      }
+    }
+    return set.size ? set : null
   }, [tab, workbook])
+  // Columns hidden by a collapsed outline group (members right of the first).
+  const hiddenCols = useMemo(() => {
+    const set = new Set<number>()
+    for (const g of tab.colGroups ?? []) {
+      if (g.collapsed) for (let c = g.start + 1; c <= g.end; c++) set.add(c)
+    }
+    return set.size ? set : null
+  }, [tab.colGroups])
 
   // ── Commit helpers ────────────────────────────────────────────────────────
   const commit = useCallback(
@@ -1087,6 +1101,42 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
     mutateTab((t) => setColWidth(t, c, w))
   }
 
+  // ── Outline groups (Data > Group) ──────────────────────────────────────────
+  function groupRows(): void {
+    if (selection.r0 === selection.r1) return // a group needs at least two rows
+    mutateTab((t) => ({
+      ...t,
+      rowGroups: [...(t.rowGroups ?? []), { start: selection.r0, end: selection.r1, collapsed: false }]
+    }))
+  }
+  function ungroupRows(r: number): void {
+    mutateTab((t) => ({ ...t, rowGroups: (t.rowGroups ?? []).filter((g) => !(r >= g.start && r <= g.end)) }))
+  }
+  function toggleRowGroup(index: number): void {
+    mutateTab((t) => ({
+      ...t,
+      rowGroups: (t.rowGroups ?? []).map((g, i) => (i === index ? { ...g, collapsed: !g.collapsed } : g))
+    }))
+  }
+  function groupCols(): void {
+    if (selection.c0 === selection.c1) return
+    mutateTab((t) => ({
+      ...t,
+      colGroups: [...(t.colGroups ?? []), { start: selection.c0, end: selection.c1, collapsed: false }]
+    }))
+  }
+  function ungroupCols(c: number): void {
+    mutateTab((t) => ({ ...t, colGroups: (t.colGroups ?? []).filter((g) => !(c >= g.start && c <= g.end)) }))
+  }
+  function toggleColGroup(index: number): void {
+    mutateTab((t) => ({
+      ...t,
+      colGroups: (t.colGroups ?? []).map((g, i) => (i === index ? { ...g, collapsed: !g.collapsed } : g))
+    }))
+  }
+  const rowInGroup = (r: number): boolean => (tab.rowGroups ?? []).some((g) => r >= g.start && r <= g.end)
+  const colInGroup = (c: number): boolean => (tab.colGroups ?? []).some((g) => c >= g.start && c <= g.end)
+
   // ── Office import / export ────────────────────────────────────────────────
   async function importFile(): Promise<void> {
     setStatus('Importing…')
@@ -1478,6 +1528,11 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
             workbook={workbook}
             names={names}
             hiddenRows={hiddenRows}
+            hiddenCols={hiddenCols}
+            rowGroups={tab.rowGroups}
+            colGroups={tab.colGroups}
+            onToggleRowGroup={toggleRowGroup}
+            onToggleColGroup={toggleColGroup}
             filterActive={tab.filterActive}
             filters={tab.filters}
             onSetColumnFilter={(c, hidden) =>
@@ -1517,6 +1572,10 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
             freezeActive={(tab.freeze?.cols ?? 0) > 0}
             onFreeze={() => { mutateTab((t) => ({ ...t, freeze: { rows: t.freeze?.rows ?? 0, cols: colMenu.c + 1 } })); setColMenu(null) }}
             onUnfreeze={() => { mutateTab((t) => ({ ...t, freeze: { rows: t.freeze?.rows ?? 0, cols: 0 } })); setColMenu(null) }}
+            canGroup={selection.c1 > selection.c0}
+            grouped={colInGroup(colMenu.c)}
+            onGroup={() => { groupCols(); setColMenu(null) }}
+            onUngroup={() => { ungroupCols(colMenu.c); setColMenu(null) }}
             onClose={() => setColMenu(null)}
           />
         )}
@@ -1532,6 +1591,10 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
             freezeActive={(tab.freeze?.rows ?? 0) > 0}
             onFreeze={() => { mutateTab((t) => ({ ...t, freeze: { cols: t.freeze?.cols ?? 0, rows: rowMenu.r + 1 } })); setRowMenu(null) }}
             onUnfreeze={() => { mutateTab((t) => ({ ...t, freeze: { cols: t.freeze?.cols ?? 0, rows: 0 } })); setRowMenu(null) }}
+            canGroup={selection.r1 > selection.r0}
+            grouped={rowInGroup(rowMenu.r)}
+            onGroup={() => { groupRows(); setRowMenu(null) }}
+            onUngroup={() => { ungroupRows(rowMenu.r); setRowMenu(null) }}
             onClose={() => setRowMenu(null)}
           />
         )}
@@ -1615,6 +1678,10 @@ function ColumnHeaderMenu({
   freezeActive,
   onFreeze,
   onUnfreeze,
+  canGroup,
+  grouped,
+  onGroup,
+  onUngroup,
   onClose
 }: {
   x: number
@@ -1626,6 +1693,10 @@ function ColumnHeaderMenu({
   freezeActive: boolean
   onFreeze: () => void
   onUnfreeze: () => void
+  canGroup: boolean
+  grouped: boolean
+  onGroup: () => void
+  onUngroup: () => void
   onClose: () => void
 }): JSX.Element {
   const ref = useRef<HTMLDivElement | null>(null)
@@ -1644,7 +1715,7 @@ function ColumnHeaderMenu({
     }
   }, [onClose])
   const left = Math.min(x, window.innerWidth - 210)
-  const top = Math.min(y, window.innerHeight - 140)
+  const top = Math.min(y, window.innerHeight - 220)
   const item =
     'w-full flex items-center gap-2 px-3 py-1.5 text-[12px] hover:bg-[var(--surface-sunken)] text-left'
   return (
@@ -1667,6 +1738,16 @@ function ColumnHeaderMenu({
       {freezeActive && (
         <button className={item} onClick={onUnfreeze}>
           <Icon name="close" size={13} className="text-[var(--ink-40)]" /> Unfreeze columns
+        </button>
+      )}
+      <div className="my-1 border-t border-[var(--edge-soft)]" />
+      {grouped ? (
+        <button className={item} onClick={onUngroup}>
+          <Icon name="unfold_more" size={13} className="text-[var(--ink-40)]" /> Ungroup columns
+        </button>
+      ) : (
+        <button className={item + ' disabled:opacity-40'} onClick={onGroup} disabled={!canGroup}>
+          <Icon name="unfold_less" size={13} className="text-[var(--ink-40)]" /> Group selected columns
         </button>
       )}
       <div className="my-1 border-t border-[var(--edge-soft)]" />
@@ -1693,6 +1774,10 @@ function RowHeaderMenu({
   freezeActive,
   onFreeze,
   onUnfreeze,
+  canGroup,
+  grouped,
+  onGroup,
+  onUngroup,
   onClose
 }: {
   x: number
@@ -1704,6 +1789,10 @@ function RowHeaderMenu({
   freezeActive: boolean
   onFreeze: () => void
   onUnfreeze: () => void
+  canGroup: boolean
+  grouped: boolean
+  onGroup: () => void
+  onUngroup: () => void
   onClose: () => void
 }): JSX.Element {
   const ref = useRef<HTMLDivElement | null>(null)
@@ -1722,7 +1811,7 @@ function RowHeaderMenu({
     }
   }, [onClose])
   const left = Math.min(x, window.innerWidth - 210)
-  const top = Math.min(y, window.innerHeight - 140)
+  const top = Math.min(y, window.innerHeight - 220)
   const item =
     'w-full flex items-center gap-2 px-3 py-1.5 text-[12px] hover:bg-[var(--surface-sunken)] text-left'
   return (
@@ -1745,6 +1834,16 @@ function RowHeaderMenu({
       {freezeActive && (
         <button className={item} onClick={onUnfreeze}>
           <Icon name="close" size={13} className="text-[var(--ink-40)]" /> Unfreeze rows
+        </button>
+      )}
+      <div className="my-1 border-t border-[var(--edge-soft)]" />
+      {grouped ? (
+        <button className={item} onClick={onUngroup}>
+          <Icon name="unfold_more" size={13} className="text-[var(--ink-40)]" /> Ungroup rows
+        </button>
+      ) : (
+        <button className={item + ' disabled:opacity-40'} onClick={onGroup} disabled={!canGroup}>
+          <Icon name="unfold_less" size={13} className="text-[var(--ink-40)]" /> Group selected rows
         </button>
       )}
       <div className="my-1 border-t border-[var(--edge-soft)]" />

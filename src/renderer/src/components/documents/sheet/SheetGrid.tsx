@@ -74,9 +74,16 @@ interface Props {
   // Column filters: rows to hide, whether funnels show, the current per-column
   // hide-sets, and a setter. SheetGrid owns the funnel dropdown UI.
   hiddenRows?: Set<number> | null
+  hiddenCols?: Set<number> | null
   filterActive?: boolean
   filters?: Record<number, string[]>
   onSetColumnFilter?: (c: number, hidden: string[]) => void
+  // Outline groups: a collapse/expand chevron shows on each group's first
+  // row/column header; toggling hides or reveals the members.
+  rowGroups?: Array<{ start: number; end: number; collapsed: boolean }>
+  colGroups?: Array<{ start: number; end: number; collapsed: boolean }>
+  onToggleRowGroup?: (groupIndex: number) => void
+  onToggleColGroup?: (groupIndex: number) => void
 }
 
 const ROW_HEADER_W = 44
@@ -119,6 +126,10 @@ export default function SheetGrid(props: Props): JSX.Element {
     for (let i = 0; i < r; i++) y += props.rowHeightOf?.(i) ?? DEFAULT_ROW_PX
     return y
   }
+  // The outline-group (if any) that starts on a given row/column, so its header
+  // can carry the collapse/expand chevron. -1 when none starts there.
+  const rowGroupAt = (r: number): number => (props.rowGroups ?? []).findIndex((g) => g.start === r)
+  const colGroupAt = (c: number): number => (props.colGroups ?? []).findIndex((g) => g.start === c)
   // Spill map for array formulas (SEQUENCE/UNIQUE/SORT/FILTER/TRANSPOSE), built
   // once per data change rather than per cell. Drives both the anchor's value and
   // the cells the result spills into.
@@ -144,9 +155,9 @@ export default function SheetGrid(props: Props): JSX.Element {
       <table className="border-collapse text-[13px]" style={{ tableLayout: 'fixed' }}>
         <colgroup>
           <col style={{ width: ROW_HEADER_W }} />
-          {tab.columns.map((_, c) => (
-            <col key={c} style={{ width: props.colWidthOf(c) }} />
-          ))}
+          {tab.columns.map((_, c) =>
+            props.hiddenCols?.has(c) ? null : <col key={c} style={{ width: props.colWidthOf(c) }} />
+          )}
         </colgroup>
         <thead>
           <tr className="sticky top-0 z-20" style={{ height: HEADER_H }}>
@@ -159,7 +170,10 @@ export default function SheetGrid(props: Props): JSX.Element {
               }}
               className="sticky left-0 z-30 bg-[var(--surface-sunken)]/80 border-b border-[var(--edge-firm)] border-r border-[var(--edge-soft)] cursor-pointer hover:bg-accent/10 transition-colors"
             />
-            {tab.columns.map((col, c) => (
+            {tab.columns.map((col, c) => {
+              if (props.hiddenCols?.has(c)) return null
+              const cGroup = colGroupAt(c)
+              return (
               <th
                 key={c}
                 data-testid={`col-header-${c}`}
@@ -175,6 +189,20 @@ export default function SheetGrid(props: Props): JSX.Element {
                 } ${props.reorderOver?.kind === 'col' && props.reorderOver.over === c ? 'shadow-[inset_2px_0_0_0_var(--accent)]' : ''}`}
               >
                 <div className="flex items-center">
+                  {cGroup >= 0 && (
+                    <button
+                      data-testid={`col-group-toggle-${c}`}
+                      title={props.colGroups?.[cGroup]?.collapsed ? 'Expand group' : 'Collapse group'}
+                      onMouseDown={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        props.onToggleColGroup?.(cGroup)
+                      }}
+                      className="pl-0.5 text-[9px] text-[var(--ink-40)] hover:text-accent leading-none"
+                    >
+                      {props.colGroups?.[cGroup]?.collapsed ? '▸' : '▾'}
+                    </button>
+                  )}
                   <span
                     data-testid={`col-select-${c}`}
                     title="Click to select column · drag to select several"
@@ -238,7 +266,8 @@ export default function SheetGrid(props: Props): JSX.Element {
                   />
                 )}
               </th>
-            ))}
+              )
+            })}
           </tr>
         </thead>
         <tbody>
@@ -267,6 +296,20 @@ export default function SheetGrid(props: Props): JSX.Element {
                   props.reorderOver?.kind === 'row' && props.reorderOver.over === r ? 'shadow-[inset_0_2px_0_0_var(--accent)]' : ''
                 }`}
               >
+                {rowGroupAt(r) >= 0 && (
+                  <button
+                    data-testid={`row-group-toggle-${r}`}
+                    title={props.rowGroups?.[rowGroupAt(r)]?.collapsed ? 'Expand group' : 'Collapse group'}
+                    onMouseDown={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      props.onToggleRowGroup?.(rowGroupAt(r))
+                    }}
+                    className="absolute left-0.5 top-0 text-[9px] text-[var(--ink-40)] hover:text-accent leading-none"
+                  >
+                    {props.rowGroups?.[rowGroupAt(r)]?.collapsed ? '▸' : '▾'}
+                  </button>
+                )}
                 {r + 1}
                 {/* Drag the bottom edge to resize the row height. */}
                 {props.onRowResizeStart && (
@@ -281,6 +324,7 @@ export default function SheetGrid(props: Props): JSX.Element {
                 )}
               </td>
               {tab.columns.map((_, c) => {
+                if (props.hiddenCols?.has(c)) return null
                 const isActive = active?.r === r && active?.c === c
                 const isEditing = editing?.r === r && editing?.c === c
                 const selected = inRange(selection, r, c)

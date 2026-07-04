@@ -1461,6 +1461,10 @@ export interface SheetTab {
   // data is untouched; only which rows render changes.
   filters?: Record<number, string[]>
   filterActive?: boolean // funnels shown on the headers (Data > Create a filter)
+  // Outline groups (Data > Group). A collapsed group hides its member rows/cols
+  // below/right of the first, which carries the expand/collapse toggle.
+  rowGroups?: Array<{ start: number; end: number; collapsed: boolean }>
+  colGroups?: Array<{ start: number; end: number; collapsed: boolean }>
 }
 
 export interface SheetBodyV2 {
