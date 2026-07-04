@@ -42,6 +42,15 @@ interface Props {
   // a cell click keeps the input focused rather than blurring + committing).
   editInputRef?: React.MutableRefObject<HTMLInputElement | null>
   formulaRefMode?: boolean
+  // Excel-style header selection. Clicking the top-left corner selects the whole
+  // grid; clicking a column letter or a row number selects that column/row, and
+  // dragging across headers (or shift-clicking) extends the selection.
+  onSelectAll?: () => void
+  onColHeaderMouseDown?: (c: number, shift: boolean) => void
+  onColHeaderMouseEnter?: (c: number) => void
+  onRowHeaderMouseDown?: (r: number, shift: boolean) => void
+  onRowHeaderMouseEnter?: (r: number) => void
+  onRowHeaderContextMenu?: (r: number, x: number, y: number) => void
   // The fill handle: a live preview rectangle while dragging it, a start hook
   // (mousedown on the handle), and a fill-to-end hook (double-click the handle).
   fillPreview?: CellRange | null
@@ -71,6 +80,14 @@ function inRange(range: CellRange | null, r: number, c: number): boolean {
 export default function SheetGrid(props: Props): JSX.Element {
   const { tab, selection, active, editing } = props
   const grid: Grid = { columns: tab.columns, rows: tab.rows }
+  const maxR = tab.rows.length - 1
+  const maxC = tab.columns.length - 1
+  // A column/row header reads as "selected" (tinted) when the selection spans the
+  // full height/width over it, matching Excel's highlighted headers.
+  const colFullySelected = (c: number): boolean =>
+    !!selection && selection.r0 === 0 && selection.r1 === maxR && c >= selection.c0 && c <= selection.c1
+  const rowFullySelected = (r: number): boolean =>
+    !!selection && selection.c0 === 0 && selection.c1 === maxC && r >= selection.r0 && r <= selection.r1
   // Spill map for array formulas (SEQUENCE/UNIQUE/SORT/FILTER/TRANSPOSE), built
   // once per data change rather than per cell. Drives both the anchor's value and
   // the cells the result spills into.
@@ -101,7 +118,15 @@ export default function SheetGrid(props: Props): JSX.Element {
         </colgroup>
         <thead>
           <tr className={freezeHeader ? 'sticky top-0 z-20' : ''}>
-            <th className="sticky left-0 z-30 bg-[var(--surface-sunken)] border-b border-r border-[var(--edge-soft)]" />
+            <th
+              data-testid="sheet-select-all"
+              title="Select all cells"
+              onMouseDown={(e) => {
+                e.preventDefault()
+                props.onSelectAll?.()
+              }}
+              className="sticky left-0 z-30 bg-[var(--surface-sunken)] border-b border-r border-[var(--edge-soft)] cursor-pointer hover:bg-accent/10"
+            />
             {tab.columns.map((col, c) => (
               <th
                 key={c}
@@ -110,10 +135,23 @@ export default function SheetGrid(props: Props): JSX.Element {
                   e.preventDefault()
                   props.onHeaderContextMenu(c, e.clientX, e.clientY)
                 }}
-                className="relative border-b border-r border-[var(--edge-soft)] bg-[var(--surface-sunken)] p-0"
+                className={`relative border-b border-r border-[var(--edge-soft)] p-0 ${
+                  colFullySelected(c) ? 'bg-accent/20' : 'bg-[var(--surface-sunken)]'
+                }`}
               >
                 <div className="flex items-center">
-                  <span className="px-1 text-[10px] text-[var(--ink-40)] select-none">{colLabel(c)}</span>
+                  <span
+                    data-testid={`col-select-${c}`}
+                    title="Click to select column · drag to select several"
+                    onMouseDown={(e) => {
+                      e.preventDefault()
+                      props.onColHeaderMouseDown?.(c, e.shiftKey)
+                    }}
+                    onMouseEnter={() => props.onColHeaderMouseEnter?.(c)}
+                    className="px-1.5 text-[10px] text-[var(--ink-40)] select-none cursor-pointer hover:text-accent"
+                  >
+                    {colLabel(c)}
+                  </span>
                   <input
                     value={col}
                     onChange={(e) => props.onHeaderRename(c, e.target.value)}
@@ -175,7 +213,22 @@ export default function SheetGrid(props: Props): JSX.Element {
             if (props.hiddenRows?.has(r)) return null
             return (
             <tr key={r}>
-              <td className="sticky left-0 z-10 bg-[var(--surface-sunken)] text-center text-[11px] text-[var(--ink-40)] border-b border-r border-[var(--edge-soft)] select-none">
+              <td
+                data-testid={`row-header-${r}`}
+                title="Click to select row · drag to select several · right-click for options"
+                onMouseDown={(e) => {
+                  e.preventDefault()
+                  props.onRowHeaderMouseDown?.(r, e.shiftKey)
+                }}
+                onMouseEnter={() => props.onRowHeaderMouseEnter?.(r)}
+                onContextMenu={(e) => {
+                  e.preventDefault()
+                  props.onRowHeaderContextMenu?.(r, e.clientX, e.clientY)
+                }}
+                className={`sticky left-0 z-10 text-center text-[11px] text-[var(--ink-40)] border-b border-r border-[var(--edge-soft)] select-none cursor-pointer hover:text-accent ${
+                  rowFullySelected(r) ? 'bg-accent/20' : 'bg-[var(--surface-sunken)]'
+                }`}
+              >
                 {r + 1}
               </td>
               {tab.columns.map((_, c) => {
@@ -324,11 +377,11 @@ export default function SheetGrid(props: Props): JSX.Element {
                           }
                         }}
                         onBlur={() => props.onCommitEdit('none')}
-                        className="w-full px-2 py-1.5 bg-white dark:bg-stone-900 outline-none text-stone-900 dark:text-stone-100 font-mono"
+                        className="w-full px-2.5 py-2 bg-white dark:bg-stone-900 outline-none text-stone-900 dark:text-stone-100 font-mono"
                       />
                     ) : sparkline ? (
                       <div
-                        className="px-2 py-1.5 select-none text-accent"
+                        className="px-2.5 py-2 select-none text-accent"
                         title={`Sparkline of ${sparkline.values.length} value${sparkline.values.length === 1 ? '' : 's'}`}
                       >
                         <SparklineCell
@@ -342,7 +395,7 @@ export default function SheetGrid(props: Props): JSX.Element {
                     ) : (
                       <div
                         style={style}
-                        className={`px-2 py-1.5 whitespace-pre-wrap break-words select-none text-stone-800 dark:text-stone-100 ${listValues ? 'pr-4' : ''}`}
+                        className={`px-2.5 py-2 whitespace-pre-wrap break-words select-none text-stone-800 dark:text-stone-100 ${listValues ? 'pr-4' : ''}`}
                         title={shown}
                       >
                         {shown}

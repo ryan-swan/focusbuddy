@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { displayCell, buildSpillMap, makeNames, rewriteFormulaRefs, type Grid } from '@renderer/lib/sheetFormula'
+import { displayCell, buildSpillMap, makeNames, rewriteFormulaRefs, remapFormulaRefs, type Grid } from '@renderer/lib/sheetFormula'
 
 // The sheet's formula engine must compute real values, not plausible ones. A
 // wrong total is worse than a visible #ERR, so these tests pin the arithmetic,
@@ -536,5 +536,62 @@ describe('SPARKLINE — in-cell mini chart', () => {
   it('displayCell renders a SPARKLINE cell as its joined values, not #ERR', () => {
     const g = grid([['3', '6', '9', '=SPARKLINE(A1:C1)']])
     expect(displayCell(g, 0, 3)).toBe('3 6 9')
+  })
+})
+
+describe('remapFormulaRefs — structural edits (insert / delete / move)', () => {
+  // Insert a row at index `at`: every ref at or below `at` shifts down one.
+  const insRow = (at: number) => (f: string) =>
+    remapFormulaRefs(f, (r) => (r >= at ? r + 1 : r), (c) => c)
+  // Delete a row at index `at`: the deleted line -> #REF!, lines below shift up.
+  const delRow = (at: number) => (f: string) =>
+    remapFormulaRefs(f, (r) => (r === at ? null : r > at ? r - 1 : r), (c) => c)
+  const insCol = (at: number) => (f: string) =>
+    remapFormulaRefs(f, (r) => r, (c) => (c >= at ? c + 1 : c))
+  const delCol = (at: number) => (f: string) =>
+    remapFormulaRefs(f, (r) => r, (c) => (c === at ? null : c > at ? c - 1 : c))
+
+  it('insert row above a reference shifts it down', () => {
+    expect(insRow(0)('=A3')).toBe('=A4') // A3 is row index 2 -> 3
+    expect(insRow(2)('=A2')).toBe('=A2') // ref above the insert is untouched
+  })
+  it('insert row rewrites both ends of a range that straddles it', () => {
+    expect(insRow(1)('=SUM(A1:A3)')).toBe('=SUM(A1:A4)')
+  })
+  it('insert column shifts columns at/after the index', () => {
+    expect(insCol(0)('=B1')).toBe('=C1')
+    expect(insCol(2)('=A1')).toBe('=A1')
+  })
+  it('absolute references also move on a structural edit', () => {
+    expect(insRow(0)('=$A$3')).toBe('=$A$4')
+    expect(insCol(0)('=$B$1')).toBe('=$C$1')
+  })
+  it('delete row shifts later refs up and untouched refs stay', () => {
+    expect(delRow(0)('=A3')).toBe('=A2')
+    expect(delRow(3)('=A2')).toBe('=A2')
+  })
+  it('deleting a referenced cell yields #REF!, never a silent repoint', () => {
+    expect(delRow(2)('=A3')).toBe('=#REF!') // A3 is the deleted row
+    expect(delCol(1)('=B1')).toBe('=#REF!') // column B deleted
+  })
+  it('deleting one edge of a range shrinks it rather than breaking the whole range', () => {
+    // Delete row index 0 (A1); the A1:A3 range collapses toward the survivor.
+    expect(delRow(0)('=SUM(A1:A3)')).toBe('=SUM(A1:A2)')
+  })
+  it('leaves cross-sheet references untouched (they point at another tab)', () => {
+    expect(insRow(0)('=Data!A1+A1')).toBe('=Data!A1+A2')
+  })
+  it('a move permutation repoints a reference to its new home', () => {
+    // Move row 0 to position 2 (0-based final): old->new = {0:2, 1:0, 2:1}
+    const order = [1, 2, 0] // order[newPos] = oldIndex
+    const oldToNew: number[] = []
+    order.forEach((oldIdx, newPos) => (oldToNew[oldIdx] = newPos))
+    const moved = (f: string) => remapFormulaRefs(f, (r) => oldToNew[r] ?? r, (c) => c)
+    expect(moved('=A1')).toBe('=A3') // row 0 -> row 2
+    expect(moved('=A2')).toBe('=A1') // row 1 -> row 0
+  })
+  it('returns unparseable input unchanged', () => {
+    expect(insRow(0)('=SUM(')).toBe('=SUM(')
+    expect(insRow(0)('plain text')).toBe('plain text')
   })
 })

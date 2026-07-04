@@ -608,6 +608,80 @@ export function rewriteFormulaRefs(formula: string, dRow: number, dCol: number):
   return (hadEquals ? '=' : '') + nodeToString(rewrite(ast))
 }
 
+// Remap references through row/column INDEX maps, for structural edits: inserting,
+// deleting, or moving rows/columns. Unlike rewriteFormulaRefs (a uniform relative
+// shift), this repoints each coordinate through an arbitrary old->new index map,
+// so a mid-sheet insert/delete or a drag-reorder keeps formulas pointing at the
+// same data. A map returns the new index, or null when that row/column was
+// removed, in which case the reference becomes #REF! rather than being silently
+// repointed. Both absolute and relative references remap, because a structural
+// edit moves the referenced data itself. References that carry a sheet qualifier
+// (=Sheet2!A1) point at another tab and are left untouched. Unparseable input is
+// returned unchanged.
+export function remapFormulaRefs(
+  formula: string,
+  mapRow: (r: number) => number | null,
+  mapCol: (c: number) => number | null
+): string {
+  const hadEquals = formula.startsWith('=')
+  const src = hadEquals ? formula.slice(1) : formula
+  if (src.trim() === '') return formula
+  let ast: Node
+  try {
+    ast = parse(src)
+  } catch {
+    return formula
+  }
+  // A broken reference is carried as a sentinel string node and swapped for a
+  // bare #REF! after serialization (there is no dedicated error node).
+  const BROKE = ' REF '
+  const broken = (): Node => ({ k: 'str', v: BROKE })
+  const remap = (n: Node): Node => {
+    switch (n.k) {
+      case 'ref': {
+        if (n.sheet) return n // cross-sheet ref points elsewhere; leave it
+        const nr = mapRow(n.r)
+        const nc = mapCol(n.c)
+        if (nr === null || nc === null) return broken()
+        return { ...n, r: nr, c: nc }
+      }
+      case 'range': {
+        if (n.sheet) return n
+        // Map an endpoint; if that exact line was deleted, walk inward toward the
+        // other endpoint to the nearest surviving line so the range shrinks to its
+        // survivors (deleting the top of A1:A3 leaves A1:A2, not A2:A2). Returns
+        // null only when every line between the two endpoints is gone.
+        const edge = (start: number, other: number, map: (i: number) => number | null): number | null => {
+          const first = map(start)
+          if (first !== null) return first
+          const step = start <= other ? 1 : -1
+          for (let i = start + step; step > 0 ? i <= other : i >= other; i += step) {
+            const m = map(i)
+            if (m !== null) return m
+          }
+          return null
+        }
+        const r1 = edge(n.r1, n.r2, mapRow)
+        const r2 = edge(n.r2, n.r1, mapRow)
+        const c1 = edge(n.c1, n.c2, mapCol)
+        const c2 = edge(n.c2, n.c1, mapCol)
+        if (r1 === null || r2 === null || c1 === null || c2 === null) return broken()
+        return { ...n, r1, r2, c1, c2 }
+      }
+      case 'unary':
+        return { ...n, x: remap(n.x) }
+      case 'binary':
+        return { ...n, a: remap(n.a), b: remap(n.b) }
+      case 'call':
+        return { ...n, args: n.args.map(remap) }
+      default:
+        return n
+    }
+  }
+  const out = nodeToString(remap(ast)).split(`"${BROKE}"`).join('#REF!')
+  return (hadEquals ? '=' : '') + out
+}
+
 // ── Evaluation ────────────────────────────────────────────────────────────────
 
 function toNum(v: CellValue): number {
