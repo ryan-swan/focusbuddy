@@ -5,7 +5,14 @@ import { useAccountStore } from '../stores/account'
 import { useNodeStore } from '../stores/nodes'
 import { useWidgetStore } from '../stores/widgets'
 import { useTimeBlockStore } from '../stores/timeBlocks'
+import { useDocumentsStore } from '../stores/documents'
+import { useTablesStore } from '../stores/tables'
 import { useOrgStore, PERSONAL_ORG_ID } from '../stores/org'
+
+// Every item type carried over the sync transport. Rung 2 added document, table
+// and row alongside the rung-1 timeblock. The transport is type-agnostic (a JSON
+// body plus this discriminator), so a wider union is all the client needs.
+type SyncItemType = 'node' | 'widget' | 'timeblock' | 'document' | 'table' | 'row'
 
 // Renderer half of multi-device workspace sync. It owns the network (it has the
 // signal URL + session token); the main process owns the local SQLite and exposes
@@ -34,7 +41,7 @@ function urlFor(path: string): string {
 
 interface ServerItem {
   id: string
-  itemType: 'node' | 'widget' | 'timeblock'
+  itemType: SyncItemType
   body: Record<string, unknown> | null
   rev: number
   deleted: boolean
@@ -69,7 +76,7 @@ type PutResult =
 async function putItem(
   token: string,
   id: string,
-  itemType: 'node' | 'widget' | 'timeblock',
+  itemType: SyncItemType,
   body: Record<string, unknown>,
   baseRev: number
 ): Promise<PutResult> {
@@ -154,7 +161,7 @@ async function putItemOrg(
   token: string,
   orgId: string,
   id: string,
-  itemType: 'node' | 'widget' | 'timeblock',
+  itemType: SyncItemType,
   body: Record<string, unknown>,
   baseRev: number
 ): Promise<PutResult> {
@@ -254,9 +261,37 @@ async function syncOrgWorkspaceOnce(token: string, orgId: string): Promise<numbe
   else if (verdict === 'offline') useSyncStatus.getState().setOffline()
   else useSyncStatus.getState().setOk()
 
-  // Only time blocks are org-shared this slice, so refresh the calendar alone.
-  if (applied > 0) await useTimeBlockStore.getState().reload()
+  // Rung 2 shares time blocks, documents and tables (with rows), so refresh each
+  // affected surface when anything landed. applyRemoteOrg writes tables/rows
+  // straight to the DB (bypassing the notifyRowsChanged event the store listens
+  // for), so the cached tables/rows are re-fetched here explicitly.
+  if (applied > 0) {
+    await useTimeBlockStore.getState().reload()
+    await useDocumentsStore.getState().refresh().catch(() => {})
+    await refreshCachedTables()
+  }
   return applied
+}
+
+// Re-fetch whatever the tables store currently has cached (tables + their rows),
+// so pulled org changes to tables and rows show without an app restart. A table
+// that has been tombstoned locally now reads as null and is dropped from cache.
+async function refreshCachedTables(): Promise<void> {
+  const ts = useTablesStore.getState()
+  for (const id of Object.keys(ts.tables)) {
+    const t = await window.api.tables.get(id)
+    const cur = useTablesStore.getState().tables
+    if (t) useTablesStore.setState({ tables: { ...cur, [id]: t } })
+    else {
+      const next = { ...cur }
+      delete next[id]
+      useTablesStore.setState({ tables: next })
+    }
+  }
+  for (const tableId of Object.keys(ts.rows)) {
+    const rows = await window.api.tables.listRows(tableId)
+    useTablesStore.setState({ rows: { ...useTablesStore.getState().rows, [tableId]: rows } })
+  }
 }
 
 let running = false

@@ -8,9 +8,16 @@ import { PERSONAL_ORG_ID } from './activeOrg'
 // dirty state in needs_sync (set by the DB triggers in database.ts on any content
 // write, cleared here after a push or an applied pull).
 
-type SyncTable = 'nodes' | 'widgets' | 'time_blocks'
-type ItemType = 'node' | 'widget' | 'timeblock'
-const TABLE: Record<ItemType, SyncTable> = { node: 'nodes', widget: 'widgets', timeblock: 'time_blocks' }
+type SyncTable = 'nodes' | 'widgets' | 'time_blocks' | 'documents' | 'fb_tables' | 'fb_rows'
+type ItemType = 'node' | 'widget' | 'timeblock' | 'document' | 'table' | 'row'
+const TABLE: Record<ItemType, SyncTable> = {
+  node: 'nodes',
+  widget: 'widgets',
+  timeblock: 'time_blocks',
+  document: 'documents',
+  table: 'fb_tables',
+  row: 'fb_rows'
+}
 
 export interface PendingUpsert {
   id: string
@@ -119,11 +126,18 @@ export function collectPending(): { upserts: PendingUpsert[]; deletes: PendingDe
   return { upserts, deletes }
 }
 
-// Org-scoped collect: only the time blocks that belong to the given real org and
-// need syncing. The mirror-image of the personal leak guard — an org block is
-// never pushed up the personal endpoint, and a personal block is never pushed up
-// the org endpoint. Nodes/widgets/documents are deferred to a later rung, so only
-// 'timeblock' is collected here.
+// Org-scoped collect: every org-shared row that belongs to the given real org and
+// needs syncing. The mirror-image of the personal leak guard — an org row is
+// never pushed up the personal endpoint, and a personal row is never pushed up
+// the org endpoint. Rung 2 widens this beyond time blocks to documents, tables
+// and table rows.
+//
+// time_blocks, documents and fb_tables each carry their own org_id, so they are
+// filtered directly. fb_rows deliberately has NO org_id — a row derives its org
+// scope from its parent fb_tables.org_id (the widget-from-node precedent), so
+// rows are joined to their table and filtered by the table's org. A row body
+// already carries table_id, so the row can be reattached to its table on the
+// other device.
 export function collectPendingOrg(orgId: string): {
   upserts: PendingUpsert[]
   deletes: PendingDelete[]
@@ -132,16 +146,38 @@ export function collectPendingOrg(orgId: string): {
   const upserts: PendingUpsert[] = []
   const deletes: PendingDelete[] = []
   if (!orgId || orgId === PERSONAL_ORG_ID) return { upserts, deletes }
-  const table = TABLE.timeblock
-  const rows = db
-    .prepare(`SELECT * FROM ${table} WHERE needs_sync = 1 AND org_id = ?`)
-    .all(orgId) as Array<Record<string, unknown>>
-  for (const row of rows) {
+
+  const pushRow = (row: Record<string, unknown>, itemType: ItemType): void => {
     const id = String(row.id)
     const baseRev = Number(row.sync_rev) || 0
-    if (row.trashed_at != null) deletes.push({ id, itemType: 'timeblock', baseRev })
-    else upserts.push({ id, itemType: 'timeblock', body: bodyFromRow(row), baseRev })
+    if (row.trashed_at != null) deletes.push({ id, itemType, baseRev })
+    else upserts.push({ id, itemType, body: bodyFromRow(row), baseRev })
   }
+
+  // Types that carry org_id directly: filter by the column.
+  const directTypes: Array<[ItemType, SyncTable]> = [
+    ['timeblock', TABLE.timeblock],
+    ['document', TABLE.document],
+    ['table', TABLE.table]
+  ]
+  for (const [itemType, table] of directTypes) {
+    const rows = db
+      .prepare(`SELECT * FROM ${table} WHERE needs_sync = 1 AND org_id = ?`)
+      .all(orgId) as Array<Record<string, unknown>>
+    for (const row of rows) pushRow(row, itemType)
+  }
+
+  // Rows: no org_id of their own, so join to the parent table and filter by the
+  // table's org. The row body still includes table_id for reattachment.
+  const rows = db
+    .prepare(
+      `SELECT r.* FROM fb_rows r
+       JOIN fb_tables t ON r.table_id = t.id
+       WHERE r.needs_sync = 1 AND t.org_id = ?`
+    )
+    .all(orgId) as Array<Record<string, unknown>>
+  for (const row of rows) pushRow(row, 'row')
+
   return { upserts, deletes }
 }
 
@@ -214,21 +250,37 @@ export function applyRemote(items: RemoteItem[]): { applied: number } {
   return { applied }
 }
 
-// Apply rows pulled from the ORG endpoint. Mirror of applyRemote, restricted to
-// the one org-shared type in this slice (timeblock) and stamping the active org's
-// id onto every applied row so a pulled block always lands in the correct org
-// bucket regardless of what its serialized body carried. Kept separate from
-// applyRemote so the personal path stays byte-for-byte unchanged.
+// Apply rows pulled from the ORG endpoint. Mirror of applyRemote, widened in
+// rung 2 to time blocks, documents, tables and table rows. Two rules keep it
+// correct across types:
+//
+//   1. Ordering: tables are applied before rows, because a row's foreign key to
+//      fb_tables needs the parent table present first (the same reason applyRemote
+//      applies nodes before widgets). Other types are order-independent.
+//   2. org_id stamping: the active org's id is stamped onto any applied row whose
+//      table actually has an org_id column (time blocks, documents, tables), so a
+//      pulled row always lands in the correct org bucket regardless of what its
+//      serialized body carried. fb_rows has no org_id column (its scope derives
+//      from the parent table), so it is never stamped.
+//
+// Kept separate from applyRemote so the personal path stays byte-for-byte
+// unchanged. Each row is applied under its own try/catch so one bad foreign key
+// (e.g. a row whose table has not synced yet) never aborts the batch.
 export function applyRemoteOrg(items: RemoteItem[], orgId: string): { applied: number } {
   const db = getDb()
   if (!orgId || orgId === PERSONAL_ORG_ID) return { applied: 0 }
-  const table = TABLE.timeblock
+  // Tables before rows; everything else keeps its relative order.
+  const rank = (t: ItemType): number => (t === 'table' ? 0 : t === 'row' ? 1 : 0)
+  const ordered = [...items].sort((a, b) => rank(a.itemType) - rank(b.itemType))
   let applied = 0
   const tx = db.transaction(() => {
-    for (const item of items) {
-      // Only time blocks are org-shared this slice; ignore anything else.
-      if (item.itemType !== 'timeblock') continue
+    for (const item of ordered) {
+      const table = TABLE[item.itemType]
+      // Forward compatibility: an item type this build does not know is skipped,
+      // never a crash (a newer device may sync richer types).
+      if (!table) continue
       if (item.deleted) {
+        // Soft-delete locally if the row exists; keep an existing trash timestamp.
         const exists = db.prepare(`SELECT 1 FROM ${table} WHERE id = ?`).get(item.id)
         if (exists) {
           db.prepare(
@@ -249,14 +301,15 @@ export function applyRemoteOrg(items: RemoteItem[], orgId: string): { applied: n
       if (!present.includes('id')) continue
       const params: Record<string, unknown> = {}
       for (const c of present) params[c] = (item.body as Record<string, unknown>)[c]
-      // Stamp the active org so the row always lands in the right bucket, and set
-      // the sync bookkeeping to "clean at this rev" so we never re-push a pull.
-      params.org_id = orgId
+      // Stamp the active org only on types that actually have an org_id column, so
+      // the row lands in the right bucket. fb_rows has no org_id, so skip it.
+      const hasOrgIdCol = cols.includes('org_id')
+      if (hasOrgIdCol) params.org_id = orgId
       params.sync_rev = item.rev
       params.needs_sync = 0
-      const allCols = present.includes('org_id')
-        ? [...present, 'sync_rev', 'needs_sync']
-        : [...present, 'org_id', 'sync_rev', 'needs_sync']
+      const allCols = [...present]
+      if (hasOrgIdCol && !allCols.includes('org_id')) allCols.push('org_id')
+      allCols.push('sync_rev', 'needs_sync')
       const insertList = allCols.join(', ')
       const valueList = allCols.map((c) => `@${c}`).join(', ')
       const updateList = allCols.filter((c) => c !== 'id').map((c) => `${c} = @${c}`).join(', ')
@@ -266,7 +319,8 @@ export function applyRemoteOrg(items: RemoteItem[], orgId: string): { applied: n
         ).run(params)
         applied++
       } catch {
-        // A single bad row must not abort the batch; the next cycle retries it.
+        // A single bad row (e.g. a foreign key whose parent table has not synced
+        // yet) must not abort the batch; the next cycle retries it.
       }
     }
   })

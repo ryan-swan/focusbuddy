@@ -24,6 +24,7 @@ import {
   type CloudDocType
 } from './cloudDocsClient'
 import { useAccountStore } from '../stores/account'
+import { useOrgStore, PERSONAL_ORG_ID } from '../stores/org'
 
 const FLAG_KEY = 'fb.clouddocs.enabled'
 const CURSOR_KEY = 'fb.clouddocs.cursor'
@@ -47,6 +48,20 @@ export function setCloudDocsEnabled(on: boolean): void {
 
 function token(): string | null {
   return useAccountStore.getState().sessionToken
+}
+
+// Cloud-docs is the personal-scope document mirror (PlexiDesk <-> standalone
+// PlexiOffice). Org documents sync through the org workspace loop instead, so
+// when a real org is active this whole path goes dormant to avoid double-syncing
+// an org document. Documents shown/edited are always in the active org (the store
+// is org-scoped), so "active org is personal" is exactly "these docs are
+// personal". Personal scope keeps its existing behavior unchanged.
+function docScopeIsPersonal(): boolean {
+  try {
+    return (useOrgStore.getState().activeOrgId || PERSONAL_ORG_ID) === PERSONAL_ORG_ID
+  } catch {
+    return true
+  }
 }
 // Sync only runs when the flag is on AND the user is signed in (cloud docs are
 // account-scoped).
@@ -132,7 +147,7 @@ async function applyLocal(action: SyncAction): Promise<void> {
 // documents applied (0 when nothing changed or sync is inactive/offline).
 export async function pullCloudDocs(): Promise<number> {
   const t = token()
-  if (!cloudDocsEnabled() || !t) return 0
+  if (!cloudDocsEnabled() || !t || !docScopeIsPersonal()) return 0
   const res = await syncCloudDocs(t, getCursor())
   if (!res) return 0 // offline / transport failure — keep cursor, retry later
   for (const action of planFromChanges(res.documents)) await applyLocal(action)
@@ -144,7 +159,7 @@ export async function pullCloudDocs(): Promise<number> {
 // applied locally (and returned so the caller can refresh its view).
 export async function pushCloudDoc(doc: FbDocument): Promise<{ conflictedTo?: FbDocument }> {
   const t = token()
-  if (!cloudDocsEnabled() || !t) return {}
+  if (!cloudDocsEnabled() || !t || !docScopeIsPersonal()) return {}
   const res = await putCloudDoc(t, {
     id: doc.id,
     docType: doc.docType as CloudDocType,
@@ -168,7 +183,7 @@ export async function pushCloudDoc(doc: FbDocument): Promise<{ conflictedTo?: Fb
 // Mirror a local delete to the cloud (tombstone).
 export async function pushCloudDelete(id: string): Promise<void> {
   const t = token()
-  if (!cloudDocsEnabled() || !t) return
+  if (!cloudDocsEnabled() || !t || !docScopeIsPersonal()) return
   await deleteCloudDoc(t, id)
   forgetRev(id)
 }

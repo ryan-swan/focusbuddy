@@ -254,6 +254,7 @@ import {
   listRows,
   listTables,
   reorderRows,
+  restoreRow,
   updateRow,
   updateTable
 } from '../db/tables'
@@ -1610,6 +1611,7 @@ export function registerIpcHandlers(): void {
     updateRow(id, patch)
   )
   ipcMain.handle('tables:deleteRow', (_e, id: string) => deleteRow(id))
+  ipcMain.handle('tables:restoreRow', (_e, id: string) => restoreRow(id))
   ipcMain.handle('tables:reorderRows', (_e, tableId: string, ids: string[]) =>
     reorderRows(tableId, ids)
   )
@@ -2211,7 +2213,7 @@ export function registerIpcHandlers(): void {
   // signal URL + token); these expose the local-DB half: what to push, what to
   // mark pushed, applying pulled rows, and the pull cursor.
   ipcMain.handle('workspace:pending', () => collectPending())
-  ipcMain.handle('workspace:markPushed', (_e, itemType: 'node' | 'widget' | 'timeblock', id: string, rev: number) =>
+  ipcMain.handle('workspace:markPushed', (_e, itemType: 'node' | 'widget' | 'timeblock' | 'document' | 'table' | 'row', id: string, rev: number) =>
     markPushed(itemType, id, rev)
   )
   ipcMain.handle('workspace:applyRemote', (_e, items: RemoteItem[]) =>

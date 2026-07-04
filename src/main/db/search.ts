@@ -145,7 +145,7 @@ export async function searchAll(rawQuery: string): Promise<SearchHit[]> {
     .prepare(
       `SELECT r.cells_json AS cells, t.id AS tid, t.task_id AS task_id, t.title AS ttitle
        FROM fb_rows r JOIN fb_tables t ON r.table_id = t.id
-       WHERE r.cells_json LIKE ?${ESC} LIMIT ?`
+       WHERE r.cells_json LIKE ?${ESC} AND r.trashed_at IS NULL AND t.trashed_at IS NULL LIMIT ?`
     )
     .all(like, PER_CATEGORY) as Array<{
     cells: string
@@ -173,7 +173,7 @@ export async function searchAll(rawQuery: string): Promise<SearchHit[]> {
   const tableRows = db
     .prepare(
       `SELECT id, task_id, title FROM fb_tables
-       WHERE task_id IS NOT NULL AND title LIKE ?${ESC} LIMIT ?`
+       WHERE task_id IS NOT NULL AND trashed_at IS NULL AND title LIKE ?${ESC} LIMIT ?`
     )
     .all(like, PER_CATEGORY) as Array<{ id: string; task_id: string; title: string }>
   for (const r of tableRows) {
