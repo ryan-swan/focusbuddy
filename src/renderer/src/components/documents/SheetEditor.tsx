@@ -31,7 +31,7 @@ import {
   type CellRange
 } from './sheet/sheetOps'
 import { extendSeries, canToggleSeries, numericFill } from '../../lib/sheetFill'
-import { rewriteFormulaRefs, displayCell, makeWorkbook, makeNames } from '../../lib/sheetFormula'
+import { rewriteFormulaRefs, remapFormulaRefs, displayCell, makeWorkbook, makeNames } from '../../lib/sheetFormula'
 import { isSingleCell } from '@shared/gridClipboard'
 import SheetGrid from './sheet/SheetGrid'
 import SheetToolbar from './sheet/SheetToolbar'
@@ -74,7 +74,40 @@ interface FuncMenu {
   query: string
 }
 
-const DEFAULT_COL_W = 120
+const DEFAULT_COL_W = 140
+
+// Structural edits that also fix formula references, so inserting, deleting or
+// moving rows/columns keeps every formula pointing at the same data. A reference
+// to a genuinely removed line becomes #REF! (never silently repointed). These
+// wrap the pure sheetOps mutators and sweep every formula cell through
+// remapFormulaRefs with the matching old->new index map.
+const idIndex = (i: number): number => i
+function fixFormulas(
+  t: SheetTab,
+  mapRow: (r: number) => number | null,
+  mapCol: (c: number) => number | null
+): SheetTab {
+  return {
+    ...t,
+    rows: t.rows.map((row) =>
+      row.map((cell) => (cell.trim().startsWith('=') ? remapFormulaRefs(cell, mapRow, mapCol) : cell))
+    )
+  }
+}
+function insertRowFixed(t: SheetTab, at: number): SheetTab {
+  return fixFormulas(insertRowAt(t, at), (r) => (r >= at ? r + 1 : r), idIndex)
+}
+function deleteRowFixed(t: SheetTab, at: number): SheetTab {
+  if (t.rows.length <= 1) return t
+  return fixFormulas(deleteRowAt(t, at), (r) => (r === at ? null : r > at ? r - 1 : r), idIndex)
+}
+function insertColFixed(t: SheetTab, at: number): SheetTab {
+  return fixFormulas(insertColAt(t, at), idIndex, (c) => (c >= at ? c + 1 : c))
+}
+function deleteColFixed(t: SheetTab, at: number): SheetTab {
+  if (t.columns.length <= 1) return t
+  return fixFormulas(deleteColAt(t, at), idIndex, (c) => (c === at ? null : c > at ? c - 1 : c))
+}
 
 // When the in-cell text is a formula, work out whether to show the function
 // menu and which functions match. We assume the caret is at the end of the
@@ -128,6 +161,7 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
   const [liveWidth, setLiveWidth] = useState<{ c: number; w: number } | null>(null)
   const [status, setStatus] = useState<string | null>(null)
   const [colMenu, setColMenu] = useState<{ c: number; x: number; y: number } | null>(null)
+  const [rowMenu, setRowMenu] = useState<{ r: number; x: number; y: number } | null>(null)
   const [funcIndex, setFuncIndex] = useState(0)
   const [funcDismissed, setFuncDismissed] = useState(false)
   const [namesOpen, setNamesOpen] = useState(false)
@@ -149,6 +183,10 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
   const gridWrapRef = useRef<HTMLDivElement | null>(null)
   const editInputRef = useRef<HTMLInputElement | null>(null)
   const refDrag = useRef<{ start: Cell; end: Cell } | null>(null)
+  // Header selection drag: 'col' while dragging across column letters, 'row'
+  // across row numbers. `anchor` is the header the drag started on so entering
+  // another header extends a whole-column / whole-row block from it.
+  const headerDrag = useRef<{ kind: 'col' | 'row'; anchor: number } | null>(null)
   // Source selection captured when a fill-handle drag begins, the live preview
   // rectangle (mirrored as a ref so the global mouseup can read it), and a ref to
   // the latest fill executor (kept fresh each render so the mouseup closure isn't
@@ -313,6 +351,7 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
         return
       }
       dragging.current = false
+      headerDrag.current = null
     }
     window.addEventListener('mouseup', up)
     return () => window.removeEventListener('mouseup', up)
@@ -403,6 +442,43 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
   function selectCell(r: number, c: number): void {
     setAnchor({ r, c })
     setFocus({ r, c })
+  }
+
+  // ── Header selection (Excel-style) ─────────────────────────────────────────
+  function selectAllCells(): void {
+    setEditing(null)
+    headerDrag.current = null
+    setAnchor({ r: 0, c: 0 })
+    setFocus({ r: tab.rows.length - 1, c: tab.columns.length - 1 })
+    focusGrid()
+  }
+  function selectColumn(c: number, shift: boolean): void {
+    setEditing(null)
+    const maxR = tab.rows.length - 1
+    const a = shift && headerDrag.current?.kind === 'col' ? headerDrag.current.anchor : c
+    headerDrag.current = { kind: 'col', anchor: a }
+    setAnchor({ r: 0, c: a })
+    setFocus({ r: maxR, c })
+    focusGrid()
+  }
+  function colHeaderEnter(c: number): void {
+    if (headerDrag.current?.kind !== 'col') return
+    setAnchor({ r: 0, c: headerDrag.current.anchor })
+    setFocus({ r: tab.rows.length - 1, c })
+  }
+  function selectRow(r: number, shift: boolean): void {
+    setEditing(null)
+    const maxC = tab.columns.length - 1
+    const a = shift && headerDrag.current?.kind === 'row' ? headerDrag.current.anchor : r
+    headerDrag.current = { kind: 'row', anchor: a }
+    setAnchor({ r: a, c: 0 })
+    setFocus({ r, c: maxC })
+    focusGrid()
+  }
+  function rowHeaderEnter(r: number): void {
+    if (headerDrag.current?.kind !== 'row') return
+    setAnchor({ r: headerDrag.current.anchor, c: 0 })
+    setFocus({ r, c: tab.columns.length - 1 })
   }
 
   // ── Keyboard ──────────────────────────────────────────────────────────────
@@ -886,12 +962,12 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
             canRedo: redoStack.current.length > 0,
             format: applyToSelection,
             numberFormat: applyNumberFormat,
-            insertRowAbove: () => mutateTab((t) => insertRowAt(t, selection.r0)),
-            insertRowBelow: () => mutateTab((t) => insertRowAt(t, selection.r1 + 1)),
-            insertColLeft: () => mutateTab((t) => insertColAt(t, selection.c0)),
-            insertColRight: () => mutateTab((t) => insertColAt(t, selection.c1 + 1)),
-            deleteRow: () => mutateTab((t) => deleteRowAt(t, selection.r0)),
-            deleteCol: () => mutateTab((t) => deleteColAt(t, selection.c0)),
+            insertRowAbove: () => mutateTab((t) => insertRowFixed(t, selection.r0)),
+            insertRowBelow: () => mutateTab((t) => insertRowFixed(t, selection.r1 + 1)),
+            insertColLeft: () => mutateTab((t) => insertColFixed(t, selection.c0)),
+            insertColRight: () => mutateTab((t) => insertColFixed(t, selection.c1 + 1)),
+            deleteRow: () => mutateTab((t) => deleteRowFixed(t, selection.r0)),
+            deleteCol: () => mutateTab((t) => deleteColFixed(t, selection.c0)),
             sort: (dir) => mutateTab((t) => sortByColumn(t, selection.c0, dir)),
             toggleFilter: () =>
               mutateTab((t) => ({
@@ -917,10 +993,10 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
         activeFont={cellFormat(tab, focus.r, focus.c)?.fontFamily}
         onFormat={applyToSelection}
         onNumberFormat={applyNumberFormat}
-        onInsertRow={() => mutateTab((t) => insertRowAt(t, selection.r0))}
-        onDeleteRow={() => mutateTab((t) => deleteRowAt(t, selection.r0))}
-        onInsertCol={() => mutateTab((t) => insertColAt(t, selection.c0))}
-        onDeleteCol={() => mutateTab((t) => deleteColAt(t, selection.c0))}
+        onInsertRow={() => mutateTab((t) => insertRowFixed(t, selection.r0))}
+        onDeleteRow={() => mutateTab((t) => deleteRowFixed(t, selection.r0))}
+        onInsertCol={() => mutateTab((t) => insertColFixed(t, selection.c0))}
+        onDeleteCol={() => mutateTab((t) => deleteColFixed(t, selection.c0))}
         onSort={(dir) => mutateTab((t) => sortByColumn(t, selection.c0, dir))}
         onConditionalFormat={() => setCondOpen(true)}
         onDataValidation={() => setValidationOpen(true)}
@@ -1150,6 +1226,12 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
             onColResizeStart={onColResizeStart}
             onColAutoFit={onColAutoFit}
             onHeaderContextMenu={(c, x, y) => setColMenu({ c, x, y })}
+            onSelectAll={selectAllCells}
+            onColHeaderMouseDown={selectColumn}
+            onColHeaderMouseEnter={colHeaderEnter}
+            onRowHeaderMouseDown={selectRow}
+            onRowHeaderMouseEnter={rowHeaderEnter}
+            onRowHeaderContextMenu={(r, x, y) => setRowMenu({ r, x, y })}
             editInputRef={editInputRef}
             formulaRefMode={inFormulaEdit()}
             fillPreview={fillPreview}
@@ -1185,10 +1267,22 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
             x={colMenu.x}
             y={colMenu.y}
             canDelete={tab.columns.length > 1}
-            onInsertLeft={() => { mutateTab((t) => insertColAt(t, colMenu.c)); setColMenu(null) }}
-            onInsertRight={() => { mutateTab((t) => insertColAt(t, colMenu.c + 1)); setColMenu(null) }}
-            onDelete={() => { mutateTab((t) => deleteColAt(t, colMenu.c)); setColMenu(null) }}
+            onInsertLeft={() => { mutateTab((t) => insertColFixed(t, colMenu.c)); setColMenu(null) }}
+            onInsertRight={() => { mutateTab((t) => insertColFixed(t, colMenu.c + 1)); setColMenu(null) }}
+            onDelete={() => { mutateTab((t) => deleteColFixed(t, colMenu.c)); setColMenu(null) }}
             onClose={() => setColMenu(null)}
+          />
+        )}
+
+        {rowMenu && (
+          <RowHeaderMenu
+            x={rowMenu.x}
+            y={rowMenu.y}
+            canDelete={tab.rows.length > 1}
+            onInsertAbove={() => { mutateTab((t) => insertRowFixed(t, rowMenu.r)); setRowMenu(null) }}
+            onInsertBelow={() => { mutateTab((t) => insertRowFixed(t, rowMenu.r + 1)); setRowMenu(null) }}
+            onDelete={() => { mutateTab((t) => deleteRowFixed(t, rowMenu.r)); setRowMenu(null) }}
+            onClose={() => setRowMenu(null)}
           />
         )}
 
@@ -1296,6 +1390,69 @@ function ColumnHeaderMenu({
         disabled={!canDelete}
       >
         <Icon name="delete" size={13} /> Delete column
+      </button>
+    </div>
+  )
+}
+
+// Right-click row-header menu: insert a row above or below the clicked row, or
+// delete it. Insert/delete reindex formula references (via *Fixed helpers).
+function RowHeaderMenu({
+  x,
+  y,
+  canDelete,
+  onInsertAbove,
+  onInsertBelow,
+  onDelete,
+  onClose
+}: {
+  x: number
+  y: number
+  canDelete: boolean
+  onInsertAbove: () => void
+  onInsertBelow: () => void
+  onDelete: () => void
+  onClose: () => void
+}): JSX.Element {
+  const ref = useRef<HTMLDivElement | null>(null)
+  useEffect(() => {
+    function onDown(e: MouseEvent): void {
+      if (!ref.current?.contains(e.target as Node)) onClose()
+    }
+    function onKey(e: KeyboardEvent): void {
+      if (e.key === 'Escape') onClose()
+    }
+    document.addEventListener('mousedown', onDown)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onDown)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [onClose])
+  const left = Math.min(x, window.innerWidth - 210)
+  const top = Math.min(y, window.innerHeight - 140)
+  const item =
+    'w-full flex items-center gap-2 px-3 py-1.5 text-[12px] hover:bg-[var(--surface-sunken)] text-left'
+  return (
+    <div
+      ref={ref}
+      data-testid="sheet-row-menu"
+      className="fixed z-[100] w-52 rounded-md border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-xl py-1 text-[var(--ink-70)]"
+      style={{ left, top }}
+    >
+      <button className={item} onClick={onInsertAbove}>
+        <Icon name="add" size={13} className="text-[var(--ink-40)]" /> Insert row above
+      </button>
+      <button className={item} onClick={onInsertBelow}>
+        <Icon name="add" size={13} className="text-[var(--ink-40)]" /> Insert row below
+      </button>
+      <div className="my-1 border-t border-[var(--edge-soft)]" />
+      <button
+        className={item + ' text-red-600 disabled:opacity-40'}
+        onClick={onDelete}
+        disabled={!canDelete}
+      >
+        <Icon name="delete" size={13} /> Delete row
       </button>
     </div>
   )
