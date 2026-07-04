@@ -33,7 +33,13 @@ import { launchApp, type LaunchedApp, waitForReady } from './_helpers'
 // ── Shared navigation helpers ─────────────────────────────────────────────────
 
 async function openDocumentsHub(window: Page): Promise<void> {
-  await window.getByRole('button', { name: /^Documents$/i }).click()
+  // The object-based IA no longer has a literal "Documents" sidebar button;
+  // navigation goes through the exposed view store (same approach as
+  // documents.spec.ts / documentTrash.spec.ts).
+  await window.evaluate(() => {
+    const w = window as unknown as { __fbView?: { getState: () => { goDocuments: () => void } } }
+    w.__fbView?.getState().goDocuments()
+  })
   await expect(window.getByRole('heading', { name: 'Documents', level: 1 })).toBeVisible({
     timeout: 8_000
   })

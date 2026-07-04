@@ -28,7 +28,7 @@
  */
 
 import { test, expect } from '@playwright/test'
-import { launchApp, waitForReady } from './_helpers'
+import { launchApp, waitForReady, gotoView } from './_helpers'
 
 test('COLLAB-1 — boot smoke: app loads, no uncaught exceptions, docCollab store + socket handler are inert when signed out', async () => {
   const { window, dispose } = await launchApp()
@@ -69,7 +69,7 @@ test('COLLAB-2 — DocumentsView: Collaborate button present in DOM after creati
     await waitForReady(window)
 
     // Open Documents hub.
-    await window.getByRole('button', { name: /^Documents$/i }).click()
+    await gotoView(window, 'goDocuments')
     await expect(window.getByRole('heading', { name: 'Documents', level: 1 })).toBeVisible({ timeout: 8_000 })
 
     // Create a blank Document so a recent-doc row is available.
@@ -102,8 +102,8 @@ test('COLLAB-2 — DocumentsView: Collaborate button present in DOM after creati
     // Click the Collaborate button while signed out.
     await collaborateBtn.click()
 
-    // The app must stay alive — sidebar still responds.
-    await expect(window.getByRole('button', { name: /^Documents$/i })).toBeVisible({ timeout: 3_000 })
+    // The app must stay alive — we are still on the Documents hub after the click.
+    await expect(window.getByRole('heading', { name: 'Documents', level: 1 })).toBeVisible({ timeout: 3_000 })
 
     // An inline error should be visible (the collaborate() function sets error state
     // when no token — "Sign in to collaborate on a document.").
@@ -134,7 +134,7 @@ test('COLLAB-3 — DocumentsView: Shared-live section absent when signed out', a
   try {
     await waitForReady(window)
 
-    await window.getByRole('button', { name: /^Documents$/i }).click()
+    await gotoView(window, 'goDocuments')
     await expect(window.getByRole('heading', { name: 'Documents', level: 1 })).toBeVisible({ timeout: 8_000 })
 
     // No account, so shared=[] → the section must not be rendered.
@@ -154,21 +154,16 @@ test('COLLAB-4 — PlexiInbox renders without crash; no takeover-requests sectio
   try {
     await waitForReady(window)
 
-    // Navigate to PlexiInbox via the sidebar.
-    const inboxBtn = window.getByRole('button', { name: /^PlexiInbox$/i })
-    if (!(await inboxBtn.isVisible().catch(() => false))) {
-      // PlexiInbox may be nested under a section — look for it anywhere.
-      await window.locator('button', { hasText: /plexiinbox/i }).first().click()
-    } else {
-      await inboxBtn.click()
-    }
+    // Navigate to PlexiInbox through the view store (object-based IA has no
+    // literal sidebar button for it).
+    await gotoView(window, 'goInbox')
 
     // The view must mount — sign-in gate or content, either is fine.
     // We just wait a beat and confirm the app hasn't crashed.
     await window.waitForTimeout(600)
 
-    // App still alive: sidebar rendered.
-    await expect(window.getByRole('button', { name: /^Documents$/i })).toBeVisible({ timeout: 4_000 })
+    // App still alive: the always-present footer sync chip is rendered.
+    await expect(window.locator('[data-testid="footer-sync-chip"]')).toBeVisible({ timeout: 4_000 })
 
     // No takeover-requests section when signed out (takeovers array is empty,
     // the conditional block is not rendered).

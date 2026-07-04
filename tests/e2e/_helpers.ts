@@ -106,15 +106,13 @@ export async function waitForReady(
     { timeout: 10_000 }
   )
 
-  // Sidebar wordmark — anchored on an EXACT case-insensitive regex so
-  // future case rebrands (FocusBuddy → FOCUSBUDDY → Haptyx) survive a
-  // one-line edit here. Must NOT match the launch sign-in dialog's
-  // "Sign in to FocusBuddy" heading, hence the anchored ^...$ form.
-  // .first() tolerates the PlexiSuiteHome hero card which also renders an
-  // h2 "PlexiDesk", so there can be two matches in the DOM simultaneously.
-  await expect(
-    window.getByRole('heading', { name: /^(focusbuddy|haptyx|plexidesk)$/i, level: 2 }).first()
-  ).toBeVisible({ timeout: 10_000 })
+  // App-shell painted signal. The old wordmark heading only rendered on the
+  // home/suite view, so a test that reloaded into a non-home view (Documents,
+  // Calendar, an editor) would hang here even though the app was fully ready.
+  // The global footer sync chip renders in every view as a sibling of <main>,
+  // so it is the robust "shell is up" signal that survives a reload into any
+  // view. (The renderer-ready gate above already confirms window.api exists.)
+  await expect(window.locator('[data-testid="footer-sync-chip"]')).toBeVisible({ timeout: 10_000 })
 
   if (!dismissModals) return
 
@@ -195,4 +193,30 @@ export async function openProduct(window: Page, product: keyof typeof SEGMENT_OF
 
   await window.locator(`[data-testid="${route.switch}"]`).click()
   await window.locator(`[data-testid="segment-app-${route.app}"]`).click()
+}
+
+// Navigate through the exposed view store. The object-based IA no longer has
+// literal sidebar buttons for these destinations, so specs drive navigation via
+// __fbView (the same approach documents.spec.ts / documentTrash.spec.ts use).
+// Use this instead of getByRole('button', { name: /^Documents$/ }) and friends.
+export async function gotoView(
+  window: Page,
+  fn:
+    | 'goHome'
+    | 'goDocuments'
+    | 'goCalendar'
+    | 'goVault'
+    | 'goAllTasks'
+    | 'goProjects'
+    | 'goReports'
+    | 'goFiles'
+    | 'goInbox'
+    | 'goMeetings'
+    | 'goMail'
+): Promise<void> {
+  await window.evaluate((f) => {
+    const w = window as unknown as { __fbView?: { getState: () => Record<string, () => void> } }
+    w.__fbView?.getState()[f]?.()
+  }, fn)
+  await window.waitForTimeout(300)
 }
