@@ -125,12 +125,14 @@ export default function SheetGrid(props: Props): JSX.Element {
   const fRows = Math.min(tab.freeze?.rows ?? 0, maxR + 1)
   const colLeft = (c: number): number => {
     let x = ROW_HEADER_W
-    for (let i = 0; i < c; i++) x += props.colWidthOf(i)
+    // Collapsed (hidden) columns are not rendered, so they must not add to the
+    // sticky-left offset of a frozen column or a gap opens up.
+    for (let i = 0; i < c; i++) if (!props.hiddenCols?.has(i)) x += props.colWidthOf(i)
     return x
   }
   const rowTop = (r: number): number => {
     let y = HEADER_H
-    for (let i = 0; i < r; i++) y += props.rowHeightOf?.(i) ?? DEFAULT_ROW_PX
+    for (let i = 0; i < r; i++) if (!props.hiddenRows?.has(i)) y += props.rowHeightOf?.(i) ?? DEFAULT_ROW_PX
     return y
   }
   // The outline-group (if any) that starts on a given row/column, so its header
@@ -335,7 +337,7 @@ export default function SheetGrid(props: Props): JSX.Element {
                       e.stopPropagation()
                       props.onToggleRowGroup?.(rowGroupAt(r))
                     }}
-                    className="absolute left-0.5 top-0 text-[9px] text-[var(--ink-40)] hover:text-accent leading-none"
+                    className="absolute left-0.5 top-1/2 -translate-y-1/2 text-[9px] text-[var(--ink-40)] hover:text-accent leading-none"
                   >
                     {props.rowGroups?.[rowGroupAt(r)]?.collapsed ? '▸' : '▾'}
                   </button>
