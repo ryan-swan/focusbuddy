@@ -24,6 +24,7 @@ interface Props {
   onInsertPivot: () => void
   onInsertSparkline: () => void
   onInsertLookup: () => void
+  onMacros: () => void
   onInsertChart: (type: 'bar' | 'line' | 'pie') => void
   onImport: () => void
   onExport: (format: 'xlsx' | 'csv') => void
@@ -185,6 +186,14 @@ export default function SheetToolbar(props: Props): JSX.Element {
         onClick={props.onInsertLookup}
       >
         <Icon name="search" size={15} />
+      </button>
+      <button
+        className={btn}
+        title="Macros — automate the sheet with a script"
+        data-testid="sheet-macros-btn"
+        onClick={props.onMacros}
+      >
+        <Icon name="code" size={15} />
       </button>
       <Divider />
 
