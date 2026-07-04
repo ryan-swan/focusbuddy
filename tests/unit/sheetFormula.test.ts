@@ -765,3 +765,78 @@ describe('LET — name bindings', () => {
     expect(displayCell(g, 0, 0)).toBe('#NAME?')
   })
 })
+
+describe('LAMBDA + the array-lambda family', () => {
+  it('calls a LET-bound lambda directly', () => {
+    const g = grid([['5', '=LET(dbl, LAMBDA(x, x*2), dbl(A1))']])
+    expect(displayCell(g, 0, 1)).toBe('10')
+  })
+
+  it('a lambda closes over an earlier LET binding', () => {
+    const g = grid([['=LET(k, 3, addk, LAMBDA(n, n+k), addk(10))']])
+    expect(displayCell(g, 0, 0)).toBe('13')
+  })
+
+  it('MAP applies an inline lambda over a range and spills', () => {
+    const g = grid([
+      ['2', '', '=MAP(A1:A3, LAMBDA(x, x*x))'],
+      ['3', '', ''],
+      ['4', '', '']
+    ])
+    const m = buildSpillMap(g)
+    expect(m.get('0,2')).toBe('4')
+    expect(m.get('1,2')).toBe('9')
+    expect(m.get('2,2')).toBe('16')
+  })
+
+  it('MAP zips two arrays through a two-parameter lambda', () => {
+    const g = grid([
+      ['1', '10', '=MAP(A1:A2, B1:B2, LAMBDA(a, b, a+b))'],
+      ['2', '20', '']
+    ])
+    const m = buildSpillMap(g)
+    expect(m.get('0,2')).toBe('11')
+    expect(m.get('1,2')).toBe('22')
+  })
+
+  it('REDUCE folds a lambda over an array to a scalar', () => {
+    const g = grid([['1', '2', '3', '=REDUCE(0, A1:C1, LAMBDA(acc, v, acc+v))']])
+    expect(displayCell(g, 0, 3)).toBe('6')
+  })
+
+  it('SCAN returns the running totals and spills', () => {
+    const g = grid([
+      ['1', '', '=SCAN(0, A1:A3, LAMBDA(acc, v, acc+v))'],
+      ['2', '', ''],
+      ['3', '', '']
+    ])
+    const m = buildSpillMap(g)
+    expect(m.get('0,2')).toBe('1')
+    expect(m.get('1,2')).toBe('3')
+    expect(m.get('2,2')).toBe('6')
+  })
+
+  it('MAKEARRAY builds a block from the index lambda', () => {
+    const g = grid([['=MAKEARRAY(2, 2, LAMBDA(r, c, r*10+c))']])
+    const m = buildSpillMap(g)
+    expect(m.get('0,0')).toBe('11')
+    expect(m.get('0,1')).toBe('12')
+    expect(m.get('1,0')).toBe('21')
+    expect(m.get('1,1')).toBe('22')
+  })
+
+  it('a LET-bound lambda drives MAP', () => {
+    const g = grid([
+      ['5', '', '=LET(sq, LAMBDA(x, x*x), MAP(A1:A2, sq))'],
+      ['6', '', '']
+    ])
+    const m = buildSpillMap(g)
+    expect(m.get('0,2')).toBe('25')
+    expect(m.get('1,2')).toBe('36')
+  })
+
+  it('using a lambda where a scalar is expected is #VALUE!', () => {
+    const g = grid([['=LET(f, LAMBDA(x, x), f+1)']])
+    expect(displayCell(g, 0, 0)).toBe('#VALUE!')
+  })
+})
