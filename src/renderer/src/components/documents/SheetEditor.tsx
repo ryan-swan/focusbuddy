@@ -1514,6 +1514,9 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
             onInsertLeft={() => { mutateTab((t) => insertColFixed(t, colMenu.c)); setColMenu(null) }}
             onInsertRight={() => { mutateTab((t) => insertColFixed(t, colMenu.c + 1)); setColMenu(null) }}
             onDelete={() => { mutateTab((t) => deleteColFixed(t, colMenu.c)); setColMenu(null) }}
+            freezeActive={(tab.freeze?.cols ?? 0) > 0}
+            onFreeze={() => { mutateTab((t) => ({ ...t, freeze: { rows: t.freeze?.rows ?? 0, cols: colMenu.c + 1 } })); setColMenu(null) }}
+            onUnfreeze={() => { mutateTab((t) => ({ ...t, freeze: { rows: t.freeze?.rows ?? 0, cols: 0 } })); setColMenu(null) }}
             onClose={() => setColMenu(null)}
           />
         )}
@@ -1526,6 +1529,9 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
             onInsertAbove={() => { mutateTab((t) => insertRowFixed(t, rowMenu.r)); setRowMenu(null) }}
             onInsertBelow={() => { mutateTab((t) => insertRowFixed(t, rowMenu.r + 1)); setRowMenu(null) }}
             onDelete={() => { mutateTab((t) => deleteRowFixed(t, rowMenu.r)); setRowMenu(null) }}
+            freezeActive={(tab.freeze?.rows ?? 0) > 0}
+            onFreeze={() => { mutateTab((t) => ({ ...t, freeze: { cols: t.freeze?.cols ?? 0, rows: rowMenu.r + 1 } })); setRowMenu(null) }}
+            onUnfreeze={() => { mutateTab((t) => ({ ...t, freeze: { cols: t.freeze?.cols ?? 0, rows: 0 } })); setRowMenu(null) }}
             onClose={() => setRowMenu(null)}
           />
         )}
@@ -1606,6 +1612,9 @@ function ColumnHeaderMenu({
   onInsertLeft,
   onInsertRight,
   onDelete,
+  freezeActive,
+  onFreeze,
+  onUnfreeze,
   onClose
 }: {
   x: number
@@ -1614,6 +1623,9 @@ function ColumnHeaderMenu({
   onInsertLeft: () => void
   onInsertRight: () => void
   onDelete: () => void
+  freezeActive: boolean
+  onFreeze: () => void
+  onUnfreeze: () => void
   onClose: () => void
 }): JSX.Element {
   const ref = useRef<HTMLDivElement | null>(null)
@@ -1649,6 +1661,15 @@ function ColumnHeaderMenu({
         <Icon name="add" size={13} className="text-[var(--ink-40)]" /> Insert column right
       </button>
       <div className="my-1 border-t border-[var(--edge-soft)]" />
+      <button className={item} onClick={onFreeze}>
+        <Icon name="ac_unit" size={13} className="text-[var(--ink-40)]" /> Freeze up to this column
+      </button>
+      {freezeActive && (
+        <button className={item} onClick={onUnfreeze}>
+          <Icon name="close" size={13} className="text-[var(--ink-40)]" /> Unfreeze columns
+        </button>
+      )}
+      <div className="my-1 border-t border-[var(--edge-soft)]" />
       <button
         className={item + ' text-red-600 disabled:opacity-40'}
         onClick={onDelete}
@@ -1669,6 +1690,9 @@ function RowHeaderMenu({
   onInsertAbove,
   onInsertBelow,
   onDelete,
+  freezeActive,
+  onFreeze,
+  onUnfreeze,
   onClose
 }: {
   x: number
@@ -1677,6 +1701,9 @@ function RowHeaderMenu({
   onInsertAbove: () => void
   onInsertBelow: () => void
   onDelete: () => void
+  freezeActive: boolean
+  onFreeze: () => void
+  onUnfreeze: () => void
   onClose: () => void
 }): JSX.Element {
   const ref = useRef<HTMLDivElement | null>(null)
@@ -1711,6 +1738,15 @@ function RowHeaderMenu({
       <button className={item} onClick={onInsertBelow}>
         <Icon name="add" size={13} className="text-[var(--ink-40)]" /> Insert row below
       </button>
+      <div className="my-1 border-t border-[var(--edge-soft)]" />
+      <button className={item} onClick={onFreeze}>
+        <Icon name="ac_unit" size={13} className="text-[var(--ink-40)]" /> Freeze up to this row
+      </button>
+      {freezeActive && (
+        <button className={item} onClick={onUnfreeze}>
+          <Icon name="close" size={13} className="text-[var(--ink-40)]" /> Unfreeze rows
+        </button>
+      )}
       <div className="my-1 border-t border-[var(--edge-soft)]" />
       <button
         className={item + ' text-red-600 disabled:opacity-40'}

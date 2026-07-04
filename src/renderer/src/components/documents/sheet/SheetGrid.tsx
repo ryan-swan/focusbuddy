@@ -80,6 +80,10 @@ interface Props {
 }
 
 const ROW_HEADER_W = 44
+// The column-label header row is a fixed height so frozen-row sticky offsets are
+// deterministic. DEFAULT_ROW_PX mirrors the 0.75cm default used by the editor.
+const HEADER_H = 30
+const DEFAULT_ROW_PX = 28
 
 function inRange(range: CellRange | null, r: number, c: number): boolean {
   if (!range) return false
@@ -97,6 +101,24 @@ export default function SheetGrid(props: Props): JSX.Element {
     !!selection && selection.r0 === 0 && selection.r1 === maxR && c >= selection.c0 && c <= selection.c1
   const rowFullySelected = (r: number): boolean =>
     !!selection && selection.c0 === 0 && selection.c1 === maxC && r >= selection.r0 && r <= selection.r1
+
+  // Freeze panes. freeze.cols / freeze.rows are counts of leading data columns /
+  // rows that stay pinned while the rest scrolls. The column-label header row is
+  // always pinned to the top and the row-number column to the left; these add
+  // frozen DATA lines on top of that. Offsets are cumulative so a frozen line
+  // sits flush against the previous one (header row is a fixed height).
+  const fCols = Math.min(tab.freeze?.cols ?? 0, maxC + 1)
+  const fRows = Math.min(tab.freeze?.rows ?? 0, maxR + 1)
+  const colLeft = (c: number): number => {
+    let x = ROW_HEADER_W
+    for (let i = 0; i < c; i++) x += props.colWidthOf(i)
+    return x
+  }
+  const rowTop = (r: number): number => {
+    let y = HEADER_H
+    for (let i = 0; i < r; i++) y += props.rowHeightOf?.(i) ?? DEFAULT_ROW_PX
+    return y
+  }
   // Spill map for array formulas (SEQUENCE/UNIQUE/SORT/FILTER/TRANSPOSE), built
   // once per data change rather than per cell. Drives both the anchor's value and
   // the cells the result spills into.
@@ -114,8 +136,6 @@ export default function SheetGrid(props: Props): JSX.Element {
     if (editing) editRef.current?.focus()
   }, [editing])
 
-  const freezeHeader = (tab.freeze?.rows ?? 1) >= 1
-
   return (
     <div
       className="h-full overflow-auto border border-[var(--edge-soft)] rounded-xl bg-[var(--surface-raised)] shadow-sm"
@@ -129,7 +149,7 @@ export default function SheetGrid(props: Props): JSX.Element {
           ))}
         </colgroup>
         <thead>
-          <tr className={freezeHeader ? 'sticky top-0 z-20' : ''}>
+          <tr className="sticky top-0 z-20" style={{ height: HEADER_H }}>
             <th
               data-testid="sheet-select-all"
               title="Select all cells"
@@ -147,7 +167,10 @@ export default function SheetGrid(props: Props): JSX.Element {
                   e.preventDefault()
                   props.onHeaderContextMenu(c, e.clientX, e.clientY)
                 }}
-                className={`relative border-b border-[var(--edge-firm)] border-r border-[var(--edge-soft)] p-0 transition-colors ${
+                style={c < fCols ? { position: 'sticky', left: colLeft(c), zIndex: 25 } : undefined}
+                className={`relative border-b border-[var(--edge-firm)] border-r p-0 transition-colors ${
+                  c === fCols - 1 ? 'border-r-2 border-r-[var(--edge-firm)]' : 'border-[var(--edge-soft)]'
+                } ${
                   colFullySelected(c) ? 'bg-accent/20' : 'bg-[var(--surface-sunken)]/80'
                 } ${props.reorderOver?.kind === 'col' && props.reorderOver.over === c ? 'shadow-[inset_2px_0_0_0_var(--accent)]' : ''}`}
               >
@@ -237,9 +260,12 @@ export default function SheetGrid(props: Props): JSX.Element {
                   e.preventDefault()
                   props.onRowHeaderContextMenu?.(r, e.clientX, e.clientY)
                 }}
-                className={`relative sticky left-0 z-10 text-center text-[11px] text-[var(--ink-40)] border-b border-r border-[var(--edge-soft)] select-none cursor-pointer hover:text-accent transition-colors ${
-                  rowFullySelected(r) ? 'bg-accent/20' : 'bg-[var(--surface-sunken)]/80'
-                } ${props.reorderOver?.kind === 'row' && props.reorderOver.over === r ? 'shadow-[inset_0_2px_0_0_var(--accent)]' : ''}`}
+                style={r < fRows ? { position: 'sticky', top: rowTop(r), left: 0, zIndex: 25 } : undefined}
+                className={`relative sticky left-0 z-10 text-center text-[11px] text-[var(--ink-40)] border-r border-[var(--edge-soft)] select-none cursor-pointer hover:text-accent transition-colors ${
+                  r === fRows - 1 ? 'border-b-2 border-b-[var(--edge-firm)]' : 'border-b border-[var(--edge-soft)]'
+                } ${rowFullySelected(r) ? 'bg-accent/20' : 'bg-[var(--surface-sunken)]/80'} ${
+                  props.reorderOver?.kind === 'row' && props.reorderOver.over === r ? 'shadow-[inset_0_2px_0_0_var(--accent)]' : ''
+                }`}
               >
                 {r + 1}
                 {/* Drag the bottom edge to resize the row height. */}
@@ -299,12 +325,32 @@ export default function SheetGrid(props: Props): JSX.Element {
                   textAlign: fmt?.align ?? (computed !== '' && Number.isFinite(Number(computed)) ? 'right' : 'left')
                 }
                 const isPoint = props.pointCell?.r === r && props.pointCell?.c === c
+                // Freeze-pane stickiness: pinned leading columns/rows stay put
+                // while the rest scrolls. Pinned cells need an opaque background so
+                // scrolled content doesn't show through, and the last pinned line
+                // carries a firmer divider.
+                const frozenL = c < fCols
+                const frozenT = r < fRows
+                const tdStyle: React.CSSProperties = {}
+                if (isPoint) {
+                  tdStyle.outline = '2px dashed var(--accent)'
+                  tdStyle.outlineOffset = '-1px'
+                }
+                if (frozenL || frozenT) {
+                  tdStyle.position = 'sticky'
+                  if (frozenL) tdStyle.left = colLeft(c)
+                  if (frozenT) tdStyle.top = rowTop(r)
+                  tdStyle.zIndex = frozenL && frozenT ? 16 : frozenL ? 13 : 12
+                  if (!selected && !inFillPreview) tdStyle.background = 'var(--surface-raised)'
+                }
+                if (c === fCols - 1 && fCols > 0) tdStyle.borderRight = '2px solid var(--edge-firm)'
+                if (r === fRows - 1 && fRows > 0) tdStyle.borderBottom = '2px solid var(--edge-firm)'
                 return (
                   <td
                     key={c}
                     data-testid={`cell-${r}-${c}`}
                     data-spill={isSpilled ? '1' : undefined}
-                    style={isPoint ? { outline: '2px dashed var(--accent)', outlineOffset: '-1px' } : undefined}
+                    style={Object.keys(tdStyle).length ? tdStyle : undefined}
                     onMouseDown={(e) => {
                       // In formula reference mode, prevent the default focus
                       // shift so the edit input keeps focus (no blur -> no
