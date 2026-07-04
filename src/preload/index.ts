@@ -1718,6 +1718,14 @@ const api = {
     removeBackground: (input: { dataUrl: string }): Promise<{ ok: boolean; dataUrl?: string; error?: string; needsKey?: boolean }> =>
       ipcRenderer.invoke('design:removeBackground', input)
   },
+  // PlexiDraw export — one diagram out to .svg / .png / .jpg / .pdf.
+  map: {
+    export: (input: {
+      map: import('@shared/types').MapBody
+      title: string
+      format: 'svg' | 'png' | 'jpg' | 'pdf'
+    }): Promise<{ ok: boolean; path?: string; error?: string }> => ipcRenderer.invoke('map:export', input)
+  },
   // The organization Brand Kit — one brand the whole workspace reads.
   brand: {
     get: (): Promise<{ kit: import('@shared/brandKit').OrgBrandKit; isSet: boolean }> => ipcRenderer.invoke('brand:get'),
