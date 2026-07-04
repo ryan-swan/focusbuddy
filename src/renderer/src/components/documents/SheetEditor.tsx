@@ -1697,8 +1697,8 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
 
         {macrosOpen && (
           <MacrosPanel
-            onRun={(code) => {
-              const res = runSheetScript(tab, code)
+            onRun={async (code) => {
+              const res = await runSheetScript(tab, code)
               if (!res.error) mutateTab(() => res.tab)
               return res
             }}
@@ -2080,13 +2080,14 @@ function MacrosPanel({
   onRun,
   onClose
 }: {
-  onRun: (code: string) => SheetScriptResult
+  onRun: (code: string) => Promise<SheetScriptResult>
   onClose: () => void
 }): JSX.Element {
   const [code, setCode] = useState(MACRO_EXAMPLE)
   const [logs, setLogs] = useState<string[]>([])
   const [error, setError] = useState<string | null>(null)
   const [ran, setRan] = useState(false)
+  const [running, setRunning] = useState(false)
   useEffect(() => {
     function onKey(e: KeyboardEvent): void {
       if (e.key === 'Escape') onClose()
@@ -2136,15 +2137,21 @@ function MacrosPanel({
           </button>
           <button
             data-testid="macros-run"
-            className="btn-primary text-[12px] px-3 py-1.5 inline-flex items-center gap-1"
-            onClick={() => {
-              const res = onRun(code)
-              setError(res.error)
-              setLogs(res.logs)
-              setRan(true)
+            className="btn-primary text-[12px] px-3 py-1.5 inline-flex items-center gap-1 disabled:opacity-50"
+            disabled={running}
+            onClick={async () => {
+              setRunning(true)
+              try {
+                const res = await onRun(code)
+                setError(res.error)
+                setLogs(res.logs)
+                setRan(true)
+              } finally {
+                setRunning(false)
+              }
             }}
           >
-            <Icon name="play_arrow" size={14} /> Run macro
+            <Icon name="play_arrow" size={14} /> {running ? 'Running…' : 'Run macro'}
           </button>
         </div>
       </div>
