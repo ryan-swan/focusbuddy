@@ -25,6 +25,7 @@ import {
   dataExtentBelow,
   sortByColumn,
   setColWidth,
+  setRowHeight,
   parseTsv,
   rangeToTsv,
   normalizeRange,
@@ -77,7 +78,21 @@ interface FuncMenu {
   query: string
 }
 
-const DEFAULT_COL_W = 140
+// Sizing defaults, in CSS px. The sheet defaults to 3cm columns and 0.75cm rows
+// (1cm = 37.795px at 96dpi), both resizable by the user.
+const CM_PX = 37.795
+const DEFAULT_COL_W = Math.round(3 * CM_PX) // ~113px
+const DEFAULT_ROW_H = Math.round(0.75 * CM_PX) // ~28px
+
+// Measure rendered text width for auto-fit, using a cached canvas so a column of
+// mixed content fits its widest actual value (not a character-count guess).
+let _measureCtx: CanvasRenderingContext2D | null = null
+function measureTextPx(text: string, bold: boolean): number {
+  if (!_measureCtx) _measureCtx = document.createElement('canvas').getContext('2d')
+  if (!_measureCtx) return text.length * 7.3
+  _measureCtx.font = `${bold ? '600 ' : ''}13px Inter, system-ui, sans-serif`
+  return _measureCtx.measureText(text).width
+}
 
 // Structural edits that also fix formula references, so inserting, deleting or
 // moving rows/columns keeps every formula pointing at the same data. A reference
@@ -162,6 +177,7 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
   // The right-side AI Assistant panel is shown by default and is collapsible.
   const [aiPanelOpen, setAiPanelOpen] = useState(true)
   const [liveWidth, setLiveWidth] = useState<{ c: number; w: number } | null>(null)
+  const [liveHeight, setLiveHeight] = useState<{ r: number; h: number } | null>(null)
   const [status, setStatus] = useState<string | null>(null)
   const [colMenu, setColMenu] = useState<{ c: number; x: number; y: number } | null>(null)
   const [rowMenu, setRowMenu] = useState<{ r: number; x: number; y: number } | null>(null)
@@ -199,6 +215,10 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
   // across row numbers. `anchor` is the header the drag started on so entering
   // another header extends a whole-column / whole-row block from it.
   const headerDrag = useRef<{ kind: 'col' | 'row'; anchor: number } | null>(null)
+  // The header-selection anchor, kept across separate click gestures so a
+  // shift-click on another header extends from it. (headerDrag is cleared on
+  // every mouseup, so it can't hold this.)
+  const headerAnchor = useRef<{ kind: 'col' | 'row'; index: number } | null>(null)
   // Header drag-REORDER (distinct from select-drag): armed when the user presses
   // on an already-selected column/row header and drags it to a new position.
   // `band` is the moved block, `over` the header currently under the cursor.
@@ -206,6 +226,12 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
   // Assigned every render (below) with a closure over the current tab + mutators
   // so the empty-dependency global mouseup listener resolves a reorder correctly.
   const finalizeReorderRef = useRef<() => void>(() => {})
+  // Formula "point mode": while editing a formula, arrow keys (and clicks) insert
+  // a cell reference. pointRef holds the cell being pointed at and the span of the
+  // inserted ref text so the next arrow can replace it; pointCell drives the
+  // dashed marker on the grid.
+  const pointRef = useRef<{ r: number; c: number; from: number; to: number } | null>(null)
+  const [pointCell, setPointCell] = useState<{ r: number; c: number } | null>(null)
   // Source selection captured when a fill-handle drag begins, the live preview
   // rectangle (mirrored as a ref so the global mouseup can read it), and a ref to
   // the latest fill executor (kept fresh each render so the mouseup closure isn't
@@ -287,6 +313,10 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
     (c: number): number => (liveWidth?.c === c ? liveWidth.w : tab.colWidths?.[c] ?? DEFAULT_COL_W),
     [liveWidth, tab.colWidths]
   )
+  const rowHeightOf = useCallback(
+    (r: number): number => (liveHeight?.r === r ? liveHeight.h : tab.rowHeights?.[r] ?? DEFAULT_ROW_H),
+    [liveHeight, tab.rowHeights]
+  )
 
   // ── Selection + editing ───────────────────────────────────────────────────
   function focusGrid(): void {
@@ -305,6 +335,8 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
       return
     }
     setEditing(null)
+    // A cell click ends any header-selection anchor chain.
+    if (!shift) headerAnchor.current = null
     if (shift) setFocus({ r, c })
     else {
       setAnchor({ r, c })
@@ -356,6 +388,9 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
           const s = input.selectionStart ?? input.value.length
           const e = input.selectionEnd ?? s
           const next = input.value.slice(0, s) + ref + input.value.slice(e)
+          // A click-inserted reference supersedes any arrow-key point.
+          pointRef.current = null
+          setPointCell(null)
           setEditValue(next)
           const caret = s + ref.length
           requestAnimationFrame(() => {
@@ -389,9 +424,56 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
     [editing, editValue, funcDismissed]
   )
   function handleEditValue(v: string): void {
+    // Typing anything locks the current point-mode reference in place.
+    pointRef.current = null
+    setPointCell(null)
     setEditValue(v)
     setFuncIndex(0)
     setFuncDismissed(false)
+  }
+
+  // Formula point mode: an arrow key while editing a formula points at a cell and
+  // inserts (or moves) its reference. Returns true when the arrow was consumed so
+  // the caller stops the text caret from also moving. Only engages when a
+  // reference is expected — a point is active, or the caret sits at the end right
+  // after =, an operator, "(" or ",". Otherwise arrows move the caret as usual.
+  function handleFormulaArrow(dir: 'up' | 'down' | 'left' | 'right', _shift: boolean): boolean {
+    if (!editing || !editValue.startsWith('=')) return false
+    const input = editInputRef.current
+    const atEnd = input ? input.selectionStart === editValue.length && input.selectionEnd === editValue.length : true
+    const cur = pointRef.current
+    if (!cur && !(atEnd && /[=+\-*/(,&<>^%: ]$/.test(editValue))) return false
+    const base = cur ? { r: cur.r, c: cur.c } : { r: editing.r, c: editing.c }
+    const dr = dir === 'up' ? -1 : dir === 'down' ? 1 : 0
+    const dc = dir === 'left' ? -1 : dir === 'right' ? 1 : 0
+    const nr = Math.max(0, Math.min(tab.rows.length - 1, base.r + dr))
+    const nc = Math.max(0, Math.min(tab.columns.length - 1, base.c + dc))
+    const ref = `${colLabel(nc)}${nr + 1}`
+    let next: string
+    let from: number
+    if (cur) {
+      next = editValue.slice(0, cur.from) + ref + editValue.slice(cur.to)
+      from = cur.from
+    } else {
+      from = editValue.length
+      next = editValue + ref
+    }
+    pointRef.current = { r: nr, c: nc, from, to: from + ref.length }
+    setPointCell({ r: nr, c: nc })
+    setEditValue(next)
+    const caret = from + ref.length
+    requestAnimationFrame(() => {
+      const el = editInputRef.current
+      if (el) {
+        el.focus()
+        try {
+          el.setSelectionRange(caret, caret)
+        } catch {
+          /* input may have unmounted */
+        }
+      }
+    })
+    return true
   }
   function applyFunc(menu: FuncMenu, index: number): void {
     const fn = menu.items[index] ?? menu.items[0]
@@ -441,13 +523,20 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
   }, [funcMenu, funcIndex])
 
   function startEdit(cell: Cell, initial?: string): void {
+    pointRef.current = null
+    setPointCell(null)
     setEditing(cell)
     setEditValue(initial ?? tab.rows[cell.r]?.[cell.c] ?? '')
     setFuncIndex(0)
     setFuncDismissed(false)
   }
+  function endPointMode(): void {
+    pointRef.current = null
+    setPointCell(null)
+  }
   function commitEdit(move: 'down' | 'right' | 'none'): void {
     if (!editing) return
+    endPointMode()
     const { r, c } = editing
     // Strict data validation rejects an invalid entry rather than writing a value
     // the rule forbids. The cell keeps its previous content; we never silently
@@ -488,7 +577,8 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
       reorderArm.current = { kind: 'col', band: [selection.c0, selection.c1], moved: false, over: c }
       return
     }
-    const a = shift && headerDrag.current?.kind === 'col' ? headerDrag.current.anchor : c
+    const a = shift && headerAnchor.current?.kind === 'col' ? headerAnchor.current.index : c
+    headerAnchor.current = { kind: 'col', index: a }
     headerDrag.current = { kind: 'col', anchor: a }
     reorderArm.current = null
     setAnchor({ r: 0, c: a })
@@ -504,7 +594,7 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
       return
     }
     if (headerDrag.current?.kind !== 'col') return
-    setAnchor({ r: 0, c: headerDrag.current.anchor })
+    setAnchor({ r: 0, c: headerAnchor.current?.index ?? headerDrag.current.anchor })
     setFocus({ r: tab.rows.length - 1, c })
   }
   function selectRow(r: number, shift: boolean): void {
@@ -515,7 +605,8 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
       reorderArm.current = { kind: 'row', band: [selection.r0, selection.r1], moved: false, over: r }
       return
     }
-    const a = shift && headerDrag.current?.kind === 'row' ? headerDrag.current.anchor : r
+    const a = shift && headerAnchor.current?.kind === 'row' ? headerAnchor.current.index : r
+    headerAnchor.current = { kind: 'row', index: a }
     headerDrag.current = { kind: 'row', anchor: a }
     reorderArm.current = null
     setAnchor({ r: a, c: 0 })
@@ -531,7 +622,7 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
       return
     }
     if (headerDrag.current?.kind !== 'row') return
-    setAnchor({ r: headerDrag.current.anchor, c: 0 })
+    setAnchor({ r: headerAnchor.current?.index ?? headerDrag.current.anchor, c: 0 })
     setFocus({ r, c: tab.columns.length - 1 })
   }
 
@@ -925,16 +1016,38 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
     document.addEventListener('mouseup', onUp)
   }
 
+  // Drag the bottom edge of a row header to resize its height (Excel-style).
+  function onRowResizeStart(r: number, e: React.MouseEvent): void {
+    e.preventDefault()
+    e.stopPropagation()
+    const startY = e.clientY
+    const startH = rowHeightOf(r)
+    const onMove = (ev: MouseEvent): void => setLiveHeight({ r, h: Math.max(20, startH + ev.clientY - startY) })
+    const onUp = (ev: MouseEvent): void => {
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup', onUp)
+      const h = Math.max(20, startH + ev.clientY - startY)
+      setLiveHeight(null)
+      mutateTab((t) => setRowHeight(t, r, h))
+    }
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
+  }
+
   // Double-click the column boundary to auto-fit width to content (Excel). Sizes
   // to the widest displayed value in the column, clamped to a sane range.
   function onColAutoFit(c: number): void {
     const grid = { columns: tab.columns, rows: tab.rows }
-    let maxLen = (tab.columns[c] ?? '').length
+    // Header is semibold; each cell is measured in its own weight so a bold value
+    // widens the fit. The column grows to its widest actual content.
+    let maxW = measureTextPx(tab.columns[c] ?? '', true)
     for (let r = 0; r < tab.rows.length; r++) {
       const v = displayCell(grid, r, c, workbook)
-      if (v.length > maxLen) maxLen = v.length
+      if (!v) continue
+      const w = measureTextPx(v, !!cellFormat(tab, r, c)?.bold)
+      if (w > maxW) maxW = w
     }
-    const w = Math.max(64, Math.min(480, Math.round(maxLen * 7.3) + 28))
+    const w = Math.max(64, Math.min(600, Math.round(maxW) + 26))
     mutateTab((t) => setColWidth(t, c, w))
   }
 
@@ -1304,10 +1417,14 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
             onCellMouseEnter={onCellMouseEnter}
             onCellDoubleClick={(r, c) => startEdit({ r, c })}
             onCommitEdit={commitEdit}
-            onCancelEdit={() => setEditing(null)}
+            onCancelEdit={() => { endPointMode(); setEditing(null) }}
+            onFormulaArrow={handleFormulaArrow}
+            pointCell={pointCell}
             onHeaderRename={(c, name) => mutateTab((t) => setColumnName(t, c, name))}
             onColResizeStart={onColResizeStart}
             onColAutoFit={onColAutoFit}
+            rowHeightOf={rowHeightOf}
+            onRowResizeStart={onRowResizeStart}
             onHeaderContextMenu={(c, x, y) => setColMenu({ c, x, y })}
             onSelectAll={selectAllCells}
             onColHeaderMouseDown={selectColumn}

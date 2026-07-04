@@ -99,13 +99,23 @@ function shiftWidths(
 export function insertRowAt(tab: SheetTab, index: number): SheetTab {
   const rows = [...tab.rows]
   rows.splice(index, 0, new Array(tab.columns.length).fill(''))
-  return { ...tab, rows, formats: shiftFormats(tab.formats, 'row', index, 1) }
+  return {
+    ...tab,
+    rows,
+    formats: shiftFormats(tab.formats, 'row', index, 1),
+    rowHeights: shiftWidths(tab.rowHeights, index, 1)
+  }
 }
 
 export function deleteRowAt(tab: SheetTab, index: number): SheetTab {
   if (tab.rows.length <= 1) return tab
   const rows = tab.rows.filter((_, i) => i !== index)
-  return { ...tab, rows, formats: shiftFormats(tab.formats, 'row', index, -1) }
+  return {
+    ...tab,
+    rows,
+    formats: shiftFormats(tab.formats, 'row', index, -1),
+    rowHeights: shiftWidths(tab.rowHeights, index, -1)
+  }
 }
 
 export function insertColAt(tab: SheetTab, index: number): SheetTab {
@@ -160,10 +170,18 @@ function reorderFormats(
 // are not rewritten here; the editor does that via remapFormulaRefs so a reorder
 // can keep formulas pointing at the same data.
 export function reorderRows(tab: SheetTab, order: number[]): SheetTab {
+  const oldToNew: number[] = []
+  order.forEach((oldIdx, newIdx) => (oldToNew[oldIdx] = newIdx))
+  const heights = tab.rowHeights
+    ? Object.fromEntries(
+        Object.entries(tab.rowHeights).map(([k, h]) => [oldToNew[Number(k)] ?? Number(k), h])
+      )
+    : tab.rowHeights
   return {
     ...tab,
     rows: order.map((oi) => tab.rows[oi] ?? new Array(tab.columns.length).fill('')),
-    formats: reorderFormats(tab.formats, order, 'row')
+    formats: reorderFormats(tab.formats, order, 'row'),
+    rowHeights: heights
   }
 }
 
@@ -366,6 +384,10 @@ export function sortByColumn(tab: SheetTab, col: number, dir: 'asc' | 'desc'): S
 
 export function setColWidth(tab: SheetTab, col: number, width: number): SheetTab {
   return { ...tab, colWidths: { ...(tab.colWidths ?? {}), [col]: Math.max(48, Math.round(width)) } }
+}
+
+export function setRowHeight(tab: SheetTab, row: number, height: number): SheetTab {
+  return { ...tab, rowHeights: { ...(tab.rowHeights ?? {}), [row]: Math.max(20, Math.round(height)) } }
 }
 
 // Serialize a range to TSV for the clipboard, using raw cell text.

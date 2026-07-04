@@ -26,6 +26,8 @@ interface Props {
   editing: { r: number; c: number } | null
   editValue: string
   colWidthOf: (c: number) => number
+  rowHeightOf?: (r: number) => number
+  onRowResizeStart?: (r: number, e: React.MouseEvent) => void
   onEditValue: (v: string) => void
   onCellMouseDown: (r: number, c: number, shift: boolean) => void
   onCellMouseEnter: (r: number, c: number) => void
@@ -42,6 +44,11 @@ interface Props {
   // a cell click keeps the input focused rather than blurring + committing).
   editInputRef?: React.MutableRefObject<HTMLInputElement | null>
   formulaRefMode?: boolean
+  // Arrow-key cell referencing while editing a formula (Excel point mode). The
+  // parent returns true when it consumed the arrow. `pointCell` is the cell it is
+  // currently pointing at, drawn with a dashed outline.
+  onFormulaArrow?: (dir: 'up' | 'down' | 'left' | 'right', shift: boolean) => boolean
+  pointCell?: { r: number; c: number } | null
   // Excel-style header selection. Clicking the top-left corner selects the whole
   // grid; clicking a column letter or a row number selects that column/row, and
   // dragging across headers (or shift-clicking) extends the selection.
@@ -110,7 +117,10 @@ export default function SheetGrid(props: Props): JSX.Element {
   const freezeHeader = (tab.freeze?.rows ?? 1) >= 1
 
   return (
-    <div className="h-full overflow-auto border border-[var(--edge-soft)] rounded-lg" data-testid="sheet-grid">
+    <div
+      className="h-full overflow-auto border border-[var(--edge-soft)] rounded-xl bg-[var(--surface-raised)] shadow-sm"
+      data-testid="sheet-grid"
+    >
       <table className="border-collapse text-[13px]" style={{ tableLayout: 'fixed' }}>
         <colgroup>
           <col style={{ width: ROW_HEADER_W }} />
@@ -127,7 +137,7 @@ export default function SheetGrid(props: Props): JSX.Element {
                 e.preventDefault()
                 props.onSelectAll?.()
               }}
-              className="sticky left-0 z-30 bg-[var(--surface-sunken)] border-b border-r border-[var(--edge-soft)] cursor-pointer hover:bg-accent/10"
+              className="sticky left-0 z-30 bg-[var(--surface-sunken)]/80 border-b border-[var(--edge-firm)] border-r border-[var(--edge-soft)] cursor-pointer hover:bg-accent/10 transition-colors"
             />
             {tab.columns.map((col, c) => (
               <th
@@ -137,8 +147,8 @@ export default function SheetGrid(props: Props): JSX.Element {
                   e.preventDefault()
                   props.onHeaderContextMenu(c, e.clientX, e.clientY)
                 }}
-                className={`relative border-b border-r border-[var(--edge-soft)] p-0 ${
-                  colFullySelected(c) ? 'bg-accent/20' : 'bg-[var(--surface-sunken)]'
+                className={`relative border-b border-[var(--edge-firm)] border-r border-[var(--edge-soft)] p-0 transition-colors ${
+                  colFullySelected(c) ? 'bg-accent/20' : 'bg-[var(--surface-sunken)]/80'
                 } ${props.reorderOver?.kind === 'col' && props.reorderOver.over === c ? 'shadow-[inset_2px_0_0_0_var(--accent)]' : ''}`}
               >
                 <div className="flex items-center">
@@ -214,7 +224,7 @@ export default function SheetGrid(props: Props): JSX.Element {
             // so selection, fill, and every formula reference are unaffected.
             if (props.hiddenRows?.has(r)) return null
             return (
-            <tr key={r}>
+            <tr key={r} className="group" style={{ height: props.rowHeightOf?.(r) }}>
               <td
                 data-testid={`row-header-${r}`}
                 title="Click to select row · drag to select several · right-click for options"
@@ -227,11 +237,22 @@ export default function SheetGrid(props: Props): JSX.Element {
                   e.preventDefault()
                   props.onRowHeaderContextMenu?.(r, e.clientX, e.clientY)
                 }}
-                className={`sticky left-0 z-10 text-center text-[11px] text-[var(--ink-40)] border-b border-r border-[var(--edge-soft)] select-none cursor-pointer hover:text-accent ${
-                  rowFullySelected(r) ? 'bg-accent/20' : 'bg-[var(--surface-sunken)]'
+                className={`relative sticky left-0 z-10 text-center text-[11px] text-[var(--ink-40)] border-b border-r border-[var(--edge-soft)] select-none cursor-pointer hover:text-accent transition-colors ${
+                  rowFullySelected(r) ? 'bg-accent/20' : 'bg-[var(--surface-sunken)]/80'
                 } ${props.reorderOver?.kind === 'row' && props.reorderOver.over === r ? 'shadow-[inset_0_2px_0_0_var(--accent)]' : ''}`}
               >
                 {r + 1}
+                {/* Drag the bottom edge to resize the row height. */}
+                {props.onRowResizeStart && (
+                  <span
+                    onMouseDown={(e) => {
+                      e.stopPropagation()
+                      props.onRowResizeStart?.(r, e)
+                    }}
+                    title="Drag to resize row"
+                    className="absolute bottom-0 left-0 right-0 h-[6px] translate-y-1/2 z-20 cursor-row-resize hover:bg-accent/40"
+                  />
+                )}
               </td>
               {tab.columns.map((_, c) => {
                 const isActive = active?.r === r && active?.c === c
@@ -277,11 +298,13 @@ export default function SheetGrid(props: Props): JSX.Element {
                   fontFamily: fmt?.fontFamily || undefined,
                   textAlign: fmt?.align ?? (computed !== '' && Number.isFinite(Number(computed)) ? 'right' : 'left')
                 }
+                const isPoint = props.pointCell?.r === r && props.pointCell?.c === c
                 return (
                   <td
                     key={c}
                     data-testid={`cell-${r}-${c}`}
                     data-spill={isSpilled ? '1' : undefined}
+                    style={isPoint ? { outline: '2px dashed var(--accent)', outlineOffset: '-1px' } : undefined}
                     onMouseDown={(e) => {
                       // In formula reference mode, prevent the default focus
                       // shift so the edit input keeps focus (no blur -> no
@@ -292,8 +315,12 @@ export default function SheetGrid(props: Props): JSX.Element {
                     }}
                     onMouseEnter={() => props.onCellMouseEnter(r, c)}
                     onDoubleClick={() => props.onCellDoubleClick(r, c)}
-                    className={`relative border-b border-r border-[var(--edge-soft)] p-0 align-top ${
-                      selected ? 'bg-accent/[0.10]' : inFillPreview ? 'bg-accent/[0.06]' : ''
+                    className={`relative border-b border-r border-[var(--edge-soft)] p-0 align-middle transition-colors ${
+                      selected
+                        ? 'bg-accent/[0.10]'
+                        : inFillPreview
+                          ? 'bg-accent/[0.06]'
+                          : 'group-hover:bg-[var(--surface-sunken)]/40'
                     } ${isActive ? 'outline outline-2 -outline-offset-1 outline-accent' : ''}`}
                   >
                     {showHandle && (
@@ -367,6 +394,24 @@ export default function SheetGrid(props: Props): JSX.Element {
                         value={props.editValue}
                         onChange={(e) => props.onEditValue(e.target.value)}
                         onKeyDown={(e) => {
+                          const arrow =
+                            e.key === 'ArrowUp'
+                              ? 'up'
+                              : e.key === 'ArrowDown'
+                                ? 'down'
+                                : e.key === 'ArrowLeft'
+                                  ? 'left'
+                                  : e.key === 'ArrowRight'
+                                    ? 'right'
+                                    : null
+                          // While typing a formula, arrow keys point at a cell to
+                          // insert its reference (Excel point mode). The parent
+                          // returns true when it consumed the arrow, so the text
+                          // caret does not also move.
+                          if (arrow && props.onFormulaArrow?.(arrow, e.shiftKey)) {
+                            e.preventDefault()
+                            return
+                          }
                           if (e.key === 'Enter') {
                             e.preventDefault()
                             props.onCommitEdit('down')
@@ -379,11 +424,11 @@ export default function SheetGrid(props: Props): JSX.Element {
                           }
                         }}
                         onBlur={() => props.onCommitEdit('none')}
-                        className="w-full px-2.5 py-2 bg-white dark:bg-stone-900 outline-none text-stone-900 dark:text-stone-100 font-mono"
+                        className="w-full px-2.5 py-1 bg-white dark:bg-stone-900 outline-none text-stone-900 dark:text-stone-100 font-mono"
                       />
                     ) : sparkline ? (
                       <div
-                        className="px-2.5 py-2 select-none text-accent"
+                        className="px-2.5 py-1 select-none text-accent"
                         title={`Sparkline of ${sparkline.values.length} value${sparkline.values.length === 1 ? '' : 's'}`}
                       >
                         <SparklineCell
@@ -397,7 +442,7 @@ export default function SheetGrid(props: Props): JSX.Element {
                     ) : (
                       <div
                         style={style}
-                        className={`px-2.5 py-2 whitespace-pre-wrap break-words select-none text-stone-800 dark:text-stone-100 ${listValues ? 'pr-4' : ''}`}
+                        className={`px-2.5 py-1 whitespace-pre-wrap break-words select-none text-stone-800 dark:text-stone-100 ${listValues ? 'pr-4' : ''}`}
                         title={shown}
                       >
                         {shown}
