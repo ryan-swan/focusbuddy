@@ -295,9 +295,14 @@ interface Props {
   body: MapBody
   title?: string
   onChange: (body: MapBody) => void
+  // Live co-editing only. When true, a change in the body prop's identity is
+  // treated as a peer's merge and folded into the graph. Left off (the default)
+  // for the normal single-user editor, where the parent feeds our own saves back
+  // as a new body identity and folding them would fight the live editing state.
+  foldExternal?: boolean
 }
 
-function MapInner({ body, onChange }: Props): JSX.Element {
+function MapInner({ body, onChange, foldExternal = false }: Props): JSX.Element {
   const initial = useMemo(() => normalizeMapBody(body), [])
   const [nodes, setNodes, onNodesChange] = useNodesState<Node<ShapeData>>(toFlowNodes(initial))
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>(toFlowEdges(initial))
@@ -324,6 +329,27 @@ function MapInner({ body, onChange }: Props): JSX.Element {
     }, 350)
     return () => window.clearTimeout(t)
   }, [nodes, edges])
+
+  // Fold live co-editing merges. When the body prop changes identity (a peer's
+  // edit arrived through the CRDT, never our own echo — the parent reconciles our
+  // edits under a private origin that does not refresh the prop), reconcile the
+  // shared nodes and edges into the graph. We deliberately leave the viewport
+  // alone so a peer's pan or zoom never yanks our view; the shared viewport field
+  // is then just last-writer noise that no live client applies. The first run is
+  // skipped because the initial state already reflects the first body.
+  const foldKey = useMemo(() => (foldExternal ? JSON.stringify(normalizeMapBody(body)) : ''), [body, foldExternal])
+  const firstFold = useRef(true)
+  useEffect(() => {
+    if (!foldExternal) return
+    if (firstFold.current) {
+      firstFold.current = false
+      return
+    }
+    const norm = normalizeMapBody(body)
+    setNodes(toFlowNodes(norm))
+    setEdges(toFlowEdges(norm))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [foldKey])
 
   // Label commits from a node's inline editor.
   useEffect(() => {

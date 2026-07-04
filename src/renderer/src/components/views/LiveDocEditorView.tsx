@@ -42,6 +42,19 @@ interface Props {
   onBack?: () => void
 }
 
+// The whole-body JSON editors that co-edit through the reconcile engine. The doc
+// type uses the Tiptap binding instead; everything here shares one code path.
+const JSON_COEDIT_TYPES = ['sheet', 'slides', 'map', 'design'] as const
+type JsonCoeditType = (typeof JSON_COEDIT_TYPES)[number]
+function isJsonCoedit(t: string | undefined): t is JsonCoeditType {
+  return !!t && (JSON_COEDIT_TYPES as readonly string[]).includes(t)
+}
+// Every type that edits live with no check-out lock (doc via Tiptap, the rest via
+// JSON reconcile).
+function isLiveCoEdit(t: string | undefined): boolean {
+  return t === 'doc' || isJsonCoedit(t)
+}
+
 export default function LiveDocEditorView({ liveDocId, onBack }: Props): JSX.Element {
   const meta = useDocCollabStore((s) => s.meta)
   const bodyObj = useDocCollabStore((s) => s.bodyObj)
@@ -51,7 +64,6 @@ export default function LiveDocEditorView({ liveDocId, onBack }: Props): JSX.Ele
   const saving = useDocCollabStore((s) => s.saving)
   const openLive = useDocCollabStore((s) => s.openLive)
   const closeLive = useDocCollabStore((s) => s.closeLive)
-  const saveBody = useDocCollabStore((s) => s.saveBody)
   const acquire = useDocCollabStore((s) => s.acquire)
   const requestTakeoverForOpen = useDocCollabStore((s) => s.requestTakeoverForOpen)
   const goDocuments = useViewStore((s) => s.goDocuments)
@@ -151,9 +163,12 @@ export default function LiveDocEditorView({ liveDocId, onBack }: Props): JSX.Ele
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [meta?.id, meta?.docType, liveDocId])
 
-  // CRDT session for sheets/slides via the JSON reconcile engine.
+  // CRDT session for sheets/slides/maps/designs via the JSON reconcile engine.
+  // These are all whole-body JSON editors, so the same reconcile+observe path
+  // drives genuine simultaneous editing for every one of them; only the plain
+  // document uses the Tiptap binding above.
   useEffect(() => {
-    if (!meta || meta.id !== liveDocId || !(meta.docType === 'sheet' || meta.docType === 'slides')) return
+    if (!meta || meta.id !== liveDocId || !isJsonCoedit(meta.docType)) return
     if (jsonCollabRef.current?.docId === liveDocId) return
     const ydoc = new Y.Doc()
     const root = ydoc.getMap('root')
@@ -208,9 +223,10 @@ export default function LiveDocEditorView({ liveDocId, onBack }: Props): JSX.Ele
   // server also rejects writes without the lock, so this is belt-and-braces).
   useEffect(() => {
     const el = surfaceRef.current
-    // Docs, sheets and slides are concurrently editable by everyone (CRDT), so
-    // never inert. Other types keep the single-writer lock.
-    const co = meta?.docType === 'doc' || meta?.docType === 'sheet' || meta?.docType === 'slides'
+    // All live editor types are concurrently editable by everyone (CRDT), so
+    // never inert. (There is no non-CRDT type left, but the guard stays so a
+    // future lock-only type still gets the read-only treatment.)
+    const co = isLiveCoEdit(meta?.docType)
     if (el) (el as unknown as { inert: boolean }).inert = co ? false : !isHolder
   }, [isHolder, meta, bodyObj])
 
@@ -235,7 +251,9 @@ export default function LiveDocEditorView({ liveDocId, onBack }: Props): JSX.Ele
         ? 'Spreadsheet'
         : meta.docType === 'slides'
           ? 'Slides'
-          : 'Map'
+          : meta.docType === 'design'
+            ? 'Design'
+            : 'Map'
   const typeIcon =
     meta.docType === 'doc'
       ? 'description'
@@ -243,12 +261,15 @@ export default function LiveDocEditorView({ liveDocId, onBack }: Props): JSX.Ele
         ? 'table_chart'
         : meta.docType === 'slides'
           ? 'slideshow'
-          : 'account_tree'
+          : meta.docType === 'design'
+            ? 'brush'
+            : 'account_tree'
   const isOwner = meta.ownerAccountId === myId
   const holderHandle = lock?.holder?.handle ?? null
   const lockedByOther = !!lock?.holder && lock.holder.accountId !== myId
-  // Docs, sheets and slides co-edit in real time (no lock); maps still check out.
-  const liveCoEdit = meta.docType === 'doc' || meta.docType === 'sheet' || meta.docType === 'slides'
+  // Every editor type co-edits in real time (doc via Tiptap, the rest via the
+  // JSON reconcile engine); nothing uses the check-out lock any more.
+  const liveCoEdit = isLiveCoEdit(meta.docType)
   // Comments are a document-only feature for now.
   const canComment = meta.docType === 'doc'
   // Awareness: who has access, with the live editor (lock holder) highlighted.
@@ -403,10 +424,6 @@ export default function LiveDocEditorView({ liveDocId, onBack }: Props): JSX.Ele
     setRequested(true)
     setRequestMsg('')
   }
-
-  // Re-key the editor on remote version changes for read-only viewers so pushed
-  // updates show; keep it stable for the holder so typing never loses the cursor.
-  const editorKey = `${meta.id}:${isHolder ? 'edit' : `v${meta.version}`}`
 
   return (
     <div className="h-full flex flex-col desk-paper no-tod">
@@ -632,12 +649,18 @@ export default function LiveDocEditorView({ liveDocId, onBack }: Props): JSX.Ele
           ) : (
             <div className="p-6 text-[13px] text-[var(--ink-40)]">Connecting live editing…</div>
           ))}
-        {meta.docType === 'map' && (
-          <MapEditor key={editorKey} body={bodyObj as MapBody} title={meta.title} onChange={(b) => saveBody(b)} />
-        )}
-        {meta.docType === 'design' && (
-          <DesignEditor key={editorKey} content={bodyObj} title={meta.title} onChange={(b) => saveBody(b)} />
-        )}
+        {meta.docType === 'map' &&
+          (collabBody !== null ? (
+            <MapEditor key={`${meta.id}:collab`} body={collabBody as MapBody} title={meta.title} onChange={onJsonChange} foldExternal />
+          ) : (
+            <div className="p-6 text-[13px] text-[var(--ink-40)]" data-testid="livedoc-connecting">Connecting live editing…</div>
+          ))}
+        {meta.docType === 'design' &&
+          (collabBody !== null ? (
+            <DesignEditor key={`${meta.id}:collab`} content={collabBody} title={meta.title} onChange={onJsonChange} foldExternal />
+          ) : (
+            <div className="p-6 text-[13px] text-[var(--ink-40)]" data-testid="livedoc-connecting">Connecting live editing…</div>
+          ))}
         </div>
         {canComment && commentsOpen && (
           <CommentsPanel
