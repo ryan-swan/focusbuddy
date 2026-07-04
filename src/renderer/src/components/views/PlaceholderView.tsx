@@ -13,13 +13,13 @@ export default function PlaceholderView({ icon, title, blurb, cta }: Props): JSX
   return (
     <div className="h-full flex flex-col items-center justify-center text-center px-6 desk-paper no-tod">
       <div className="max-w-md">
-        <div className="inline-flex items-center justify-center h-14 w-14 rounded-2xl bg-stone-100 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 mb-4">
+        <div className="inline-flex items-center justify-center h-14 w-14 rounded-2xl bg-[var(--surface-sunken)] border border-[var(--edge-soft)] mb-4">
           <Icon name={icon} size={28} className="text-accent" />
         </div>
-        <h2 className="text-xl font-semibold text-stone-900 dark:text-stone-100 mb-2">
+        <h2 className="text-xl font-semibold text-[var(--ink-100)] mb-2">
           {title}
         </h2>
-        <p className="text-sm text-stone-600 dark:text-stone-300 leading-relaxed mb-5">
+        <p className="text-sm text-[var(--ink-70)] leading-relaxed mb-5">
           {blurb}
         </p>
         {cta && (

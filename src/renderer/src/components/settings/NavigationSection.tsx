@@ -28,8 +28,8 @@ function Toggle({
   return (
     <label className="flex items-start justify-between gap-3 py-1.5 cursor-pointer">
       <div className="min-w-0">
-        <div className="text-xs text-stone-700 dark:text-stone-200">{label}</div>
-        <div className="text-[10px] text-stone-500 dark:text-stone-400 leading-snug">{desc}</div>
+        <div className="text-xs text-[var(--ink-70)]">{label}</div>
+        <div className="text-[10px] text-[var(--ink-50)] leading-snug">{desc}</div>
       </div>
       <input
         type="checkbox"
@@ -65,12 +65,12 @@ function Slider({
   return (
     <div className={`py-1.5 ${disabled ? 'opacity-40 pointer-events-none' : ''}`}>
       <div className="flex items-center justify-between">
-        <span className="text-xs text-stone-700 dark:text-stone-200">{label}</span>
-        <span className="text-[10px] font-mono text-stone-500 dark:text-stone-400">
+        <span className="text-xs text-[var(--ink-70)]">{label}</span>
+        <span className="text-[10px] font-mono text-[var(--ink-50)]">
           {format(value)}
         </span>
       </div>
-      <div className="text-[10px] text-stone-500 dark:text-stone-400 leading-snug mb-1">{desc}</div>
+      <div className="text-[10px] text-[var(--ink-50)] leading-snug mb-1">{desc}</div>
       <input
         type="range"
         min={min}
@@ -221,7 +221,7 @@ function NavPreview({ nav }: { nav: NavPrefs }): JSX.Element {
         onPointerMove={onMove}
         onPointerUp={onUp}
         onPointerCancel={onUp}
-        className="relative h-[120px] w-full rounded-md overflow-hidden cursor-grab active:cursor-grabbing border border-stone-200 dark:border-stone-700 touch-none"
+        className="relative h-[120px] w-full rounded-md overflow-hidden cursor-grab active:cursor-grabbing border border-[var(--edge-soft)] touch-none"
         style={{
           backgroundColor: 'rgb(var(--accent) / 0.04)',
           backgroundImage:
@@ -235,7 +235,7 @@ function NavPreview({ nav }: { nav: NavPrefs }): JSX.Element {
           style={{ willChange: 'transform' }}
         />
       </div>
-      <div className="text-[10px] text-stone-500 dark:text-stone-400 mt-1 text-center">
+      <div className="text-[10px] text-[var(--ink-50)] mt-1 text-center">
         Flick the dot — it slingshots and glides exactly like your canvas. (Auto-demos when idle.)
       </div>
     </div>
@@ -247,14 +247,14 @@ export default function NavigationSection(): JSX.Element {
   const x = (v: number): string => `${v.toFixed(1)}×`
 
   return (
-    <div className="px-3 py-3 border-t border-stone-200 dark:border-stone-700">
+    <div className="px-3 py-3 border-t border-[var(--edge-soft)]">
       <div className="flex items-center justify-between mb-1">
-        <div className="text-[11px] uppercase tracking-[0.12em] text-stone-500 dark:text-stone-400 font-medium">
+        <div className="text-[11px] uppercase tracking-[0.12em] text-[var(--ink-50)] font-medium">
           Canvas navigation
         </div>
         <button
           onClick={() => resetNavPrefs()}
-          className="text-[10px] text-stone-500 hover:text-stone-800 dark:hover:text-stone-200 inline-flex items-center gap-0.5"
+          className="text-[10px] text-[var(--ink-50)] hover:text-[var(--ink-90)] inline-flex items-center gap-0.5"
           title="Reset all navigation settings to defaults"
         >
           <Icon name="restart_alt" size={12} />
@@ -265,7 +265,7 @@ export default function NavigationSection(): JSX.Element {
       <NavPreview nav={nav} />
 
       {/* Click-drag pan */}
-      <div className="mt-3 text-[10px] uppercase tracking-wider text-stone-400 dark:text-stone-500">
+      <div className="mt-3 text-[10px] uppercase tracking-wider text-[var(--ink-40)]">
         Click-drag pan
       </div>
       <Toggle
@@ -322,7 +322,7 @@ export default function NavigationSection(): JSX.Element {
       </div>
 
       {/* Edge pan */}
-      <div className="mt-3 text-[10px] uppercase tracking-wider text-stone-400 dark:text-stone-500">
+      <div className="mt-3 text-[10px] uppercase tracking-wider text-[var(--ink-40)]">
         Edge pan
       </div>
       <Toggle
@@ -344,7 +344,7 @@ export default function NavigationSection(): JSX.Element {
       />
 
       {/* Trackpad / wheel + zoom */}
-      <div className="mt-3 text-[10px] uppercase tracking-wider text-stone-400 dark:text-stone-500">
+      <div className="mt-3 text-[10px] uppercase tracking-wider text-[var(--ink-40)]">
         Trackpad &amp; zoom
       </div>
       <Slider

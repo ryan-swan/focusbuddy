@@ -222,7 +222,7 @@ export default function LiveDocEditorView({ liveDocId, onBack }: Props): JSX.Ele
 
   if (loading || !meta || meta.id !== liveDocId) {
     return (
-      <div className="h-full flex items-center justify-center desk-paper no-tod text-[13px] text-stone-400">
+      <div className="h-full flex items-center justify-center desk-paper no-tod text-[13px] text-[var(--ink-40)]">
         Loading shared document…
       </div>
     )
@@ -411,12 +411,12 @@ export default function LiveDocEditorView({ liveDocId, onBack }: Props): JSX.Ele
   return (
     <div className="h-full flex flex-col desk-paper no-tod">
       {/* Header */}
-      <div className="shrink-0 px-4 py-2.5 border-b border-stone-200 dark:border-stone-800 flex items-center gap-3">
+      <div className="shrink-0 px-4 py-2.5 border-b border-[var(--edge-soft)] flex items-center gap-3">
         <button onClick={() => back()} className="icon-btn" title="Back">
           <Icon name="arrow_back" size={17} />
         </button>
         <Icon name={typeIcon} size={16} className="text-accent shrink-0" />
-        <span className="flex-1 min-w-0 text-[14px] font-semibold text-stone-900 dark:text-stone-100 truncate">
+        <span className="flex-1 min-w-0 text-[14px] font-semibold text-[var(--ink-100)] truncate">
           {meta.title}
         </span>
         <CollaboratorBar people={people} />
@@ -424,7 +424,7 @@ export default function LiveDocEditorView({ liveDocId, onBack }: Props): JSX.Ele
           <>
             <button
               onClick={startComment}
-              className="icon-btn text-stone-400 hover:text-accent"
+              className="icon-btn text-[var(--ink-40)] hover:text-accent"
               title="Comment on the selected text"
               data-testid="livedoc-comment-add"
             >
@@ -432,7 +432,7 @@ export default function LiveDocEditorView({ liveDocId, onBack }: Props): JSX.Ele
             </button>
             <button
               onClick={() => setCommentsOpen((v) => !v)}
-              className="icon-btn text-stone-400 hover:text-accent inline-flex items-center"
+              className="icon-btn text-[var(--ink-40)] hover:text-accent inline-flex items-center"
               title="Comments"
               data-testid="livedoc-comments-toggle"
             >
@@ -446,12 +446,12 @@ export default function LiveDocEditorView({ liveDocId, onBack }: Props): JSX.Ele
           </>
         )}
         {isHolder && (
-          <span className="text-[11px] text-stone-400 dark:text-stone-500 inline-flex items-center gap-1 shrink-0">
+          <span className="text-[11px] text-[var(--ink-40)] inline-flex items-center gap-1 shrink-0">
             <Icon name={saving ? 'sync' : 'cloud_done'} size={13} className={saving ? 'animate-spin' : 'text-emerald-500'} />
             {saving ? 'Saving' : 'Saved'}
           </span>
         )}
-        <span className="text-[11px] text-stone-400 dark:text-stone-500 shrink-0">{typeLabel}</span>
+        <span className="text-[11px] text-[var(--ink-40)] shrink-0">{typeLabel}</span>
         {isOwner && (
           <button onClick={() => setInviting((v) => !v)} className="icon-btn" title="Invite someone" data-testid="livedoc-invite">
             <Icon name="person_add" size={15} />
@@ -512,12 +512,12 @@ export default function LiveDocEditorView({ liveDocId, onBack }: Props): JSX.Ele
       </div>
 
       {requesting && (
-        <div className="shrink-0 px-4 py-2 border-b border-stone-200 dark:border-stone-800 flex items-center gap-2">
+        <div className="shrink-0 px-4 py-2 border-b border-[var(--edge-soft)] flex items-center gap-2">
           <input
             value={requestMsg}
             onChange={(e) => setRequestMsg(e.target.value)}
             placeholder={`Message to ${holderHandle ?? 'the editor'} (optional)`}
-            className="flex-1 bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-lg px-3 py-1.5 text-[12px] focus:outline-none focus:border-accent"
+            className="flex-1 bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded-lg px-3 py-1.5 text-[12px] focus:outline-none focus:border-accent"
             data-testid="livedoc-request-message"
           />
           <button onClick={() => void sendRequest()} className="btn-primary text-[12px] px-3 py-1.5" data-testid="livedoc-request-send">
@@ -527,27 +527,27 @@ export default function LiveDocEditorView({ liveDocId, onBack }: Props): JSX.Ele
       )}
 
       {inviting && (
-        <div className="shrink-0 px-4 py-2 border-b border-stone-200 dark:border-stone-800 flex items-center gap-2">
+        <div className="shrink-0 px-4 py-2 border-b border-[var(--edge-soft)] flex items-center gap-2">
           <input
             value={inviteHandle}
             onChange={(e) => setInviteHandle(e.target.value)}
             placeholder="Invite by handle, e.g. @alex"
-            className="flex-1 bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-lg px-3 py-1.5 text-[12px] focus:outline-none focus:border-accent"
+            className="flex-1 bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded-lg px-3 py-1.5 text-[12px] focus:outline-none focus:border-accent"
             data-testid="livedoc-invite-handle"
           />
           <button onClick={() => void sendInvite()} className="btn-primary text-[12px] px-3 py-1.5" data-testid="livedoc-invite-send">
             Invite
           </button>
-          {inviteNote && <span className="text-[11px] text-stone-500 dark:text-stone-400">{inviteNote}</span>}
+          {inviteNote && <span className="text-[11px] text-[var(--ink-50)]">{inviteNote}</span>}
           {teams.length > 0 && (
             <div className="flex items-center gap-1.5 flex-wrap">
-              <span className="text-[11px] text-stone-400">or a team:</span>
+              <span className="text-[11px] text-[var(--ink-40)]">or a team:</span>
               {teams.map((t) => (
                 <button
                   key={t.id}
                   onClick={() => void inviteTeam(t.id)}
                   data-testid={`livedoc-invite-team-${t.id}`}
-                  className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md border border-stone-200 dark:border-stone-700 hover:border-accent hover:text-accent"
+                  className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md border border-[var(--edge-soft)] hover:border-accent hover:text-accent"
                 >
                   <Icon name="group" size={12} />
                   {t.name}
@@ -559,7 +559,7 @@ export default function LiveDocEditorView({ liveDocId, onBack }: Props): JSX.Ele
       )}
 
       {composing && (
-        <div className="shrink-0 px-4 py-2 border-b border-stone-200 dark:border-stone-800 flex items-center gap-2 bg-amber-50/60 dark:bg-amber-950/20">
+        <div className="shrink-0 px-4 py-2 border-b border-[var(--edge-soft)] flex items-center gap-2 bg-amber-50/60 dark:bg-amber-950/20">
           <Icon name="add_comment" size={14} className="text-amber-600 shrink-0" />
           <input
             autoFocus
@@ -571,7 +571,7 @@ export default function LiveDocEditorView({ liveDocId, onBack }: Props): JSX.Ele
             }}
             placeholder="Comment on the selected text…"
             data-testid="livedoc-comment-input"
-            className="flex-1 bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-lg px-3 py-1.5 text-[12px] focus:outline-none focus:border-accent"
+            className="flex-1 bg-[var(--surface-raised)] border border-[var(--edge-soft)] rounded-lg px-3 py-1.5 text-[12px] focus:outline-none focus:border-accent"
           />
           <button
             onClick={() => void submitComment()}
@@ -614,7 +614,7 @@ export default function LiveDocEditorView({ liveDocId, onBack }: Props): JSX.Ele
               }}
             />
           ) : (
-            <div className="p-6 text-[13px] text-stone-400" data-testid="livedoc-connecting">
+            <div className="p-6 text-[13px] text-[var(--ink-40)]" data-testid="livedoc-connecting">
               Connecting live editing…
             </div>
           ))}
@@ -624,13 +624,13 @@ export default function LiveDocEditorView({ liveDocId, onBack }: Props): JSX.Ele
             // its body-sync effect, so an uncommitted cell edit is never lost.
             <SheetEditor key={`${meta.id}:collab`} body={collabBody as SheetBody} title={meta.title} onChange={onJsonChange} />
           ) : (
-            <div className="p-6 text-[13px] text-stone-400" data-testid="livedoc-connecting">Connecting live editing…</div>
+            <div className="p-6 text-[13px] text-[var(--ink-40)]" data-testid="livedoc-connecting">Connecting live editing…</div>
           ))}
         {meta.docType === 'slides' &&
           (collabBody !== null ? (
             <SlidesEditor key={`${meta.id}:collab`} body={collabBody as SlidesBody} title={meta.title} onChange={onJsonChange} />
           ) : (
-            <div className="p-6 text-[13px] text-stone-400">Connecting live editing…</div>
+            <div className="p-6 text-[13px] text-[var(--ink-40)]">Connecting live editing…</div>
           ))}
         {meta.docType === 'map' && (
           <MapEditor key={editorKey} body={bodyObj as MapBody} title={meta.title} onChange={(b) => saveBody(b)} />

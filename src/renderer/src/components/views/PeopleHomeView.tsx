@@ -25,7 +25,7 @@ const STATUS_META: Record<PresenceStatus, { label: string; dot: string; text: st
   away: { label: 'Away', dot: 'bg-amber-500', text: 'text-amber-600 dark:text-amber-400' },
   focus: { label: 'In focus', dot: 'bg-violet-500', text: 'text-violet-600 dark:text-violet-400' },
   busy: { label: 'Busy', dot: 'bg-rose-500', text: 'text-rose-600 dark:text-rose-400' },
-  offline: { label: 'Offline', dot: 'bg-stone-400', text: 'text-stone-500' }
+  offline: { label: 'Offline', dot: 'bg-stone-400', text: 'text-[var(--ink-50)]' }
 }
 
 const AV_COLORS = ['#6366f1', '#0ea5e9', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6', '#14b8a6', '#ef4444']

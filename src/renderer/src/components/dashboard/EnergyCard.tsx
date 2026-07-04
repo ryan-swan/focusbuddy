@@ -18,8 +18,8 @@ export default function EnergyCard(): JSX.Element {
   const recent = history.slice(0, 6)
 
   return (
-    <div className="rounded-xl border border-stone-200 dark:border-stone-700 bg-white/85 dark:bg-stone-900/85 backdrop-blur p-4">
-      <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.12em] text-stone-500 dark:text-stone-400 font-semibold mb-3">
+    <div className="rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-raised)]/85 backdrop-blur p-4">
+      <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.12em] text-[var(--ink-50)] font-semibold mb-3">
         <Icon name="bolt" size={12} />
         <span>Energy</span>
       </div>
@@ -35,7 +35,7 @@ export default function EnergyCard(): JSX.Element {
               className={`flex-1 flex flex-col items-center gap-1 py-3 rounded-lg border-2 transition-colors ${
                 active
                   ? 'border-accent bg-accent/5'
-                  : 'border-stone-200 dark:border-stone-700 hover:border-stone-400 dark:hover:border-stone-500'
+                  : 'border-[var(--edge-soft)] hover:border-[var(--edge-firm)]'
               }`}
               title={m.description}
             >
@@ -52,17 +52,17 @@ export default function EnergyCard(): JSX.Element {
       </div>
 
       {!current ? (
-        <p className="text-[11px] text-stone-500 dark:text-stone-400 text-center leading-snug">
+        <p className="text-[11px] text-[var(--ink-50)] text-center leading-snug">
           Tap your energy. Used to suggest tasks that match your state — not to punish you for picking the easier one.
         </p>
       ) : (
         <>
-          <p className="text-[11px] text-stone-600 dark:text-stone-400 mb-2 leading-snug">
+          <p className="text-[11px] text-[var(--ink-70)] mb-2 leading-snug">
             <span className="font-medium">{ENERGY_META[current.level].description}</span>
           </p>
           {recent.length > 1 && (
             <div className="flex items-center gap-1 flex-wrap">
-              <span className="text-[9px] uppercase tracking-wider text-stone-500 dark:text-stone-400 mr-1">
+              <span className="text-[9px] uppercase tracking-wider text-[var(--ink-50)] mr-1">
                 last 72h
               </span>
               {recent.map((e) => (

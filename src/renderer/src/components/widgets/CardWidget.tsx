@@ -134,7 +134,7 @@ export default function CardWidget({ widget, inline = false }: Props): JSX.Eleme
 
   const content = (
     <div
-      className={`group relative min-h-full w-full flex flex-col ${data.bgFill ? '' : 'bg-white dark:bg-stone-900'}`}
+      className={`group relative min-h-full w-full flex flex-col ${data.bgFill ? '' : 'bg-[var(--surface-raised)]'}`}
       style={data.bgFill ? { backgroundColor: tint(data.accent, 0.14) } : undefined}
     >
       <div className="h-1.5 w-full shrink-0" style={{ backgroundColor: data.accent }} />
@@ -144,7 +144,7 @@ export default function CardWidget({ widget, inline = false }: Props): JSX.Eleme
             onClick={() => setPickIcon((v) => !v)}
             onMouseDown={(e) => e.stopPropagation()}
             className={`shrink-0 h-6 w-6 inline-flex items-center justify-center rounded text-[15px] leading-none ${
-              data.icon ? '' : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 text-stone-400 hover:bg-stone-200/60 dark:hover:bg-stone-700/60'
+              data.icon ? '' : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 text-[var(--ink-40)] hover:bg-[var(--surface-sunken)]/60'
             } transition-opacity`}
             title="Card icon"
             aria-label="Card icon"
@@ -157,12 +157,12 @@ export default function CardWidget({ widget, inline = false }: Props): JSX.Eleme
             onChange={(e) => set({ title: e.target.value })}
             onMouseDown={(e) => e.stopPropagation()}
             placeholder="Title"
-            className="flex-1 bg-transparent text-[15px] font-semibold text-stone-900 dark:text-stone-100 placeholder:text-stone-400 focus:outline-none"
+            className="flex-1 bg-transparent text-[15px] font-semibold text-[var(--ink-100)] placeholder:text-[var(--ink-40)] focus:outline-none"
           />
         </div>
         {pickIcon && (
           <div
-            className="flex flex-wrap gap-1 p-1.5 rounded-lg bg-white dark:bg-stone-800 shadow-xl border border-stone-200 dark:border-stone-700 max-w-[220px]"
+            className="flex flex-wrap gap-1 p-1.5 rounded-lg bg-[var(--surface-raised)] shadow-xl border border-[var(--edge-soft)] max-w-[220px]"
             onMouseDown={(e) => e.stopPropagation()}
             data-testid="card-icon-picker"
           >
@@ -173,7 +173,7 @@ export default function CardWidget({ widget, inline = false }: Props): JSX.Eleme
                   set({ icon: data.icon === ic ? '' : ic })
                   setPickIcon(false)
                 }}
-                className="h-6 w-6 inline-flex items-center justify-center rounded text-[15px] hover:bg-stone-200/60 dark:hover:bg-stone-700/60"
+                className="h-6 w-6 inline-flex items-center justify-center rounded text-[15px] hover:bg-[var(--surface-sunken)]/60"
               >
                 {ic}
               </button>
@@ -189,7 +189,7 @@ export default function CardWidget({ widget, inline = false }: Props): JSX.Eleme
             onMouseDown={(e) => e.stopPropagation()}
             onBlur={() => setBodyEditing(false)}
             placeholder="Write something… **bold**, *italic*, paste a link"
-            className="flex-1 min-h-0 w-full resize-none bg-transparent text-[13px] leading-relaxed text-stone-700 dark:text-stone-300 placeholder:text-stone-400 focus:outline-none"
+            className="flex-1 min-h-0 w-full resize-none bg-transparent text-[13px] leading-relaxed text-[var(--ink-70)] placeholder:text-[var(--ink-40)] focus:outline-none"
           />
         ) : (
           <div
@@ -201,7 +201,7 @@ export default function CardWidget({ widget, inline = false }: Props): JSX.Eleme
               setBodyEditing(true)
               requestAnimationFrame(() => bodyRef.current?.focus())
             }}
-            className="flex-1 min-h-0 w-full overflow-auto text-[13px] leading-relaxed text-stone-700 dark:text-stone-300 cursor-text whitespace-pre-wrap"
+            className="flex-1 min-h-0 w-full overflow-auto text-[13px] leading-relaxed text-[var(--ink-70)] cursor-text whitespace-pre-wrap"
           >
             {renderBody(data.body)}
           </div>
@@ -213,14 +213,14 @@ export default function CardWidget({ widget, inline = false }: Props): JSX.Eleme
         <button
           onClick={() => setPickAccent((v) => !v)}
           onMouseDown={(e) => e.stopPropagation()}
-          className="h-5 w-5 rounded-full ring-2 ring-white dark:ring-stone-900 shadow"
+          className="h-5 w-5 rounded-full ring-2 ring-[var(--surface-raised)] shadow"
           style={{ backgroundColor: data.accent }}
           title="Card colour"
           aria-label="Card colour"
         />
         {pickAccent && (
           <div
-            className="absolute right-0 mt-1 flex flex-col gap-1.5 p-1.5 rounded-lg bg-white dark:bg-stone-800 shadow-xl border border-stone-200 dark:border-stone-700 z-10"
+            className="absolute right-0 mt-1 flex flex-col gap-1.5 p-1.5 rounded-lg bg-[var(--surface-raised)] shadow-xl border border-[var(--edge-soft)] z-10"
             onMouseDown={(e) => e.stopPropagation()}
           >
             <div className="flex gap-1">
@@ -228,7 +228,7 @@ export default function CardWidget({ widget, inline = false }: Props): JSX.Eleme
                 <button
                   key={c}
                   onClick={() => set({ accent: c })}
-                  className={`h-5 w-5 rounded-full ring-1 ring-black/10 ${data.accent === c ? 'ring-2 ring-offset-1 ring-stone-500' : ''}`}
+                  className={`h-5 w-5 rounded-full ring-1 ring-black/10 ${data.accent === c ? 'ring-2 ring-offset-1 ring-[var(--edge-firm)]' : ''}`}
                   style={{ backgroundColor: c }}
                   aria-label={`Accent ${c}`}
                 />
@@ -237,7 +237,7 @@ export default function CardWidget({ widget, inline = false }: Props): JSX.Eleme
             <button
               onClick={() => set({ bgFill: !data.bgFill })}
               data-testid="card-fill-toggle"
-              className="text-[11px] text-stone-600 dark:text-stone-300 hover:text-stone-900 dark:hover:text-stone-100 text-left px-1 py-0.5 rounded hover:bg-stone-100 dark:hover:bg-stone-700/60"
+              className="text-[11px] text-[var(--ink-70)] hover:text-[var(--ink-100)] text-left px-1 py-0.5 rounded hover:bg-[var(--surface-sunken)]"
             >
               {data.bgFill ? '✓ Fill background' : 'Fill background'}
             </button>

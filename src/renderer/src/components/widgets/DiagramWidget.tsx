@@ -51,7 +51,7 @@ function ShapeNode({ id, data, selected }: NodeProps): JSX.Element {
       return d.img ? (
         <img src={d.img} alt={d.label} className="max-w-full max-h-full object-contain pointer-events-none" />
       ) : (
-        <span className="text-[10px] text-stone-400">image</span>
+        <span className="text-[10px] text-[var(--ink-40)]">image</span>
       )
     }
     return (
@@ -69,7 +69,7 @@ function ShapeNode({ id, data, selected }: NodeProps): JSX.Element {
   let shapeCls = ''
   let style: React.CSSProperties = {}
   if (d.shape === 'box') {
-    shapeCls = `${base} rounded-md border-2 bg-white dark:bg-stone-800`
+    shapeCls = `${base} rounded-md border-2 bg-[var(--surface-raised)]`
     style = { borderColor: d.color, color: '#1c1917', minWidth: 90, minHeight: 44 }
   } else if (d.shape === 'circle') {
     // Translucent fill so overlapping circles read as a Venn diagram.
@@ -85,7 +85,7 @@ function ShapeNode({ id, data, selected }: NodeProps): JSX.Element {
     shapeCls = `${base} bg-transparent`
     style = { color: d.color, minWidth: 60 }
   } else {
-    shapeCls = `${base} rounded-md bg-white/60 dark:bg-stone-800/60 border border-dashed border-stone-300`
+    shapeCls = `${base} rounded-md bg-[var(--surface-raised)]/60 border border-dashed border-[var(--edge-firm)]`
     style = { minWidth: 60, minHeight: 60, padding: 4 }
   }
 
@@ -142,7 +142,7 @@ function EditableLabel({
           }
           e.stopPropagation()
         }}
-        className="bg-white text-stone-900 text-[12px] text-center rounded px-1 outline-none border border-accent w-full"
+        className="bg-[var(--surface-raised)] text-[var(--ink-100)] text-[12px] text-center rounded px-1 outline-none border border-accent w-full"
         onClick={(e) => e.stopPropagation()}
       />
     )
@@ -279,13 +279,13 @@ function DiagramInner({ widget, inline = false }: Props): JSX.Element {
   ]
 
   const body = (
-    <div className="h-full w-full flex flex-col bg-white dark:bg-stone-900">
-      <div className="shrink-0 flex items-center gap-1 px-2 py-1 border-b border-stone-200 dark:border-stone-700 bg-stone-50/80 dark:bg-stone-800/60">
+    <div className="h-full w-full flex flex-col bg-[var(--surface-raised)]">
+      <div className="shrink-0 flex items-center gap-1 px-2 py-1 border-b border-[var(--edge-soft)] bg-[var(--surface-sunken)]/80">
         {tools.map((t) => (
           <button
             key={t.shape}
             onClick={() => addNode(t.shape)}
-            className="inline-flex items-center gap-1 text-[11px] px-1.5 py-1 rounded text-stone-600 dark:text-stone-300 hover:bg-stone-200 dark:hover:bg-stone-700"
+            className="inline-flex items-center gap-1 text-[11px] px-1.5 py-1 rounded text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]"
             title={`Add ${t.label}`}
           >
             <Icon name={t.icon} size={14} />
@@ -294,26 +294,26 @@ function DiagramInner({ widget, inline = false }: Props): JSX.Element {
         ))}
         <button
           onClick={() => fileInputRef.current?.click()}
-          className="inline-flex items-center gap-1 text-[11px] px-1.5 py-1 rounded text-stone-600 dark:text-stone-300 hover:bg-stone-200 dark:hover:bg-stone-700"
+          className="inline-flex items-center gap-1 text-[11px] px-1.5 py-1 rounded text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]"
           title="Add an image / icon node (upload)"
         >
           <Icon name="add_photo_alternate" size={14} />
           Image
         </button>
         <input ref={fileInputRef} type="file" accept="image/*" hidden onChange={onPickImage} />
-        <div className="w-px h-4 bg-stone-300 dark:bg-stone-600 mx-0.5" />
+        <div className="w-px h-4 bg-[var(--surface-sunken)] mx-0.5" />
         {NODE_COLORS.map((c) => (
           <button
             key={c}
             onClick={() => setColor(c)}
-            className={`h-4 w-4 rounded-full border ${color === c ? 'ring-2 ring-offset-1 ring-stone-400' : 'border-black/10'}`}
+            className={`h-4 w-4 rounded-full border ${color === c ? 'ring-2 ring-offset-1 ring-[var(--edge-firm)]' : 'border-black/10'}`}
             style={{ backgroundColor: c }}
             title={`Colour for new nodes`}
             aria-label={`Colour ${c}`}
           />
         ))}
         <div className="flex-1" />
-        <span className="text-[10px] text-stone-400">double-click a node to rename · drag the dots to connect · ⌫ deletes</span>
+        <span className="text-[10px] text-[var(--ink-40)]">double-click a node to rename · drag the dots to connect · ⌫ deletes</span>
       </div>
       <div className="flex-1 min-h-0 relative">
         <ReactFlow
@@ -337,7 +337,7 @@ function DiagramInner({ widget, inline = false }: Props): JSX.Element {
         </ReactFlow>
         {nodes.length === 0 && (
           <div className="absolute inset-0 grid place-items-center pointer-events-none">
-            <span className="text-[12px] text-stone-400">
+            <span className="text-[12px] text-[var(--ink-40)]">
               Add a Box, Circle, Text or Image from the toolbar to start your diagram
             </span>
           </div>

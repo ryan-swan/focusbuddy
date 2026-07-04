@@ -45,8 +45,8 @@ export default function OfficeCollaborations({
   if (!token || docs.length === 0) return null
 
   return (
-    <div className="shrink-0 border-t border-stone-200 dark:border-stone-800 max-h-44 overflow-auto">
-      <div className="px-3 pt-2 pb-1 text-[10px] uppercase tracking-wider text-stone-400 flex items-center gap-1">
+    <div className="shrink-0 border-t border-[var(--edge-soft)] max-h-44 overflow-auto">
+      <div className="px-3 pt-2 pb-1 text-[10px] uppercase tracking-wider text-[var(--ink-40)] flex items-center gap-1">
         <Icon name="group" size={12} />
         Shared & live
       </div>
@@ -57,10 +57,10 @@ export default function OfficeCollaborations({
             onClick={() => onOpen(d.id)}
             data-testid={`office-collab-${d.id}`}
             className={`w-full flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-[12.5px] truncate ${
-              activeId === d.id ? 'bg-accent/[0.12] text-accent' : 'hover:bg-stone-100 dark:hover:bg-stone-800'
+              activeId === d.id ? 'bg-accent/[0.12] text-accent' : 'hover:bg-[var(--surface-sunken)]'
             }`}
           >
-            <Icon name={docIcon(d.docType)} size={14} className="shrink-0 text-stone-400" />
+            <Icon name={docIcon(d.docType)} size={14} className="shrink-0 text-[var(--ink-40)]" />
             <span className="truncate flex-1">{d.title || 'Untitled'}</span>
             {d.lock && (
               <span className="shrink-0 text-amber-500" title={`Locked by ${d.lock.handle}`}>

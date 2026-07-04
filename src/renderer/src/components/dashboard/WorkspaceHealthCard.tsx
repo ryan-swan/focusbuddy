@@ -253,15 +253,15 @@ export default function WorkspaceHealthCard({ taskIds, nodes }: Props): JSX.Elem
   }
 
   return (
-    <div className="rounded-xl border border-stone-200 dark:border-stone-700 bg-white/85 dark:bg-stone-900/85 backdrop-blur p-4 fb-glass-soft">
+    <div className="rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-raised)]/85 backdrop-blur p-4 fb-glass-soft">
       <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.12em] text-stone-500 dark:text-stone-400 font-semibold">
+        <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.12em] text-[var(--ink-50)] font-semibold">
           <Icon name="health_and_safety" size={12} />
           <span>Workspace health</span>
         </div>
         <div className="flex items-center gap-1">
           {aiLastRunAt && (
-            <span className="text-[9px] text-stone-400 dark:text-stone-500 font-mono">
+            <span className="text-[9px] text-[var(--ink-40)] font-mono">
               AI · {Math.round((Date.now() - aiLastRunAt) / 1000)}s ago
             </span>
           )}
@@ -286,11 +286,11 @@ export default function WorkspaceHealthCard({ taskIds, nodes }: Props): JSX.Elem
         </div>
       )}
       {combined.length === 0 && (
-        <div className="text-center py-6 text-[12px] text-stone-500 dark:text-stone-400">
+        <div className="text-center py-6 text-[12px] text-[var(--ink-50)]">
           <Icon
             name="local_florist"
             size={22}
-            className="text-stone-300 dark:text-stone-600 mx-auto mb-2"
+            className="text-[var(--ink-30)] mx-auto mb-2"
           />
           Nothing to flag. Quiet workspace is a good workspace.
           {hasApiKey !== false && (
@@ -310,7 +310,7 @@ export default function WorkspaceHealthCard({ taskIds, nodes }: Props): JSX.Elem
         ))}
       </div>
       {hasApiKey === false && combined.length > 0 && (
-        <div className="mt-3 pt-3 border-t border-stone-200 dark:border-stone-700 text-[10px] text-stone-500 dark:text-stone-400 leading-snug">
+        <div className="mt-3 pt-3 border-t border-[var(--edge-soft)] text-[10px] text-[var(--ink-50)] leading-snug">
           Showing local heuristics. Add an Anthropic API key in Settings for AI-driven pattern analysis on top.
         </div>
       )}
@@ -330,7 +330,7 @@ function InsightRow({
       ? 'border-amber-300/60 bg-amber-50/60 dark:bg-amber-950/20 dark:border-amber-900/60'
       : insight.tone === 'win'
         ? 'border-emerald-300/60 bg-emerald-50/60 dark:bg-emerald-950/20 dark:border-emerald-900/60'
-        : 'border-stone-200 bg-stone-50 dark:bg-stone-800/40 dark:border-stone-700'
+        : 'border-[var(--edge-soft)] bg-[var(--surface-sunken)] dark:border-[var(--edge-firm)]'
   const iconName =
     insight.tone === 'flag'
       ? 'priority_high'
@@ -342,15 +342,15 @@ function InsightRow({
       ? 'text-amber-600 dark:text-amber-400'
       : insight.tone === 'win'
         ? 'text-emerald-600 dark:text-emerald-400'
-        : 'text-stone-500 dark:text-stone-400'
+        : 'text-[var(--ink-50)]'
   return (
     <div className={`rounded-md border p-2.5 flex items-start gap-2 ${toneCls}`}>
       <Icon name={iconName} size={14} className={`mt-0.5 shrink-0 ${iconCls}`} />
       <div className="flex-1 min-w-0">
-        <div className="text-[12px] font-medium text-stone-900 dark:text-stone-100 leading-snug">
+        <div className="text-[12px] font-medium text-[var(--ink-100)] leading-snug">
           {insight.title}
         </div>
-        <div className="text-[11px] text-stone-600 dark:text-stone-300 leading-snug mt-0.5">
+        <div className="text-[11px] text-[var(--ink-70)] leading-snug mt-0.5">
           {insight.why}
         </div>
         {onJump && (

@@ -121,7 +121,7 @@ export default function MinimapWidget({ widget, inline = false }: Props): JSX.El
         }}
         data-testid="minimap-collapsed"
         title="Show minimap"
-        className="absolute w-9 h-9 rounded-full bg-white/95 dark:bg-stone-800/95 shadow-lg ring-1 ring-black/10 dark:ring-white/10 flex items-center justify-center text-stone-500 dark:text-stone-300 hover:text-accent pointer-events-auto"
+        className="absolute w-9 h-9 rounded-full bg-[var(--surface-raised)]/95 shadow-lg ring-1 ring-black/10 dark:ring-white/10 flex items-center justify-center text-[var(--ink-50)] hover:text-accent pointer-events-auto"
         style={{ position: 'absolute', ...pos }}
       >
         <Icon name="map" size={18} />
@@ -298,7 +298,7 @@ function MinimapBody({
     return (
       <div
         ref={wrapRef}
-        className="h-full w-full flex flex-col items-center justify-center gap-1.5 bg-stone-50 dark:bg-stone-900 text-stone-400 dark:text-stone-500"
+        className="h-full w-full flex flex-col items-center justify-center gap-1.5 bg-[var(--surface-sunken)] text-[var(--ink-40)]"
       >
         <Icon name="map" size={20} />
         <div className="text-[10px] uppercase tracking-[0.12em]">Empty canvas</div>
@@ -309,11 +309,11 @@ function MinimapBody({
   return (
     <div
       ref={wrapRef}
-      className="h-full w-full relative bg-stone-50 dark:bg-stone-900 select-none"
+      className="h-full w-full relative bg-[var(--surface-sunken)] select-none"
     >
       {/* Zoom badge — small monospaced indicator so users at a glance know
           where they are on the zoom scale. */}
-      <div className="absolute top-1 right-1.5 text-[9px] font-mono text-stone-400 dark:text-stone-500 pointer-events-none">
+      <div className="absolute top-1 right-1.5 text-[9px] font-mono text-[var(--ink-40)] pointer-events-none">
         {Math.round(zoom * 100)}%
       </div>
       <svg

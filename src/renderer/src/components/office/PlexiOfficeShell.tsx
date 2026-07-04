@@ -417,7 +417,7 @@ export default function PlexiOfficeShell({ initialApp }: { initialApp?: string }
                         <span />
                       </div>
                       {recentRows.map((d) => {
-                        const ti = TYPE_ICON[d.docType] ?? { icon: 'description', tint: 'text-stone-400' }
+                        const ti = TYPE_ICON[d.docType] ?? { icon: 'description', tint: 'text-[var(--ink-40)]' }
                         return (
                           <div
                             key={d.id}
@@ -461,7 +461,7 @@ export default function PlexiOfficeShell({ initialApp }: { initialApp?: string }
                         <span />
                       </div>
                       {visibleDocs(officeDocs, page, starred).map((d) => {
-                        const ti = TYPE_ICON[d.docType] ?? { icon: 'description', tint: 'text-stone-400' }
+                        const ti = TYPE_ICON[d.docType] ?? { icon: 'description', tint: 'text-[var(--ink-40)]' }
                         return (
                           <div
                             key={d.id}

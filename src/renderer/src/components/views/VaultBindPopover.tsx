@@ -81,16 +81,16 @@ export default function VaultBindPopover({ app, onClose }: Props): JSX.Element {
   return (
     <div
       ref={ref}
-      className="absolute right-0 top-full mt-1 z-50 w-72 rounded-md border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 shadow-lg p-2"
+      className="absolute right-0 top-full mt-1 z-50 w-72 rounded-md border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-lg p-2"
     >
-      <div className="flex items-center justify-between px-1 pb-2 mb-2 border-b border-stone-200 dark:border-stone-700">
-        <span className="text-[11px] uppercase tracking-wider text-stone-500 dark:text-stone-400">
+      <div className="flex items-center justify-between px-1 pb-2 mb-2 border-b border-[var(--edge-soft)]">
+        <span className="text-[11px] uppercase tracking-wider text-[var(--ink-50)]">
           Auto-fill
         </span>
         {boundEntry && (
           <button
             onClick={() => void toggleAutofill()}
-            className="text-[10px] px-1.5 py-0.5 rounded border border-stone-200 dark:border-stone-700 hover:bg-stone-100 dark:hover:bg-stone-800"
+            className="text-[10px] px-1.5 py-0.5 rounded border border-[var(--edge-soft)] hover:bg-[var(--surface-sunken)]"
             title="Toggle auto-fill for this app"
           >
             {app.autofillEnabled ? 'enabled' : 'disabled'}
@@ -99,7 +99,7 @@ export default function VaultBindPopover({ app, onClose }: Props): JSX.Element {
       </div>
 
       {!unlocked && (
-        <div className="px-2 py-3 text-[12px] text-stone-600 dark:text-stone-400 leading-snug">
+        <div className="px-2 py-3 text-[12px] text-[var(--ink-70)] leading-snug">
           Vault is locked. Open the Vault from the sidebar and unlock it to bind
           credentials here.
         </div>
@@ -108,14 +108,14 @@ export default function VaultBindPopover({ app, onClose }: Props): JSX.Element {
       {unlocked && !creating && (
         <>
           {boundEntry && (
-            <div className="flex items-center gap-2 mx-1 mb-2 p-2 rounded bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700">
+            <div className="flex items-center gap-2 mx-1 mb-2 p-2 rounded bg-[var(--surface-sunken)] border border-[var(--edge-soft)]">
               <Icon name="key" size={14} className="text-accent shrink-0" />
               <div className="min-w-0 flex-1">
-                <div className="text-[12px] font-medium text-stone-800 dark:text-stone-100 truncate">
+                <div className="text-[12px] font-medium text-[var(--ink-90)] truncate">
                   {boundEntry.title}
                 </div>
                 {boundEntry.username && (
-                  <div className="text-[10px] text-stone-500 dark:text-stone-400 truncate font-mono">
+                  <div className="text-[10px] text-[var(--ink-50)] truncate font-mono">
                     {boundEntry.username}
                   </div>
                 )}
@@ -132,7 +132,7 @@ export default function VaultBindPopover({ app, onClose }: Props): JSX.Element {
 
           <div className="max-h-48 overflow-y-auto">
             {entries.length === 0 && (
-              <div className="px-2 py-3 text-[12px] text-stone-500 dark:text-stone-400 text-center">
+              <div className="px-2 py-3 text-[12px] text-[var(--ink-50)] text-center">
                 No vault entries yet.
               </div>
             )}
@@ -142,15 +142,15 @@ export default function VaultBindPopover({ app, onClose }: Props): JSX.Element {
                 <button
                   key={entry.id}
                   onClick={() => void bind(entry)}
-                  className="w-full text-left px-2 py-1.5 rounded hover:bg-stone-100 dark:hover:bg-stone-800 flex items-center gap-2"
+                  className="w-full text-left px-2 py-1.5 rounded hover:bg-[var(--surface-sunken)] flex items-center gap-2"
                 >
-                  <Icon name="key" size={12} className="text-stone-400 shrink-0" />
+                  <Icon name="key" size={12} className="text-[var(--ink-40)] shrink-0" />
                   <div className="min-w-0 flex-1">
-                    <div className="text-[12px] text-stone-800 dark:text-stone-100 truncate">
+                    <div className="text-[12px] text-[var(--ink-90)] truncate">
                       {entry.title}
                     </div>
                     {entry.username && (
-                      <div className="text-[10px] text-stone-500 dark:text-stone-400 truncate font-mono">
+                      <div className="text-[10px] text-[var(--ink-50)] truncate font-mono">
                         {entry.username}
                       </div>
                     )}
@@ -161,7 +161,7 @@ export default function VaultBindPopover({ app, onClose }: Props): JSX.Element {
 
           <button
             onClick={() => setCreating(true)}
-            className="mt-2 w-full px-2 py-1.5 rounded border border-dashed border-stone-300 dark:border-stone-700 text-[12px] text-stone-600 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-stone-800 flex items-center justify-center gap-1"
+            className="mt-2 w-full px-2 py-1.5 rounded border border-dashed border-[var(--edge-firm)] text-[12px] text-[var(--ink-70)] hover:bg-[var(--surface-sunken)] flex items-center justify-center gap-1"
           >
             <Icon name="add" size={12} />
             <span>Save new credentials</span>
@@ -183,20 +183,20 @@ export default function VaultBindPopover({ app, onClose }: Props): JSX.Element {
             value={username}
             onChange={(e) => setUsername(e.target.value)}
             placeholder="username or email"
-            className="text-[12px] px-2 py-1.5 rounded border border-stone-300 dark:border-stone-700 bg-white dark:bg-stone-900"
+            className="text-[12px] px-2 py-1.5 rounded border border-[var(--edge-firm)] bg-[var(--surface-raised)]"
           />
           <input
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="password"
-            className="text-[12px] px-2 py-1.5 rounded border border-stone-300 dark:border-stone-700 bg-white dark:bg-stone-900"
+            className="text-[12px] px-2 py-1.5 rounded border border-[var(--edge-firm)] bg-[var(--surface-raised)]"
           />
           <div className="flex gap-2 justify-end">
             <button
               type="button"
               onClick={() => setCreating(false)}
-              className="text-[11px] px-2 py-1 rounded border border-stone-300 dark:border-stone-700"
+              className="text-[11px] px-2 py-1 rounded border border-[var(--edge-firm)]"
             >
               cancel
             </button>

@@ -76,15 +76,15 @@ export default function AIAssistantCard(): JSX.Element {
   }
 
   return (
-    <div className="rounded-xl border border-stone-200 dark:border-stone-700 bg-white/85 dark:bg-stone-900/85 backdrop-blur p-4 fb-glass-soft">
+    <div className="rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-raised)]/85 backdrop-blur p-4 fb-glass-soft">
       <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.12em] text-stone-500 dark:text-stone-400 font-semibold">
+        <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.12em] text-[var(--ink-50)] font-semibold">
           <Icon name="auto_awesome" size={12} className="text-accent" />
           <span>AI Assistant</span>
         </div>
       </div>
 
-      <div className="text-[13px] text-stone-700 dark:text-stone-200 font-medium mb-3">
+      <div className="text-[13px] text-[var(--ink-70)] font-medium mb-3">
         How can I help you today?
       </div>
 
@@ -95,12 +95,12 @@ export default function AIAssistantCard(): JSX.Element {
             key={s.id}
             onClick={() => void ask(s.prompt)}
             disabled={busy}
-            className="group flex items-center gap-2 px-2.5 py-2 rounded-md border border-stone-200 dark:border-stone-700 hover:border-accent hover:bg-accent/5 disabled:opacity-50 text-left text-[12px] text-stone-700 dark:text-stone-200 transition-colors"
+            className="group flex items-center gap-2 px-2.5 py-2 rounded-md border border-[var(--edge-soft)] hover:border-accent hover:bg-accent/5 disabled:opacity-50 text-left text-[12px] text-[var(--ink-70)] transition-colors"
           >
             <Icon
               name="add"
               size={11}
-              className="text-stone-400 group-hover:text-accent shrink-0"
+              className="text-[var(--ink-40)] group-hover:text-accent shrink-0"
             />
             <span className="flex-1">{s.label}</span>
           </button>
@@ -114,12 +114,12 @@ export default function AIAssistantCard(): JSX.Element {
         </div>
       )}
       {response && (
-        <div className="mb-3 p-3 rounded-md bg-stone-50 dark:bg-stone-800/50 border border-stone-200 dark:border-stone-700 text-[12px] text-stone-700 dark:text-stone-200 leading-relaxed whitespace-pre-wrap max-h-48 overflow-y-auto">
+        <div className="mb-3 p-3 rounded-md bg-[var(--surface-sunken)] border border-[var(--edge-soft)] text-[12px] text-[var(--ink-70)] leading-relaxed whitespace-pre-wrap max-h-48 overflow-y-auto">
           {response}
         </div>
       )}
       {busy && !response && (
-        <div className="mb-3 p-3 rounded-md bg-stone-50 dark:bg-stone-800/50 border border-stone-200 dark:border-stone-700 text-[11px] text-stone-500 dark:text-stone-400 inline-flex items-center gap-2">
+        <div className="mb-3 p-3 rounded-md bg-[var(--surface-sunken)] border border-[var(--edge-soft)] text-[11px] text-[var(--ink-50)] inline-flex items-center gap-2">
           <Icon name="hourglass_empty" size={12} />
           <span>Thinking…</span>
         </div>
@@ -137,7 +137,7 @@ export default function AIAssistantCard(): JSX.Element {
             }
           }}
           placeholder="Ask anything…"
-          className="flex-1 px-3 py-2 bg-stone-50 dark:bg-stone-800/60 border border-stone-200 dark:border-stone-700 rounded-md text-[12px] text-stone-900 dark:text-stone-100 placeholder:text-stone-400 dark:placeholder:text-stone-500 focus:outline-none focus:border-accent"
+          className="flex-1 px-3 py-2 bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded-md text-[12px] text-[var(--ink-100)] placeholder:text-[var(--ink-40)] focus:outline-none focus:border-accent"
         />
         <button
           onClick={() => void ask(input)}

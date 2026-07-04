@@ -25,7 +25,7 @@ export default function CollaboratorBar({ people }: { people: Collaborator[] }):
         </span>
       ))}
       {extra > 0 && (
-        <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-stone-300 text-[10px] font-semibold text-stone-700 ring-2 ring-white dark:bg-stone-700 dark:text-stone-200 dark:ring-stone-900">
+        <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-[var(--surface-sunken)] text-[10px] font-semibold text-[var(--ink-70)] ring-2 ring-white dark:ring-stone-900">
           +{extra}
         </span>
       )}

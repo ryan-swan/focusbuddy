@@ -147,10 +147,10 @@ export default function ShapeWidget({ widget, inline = false }: Props): JSX.Elem
                 if (e.key === 'Enter' || e.key === 'Escape') setEditingLabel(false)
               }}
               onMouseDown={(e) => e.stopPropagation()}
-              className="pointer-events-auto max-w-[90%] bg-white/80 dark:bg-stone-900/80 text-center text-sm text-stone-900 dark:text-stone-100 rounded px-2 py-0.5 border border-stone-300 focus:outline-none"
+              className="pointer-events-auto max-w-[90%] bg-[var(--surface-raised)]/80 text-center text-sm text-[var(--ink-100)] rounded px-2 py-0.5 border border-[var(--edge-firm)] focus:outline-none"
             />
           ) : (
-            <span className="text-sm font-medium text-stone-900 dark:text-stone-100 text-center break-words drop-shadow-sm">
+            <span className="text-sm font-medium text-[var(--ink-100)] text-center break-words drop-shadow-sm">
               {data.label}
             </span>
           )}
@@ -160,9 +160,9 @@ export default function ShapeWidget({ widget, inline = false }: Props): JSX.Elem
         <button
           onClick={() => setEditingLabel(true)}
           onMouseDown={(e) => e.stopPropagation()}
-          className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity text-[11px] text-stone-500"
+          className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity text-[11px] text-[var(--ink-50)]"
         >
-          <span className="px-2 py-0.5 rounded bg-white/70 dark:bg-stone-900/70">+ label</span>
+          <span className="px-2 py-0.5 rounded bg-[var(--surface-raised)]/70">+ label</span>
         </button>
       )}
       {data.label && !editingLabel && (

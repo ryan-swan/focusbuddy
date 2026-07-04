@@ -151,7 +151,7 @@ export default function LiveCanvasView({ liveCanvasId }: Props): JSX.Element {
 
   if (loading || !meta || meta.id !== liveCanvasId) {
     return (
-      <div className="h-full flex items-center justify-center desk-paper no-tod text-[13px] text-stone-400">
+      <div className="h-full flex items-center justify-center desk-paper no-tod text-[13px] text-[var(--ink-40)]">
         Loading shared canvas…
       </div>
     )
@@ -181,22 +181,22 @@ export default function LiveCanvasView({ liveCanvasId }: Props): JSX.Element {
   return (
     <div className="h-full flex flex-col desk-paper no-tod">
       {/* Header */}
-      <div className="shrink-0 px-4 py-2.5 border-b border-stone-200 dark:border-stone-800 flex items-center gap-3">
+      <div className="shrink-0 px-4 py-2.5 border-b border-[var(--edge-soft)] flex items-center gap-3">
         <button onClick={() => goDocuments()} className="icon-btn" title="Back">
           <Icon name="arrow_back" size={17} />
         </button>
         <Icon name="space_dashboard" size={16} className="text-accent shrink-0" />
-        <span className="flex-1 min-w-0 text-[14px] font-semibold text-stone-900 dark:text-stone-100 truncate">
+        <span className="flex-1 min-w-0 text-[14px] font-semibold text-[var(--ink-100)] truncate">
           {meta.title}
         </span>
-        <Icon name="group" size={14} className="text-stone-400 shrink-0" />
+        <Icon name="group" size={14} className="text-[var(--ink-40)] shrink-0" />
         {isHolder && (
-          <span className="text-[11px] text-stone-400 dark:text-stone-500 inline-flex items-center gap-1 shrink-0">
+          <span className="text-[11px] text-[var(--ink-40)] inline-flex items-center gap-1 shrink-0">
             <Icon name={saving ? 'sync' : 'cloud_done'} size={13} className={saving ? 'animate-spin' : 'text-emerald-500'} />
             {saving ? 'Saving' : 'Saved'}
           </span>
         )}
-        <span className="text-[11px] text-stone-400 dark:text-stone-500 shrink-0">Live canvas</span>
+        <span className="text-[11px] text-[var(--ink-40)] shrink-0">Live canvas</span>
         {isOwner && (
           <button onClick={() => setInviting((v) => !v)} className="icon-btn" title="Invite someone" data-testid="livecanvas-invite">
             <Icon name="person_add" size={15} />
@@ -252,12 +252,12 @@ export default function LiveCanvasView({ liveCanvasId }: Props): JSX.Element {
       </div>
 
       {requesting && (
-        <div className="shrink-0 px-4 py-2 border-b border-stone-200 dark:border-stone-800 flex items-center gap-2">
+        <div className="shrink-0 px-4 py-2 border-b border-[var(--edge-soft)] flex items-center gap-2">
           <input
             value={requestMsg}
             onChange={(e) => setRequestMsg(e.target.value)}
             placeholder={`Message to ${holderHandle ?? 'the editor'} (optional)`}
-            className="flex-1 bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-lg px-3 py-1.5 text-[12px] focus:outline-none focus:border-accent"
+            className="flex-1 bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded-lg px-3 py-1.5 text-[12px] focus:outline-none focus:border-accent"
             data-testid="livecanvas-request-message"
           />
           <button onClick={() => void sendRequest()} className="btn-primary text-[12px] px-3 py-1.5" data-testid="livecanvas-request-send">
@@ -267,18 +267,18 @@ export default function LiveCanvasView({ liveCanvasId }: Props): JSX.Element {
       )}
 
       {inviting && (
-        <div className="shrink-0 px-4 py-2 border-b border-stone-200 dark:border-stone-800 flex items-center gap-2">
+        <div className="shrink-0 px-4 py-2 border-b border-[var(--edge-soft)] flex items-center gap-2">
           <input
             value={inviteHandle}
             onChange={(e) => setInviteHandle(e.target.value)}
             placeholder="Invite by handle, e.g. @alex"
-            className="flex-1 bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-lg px-3 py-1.5 text-[12px] focus:outline-none focus:border-accent"
+            className="flex-1 bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded-lg px-3 py-1.5 text-[12px] focus:outline-none focus:border-accent"
             data-testid="livecanvas-invite-handle"
           />
           <button onClick={() => void sendInvite()} className="btn-primary text-[12px] px-3 py-1.5" data-testid="livecanvas-invite-send">
             Invite
           </button>
-          {inviteNote && <span className="text-[11px] text-stone-500 dark:text-stone-400">{inviteNote}</span>}
+          {inviteNote && <span className="text-[11px] text-[var(--ink-50)]">{inviteNote}</span>}
         </div>
       )}
 
@@ -287,7 +287,7 @@ export default function LiveCanvasView({ liveCanvasId }: Props): JSX.Element {
         {mirrorId ? (
           <Canvas />
         ) : (
-          <div className="h-full flex items-center justify-center text-[13px] text-stone-400">
+          <div className="h-full flex items-center justify-center text-[13px] text-[var(--ink-40)]">
             Preparing canvas…
           </div>
         )}

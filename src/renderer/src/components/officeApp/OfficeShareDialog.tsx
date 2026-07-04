@@ -87,12 +87,12 @@ export default function OfficeShareDialog({
     <div className="fixed inset-0 z-[300] bg-black/40 flex items-center justify-center" onMouseDown={onClose}>
       <div
         data-testid="office-share-dialog"
-        className="w-[440px] max-w-[92vw] rounded-xl border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 shadow-2xl p-4 space-y-3"
+        className="w-[440px] max-w-[92vw] rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-2xl p-4 space-y-3"
         onMouseDown={(e) => e.stopPropagation()}
       >
         <div className="flex items-center gap-2">
           <Icon name={isFolder ? 'folder_shared' : 'share'} size={16} className="text-accent" />
-          <span className="text-[14px] font-semibold text-stone-800 dark:text-stone-100 truncate">
+          <span className="text-[14px] font-semibold text-[var(--ink-90)] truncate">
             Share “{label}”
           </span>
           <button onClick={onClose} className="ml-auto icon-btn" aria-label="Close">
@@ -107,7 +107,7 @@ export default function OfficeShareDialog({
           </div>
         )}
 
-        <p className="text-[12px] text-stone-500 dark:text-stone-400">
+        <p className="text-[12px] text-[var(--ink-50)]">
           {isFolder
             ? scope === 'copy'
               ? 'Anyone with the link can view this folder and import a copy of its documents into their own Drive.'
@@ -128,12 +128,12 @@ export default function OfficeShareDialog({
           </button>
         ) : (
           <>
-            <div className="flex items-center gap-2 rounded-lg border border-stone-200 dark:border-stone-700 px-2 py-1.5">
+            <div className="flex items-center gap-2 rounded-lg border border-[var(--edge-soft)] px-2 py-1.5">
               <input
                 readOnly
                 value={link}
                 data-testid="office-share-link"
-                className="flex-1 min-w-0 bg-transparent text-[12px] font-mono text-stone-600 dark:text-stone-300 focus:outline-none"
+                className="flex-1 min-w-0 bg-transparent text-[12px] font-mono text-[var(--ink-70)] focus:outline-none"
               />
               <button
                 onClick={() => void navigator.clipboard.writeText(link).then(() => setCopied(true))}
@@ -143,8 +143,8 @@ export default function OfficeShareDialog({
               </button>
             </div>
 
-            <div className="border-t border-stone-100 dark:border-stone-800 pt-2">
-              <div className="text-[11px] text-stone-500 mb-1">Invite by email (optional)</div>
+            <div className="border-t border-[var(--edge-soft)] pt-2">
+              <div className="text-[11px] text-[var(--ink-50)] mb-1">Invite by email (optional)</div>
               <div className="flex items-center gap-2">
                 <input
                   type="email"
@@ -154,7 +154,7 @@ export default function OfficeShareDialog({
                     if (e.key === 'Enter') void sendInvite()
                   }}
                   placeholder="name@example.com"
-                  className="flex-1 bg-stone-50 dark:bg-stone-800 border border-stone-300 dark:border-stone-600 rounded px-2 py-1.5 text-[12px] focus:outline-none focus:border-accent"
+                  className="flex-1 bg-[var(--surface-sunken)] border border-[var(--edge-firm)] rounded px-2 py-1.5 text-[12px] focus:outline-none focus:border-accent"
                 />
                 <button
                   onClick={() => void sendInvite()}
@@ -164,7 +164,7 @@ export default function OfficeShareDialog({
                   {inviteBusy ? 'Sending…' : 'Send'}
                 </button>
               </div>
-              {inviteMsg && <div className="text-[11px] text-stone-500 mt-1">{inviteMsg}</div>}
+              {inviteMsg && <div className="text-[11px] text-[var(--ink-50)] mt-1">{inviteMsg}</div>}
             </div>
           </>
         )}
@@ -188,11 +188,11 @@ function ScopeChip({
     <button
       onClick={onClick}
       className={`flex-1 rounded-lg border px-2.5 py-1.5 text-left ${
-        active ? 'border-accent bg-accent/[0.06]' : 'border-stone-200 dark:border-stone-700'
+        active ? 'border-accent bg-accent/[0.06]' : 'border-[var(--edge-soft)]'
       }`}
     >
-      <div className="text-[12px] font-medium text-stone-800 dark:text-stone-100">{title}</div>
-      <div className="text-[10px] text-stone-500">{desc}</div>
+      <div className="text-[12px] font-medium text-[var(--ink-90)]">{title}</div>
+      <div className="text-[10px] text-[var(--ink-50)]">{desc}</div>
     </button>
   )
 }

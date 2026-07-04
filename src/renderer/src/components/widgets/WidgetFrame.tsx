@@ -824,7 +824,7 @@ export default function WidgetFrame({
           if (isPinned) setActive(widget.id)
           else focusOn(widget.id)
         }}
-        className={`h-full w-full flex flex-col rounded-[12px] overflow-hidden border bg-white dark:bg-stone-900 fb-spring-snap ${
+        className={`h-full w-full flex flex-col rounded-[12px] overflow-hidden border bg-[var(--surface-raised)] fb-spring-snap ${
           selected
             ? 'border-[rgb(var(--accent))] ring-2 ring-[rgb(var(--accent)/0.7)] ring-offset-2 ring-offset-transparent'
             : isActive
@@ -854,7 +854,7 @@ export default function WidgetFrame({
             setHeaderCtxMenu({ x: e.clientX, y: e.clientY })
           }}
         >
-          <span className="text-[10px] uppercase tracking-[0.08em] font-medium text-stone-700 dark:text-stone-300 truncate flex items-center gap-1.5">
+          <span className="text-[10px] uppercase tracking-[0.08em] font-medium text-[var(--ink-70)] truncate flex items-center gap-1.5">
             {isActive && (
               <span
                 className="inline-block h-1.5 w-1.5 rounded-full bg-blue-500"
@@ -881,7 +881,7 @@ export default function WidgetFrame({
                   }).then(() => bumpLayout())
                 }}
                 title="Remove from section (eject to canvas)"
-                className="text-stone-500 hover:text-amber-700 transition-colors"
+                className="text-[var(--ink-50)] hover:text-amber-700 transition-colors"
               >
                 <Icon name="layers_clear" size={11} />
               </button>
@@ -914,7 +914,7 @@ export default function WidgetFrame({
                 }}
                 placeholder={widgetDisplayName(widget, headerLabel)}
                 aria-label="Widget name"
-                className="widget-nodrag min-w-0 flex-1 bg-transparent border-b border-accent/60 outline-none text-[10px] uppercase tracking-[0.08em] font-medium text-stone-800 dark:text-stone-100 placeholder:text-stone-400 placeholder:normal-case"
+                className="widget-nodrag min-w-0 flex-1 bg-transparent border-b border-accent/60 outline-none text-[10px] uppercase tracking-[0.08em] font-medium text-[var(--ink-90)] placeholder:text-[var(--ink-40)] placeholder:normal-case"
               />
             ) : (
               <span
@@ -946,7 +946,7 @@ export default function WidgetFrame({
                   e.stopPropagation()
                   beginRename()
                 }}
-                className="widget-nodrag h-5 w-5 rounded inline-flex items-center justify-center text-stone-400 opacity-50 hover:opacity-100 hover:bg-stone-300/60 hover:text-accent transition-opacity"
+                className="widget-nodrag h-5 w-5 rounded inline-flex items-center justify-center text-[var(--ink-40)] opacity-50 hover:opacity-100 hover:bg-[var(--surface-sunken)]/60 hover:text-accent transition-opacity"
                 aria-label="Rename widget"
                 title="Rename"
               >
@@ -965,7 +965,7 @@ export default function WidgetFrame({
                   e.stopPropagation()
                   linkDrag.start(widget.id)
                 }}
-                className="h-5 w-5 rounded inline-flex items-center justify-center text-stone-500 hover:bg-stone-300/60 hover:text-accent cursor-cell"
+                className="h-5 w-5 rounded inline-flex items-center justify-center text-[var(--ink-50)] hover:bg-[var(--surface-sunken)]/60 hover:text-accent cursor-cell"
                 aria-label="Link to another widget"
                 title="Click, then click another widget to connect them"
               >
@@ -1019,7 +1019,7 @@ export default function WidgetFrame({
                 e.stopPropagation()
                 if (confirm('Remove from the desk?')) void remove(widget.id)
               }}
-              className="h-5 w-5 rounded inline-flex items-center justify-center text-stone-500 hover:bg-red-100 hover:text-red-700"
+              className="h-5 w-5 rounded inline-flex items-center justify-center text-[var(--ink-50)] hover:bg-red-100 hover:text-red-700"
               aria-label="Remove widget"
             >
               <Icon name="close" size={13} />
@@ -1119,7 +1119,7 @@ function ResizeStepButton({
         e.stopPropagation()
         onClick()
       }}
-      className="h-5 w-5 rounded inline-flex items-center justify-center text-stone-500 hover:bg-stone-300/60 hover:text-stone-900 transition-colors"
+      className="h-5 w-5 rounded inline-flex items-center justify-center text-[var(--ink-50)] hover:bg-[var(--surface-sunken)]/60 hover:text-[var(--ink-100)] transition-colors"
       aria-label={isGrow ? 'Grow widget' : 'Shrink widget'}
       data-testid={isGrow ? `widget-grow-${widgetId}` : `widget-shrink-${widgetId}`}
       title={
@@ -1232,7 +1232,7 @@ function PinControl({
         className={`h-5 w-5 rounded inline-flex items-center justify-center transition-colors ${
           isPinned
             ? 'text-amber-600 hover:bg-amber-100'
-            : 'text-stone-500 hover:bg-stone-300/60 hover:text-stone-900'
+            : 'text-[var(--ink-50)] hover:bg-[var(--surface-sunken)]/60 hover:text-[var(--ink-100)]'
         }`}
         aria-label={isPinned ? 'Pin options' : 'Pin to screen'}
         title={
@@ -1254,10 +1254,10 @@ function PinControl({
           // sits above pinned-layer (z-30), floating toolbar (z-20), and
           // anything else in the canvas chrome, but below modal dialogs
           // (typically z-[300]+).
-          className="fixed z-[200] w-44 rounded-md border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 shadow-xl p-2 cursor-default"
+          className="fixed z-[200] w-44 rounded-md border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-xl p-2 cursor-default"
           style={{ top: popoverPos.top, right: popoverPos.right }}
         >
-          <div className="text-[10px] uppercase tracking-wider text-stone-500 dark:text-stone-400 mb-1.5">
+          <div className="text-[10px] uppercase tracking-wider text-[var(--ink-50)] mb-1.5">
             Pin to zone
           </div>
           <div className="grid grid-cols-2 gap-1">
@@ -1274,7 +1274,7 @@ function PinControl({
                   className={`flex flex-col items-center gap-0.5 py-2 rounded border text-[10px] transition-colors ${
                     active
                       ? 'border-amber-500 bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400'
-                      : 'border-stone-200 dark:border-stone-700 hover:border-amber-400 hover:bg-amber-50/50 dark:hover:bg-amber-950/20 text-stone-600 dark:text-stone-300'
+                      : 'border-[var(--edge-soft)] hover:border-amber-400 hover:bg-amber-50/50 dark:hover:bg-amber-950/20 text-[var(--ink-70)]'
                   }`}
                 >
                   <Icon name={PIN_ZONE_ICONS[z]} size={14} />
@@ -1290,7 +1290,7 @@ function PinControl({
                 onUnpin()
                 setOpen(false)
               }}
-              className="w-full mt-1.5 text-[11px] text-stone-600 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800 rounded px-2 py-1 text-left inline-flex items-center gap-1"
+              className="w-full mt-1.5 text-[11px] text-[var(--ink-70)] hover:bg-[var(--surface-sunken)] rounded px-2 py-1 text-left inline-flex items-center gap-1"
             >
               <Icon name="close" size={11} />
               <span>Unpin — return to canvas</span>
@@ -1380,7 +1380,7 @@ function ExpandControl({
           e.stopPropagation()
           setOpen(!open)
         }}
-        className="h-5 w-5 rounded inline-flex items-center justify-center text-stone-500 hover:bg-stone-300/60 hover:text-stone-900"
+        className="h-5 w-5 rounded inline-flex items-center justify-center text-[var(--ink-50)] hover:bg-[var(--surface-sunken)]/60 hover:text-[var(--ink-100)]"
         aria-label="Expand options"
         title="Expand — bigger on desk or full focus mode"
       >
@@ -1390,7 +1390,7 @@ function ExpandControl({
         <div
           ref={popoverRef}
           onMouseDown={(e) => e.stopPropagation()}
-          className="fixed z-[200] w-48 rounded-md border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 shadow-xl p-1 cursor-default"
+          className="fixed z-[200] w-48 rounded-md border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-xl p-1 cursor-default"
           style={{ top: popoverPos.top, right: popoverPos.right }}
         >
           <button
@@ -1399,12 +1399,12 @@ function ExpandControl({
               onEnlargeOnDesk()
               setOpen(false)
             }}
-            className="w-full flex items-start gap-2 px-2 py-1.5 rounded hover:bg-stone-100 dark:hover:bg-stone-800 text-left"
+            className="w-full flex items-start gap-2 px-2 py-1.5 rounded hover:bg-[var(--surface-sunken)] text-left"
           >
-            <Icon name="zoom_out_map" size={14} className="text-stone-500 mt-[1px] shrink-0" />
+            <Icon name="zoom_out_map" size={14} className="text-[var(--ink-50)] mt-[1px] shrink-0" />
             <div className="flex-1 min-w-0">
-              <div className="text-[12px] text-stone-800 dark:text-stone-100">Larger on desk</div>
-              <div className="text-[10px] text-stone-500 dark:text-stone-400 leading-tight">
+              <div className="text-[12px] text-[var(--ink-90)]">Larger on desk</div>
+              <div className="text-[10px] text-[var(--ink-50)] leading-tight">
                 Grow in place — keep canvas context
               </div>
             </div>
@@ -1415,12 +1415,12 @@ function ExpandControl({
               onFocusMode()
               setOpen(false)
             }}
-            className="w-full flex items-start gap-2 px-2 py-1.5 rounded hover:bg-stone-100 dark:hover:bg-stone-800 text-left"
+            className="w-full flex items-start gap-2 px-2 py-1.5 rounded hover:bg-[var(--surface-sunken)] text-left"
           >
-            <Icon name="open_in_full" size={14} className="text-stone-500 mt-[1px] shrink-0" />
+            <Icon name="open_in_full" size={14} className="text-[var(--ink-50)] mt-[1px] shrink-0" />
             <div className="flex-1 min-w-0">
-              <div className="text-[12px] text-stone-800 dark:text-stone-100">Focus mode</div>
-              <div className="text-[10px] text-stone-500 dark:text-stone-400 leading-tight">
+              <div className="text-[12px] text-[var(--ink-90)]">Focus mode</div>
+              <div className="text-[10px] text-[var(--ink-50)] leading-tight">
                 Full pane — hide everything else
               </div>
             </div>

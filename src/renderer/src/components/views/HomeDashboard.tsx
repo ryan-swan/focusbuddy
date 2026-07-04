@@ -363,7 +363,7 @@ export default function HomeDashboard(): JSX.Element {
                           ? 'bg-rose-500/10 text-rose-500'
                           : s.tone === 'sky'
                             ? 'bg-sky-500/10 text-sky-500'
-                            : 'bg-stone-500/10 text-stone-500'
+                            : 'bg-stone-500/10 text-[var(--ink-50)]'
                   }`}
                 >
                   <Icon name={s.icon} size={17} />
@@ -398,7 +398,7 @@ export default function HomeDashboard(): JSX.Element {
                   {recentDocs.map((d) => {
                     const ti = DOC_TYPE_ICON[d.docType] ?? {
                       icon: 'draft',
-                      tint: 'text-stone-400',
+                      tint: 'text-[var(--ink-40)]',
                       label: 'File'
                     }
                     return (

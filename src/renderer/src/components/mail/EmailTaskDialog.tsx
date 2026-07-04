@@ -97,30 +97,30 @@ export default function EmailTaskDialog({ email, onClose, onCreated }: Props): J
   }
 
   const inputCls =
-    'w-full bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-lg px-3 py-2 text-[13px] focus:outline-none focus:border-accent'
+    'w-full bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded-lg px-3 py-2 text-[13px] focus:outline-none focus:border-accent'
 
   return (
     <div className="fixed inset-0 z-[300] bg-black/40 flex items-center justify-center" onMouseDown={onClose}>
       <div
         data-testid="email-task-dialog"
-        className="w-[480px] max-w-[92vw] rounded-xl border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 shadow-2xl p-4 space-y-3"
+        className="w-[480px] max-w-[92vw] rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-2xl p-4 space-y-3"
         onMouseDown={(e) => e.stopPropagation()}
       >
         <div className="flex items-center gap-2">
           <Icon name="add_task" size={16} className="text-accent" />
-          <span className="text-[14px] font-semibold text-stone-800 dark:text-stone-100">Make a task from this email</span>
+          <span className="text-[14px] font-semibold text-[var(--ink-90)]">Make a task from this email</span>
           <button onClick={onClose} className="ml-auto icon-btn" aria-label="Close">
             <Icon name="close" size={15} />
           </button>
         </div>
 
         <label className="block">
-          <span className="text-[11px] uppercase tracking-wide text-stone-400">Task</span>
+          <span className="text-[11px] uppercase tracking-wide text-[var(--ink-40)]">Task</span>
           <input value={title} onChange={(e) => setTitle(e.target.value)} className={inputCls + ' mt-1'} data-testid="email-task-title" />
         </label>
 
         <label className="block">
-          <span className="text-[11px] uppercase tracking-wide text-stone-400">Place it in</span>
+          <span className="text-[11px] uppercase tracking-wide text-[var(--ink-40)]">Place it in</span>
           <select
             value={parentId ?? ''}
             onChange={(e) => setParentId(e.target.value || null)}
@@ -138,7 +138,7 @@ export default function EmailTaskDialog({ email, onClose, onCreated }: Props): J
         </label>
 
         <label className="block">
-          <span className="text-[11px] uppercase tracking-wide text-stone-400">…or new folder</span>
+          <span className="text-[11px] uppercase tracking-wide text-[var(--ink-40)]">…or new folder</span>
           <input
             value={newFolder}
             onChange={(e) => setNewFolder(e.target.value)}
@@ -150,11 +150,11 @@ export default function EmailTaskDialog({ email, onClose, onCreated }: Props): J
 
         <div className="flex gap-3">
           <label className="block flex-1">
-            <span className="text-[11px] uppercase tracking-wide text-stone-400">Due date</span>
+            <span className="text-[11px] uppercase tracking-wide text-[var(--ink-40)]">Due date</span>
             <input type="date" value={due} onChange={(e) => setDue(e.target.value)} data-testid="email-task-due" className={inputCls + ' mt-1'} />
           </label>
           <div className="flex-1">
-            <span className="text-[11px] uppercase tracking-wide text-stone-400">Urgency</span>
+            <span className="text-[11px] uppercase tracking-wide text-[var(--ink-40)]">Urgency</span>
             <div className="mt-1 flex gap-1" data-testid="email-task-urgency">
               {URGENCY.map((u) => (
                 <button
@@ -163,7 +163,7 @@ export default function EmailTaskDialog({ email, onClose, onCreated }: Props): J
                   className={`flex-1 py-1.5 rounded text-[11px] border ${
                     urgency === u.value
                       ? 'border-accent bg-accent/15 text-accent font-medium'
-                      : 'border-stone-200 dark:border-stone-700 text-stone-500 dark:text-stone-400'
+                      : 'border-[var(--edge-soft)] text-[var(--ink-50)]'
                   }`}
                 >
                   {u.label}
@@ -176,7 +176,7 @@ export default function EmailTaskDialog({ email, onClose, onCreated }: Props): J
         {error && <div className="text-[12px] text-red-600 dark:text-red-400">{error}</div>}
 
         <div className="flex items-center justify-end gap-2 pt-1">
-          <button onClick={onClose} className="text-[12px] px-3 py-1.5 rounded-lg border border-stone-300 dark:border-stone-600 text-stone-600 dark:text-stone-300">
+          <button onClick={onClose} className="text-[12px] px-3 py-1.5 rounded-lg border border-[var(--edge-firm)] text-[var(--ink-70)]">
             Cancel
           </button>
           <button onClick={() => void submit()} disabled={busy} className="btn-primary text-[12px] px-3 py-1.5" data-testid="email-task-create">

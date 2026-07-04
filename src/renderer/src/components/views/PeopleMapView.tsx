@@ -787,7 +787,7 @@ function PeopleRail({ data, now }: { data: PeopleMapData; now: Date }): JSX.Elem
     <aside className="pm-rail">
       <RailCard title="Around right now" icon="bolt" tone="emerald">
         {around.length === 0 ? (
-          <div className="text-[11.5px] text-stone-400">No one is online right now.</div>
+          <div className="text-[11.5px] text-[var(--ink-40)]">No one is online right now.</div>
         ) : (
           <div className="flex flex-col gap-0.5">
             {(expanded ? around : around.slice(0, 6)).map((p) => {
@@ -799,12 +799,12 @@ function PeopleRail({ data, now }: { data: PeopleMapData; now: Date }): JSX.Elem
                     <span className={`pm-prow__sdot pm-dot ${STATUS_META[p.liveStatus].cls}`} />
                   </span>
                   <span className="min-w-0 flex-1">
-                    <div className="text-[12px] font-medium text-stone-800 dark:text-stone-100 truncate">{p.handle}</div>
-                    <div className="text-[11px] text-stone-500 truncate">
+                    <div className="text-[12px] font-medium text-[var(--ink-90)] truncate">{p.handle}</div>
+                    <div className="text-[11px] text-[var(--ink-50)] truncate">
                       {p.liveWorkingOn || p.title || STATUS_META[p.liveStatus].label}
                     </div>
                   </span>
-                  {d && <span className="text-[11px] text-stone-400 fb-tabular shrink-0">{fmtHour(d.hour)}</span>}
+                  {d && <span className="text-[11px] text-[var(--ink-40)] fb-tabular shrink-0">{fmtHour(d.hour)}</span>}
                 </div>
               )
             })}
@@ -823,16 +823,16 @@ function PeopleRail({ data, now }: { data: PeopleMapData; now: Date }): JSX.Elem
 
       <RailCard title="Follow the sun" icon="wb_twilight" tone="amber" className="mt-3">
         {wrapping.length === 0 && starting.length === 0 ? (
-          <div className="text-[11.5px] text-stone-400">No handoffs in motion right now.</div>
+          <div className="text-[11.5px] text-[var(--ink-40)]">No handoffs in motion right now.</div>
         ) : (
           <div className="flex flex-col gap-2.5 text-[12px]">
             <div>
-              <div className="text-[10.5px] uppercase tracking-wide text-stone-400 mb-1">Wrapping up</div>
-              <div className="text-stone-700 dark:text-stone-200">{wrapping.length ? names(wrapping) : '—'}</div>
+              <div className="text-[10.5px] uppercase tracking-wide text-[var(--ink-40)] mb-1">Wrapping up</div>
+              <div className="text-[var(--ink-70)]">{wrapping.length ? names(wrapping) : '—'}</div>
             </div>
             <div>
-              <div className="text-[10.5px] uppercase tracking-wide text-stone-400 mb-1">Starting their day</div>
-              <div className="text-stone-700 dark:text-stone-200">{starting.length ? names(starting) : '—'}</div>
+              <div className="text-[10.5px] uppercase tracking-wide text-[var(--ink-40)] mb-1">Starting their day</div>
+              <div className="text-[var(--ink-70)]">{starting.length ? names(starting) : '—'}</div>
             </div>
           </div>
         )}
@@ -843,8 +843,8 @@ function PeopleRail({ data, now }: { data: PeopleMapData; now: Date }): JSX.Elem
           {depts.map(([name, n]) => (
             <div key={name} className="text-[12px]">
               <div className="flex justify-between gap-2">
-                <span className="text-stone-700 dark:text-stone-200 truncate">{name}</span>
-                <span className="text-stone-400 fb-tabular shrink-0">{n}</span>
+                <span className="text-[var(--ink-70)] truncate">{name}</span>
+                <span className="text-[var(--ink-40)] fb-tabular shrink-0">{n}</span>
               </div>
               <div className="h-1.5 rounded-full bg-stone-500/10 mt-1 overflow-hidden">
                 <div className="h-full rounded-full bg-accent/60" style={{ width: `${(n / maxDept) * 100}%` }} />
@@ -950,7 +950,7 @@ export default function PeopleMapView(): JSX.Element {
             <>
               {orgs.filter((o) => !o.personal).length > 0 && (
                 <select
-                  className="text-[12px] bg-transparent text-stone-700 dark:text-stone-200 border border-stone-200 dark:border-white/10 rounded-lg px-2 py-1.5 focus:outline-none focus:border-accent"
+                  className="text-[12px] bg-transparent text-[var(--ink-70)] border border-[var(--edge-soft)] dark:border-white/10 rounded-lg px-2 py-1.5 focus:outline-none focus:border-accent"
                   value={orgId ?? ''}
                   onChange={(e) => setOrgId(e.target.value || null)}
                   data-testid="people-map-org"

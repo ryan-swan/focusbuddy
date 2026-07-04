@@ -127,7 +127,7 @@ export default function TableImportDialog({
   }
 
   const selectCls =
-    'text-[11px] rounded border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 px-1.5 py-1 text-stone-700 dark:text-stone-200 focus:outline-none focus:border-accent'
+    'text-[11px] rounded border border-[var(--edge-soft)] bg-[var(--surface-raised)] px-1.5 py-1 text-[var(--ink-70)] focus:outline-none focus:border-accent'
 
   return createPortal(
     <div
@@ -140,23 +140,23 @@ export default function TableImportDialog({
         if (e.target === e.currentTarget) onClose()
       }}
     >
-      <div className="w-full max-w-2xl max-h-[85vh] flex flex-col rounded-xl bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-700 shadow-2xl">
-        <div className="px-4 py-3 border-b border-stone-200 dark:border-stone-700 flex items-center gap-2">
+      <div className="w-full max-w-2xl max-h-[85vh] flex flex-col rounded-xl bg-[var(--surface-raised)] border border-[var(--edge-soft)] shadow-2xl">
+        <div className="px-4 py-3 border-b border-[var(--edge-soft)] flex items-center gap-2">
           <Icon name="upload_file" size={16} />
           <div className="flex-1 min-w-0">
-            <div className="text-[13px] font-semibold text-stone-900 dark:text-stone-100">Import into table</div>
-            <div className="text-[11px] text-stone-500 dark:text-stone-400 truncate">
+            <div className="text-[13px] font-semibold text-[var(--ink-100)]">Import into table</div>
+            <div className="text-[11px] text-[var(--ink-50)] truncate">
               {fileLabel} · {grid.rows.length} {grid.rows.length === 1 ? 'row' : 'rows'}, {grid.headers.length}{' '}
               {grid.headers.length === 1 ? 'column' : 'columns'}
             </div>
           </div>
-          <button onClick={onClose} aria-label="Close" className="h-7 w-7 inline-flex items-center justify-center rounded text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 hover:bg-stone-100 dark:hover:bg-stone-800">
+          <button onClick={onClose} aria-label="Close" className="h-7 w-7 inline-flex items-center justify-center rounded text-[var(--ink-40)] hover:text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]">
             <Icon name="close" size={16} />
           </button>
         </div>
 
         <div className="flex-1 overflow-auto px-4 py-3 space-y-3">
-          <div className="text-[11px] uppercase tracking-[0.1em] text-stone-500 dark:text-stone-400 font-medium">
+          <div className="text-[11px] uppercase tracking-[0.1em] text-[var(--ink-50)] font-medium">
             Map columns
           </div>
           <div className="space-y-1.5">
@@ -164,7 +164,7 @@ export default function TableImportDialog({
               const t = m.target
               return (
                 <div key={m.sourceHeader + i} className="flex items-center gap-2" data-testid={`map-row-${i}`}>
-                  <div className="w-40 shrink-0 text-[12px] font-medium text-stone-700 dark:text-stone-200 truncate" title={m.sourceHeader}>
+                  <div className="w-40 shrink-0 text-[12px] font-medium text-[var(--ink-70)] truncate" title={m.sourceHeader}>
                     {m.sourceHeader}
                   </div>
                   <Icon name="arrow_forward" size={13} />
@@ -215,7 +215,7 @@ export default function TableImportDialog({
           </div>
 
           <div className="pt-1 flex items-center gap-2">
-            <div className="text-[11px] uppercase tracking-[0.1em] text-stone-500 dark:text-stone-400 font-medium">
+            <div className="text-[11px] uppercase tracking-[0.1em] text-[var(--ink-50)] font-medium">
               Match rows on
             </div>
             <select
@@ -231,20 +231,20 @@ export default function TableImportDialog({
                 </option>
               ))}
             </select>
-            <span className="text-[10px] text-stone-400 dark:text-stone-500">
+            <span className="text-[10px] text-[var(--ink-40)]">
               rows with a matching value update in place; the rest are added
             </span>
           </div>
         </div>
 
-        <div className="px-4 py-3 border-t border-stone-200 dark:border-stone-700 flex items-center gap-3">
-          <div className="flex-1 text-[11px] text-stone-600 dark:text-stone-300" data-testid="import-preview">
+        <div className="px-4 py-3 border-t border-[var(--edge-soft)] flex items-center gap-3">
+          <div className="flex-1 text-[11px] text-[var(--ink-70)]" data-testid="import-preview">
             {plan.summary.inserted} to add, {plan.summary.updated} to update
             {plan.summary.columnsAdded > 0 ? `, ${plan.summary.columnsAdded} new column${plan.summary.columnsAdded === 1 ? '' : 's'}` : ''}
             {plan.summary.rowsSkipped > 0 ? `, ${plan.summary.rowsSkipped} empty skipped` : ''}
             {error && <span className="ml-2 text-red-500">{error}</span>}
           </div>
-          <button onClick={onClose} className="px-3 py-1.5 rounded-md text-[12px] text-stone-600 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800">
+          <button onClick={onClose} className="px-3 py-1.5 rounded-md text-[12px] text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]">
             Cancel
           </button>
           <button

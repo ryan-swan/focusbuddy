@@ -12,9 +12,9 @@ export default function PrivacyHelpSection(): JSX.Element {
   const [shareUsage, setShareUsage] = useState(telemetryEnabled())
 
   return (
-    <div className="px-3 py-3 border-t border-stone-200 dark:border-stone-700 space-y-4">
+    <div className="px-3 py-3 border-t border-[var(--edge-soft)] space-y-4">
       <div>
-        <div className="text-[11px] uppercase tracking-[0.12em] text-stone-500 dark:text-stone-400 font-medium mb-2">
+        <div className="text-[11px] uppercase tracking-[0.12em] text-[var(--ink-50)] font-medium mb-2">
           Privacy
         </div>
         <label className="flex items-start gap-2.5 cursor-pointer">
@@ -28,38 +28,38 @@ export default function PrivacyHelpSection(): JSX.Element {
             data-testid="privacy-usage-toggle"
             className="mt-0.5 h-4 w-4 accent-accent"
           />
-          <span className="text-[12px] text-stone-700 dark:text-stone-300 leading-relaxed">
+          <span className="text-[12px] text-[var(--ink-70)] leading-relaxed">
             Share anonymous usage data. This sends aggregate counts (how often features are used), never the contents of
             your documents, messages, or files, and no third-party trackers. Turning this off stops it immediately.
           </span>
         </label>
-        <p className="mt-2 text-[10px] text-stone-500 dark:text-stone-400 leading-relaxed">
+        <p className="mt-2 text-[10px] text-[var(--ink-50)] leading-relaxed">
           Your work stays on this device. Only items you explicitly share, and your email address, are sent to our
           server. AI features send the text you ask them to act on to the AI provider when you use them.
         </p>
       </div>
 
       <div>
-        <div className="text-[11px] uppercase tracking-[0.12em] text-stone-500 dark:text-stone-400 font-medium mb-2">
+        <div className="text-[11px] uppercase tracking-[0.12em] text-[var(--ink-50)] font-medium mb-2">
           Help &amp; support
         </div>
         <div className="space-y-1.5">
           <button
             onClick={() => void window.api.files.openExternal(HELP_BASE)}
             data-testid="help-guides"
-            className="w-full inline-flex items-center gap-2 px-2.5 py-1.5 rounded-md text-[12px] border border-stone-200 dark:border-stone-700 text-stone-700 dark:text-stone-300 hover:border-accent hover:text-accent transition-colors"
+            className="w-full inline-flex items-center gap-2 px-2.5 py-1.5 rounded-md text-[12px] border border-[var(--edge-soft)] text-[var(--ink-70)] hover:border-accent hover:text-accent transition-colors"
           >
             <Icon name="help" size={14} /> Help &amp; guides
           </button>
           <button
             onClick={() => void window.api.files.openExternal(PRICING_URL)}
             data-testid="help-pricing"
-            className="w-full inline-flex items-center gap-2 px-2.5 py-1.5 rounded-md text-[12px] border border-stone-200 dark:border-stone-700 text-stone-700 dark:text-stone-300 hover:border-accent hover:text-accent transition-colors"
+            className="w-full inline-flex items-center gap-2 px-2.5 py-1.5 rounded-md text-[12px] border border-[var(--edge-soft)] text-[var(--ink-70)] hover:border-accent hover:text-accent transition-colors"
           >
             <Icon name="sell" size={14} /> Plans &amp; pricing
           </button>
         </div>
-        <p className="mt-2 text-[10px] text-stone-500 dark:text-stone-400 leading-relaxed">
+        <p className="mt-2 text-[10px] text-[var(--ink-50)] leading-relaxed">
           Stuck on something? The guides cover the common questions.
         </p>
       </div>

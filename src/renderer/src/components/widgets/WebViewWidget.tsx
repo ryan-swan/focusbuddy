@@ -477,7 +477,7 @@ export default function WebViewWidget({ widget, inline = false }: Props): JSX.El
 
   const body = (
     <div
-      className="h-full w-full bg-white relative flex flex-col"
+      className="h-full w-full bg-[var(--surface-raised)] relative flex flex-col"
       onContextMenu={(e) => {
         // The <webview> element owns its inner context menu via
         // shell-level webContents; we only act on right-clicks landing
@@ -503,8 +503,8 @@ export default function WebViewWidget({ widget, inline = false }: Props): JSX.El
           }}
           className="h-full w-full flex flex-col items-stretch justify-center gap-2 p-4"
         >
-          <label className="text-xs uppercase tracking-wider text-stone-500 flex items-center gap-1.5">
-            <Icon name={entry?.icon ?? 'public'} size={16} className="text-stone-600" />
+          <label className="text-xs uppercase tracking-wider text-[var(--ink-50)] flex items-center gap-1.5">
+            <Icon name={entry?.icon ?? 'public'} size={16} className="text-[var(--ink-70)]" />
             {entry?.label ?? 'URL'}
           </label>
           <input
@@ -512,9 +512,9 @@ export default function WebViewWidget({ widget, inline = false }: Props): JSX.El
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             placeholder={placeholder}
-            className="bg-white border border-stone-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-stone-700 focus:ring-2 focus:ring-stone-200"
+            className="bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded px-3 py-2 text-sm focus:outline-none focus:border-[var(--edge-firm)] focus:ring-2 focus:ring-[var(--edge-soft)]"
           />
-          <p className="text-[11px] text-stone-600">
+          <p className="text-[11px] text-[var(--ink-70)]">
             {entry?.hint ?? 'Renders inside a focused browser tab — no other tabs allowed.'}
           </p>
           <div className="flex justify-end gap-2 pt-1">
@@ -529,11 +529,11 @@ export default function WebViewWidget({ widget, inline = false }: Props): JSX.El
           {/* Browser-chrome toolbar — back/forward/reload/stop + URL bar.
               Lives above the webview content in a flex column so the
               webview area shrinks to the remaining height. */}
-          <div className="shrink-0 flex items-center gap-1 px-1.5 py-1 border-b border-stone-200 bg-stone-50/80">
+          <div className="shrink-0 flex items-center gap-1 px-1.5 py-1 border-b border-[var(--edge-soft)] bg-[var(--surface-sunken)]/80">
             <button
               onClick={navBack}
               disabled={!canGoBack}
-              className="h-6 w-6 inline-flex items-center justify-center rounded text-stone-600 hover:bg-stone-200 disabled:text-stone-300 disabled:hover:bg-transparent disabled:cursor-not-allowed"
+              className="h-6 w-6 inline-flex items-center justify-center rounded text-[var(--ink-70)] hover:bg-[var(--surface-sunken)] disabled:text-[var(--ink-30)] disabled:hover:bg-transparent disabled:cursor-not-allowed"
               title="Back"
               aria-label="Go back"
             >
@@ -542,7 +542,7 @@ export default function WebViewWidget({ widget, inline = false }: Props): JSX.El
             <button
               onClick={navForward}
               disabled={!canGoForward}
-              className="h-6 w-6 inline-flex items-center justify-center rounded text-stone-600 hover:bg-stone-200 disabled:text-stone-300 disabled:hover:bg-transparent disabled:cursor-not-allowed"
+              className="h-6 w-6 inline-flex items-center justify-center rounded text-[var(--ink-70)] hover:bg-[var(--surface-sunken)] disabled:text-[var(--ink-30)] disabled:hover:bg-transparent disabled:cursor-not-allowed"
               title="Forward"
               aria-label="Go forward"
             >
@@ -550,7 +550,7 @@ export default function WebViewWidget({ widget, inline = false }: Props): JSX.El
             </button>
             <button
               onClick={isLoading ? navStop : navReload}
-              className="h-6 w-6 inline-flex items-center justify-center rounded text-stone-600 hover:bg-stone-200"
+              className="h-6 w-6 inline-flex items-center justify-center rounded text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]"
               title={isLoading ? 'Stop loading' : 'Reload'}
               aria-label={isLoading ? 'Stop loading' : 'Reload'}
             >
@@ -584,7 +584,7 @@ export default function WebViewWidget({ widget, inline = false }: Props): JSX.El
                 onMouseDown={(e) => e.stopPropagation()}
                 spellCheck={false}
                 placeholder="https://…"
-                className="w-full h-6 px-2 text-[11px] rounded bg-white border border-stone-200 focus:border-stone-400 focus:outline-none text-stone-800 truncate"
+                className="w-full h-6 px-2 text-[11px] rounded bg-[var(--surface-raised)] border border-[var(--edge-soft)] focus:border-[var(--edge-firm)] focus:outline-none text-[var(--ink-90)] truncate"
                 title={currentUrl}
               />
             </div>
@@ -595,7 +595,7 @@ export default function WebViewWidget({ widget, inline = false }: Props): JSX.El
                   setResMenuOpen((v) => !v)
                 }}
                 onMouseDown={(e) => e.stopPropagation()}
-                className={`h-6 w-6 inline-flex items-center justify-center rounded text-stone-600 hover:bg-stone-200 ${resMenuOpen ? 'bg-stone-200' : ''}`}
+                className={`h-6 w-6 inline-flex items-center justify-center rounded text-[var(--ink-70)] hover:bg-[var(--surface-sunken)] ${resMenuOpen ? 'bg-stone-200' : ''}`}
                 title="Resize to a stored resolution"
                 aria-label="Resize to a stored resolution"
               >
@@ -613,10 +613,10 @@ export default function WebViewWidget({ widget, inline = false }: Props): JSX.El
                     onMouseDown={(e) => e.stopPropagation()}
                   />
                   <div
-                    className="absolute right-0 top-7 z-50 w-44 rounded-lg border border-stone-200 bg-white shadow-lg py-1"
+                    className="absolute right-0 top-7 z-50 w-44 rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-lg py-1"
                     onMouseDown={(e) => e.stopPropagation()}
                   >
-                    <div className="px-3 py-1 text-[10px] font-medium uppercase tracking-wide text-stone-400">
+                    <div className="px-3 py-1 text-[10px] font-medium uppercase tracking-wide text-[var(--ink-40)]">
                       Window size
                     </div>
                     {BROWSER_RESOLUTIONS.map((r) => {
@@ -631,13 +631,13 @@ export default function WebViewWidget({ widget, inline = false }: Props): JSX.El
                             update(widget.id, { width: r.width, height: r.height })
                             setResMenuOpen(false)
                           }}
-                          className={`w-full flex items-center justify-between px-3 py-1.5 text-left text-[12px] hover:bg-stone-100 ${active ? 'text-stone-900 font-medium' : 'text-stone-700'}`}
+                          className={`w-full flex items-center justify-between px-3 py-1.5 text-left text-[12px] hover:bg-[var(--surface-sunken)] ${active ? 'text-[var(--ink-100)] font-medium' : 'text-[var(--ink-70)]'}`}
                         >
                           <span className="flex items-center gap-2">
                             {active && <Icon name="check" size={12} />}
                             <span className={active ? '' : 'pl-[18px]'}>{r.label}</span>
                           </span>
-                          <span className="text-[10px] text-stone-400 tabular-nums">{r.sub}</span>
+                          <span className="text-[10px] text-[var(--ink-40)] tabular-nums">{r.sub}</span>
                         </button>
                       )
                     })}
@@ -688,7 +688,7 @@ export default function WebViewWidget({ widget, inline = false }: Props): JSX.El
                   }}
                   disabled={pinning}
                   title="Pin this site to Connected Apps (shares session + enables vault auto-fill)"
-                  className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded bg-white/90 border border-stone-300 hover:bg-stone-100 text-stone-700 disabled:opacity-60"
+                  className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded bg-[var(--surface-raised)]/90 border border-[var(--edge-firm)] hover:bg-[var(--surface-sunken)] text-[var(--ink-70)] disabled:opacity-60"
                 >
                   <Icon name="push_pin" size={11} />
                   <span>{pinning ? 'pinning…' : 'pin to apps'}</span>
@@ -697,7 +697,7 @@ export default function WebViewWidget({ widget, inline = false }: Props): JSX.El
               {sourceApp && (
                 <span
                   title={`Linked to "${sourceApp.title}" — session + auto-fill shared`}
-                  className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded bg-white/90 border border-stone-300 text-stone-700"
+                  className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded bg-[var(--surface-raised)]/90 border border-[var(--edge-firm)] text-[var(--ink-70)]"
                 >
                   <Icon name="link" size={11} />
                   <span className="truncate max-w-[120px]">{sourceApp.title}</span>
@@ -709,7 +709,7 @@ export default function WebViewWidget({ widget, inline = false }: Props): JSX.El
                   setEditing(true)
                 }}
                 title="Change URL (full form)"
-                className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded bg-white/90 border border-stone-300 hover:bg-stone-100 text-stone-700"
+                className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded bg-[var(--surface-raised)]/90 border border-[var(--edge-firm)] hover:bg-[var(--surface-sunken)] text-[var(--ink-70)]"
               >
                 <Icon name="edit" size={11} />
                 <span>edit</span>

@@ -201,7 +201,7 @@ export default function WeekTimeGrid({ weekStart }: { weekStart: Date }): JSX.El
           <div
             key={i}
             style={{ height: HOUR_PX }}
-            className="text-[10px] font-mono text-stone-400 dark:text-stone-500 text-right pr-1.5 -translate-y-1.5"
+            className="text-[10px] font-mono text-[var(--ink-40)] text-right pr-1.5 -translate-y-1.5"
           >
             {START_HOUR + i}:00
           </div>
@@ -222,7 +222,7 @@ export default function WeekTimeGrid({ weekStart }: { weekStart: Date }): JSX.El
                 className={`text-center text-[11px] font-semibold py-1 rounded ${
                   isToday
                     ? 'text-accent'
-                    : 'text-stone-500 dark:text-stone-400'
+                    : 'text-[var(--ink-50)]'
                 }`}
               >
                 {label} {new Date(dStart).getDate()}
@@ -231,7 +231,7 @@ export default function WeekTimeGrid({ weekStart }: { weekStart: Date }): JSX.El
                 className={`relative rounded-lg border ${
                   isToday
                     ? 'border-accent/40 bg-accent/[0.03]'
-                    : 'border-stone-200 dark:border-stone-700 bg-white/50 dark:bg-stone-900/40'
+                    : 'border-[var(--edge-soft)] bg-white/50 dark:bg-stone-900/40'
                 }`}
                 style={{ height: gridHeight }}
                 onClick={(e) => onColumnClick(e, dayIndex)}
@@ -244,7 +244,7 @@ export default function WeekTimeGrid({ weekStart }: { weekStart: Date }): JSX.El
                   <div
                     key={i}
                     style={{ top: i * HOUR_PX, height: HOUR_PX }}
-                    className="absolute left-0 right-0 border-t border-stone-100 dark:border-stone-800 pointer-events-none"
+                    className="absolute left-0 right-0 border-t border-[var(--edge-soft)] pointer-events-none"
                   />
                 ))}
 
@@ -269,8 +269,8 @@ export default function WeekTimeGrid({ weekStart }: { weekStart: Date }): JSX.El
                         done
                           ? 'bg-emerald-100/90 dark:bg-emerald-950/50 border-emerald-300/50 dark:border-emerald-800/40 text-emerald-800 dark:text-emerald-300'
                           : isPast
-                            ? 'bg-stone-100/90 dark:bg-stone-800/80 border-stone-300/50 dark:border-stone-700 text-stone-500 dark:text-stone-400'
-                            : 'bg-accent/15 border-accent/40 text-stone-800 dark:text-stone-100'
+                            ? 'bg-[var(--surface-sunken)]/90 border-[var(--edge-firm)]/50 text-[var(--ink-50)]'
+                            : 'bg-accent/15 border-accent/40 text-[var(--ink-90)]'
                       }`}
                       style={{ top: Math.max(0, top), height: Math.max(16, height) }}
                       title={`${block.title || linked?.title || 'Focus time'} · ${fmtTime(startMs)}`}
@@ -304,7 +304,7 @@ export default function WeekTimeGrid({ weekStart }: { weekStart: Date }): JSX.El
                               jumpToNode(linked)
                             }}
                             onPointerDown={(e) => e.stopPropagation()}
-                            className="h-4 w-4 inline-flex items-center justify-center rounded bg-white/70 dark:bg-stone-900/70 text-stone-600 dark:text-stone-300"
+                            className="h-4 w-4 inline-flex items-center justify-center rounded bg-white/70 dark:bg-stone-900/70 text-[var(--ink-70)]"
                             title={linked.kind === 'folder' ? 'Open this folder' : 'Jump to this task'}
                             data-testid="block-jump"
                           >
@@ -332,7 +332,7 @@ export default function WeekTimeGrid({ weekStart }: { weekStart: Date }): JSX.El
                             void updateBlock(block.id, { status: done ? 'planned' : 'done' })
                           }}
                           onPointerDown={(e) => e.stopPropagation()}
-                          className="h-4 w-4 inline-flex items-center justify-center rounded bg-white/70 dark:bg-stone-900/70 text-stone-600 dark:text-stone-300"
+                          className="h-4 w-4 inline-flex items-center justify-center rounded bg-white/70 dark:bg-stone-900/70 text-[var(--ink-70)]"
                           title={done ? 'Mark not done' : 'Mark done'}
                         >
                           <Icon name={done ? 'undo' : 'check'} size={9} />
@@ -352,7 +352,7 @@ export default function WeekTimeGrid({ weekStart }: { weekStart: Date }): JSX.El
                             }
                           }}
                           onPointerDown={(e) => e.stopPropagation()}
-                          className="h-4 w-4 inline-flex items-center justify-center rounded bg-white/70 dark:bg-stone-900/70 text-stone-600 hover:text-red-600 dark:text-stone-300"
+                          className="h-4 w-4 inline-flex items-center justify-center rounded bg-white/70 dark:bg-stone-900/70 text-[var(--ink-70)] hover:text-red-600"
                           title="Delete block"
                           data-testid="block-delete"
                         >
@@ -490,20 +490,20 @@ function BlockComposer({
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="w-[340px] rounded-xl bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-700 shadow-2xl p-4 space-y-3"
+        className="w-[340px] rounded-xl bg-[var(--surface-raised)] border border-[var(--edge-soft)] shadow-2xl p-4 space-y-3"
         data-testid="block-composer"
       >
         <div className="flex items-center gap-2">
           <Icon name="schedule" size={16} className="text-accent" />
-          <h3 className="text-sm font-semibold text-stone-900 dark:text-stone-100">Book time</h3>
-          <span className="ml-auto text-[11px] font-mono text-stone-500 dark:text-stone-400">
+          <h3 className="text-sm font-semibold text-[var(--ink-100)]">Book time</h3>
+          <span className="ml-auto text-[11px] font-mono text-[var(--ink-50)]">
             {fmtTime(startMs)}
           </span>
         </div>
 
         {prefillNode ? (
           <div
-            className="flex items-center gap-2 rounded-md border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 px-2 py-1.5"
+            className="flex items-center gap-2 rounded-md border border-[var(--edge-soft)] bg-[var(--surface-sunken)] px-2 py-1.5"
             data-testid="composer-prefill"
           >
             <Icon
@@ -511,20 +511,20 @@ function BlockComposer({
               size={14}
               className="text-accent shrink-0"
             />
-            <span className="text-sm text-stone-800 dark:text-stone-100 truncate">
+            <span className="text-sm text-[var(--ink-90)] truncate">
               {prefillNode.title}
             </span>
           </div>
         ) : (
           <>
             <label className="block">
-              <span className="text-[10px] uppercase tracking-wider text-stone-500 dark:text-stone-400 font-medium">
+              <span className="text-[10px] uppercase tracking-wider text-[var(--ink-50)] font-medium">
                 Task
               </span>
               <select
                 value={taskId}
                 onChange={(e) => setTaskId(e.target.value)}
-                className="mt-1 w-full bg-white dark:bg-stone-800 border border-stone-300 dark:border-stone-600 rounded-md px-2 py-1.5 text-sm"
+                className="mt-1 w-full bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded-md px-2 py-1.5 text-sm"
                 data-testid="composer-task"
               >
                 <option value="">Focus time (no task)</option>
@@ -538,14 +538,14 @@ function BlockComposer({
 
             {!taskId && (
               <label className="block">
-                <span className="text-[10px] uppercase tracking-wider text-stone-500 dark:text-stone-400 font-medium">
+                <span className="text-[10px] uppercase tracking-wider text-[var(--ink-50)] font-medium">
                   Label (optional)
                 </span>
                 <input
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   placeholder="Focus time"
-                  className="mt-1 w-full bg-white dark:bg-stone-800 border border-stone-300 dark:border-stone-600 rounded-md px-2 py-1.5 text-sm"
+                  className="mt-1 w-full bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded-md px-2 py-1.5 text-sm"
                 />
               </label>
             )}
@@ -561,12 +561,12 @@ function BlockComposer({
             data-testid="composer-meeting-toggle"
           />
           <Icon name="videocam" size={14} className="text-accent" />
-          <span className="text-sm text-stone-800 dark:text-stone-100">Video meeting</span>
+          <span className="text-sm text-[var(--ink-90)]">Video meeting</span>
         </label>
 
         {isMeeting && (
           <label className="block">
-            <span className="text-[10px] uppercase tracking-wider text-stone-500 dark:text-stone-400 font-medium">
+            <span className="text-[10px] uppercase tracking-wider text-[var(--ink-50)] font-medium">
               Invite people (emails)
             </span>
             <textarea
@@ -574,10 +574,10 @@ function BlockComposer({
               onChange={(e) => setInvitees(e.target.value)}
               placeholder="alex@acme.com, sam@acme.com"
               rows={2}
-              className="mt-1 w-full bg-white dark:bg-stone-800 border border-stone-300 dark:border-stone-600 rounded-md px-2 py-1.5 text-sm resize-none"
+              className="mt-1 w-full bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded-md px-2 py-1.5 text-sm resize-none"
               data-testid="composer-invitees"
             />
-            <span className="mt-1 block text-[11px] text-stone-500 dark:text-stone-400">
+            <span className="mt-1 block text-[11px] text-[var(--ink-50)]">
               Each invitee gets an email with the time and a link to join in PlexiDesk.
             </span>
           </label>
@@ -585,7 +585,7 @@ function BlockComposer({
 
         {inviteNote && (
           <div
-            className="rounded-md border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 px-2.5 py-2 text-[12px] text-stone-700 dark:text-stone-200"
+            className="rounded-md border border-[var(--edge-soft)] bg-[var(--surface-sunken)] px-2.5 py-2 text-[12px] text-[var(--ink-70)]"
             data-testid="composer-invite-note"
           >
             {inviteNote}
@@ -593,13 +593,13 @@ function BlockComposer({
         )}
 
         <label className="block">
-          <span className="text-[10px] uppercase tracking-wider text-stone-500 dark:text-stone-400 font-medium">
+          <span className="text-[10px] uppercase tracking-wider text-[var(--ink-50)] font-medium">
             Length
           </span>
           <select
             value={duration}
             onChange={(e) => setDuration(Number(e.target.value))}
-            className="mt-1 w-full bg-white dark:bg-stone-800 border border-stone-300 dark:border-stone-600 rounded-md px-2 py-1.5 text-sm"
+            className="mt-1 w-full bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded-md px-2 py-1.5 text-sm"
           >
             {[15, 25, 30, 45, 60, 90, 120].map((m) => (
               <option key={m} value={m}>
@@ -610,13 +610,13 @@ function BlockComposer({
         </label>
 
         <label className="block">
-          <span className="text-[10px] uppercase tracking-wider text-stone-500 dark:text-stone-400 font-medium">
+          <span className="text-[10px] uppercase tracking-wider text-[var(--ink-50)] font-medium">
             Repeats
           </span>
           <select
             value={repeat}
             onChange={(e) => setRepeat(e.target.value as TimeBlockRecurrence | '')}
-            className="mt-1 w-full bg-white dark:bg-stone-800 border border-stone-300 dark:border-stone-600 rounded-md px-2 py-1.5 text-sm"
+            className="mt-1 w-full bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded-md px-2 py-1.5 text-sm"
             data-testid="block-repeat"
           >
             <option value="">Does not repeat</option>

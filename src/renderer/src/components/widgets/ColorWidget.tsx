@@ -62,7 +62,7 @@ export default function ColorWidget({ widget, inline = false }: Props): JSX.Elem
   const rgb = hexToRgb(color)
 
   const content = (
-    <div className={`h-full w-full bg-white flex flex-col gap-2 ${inline ? 'p-6' : 'p-3'}`}>
+    <div className={`h-full w-full bg-[var(--surface-raised)] flex flex-col gap-2 ${inline ? 'p-6' : 'p-3'}`}>
       <div
         className={`flex-1 rounded border border-black/10 ${inline ? 'min-h-[200px]' : 'min-h-[60px]'}`}
         style={{ backgroundColor: color }}
@@ -72,18 +72,18 @@ export default function ColorWidget({ widget, inline = false }: Props): JSX.Elem
           type="color"
           value={color}
           onChange={(e) => setColor(e.target.value)}
-          className="h-8 w-12 border border-stone-300 rounded cursor-pointer"
+          className="h-8 w-12 border border-[var(--edge-firm)] rounded cursor-pointer"
           aria-label="Pick color"
         />
         <input
           value={color}
           onChange={(e) => setColor(e.target.value)}
-          className={`flex-1 bg-white border border-stone-300 rounded px-2 py-1.5 font-mono focus:outline-none focus:border-stone-700 ${
+          className={`flex-1 bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded px-2 py-1.5 font-mono focus:outline-none focus:border-[var(--edge-firm)] ${
             inline ? 'text-base' : 'text-xs'
           }`}
         />
       </div>
-      <div className={`text-stone-700 font-mono ${inline ? 'text-sm' : 'text-[11px]'}`}>
+      <div className={`text-[var(--ink-70)] font-mono ${inline ? 'text-sm' : 'text-[11px]'}`}>
         {rgb ? `rgb(${rgb.r}, ${rgb.g}, ${rgb.b})` : 'invalid hex'}
       </div>
       <div className="flex gap-1.5">

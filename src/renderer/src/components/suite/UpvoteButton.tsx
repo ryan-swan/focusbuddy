@@ -45,7 +45,7 @@ export default function UpvoteButton({
       } ${
         voted
           ? 'border-indigo-400/50 bg-indigo-500/15 text-indigo-300'
-          : 'border-white/10 bg-white/[0.03] text-stone-400 hover:text-indigo-300 hover:border-indigo-400/40 hover:bg-indigo-500/10'
+          : 'border-white/10 bg-white/[0.03] text-[var(--ink-40)] hover:text-indigo-300 hover:border-indigo-400/40 hover:bg-indigo-500/10'
       }`}
     >
       <Icon name={voted ? 'arrow_circle_up' : 'arrow_upward'} size={lg ? 16 : 13} filled={voted} />

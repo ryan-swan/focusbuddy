@@ -73,11 +73,11 @@ export default function BackupSection(): JSX.Element {
   }
 
   return (
-    <div className="px-3 py-3 border-t border-stone-200 dark:border-stone-700 space-y-2">
-      <div className="text-[11px] uppercase tracking-[0.12em] text-stone-500 dark:text-stone-400 font-medium">
+    <div className="px-3 py-3 border-t border-[var(--edge-soft)] space-y-2">
+      <div className="text-[11px] uppercase tracking-[0.12em] text-[var(--ink-50)] font-medium">
         Backup &amp; data
       </div>
-      <p className="text-[10px] text-stone-500 dark:text-stone-400 leading-snug">
+      <p className="text-[10px] text-[var(--ink-50)] leading-snug">
         Everything you make is stored in one local database. Export a portable snapshot to keep
         it safe or move it to another machine. The app also keeps automatic snapshots and rotates
         the last seven.
@@ -87,7 +87,7 @@ export default function BackupSection(): JSX.Element {
         <button
           onClick={() => void onExport()}
           disabled={busy !== null}
-          className="inline-flex items-center justify-center gap-1.5 px-2 py-1.5 rounded text-[11px] border border-stone-200 dark:border-stone-700 hover:bg-stone-100 dark:hover:bg-stone-800 hover:border-accent transition-colors disabled:opacity-50"
+          className="inline-flex items-center justify-center gap-1.5 px-2 py-1.5 rounded text-[11px] border border-[var(--edge-soft)] hover:bg-[var(--surface-sunken)] hover:border-accent transition-colors disabled:opacity-50"
         >
           <Icon name="download" size={13} />
           <span>{busy === 'export' ? 'Exporting…' : 'Export a backup'}</span>
@@ -95,14 +95,14 @@ export default function BackupSection(): JSX.Element {
         <button
           onClick={() => void onRestore()}
           disabled={busy !== null}
-          className="inline-flex items-center justify-center gap-1.5 px-2 py-1.5 rounded text-[11px] border border-stone-200 dark:border-stone-700 hover:bg-stone-100 dark:hover:bg-stone-800 hover:border-accent transition-colors disabled:opacity-50"
+          className="inline-flex items-center justify-center gap-1.5 px-2 py-1.5 rounded text-[11px] border border-[var(--edge-soft)] hover:bg-[var(--surface-sunken)] hover:border-accent transition-colors disabled:opacity-50"
         >
           <Icon name="restore" size={13} />
           <span>{busy === 'restore' ? 'Restoring…' : 'Restore from backup…'}</span>
         </button>
       </div>
 
-      <div className="flex items-center justify-between text-[10px] text-stone-500 dark:text-stone-400">
+      <div className="flex items-center justify-between text-[10px] text-[var(--ink-50)]">
         <span>
           {info ? `${info.count} snapshot${info.count === 1 ? '' : 's'} · last ${relativeTime(info.lastBackupMs)}` : 'Checking…'}
         </span>
@@ -126,7 +126,7 @@ export default function BackupSection(): JSX.Element {
         </div>
       )}
 
-      <p className="text-[10px] text-stone-400 dark:text-stone-500 leading-snug">
+      <p className="text-[10px] text-[var(--ink-40)] leading-snug">
         Restoring replaces all current data. Your current data is snapshotted first, so a restore
         is itself reversible. API keys are stored in your system keychain and are not included in a
         backup, so re-enter them after restoring on a new machine.

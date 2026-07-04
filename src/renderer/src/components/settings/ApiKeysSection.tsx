@@ -61,14 +61,14 @@ export default function ApiKeysSection({ onKeySaved }: Props): JSX.Element {
   }, [])
 
   return (
-    <div className="px-3 py-3 border-t border-stone-200 dark:border-stone-700 space-y-3">
-      <div className="text-[11px] uppercase tracking-[0.12em] text-stone-500 dark:text-stone-400 font-medium">
+    <div className="px-3 py-3 border-t border-[var(--edge-soft)] space-y-3">
+      <div className="text-[11px] uppercase tracking-[0.12em] text-[var(--ink-50)] font-medium">
         AI · source
       </div>
 
       <AiSourceSection />
 
-      <div className="text-[11px] uppercase tracking-[0.12em] text-stone-500 dark:text-stone-400 font-medium pt-1">
+      <div className="text-[11px] uppercase tracking-[0.12em] text-[var(--ink-50)] font-medium pt-1">
         AI · API keys
       </div>
 
@@ -183,7 +183,7 @@ export default function ApiKeysSection({ onKeySaved }: Props): JSX.Element {
         onKeySaved={onKeySaved}
       />
 
-      <div className="text-[10px] text-stone-500 dark:text-stone-400 leading-relaxed">
+      <div className="text-[10px] text-[var(--ink-50)] leading-relaxed">
         Each key is encrypted with the macOS Keychain and stored locally only.
         When you use your own key, prompts go direct from this Mac to Anthropic /
         OpenAI. On PlexiDesk credits, AI prompts route through PlexiDesk's server
@@ -289,12 +289,12 @@ function AiSourceSection(): JSX.Element {
             data-testid={`ai-mode-${m.id}`}
             className={`text-[11px] px-2 py-1.5 rounded-md border text-left ${
               status?.mode === m.id
-                ? 'border-accent bg-accent/10 text-stone-900 dark:text-stone-100'
-                : 'border-stone-200 dark:border-stone-700 text-stone-600 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800'
+                ? 'border-accent bg-accent/10 text-[var(--ink-100)]'
+                : 'border-[var(--edge-soft)] text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]'
             } disabled:opacity-50`}
           >
             <div className="font-medium">{m.label}</div>
-            <div className="text-[10px] text-stone-500 dark:text-stone-400 mt-0.5 leading-snug">
+            <div className="text-[10px] text-[var(--ink-50)] mt-0.5 leading-snug">
               {m.sub}
             </div>
           </button>
@@ -302,16 +302,16 @@ function AiSourceSection(): JSX.Element {
       </div>
 
       {status && status.mode !== 'byok' && (
-        <div className="bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-md px-2.5 py-2 mb-2">
+        <div className="bg-[var(--surface-raised)] border border-[var(--edge-soft)] rounded-md px-2.5 py-2 mb-2">
           {!status.signedIn ? (
-            <div className="text-[11px] text-stone-500 dark:text-stone-400 leading-snug">
+            <div className="text-[11px] text-[var(--ink-50)] leading-snug">
               Sign in to your PlexiDesk account to use credits. New accounts start
               with $1 of free AI credits.
             </div>
           ) : (
             <>
               <div className="flex items-center justify-between">
-                <span className="text-[11px] text-stone-600 dark:text-stone-300">
+                <span className="text-[11px] text-[var(--ink-70)]">
                   Credit balance
                 </span>
                 <span
@@ -319,7 +319,7 @@ function AiSourceSection(): JSX.Element {
                   className={`text-xs font-mono ${
                     status.outOfCredits
                       ? 'text-red-600 dark:text-red-400'
-                      : 'text-stone-800 dark:text-stone-100'
+                      : 'text-[var(--ink-90)]'
                   }`}
                 >
                   {balanceLabel}
@@ -340,7 +340,7 @@ function AiSourceSection(): JSX.Element {
                     onClick={() => void topUp(amt)}
                     disabled={busy}
                     data-testid={`ai-topup-${amt}`}
-                    className="flex-1 text-[11px] border border-stone-200 dark:border-stone-700 rounded-md py-1 text-stone-700 dark:text-stone-200 hover:bg-stone-100 dark:hover:bg-stone-800 disabled:opacity-50"
+                    className="flex-1 text-[11px] border border-[var(--edge-soft)] rounded-md py-1 text-[var(--ink-70)] hover:bg-[var(--surface-sunken)] disabled:opacity-50"
                   >
                     Add ${amt}
                   </button>
@@ -352,7 +352,7 @@ function AiSourceSection(): JSX.Element {
       )}
 
       {note && (
-        <div className="text-[10px] text-stone-500 dark:text-stone-400 mb-2 leading-snug">
+        <div className="text-[10px] text-[var(--ink-50)] mb-2 leading-snug">
           {note}
         </div>
       )}
@@ -415,8 +415,8 @@ function VoiceProviderToggle(): JSX.Element {
   }
 
   return (
-    <div className="pt-3 border-t border-stone-200 dark:border-stone-700">
-      <div className="text-[11px] uppercase tracking-[0.12em] text-stone-500 dark:text-stone-400 font-medium mb-2">
+    <div className="pt-3 border-t border-[var(--edge-soft)]">
+      <div className="text-[11px] uppercase tracking-[0.12em] text-[var(--ink-50)] font-medium mb-2">
         Voice · transcription provider
       </div>
       <div className="grid grid-cols-2 gap-1.5">
@@ -425,13 +425,13 @@ function VoiceProviderToggle(): JSX.Element {
           disabled={busy || provider === null || provider === 'unavailable'}
           className={`text-[11px] px-2.5 py-1.5 rounded-md border ${
             provider === 'cloud'
-              ? 'border-accent bg-accent/10 text-stone-900 dark:text-stone-100'
-              : 'border-stone-200 dark:border-stone-700 text-stone-600 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800'
+              ? 'border-accent bg-accent/10 text-[var(--ink-100)]'
+              : 'border-[var(--edge-soft)] text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]'
           } disabled:opacity-50`}
           data-testid="voice-provider-cloud"
         >
           <div className="font-medium">Cloud</div>
-          <div className="text-[10px] text-stone-500 dark:text-stone-400 mt-0.5">
+          <div className="text-[10px] text-[var(--ink-50)] mt-0.5">
             OpenAI Whisper · fastest · paid per minute
           </div>
         </button>
@@ -440,19 +440,19 @@ function VoiceProviderToggle(): JSX.Element {
           disabled={busy || provider === null || provider === 'unavailable'}
           className={`text-[11px] px-2.5 py-1.5 rounded-md border ${
             provider === 'local'
-              ? 'border-accent bg-accent/10 text-stone-900 dark:text-stone-100'
-              : 'border-stone-200 dark:border-stone-700 text-stone-600 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800'
+              ? 'border-accent bg-accent/10 text-[var(--ink-100)]'
+              : 'border-[var(--edge-soft)] text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]'
           } disabled:opacity-50`}
           data-testid="voice-provider-local"
         >
           <div className="font-medium">Local</div>
-          <div className="text-[10px] text-stone-500 dark:text-stone-400 mt-0.5">
+          <div className="text-[10px] text-[var(--ink-50)] mt-0.5">
             Whisper tiny · offline · free · ~80MB
           </div>
         </button>
       </div>
       {status && (
-        <div className="text-[10px] text-stone-500 dark:text-stone-400 mt-2 leading-snug">
+        <div className="text-[10px] text-[var(--ink-50)] mt-2 leading-snug">
           {status}
         </div>
       )}
@@ -559,10 +559,10 @@ function ApiKeyRow({
     <div>
       <div className="flex items-start justify-between mb-1.5 gap-2">
         <div className="flex flex-col min-w-0">
-          <span className="text-xs text-stone-700 dark:text-stone-300">
+          <span className="text-xs text-[var(--ink-70)]">
             {config.label}
           </span>
-          <span className="text-[10px] text-stone-500 dark:text-stone-400 leading-snug">
+          <span className="text-[10px] text-[var(--ink-50)] leading-snug">
             {config.purpose}
           </span>
         </div>
@@ -584,8 +584,8 @@ function ApiKeyRow({
       )}
 
       {hint.hasKey && !editing && (
-        <div className="flex items-center justify-between bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-md px-2.5 py-1.5 mb-2">
-          <code className="text-xs font-mono text-stone-700 dark:text-stone-300">
+        <div className="flex items-center justify-between bg-[var(--surface-raised)] border border-[var(--edge-soft)] rounded-md px-2.5 py-1.5 mb-2">
+          <code className="text-xs font-mono text-[var(--ink-70)]">
             ••••••••{hint.last4 ?? '????'}
           </code>
           <div className="flex gap-1">
@@ -594,14 +594,14 @@ function ApiKeyRow({
                 setEditing(true)
                 setStatus({ kind: 'idle' })
               }}
-              className="text-[11px] text-stone-600 dark:text-stone-300 hover:text-stone-900 dark:hover:text-stone-50 px-1.5"
+              className="text-[11px] text-[var(--ink-70)] hover:text-[var(--ink-100)] px-1.5"
             >
               Replace
             </button>
             <button
               onClick={onTest}
               disabled={isBusy}
-              className="text-[11px] text-stone-600 dark:text-stone-300 hover:text-stone-900 dark:hover:text-stone-50 px-1.5 disabled:opacity-50"
+              className="text-[11px] text-[var(--ink-70)] hover:text-[var(--ink-100)] px-1.5 disabled:opacity-50"
             >
               {status.kind === 'testing' ? 'Testing…' : 'Test'}
             </button>
@@ -628,12 +628,12 @@ function ApiKeyRow({
               placeholder={config.placeholder}
               autoComplete="off"
               spellCheck={false}
-              className="w-full text-xs font-mono bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-md px-2.5 py-1.5 pr-12 focus:outline-none focus:border-accent"
+              className="w-full text-xs font-mono bg-[var(--surface-raised)] border border-[var(--edge-soft)] rounded-md px-2.5 py-1.5 pr-12 focus:outline-none focus:border-accent"
             />
             <button
               type="button"
               onClick={() => setShow(!show)}
-              className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] uppercase tracking-wider text-stone-500 dark:text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 px-1.5 py-0.5"
+              className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] uppercase tracking-wider text-[var(--ink-50)] hover:text-[var(--ink-70)] px-1.5 py-0.5"
             >
               {show ? 'Hide' : 'Show'}
             </button>
@@ -653,7 +653,7 @@ function ApiKeyRow({
                   setPasted('')
                   setStatus({ kind: 'idle' })
                 }}
-                className="text-[11px] text-stone-600 dark:text-stone-300 hover:text-stone-900 dark:hover:text-stone-50 px-2"
+                className="text-[11px] text-[var(--ink-70)] hover:text-[var(--ink-100)] px-2"
               >
                 Cancel
               </button>

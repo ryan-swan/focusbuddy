@@ -16,11 +16,11 @@ export default function DocumentsSyncSection(): JSX.Element {
   }
 
   return (
-    <div className="px-3 py-3 border-t border-stone-200 dark:border-stone-700 space-y-2">
-      <div className="text-[11px] uppercase tracking-wider text-stone-400">Documents sync</div>
+    <div className="px-3 py-3 border-t border-[var(--edge-soft)] space-y-2">
+      <div className="text-[11px] uppercase tracking-wider text-[var(--ink-40)]">Documents sync</div>
       <label className="flex items-center justify-between py-1 cursor-pointer">
-        <span className="text-xs text-stone-700 dark:text-stone-300">
-          Sync documents to your account <span className="text-stone-400">(beta)</span>
+        <span className="text-xs text-[var(--ink-70)]">
+          Sync documents to your account <span className="text-[var(--ink-40)]">(beta)</span>
         </span>
         <input
           type="checkbox"
@@ -30,7 +30,7 @@ export default function DocumentsSyncSection(): JSX.Element {
           className="h-3.5 w-3.5 accent-violet-600 cursor-pointer"
         />
       </label>
-      <p className="text-[11px] text-stone-500 dark:text-stone-400 leading-relaxed">
+      <p className="text-[11px] text-[var(--ink-50)] leading-relaxed">
         {on
           ? signedIn
             ? 'Your documents sync across PlexiDesk and PlexiOffice. Local copies stay on this device too.'

@@ -94,7 +94,7 @@ export default function LiveFolderView({ liveFolderId }: Props): JSX.Element {
 
   if (loading || !meta || meta.id !== liveFolderId || !body) {
     return (
-      <div className="h-full flex items-center justify-center desk-paper no-tod text-[13px] text-stone-400">
+      <div className="h-full flex items-center justify-center desk-paper no-tod text-[13px] text-[var(--ink-40)]">
         Loading shared folder…
       </div>
     )
@@ -208,21 +208,21 @@ export default function LiveFolderView({ liveFolderId }: Props): JSX.Element {
   return (
     <div className="h-full flex flex-col desk-paper no-tod">
       {/* Header */}
-      <div className="shrink-0 px-4 py-2.5 border-b border-stone-200 dark:border-stone-800 flex items-center gap-3">
+      <div className="shrink-0 px-4 py-2.5 border-b border-[var(--edge-soft)] flex items-center gap-3">
         <button onClick={() => goDocuments()} className="icon-btn" title="Back">
           <Icon name="arrow_back" size={17} />
         </button>
         <Icon name="folder_shared" size={16} className="text-accent shrink-0" />
-        <span className="flex-1 min-w-0 text-[14px] font-semibold text-stone-900 dark:text-stone-100 truncate">
+        <span className="flex-1 min-w-0 text-[14px] font-semibold text-[var(--ink-100)] truncate">
           {meta.title}
         </span>
         {isHolder && (
-          <span className="text-[11px] text-stone-400 dark:text-stone-500 inline-flex items-center gap-1 shrink-0">
+          <span className="text-[11px] text-[var(--ink-40)] inline-flex items-center gap-1 shrink-0">
             <Icon name={saving ? 'sync' : 'cloud_done'} size={13} className={saving ? 'animate-spin' : 'text-emerald-500'} />
             {saving ? 'Saving' : 'Saved'}
           </span>
         )}
-        <span className="text-[11px] text-stone-400 dark:text-stone-500 shrink-0">Live folder</span>
+        <span className="text-[11px] text-[var(--ink-40)] shrink-0">Live folder</span>
         {isOwner && (
           <button onClick={() => setInviting((v) => !v)} className="icon-btn" title="Invite someone" data-testid="livefolder-invite">
             <Icon name="person_add" size={15} />
@@ -278,12 +278,12 @@ export default function LiveFolderView({ liveFolderId }: Props): JSX.Element {
       </div>
 
       {requesting && (
-        <div className="shrink-0 px-4 py-2 border-b border-stone-200 dark:border-stone-800 flex items-center gap-2">
+        <div className="shrink-0 px-4 py-2 border-b border-[var(--edge-soft)] flex items-center gap-2">
           <input
             value={requestMsg}
             onChange={(e) => setRequestMsg(e.target.value)}
             placeholder={`Message to ${holderHandle ?? 'the editor'} (optional)`}
-            className="flex-1 bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-lg px-3 py-1.5 text-[12px] focus:outline-none focus:border-accent"
+            className="flex-1 bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded-lg px-3 py-1.5 text-[12px] focus:outline-none focus:border-accent"
             data-testid="livefolder-request-message"
           />
           <button onClick={() => void sendRequest()} className="btn-primary text-[12px] px-3 py-1.5" data-testid="livefolder-request-send">
@@ -293,30 +293,30 @@ export default function LiveFolderView({ liveFolderId }: Props): JSX.Element {
       )}
 
       {inviting && (
-        <div className="shrink-0 px-4 py-2 border-b border-stone-200 dark:border-stone-800 flex items-center gap-2">
+        <div className="shrink-0 px-4 py-2 border-b border-[var(--edge-soft)] flex items-center gap-2">
           <input
             value={inviteHandle}
             onChange={(e) => setInviteHandle(e.target.value)}
             placeholder="Invite by handle, e.g. @alex"
-            className="flex-1 bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-lg px-3 py-1.5 text-[12px] focus:outline-none focus:border-accent"
+            className="flex-1 bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded-lg px-3 py-1.5 text-[12px] focus:outline-none focus:border-accent"
             data-testid="livefolder-invite-handle"
           />
           <button onClick={() => void sendInvite()} className="btn-primary text-[12px] px-3 py-1.5" data-testid="livefolder-invite-send">
             Invite
           </button>
-          {inviteNote && <span className="text-[11px] text-stone-500 dark:text-stone-400">{inviteNote}</span>}
+          {inviteNote && <span className="text-[11px] text-[var(--ink-50)]">{inviteNote}</span>}
         </div>
       )}
 
       {/* Breadcrumbs + holder toolbar */}
-      <div className="shrink-0 px-4 py-2 border-b border-stone-200 dark:border-stone-800 flex items-center gap-2 text-[12px]">
+      <div className="shrink-0 px-4 py-2 border-b border-[var(--edge-soft)] flex items-center gap-2 text-[12px]">
         <div className="flex items-center gap-1 min-w-0 flex-1 overflow-hidden">
           {crumbs.map((c, i) => (
             <span key={c.id ?? 'root'} className="inline-flex items-center gap-1 min-w-0">
-              {i > 0 && <Icon name="chevron_right" size={13} className="text-stone-300 dark:text-stone-600 shrink-0" />}
+              {i > 0 && <Icon name="chevron_right" size={13} className="text-[var(--ink-30)] shrink-0" />}
               <button
                 onClick={() => setCwd(c.id)}
-                className={`truncate hover:text-accent ${i === crumbs.length - 1 ? 'font-medium text-stone-800 dark:text-stone-100' : 'text-stone-500 dark:text-stone-400'}`}
+                className={`truncate hover:text-accent ${i === crumbs.length - 1 ? 'font-medium text-[var(--ink-90)]' : 'text-[var(--ink-50)]'}`}
               >
                 {c.name}
               </button>
@@ -343,8 +343,8 @@ export default function LiveFolderView({ liveFolderId }: Props): JSX.Element {
       </div>
 
       {(busyMsg || errMsg) && (
-        <div className="shrink-0 px-4 py-1.5 text-[12px] border-b border-stone-200 dark:border-stone-800">
-          {busyMsg && <span className="text-stone-500 dark:text-stone-400">{busyMsg}</span>}
+        <div className="shrink-0 px-4 py-1.5 text-[12px] border-b border-[var(--edge-soft)]">
+          {busyMsg && <span className="text-[var(--ink-50)]">{busyMsg}</span>}
           {errMsg && <span className="text-red-500" data-testid="livefolder-error">{errMsg}</span>}
         </div>
       )}
@@ -352,16 +352,16 @@ export default function LiveFolderView({ liveFolderId }: Props): JSX.Element {
       {/* Entry list */}
       <div className="flex-1 overflow-auto px-2 py-2" data-testid="livefolder-entries">
         {entries.length === 0 ? (
-          <div className="h-full flex items-center justify-center text-[13px] text-stone-400">This folder is empty.</div>
+          <div className="h-full flex items-center justify-center text-[13px] text-[var(--ink-40)]">This folder is empty.</div>
         ) : (
           <div className="space-y-0.5">
             {entries.map((e) => (
               <div
                 key={e.id}
-                className="group flex items-center gap-2.5 rounded-lg px-2.5 py-2 hover:bg-stone-100/70 dark:hover:bg-stone-800/50"
+                className="group flex items-center gap-2.5 rounded-lg px-2.5 py-2 hover:bg-[var(--surface-sunken)]/70"
                 data-testid="livefolder-entry"
               >
-                <Icon name={iconFor(e)} size={18} className={e.kind === 'folder' ? 'text-accent' : 'text-stone-400'} />
+                <Icon name={iconFor(e)} size={18} className={e.kind === 'folder' ? 'text-accent' : 'text-[var(--ink-40)]'} />
                 {renamingId === e.id ? (
                   <input
                     autoFocus
@@ -375,10 +375,10 @@ export default function LiveFolderView({ liveFolderId }: Props): JSX.Element {
                         setRenameText('')
                       }
                     }}
-                    className="flex-1 bg-white dark:bg-stone-900 border border-accent rounded px-1.5 py-0.5 text-[13px] focus:outline-none"
+                    className="flex-1 bg-[var(--surface-raised)] border border-accent rounded px-1.5 py-0.5 text-[13px] focus:outline-none"
                   />
                 ) : (
-                  <button onClick={() => void onOpen(e)} className="flex-1 min-w-0 text-left text-[13px] text-stone-800 dark:text-stone-100 truncate">
+                  <button onClick={() => void onOpen(e)} className="flex-1 min-w-0 text-left text-[13px] text-[var(--ink-90)] truncate">
                     {e.name}
                     {e.kind === 'file' && !e.blobId && (
                       <span className="ml-2 text-[10px] text-amber-500">not uploaded</span>

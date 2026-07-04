@@ -61,10 +61,10 @@ export default function QuickStartCard({ taskIds, nodes }: Props): JSX.Element |
       }}
     >
       <div className="flex-1 min-w-0">
-        <div className="text-[10px] uppercase tracking-[0.12em] text-stone-500 dark:text-stone-400 font-semibold mb-1">
+        <div className="text-[10px] uppercase tracking-[0.12em] text-[var(--ink-50)] font-semibold mb-1">
           Start with
         </div>
-        <div className="text-sm font-semibold text-stone-900 dark:text-stone-100 truncate">
+        <div className="text-sm font-semibold text-[var(--ink-100)] truncate">
           {top.title}
         </div>
         {reasons.length > 0 && (
@@ -72,7 +72,7 @@ export default function QuickStartCard({ taskIds, nodes }: Props): JSX.Element |
             {reasons.map((r) => (
               <span
                 key={r}
-                className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-stone-100 dark:bg-stone-800 text-stone-600 dark:text-stone-400"
+                className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-[var(--surface-sunken)] text-[var(--ink-70)]"
               >
                 {r}
               </span>

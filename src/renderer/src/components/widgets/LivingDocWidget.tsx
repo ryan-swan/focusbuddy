@@ -114,10 +114,10 @@ export default function LivingDocWidget({ widget, inline = false }: Props): JSX.
 
   // First-run setup — no brief yet. An inline input (NOT window.prompt).
   const setup = (
-    <div className="h-full w-full flex flex-col items-center justify-center gap-3 p-5 text-center bg-white dark:bg-stone-900">
+    <div className="h-full w-full flex flex-col items-center justify-center gap-3 p-5 text-center bg-[var(--surface-raised)]">
       <Icon name="auto_awesome" size={22} />
-      <div className="text-[13px] font-semibold text-stone-800 dark:text-stone-100">A doc that writes itself</div>
-      <div className="text-[11px] text-stone-500 dark:text-stone-400 max-w-[300px] leading-relaxed">
+      <div className="text-[13px] font-semibold text-[var(--ink-90)]">A doc that writes itself</div>
+      <div className="text-[11px] text-[var(--ink-50)] max-w-[300px] leading-relaxed">
         Tell it what to track. It reads the other widgets on this desk and keeps a living summary, refreshing as things change.
       </div>
       <input
@@ -130,7 +130,7 @@ export default function LivingDocWidget({ widget, inline = false }: Props): JSX.
           if (e.key === 'Enter') void startLiving()
         }}
         placeholder="e.g. a running summary of everything on this task"
-        className="w-full max-w-[330px] px-3 py-2 rounded-md text-[12px] bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 focus:outline-none focus:border-accent text-stone-800 dark:text-stone-100"
+        className="w-full max-w-[330px] px-3 py-2 rounded-md text-[12px] bg-[var(--surface-sunken)] border border-[var(--edge-soft)] focus:outline-none focus:border-accent text-[var(--ink-90)]"
       />
       <button
         data-testid="livingdoc-start"
@@ -144,7 +144,7 @@ export default function LivingDocWidget({ widget, inline = false }: Props): JSX.
   )
 
   const header = (
-    <div className="px-2.5 py-1.5 border-b border-stone-200 dark:border-stone-700 bg-stone-50/70 dark:bg-stone-800/40 flex items-center gap-1.5">
+    <div className="px-2.5 py-1.5 border-b border-[var(--edge-soft)] bg-[var(--surface-sunken)]/70 flex items-center gap-1.5">
       <Icon name="auto_awesome" size={12} className="text-accent shrink-0" />
       {editingBrief ? (
         <input
@@ -161,7 +161,7 @@ export default function LivingDocWidget({ widget, inline = false }: Props): JSX.
               setEditingBrief(false)
             }
           }}
-          className="flex-1 bg-transparent text-[11px] text-stone-700 dark:text-stone-200 focus:outline-none border-b border-accent"
+          className="flex-1 bg-transparent text-[11px] text-[var(--ink-70)] focus:outline-none border-b border-accent"
         />
       ) : (
         <button
@@ -169,7 +169,7 @@ export default function LivingDocWidget({ widget, inline = false }: Props): JSX.
             setBrief(widget.livingQuery ?? '')
             setEditingBrief(true)
           }}
-          className="flex-1 text-left text-[11px] text-stone-600 dark:text-stone-300 truncate hover:text-accent"
+          className="flex-1 text-left text-[11px] text-[var(--ink-70)] truncate hover:text-accent"
           title="Edit what this doc tracks"
           data-testid="livingdoc-brief"
         >
@@ -183,7 +183,7 @@ export default function LivingDocWidget({ widget, inline = false }: Props): JSX.
         onClick={() => void togglePause()}
         title={widget.livingPaused ? 'Resume auto-updates' : 'Pause auto-updates'}
         data-testid="livingdoc-pause"
-        className="shrink-0 h-5 w-5 inline-flex items-center justify-center rounded text-stone-400 hover:text-accent"
+        className="shrink-0 h-5 w-5 inline-flex items-center justify-center rounded text-[var(--ink-40)] hover:text-accent"
       >
         <Icon name={widget.livingPaused ? 'play_arrow' : 'pause'} size={13} />
       </button>
@@ -192,7 +192,7 @@ export default function LivingDocWidget({ widget, inline = false }: Props): JSX.
         disabled={busy}
         title="Regenerate now"
         data-testid="livingdoc-regenerate"
-        className="shrink-0 h-5 w-5 inline-flex items-center justify-center rounded text-stone-400 hover:text-accent disabled:opacity-50"
+        className="shrink-0 h-5 w-5 inline-flex items-center justify-center rounded text-[var(--ink-40)] hover:text-accent disabled:opacity-50"
       >
         <Icon name={busy ? 'hourglass_empty' : 'refresh'} size={13} className={busy ? 'animate-spin' : ''} />
       </button>
@@ -200,7 +200,7 @@ export default function LivingDocWidget({ widget, inline = false }: Props): JSX.
   )
 
   const body = (
-    <div className="h-full w-full flex flex-col bg-white dark:bg-stone-900">
+    <div className="h-full w-full flex flex-col bg-[var(--surface-raised)]">
       {!isLiving ? (
         setup
       ) : (
@@ -215,7 +215,7 @@ export default function LivingDocWidget({ widget, inline = false }: Props): JSX.
             </div>
           )}
           <div
-            className="flex-1 overflow-auto md-rendered tiptap-editor px-4 py-3 text-stone-900 dark:text-stone-100 select-text"
+            className="flex-1 overflow-auto md-rendered tiptap-editor px-4 py-3 text-[var(--ink-100)] select-text"
             data-testid="livingdoc-body"
             onMouseDown={(e) => e.stopPropagation()}
           >
