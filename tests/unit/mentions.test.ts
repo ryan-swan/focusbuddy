@@ -5,7 +5,7 @@
 // null/undefined handle, and punctuation-boundary cases.
 
 import { describe, it, expect } from 'vitest'
-import { bodyMentionsHandle } from '@renderer/lib/mentions'
+import { applyMention, bodyMentionsHandle, filterMentionCandidates, matchMentionQuery } from '@renderer/lib/mentions'
 
 describe('bodyMentionsHandle', () => {
   it('matches a plain @handle mention in the body', () => {
@@ -82,5 +82,56 @@ describe('bodyMentionsHandle', () => {
     // captured from the body even if present as text — false is the honest
     // (unmatched) result here, not a bug in bodyMentionsHandle itself.
     expect(bodyMentionsHandle('hey @a is that you', 'a')).toBe(false)
+  })
+})
+
+describe('matchMentionQuery (autocomplete trigger)', () => {
+  it('detects an in-progress mention at the end of the text', () => {
+    expect(matchMentionQuery('cc @an')).toEqual({ query: 'an' })
+  })
+  it('detects a bare @ with no characters yet', () => {
+    expect(matchMentionQuery('cc @')).toEqual({ query: '' })
+    expect(matchMentionQuery('@')).toEqual({ query: '' })
+  })
+  it('does not trigger mid-word (no boundary before the @)', () => {
+    expect(matchMentionQuery('email me@ex')).toBeNull()
+  })
+  it('does not trigger once the mention is finished with a space', () => {
+    expect(matchMentionQuery('cc @ana thanks')).toBeNull()
+  })
+  it('returns null when there is no @ at all', () => {
+    expect(matchMentionQuery('just some text')).toBeNull()
+  })
+})
+
+describe('applyMention', () => {
+  it('replaces the in-progress prefix with the handle and a trailing space', () => {
+    expect(applyMention('cc @an', 'ana')).toBe('cc @ana ')
+  })
+  it('completes a bare @ into the chosen handle', () => {
+    expect(applyMention('hey @', 'bob')).toBe('hey @bob ')
+  })
+  it('leaves text unchanged when no mention is in progress', () => {
+    expect(applyMention('cc @ana thanks', 'bob')).toBe('cc @ana thanks')
+  })
+})
+
+describe('filterMentionCandidates', () => {
+  const pool = ['ana', 'anders', 'bob', 'Ana2']
+  it('returns handles that start with the query, case-insensitively', () => {
+    expect(filterMentionCandidates(pool, 'an')).toEqual(['ana', 'anders', 'Ana2'])
+    expect(filterMentionCandidates(pool, 'bo')).toEqual(['bob'])
+  })
+  it('returns the whole pool for an empty query', () => {
+    expect(filterMentionCandidates(pool, '')).toEqual(pool)
+  })
+  it('dedupes case-insensitively, keeping the first spelling', () => {
+    expect(filterMentionCandidates(['ana', 'ANA', 'ana'], 'a')).toEqual(['ana'])
+  })
+  it('caps the result at the limit', () => {
+    expect(filterMentionCandidates(['a1', 'a2', 'a3', 'a4'], 'a', 2)).toEqual(['a1', 'a2'])
+  })
+  it('returns nothing from an empty pool — never invents a candidate', () => {
+    expect(filterMentionCandidates([], 'an')).toEqual([])
   })
 })

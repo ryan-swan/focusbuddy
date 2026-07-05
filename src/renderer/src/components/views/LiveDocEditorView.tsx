@@ -277,6 +277,11 @@ export default function LiveDocEditorView({ liveDocId, onBack }: Props): JSX.Ele
   // The label + colour shown on my caret to the other editors.
   const me = people.find((p) => p.you)
   const meUser = { name: me?.handle ?? 'You', color: me?.color ?? '#888888' }
+  // Who a comment can @mention: the real collaborators on this document (their
+  // handles), restricted to handle-shaped tokens. No invented members.
+  const mentionHandles = Array.from(
+    new Set(people.map((p) => p.handle).filter((h): h is string => !!h && /^[a-z0-9._-]{2,32}$/i.test(h)))
+  )
 
   // Snapshot the live Yjs content back to stored body_json (debounced), so
   // exports and non-live views of this doc track what people are typing.
@@ -625,6 +630,8 @@ export default function LiveDocEditorView({ liveDocId, onBack }: Props): JSX.Ele
               onAddComment={startComment}
               onReplyComment={(rootId, body) => void replyToComment(rootId, body)}
               onJumpComment={jumpToComment}
+              mentionHandles={mentionHandles}
+              myHandle={me?.handle ?? null}
               onCommentClick={(id) => {
                 setCommentsOpen(true)
                 setFocusComment(id)

@@ -64,6 +64,17 @@ export default function DocumentEditorView({ documentId, onBack }: Props): JSX.E
   }, [documentId])
 
   const author = userName ?? 'You'
+  // Who a comment can @mention: the real participants in this document's comment
+  // thread plus the signed-in user, restricted to handle-shaped tokens so an
+  // inserted @mention actually resolves. No invented members.
+  const isHandle = (h: string): boolean => /^[a-z0-9._-]{2,32}$/i.test(h)
+  const mentionHandles = Array.from(
+    new Set(
+      [author, ...comments.map((c) => c.author)]
+        .filter((h): h is string => !!h && isHandle(h))
+        .map((h) => h)
+    )
+  )
   const panelThreads = comments
     .filter((c) => !c.parentId)
     .map((root) => ({
@@ -206,6 +217,8 @@ export default function DocumentEditorView({ documentId, onBack }: Props): JSX.E
             onAddComment={() => void addComment()}
             onReplyComment={(threadId, body) => void replyComment(threadId, body)}
             onJumpComment={jumpToComment}
+            mentionHandles={mentionHandles}
+            myHandle={userName}
           />
         )}
         {active.docType === 'sheet' && (

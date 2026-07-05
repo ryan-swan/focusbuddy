@@ -3,6 +3,8 @@ import type { Editor } from '@tiptap/react'
 import Icon from '../../Icon'
 import DocOutline from './DocOutline'
 import { sanitizeHtml } from '../../../lib/htmlSanitize'
+import { applyMention, filterMentionCandidates, matchMentionQuery } from '../../../lib/mentions'
+import MentionText from '../../views/chat/MentionText'
 import type { DocAi } from './useDocAi'
 
 // The persistent right-side panel for PlexiDocs. Three tabs share one column:
@@ -56,6 +58,12 @@ interface Props {
   onAddComment?: () => void
   onReply?: (threadId: string, body: string) => void
   onJumpComment?: (threadId: string) => void
+  // Member handles a comment can @mention (real participants: comment authors,
+  // live collaborators, the signed-in user). Drives the reply autocomplete and
+  // decides which @tokens render as highlighted chips. Empty when there is no one
+  // to mention, in which case mentions render as plain text.
+  mentionHandles?: string[]
+  myHandle?: string | null
 }
 
 function timeAgo(ms: number): string {
@@ -234,17 +242,114 @@ function AiTab({ ai, userName }: { ai: DocAi; userName?: string | null }): JSX.E
   )
 }
 
+// A reply field with @mention autocomplete. As the user types "@prefix" it offers
+// matching member handles; Arrow keys move, Enter/Tab or a click inserts. When no
+// mention is in progress, Enter submits the reply. Purely additive: typing an
+// unknown @word just sends as plain text.
+function MentionInput({
+  value,
+  onChange,
+  onSubmit,
+  handles,
+  placeholder,
+  testId
+}: {
+  value: string
+  onChange: (v: string) => void
+  onSubmit: () => void
+  handles: string[]
+  placeholder: string
+  testId: string
+}): JSX.Element {
+  const [idx, setIdx] = useState(0)
+  const q = matchMentionQuery(value)
+  const candidates = q ? filterMentionCandidates(handles, q.query) : []
+  const open = candidates.length > 0
+
+  function choose(handle: string): void {
+    onChange(applyMention(value, handle))
+    setIdx(0)
+  }
+
+  return (
+    <div className="relative mt-1.5">
+      {open && (
+        <div
+          className="absolute bottom-full left-0 mb-1 z-10 w-48 rounded-md border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-lg py-1"
+          data-testid={`${testId}-mentions`}
+        >
+          {candidates.map((h, i) => (
+            <button
+              key={h}
+              onMouseDown={(e) => {
+                e.preventDefault()
+                choose(h)
+              }}
+              className={`block w-full text-left px-2.5 py-1 text-[12px] ${
+                i === idx ? 'bg-[rgb(var(--accent)/0.12)] text-[rgb(var(--accent))]' : 'text-[var(--ink-80)]'
+              }`}
+              data-testid={`${testId}-mention-option`}
+            >
+              @{h}
+            </button>
+          ))}
+        </div>
+      )}
+      <div className="flex items-center gap-1.5">
+        <input
+          value={value}
+          onChange={(e) => {
+            onChange(e.target.value)
+            setIdx(0)
+          }}
+          onKeyDown={(e) => {
+            if (open) {
+              if (e.key === 'ArrowDown') {
+                e.preventDefault()
+                setIdx((n) => (n + 1) % candidates.length)
+                return
+              }
+              if (e.key === 'ArrowUp') {
+                e.preventDefault()
+                setIdx((n) => (n - 1 + candidates.length) % candidates.length)
+                return
+              }
+              if (e.key === 'Enter' || e.key === 'Tab') {
+                e.preventDefault()
+                choose(candidates[idx])
+                return
+              }
+            }
+            if (e.key === 'Enter') onSubmit()
+          }}
+          placeholder={placeholder}
+          data-testid={testId}
+          className="flex-1 rounded border border-[var(--edge-soft)] bg-[var(--surface-base)] px-2 py-1 text-[12px] focus:outline-none focus:border-[rgb(var(--accent))]"
+        />
+        <button onClick={onSubmit} disabled={!value.trim()} className="icon-btn disabled:opacity-40" title="Reply">
+          <Icon name="send" size={13} />
+        </button>
+      </div>
+    </div>
+  )
+}
+
 // One comment thread with its replies and a reply box.
 function Thread({
   thread,
   onReply,
-  onJump
+  onJump,
+  mentionHandles,
+  myHandle
 }: {
   thread: PanelCommentThread
   onReply?: (threadId: string, body: string) => void
   onJump?: (threadId: string) => void
+  mentionHandles: string[]
+  myHandle?: string | null
 }): JSX.Element {
   const [reply, setReply] = useState('')
+  const known = new Set(mentionHandles.map((h) => h.toLowerCase()))
   const submit = (): void => {
     const t = reply.trim()
     if (!t || !onReply) return
@@ -268,7 +373,9 @@ function Thread({
               <span className="rounded bg-emerald-100 px-1 text-[10px] text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">Resolved</span>
             )}
           </div>
-          <div className="mt-0.5 whitespace-pre-wrap text-[12.5px] text-[var(--ink-80)]">{thread.body}</div>
+          <div className="mt-0.5 whitespace-pre-wrap text-[12.5px] text-[var(--ink-80)]">
+            <MentionText body={thread.body} myHandle={myHandle} knownHandles={known} />
+          </div>
         </button>
       </div>
 
@@ -278,26 +385,21 @@ function Thread({
             <span className="text-[11.5px] font-medium text-[var(--ink-80)]">{r.author}</span>
             <span className="text-[10px] text-[var(--ink-40)]">{timeAgo(r.createdAt)}</span>
           </div>
-          <div className="whitespace-pre-wrap text-[12px] text-[var(--ink-80)]">{r.body}</div>
+          <div className="whitespace-pre-wrap text-[12px] text-[var(--ink-80)]">
+            <MentionText body={r.body} myHandle={myHandle} knownHandles={known} />
+          </div>
         </div>
       ))}
 
       {!thread.resolved && onReply && (
-        <div className="mt-1.5 flex items-center gap-1.5">
-          <input
-            value={reply}
-            onChange={(e) => setReply(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') submit()
-            }}
-            placeholder="Reply"
-            data-testid={`doc-comment-reply-${thread.id}`}
-            className="flex-1 rounded border border-[var(--edge-soft)] bg-[var(--surface-base)] px-2 py-1 text-[12px] focus:outline-none focus:border-[rgb(var(--accent))]"
-          />
-          <button onClick={submit} disabled={!reply.trim()} className="icon-btn disabled:opacity-40" title="Reply">
-            <Icon name="send" size={13} />
-          </button>
-        </div>
+        <MentionInput
+          value={reply}
+          onChange={setReply}
+          onSubmit={submit}
+          handles={mentionHandles}
+          placeholder="Reply"
+          testId={`doc-comment-reply-${thread.id}`}
+        />
       )}
     </div>
   )
@@ -309,13 +411,17 @@ function CommentsTab({
   canComment,
   onAddComment,
   onReply,
-  onJumpComment
+  onJumpComment,
+  mentionHandles,
+  myHandle
 }: {
   comments: PanelCommentThread[]
   canComment: boolean
   onAddComment?: () => void
   onReply?: (threadId: string, body: string) => void
   onJumpComment?: (threadId: string) => void
+  mentionHandles: string[]
+  myHandle?: string | null
 }): JSX.Element {
   const sorted = [...comments].sort((a, b) => a.createdAt - b.createdAt)
   return (
@@ -331,7 +437,14 @@ function CommentsTab({
         ) : (
           <div className="flex flex-col gap-2">
             {sorted.map((t) => (
-              <Thread key={t.id} thread={t} onReply={onReply} onJump={onJumpComment} />
+              <Thread
+                key={t.id}
+                thread={t}
+                onReply={onReply}
+                onJump={onJumpComment}
+                mentionHandles={mentionHandles}
+                myHandle={myHandle}
+              />
             ))}
           </div>
         )}
@@ -364,7 +477,9 @@ export default function DocSidePanel({
   canComment,
   onAddComment,
   onReply,
-  onJumpComment
+  onJumpComment,
+  mentionHandles = [],
+  myHandle
 }: Props): JSX.Element {
   // Reset a stale preview/error when the writer leaves and re-enters the AI tab,
   // so an old result does not linger after switching tabs and back.
@@ -431,6 +546,8 @@ export default function DocSidePanel({
             onAddComment={onAddComment}
             onReply={onReply}
             onJumpComment={onJumpComment}
+            mentionHandles={mentionHandles}
+            myHandle={myHandle}
           />
         )}
         {tab === 'outline' && (

@@ -109,6 +109,10 @@ interface Props {
   onAddComment?: () => void
   onReplyComment?: (threadId: string, body: string) => void
   onJumpComment?: (threadId: string) => void
+  // Real member handles a comment can @mention, and the viewer's own handle.
+  // Passed straight to the side panel's comment autocomplete + highlighting.
+  mentionHandles?: string[]
+  myHandle?: string | null
   // The name to greet the writer with in the AI Assistant tab. Omit when the user
   // is not signed in; the panel falls back to a neutral greeting.
   userName?: string | null
@@ -137,6 +141,8 @@ export default function DocEditor({
   onAddComment,
   onReplyComment,
   onJumpComment,
+  mentionHandles,
+  myHandle,
   userName
 }: Props): JSX.Element {
   const [findOpen, setFindOpen] = useState(false)
@@ -734,6 +740,8 @@ export default function DocEditor({
           onAddComment={onAddComment}
           onReply={onReplyComment}
           onJumpComment={onJumpComment}
+          mentionHandles={mentionHandles}
+          myHandle={myHandle}
         />
       )}
     </div>
