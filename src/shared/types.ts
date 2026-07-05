@@ -1459,6 +1459,13 @@ export interface SheetValidation {
 // across a second field, aggregating a value field. Computed read-only from the
 // live data (honest: aggregates the real values, never fabricated ones).
 export type SheetPivotAgg = 'sum' | 'count' | 'avg' | 'min' | 'max'
+// A slicer: hide the listed values of a field so the pivot recomputes over the
+// rest. Empty exclude = everything shown.
+export interface SheetPivotFilter {
+  field: number // 0-based column index within the range
+  exclude: string[] // field values currently hidden
+}
+
 export interface SheetPivotSpec {
   id: string
   range: string // A1 source range INCLUDING the header row
@@ -1467,6 +1474,8 @@ export interface SheetPivotSpec {
   valueField: number // column index whose values are aggregated
   agg: SheetPivotAgg
   title?: string
+  // Interactive slicers — live value filters applied before aggregation.
+  filters?: SheetPivotFilter[]
 }
 
 export interface SheetTab {

@@ -46,4 +46,36 @@ describe('computePivot', () => {
   it('returns null on a bad range', () => {
     expect(computePivot(getCell, { ...base, range: 'nope', agg: 'sum' })).toBeNull()
   })
+  it('reports the full field domains for slicers regardless of filtering', () => {
+    const res = computePivot(getCell, { ...base, colField: 1, agg: 'sum' })!
+    expect(res.rowFieldValues).toEqual(['Eng', 'Sales'])
+    expect(res.colFieldValues).toEqual(['EU', 'US'])
+  })
+  it('slicer filter excludes matching source rows before aggregating', () => {
+    const res = computePivot(getCell, {
+      ...base,
+      agg: 'sum',
+      filters: [{ field: 1, exclude: ['EU'] }] // hide the EU region
+    })!
+    // Only the US rows survive: Eng 100, Sales 90.
+    expect(res.rows.map((r) => [r.key, r.total])).toEqual([['Eng', 100], ['Sales', 90]])
+    expect(res.grandTotal).toBe(190)
+    // The excluded value is still offered as a slicer choice.
+    expect(res.rowFieldValues).toEqual(['Eng', 'Sales'])
+  })
+  it('excluding every value of a field yields an empty result, not a fabricated one', () => {
+    const res = computePivot(getCell, {
+      ...base,
+      agg: 'sum',
+      filters: [{ field: 0, exclude: ['Eng', 'Sales'] }]
+    })!
+    expect(res.rows).toEqual([])
+    expect(res.grandTotal).toBe(0) // sum of nothing is 0
+  })
+  it('an empty exclude list changes nothing', () => {
+    const plain = computePivot(getCell, { ...base, agg: 'sum' })!
+    const withEmpty = computePivot(getCell, { ...base, agg: 'sum', filters: [{ field: 1, exclude: [] }] })!
+    expect(withEmpty.rows).toEqual(plain.rows)
+    expect(withEmpty.grandTotal).toBe(plain.grandTotal)
+  })
 })
