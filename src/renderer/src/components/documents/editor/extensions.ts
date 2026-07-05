@@ -35,6 +35,7 @@ import { FocusBlock } from './focusBlock'
 import { PagePagination } from './pagination'
 import { CommentMark } from './CommentMark'
 import { TableOfContents } from './TableOfContents'
+import { Footnote } from './Footnote'
 import Collaboration from '@tiptap/extension-collaboration'
 import CollaborationCaret from '@tiptap/extension-collaboration-caret'
 import type { Doc as YDoc } from 'yjs'
@@ -105,7 +106,9 @@ export function buildDocExtensions(opts: BuildOptions = {}): AnyExt[] {
     // HTML round trip. Headless use only exercises renderHTML/parseHTML.
     WidgetEmbedNode as AnyExt,
     // A Word-style Table of Contents built from the document's headings.
-    TableOfContents as AnyExt
+    TableOfContents as AnyExt,
+    // Auto-numbered inline footnotes with editable note text.
+    Footnote as AnyExt
   ]
 
   if (interactive) {
