@@ -5,7 +5,7 @@
 
 import { BrowserWindow, dialog } from 'electron'
 import { writeFile } from 'fs/promises'
-import { designToHtml, type DesignBody } from '@shared/design'
+import { designToHtml, designPrintHtml, designPrintSize, type DesignBody } from '@shared/design'
 
 export interface DesignExportResult {
   ok: boolean
@@ -22,22 +22,29 @@ export async function exportDesign(input: {
   design: DesignBody
   title: string
   format: 'png' | 'pdf'
+  // Print output: extend the background into the bleed and draw crop marks.
+  printMarks?: boolean
 }): Promise<DesignExportResult> {
-  const { design, title, format } = input
+  const { design, title, format, printMarks } = input
   const safe = (title || 'design').replace(/[/\\?%*:|"<>]/g, '-')
   const parent = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0]
   const res = await dialog.showSaveDialog(parent!, {
-    title: `Export ${format.toUpperCase()}`,
-    defaultPath: `${safe}.${format}`,
+    title: printMarks ? 'Export print PDF' : `Export ${format.toUpperCase()}`,
+    defaultPath: `${safe}${printMarks ? '-print' : ''}.${format}`,
     filters: [{ name: format.toUpperCase(), extensions: [format] }]
   })
   if (res.canceled || !res.filePath) return { ok: false }
 
-  const html = designToHtml(design)
+  // Print export uses the larger bleed+marks page; screen export the trim size.
+  const print = designPrintSize(design, { cropMarks: printMarks })
+  const usePrint = !!printMarks && (print.bleed > 0 || print.markMargin > 0)
+  const pageW = usePrint ? print.pageWidth : design.width
+  const pageH = usePrint ? print.pageHeight : design.height
+  const html = usePrint ? designPrintHtml(design, { cropMarks: true }) : designToHtml(design)
   const win = new BrowserWindow({
     show: false,
-    width: Math.min(Math.max(design.width, 16), 8000),
-    height: Math.min(Math.max(design.height, 16), 8000),
+    width: Math.min(Math.max(pageW, 16), 8000),
+    height: Math.min(Math.max(pageH, 16), 8000),
     useContentSize: true,
     webPreferences: { offscreen: true }
   })
@@ -51,7 +58,7 @@ export async function exportDesign(input: {
     } else {
       const pdf = await win.webContents.printToPDF({
         printBackground: true,
-        pageSize: { width: pxToMicron(design.width), height: pxToMicron(design.height) },
+        pageSize: { width: pxToMicron(pageW), height: pxToMicron(pageH) },
         margins: { marginType: 'custom', top: 0, right: 0, bottom: 0, left: 0 }
       })
       await writeFile(res.filePath, pdf)

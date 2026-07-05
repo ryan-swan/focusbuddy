@@ -21,6 +21,10 @@ export interface DesignBody {
   category?: DesignCategory
   // True once the brand kit has been applied, so the UI can show the state.
   brandApplied?: boolean
+  // Print bleed in logical px — the extra printed area beyond the trim edge that
+  // a print shop cuts off. 0 (or absent) means no bleed. When > 0, the print
+  // export extends the background into the bleed and adds crop marks.
+  bleed?: number
 }
 
 export type DesignCategory = 'social' | 'marketing' | 'presentation' | 'logo' | 'custom'
@@ -79,7 +83,8 @@ export function normalizeDesignBody(raw: unknown): DesignBody {
     background,
     elements,
     category: typeof r.category === 'string' ? (r.category as DesignCategory) : 'custom',
-    brandApplied: r.brandApplied === true
+    brandApplied: r.brandApplied === true,
+    ...(typeof r.bleed === 'number' && r.bleed > 0 ? { bleed: Math.round(r.bleed) } : {})
   }
 }
 
@@ -555,6 +560,79 @@ export function designToHtml(design: DesignBody): string {
     .map(elementHtml)
     .join('')
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>*{margin:0;padding:0;box-sizing:border-box}html,body{width:${design.width}px;height:${design.height}px}</style></head><body><div style="position:relative;width:${design.width}px;height:${design.height}px;background:${bg};overflow:hidden">${els}</div></body></html>`
+}
+
+// The print dimensions of a design: the trim (design) size plus bleed on every
+// side, plus a margin for crop marks. Pure, so the exporter and tests agree.
+export function designPrintSize(design: DesignBody, opts: { bleed?: number; cropMarks?: boolean } = {}): {
+  bleed: number
+  markMargin: number
+  pageWidth: number
+  pageHeight: number
+} {
+  const bleed = Math.max(0, Math.round(opts.bleed ?? design.bleed ?? 0))
+  const cropMarks = opts.cropMarks ?? bleed > 0
+  const markMargin = cropMarks ? 24 : 0
+  return {
+    bleed,
+    markMargin,
+    pageWidth: design.width + 2 * (bleed + markMargin),
+    pageHeight: design.height + 2 * (bleed + markMargin)
+  }
+}
+
+// A print-ready standalone HTML page: the design centred on a larger sheet, its
+// background extended into the bleed, and crop marks at the four trim corners so
+// a print shop knows exactly where to cut. This is the Publisher/InDesign print
+// output that ordinary PNG/PDF export can't produce.
+export function designPrintHtml(design: DesignBody, opts: { bleed?: number; cropMarks?: boolean } = {}): string {
+  const { bleed, markMargin, pageWidth, pageHeight } = designPrintSize(design, opts)
+  const cropMarks = (opts.cropMarks ?? bleed > 0) && markMargin > 0
+  const bg = fillToCss(design.background) ?? '#ffffff'
+  const els = design.elements
+    .slice()
+    .sort((a, b) => a.z - b.z)
+    .map(elementHtml)
+    .join('')
+
+  const trimLeft = markMargin + bleed
+  const trimTop = markMargin + bleed
+  // The background fills the trim + bleed area so a full-bleed design prints with
+  // no white slivers after the cut.
+  const bleedBox = `<div style="position:absolute;left:${markMargin}px;top:${markMargin}px;width:${design.width + 2 * bleed}px;height:${design.height + 2 * bleed}px;background:${bg};overflow:hidden"></div>`
+  // Elements sit in trim coordinates; overflow is visible so a deliberately
+  // oversized (full-bleed) element extends into the bleed.
+  const trimBox = `<div style="position:absolute;left:${trimLeft}px;top:${trimTop}px;width:${design.width}px;height:${design.height}px;overflow:visible">${els}</div>`
+
+  let marks = ''
+  if (cropMarks) {
+    const L = 14 // crop-mark length
+    const line = (x1: number, y1: number, x2: number, y2: number): string =>
+      `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#000" stroke-width="0.75" />`
+    const tR = trimLeft + design.width
+    const tB = trimTop + design.height
+    const bl = markMargin // bleed-box edge (marks live in the margin outside it)
+    const br = markMargin + design.width + 2 * bleed
+    const bt = markMargin
+    const bb = markMargin + design.height + 2 * bleed
+    marks =
+      `<svg style="position:absolute;left:0;top:0;pointer-events:none" width="${pageWidth}" height="${pageHeight}">` +
+      // top-left
+      line(trimLeft, bt - L, trimLeft, bt) +
+      line(bl - L, trimTop, bl, trimTop) +
+      // top-right
+      line(tR, bt - L, tR, bt) +
+      line(br, trimTop, br + L, trimTop) +
+      // bottom-left
+      line(trimLeft, bb, trimLeft, bb + L) +
+      line(bl - L, tB, bl, tB) +
+      // bottom-right
+      line(tR, bb, tR, bb + L) +
+      line(br, tB, br + L, tB) +
+      `</svg>`
+  }
+
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>*{margin:0;padding:0;box-sizing:border-box}html,body{width:${pageWidth}px;height:${pageHeight}px}</style></head><body><div style="position:relative;width:${pageWidth}px;height:${pageHeight}px;background:#ffffff;overflow:hidden">${bleedBox}${trimBox}${marks}</div></body></html>`
 }
 
 // ── AI template generator: layout variants ───────────────────────────────────
