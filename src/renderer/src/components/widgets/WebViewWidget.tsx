@@ -651,6 +651,14 @@ export default function WebViewWidget({ widget, inline = false }: Props): JSX.El
             ref={webviewRef}
             src={webviewSrc}
             partition={partition}
+            // allowpopups MUST be present at attach time — Electron reads it when
+            // the guest webContents is created. Setting it later via setAttribute
+            // (the old approach, kept below as a belt-and-braces no-op) does not
+            // reliably enable window.open for the already-attached contents, which
+            // is why site menus and OAuth "sign in" popups silently did nothing.
+            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+            // @ts-ignore — allowpopups is a valid <webview> attribute
+            allowpopups="true"
             style={{ width: '100%', height: '100%', display: 'inline-flex' }}
           />
           {showOverlay && (
