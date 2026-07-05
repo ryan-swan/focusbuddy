@@ -8,6 +8,7 @@ import { getRecentHistory } from '../db/browsing'
 import { getRecentActivity } from '../db/activity'
 import { markdownToTiptap } from './markdownToTiptap'
 import { extractJson, salvageEnvelope } from './chatJson'
+import { renderAttachments } from './chatAttachments'
 import { resolveModel } from './modelRouting'
 import { parseSheetRows, parseSheetColumns } from './sheetParse'
 import { migrateSlidesBody } from '@shared/slidesMigrate'
@@ -767,7 +768,7 @@ export async function sendChat(req: ChatRequest): Promise<ChatResponse> {
     }
   }
   try {
-    const system = buildSystemPrompt(req.taskId)
+    const system = buildSystemPrompt(req.taskId) + renderAttachments(req.attachments)
     const msgs = req.messages
       .filter((m) => m.role === 'user' || m.role === 'assistant')
       .map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content }))

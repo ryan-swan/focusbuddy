@@ -366,9 +366,22 @@ export interface ChatMessage {
   ts: number
 }
 
+// Text pulled from a browser / doc / pdf widget on the canvas, so the assistant
+// can act on what the user is actually looking at (e.g. create calendar events
+// from a booking page, an itinerary doc, or a PDF invoice).
+export interface ChatAttachment {
+  widgetId: string
+  kind: string
+  title: string
+  source?: string // URL for a browser widget, filename for a file, etc.
+  text: string
+}
+
 export interface ChatRequest {
   taskId: string | null
   messages: ChatMessage[]
+  // Live content the user has open on the canvas, gathered by the renderer.
+  attachments?: ChatAttachment[]
 }
 
 export interface ChatResponse {
