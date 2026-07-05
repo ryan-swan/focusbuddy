@@ -26,6 +26,7 @@ import { normalizeMapBody, autoLayout } from '@shared/mapGraph'
 import { mapTemplate, type MapTemplateId } from './map/mapTemplates'
 import Icon from '../Icon'
 import DrawMenuBar from './editor/DrawMenuBar'
+import { alignBoxes, distributeBoxes, type AlignEdge } from './map/mapAlign'
 import WidgetEmbed from './embed/WidgetEmbed'
 import WidgetPickerDialog from './embed/WidgetPickerDialog'
 
@@ -81,6 +82,7 @@ function defaultShapeSize(shape: MapShape): { w: number; h: number } {
       return { w: 120, h: 48 }
   }
 }
+
 
 // The on-canvas size of a widget-embed node. Fixed rather than resizable so it
 // behaves like the other draw shapes (which size to their content).
@@ -496,6 +498,29 @@ function MapInner({ body, title, onChange, foldExternal = false }: Props): JSX.E
     window.setTimeout(() => rf.fitView({ padding: 0.2, duration: 300 }), 60)
   }
 
+  // Boxes for the currently-selected shape nodes, for align/distribute.
+  function selectedBoxes(ns: Node<ShapeData>[]): { id: string; x: number; y: number; w: number; h: number }[] {
+    return ns
+      .filter((n) => n.selected)
+      .map((n) => {
+        const def = defaultShapeSize(n.data.shape)
+        return { id: n.id, x: n.position.x, y: n.position.y, w: n.data.width ?? def.w, h: n.data.height ?? def.h }
+      })
+  }
+  function applyAlign(edge: AlignEdge): void {
+    setNodes((ns) => {
+      const moves = alignBoxes(selectedBoxes(ns), edge)
+      return ns.map((n) => (moves.has(n.id) ? { ...n, position: moves.get(n.id)! } : n))
+    })
+  }
+  function applyDistribute(axis: 'h' | 'v'): void {
+    setNodes((ns) => {
+      const moves = distributeBoxes(selectedBoxes(ns), axis)
+      return ns.map((n) => (moves.has(n.id) ? { ...n, position: moves.get(n.id)! } : n))
+    })
+  }
+  const selectedCount = nodes.filter((n) => n.selected).length
+
   async function exportMapAs(format: 'svg' | 'png' | 'jpg' | 'pdf'): Promise<void> {
     const map = fromFlow(nodes, edges, viewportRef.current)
     setExportStatus(`Exporting ${format.toUpperCase()}…`)
@@ -570,6 +595,51 @@ function MapInner({ body, title, onChange, foldExternal = false }: Props): JSX.E
           AI map
         </button>
         <div className="flex-1" />
+        {selectedCount >= 2 && (
+          <div className="inline-flex items-center gap-0.5 mr-1" data-testid="map-align-tools">
+            {(
+              [
+                { edge: 'left', icon: 'align_horizontal_left' },
+                { edge: 'hcenter', icon: 'align_horizontal_center' },
+                { edge: 'right', icon: 'align_horizontal_right' },
+                { edge: 'top', icon: 'align_vertical_top' },
+                { edge: 'vcenter', icon: 'align_vertical_center' },
+                { edge: 'bottom', icon: 'align_vertical_bottom' }
+              ] as const
+            ).map((a) => (
+              <button
+                key={a.edge}
+                onClick={() => applyAlign(a.edge)}
+                data-testid={`map-align-${a.edge}`}
+                className="h-6 w-6 inline-flex items-center justify-center rounded text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]"
+                title={`Align ${a.edge}`}
+              >
+                <Icon name={a.icon} size={14} />
+              </button>
+            ))}
+            {selectedCount >= 3 && (
+              <>
+                <button
+                  onClick={() => applyDistribute('h')}
+                  data-testid="map-distribute-h"
+                  className="h-6 w-6 inline-flex items-center justify-center rounded text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]"
+                  title="Distribute horizontally"
+                >
+                  <Icon name="horizontal_distribute" size={14} />
+                </button>
+                <button
+                  onClick={() => applyDistribute('v')}
+                  data-testid="map-distribute-v"
+                  className="h-6 w-6 inline-flex items-center justify-center rounded text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]"
+                  title="Distribute vertically"
+                >
+                  <Icon name="vertical_distribute" size={14} />
+                </button>
+              </>
+            )}
+            <div className="w-px h-4 bg-[var(--edge-firm)] mx-0.5" />
+          </div>
+        )}
         <button
           onClick={arrangeMap}
           data-testid="map-arrange"
