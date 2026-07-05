@@ -45,7 +45,8 @@ const SHAPE_TOOLS: { shape: MapShape; icon: string; label: string }[] = [
   { shape: 'data', icon: 'note', label: 'Data' },
   { shape: 'database', icon: 'database', label: 'Store' },
   { shape: 'circle', icon: 'circle', label: 'Connector' },
-  { shape: 'note', icon: 'title', label: 'Text' }
+  { shape: 'note', icon: 'title', label: 'Text' },
+  { shape: 'lane', icon: 'view_column', label: 'Lane' }
 ]
 
 // ── Custom node ─────────────────────────────────────────────────────────────
@@ -74,6 +75,8 @@ function defaultShapeSize(shape: MapShape): { w: number; h: number } {
       return { w: 104, h: 64 }
     case 'circle':
       return { w: 86, h: 86 }
+    case 'lane':
+      return { w: 680, h: 200 }
     case 'note':
       return { w: 90, h: 40 }
     case 'terminator':
@@ -184,6 +187,23 @@ function ShapeNode({ id, data, selected }: NodeProps): JSX.Element {
         {label}
       </div>
     )
+  } else if (d.shape === 'lane') {
+    // A container band: a titled header strip down the left, a faint fill, and no
+    // connection handles. Shapes dropped on top read as members of the lane.
+    inner = (
+      <div
+        className={`${ring} rounded-md overflow-hidden flex`}
+        style={box({ background: `${d.color}0d`, border: `2px solid ${d.color}66` })}
+        onDoubleClick={() => setEditing(true)}
+      >
+        <div
+          className="shrink-0 flex items-center justify-center text-[11px] font-semibold text-[var(--ink-90)] px-1"
+          style={{ width: 26, background: `${d.color}26`, writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}
+        >
+          {label}
+        </div>
+      </div>
+    )
   } else {
     // process (rectangle)
     inner = (
@@ -207,9 +227,10 @@ function ShapeNode({ id, data, selected }: NodeProps): JSX.Element {
         onResize={(_e, p) => rf.updateNodeData(id, { width: Math.round(p.width), height: Math.round(p.height) })}
       />
       {inner}
-      {SIDES.map((s) => (
-        <Handle key={s.id} id={s.id} type="source" position={s.position} style={HANDLE_STYLE} />
-      ))}
+      {d.shape !== 'lane' &&
+        SIDES.map((s) => (
+          <Handle key={s.id} id={s.id} type="source" position={s.position} style={HANDLE_STYLE} />
+        ))}
     </div>
   )
 }
@@ -264,6 +285,8 @@ function toFlowNodes(body: MapBody): Node<ShapeData>[] {
     id: n.id,
     type: 'shape',
     position: { x: n.x, y: n.y },
+    // Lanes are containers, so they sit behind the shapes placed on top of them.
+    ...(n.shape === 'lane' ? { zIndex: -1 } : {}),
     data: {
       label: n.label,
       shape: n.shape,

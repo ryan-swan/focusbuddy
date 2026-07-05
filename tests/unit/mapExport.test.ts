@@ -84,3 +84,21 @@ describe('mapToSvg', () => {
     expect(width).toBe(400 + 20)
   })
 })
+
+describe('mapToSvg — lanes (swimlane containers)', () => {
+  it('renders a lane as a banded container and paints it behind other shapes', () => {
+    const { svg } = mapToSvg(
+      body({
+        nodes: [
+          { id: 'p', x: 100, y: 40, label: 'Step', shape: 'process', color: '#2563eb' },
+          { id: 'lane', x: 0, y: 0, width: 600, height: 200, label: 'Requester', shape: 'lane', color: '#2563eb' }
+        ]
+      })
+    )
+    // The lane's rotated header label is present.
+    expect(svg).toContain('Requester')
+    expect(svg).toContain('rotate(-90')
+    // Painted first (behind): the lane's band rect appears before the process rect's label.
+    expect(svg.indexOf('Requester')).toBeLessThan(svg.indexOf('>Step<'))
+  })
+})

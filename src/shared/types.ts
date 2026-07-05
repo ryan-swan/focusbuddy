@@ -1720,6 +1720,7 @@ export type MapShape =
   | 'database' // cylinder — a store
   | 'circle' // connector / state
   | 'note' // free text label
+  | 'lane' // swimlane / container band that groups shapes placed on top of it
   | 'widget' // live embed of a desk widget (widgetId on the node)
 
 export interface MapNode {

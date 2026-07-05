@@ -2014,6 +2014,7 @@ export async function generateDocument(input: {
         note: '#475569',
         // Not offered to the AI (the prompt enumerates its own shapes); listed
         // only to keep this record total over MapShape.
+        lane: '#2563eb',
         widget: '#6d5dfc'
       }
       const coloured = norm.nodes.map((n) => ({ ...n, color: SHAPE_COLOR[n.shape] || n.color }))
