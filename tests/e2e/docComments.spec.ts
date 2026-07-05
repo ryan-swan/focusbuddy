@@ -99,3 +99,54 @@ test('add a comment on selected text, see the thread + highlight, and it persist
     { timeout: 5_000 }
   )
 })
+
+test('reply with an @mention: the autocomplete offers a real participant and the mention renders highlighted', async () => {
+  launched = await launchApp()
+  const { window } = launched
+  await waitForReady(window)
+
+  await openDocumentsHub(window)
+  await startBlankDoc(window)
+
+  const surface = window.locator('[data-testid="doc-editor-surface"]')
+  await surface.click()
+  await window.keyboard.type('The revenue figure in this section looks off.')
+  await window.waitForTimeout(300)
+  await selectAllInEditor(window)
+
+  await window.locator('[data-testid="doc-comments-toggle"]').click()
+  await expect(window.locator('[data-testid="doc-comments-tab"]')).toBeVisible({ timeout: 5_000 })
+
+  // Seed a comment so its author becomes a real @mention candidate.
+  await window.locator('[data-testid="doc-comments-add"]').click()
+  const dialog = window.locator('[data-testid="prompt-dialog"]')
+  await expect(dialog).toBeVisible({ timeout: 5_000 })
+  await window.locator('[data-testid="prompt-dialog-input"]').fill('Can someone verify this?')
+  await window.locator('[data-testid="prompt-dialog-confirm"]').click()
+  await expect(dialog).toBeHidden({ timeout: 5_000 })
+
+  // The reply box is the mention-aware input. Type "@" — the autocomplete offers
+  // the real participant (the comment author), never an invented name.
+  const replyInput = window.locator('input[data-testid^="doc-comment-reply-"]')
+  await expect(replyInput).toBeVisible({ timeout: 5_000 })
+  await replyInput.click()
+  await replyInput.type('@')
+  const menu = window.locator('[data-testid$="-mentions"]')
+  await expect(menu).toBeVisible({ timeout: 4_000 })
+  const option = window.locator('[data-testid$="-mention-option"]').first()
+  await expect(option).toBeVisible()
+
+  // Choosing the option completes the handle; finish the reply and submit.
+  await option.click()
+  await expect(replyInput).toHaveValue(/@\w+ $/)
+  await replyInput.type('please check this figure')
+  await window.keyboard.press('Enter')
+
+  // The posted reply renders the @mention as a highlighted chip, not plain text.
+  await expect(window.locator('[data-testid="doc-comments-list"]')).toContainText('please check this figure', {
+    timeout: 5_000
+  })
+  await expect(window.locator('[data-testid="doc-comments-list"] [data-testid="mention"], [data-testid="doc-comments-list"] [data-testid="mention-me"]')).toHaveCount(1, {
+    timeout: 5_000
+  })
+})
