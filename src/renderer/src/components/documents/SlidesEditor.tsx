@@ -17,6 +17,8 @@ import CropDialog from './slides/CropDialog'
 import ChartLinkDialog from './slides/ChartLinkDialog'
 import { buildChartData } from '../../lib/chartData'
 import type { SheetTab } from '@shared/types'
+import { checkSlidesA11y } from '../../lib/slidesA11y'
+import type { A11yIssue } from '../../lib/docA11y'
 import {
   addElement,
   updateElement,
@@ -65,6 +67,7 @@ export default function SlidesEditor({ body: rawBody, title, onChange }: Props):
   const [presenting, setPresenting] = useState(false)
   const [cropId, setCropId] = useState<string | null>(null)
   const [chartLinkFor, setChartLinkFor] = useState<string | null>(null)
+  const [a11yIssues, setA11yIssues] = useState<A11yIssue[] | null>(null)
   const [aiOpen, setAiOpen] = useState(false)
   const [galleryOpen, setGalleryOpen] = useState(false)
   const [widgetPickerOpen, setWidgetPickerOpen] = useState(false)
@@ -622,6 +625,7 @@ export default function SlidesEditor({ body: rawBody, title, onChange }: Props):
             canUndo: undo.current.length > 0,
             canRedo: redo.current.length > 0,
             present: () => setPresenting(true),
+            checkA11y: () => setA11yIssues(checkSlidesA11y(body)),
             newSlide: () => addSlideFromTemplate('blank'),
             deleteSlide: () => deleteSlide(slideIdx),
             moveSlideUp: () => moveSlide(slideIdx, -1),
@@ -849,6 +853,42 @@ export default function SlidesEditor({ body: rawBody, title, onChange }: Props):
             />
           )
         })()}
+
+      {a11yIssues !== null && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/30" onMouseDown={() => setA11yIssues(null)}>
+          <div
+            className="w-[380px] rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-2xl p-4"
+            data-testid="slides-a11y-modal"
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-[14px] font-semibold text-[var(--ink-90)]">Accessibility check</h3>
+              <button onClick={() => setA11yIssues(null)} className="icon-btn" title="Close">
+                <Icon name="close" size={16} />
+              </button>
+            </div>
+            {a11yIssues.length === 0 ? (
+              <div className="flex items-center gap-2 text-[13px] text-emerald-600" data-testid="slides-a11y-clean">
+                <Icon name="check_circle" size={16} />
+                <span>No accessibility issues found.</span>
+              </div>
+            ) : (
+              <div className="space-y-2" data-testid="slides-a11y-issues">
+                {a11yIssues.map((it, i) => (
+                  <div key={i} className="flex items-start gap-2 text-[12px]" data-testid="slides-a11y-issue">
+                    <Icon
+                      name={it.severity === 'error' ? 'error' : 'warning'}
+                      size={15}
+                      className={it.severity === 'error' ? 'text-rose-500 shrink-0 mt-0.5' : 'text-amber-500 shrink-0 mt-0.5'}
+                    />
+                    <span className="text-[var(--ink-70)]">{it.message}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
