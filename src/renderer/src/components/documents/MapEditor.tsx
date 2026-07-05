@@ -39,19 +39,33 @@ import WidgetPickerDialog from './embed/WidgetPickerDialog'
 
 const NODE_COLORS = ['#2563eb', '#16a34a', '#d97706', '#dc2626', '#7c3aed', '#0891b2', '#475569']
 
-const SHAPE_TOOLS: { shape: MapShape; icon: string; label: string }[] = [
-  { shape: 'process', icon: 'crop_square', label: 'Process' },
-  { shape: 'decision', icon: 'change_history', label: 'Decision' },
-  { shape: 'terminator', icon: 'pill', label: 'Start / End' },
-  { shape: 'data', icon: 'note', label: 'Data' },
-  { shape: 'database', icon: 'database', label: 'Store' },
-  { shape: 'circle', icon: 'circle', label: 'Connector' },
-  { shape: 'hexagon', icon: 'hexagon', label: 'Prep' },
-  { shape: 'trapezoid', icon: 'signal_cellular_null', label: 'Manual' },
-  { shape: 'chevron', icon: 'chevron_right', label: 'Stage' },
-  { shape: 'note', icon: 'title', label: 'Text' },
-  { shape: 'lane', icon: 'view_column', label: 'Lane' }
+type StencilCategory = 'Flowchart' | 'Basic shapes' | 'Arrows' | 'Containers'
+
+const SHAPE_TOOLS: { shape: MapShape; icon: string; label: string; category: StencilCategory }[] = [
+  // Flowchart — the classic process-diagram set.
+  { shape: 'process', icon: 'crop_square', label: 'Process', category: 'Flowchart' },
+  { shape: 'decision', icon: 'change_history', label: 'Decision', category: 'Flowchart' },
+  { shape: 'terminator', icon: 'pill', label: 'Start / End', category: 'Flowchart' },
+  { shape: 'data', icon: 'note', label: 'Data', category: 'Flowchart' },
+  { shape: 'database', icon: 'database', label: 'Store', category: 'Flowchart' },
+  { shape: 'hexagon', icon: 'hexagon', label: 'Prep', category: 'Flowchart' },
+  { shape: 'trapezoid', icon: 'signal_cellular_null', label: 'Manual', category: 'Flowchart' },
+  { shape: 'note', icon: 'title', label: 'Text', category: 'Flowchart' },
+  // Basic shapes — general-purpose geometry.
+  { shape: 'circle', icon: 'circle', label: 'Circle', category: 'Basic shapes' },
+  { shape: 'triangle', icon: 'change_history', label: 'Triangle', category: 'Basic shapes' },
+  { shape: 'pentagon', icon: 'pentagon', label: 'Pentagon', category: 'Basic shapes' },
+  { shape: 'star', icon: 'star', label: 'Star', category: 'Basic shapes' },
+  { shape: 'cross', icon: 'add', label: 'Cross', category: 'Basic shapes' },
+  { shape: 'callout', icon: 'chat_bubble', label: 'Callout', category: 'Basic shapes' },
+  // Arrows — directional flow markers.
+  { shape: 'chevron', icon: 'chevron_right', label: 'Stage', category: 'Arrows' },
+  { shape: 'arrow', icon: 'arrow_forward', label: 'Arrow', category: 'Arrows' },
+  // Containers — group other shapes.
+  { shape: 'lane', icon: 'view_column', label: 'Lane', category: 'Containers' }
 ]
+
+const STENCIL_CATEGORIES: StencilCategory[] = ['Flowchart', 'Basic shapes', 'Arrows', 'Containers']
 
 // ── Custom node ─────────────────────────────────────────────────────────────
 interface ShapeData extends Record<string, unknown> {
@@ -85,6 +99,18 @@ function defaultShapeSize(shape: MapShape): { w: number; h: number } {
       return { w: 140, h: 60 }
     case 'chevron':
       return { w: 150, h: 52 }
+    case 'triangle':
+      return { w: 96, h: 84 }
+    case 'pentagon':
+      return { w: 100, h: 92 }
+    case 'star':
+      return { w: 96, h: 96 }
+    case 'cross':
+      return { w: 90, h: 90 }
+    case 'arrow':
+      return { w: 130, h: 70 }
+    case 'callout':
+      return { w: 140, h: 84 }
     case 'lane':
       return { w: 680, h: 200 }
     case 'note':
@@ -388,6 +414,7 @@ function MapInner({ body, title, onChange, foldExternal = false }: Props): JSX.E
   const [aiOpen, setAiOpen] = useState(false)
   const [exportStatus, setExportStatus] = useState<string | null>(null)
   const [widgetPickerOpen, setWidgetPickerOpen] = useState(false)
+  const [stencilCat, setStencilCat] = useState<StencilCategory>('Flowchart')
   const seq = useRef(initial.nodes.length)
   const viewportRef = useRef(initial.viewport ?? { x: 0, y: 0, zoom: 1 })
   const rf = useReactFlow()
@@ -594,9 +621,27 @@ function MapInner({ body, title, onChange, foldExternal = false }: Props): JSX.E
           }}
         />
       </div>
-      {/* Toolbar */}
+      {/* Stencil category picker — groups the shape library so the palette stays
+          scannable as it grows. */}
+      <div className="shrink-0 flex items-center gap-1 px-2 pt-1 border-b border-[var(--edge-soft)] bg-[var(--surface-sunken)]/60">
+        {STENCIL_CATEGORIES.map((cat) => (
+          <button
+            key={cat}
+            onClick={() => setStencilCat(cat)}
+            data-testid={`map-stencil-cat-${cat.replace(/\s+/g, '-').toLowerCase()}`}
+            className={`text-[11px] px-2 py-1 rounded-t ${
+              stencilCat === cat
+                ? 'text-[var(--ink-90)] font-semibold border-b-2 border-accent'
+                : 'text-[var(--ink-50)] hover:text-[var(--ink-80)]'
+            }`}
+          >
+            {cat}
+          </button>
+        ))}
+      </div>
+      {/* Toolbar — the shapes of the active stencil category. */}
       <div className="shrink-0 flex items-center gap-1 px-2 py-1.5 border-b border-[var(--edge-soft)] bg-[var(--surface-sunken)]/80 flex-wrap">
-        {SHAPE_TOOLS.map((t) => (
+        {SHAPE_TOOLS.filter((t) => t.category === stencilCat).map((t) => (
           <button
             key={t.shape}
             onClick={() => addNode(t.shape)}

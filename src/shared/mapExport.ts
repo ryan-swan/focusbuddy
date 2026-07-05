@@ -31,6 +31,64 @@ export const POLYGON_POINTS: Partial<Record<MapShape, [number, number][]>> = {
     [0.75, 1],
     [0, 1],
     [0.25, 0.5]
+  ],
+  triangle: [
+    [0.5, 0],
+    [1, 1],
+    [0, 1]
+  ],
+  pentagon: [
+    [0.5, 0],
+    [1, 0.38],
+    [0.82, 1],
+    [0.18, 1],
+    [0, 0.38]
+  ],
+  // Five-point star: outer radius 0.5, inner 0.2, from a fixed unit circle so the
+  // editor clip-path and the SVG export draw the identical outline.
+  star: [
+    [0.5, 0],
+    [0.618, 0.338],
+    [0.976, 0.345],
+    [0.69, 0.562],
+    [0.794, 0.905],
+    [0.5, 0.7],
+    [0.206, 0.905],
+    [0.31, 0.562],
+    [0.024, 0.345],
+    [0.382, 0.338]
+  ],
+  cross: [
+    [0.33, 0],
+    [0.67, 0],
+    [0.67, 0.33],
+    [1, 0.33],
+    [1, 0.67],
+    [0.67, 0.67],
+    [0.67, 1],
+    [0.33, 1],
+    [0.33, 0.67],
+    [0, 0.67],
+    [0, 0.33],
+    [0.33, 0.33]
+  ],
+  arrow: [
+    [0, 0.3],
+    [0.6, 0.3],
+    [0.6, 0.1],
+    [1, 0.5],
+    [0.6, 0.9],
+    [0.6, 0.7],
+    [0, 0.7]
+  ],
+  callout: [
+    [0, 0],
+    [1, 0],
+    [1, 0.75],
+    [0.35, 0.75],
+    [0.2, 1],
+    [0.25, 0.75],
+    [0, 0.75]
   ]
 }
 
@@ -66,6 +124,18 @@ function nodeSize(n: MapNode): { w: number; h: number } {
       return { w: 140, h: 60 }
     case 'chevron':
       return { w: 150, h: 52 }
+    case 'triangle':
+      return { w: 96, h: 84 }
+    case 'pentagon':
+      return { w: 100, h: 92 }
+    case 'star':
+      return { w: 96, h: 96 }
+    case 'cross':
+      return { w: 90, h: 90 }
+    case 'arrow':
+      return { w: 130, h: 70 }
+    case 'callout':
+      return { w: 140, h: 84 }
     case 'lane':
       return { w: 680, h: 200 }
     default:

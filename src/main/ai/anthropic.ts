@@ -2015,6 +2015,12 @@ export async function generateDocument(input: {
         hexagon: '#0891b2',
         trapezoid: '#d97706',
         chevron: '#2563eb',
+        triangle: '#7c3aed',
+        pentagon: '#0891b2',
+        star: '#d97706',
+        cross: '#16a34a',
+        arrow: '#2563eb',
+        callout: '#475569',
         // Not offered to the AI (the prompt enumerates its own shapes); listed
         // only to keep this record total over MapShape.
         lane: '#2563eb',
