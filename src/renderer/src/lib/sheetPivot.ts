@@ -13,6 +13,10 @@ export interface PivotResult {
   colKeys: string[] // column headers (empty [''] when no colField)
   rows: Array<{ key: string; cells: Array<number | null>; total: number | null }>
   grandTotal: number | null
+  // Every distinct value of the row / column field (before slicer filtering), so
+  // the UI can render slicer checkboxes covering the full domain.
+  rowFieldValues: string[]
+  colFieldValues: string[]
 }
 
 function aggregate(values: number[], agg: SheetPivotAgg): number | null {
@@ -52,15 +56,33 @@ export function computePivot(
   const colFieldLabel = spec.colField != null ? header(spec.colField) : null
   const valueFieldLabel = header(spec.valueField)
 
+  // Slicer filters: field -> set of excluded values.
+  const excludeByField = new Map<number, Set<string>>()
+  for (const f of spec.filters ?? []) excludeByField.set(f.field, new Set(f.exclude))
+
   // Collect grouped values: rowKey -> colKey -> number[].
   const groups = new Map<string, Map<string, number[]>>()
   const colKeySet = new Set<string>()
   const rowOrder: string[] = []
   const countMode = spec.agg === 'count'
+  // The full domain of the row/column fields (unfiltered) for slicer UIs.
+  const rowFieldAll = new Set<string>()
+  const colFieldAll = new Set<string>()
 
   for (let r = r1 + 1; r <= r2; r++) {
     const rowKey = getCell(r, c1 + spec.rowField)
     const colKey = spec.colField != null ? getCell(r, c1 + spec.colField) : ''
+    rowFieldAll.add(rowKey)
+    if (spec.colField != null) colFieldAll.add(colKey)
+    // Apply slicers: skip a source row if any filtered field's value is excluded.
+    let excluded = false
+    for (const [field, set] of excludeByField) {
+      if (set.size && set.has(getCell(r, c1 + field))) {
+        excluded = true
+        break
+      }
+    }
+    if (excluded) continue
     const raw = getCell(r, c1 + spec.valueField)
     const num = asNumber(raw)
     // For non-count aggregates a non-numeric value contributes nothing.
@@ -88,6 +110,8 @@ export function computePivot(
   const grandValues: number[] = []
   for (const byCol of groups.values()) for (const arr of byCol.values()) grandValues.push(...arr)
 
+  const sortVals = (s: Set<string>): string[] => [...s].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
+
   return {
     rowFieldLabel,
     colFieldLabel,
@@ -95,6 +119,8 @@ export function computePivot(
     agg: spec.agg,
     colKeys,
     rows,
-    grandTotal: aggregate(grandValues, spec.agg)
+    grandTotal: aggregate(grandValues, spec.agg),
+    rowFieldValues: sortVals(rowFieldAll),
+    colFieldValues: sortVals(colFieldAll)
   }
 }

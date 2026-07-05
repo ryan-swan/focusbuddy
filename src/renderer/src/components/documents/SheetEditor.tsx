@@ -1049,6 +1049,9 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
   function removePivot(id: string): void {
     mutateTab((t) => ({ ...t, pivots: (t.pivots ?? []).filter((p) => p.id !== id) }))
   }
+  function updatePivot(id: string, next: SheetPivotSpec): void {
+    mutateTab((t) => ({ ...t, pivots: (t.pivots ?? []).map((p) => (p.id === id ? next : p)) }))
+  }
 
   // ── Tabs ──────────────────────────────────────────────────────────────────
   function switchTab(i: number): void {
@@ -1664,7 +1667,13 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
         {(tab.pivots ?? []).length > 0 && (
           <div className="mt-4 grid grid-cols-1 lg:grid-cols-2 gap-3">
             {tab.pivots!.map((spec) => (
-              <SheetPivot key={spec.id} spec={spec} tab={tab} onRemove={() => removePivot(spec.id)} />
+              <SheetPivot
+                key={spec.id}
+                spec={spec}
+                tab={tab}
+                onRemove={() => removePivot(spec.id)}
+                onUpdateSpec={(next) => updatePivot(spec.id, next)}
+              />
             ))}
           </div>
         )}

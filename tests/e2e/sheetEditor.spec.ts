@@ -1162,6 +1162,52 @@ test('SE-23 — pivot: sum a value column grouped by a row column', async () => 
   }
 })
 
+// ── SE-24: Pivot slicer hides a row-field value and re-aggregates ─────────────
+
+test('SE-24 — pivot slicer: unchecking a value hides it and updates the total', async () => {
+  const { window, dispose } = await launchApp()
+  try {
+    await waitForReady(window)
+    await openDocumentsHub(window)
+    await startBlankSpreadsheet(window)
+
+    // A: Dept, B: Amount.  Eng/100, Sales/90, Eng/50.
+    await setViaFormulaBar(window, 0, 0, 'Dept')
+    await setViaFormulaBar(window, 0, 1, 'Amount')
+    await setViaFormulaBar(window, 1, 0, 'Eng')
+    await setViaFormulaBar(window, 1, 1, '100')
+    await setViaFormulaBar(window, 2, 0, 'Sales')
+    await setViaFormulaBar(window, 2, 1, '90')
+    await setViaFormulaBar(window, 3, 0, 'Eng')
+    await setViaFormulaBar(window, 3, 1, '50', [0, 0])
+
+    await clickCell(window, 0, 0)
+    await window.locator('[data-testid="cell-3-1"]').click({ modifiers: ['Shift'] })
+    await window.locator('[data-testid="sheet-pivot-btn"]').click()
+    await expect(window.locator('[data-testid="sheet-pivot-dialog"]')).toBeVisible({ timeout: 3_000 })
+    await window.locator('[data-testid="pivot-create"]').click()
+
+    const pivot = window.locator('[data-testid="sheet-pivot"]')
+    await expect(pivot).toBeVisible({ timeout: 5_000 })
+    await expect(pivot).toContainText('240')
+
+    // The slicer offers the two Dept values (rowField 0).
+    const slicer = window.locator('[data-testid="sheet-pivot-slicer-0"]')
+    await expect(slicer).toBeVisible({ timeout: 4_000 })
+    await expect(slicer.locator('[data-testid="sheet-pivot-slicer-0-item"]')).toHaveCount(2)
+
+    // Uncheck "Sales" — its row disappears and the grand total drops to Eng's 150.
+    const salesRow = slicer.locator('[data-testid="sheet-pivot-slicer-0-item"]', { hasText: 'Sales' })
+    await salesRow.locator('input[type="checkbox"]').uncheck()
+
+    await expect(pivot.locator('tbody')).not.toContainText('Sales')
+    await expect(pivot).toContainText('150')
+    await expect(pivot).not.toContainText('240')
+  } finally {
+    await dispose()
+  }
+})
+
 test('SE-19 — array formula spills: =SEQUENCE(3,1) fills the cells below', async () => {
   const { window, dispose } = await launchApp()
   try {
