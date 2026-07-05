@@ -25,6 +25,18 @@ export interface DesignBody {
   // a print shop cuts off. 0 (or absent) means no bleed. When > 0, the print
   // export extends the background into the bleed and adds crop marks.
   bleed?: number
+  // Multi-page documents (booklets, brochures). Every page shares the doc's
+  // width/height. pages[activePage] mirrors the top-level background/elements, so
+  // single-page code paths and older readers still work; the page rail switches
+  // which page is live. Legacy single-page bodies migrate to one page on load.
+  pages?: DesignPage[]
+  activePage?: number
+}
+
+export interface DesignPage {
+  id: string
+  background?: SlideFill
+  elements: SlideElement[]
 }
 
 export type DesignCategory = 'social' | 'marketing' | 'presentation' | 'logo' | 'custom'
@@ -74,14 +86,34 @@ export function normalizeDesignBody(raw: unknown): DesignBody {
   const r = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>
   const width = clampDim(r.width, 1080)
   const height = clampDim(r.height, 1080)
-  const elements = Array.isArray(r.elements) ? (r.elements as SlideElement[]) : []
-  const background: SlideFill = isFill(r.background) ? (r.background as SlideFill) : { type: 'solid', color: '#ffffff' }
+  const topElements = Array.isArray(r.elements) ? (r.elements as SlideElement[]) : []
+  const topBackground: SlideFill = isFill(r.background) ? (r.background as SlideFill) : { type: 'solid', color: '#ffffff' }
+
+  // Pages: use a stored multi-page array, else migrate the legacy single canvas
+  // into one page. The active page is mirrored back to top-level elements/background.
+  let n = 0
+  const rawPages = Array.isArray(r.pages) ? (r.pages as unknown[]) : []
+  const pages: DesignPage[] = rawPages
+    .map((p) => {
+      const pr = (p && typeof p === 'object' ? p : {}) as Record<string, unknown>
+      return {
+        id: typeof pr.id === 'string' && pr.id ? pr.id : `pg-${++n}`,
+        background: isFill(pr.background) ? (pr.background as SlideFill) : topBackground,
+        elements: Array.isArray(pr.elements) ? (pr.elements as SlideElement[]) : []
+      }
+    })
+  if (pages.length === 0) pages.push({ id: 'pg-1', background: topBackground, elements: topElements })
+  const activePage = Math.max(0, Math.min(pages.length - 1, typeof r.activePage === 'number' ? Math.round(r.activePage) : 0))
+  const active = pages[activePage]
+
   return {
     schemaVersion: 1,
     width,
     height,
-    background,
-    elements,
+    background: active.background ?? topBackground,
+    elements: active.elements,
+    pages,
+    activePage,
     category: typeof r.category === 'string' ? (r.category as DesignCategory) : 'custom',
     brandApplied: r.brandApplied === true,
     ...(typeof r.bleed === 'number' && r.bleed > 0 ? { bleed: Math.round(r.bleed) } : {})
@@ -633,6 +665,21 @@ export function designPrintHtml(design: DesignBody, opts: { bleed?: number; crop
   }
 
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>*{margin:0;padding:0;box-sizing:border-box}html,body{width:${pageWidth}px;height:${pageHeight}px}</style></head><body><div style="position:relative;width:${pageWidth}px;height:${pageHeight}px;background:#ffffff;overflow:hidden">${bleedBox}${trimBox}${marks}</div></body></html>`
+}
+
+// Every page of a multi-page design stacked with page breaks, for a single
+// multi-page PDF. Each page is drawn at the doc's exact pixel size.
+export function designToHtmlAllPages(design: DesignBody): string {
+  const pages = design.pages && design.pages.length ? design.pages : [{ id: 'p1', background: design.background, elements: design.elements }]
+  const pageDivs = pages
+    .map((pg, i) => {
+      const bg = fillToCss(pg.background) ?? '#ffffff'
+      const els = pg.elements.slice().sort((a, b) => a.z - b.z).map(elementHtml).join('')
+      const brk = i < pages.length - 1 ? 'page-break-after:always;' : ''
+      return `<div style="position:relative;width:${design.width}px;height:${design.height}px;background:${bg};overflow:hidden;${brk}">${els}</div>`
+    })
+    .join('')
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>*{margin:0;padding:0;box-sizing:border-box}</style></head><body>${pageDivs}</body></html>`
 }
 
 // ── AI template generator: layout variants ───────────────────────────────────

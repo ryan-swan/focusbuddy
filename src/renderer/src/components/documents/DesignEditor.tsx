@@ -182,14 +182,54 @@ export default function DesignEditor({ content, title, onChange, foldExternal = 
     h: design.height
   }
 
+  // Keep pages[activePage] in step with the live top-level elements/background,
+  // so the multi-page array is always the source of truth.
+  function syncActivePage(b: DesignBody): DesignBody {
+    const active = b.activePage ?? 0
+    const pages = (b.pages ?? []).map((p, i) => (i === active ? { ...p, elements: b.elements, background: b.background } : p))
+    return { ...b, pages }
+  }
+
   // The single writer: records the prior body on the undo stack, clears redo, and
   // persists. Every change to the design flows through here.
   function commit(next: DesignBody): void {
+    const synced = syncActivePage(next)
     setPast([...pastRef.current.slice(-59), designRef.current])
     setFuture([])
-    designRef.current = next
-    setDesign(next)
-    onChange(next)
+    designRef.current = synced
+    setDesign(synced)
+    onChange(synced)
+  }
+
+  const pages = design.pages ?? []
+  const activePage = design.activePage ?? 0
+
+  function goToPage(i: number): void {
+    const d = designRef.current
+    const ps = d.pages ?? []
+    if (i < 0 || i >= ps.length || i === (d.activePage ?? 0)) return
+    const saved = syncActivePage(d)
+    const target = saved.pages![i]
+    commit({ ...saved, activePage: i, elements: target.elements, background: target.background })
+    setSelectedIds([])
+  }
+  function addPage(): void {
+    const saved = syncActivePage(designRef.current)
+    const np: import('@shared/design').DesignPage = { id: `pg-${Date.now().toString(36)}`, background: { type: 'solid', color: '#ffffff' }, elements: [] }
+    const nextPages = [...(saved.pages ?? []), np]
+    commit({ ...saved, pages: nextPages, activePage: nextPages.length - 1, elements: np.elements, background: np.background })
+    setSelectedIds([])
+  }
+  function deletePage(i: number): void {
+    const saved = syncActivePage(designRef.current)
+    const ps = saved.pages ?? []
+    if (ps.length <= 1) return
+    const nextPages = ps.filter((_, idx) => idx !== i)
+    const cur = saved.activePage ?? 0
+    const newActive = Math.max(0, Math.min(nextPages.length - 1, cur > i ? cur - 1 : cur))
+    const target = nextPages[newActive]
+    commit({ ...saved, pages: nextPages, activePage: newActive, elements: target.elements, background: target.background })
+    setSelectedIds([])
   }
 
   function update(patch: Partial<DesignBody>): void {
@@ -868,6 +908,7 @@ export default function DesignEditor({ content, title, onChange, foldExternal = 
 
       {/* Canvas + inspector */}
       <div className="flex-1 min-h-0 flex">
+        <div className="flex-1 min-w-0 flex flex-col">
         <div ref={wrapRef} className="flex-1 min-w-0 overflow-auto bg-stone-200/50 dark:bg-black/30 flex items-start justify-center p-6">
           <SlideCanvas
             slide={{ id: 'design', notes: '', elements: design.elements, background: design.background, schemaVersion: 2 }}
@@ -887,6 +928,42 @@ export default function DesignEditor({ content, title, onChange, foldExternal = 
               })
             }
           />
+        </div>
+        {/* Page rail — switch, add, delete pages of a multi-page document. */}
+        <div className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 border-t border-[var(--edge-soft)] bg-[var(--surface-sunken)]/60 overflow-x-auto" data-testid="design-page-rail">
+          {pages.map((pg, i) => (
+            <div key={pg.id} className="relative group/pg shrink-0">
+              <button
+                onClick={() => goToPage(i)}
+                data-testid={`design-page-${i}`}
+                className={`h-7 min-w-7 px-2 rounded text-[12px] border ${
+                  i === activePage ? 'border-accent bg-accent/10 text-accent font-medium' : 'border-[var(--edge-soft)] text-[var(--ink-60)] hover:bg-[var(--surface-sunken)]'
+                }`}
+                title={`Page ${i + 1}`}
+              >
+                {i + 1}
+              </button>
+              {pages.length > 1 && (
+                <button
+                  onClick={() => deletePage(i)}
+                  data-testid={`design-page-delete-${i}`}
+                  className="absolute -top-1 -right-1 hidden group-hover/pg:flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[var(--surface-raised)] border border-[var(--edge-firm)] text-[var(--ink-50)] hover:text-rose-500"
+                  title={`Delete page ${i + 1}`}
+                >
+                  <Icon name="close" size={9} />
+                </button>
+              )}
+            </div>
+          ))}
+          <button
+            onClick={addPage}
+            data-testid="design-page-add"
+            className="h-7 px-2 rounded text-[12px] text-[var(--ink-60)] hover:bg-[var(--surface-sunken)] inline-flex items-center gap-1"
+            title="Add a page"
+          >
+            <Icon name="add" size={14} /> Page
+          </button>
+        </div>
         </div>
 
         {selected && (

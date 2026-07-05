@@ -5,7 +5,7 @@
 
 import { BrowserWindow, dialog } from 'electron'
 import { writeFile } from 'fs/promises'
-import { designToHtml, designPrintHtml, designPrintSize, type DesignBody } from '@shared/design'
+import { designToHtml, designToHtmlAllPages, designPrintHtml, designPrintSize, type DesignBody } from '@shared/design'
 
 export interface DesignExportResult {
   ok: boolean
@@ -35,12 +35,14 @@ export async function exportDesign(input: {
   })
   if (res.canceled || !res.filePath) return { ok: false }
 
-  // Print export uses the larger bleed+marks page; screen export the trim size.
+  // Print export uses the larger bleed+marks page; a multi-page PDF stacks every
+  // page with page breaks; screen/PNG export is the active trim page.
   const print = designPrintSize(design, { cropMarks: printMarks })
   const usePrint = !!printMarks && (print.bleed > 0 || print.markMargin > 0)
+  const multiPage = !printMarks && format === 'pdf' && (design.pages?.length ?? 1) > 1
   const pageW = usePrint ? print.pageWidth : design.width
   const pageH = usePrint ? print.pageHeight : design.height
-  const html = usePrint ? designPrintHtml(design, { cropMarks: true }) : designToHtml(design)
+  const html = usePrint ? designPrintHtml(design, { cropMarks: true }) : multiPage ? designToHtmlAllPages(design) : designToHtml(design)
   const win = new BrowserWindow({
     show: false,
     width: Math.min(Math.max(pageW, 16), 8000),
