@@ -283,7 +283,15 @@ app.on('web-contents-created', (_, contents) => {
     if (decision.action === 'allow') {
       return {
         action: 'allow',
-        outlivesOpener: false,
+        // outlivesOpener MUST be true for OAuth. A sign-in popup routinely
+        // outlives a navigation of the page that opened it (the opener often
+        // redirects to a "signing you in…" URL, or reloads, the moment the popup
+        // is launched). With outlivesOpener:false Electron destroys the popup the
+        // instant the opener navigates, which aborts the OAuth handshake and
+        // bounces the page back to where it started — exactly the "logging in
+        // resets and reloads the original page" symptom. Keeping the popup alive
+        // lets the provider finish and postMessage the callback back to the opener.
+        outlivesOpener: true,
         overrideBrowserWindowOptions: decision.overrideBrowserWindowOptions
       }
     }
