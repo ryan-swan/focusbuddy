@@ -29,12 +29,24 @@ export interface PageMargins {
   left: number
 }
 
+// A running header or footer printed in the top/bottom margin of every page.
+// `text` is free text (optionally centred), and `showPageNumber` adds an
+// auto-updating "Page N" on the right. Both absent means the band is empty.
+export interface PageHeaderFooter {
+  text?: string
+  showPageNumber?: boolean
+}
+
 // A document's page setup. Persisted on the body so it travels with the document
 // (rather than a global app preference) and so every reader sees the same pages.
 export interface PageSetup {
   size: PaperSize
   orientation: PageOrientation
   margin: PageMargins
+  // Running header/footer. Optional so existing documents (no header/footer)
+  // are unaffected and need no migration.
+  header?: PageHeaderFooter
+  footer?: PageHeaderFooter
 }
 
 export const DEFAULT_MARGINS: PageMargins = { top: 1, right: 1, bottom: 1, left: 1 }
@@ -66,8 +78,21 @@ function parsePageSetup(raw: unknown): PageSetup {
       right: clampMargin(m.right),
       bottom: clampMargin(m.bottom),
       left: clampMargin(m.left)
-    }
+    },
+    ...(parseHeaderFooter(r.header) ? { header: parseHeaderFooter(r.header)! } : {}),
+    ...(parseHeaderFooter(r.footer) ? { footer: parseHeaderFooter(r.footer)! } : {})
   }
+}
+
+// A header/footer survives the round-trip only when it carries content; an empty
+// one returns null so we don't persist noise.
+function parseHeaderFooter(raw: unknown): PageHeaderFooter | null {
+  if (!raw || typeof raw !== 'object') return null
+  const r = raw as Record<string, unknown>
+  const text = typeof r.text === 'string' ? r.text : ''
+  const showPageNumber = r.showPageNumber === true
+  if (!text && !showPageNumber) return null
+  return { ...(text ? { text } : {}), ...(showPageNumber ? { showPageNumber: true } : {}) }
 }
 
 export interface WrappedDocBody {

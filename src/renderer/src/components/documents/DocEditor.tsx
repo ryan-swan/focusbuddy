@@ -11,7 +11,8 @@ import {
   type HeadingStyle,
   type HeadingStyles,
   type PageSetup,
-  type PageMargins
+  type PageMargins,
+  type PageHeaderFooter
 } from './editor/headingStyles'
 import Toolbar from './editor/Toolbar'
 import DocMenuBar from './editor/DocMenuBar'
@@ -149,6 +150,7 @@ export default function DocEditor({
   // travel with it, so they live on the body, not in localStorage.
   const [pageView, setPageView] = useState<boolean>(() => readPref('fb.doc.pageView', ['0', '1'] as const, '0') === '1')
   const [showMargins, setShowMargins] = useState(false)
+  const [showHeaderFooter, setShowHeaderFooter] = useState(false)
   const [aiInstruction, setAiInstruction] = useState('')
   const [busyOffice, setBusyOffice] = useState<string | null>(null)
   const [officeMsg, setOfficeMsg] = useState<string | null>(null)
@@ -469,6 +471,25 @@ export default function DocEditor({
                     <MarginMenu margin={page.margin} onPick={(m) => updatePageSetup({ margin: m })} onClose={() => setShowMargins(false)} />
                   )}
                 </div>
+                <div className="relative">
+                  <button
+                    onClick={() => setShowHeaderFooter((v) => !v)}
+                    className="inline-flex items-center gap-1 px-2 py-1 rounded-full hover:bg-[var(--surface-sunken)]/70 fb-spring-soft"
+                    title="Header & footer"
+                    data-testid="doc-headerfooter-btn"
+                  >
+                    <Icon name="web_asset" size={13} />
+                    <span>Header/Footer</span>
+                  </button>
+                  {showHeaderFooter && (
+                    <HeaderFooterMenu
+                      header={page.header}
+                      footer={page.footer}
+                      onChange={(patch) => updatePageSetup(patch)}
+                      onClose={() => setShowHeaderFooter(false)}
+                    />
+                  )}
+                </div>
               </>
             )}
 
@@ -721,6 +742,71 @@ export default function DocEditor({
 
 // The page-margins menu: the named presets Word offers plus a custom editor for
 // the four sides (in inches). Picking a preset or editing a side updates the
+// Header & footer editor popover. Writes header/footer straight onto the page
+// setup, so the running header/footer on every sheet and the .docx export follow.
+function HeaderFooterMenu({
+  header,
+  footer,
+  onChange,
+  onClose
+}: {
+  header?: PageHeaderFooter
+  footer?: PageHeaderFooter
+  onChange: (patch: Partial<PageSetup>) => void
+  onClose: () => void
+}): JSX.Element {
+  const inputCls =
+    'w-full bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded px-2 py-1 text-[12px] focus:outline-none focus:border-accent'
+  return (
+    <>
+      <div className="fixed inset-0 z-30" onClick={onClose} />
+      <div
+        className="absolute left-0 mt-1.5 z-40 w-64 rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-lg p-2.5 text-[var(--ink-70)] space-y-2.5"
+        data-testid="doc-headerfooter-menu"
+      >
+        <div>
+          <p className="text-[10px] uppercase tracking-[0.1em] text-[var(--ink-40)] mb-1">Header</p>
+          <input
+            className={inputCls}
+            data-testid="doc-header-input"
+            placeholder="Header text"
+            value={header?.text ?? ''}
+            onChange={(e) => onChange({ header: { ...header, text: e.target.value } })}
+          />
+          <label className="flex items-center gap-1.5 mt-1 text-[11px] cursor-pointer">
+            <input
+              type="checkbox"
+              data-testid="doc-header-pageno"
+              checked={!!header?.showPageNumber}
+              onChange={(e) => onChange({ header: { ...header, showPageNumber: e.target.checked } })}
+            />
+            Show page number
+          </label>
+        </div>
+        <div className="pt-1.5 border-t border-[var(--edge-soft)]">
+          <p className="text-[10px] uppercase tracking-[0.1em] text-[var(--ink-40)] mb-1">Footer</p>
+          <input
+            className={inputCls}
+            data-testid="doc-footer-input"
+            placeholder="Footer text"
+            value={footer?.text ?? ''}
+            onChange={(e) => onChange({ footer: { ...footer, text: e.target.value } })}
+          />
+          <label className="flex items-center gap-1.5 mt-1 text-[11px] cursor-pointer">
+            <input
+              type="checkbox"
+              data-testid="doc-footer-pageno"
+              checked={!!footer?.showPageNumber}
+              onChange={(e) => onChange({ footer: { ...footer, showPageNumber: e.target.checked } })}
+            />
+            Show page number
+          </label>
+        </div>
+      </div>
+    </>
+  )
+}
+
 // document's page setup, so the sheet and the exports follow immediately.
 function MarginMenu({
   margin,
@@ -845,6 +931,44 @@ function PageSheet({ editor, page }: { editor: Editor; page: PageSetup }): JSX.E
               Page {i + 2}
             </span>
           ))}
+          {/* Running header + footer in the top/bottom margin of every page. */}
+          {(page.header?.text || page.header?.showPageNumber || page.footer?.text || page.footer?.showPageNumber) &&
+            Array.from({ length: pageCount }).map((_, i) => (
+              <div key={`hf-${i}`} data-testid={`doc-hf-${i}`}>
+                {(page.header?.text || page.header?.showPageNumber) && (
+                  <div
+                    data-testid="doc-header"
+                    className="absolute flex items-center text-[var(--ink-50)]"
+                    style={{
+                      top: i * stride + Math.max(6, geom.mTop / 2 - 7),
+                      left: geom.mLeft,
+                      width: geom.w - geom.mLeft - geom.mRight,
+                      height: 14,
+                      fontSize: 11
+                    }}
+                  >
+                    <span className="flex-1 text-center truncate">{page.header?.text ?? ''}</span>
+                    {page.header?.showPageNumber && <span className="fb-tabular pl-2">Page {i + 1}</span>}
+                  </div>
+                )}
+                {(page.footer?.text || page.footer?.showPageNumber) && (
+                  <div
+                    data-testid="doc-footer"
+                    className="absolute flex items-center text-[var(--ink-50)]"
+                    style={{
+                      top: i * stride + geom.h - Math.max(20, geom.mBottom / 2 + 7),
+                      left: geom.mLeft,
+                      width: geom.w - geom.mLeft - geom.mRight,
+                      height: 14,
+                      fontSize: 11
+                    }}
+                  >
+                    <span className="flex-1 text-center truncate">{page.footer?.text ?? ''}</span>
+                    {page.footer?.showPageNumber && <span className="fb-tabular pl-2">Page {i + 1}</span>}
+                  </div>
+                )}
+              </div>
+            ))}
         </div>
 
         {/* The flowing content sits on top of the sheets; the plugin's spacers
