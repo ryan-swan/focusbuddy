@@ -40,6 +40,7 @@ import DesignAiPanel from './DesignAiPanel'
 import DesignMenuBar from './editor/DesignMenuBar'
 import { useAccountStore } from '../../stores/account'
 import WidgetPickerDialog from './embed/WidgetPickerDialog'
+import { checkDesignA11y } from '../../lib/designA11y'
 
 // PlexiDesign — the on-platform design studio. A design is a single arbitrary-size
 // canvas of the same elements a slide uses, so this editor reuses the proven slide
@@ -717,6 +718,19 @@ export default function DesignEditor({ content, title, onChange, foldExternal = 
                 >
                   Print PDF (crop marks)
                 </button>
+                <div className="my-1 border-t border-[var(--edge-soft)]" />
+                <button
+                  onClick={() => {
+                    setExportOpen(false)
+                    const issues = checkDesignA11y(design)
+                    setStatus(issues.length ? `Accessibility: ${issues[0].message}` : 'Accessibility: no issues found.')
+                  }}
+                  data-testid="design-a11y-check"
+                  className="w-full text-left px-2.5 py-1.5 rounded-md text-[12px] hover:bg-[var(--surface-sunken)]"
+                  title="Check the design for accessibility issues"
+                >
+                  Check accessibility
+                </button>
               </div>
             </>
           )}
@@ -884,6 +898,17 @@ export default function DesignEditor({ content, title, onChange, foldExternal = 
                   value={selected.fill?.color ?? '#000000'}
                   onChange={(c) => mutate((s) => updateElement(s, selected.id, { fill: { type: 'solid', color: c } }))}
                   testid="design-fill-color"
+                />
+              </Field>
+            )}
+            {selected.type === 'image' && (
+              <Field label="Alt text">
+                <input
+                  value={selected.alt ?? ''}
+                  data-testid="design-alt"
+                  placeholder="Describe the image"
+                  onChange={(e) => mutate((s) => updateElement(s, selected.id, { alt: e.target.value }))}
+                  className="w-full rounded border border-[var(--edge-firm)] bg-transparent px-1.5 py-1"
                 />
               </Field>
             )}
