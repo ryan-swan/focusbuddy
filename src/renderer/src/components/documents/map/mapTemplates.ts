@@ -67,12 +67,16 @@ export function mapTemplate(id: MapTemplateId): MapBody {
       return {
         version: 1,
         nodes: [
-          { id: 's1', x: 220, y: 20, label: 'Request', shape: 'terminator', color: '#2563eb' },
-          { id: 's2', x: 215, y: 130, label: 'Submit form', shape: 'data', color: '#2563eb' },
-          { id: 's3', x: 205, y: 240, label: 'Approved?', shape: 'decision', color: '#d97706' },
-          { id: 's4', x: 40, y: 380, label: 'Send back', shape: 'process', color: '#dc2626' },
-          { id: 's5', x: 380, y: 380, label: 'Record', shape: 'database', color: '#16a34a' },
-          { id: 's6', x: 390, y: 490, label: 'Done', shape: 'terminator', color: '#2563eb' }
+          // Three horizontal lanes, one per role, with the steps flowing across.
+          { id: 'lane1', x: 0, y: 0, width: 780, height: 150, label: 'Requester', shape: 'lane', color: '#2563eb' },
+          { id: 'lane2', x: 0, y: 160, width: 780, height: 150, label: 'Approver', shape: 'lane', color: '#d97706' },
+          { id: 'lane3', x: 0, y: 320, width: 780, height: 150, label: 'System', shape: 'lane', color: '#16a34a' },
+          { id: 's1', x: 60, y: 52, label: 'Request', shape: 'terminator', color: '#2563eb' },
+          { id: 's2', x: 220, y: 50, label: 'Submit form', shape: 'data', color: '#2563eb' },
+          { id: 's4', x: 430, y: 52, label: 'Send back', shape: 'process', color: '#dc2626' },
+          { id: 's3', x: 250, y: 208, label: 'Approved?', shape: 'decision', color: '#d97706' },
+          { id: 's5', x: 430, y: 372, label: 'Record', shape: 'database', color: '#16a34a' },
+          { id: 's6', x: 620, y: 378, label: 'Done', shape: 'terminator', color: '#16a34a' }
         ],
         edges: [
           { id: 'se1', source: 's1', target: 's2', style: 'solid' },

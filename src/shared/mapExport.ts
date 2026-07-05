@@ -25,6 +25,8 @@ function nodeSize(n: MapNode): { w: number; h: number } {
       return { w: 132, h: 48 }
     case 'note':
       return { w: 120, h: 48 }
+    case 'lane':
+      return { w: 680, h: 200 }
     default:
       return { w: 130, h: 48 }
   }
@@ -106,6 +108,14 @@ function shapeSvg(n: MapNode): string {
     case 'note':
       body = `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="6" ry="6" fill="#fff" stroke="${stroke}" stroke-width="2" stroke-dasharray="4 3" />`
       break
+    case 'lane': {
+      const band = 26
+      body =
+        `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="6" ry="6" fill="${fill}" fill-opacity="0.05" stroke="${stroke}" stroke-opacity="0.4" stroke-width="2" />` +
+        `<rect x="${x}" y="${y}" width="${band}" height="${h}" fill="${fill}" fill-opacity="0.15" />` +
+        `<text x="${x + band / 2}" y="${cy}" font-family="Inter, system-ui, sans-serif" font-size="12" font-weight="600" fill="${ink}" text-anchor="middle" transform="rotate(-90 ${x + band / 2} ${cy})">${esc(n.label || '')}</text>`
+      break
+    }
     case 'widget':
       body =
         `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="10" ry="10" fill="#fff" stroke="${stroke}" stroke-width="2" />` +
@@ -115,7 +125,7 @@ function shapeSvg(n: MapNode): string {
     default: // process
       body = `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="8" ry="8" ${common} />`
   }
-  const label = n.shape === 'widget' ? '' : centeredText(cx, cy, wrapLabel(n.label || '', w - 12), ink)
+  const label = n.shape === 'widget' || n.shape === 'lane' ? '' : centeredText(cx, cy, wrapLabel(n.label || '', w - 12), ink)
   return body + label
 }
 
@@ -191,7 +201,9 @@ export function mapToSvg(body: MapBody, opts: { padding?: number; background?: s
 
   // Edges first so nodes paint on top of connector ends.
   const edgeLayer = edges.map((e) => edgeSvg(e, boxes)).join('')
-  const nodeLayer = nodes.map((n) => shapeSvg(n)).join('')
+  // Lanes are containers, so paint them first (behind the other shapes).
+  const ordered = nodes.slice().sort((a, b) => (a.shape === 'lane' ? 0 : 1) - (b.shape === 'lane' ? 0 : 1))
+  const nodeLayer = ordered.map((n) => shapeSvg(n)).join('')
 
   const svg =
     `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">` +

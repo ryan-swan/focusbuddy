@@ -12,6 +12,8 @@ export const MAP_SHAPES: MapShape[] = [
   'database',
   'circle',
   'note',
+  // A swimlane / container band; groups the shapes placed on top of it.
+  'lane',
   // A live desk-widget embed; carries widgetId on the node. Inserted from the
   // editor's Insert menu, never proposed by the AI generator.
   'widget'
