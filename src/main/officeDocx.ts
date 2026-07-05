@@ -36,6 +36,8 @@ export interface PageSetupInput {
   size: 'letter' | 'a4'
   orientation: 'portrait' | 'landscape'
   margin: { top: number; right: number; bottom: number; left: number }
+  header?: { text?: string; showPageNumber?: boolean }
+  footer?: { text?: string; showPageNumber?: boolean }
 }
 
 const DEFAULT_PAGE: PageSetupInput = { size: 'letter', orientation: 'portrait', margin: { top: 1, right: 1, bottom: 1, left: 1 } }
@@ -96,22 +98,40 @@ export async function exportDocx(input: { html: string; title: string; page?: Pa
     // reads like a real Word file rather than browser default.
     const styledHtml = `<style>table,th,td{border:1px solid #999;border-collapse:collapse;padding:4px}</style>${input.html}`
     const fullHtml = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${safe}</title></head><body>${styledHtml}</body></html>`
-    const fileBuffer = (await HTMLtoDOCX(fullHtml, undefined, {
-      title: safe,
-      font: 'Calibri',
-      fontSize: 22, // half-points = 11pt
-      orientation: page.orientation,
-      pageSize: landscape ? { width: paper.height, height: paper.width } : paper,
-      margins: {
-        top: inch(page.margin.top),
-        right: inch(page.margin.right),
-        bottom: inch(page.margin.bottom),
-        left: inch(page.margin.left)
+    // Running header / footer text from the document's page setup. turbodocx takes
+    // the header HTML as the 2nd arg and the footer HTML as the 4th; pageNumber
+    // renders in the footer. Legacy docs (no footer config) keep the page number
+    // they've always had; a configured doc honours its showPageNumber toggle.
+    const esc = (s: string): string => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    const hfHtml = (t?: string): string | undefined =>
+      t && t.trim() ? `<p style="text-align:center;font-size:9pt;color:#666">${esc(t.trim())}</p>` : undefined
+    const headerHtml = hfHtml(page.header?.text)
+    const footerHtml = hfHtml(page.footer?.text)
+    const wantPageNumber = page.footer === undefined ? true : !!page.footer.showPageNumber || !!page.header?.showPageNumber
+    const wantFooter = wantPageNumber || !!footerHtml
+    const wantHeader = !!headerHtml
+    const fileBuffer = (await HTMLtoDOCX(
+      fullHtml,
+      headerHtml,
+      {
+        title: safe,
+        font: 'Calibri',
+        fontSize: 22, // half-points = 11pt
+        orientation: page.orientation,
+        pageSize: landscape ? { width: paper.height, height: paper.width } : paper,
+        margins: {
+          top: inch(page.margin.top),
+          right: inch(page.margin.right),
+          bottom: inch(page.margin.bottom),
+          left: inch(page.margin.left)
+        },
+        table: { row: { cantSplit: true } },
+        header: wantHeader,
+        footer: wantFooter,
+        pageNumber: wantPageNumber
       },
-      table: { row: { cantSplit: true } },
-      footer: true,
-      pageNumber: true
-    })) as Buffer | ArrayBuffer
+      footerHtml
+    )) as Buffer | ArrayBuffer
     const buf = Buffer.isBuffer(fileBuffer) ? fileBuffer : Buffer.from(fileBuffer as ArrayBuffer)
     await writeFile(res.filePath, buf)
     return { ok: true, path: res.filePath }

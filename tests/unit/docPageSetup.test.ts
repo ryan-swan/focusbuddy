@@ -56,3 +56,35 @@ describe('doc page setup', () => {
     expect(MARGIN_PRESETS.find((p) => p.id === 'normal')!.margin).toEqual({ top: 1, right: 1, bottom: 1, left: 1 })
   })
 })
+
+describe('doc header/footer', () => {
+  it('round-trips a header and footer with page numbers', () => {
+    const page: PageSetup = {
+      ...DEFAULT_PAGE_SETUP,
+      margin: { ...DEFAULT_PAGE_SETUP.margin },
+      header: { text: 'Confidential', showPageNumber: false },
+      footer: { text: 'Acme Corp', showPageNumber: true }
+    }
+    const wrapped = wrapDocBody({ type: 'doc', content: [] }, {}, page)
+    const parsed = parseDocBody(wrapped)
+    expect(parsed.page.header).toEqual({ text: 'Confidential' })
+    expect(parsed.page.footer).toEqual({ text: 'Acme Corp', showPageNumber: true })
+  })
+
+  it('an empty header/footer is not persisted', () => {
+    const page: PageSetup = {
+      ...DEFAULT_PAGE_SETUP,
+      margin: { ...DEFAULT_PAGE_SETUP.margin },
+      header: { text: '', showPageNumber: false }
+    }
+    const parsed = parseDocBody(wrapDocBody({ type: 'doc', content: [] }, {}, page))
+    expect(parsed.page.header).toBeUndefined()
+    expect(parsed.page.footer).toBeUndefined()
+  })
+
+  it('a legacy body has no header/footer', () => {
+    const parsed = parseDocBody({ type: 'doc', content: [] })
+    expect(parsed.page.header).toBeUndefined()
+    expect(parsed.page.footer).toBeUndefined()
+  })
+})
