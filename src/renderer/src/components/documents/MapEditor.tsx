@@ -27,6 +27,7 @@ import { mapTemplate, type MapTemplateId } from './map/mapTemplates'
 import Icon from '../Icon'
 import DrawMenuBar from './editor/DrawMenuBar'
 import { alignBoxes, distributeBoxes, type AlignEdge } from './map/mapAlign'
+import { polygonClipPath } from '@shared/mapExport'
 import WidgetEmbed from './embed/WidgetEmbed'
 import WidgetPickerDialog from './embed/WidgetPickerDialog'
 
@@ -45,6 +46,9 @@ const SHAPE_TOOLS: { shape: MapShape; icon: string; label: string }[] = [
   { shape: 'data', icon: 'note', label: 'Data' },
   { shape: 'database', icon: 'database', label: 'Store' },
   { shape: 'circle', icon: 'circle', label: 'Connector' },
+  { shape: 'hexagon', icon: 'hexagon', label: 'Prep' },
+  { shape: 'trapezoid', icon: 'signal_cellular_null', label: 'Manual' },
+  { shape: 'chevron', icon: 'chevron_right', label: 'Stage' },
   { shape: 'note', icon: 'title', label: 'Text' },
   { shape: 'lane', icon: 'view_column', label: 'Lane' }
 ]
@@ -75,6 +79,12 @@ function defaultShapeSize(shape: MapShape): { w: number; h: number } {
       return { w: 104, h: 64 }
     case 'circle':
       return { w: 86, h: 86 }
+    case 'hexagon':
+      return { w: 130, h: 70 }
+    case 'trapezoid':
+      return { w: 140, h: 60 }
+    case 'chevron':
+      return { w: 150, h: 52 }
     case 'lane':
       return { w: 680, h: 200 }
     case 'note':
@@ -172,6 +182,17 @@ function ShapeNode({ id, data, selected }: NodeProps): JSX.Element {
       <div
         className={`${baseText} rounded-full ${ring}`}
         style={box({ background: `${d.color}1f`, border: `2px solid ${d.color}` })}
+        onDoubleClick={() => setEditing(true)}
+      >
+        {label}
+      </div>
+    )
+  } else if (polygonClipPath(d.shape)) {
+    // Polygon stencil shapes (hexagon / trapezoid / chevron) share one outline.
+    inner = (
+      <div
+        className={`${baseText} ${ring}`}
+        style={box({ background: `${d.color}1f`, border: `2px solid ${d.color}`, clipPath: polygonClipPath(d.shape)! })}
         onDoubleClick={() => setEditing(true)}
       >
         {label}

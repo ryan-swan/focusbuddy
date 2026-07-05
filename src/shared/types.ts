@@ -1720,6 +1720,9 @@ export type MapShape =
   | 'database' // cylinder — a store
   | 'circle' // connector / state
   | 'note' // free text label
+  | 'hexagon' // preparation / predefined step
+  | 'trapezoid' // manual operation
+  | 'chevron' // process-flow arrow / stage
   | 'lane' // swimlane / container band that groups shapes placed on top of it
   | 'widget' // live embed of a desk widget (widgetId on the node)
 

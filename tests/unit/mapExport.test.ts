@@ -102,3 +102,23 @@ describe('mapToSvg — lanes (swimlane containers)', () => {
     expect(svg.indexOf('Requester')).toBeLessThan(svg.indexOf('>Step<'))
   })
 })
+
+import { polygonClipPath } from '../../src/shared/mapExport'
+
+describe('polygon stencil shapes', () => {
+  it('polygonClipPath returns a CSS polygon for stencil shapes, null otherwise', () => {
+    expect(polygonClipPath('hexagon')).toContain('polygon(')
+    expect(polygonClipPath('trapezoid')).toContain('polygon(')
+    expect(polygonClipPath('chevron')).toContain('polygon(')
+    expect(polygonClipPath('process')).toBeNull()
+    expect(polygonClipPath('circle')).toBeNull()
+  })
+
+  it('mapToSvg renders stencil shapes as polygons with their label', () => {
+    for (const shape of ['hexagon', 'trapezoid', 'chevron'] as const) {
+      const { svg } = mapToSvg(body({ nodes: [{ id: 'n', x: 0, y: 0, label: 'Step', shape, color: '#2563eb' }] }))
+      expect(svg, `${shape} should render a polygon`).toContain('<polygon')
+      expect(svg).toContain('>Step<')
+    }
+  })
+})

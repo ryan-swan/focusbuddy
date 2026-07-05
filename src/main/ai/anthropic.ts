@@ -2012,6 +2012,9 @@ export async function generateDocument(input: {
         database: '#16a34a',
         circle: '#7c3aed',
         note: '#475569',
+        hexagon: '#0891b2',
+        trapezoid: '#d97706',
+        chevron: '#2563eb',
         // Not offered to the AI (the prompt enumerates its own shapes); listed
         // only to keep this record total over MapShape.
         lane: '#2563eb',

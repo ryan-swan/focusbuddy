@@ -12,6 +12,10 @@ export const MAP_SHAPES: MapShape[] = [
   'database',
   'circle',
   'note',
+  // Extra stencil shapes (polygon outlines).
+  'hexagon',
+  'trapezoid',
+  'chevron',
   // A swimlane / container band; groups the shapes placed on top of it.
   'lane',
   // A live desk-widget embed; carries widgetId on the node. Inserted from the
