@@ -107,18 +107,28 @@ import { polygonClipPath } from '../../src/shared/mapExport'
 
 describe('polygon stencil shapes', () => {
   it('polygonClipPath returns a CSS polygon for stencil shapes, null otherwise', () => {
-    expect(polygonClipPath('hexagon')).toContain('polygon(')
-    expect(polygonClipPath('trapezoid')).toContain('polygon(')
-    expect(polygonClipPath('chevron')).toContain('polygon(')
+    for (const shape of ['hexagon', 'trapezoid', 'chevron', 'triangle', 'pentagon', 'star', 'cross', 'arrow', 'callout'] as const) {
+      expect(polygonClipPath(shape), `${shape} clip-path`).toContain('polygon(')
+    }
     expect(polygonClipPath('process')).toBeNull()
     expect(polygonClipPath('circle')).toBeNull()
   })
 
-  it('mapToSvg renders stencil shapes as polygons with their label', () => {
-    for (const shape of ['hexagon', 'trapezoid', 'chevron'] as const) {
+  it('mapToSvg renders every polygon stencil shape as a polygon with its label', () => {
+    for (const shape of ['hexagon', 'trapezoid', 'chevron', 'triangle', 'pentagon', 'star', 'cross', 'arrow', 'callout'] as const) {
       const { svg } = mapToSvg(body({ nodes: [{ id: 'n', x: 0, y: 0, label: 'Step', shape, color: '#2563eb' }] }))
       expect(svg, `${shape} should render a polygon`).toContain('<polygon')
       expect(svg).toContain('>Step<')
     }
+  })
+
+  it('the editor clip-path and the SVG export draw the same star outline', () => {
+    // Both consume the same POLYGON_POINTS entry, so the star has its 10 vertices
+    // in each. The CSS clip-path lists them as percentages.
+    const clip = polygonClipPath('star')!
+    expect(clip.split(',').length).toBe(10)
+    const { svg } = mapToSvg(body({ nodes: [{ id: 'n', x: 0, y: 0, label: '', shape: 'star', color: '#111' }] }))
+    const points = svg.match(/points="([^"]+)"/)![1].trim().split(/\s+/)
+    expect(points.length).toBe(10)
   })
 })

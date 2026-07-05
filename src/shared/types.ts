@@ -1734,6 +1734,12 @@ export type MapShape =
   | 'hexagon' // preparation / predefined step
   | 'trapezoid' // manual operation
   | 'chevron' // process-flow arrow / stage
+  | 'triangle' // basic triangle
+  | 'pentagon' // basic pentagon
+  | 'star' // highlight / callout marker
+  | 'cross' // junction / plus
+  | 'arrow' // right block arrow
+  | 'callout' // speech / annotation bubble
   | 'lane' // swimlane / container band that groups shapes placed on top of it
   | 'widget' // live embed of a desk widget (widgetId on the node)
 

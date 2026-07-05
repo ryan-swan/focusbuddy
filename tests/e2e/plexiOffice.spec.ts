@@ -82,6 +82,31 @@ test('PO-4 — create a PlexiMap: the diagram editor opens with a starter node a
   })
 })
 
+test('PO-4b — the stencil library is categorized; switching category reveals its shapes', async () => {
+  launched = await launchApp({ env: { PLEXI_APP: 'office' } })
+  const { window } = launched
+
+  await window.locator('[data-testid="office-new-map"]').click()
+  await expect(window.locator('[data-testid="map-add-process"]')).toBeVisible({ timeout: 10_000 })
+
+  // Flowchart is the default category, so its "process" shape is present and the
+  // basic-shapes-only "star" is not yet in the palette.
+  await expect(window.locator('[data-testid="map-add-star"]')).toHaveCount(0)
+
+  // Switch to the Basic shapes category — its stencils appear.
+  await window.locator('[data-testid="map-stencil-cat-basic-shapes"]').click()
+  await expect(window.locator('[data-testid="map-add-star"]')).toBeVisible({ timeout: 4_000 })
+  await expect(window.locator('[data-testid="map-add-triangle"]')).toBeVisible()
+
+  // Adding a star drops it on the canvas (starter node + star = 2).
+  await window.locator('[data-testid="map-add-star"]').click()
+  await expect(window.locator('.react-flow__node')).toHaveCount(2, { timeout: 5_000 })
+
+  // The Arrows category exposes the block arrow.
+  await window.locator('[data-testid="map-stencil-cat-arrows"]').click()
+  await expect(window.locator('[data-testid="map-add-arrow"]')).toBeVisible({ timeout: 4_000 })
+})
+
 test('PO-3 — the sidebar offers a sign-in surface so documents can sync with PlexiDesk', async () => {
   launched = await launchApp({ env: { PLEXI_APP: 'office' } })
   const { window } = launched
