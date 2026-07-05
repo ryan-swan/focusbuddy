@@ -36,6 +36,18 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.5.156',
+    date: '2026-07-05T10:00:00Z',
+    title: 'v2.5.156 — signing in to sites in the browser works again',
+    tag: 'fix',
+    summary:
+      'Logging in to Google, Microsoft and other sites inside a browser widget was resetting back to the original page, and app menus, pop-ups and modals were not appearing. Two causes are fixed. The browser now allows pop-ups from the moment a page loads, so sign-in windows and menus that open a new tab actually appear, and a sign-in pop-up is no longer closed the instant the page behind it redirects, so the login can finish instead of bouncing you back to the start.',
+    highlights: [
+      'Sign-in pop-ups and site menus (Google, Microsoft 365) now open instead of silently doing nothing.',
+      'Logging in no longer resets the browser back to the original page mid-sign-in.'
+    ]
+  },
+  {
     version: '2.5.155',
     date: '2026-07-03T13:00:00Z',
     title: 'v2.5.155 — search and recents respect your organisation too',

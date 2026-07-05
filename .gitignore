@@ -45,3 +45,4 @@ tests/e2e/captureMarketingShots.spec.ts
 # Stray Windows release-artifact download dirs (installers exceed GitHub 100MB)
 win-artifact/
 win[0-9]*/
+release-preview/
