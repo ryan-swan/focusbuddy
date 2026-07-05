@@ -7,6 +7,7 @@ import { useViewStore } from '../../../stores/view'
 import { launchMeeting } from '../../../lib/startMeeting'
 import type { FbDocument } from '@shared/types'
 import Icon from '../../Icon'
+import { checkDocA11y } from '../../../lib/docA11y'
 
 // A Google-Docs-style menu bar for the document editor: File / Edit / View /
 // Insert / Format / Tools / Help, each a dropdown of real actions. Every item is
@@ -65,6 +66,7 @@ export default function DocMenuBar({
 
   const [openMenu, setOpenMenu] = useState<string | null>(null)
   const [wordCountOpen, setWordCountOpen] = useState(false)
+  const [a11yOpen, setA11yOpen] = useState(false)
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
   const barRef = useRef<HTMLDivElement>(null)
 
@@ -272,7 +274,8 @@ export default function DocMenuBar({
       id: 'tools',
       label: 'Tools',
       build: () => [
-        { kind: 'item', label: 'Word count', shortcut: '⌘⇧C', icon: 'tag', run: () => setWordCountOpen(true) }
+        { kind: 'item', label: 'Word count', shortcut: '⌘⇧C', icon: 'tag', run: () => setWordCountOpen(true) },
+        { kind: 'item', label: 'Check accessibility', icon: 'accessibility_new', run: () => setA11yOpen(true) }
       ]
     },
     {
@@ -310,6 +313,7 @@ export default function DocMenuBar({
       ))}
 
       {wordCountOpen && <WordCountModal editor={editor} onClose={() => setWordCountOpen(false)} />}
+      {a11yOpen && <A11yModal editor={editor} onClose={() => setA11yOpen(false)} />}
       {shortcutsOpen && <ShortcutsModal onClose={() => setShortcutsOpen(false)} />}
     </div>
   )
@@ -416,6 +420,33 @@ function WordCountModal({ editor, onClose }: { editor: Editor; onClose: () => vo
           </div>
         ))}
       </div>
+    </Modal>
+  )
+}
+
+function A11yModal({ editor, onClose }: { editor: Editor; onClose: () => void }): JSX.Element {
+  const issues = checkDocA11y(editor.getJSON())
+  return (
+    <Modal title="Accessibility check" onClose={onClose}>
+      {issues.length === 0 ? (
+        <div className="flex items-center gap-2 text-[13px] text-emerald-600" data-testid="doc-a11y-clean">
+          <Icon name="check_circle" size={16} />
+          <span>No accessibility issues found.</span>
+        </div>
+      ) : (
+        <div className="space-y-2" data-testid="doc-a11y-issues">
+          {issues.map((it, i) => (
+            <div key={i} className="flex items-start gap-2 text-[12px]" data-testid="doc-a11y-issue">
+              <Icon
+                name={it.severity === 'error' ? 'error' : 'warning'}
+                size={15}
+                className={it.severity === 'error' ? 'text-rose-500 shrink-0 mt-0.5' : 'text-amber-500 shrink-0 mt-0.5'}
+              />
+              <span className="text-[var(--ink-70)]">{it.message}</span>
+            </div>
+          ))}
+        </div>
+      )}
     </Modal>
   )
 }
