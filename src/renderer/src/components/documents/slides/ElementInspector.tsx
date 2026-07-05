@@ -247,6 +247,13 @@ export default function ElementInspector(props: Props): JSX.Element {
       {el.type === 'image' && (
         <div className="space-y-1.5">
           <div className={labelCls}>Image</div>
+          <input
+            className={inputCls}
+            data-testid="element-alt"
+            placeholder="Alt text (for accessibility)"
+            value={el.alt ?? ''}
+            onChange={(e) => props.onUpdateElement(el.id, { alt: e.target.value })}
+          />
           <select
             className={inputCls}
             value={el.fit ?? 'contain'}

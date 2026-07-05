@@ -23,6 +23,7 @@ export interface SlidesMenuActions {
   canUndo: boolean
   canRedo: boolean
   present: () => void
+  checkA11y: () => void
   newSlide: () => void
   deleteSlide: () => void
   moveSlideUp: () => void
@@ -120,7 +121,10 @@ export default function SlidesMenuBar({ actions }: { actions: SlidesMenuActions 
     {
       id: 'view',
       label: 'View',
-      build: () => [{ kind: 'item', label: 'Present', shortcut: '▶', icon: 'play_arrow', run: a.present }]
+      build: () => [
+        { kind: 'item', label: 'Present', shortcut: '▶', icon: 'play_arrow', run: a.present },
+        { kind: 'item', label: 'Check accessibility', icon: 'accessibility_new', run: a.checkA11y }
+      ]
     },
     {
       id: 'insert',

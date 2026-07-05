@@ -1604,6 +1604,8 @@ export interface SlideTextElement extends SlideElementBase {
 export interface SlideImageElement extends SlideElementBase {
   type: 'image'
   src: string // data: URI or file path
+  // Alternative text for screen readers / accessibility checks. Absent = none.
+  alt?: string
   fit?: 'contain' | 'cover' | 'fill'
   // Optional frame around the image (in addition to the shared cornerRadius +
   // shadow on the base).
