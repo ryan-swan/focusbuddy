@@ -4,7 +4,42 @@
 // export format: it is written directly for .svg, and rasterised / printed for
 // PNG / JPG / PDF. No fabrication: an empty map exports an honest empty canvas.
 
-import type { MapBody, MapNode, MapEdge } from './types'
+import type { MapBody, MapNode, MapEdge, MapShape } from './types'
+
+// Shared fractional (0..1) polygon outlines for the polygon-based stencil shapes,
+// so the editor (as a CSS clip-path) and the export (as SVG points) draw exactly
+// the same outline from one definition.
+export const POLYGON_POINTS: Partial<Record<MapShape, [number, number][]>> = {
+  hexagon: [
+    [0.25, 0],
+    [0.75, 0],
+    [1, 0.5],
+    [0.75, 1],
+    [0.25, 1],
+    [0, 0.5]
+  ],
+  trapezoid: [
+    [0.2, 0],
+    [0.8, 0],
+    [1, 1],
+    [0, 1]
+  ],
+  chevron: [
+    [0, 0],
+    [0.75, 0],
+    [1, 0.5],
+    [0.75, 1],
+    [0, 1],
+    [0.25, 0.5]
+  ]
+}
+
+// CSS clip-path polygon() string for a polygon stencil shape (used by the editor).
+export function polygonClipPath(shape: MapShape): string | null {
+  const pts = POLYGON_POINTS[shape]
+  if (!pts) return null
+  return `polygon(${pts.map(([px, py]) => `${px * 100}% ${py * 100}%`).join(', ')})`
+}
 
 // Default on-screen sizes per shape, matching the editor's node components so an
 // export looks like what the user drew. A node's own width/height wins when set.
@@ -25,6 +60,12 @@ function nodeSize(n: MapNode): { w: number; h: number } {
       return { w: 132, h: 48 }
     case 'note':
       return { w: 120, h: 48 }
+    case 'hexagon':
+      return { w: 130, h: 70 }
+    case 'trapezoid':
+      return { w: 140, h: 60 }
+    case 'chevron':
+      return { w: 150, h: 52 }
     case 'lane':
       return { w: 680, h: 200 }
     default:
@@ -85,6 +126,13 @@ function shapeSvg(n: MapNode): string {
   const common = `fill="${fill}" fill-opacity="0.12" stroke="${stroke}" stroke-width="2"`
   const ink = '#1c1917'
   let body = ''
+  // Polygon stencil shapes share one outline definition (hexagon/trapezoid/chevron).
+  const poly = POLYGON_POINTS[n.shape]
+  if (poly) {
+    const pts = poly.map(([px, py]) => `${(x + px * w).toFixed(1)},${(y + py * h).toFixed(1)}`).join(' ')
+    const label = centeredText(cx, cy, wrapLabel(n.label || '', w - 12), ink)
+    return `<polygon points="${pts}" ${common} />${label}`
+  }
   switch (n.shape) {
     case 'decision':
       body = `<polygon points="${cx},${y} ${x + w},${cy} ${cx},${y + h} ${x},${cy}" ${common} />`
