@@ -36,18 +36,18 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '3.0.0-preview.0',
-    date: '2026-07-03T14:00:00Z',
-    title: 'v3.0 preview — the review fixes, side by side with your current install',
+    version: '3.0.0',
+    date: '2026-07-05T11:00:00Z',
+    title: 'PlexiDesk 3.0 — a full office suite on your canvas',
     tag: 'feature',
     summary:
-      'A test build of the Plexi 3.0 branch that runs alongside your existing PlexiDesk with completely separate data. Deleting a document now moves it to a real Trash you can restore from, every rename and insert-link menu that silently did nothing now opens a proper dialog, documents keep automatic version history you can roll back to, search also finds calendar blocks, meetings and signature requests, the command palette can create everything, and a keyboard shortcut reference lives on Cmd+/.',
+      'The big one. PlexiOffice grows into a real Microsoft-Office alternative: Sheets gains LET and LAMBDA with MAP, REDUCE, SCAN and MAKEARRAY, area and scatter charts, a refreshable Power-Query-style data shaper and a macro runner; Slides gains charts sourced from live sheet data, native tables, element entrance animations and slide transitions including Morph; Draw can finally export to SVG, PNG, JPG and PDF and auto-arrange a diagram; and one chart engine is shared across Sheets and Slides. The assistant can now read a browser page, document or PDF open on your canvas and turn it into calendar events you approve. Browser widgets fix signing in to sites — menus, pop-ups and modals appear, and a sign-in no longer resets to the original page. Plus the 3.0 groundwork: restorable document Trash, version history everywhere, a keyboard-shortcuts reference on Cmd+/, and search across calendar blocks, meetings and signature requests.',
     highlights: [
-      'Documents move to a restorable Trash instead of being deleted outright, with undo.',
-      'Version history for documents, sheets, slides, drawings and designs, with safe restore.',
-      'Search also finds calendar blocks, meetings and signature requests.',
-      'Cmd+/ opens a keyboard shortcuts reference; the palette can create every item type.',
-      'Simpler settings and onboarding; the AI key step is clearly optional.'
+      'Sheets: LET + LAMBDA (MAP/REDUCE/SCAN/MAKEARRAY), area & scatter charts, Power-Query data shaping and macros.',
+      'Slides: charts from live sheet data, native tables, entrance animations and transitions including Morph.',
+      'Draw: export to SVG / PNG / JPG / PDF and one-click auto-arrange.',
+      'Assistant creates calendar events from a browser page, doc or PDF on your canvas.',
+      'Signing in to sites in a browser widget works again — menus and pop-ups appear, no more reset to the original page.'
     ]
   },
   {
