@@ -564,12 +564,12 @@ export default function DesignEditor({ content, title, onChange, foldExternal = 
     update({ elements: els, brandApplied: true })
   }
 
-  async function exportAs(format: 'png' | 'pdf'): Promise<void> {
+  async function exportAs(format: 'png' | 'pdf', printMarks = false): Promise<void> {
     setExportOpen(false)
-    setBusy(`Exporting ${format.toUpperCase()}…`)
+    setBusy(printMarks ? 'Exporting print PDF…' : `Exporting ${format.toUpperCase()}…`)
     setStatus(null)
     try {
-      const res = await window.api.design.export({ design, title: title || 'design', format })
+      const res = await window.api.design.export({ design, title: title || 'design', format, printMarks })
       if (res.ok) setStatus(`Saved ${res.path}`)
       else if (res.error) setStatus(res.error)
     } finally {
@@ -695,6 +695,28 @@ export default function DesignEditor({ content, title, onChange, foldExternal = 
                     {f.label}
                   </button>
                 ))}
+                <div className="my-1 border-t border-[var(--edge-soft)]" />
+                <label className="flex items-center gap-1.5 px-2.5 py-1 text-[11px] text-[var(--ink-60)]">
+                  <span className="flex-1">Bleed (px)</span>
+                  <input
+                    type="number"
+                    min={0}
+                    max={100}
+                    data-testid="design-bleed-input"
+                    value={design.bleed ?? 0}
+                    onChange={(e) => update({ bleed: Math.max(0, Math.round(Number(e.target.value) || 0)) })}
+                    onClick={(e) => e.stopPropagation()}
+                    className="w-14 bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded px-1 py-0.5 text-[11px] focus:outline-none"
+                  />
+                </label>
+                <button
+                  onClick={() => void exportAs('pdf', true)}
+                  data-testid="design-export-print"
+                  className="w-full text-left px-2.5 py-1.5 rounded-md text-[12px] hover:bg-[var(--surface-sunken)]"
+                  title="PDF with bleed + crop marks for a print shop"
+                >
+                  Print PDF (crop marks)
+                </button>
               </div>
             </>
           )}

@@ -1703,6 +1703,7 @@ const api = {
       design: import('@shared/design').DesignBody
       title: string
       format: 'png' | 'pdf'
+      printMarks?: boolean
     }): Promise<{ ok: boolean; path?: string; error?: string }> => ipcRenderer.invoke('design:export', input),
     searchPhotos: (input: {
       query: string
