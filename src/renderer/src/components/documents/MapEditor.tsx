@@ -7,6 +7,7 @@ import {
   Controls,
   MiniMap,
   Handle,
+  NodeResizer,
   Position,
   ConnectionMode,
   MarkerType,
@@ -53,6 +54,32 @@ interface ShapeData extends Record<string, unknown> {
   color: string
   // Set only for shape === 'widget': the desk widget this node embeds.
   widgetId?: string
+  // Explicit size once the user has dragged a resize handle; absent falls back to
+  // the per-shape default.
+  width?: number
+  height?: number
+}
+
+// Default on-screen size per shape, used until the user resizes.
+function defaultShapeSize(shape: MapShape): { w: number; h: number } {
+  switch (shape) {
+    case 'widget':
+      return { w: WIDGET_NODE_W, h: WIDGET_NODE_H }
+    case 'decision':
+      return { w: 130, h: 92 }
+    case 'data':
+      return { w: 132, h: 52 }
+    case 'database':
+      return { w: 104, h: 64 }
+    case 'circle':
+      return { w: 86, h: 86 }
+    case 'note':
+      return { w: 90, h: 40 }
+    case 'terminator':
+      return { w: 110, h: 46 }
+    default:
+      return { w: 120, h: 48 }
+  }
 }
 
 // The on-canvas size of a widget-embed node. Fixed rather than resizable so it
@@ -71,21 +98,27 @@ const SIDES: { id: string; position: Position }[] = [
 function ShapeNode({ id, data, selected }: NodeProps): JSX.Element {
   const d = data as ShapeData
   const [editing, setEditing] = useState(false)
+  const rf = useReactFlow()
   const ring = selected ? 'outline outline-2 outline-offset-2 outline-accent' : ''
   const label = (
     <NodeLabel nodeId={id} value={d.label} editing={editing} setEditing={setEditing} />
   )
 
+  // Size is data-driven (default until the user drags a handle), so a resize both
+  // renders live and persists into the MapNode.
+  const def = defaultShapeSize(d.shape)
+  const w = d.width ?? def.w
+  const h = d.height ?? def.h
+  const box = (extra: React.CSSProperties): React.CSSProperties => ({ width: w, height: h, ...extra })
+
   // Each shape is a positioned box; non-rectangular shapes use clip-path or SVG.
   const baseText =
-    'flex items-center justify-center text-center text-[12px] font-medium px-3 py-2 select-none text-[var(--ink-100)]'
+    'flex items-center justify-center text-center text-[12px] font-medium px-3 py-2 select-none text-[var(--ink-100)] overflow-hidden'
   let inner: JSX.Element
 
   if (d.shape === 'widget') {
-    // A live desk-widget embed. WidgetEmbed handles loading / missing states;
-    // a node saved without a widgetId renders the missing state honestly.
     inner = (
-      <div className={ring} style={{ width: WIDGET_NODE_W, height: WIDGET_NODE_H }}>
+      <div className={ring} style={box({})}>
         <WidgetEmbed widgetId={d.widgetId ?? ''} />
       </div>
     )
@@ -93,13 +126,7 @@ function ShapeNode({ id, data, selected }: NodeProps): JSX.Element {
     inner = (
       <div
         className={`${baseText} ${ring}`}
-        style={{
-          width: 130,
-          height: 92,
-          background: `${d.color}1f`,
-          border: `2px solid ${d.color}`,
-          clipPath: 'polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)'
-        }}
+        style={box({ background: `${d.color}1f`, border: `2px solid ${d.color}`, clipPath: 'polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)' })}
         onDoubleClick={() => setEditing(true)}
       >
         {label}
@@ -109,13 +136,7 @@ function ShapeNode({ id, data, selected }: NodeProps): JSX.Element {
     inner = (
       <div
         className={`${baseText} ${ring}`}
-        style={{
-          minWidth: 120,
-          minHeight: 52,
-          background: `${d.color}1f`,
-          border: `2px solid ${d.color}`,
-          clipPath: 'polygon(16% 0, 100% 0, 84% 100%, 0% 100%)'
-        }}
+        style={box({ background: `${d.color}1f`, border: `2px solid ${d.color}`, clipPath: 'polygon(16% 0, 100% 0, 84% 100%, 0% 100%)' })}
         onDoubleClick={() => setEditing(true)}
       >
         {label}
@@ -125,7 +146,7 @@ function ShapeNode({ id, data, selected }: NodeProps): JSX.Element {
     inner = (
       <div
         className={`${baseText} rounded-full ${ring}`}
-        style={{ minWidth: 110, minHeight: 46, background: `${d.color}1f`, border: `2px solid ${d.color}` }}
+        style={box({ background: `${d.color}1f`, border: `2px solid ${d.color}` })}
         onDoubleClick={() => setEditing(true)}
       >
         {label}
@@ -135,13 +156,7 @@ function ShapeNode({ id, data, selected }: NodeProps): JSX.Element {
     inner = (
       <div
         className={`${baseText} ${ring}`}
-        style={{
-          minWidth: 104,
-          minHeight: 64,
-          background: `${d.color}1f`,
-          border: `2px solid ${d.color}`,
-          borderRadius: '50% / 18%'
-        }}
+        style={box({ background: `${d.color}1f`, border: `2px solid ${d.color}`, borderRadius: '50% / 18%' })}
         onDoubleClick={() => setEditing(true)}
       >
         {label}
@@ -151,7 +166,7 @@ function ShapeNode({ id, data, selected }: NodeProps): JSX.Element {
     inner = (
       <div
         className={`${baseText} rounded-full ${ring}`}
-        style={{ width: 86, height: 86, background: `${d.color}1f`, border: `2px solid ${d.color}` }}
+        style={box({ background: `${d.color}1f`, border: `2px solid ${d.color}` })}
         onDoubleClick={() => setEditing(true)}
       >
         {label}
@@ -161,7 +176,7 @@ function ShapeNode({ id, data, selected }: NodeProps): JSX.Element {
     inner = (
       <div
         className={`${baseText} ${ring} bg-transparent`}
-        style={{ minWidth: 60, color: d.color }}
+        style={box({ color: d.color })}
         onDoubleClick={() => setEditing(true)}
       >
         {label}
@@ -172,7 +187,7 @@ function ShapeNode({ id, data, selected }: NodeProps): JSX.Element {
     inner = (
       <div
         className={`${baseText} rounded-md bg-[var(--surface-raised)] ${ring}`}
-        style={{ minWidth: 110, minHeight: 46, border: `2px solid ${d.color}` }}
+        style={box({ border: `2px solid ${d.color}` })}
         onDoubleClick={() => setEditing(true)}
       >
         {label}
@@ -181,7 +196,14 @@ function ShapeNode({ id, data, selected }: NodeProps): JSX.Element {
   }
 
   return (
-    <div className="relative">
+    <div className="relative" style={{ width: w, height: h }}>
+      {/* Drag a corner/edge to resize; the new size persists onto the node. */}
+      <NodeResizer
+        isVisible={selected}
+        minWidth={40}
+        minHeight={24}
+        onResize={(_e, p) => rf.updateNodeData(id, { width: Math.round(p.width), height: Math.round(p.height) })}
+      />
       {inner}
       {SIDES.map((s) => (
         <Handle key={s.id} id={s.id} type="source" position={s.position} style={HANDLE_STYLE} />
@@ -240,7 +262,14 @@ function toFlowNodes(body: MapBody): Node<ShapeData>[] {
     id: n.id,
     type: 'shape',
     position: { x: n.x, y: n.y },
-    data: { label: n.label, shape: n.shape, color: n.color, ...(n.widgetId ? { widgetId: n.widgetId } : {}) }
+    data: {
+      label: n.label,
+      shape: n.shape,
+      color: n.color,
+      ...(n.widgetId ? { widgetId: n.widgetId } : {}),
+      ...(typeof n.width === 'number' ? { width: n.width } : {}),
+      ...(typeof n.height === 'number' ? { height: n.height } : {})
+    }
   }))
 }
 function edgeStyle(e: MapEdge): React.CSSProperties {
@@ -275,7 +304,9 @@ function fromFlow(
       label: n.data.label,
       shape: n.data.shape,
       color: n.data.color,
-      ...(n.data.widgetId ? { widgetId: n.data.widgetId } : {})
+      ...(n.data.widgetId ? { widgetId: n.data.widgetId } : {}),
+      ...(typeof n.data.width === 'number' ? { width: n.data.width } : {}),
+      ...(typeof n.data.height === 'number' ? { height: n.data.height } : {})
     })),
     edges: edges.map((e) => ({
       id: e.id,
