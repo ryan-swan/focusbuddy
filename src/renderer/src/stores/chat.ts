@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import type { ActionProposal, ChatMessage } from '@shared/types'
 import { recordTrail } from '../lib/trail'
+import { gatherCanvasAttachments } from '../lib/canvasContent'
 
 interface ChatStore {
   messagesByTask: Record<string, ChatMessage[]>
@@ -66,7 +67,16 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       sending: true
     })
     recordTrail('chat_sent', taskId, { preview: content.slice(0, 200) })
-    const resp = await window.api.chat.send({ taskId, messages: next })
+    // Gather any browser/doc/pdf content the user has open so the assistant can
+    // act on it (e.g. create calendar events from a booking page). Best-effort:
+    // a failure here must never block the message.
+    let attachments: Awaited<ReturnType<typeof gatherCanvasAttachments>> = []
+    try {
+      attachments = await gatherCanvasAttachments(taskId)
+    } catch {
+      attachments = []
+    }
+    const resp = await window.api.chat.send({ taskId, messages: next, attachments })
     let final: ChatMessage[]
     let proposals: ActionProposal[] | undefined
     if (resp.ok && resp.message) {
