@@ -9,7 +9,7 @@ import { readFile, writeFile } from 'fs/promises'
 // pptxgenjs and fflate are imported lazily inside the functions that use them,
 // so they stay out of the app's startup require path; a packaging gap can only
 // degrade pptx export/import to an error, never crash launch.
-import type { DeckTheme, Slide, SlidesBody, SlideTextElement, SlideImageElement } from '@shared/types'
+import type { DeckTheme, Slide, SlidesBody, SlideTextElement, SlideImageElement, SlideTableElement } from '@shared/types'
 import { resolveTheme, SLIDE_W, SLIDE_H } from '@shared/slideThemes'
 import { migrateSlidesBody } from '@shared/slidesMigrate'
 import { chartToSvg } from '@shared/chart'
@@ -354,6 +354,57 @@ function slideImages(
   return out
 }
 
+// The tables on a slide, as SlideTableElements. A pptx table is an <a:tbl> inside
+// an <a:graphicFrame>; rows are <a:tr>, cells <a:tc>. Positioned from the frame's
+// transform (EMU → logical units).
+function slideTables(slideXml: string, slideIndex: number, sldCx: number, sldCy: number): SlideTableElement[] {
+  const out: SlideTableElement[] = []
+  const frames = slideXml.split(/<p:graphicFrame\b/).slice(1)
+  let idx = 0
+  for (const chunk of frames) {
+    const frame = chunk.split(/<\/p:graphicFrame>/)[0]
+    const tblMatch = /<a:tbl>[\s\S]*?<\/a:tbl>/.exec(frame)
+    if (!tblMatch) continue
+    const tbl = tblMatch[0]
+    const cells: string[][] = []
+    for (const trChunk of tbl.split(/<a:tr\b/).slice(1)) {
+      const tr = trChunk.split(/<\/a:tr>/)[0]
+      const row: string[] = []
+      for (const tcChunk of tr.split(/<a:tc\b/).slice(1)) {
+        const tc = tcChunk.split(/<\/a:tc>/)[0]
+        row.push(paragraphs(tc).join('\n'))
+      }
+      if (row.length) cells.push(row)
+    }
+    if (!cells.length) continue
+    const off = /<a:off\s+x="(-?\d+)"\s+y="(-?\d+)"/.exec(frame)
+    const ext = /<a:ext\s+cx="(\d+)"\s+cy="(\d+)"/.exec(frame)
+    const emuX = off ? Number(off[1]) : sldCx * 0.1
+    const emuY = off ? Number(off[2]) : sldCy * 0.1
+    const emuW = ext ? Number(ext[1]) : sldCx * 0.8
+    const emuH = ext ? Number(ext[2]) : sldCy * 0.4
+    const headerRow = /<a:tblPr[^>]*\bfirstRow="1"/.test(tbl)
+    out.push({
+      id: `tbl-${slideIndex}-${idx++}`,
+      type: 'table',
+      x: Math.round((emuX / sldCx) * SLIDE_W),
+      y: Math.round((emuY / sldCy) * SLIDE_H),
+      w: Math.round((emuW / sldCx) * SLIDE_W),
+      h: Math.round((emuH / sldCy) * SLIDE_H),
+      z: 90 + idx,
+      cells,
+      ...(headerRow ? { headerRow: true } : {})
+    })
+  }
+  return out
+}
+
+// Strip table/chart frames before pulling title/body text, so a table's cell text
+// does not also leak into the slide's bullets.
+function stripGraphicFrames(xml: string): string {
+  return xml.replace(/<p:graphicFrame\b[\s\S]*?<\/p:graphicFrame>/g, '')
+}
+
 // Pure .pptx → SlidesImportResult. Extracted so it can be unit-tested against a
 // real (pptxgenjs-generated) buffer without a file dialog.
 export async function parsePptx(data: Uint8Array, name: string): Promise<SlidesImportResult> {
@@ -372,7 +423,9 @@ export async function parsePptx(data: Uint8Array, name: string): Promise<SlidesI
     const sldCy = sz ? Number(sz[2]) : 6858000
 
     const slides: Slide[] = slideNames.map((sn, i) => {
-      const paras = paragraphs(strFromU8(files[sn]))
+      // Exclude table/chart frames from the title/body text so their cell text is
+      // not double-counted as bullets.
+      const paras = paragraphs(stripGraphicFrames(strFromU8(files[sn])))
       const title = paras[0] ?? `Slide ${i + 1}`
       const bullets = paras.slice(1)
       const notes = notesForSlide(files, sn, strFromU8)
@@ -380,11 +433,14 @@ export async function parsePptx(data: Uint8Array, name: string): Promise<SlidesI
     })
 
     const body = migrateSlidesBody({ slides })
-    // Attach imported pictures onto each migrated slide's element list so they
-    // render alongside the title/body text rather than being dropped.
+    // Attach imported pictures and tables onto each migrated slide's element list
+    // so they render alongside the title/body text rather than being dropped.
     body.slides.forEach((slide, i) => {
-      const imgs = slideImages(files, slideNames[i], strFromU8, sldCx, sldCy)
-      if (imgs.length) slide.elements = [...(slide.elements ?? []), ...imgs]
+      const extras = [
+        ...slideImages(files, slideNames[i], strFromU8, sldCx, sldCy),
+        ...slideTables(strFromU8(files[slideNames[i]]), i, sldCx, sldCy)
+      ]
+      if (extras.length) slide.elements = [...(slide.elements ?? []), ...extras]
     })
 
     return { ok: true, name, body }

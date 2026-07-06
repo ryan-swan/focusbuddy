@@ -33,6 +33,22 @@ async function buildPptxWithImage(): Promise<Uint8Array> {
   return new Uint8Array(out as Buffer)
 }
 
+async function buildPptxWithTable(): Promise<Uint8Array> {
+  const pptx = new pptxgen()
+  const s = pptx.addSlide()
+  s.addText('Quarterly figures', { x: 0.5, y: 0.3, w: 9, h: 1 })
+  s.addTable(
+    [
+      [{ text: 'Region' }, { text: 'Revenue' }],
+      [{ text: 'North' }, { text: '120' }],
+      [{ text: 'South' }, { text: '95' }]
+    ],
+    { x: 1, y: 2, w: 6, h: 2 }
+  )
+  const out = await pptx.write({ outputType: 'nodebuffer' })
+  return new Uint8Array(out as Buffer)
+}
+
 describe('parsePptx — speaker notes round-trip', () => {
   it('imports slides with their text', async () => {
     const res = await parsePptx(await buildPptx(), 'deck.pptx')
@@ -82,5 +98,32 @@ describe('parsePptx — image round-trip', () => {
     const els = res.body!.slides[0].elements ?? []
     expect(els.some((e) => e.type === 'text')).toBe(true)
     expect(els.some((e) => e.type === 'image')).toBe(true)
+  })
+})
+
+describe('parsePptx — table round-trip', () => {
+  it('imports a pptx table as a table element with its cells (previously dropped)', async () => {
+    const res = await parsePptx(await buildPptxWithTable(), 'deck.pptx')
+    const tables = (res.body!.slides[0].elements ?? []).filter((e) => e.type === 'table')
+    expect(tables).toHaveLength(1)
+    const t = tables[0] as { cells: string[][]; x: number; y: number }
+    expect(t.cells).toEqual([
+      ['Region', 'Revenue'],
+      ['North', '120'],
+      ['South', '95']
+    ])
+    expect(t.x).toBeGreaterThan(0)
+    expect(t.y).toBeGreaterThan(0)
+  })
+
+  it('does not leak the table cell text into the slide bullets', async () => {
+    const res = await parsePptx(await buildPptxWithTable(), 'deck.pptx')
+    const bulletText = (res.body!.slides[0].elements ?? [])
+      .filter((e) => e.type === 'text')
+      .map((e) => JSON.stringify(e))
+      .join(' ')
+    // "Revenue"/"North" belong to the table, not the body text.
+    expect(bulletText).not.toContain('North')
+    expect(bulletText).not.toContain('120')
   })
 })
