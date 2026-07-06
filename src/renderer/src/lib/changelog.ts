@@ -36,6 +36,21 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.1.0',
+    date: '2026-07-06T12:00:00Z',
+    title: 'PlexiDesk 3.1 — your files open the way you saved them',
+    tag: 'feature',
+    summary:
+      'This release is about fidelity and finishing touches across the office suite. Bringing files in and out keeps far more of what matters. A Word import now carries the page size, margins and the running header and footer, not just the body. A spreadsheet keeps its column widths, row heights, frozen panes, dropdown and number-range validations, conditional formatting and, at last, merged cells, all the way to Excel and back. A slide deck recovers its speaker notes, pictures, tables and charts instead of arriving as plain text, and you can import a Microsoft Visio diagram straight onto a Draw canvas. Docs gains real Track Changes, so edits can be suggested and then accepted or rejected, and comments now support at-mentions with a notification when a teammate names you. Sheets pivot tables gain interactive slicers, and Draw gains a full categorised shape library.',
+    highlights: [
+      'Import fidelity: Word header/footer and page setup, and Excel widths, heights, frozen panes, validations, conditional formatting and merged cells all round-trip.',
+      'Slides import recovers speaker notes, images, tables and charts; Visio .vsdx imports into Draw.',
+      'Docs: Track Changes (suggesting mode) with accept/reject, plus @mentions in comments and a notification when someone names you.',
+      'Sheets: interactive pivot-table slicers, and merged cells you can create and that survive .xlsx.',
+      'Draw: a categorised stencil library (flowchart, basic shapes, arrows, containers).'
+    ]
+  },
+  {
     version: '3.0.0',
     date: '2026-07-05T11:00:00Z',
     title: 'PlexiDesk 3.0 — a full office suite on your canvas',
