@@ -13,6 +13,8 @@ import {
   type DocComment
 } from '../../lib/docCollabClient'
 import { setDocCommentHandler } from '../../lib/messagingSocket'
+import { isCrossUserMention } from '../../lib/mentions'
+import { notifyExternal } from '../../lib/notify'
 import CommentsPanel from './CommentsPanel'
 import type { Editor } from '@tiptap/react'
 import { listTeams, inviteTeamToDoc, type Team } from '../../lib/teamsClient'
@@ -158,6 +160,23 @@ export default function LiveDocEditorView({ liveDocId, onBack }: Props): JSX.Ele
         if (e.action === 'deleted') return prev.filter((c) => c.id !== e.comment.id && c.parentId !== e.comment.id)
         return [...prev.filter((c) => c.id !== e.comment.id), e.comment]
       })
+      // Cross-user @mention alert: when someone else's comment names my handle,
+      // notify me even if the app is focused elsewhere. Read straight from the
+      // account store so the closure never holds a stale handle. This runs on the
+      // comment already delivered by the socket, so it needs no server change.
+      if (e.action !== 'deleted') {
+        const acct = useAccountStore.getState().account
+        if (isCrossUserMention(e.comment.body, e.comment.authorAccountId, acct?.id, acct?.handle ?? null)) {
+          notifyExternal('You were mentioned in a document', e.comment.body.slice(0, 140), {
+            force: true,
+            tag: `docmention-${e.comment.id}`,
+            onClick: () => {
+              setCommentsOpen(true)
+              setFocusComment(e.comment.parentId ?? e.comment.id)
+            }
+          })
+        }
+      }
     })
     return () => setDocCommentHandler(null)
     // eslint-disable-next-line react-hooks/exhaustive-deps
