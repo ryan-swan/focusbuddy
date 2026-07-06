@@ -880,6 +880,10 @@ export interface ShareLink {
   // Revoke = soft-delete. The token stops resolving and the share manager
   // shows it as "Revoked" so the owner can audit who they shared with.
   revoked: boolean
+  // Who created the share (a handle), so a recipient view can show "invited by
+  // X" and the growth loop can attribute a sign-up to its inviter. Null when the
+  // sharer was signed out or for shares created before attribution existed.
+  createdBy?: string | null
 }
 
 // Items shared WITH the current user — the "Shared with me" sidebar

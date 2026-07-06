@@ -193,6 +193,7 @@ const api = {
       label: string
       scope: ShareScope
       expiresAt: number | null
+      createdBy?: string | null
     }): Promise<ShareLink> => ipcRenderer.invoke('shares:create', input),
     revoke: (id: string): Promise<boolean> =>
       ipcRenderer.invoke('shares:revoke', id),

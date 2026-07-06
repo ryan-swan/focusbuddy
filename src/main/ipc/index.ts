@@ -544,6 +544,7 @@ export function registerIpcHandlers(): void {
         label: string
         scope: 'view' | 'copy'
         expiresAt: number | null
+        createdBy?: string | null
       }
     ) => createShareLink(input)
   )
