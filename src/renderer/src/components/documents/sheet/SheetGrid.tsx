@@ -146,6 +146,18 @@ export default function SheetGrid(props: Props): JSX.Element {
     () => buildSpillMap({ columns: tab.columns, rows: tab.rows }, props.workbook, props.names),
     [tab.columns, tab.rows, props.workbook, props.names]
   )
+  // Merged cells: the top-left anchor spans its range (colSpan/rowSpan on the
+  // native table cell); the covered cells are not rendered.
+  const { mergeCovered, mergeAnchor } = useMemo(() => {
+    const covered = new Set<string>()
+    const anchor = new Map<string, { rowSpan: number; colSpan: number }>()
+    for (const m of tab.merges ?? []) {
+      anchor.set(`${m.r1},${m.c1}`, { rowSpan: m.r2 - m.r1 + 1, colSpan: m.c2 - m.c1 + 1 })
+      for (let r = m.r1; r <= m.r2; r++)
+        for (let c = m.c1; c <= m.c2; c++) if (!(r === m.r1 && c === m.c1)) covered.add(`${r},${c}`)
+    }
+    return { mergeCovered: covered, mergeAnchor: anchor }
+  }, [tab.merges])
   // Range extents for colour-scale / data-bar / icon-set rules, computed once per
   // data change so each cell can map its value onto the range's min..max.
   const condStats = useMemo(() => {
@@ -357,6 +369,9 @@ export default function SheetGrid(props: Props): JSX.Element {
               </td>
               {tab.columns.map((_, c) => {
                 if (props.hiddenCols?.has(c)) return null
+                // A cell covered by a merge is not drawn; the anchor spans it.
+                if (mergeCovered.has(`${r},${c}`)) return null
+                const mergeSpan = mergeAnchor.get(`${r},${c}`)
                 const isActive = active?.r === r && active?.c === c
                 const isEditing = editing?.r === r && editing?.c === c
                 const selected = inRange(selection, r, c)
@@ -448,6 +463,8 @@ export default function SheetGrid(props: Props): JSX.Element {
                     key={c}
                     data-testid={`cell-${r}-${c}`}
                     data-spill={isSpilled ? '1' : undefined}
+                    colSpan={mergeSpan?.colSpan}
+                    rowSpan={mergeSpan?.rowSpan}
                     style={Object.keys(tdStyle).length ? tdStyle : undefined}
                     onMouseDown={(e) => {
                       // In formula reference mode, prevent the default focus

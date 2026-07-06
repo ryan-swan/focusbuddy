@@ -19,6 +19,8 @@ interface Props {
   onSort: (dir: 'asc' | 'desc') => void
   onConditionalFormat: () => void
   onDataValidation: () => void
+  onMergeCells: () => void
+  isMerged: boolean
   filterActive: boolean
   onToggleFilter: () => void
   onInsertPivot: () => void
@@ -97,6 +99,15 @@ export default function SheetToolbar(props: Props): JSX.Element {
       </button>
       <button className={btn} title="Align right" onClick={() => props.onFormat({ align: 'right' })}>
         <Icon name="format_align_right" size={15} />
+      </button>
+      <button
+        className={`${btn} ${props.isMerged ? 'bg-accent/15 text-accent' : ''}`}
+        title={props.isMerged ? 'Unmerge cells' : 'Merge the selected cells'}
+        data-testid="sheet-merge-btn"
+        aria-pressed={props.isMerged}
+        onClick={props.onMergeCells}
+      >
+        <Icon name={props.isMerged ? 'call_split' : 'call_merge'} size={15} />
       </button>
       <Divider />
 

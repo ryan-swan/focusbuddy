@@ -126,6 +126,40 @@ describe('xlsx export → SheetJS import round-trip', () => {
     expect(scale).toMatchObject({ kind: 'colorScale', minColor: '#ffffff', midColor: '#fdba74', maxColor: '#3b82f6' })
   })
 
+  it('round-trips merged cells through export and import', async () => {
+    const withMerges: SheetBodyV2 = {
+      version: 2,
+      sheets: [
+        {
+          id: 't1',
+          name: 'Sheet',
+          columns: ['A', 'B', 'C'],
+          rows: [
+            ['Title', '', ''],
+            ['x', '1', '2'],
+            ['x', '3', '4']
+          ],
+          merges: [
+            { r1: 0, c1: 0, r2: 0, c2: 2 }, // A1:C1
+            { r1: 1, c1: 0, r2: 2, c2: 0 } // A2:A3
+          ]
+        }
+      ]
+    }
+    const buf = await buildStyledXlsx(withMerges)
+    const wb = XLSX.read(buf, { type: 'buffer' })
+    const tab = worksheetToTab(wb.Sheets[wb.SheetNames[0]], wb.SheetNames[0])
+    expect(tab.merges).toBeTruthy()
+    // Both ranges survive (order-independent).
+    expect(tab.merges).toEqual(
+      expect.arrayContaining([
+        { r1: 0, c1: 0, r2: 0, c2: 2 },
+        { r1: 1, c1: 0, r2: 2, c2: 0 }
+      ])
+    )
+    expect(tab.merges).toHaveLength(2)
+  })
+
   it('recovers frozen panes that SheetJS drops (read from the package XML)', async () => {
     const withFreeze: SheetBodyV2 = {
       version: 2,

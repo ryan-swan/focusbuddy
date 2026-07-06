@@ -87,6 +87,16 @@ function worksheetToTab(ws: XLSX.WorkSheet, name: string): SheetTab {
     if (Object.keys(colWidths).length) tab.colWidths = colWidths
   }
 
+  // Merged cell ranges. SheetJS exposes these as absolute-coordinate ranges; we
+  // store them relative to the tab's own origin.
+  const merges = ws['!merges'] as XLSX.Range[] | undefined
+  if (merges?.length) {
+    const rel = merges
+      .map((m) => ({ r1: m.s.r - range.s.r, c1: m.s.c - range.s.c, r2: m.e.r - range.s.r, c2: m.e.c - range.s.c }))
+      .filter((m) => m.r1 >= 0 && m.c1 >= 0 && (m.r2 > m.r1 || m.c2 > m.c1))
+    if (rel.length) tab.merges = rel
+  }
+
   // Row heights (Excel gives px or points; we store px).
   const rowInfos = ws['!rows'] as XLSX.RowInfo[] | undefined
   if (rowInfos) {
