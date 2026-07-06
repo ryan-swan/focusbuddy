@@ -562,6 +562,15 @@ const api = {
     available: (): Promise<boolean> => ipcRenderer.invoke('haptics:available'),
     fire: (feel: HapticFeel): Promise<boolean> => ipcRenderer.invoke('haptics:fire', feel)
   },
+  calendar: {
+    // Save a meeting to the OS default calendar (Apple Calendar / Outlook) via .ics.
+    addMeetingIcs: (ev: {
+      roomId: string
+      title: string
+      startMs: number
+      durationMin: number
+    }): Promise<{ ok: boolean; error?: string }> => ipcRenderer.invoke('calendar:addMeetingIcs', ev)
+  },
   energy: {
     log: (level: EnergyLevel): Promise<EnergyLogEntry> =>
       ipcRenderer.invoke('energy:log', level),

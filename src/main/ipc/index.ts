@@ -1,6 +1,8 @@
 import { app, ipcMain, BrowserWindow, dialog, shell, webContents as allWebContents, type WebContents } from 'electron'
 import { detectPreviewBuild } from '../appMode'
 import { writeFile } from 'node:fs/promises'
+import { join as pathJoin } from 'node:path'
+import { buildMeetingIcs } from '@shared/ics'
 import { consumePendingAuthHandoff, consumePendingShareToken, consumePendingMeetRoom } from '../authProtocol'
 import {
   checkForUpdates,
@@ -799,6 +801,31 @@ export function registerIpcHandlers(): void {
   })
   ipcMain.handle('chat:hasApiKey', () => Boolean(resolveAnthropicKey()))
   ipcMain.handle('ai:dailyBrief', () => generateDailyBrief())
+  // Save a meeting to the OS default calendar (Apple Calendar / Outlook) by
+  // writing a standards .ics and opening it — the universal "add to calendar".
+  // Google users use the web URL the renderer builds separately.
+  ipcMain.handle(
+    'calendar:addMeetingIcs',
+    async (_e, ev: { roomId: string; title: string; startMs: number; durationMin: number }) => {
+      try {
+        const joinUrl = `haptyx://meet?room=${encodeURIComponent(ev.roomId)}`
+        const ics = buildMeetingIcs({
+          uid: `${ev.roomId}@plexidesk`,
+          title: ev.title,
+          startMs: ev.startMs,
+          durationMin: ev.durationMin,
+          joinUrl
+        })
+        const file = pathJoin(app.getPath('temp'), `plexi-meeting-${ev.roomId.replace(/[^a-z0-9]/gi, '')}.ics`)
+        await writeFile(file, ics, 'utf8')
+        const err = await electronShell.openPath(file)
+        if (err) return { ok: false, error: err }
+        return { ok: true }
+      } catch (e) {
+        return { ok: false, error: (e as Error).message }
+      }
+    }
+  )
   ipcMain.handle('chat:proactiveWelcome', (_e, taskId: string) =>
     generateProactiveWelcome(taskId)
   )

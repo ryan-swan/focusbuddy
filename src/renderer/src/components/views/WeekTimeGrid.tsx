@@ -7,6 +7,7 @@ import { useViewStore } from '../../stores/view'
 import { futuristicPowerOn } from '../../lib/audioBeep'
 import { newMeetingRoomId, joinMeetingRoom } from '../../lib/startMeeting'
 import { sendMeetingInvites } from '../../lib/meetingInvite'
+import { googleCalendarUrl } from '@shared/ics'
 import Icon from '../Icon'
 
 // Week time-grid — the time-blocking surface. Seventeen hour rows × seven day
@@ -83,6 +84,8 @@ export default function WeekTimeGrid({ weekStart }: { weekStart: Date }): JSX.El
   }
 
   const [composer, setComposer] = useState<Composer | null>(null)
+  // "Add to calendar" menu for a meeting block — anchored at the click point.
+  const [calMenu, setCalMenu] = useState<{ block: TimeBlock; x: number; y: number } | null>(null)
   const [drag, setDrag] = useState<{ id: string; previewStart: number; previewDur: number } | null>(
     null
   )
@@ -320,6 +323,20 @@ export default function WeekTimeGrid({ weekStart }: { weekStart: Date }): JSX.El
                             <Icon name="videocam" size={9} />
                           </button>
                         )}
+                        {block.meeting && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setCalMenu({ block, x: e.clientX, y: e.clientY })
+                            }}
+                            onPointerDown={(e) => e.stopPropagation()}
+                            className="h-4 w-4 inline-flex items-center justify-center rounded bg-white/70 dark:bg-stone-900/70 text-[var(--ink-70)]"
+                            title="Add to my calendar"
+                            data-testid="block-add-to-calendar"
+                          >
+                            <Icon name="event" size={9} />
+                          </button>
+                        )}
                         {linked && (
                           <button
                             onClick={(e) => {
@@ -436,6 +453,58 @@ export default function WeekTimeGrid({ weekStart }: { weekStart: Date }): JSX.El
             return { inviteNote: `Meeting saved and invites sent to ${r.sent} ${r.sent === 1 ? 'person' : 'people'}.` }
           }}
         />
+      )}
+      {calMenu && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setCalMenu(null)} />
+          <div
+            className="fixed z-50 w-52 rounded-lg border border-[var(--line)] bg-[var(--surface)] shadow-xl p-1 text-xs"
+            style={{
+              left: Math.min(calMenu.x, window.innerWidth - 220),
+              top: Math.min(calMenu.y, window.innerHeight - 120)
+            }}
+            data-testid="add-to-calendar-menu"
+          >
+            <div className="px-2 py-1 text-[10px] uppercase tracking-wide text-[var(--ink-50)]">
+              Add to calendar
+            </div>
+            <button
+              className="w-full text-left px-2 py-1.5 rounded hover:bg-[var(--hover)] flex items-center gap-2"
+              onClick={() => {
+                const b = calMenu.block
+                void window.api.calendar.addMeetingIcs({
+                  roomId: b.meeting!.roomId,
+                  title: b.title || 'Meeting',
+                  startMs: b.startMs,
+                  durationMin: b.durationMin
+                })
+                setCalMenu(null)
+              }}
+            >
+              <Icon name="event" size={13} />
+              Apple Calendar / Outlook
+            </button>
+            <button
+              className="w-full text-left px-2 py-1.5 rounded hover:bg-[var(--hover)] flex items-center gap-2"
+              onClick={() => {
+                const b = calMenu.block
+                void window.api.files.openExternal(
+                  googleCalendarUrl({
+                    uid: `${b.meeting!.roomId}@plexidesk`,
+                    title: b.title || 'Meeting',
+                    startMs: b.startMs,
+                    durationMin: b.durationMin,
+                    joinUrl: `haptyx://meet?room=${encodeURIComponent(b.meeting!.roomId)}`
+                  })
+                )
+                setCalMenu(null)
+              }}
+            >
+              <Icon name="public" size={13} />
+              Google Calendar
+            </button>
+          </div>
+        </>
       )}
     </div>
   )
