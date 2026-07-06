@@ -410,6 +410,7 @@ import {
   suggestSetupWidgets,
   suggestFileTags,
   askWorkspace,
+  askWorkspaceStream,
   suggestTableRows,
   summarizeRecentTrail,
   suggestDocContent,
@@ -1318,6 +1319,33 @@ export function registerIpcHandlers(): void {
         question,
         sources.map((s) => ({ docId: s.docId, title: s.title, docType: s.docType, text: s.text })),
         hist
+      )
+      const cited = new Set(res.citedDocIds ?? [])
+      const sourceMeta = sources.map((s) => ({
+        docId: s.docId,
+        title: s.title,
+        docType: s.docType,
+        snippet: s.snippet,
+        cited: cited.has(s.docId)
+      }))
+      return { ...res, sources: sourceMeta }
+    }
+  )
+  // Streaming ask-your-workspace: same retrieval + grounding, but the answer
+  // streams to the renderer over a per-request channel so it appears live.
+  ipcMain.handle(
+    'workspace:askStream',
+    async (e, question: string, history: Array<{ question: string; answer: string }> | undefined, requestId: string) => {
+      const hist = Array.isArray(history) ? history.slice(-4) : []
+      const query = [...hist.map((h) => h.question), question].join(' ')
+      const sources = await retrieveSources(query, 6)
+      if (sources.length) recordAiCall()
+      const channel = `workspace:askStream:${requestId}`
+      const res = await askWorkspaceStream(
+        question,
+        sources.map((s) => ({ docId: s.docId, title: s.title, docType: s.docType, text: s.text })),
+        hist,
+        (delta) => e.sender.send(channel, { type: 'delta', payload: delta })
       )
       const cited = new Set(res.citedDocIds ?? [])
       const sourceMeta = sources.map((s) => ({

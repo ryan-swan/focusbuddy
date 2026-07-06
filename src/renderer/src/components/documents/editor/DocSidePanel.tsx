@@ -120,9 +120,27 @@ function WorkspaceAsk({ editor }: { editor: Editor }): JSX.Element {
     if (!text || busy) return
     setBusy(true)
     setError(null)
+    setQ('')
+    // Add the entry immediately with an empty answer, then stream deltas into it
+    // so the answer appears live.
+    setThread((t) => [...t, { question: text, answer: '', sources: [] }])
+    const requestId = crypto.randomUUID()
     try {
-      const res = await window.api.workspace.ask(text, historyRef.current.slice(-4))
+      const res = await window.api.workspace.askStream(
+        text,
+        historyRef.current.slice(-4),
+        requestId,
+        (delta) =>
+          setThread((t) => {
+            if (!t.length) return t
+            const copy = [...t]
+            const last = copy[copy.length - 1]
+            copy[copy.length - 1] = { ...last, answer: last.answer + delta }
+            return copy
+          })
+      )
       if (!res.ok) {
+        setThread((t) => t.slice(0, -1)) // drop the empty entry
         setError(
           res.needsApiKey
             ? 'Add your Anthropic API key in Settings → AI to let the assistant read across your whole workspace.'
@@ -131,13 +149,18 @@ function WorkspaceAsk({ editor }: { editor: Editor }): JSX.Element {
         return
       }
       const answer = res.answer ?? ''
-      setThread((t) => [
-        ...t,
-        { question: text, answer, sources: (res.sources ?? []).map((s) => ({ docId: s.docId, title: s.title, docType: s.docType, cited: s.cited })) }
-      ])
+      setThread((t) => {
+        const copy = [...t]
+        copy[copy.length - 1] = {
+          question: text,
+          answer,
+          sources: (res.sources ?? []).map((s) => ({ docId: s.docId, title: s.title, docType: s.docType, cited: s.cited }))
+        }
+        return copy
+      })
       historyRef.current.push({ question: text, answer })
-      setQ('')
     } catch (e) {
+      setThread((t) => t.slice(0, -1))
       setError((e as Error).message)
     } finally {
       setBusy(false)
