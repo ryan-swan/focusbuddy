@@ -3,6 +3,7 @@ import { EditorContent, useEditor, type Editor } from '@tiptap/react'
 import { buildDocExtensions } from './editor/extensions'
 import { htmlToDocContent } from '../../lib/docHtml'
 import { sanitizeHtml } from '../../lib/htmlSanitize'
+import { hasTrackedChanges, type PmNode as TrackedNode } from '../../lib/trackChanges'
 import {
   parseDocBody,
   wrapDocBody,
@@ -147,6 +148,10 @@ export default function DocEditor({
 }: Props): JSX.Element {
   const [findOpen, setFindOpen] = useState(false)
   const [focusMode, setFocusMode] = useState(false)
+  // Track Changes (suggesting mode) toggle, and whether the doc currently carries
+  // any suggestion (drives the Accept/Reject-all controls).
+  const [suggesting, setSuggesting] = useState(false)
+  const [hasTracked, setHasTracked] = useState(false)
   // The persistent right-side panel: open/collapsed plus the active tab. The old
   // floating-outline toggle now drives this panel's Outline tab instead.
   const [panelOpen, setPanelOpen] = useState(true)
@@ -188,7 +193,12 @@ export default function DocEditor({
       // we still emit the body so the parent can snapshot it to storage (exports
       // and non-live views read that), debounced on its side. Read meta from the
       // ref so a save never reverts a just-changed heading style or page setup.
-      onChange(wrapDocBody(editor.getJSON(), metaRef.current.headingStyles, metaRef.current.page))
+      const json = editor.getJSON()
+      setHasTracked(hasTrackedChanges(json as TrackedNode))
+      onChange(wrapDocBody(json, metaRef.current.headingStyles, metaRef.current.page))
+    },
+    onCreate({ editor }) {
+      setHasTracked(hasTrackedChanges(editor.getJSON() as TrackedNode))
     },
     editorProps: {
       attributes: {
@@ -568,6 +578,47 @@ export default function DocEditor({
                 <Icon name="center_focus_strong" size={13} />
                 <span>Focus</span>
               </button>
+              <button
+                onClick={() => {
+                  const next = !suggesting
+                  setSuggesting(next)
+                  editor?.commands.setTrackUser({ author: userName || user?.name || 'You', color: user?.color || '#2563eb' })
+                  editor?.commands.setSuggesting(next)
+                }}
+                className={`inline-flex items-center gap-1 px-2 py-1 rounded-full fb-spring-soft ${
+                  suggesting ? 'bg-accent/[0.14] text-accent' : 'hover:bg-[var(--surface-sunken)]/70'
+                }`}
+                title="Suggesting mode — record edits as tracked changes to accept or reject"
+                data-testid="doc-suggest-toggle"
+                aria-pressed={suggesting}
+              >
+                <Icon name="edit_note" size={13} />
+                <span>Suggesting</span>
+              </button>
+              {(suggesting || hasTracked) && (
+                <>
+                  <button
+                    onClick={() => editor?.commands.acceptAllChanges()}
+                    disabled={!hasTracked}
+                    className="inline-flex items-center gap-1 px-2 py-1 rounded-full hover:bg-emerald-500/[0.12] text-emerald-600 dark:text-emerald-400 disabled:opacity-40 fb-spring-soft"
+                    title="Accept all tracked changes"
+                    data-testid="doc-accept-all"
+                  >
+                    <Icon name="check" size={13} />
+                    <span>Accept all</span>
+                  </button>
+                  <button
+                    onClick={() => editor?.commands.rejectAllChanges()}
+                    disabled={!hasTracked}
+                    className="inline-flex items-center gap-1 px-2 py-1 rounded-full hover:bg-red-500/[0.12] text-red-600 dark:text-red-400 disabled:opacity-40 fb-spring-soft"
+                    title="Reject all tracked changes"
+                    data-testid="doc-reject-all"
+                  >
+                    <Icon name="close" size={13} />
+                    <span>Reject all</span>
+                  </button>
+                </>
+              )}
             </span>
           </div>
         </div>
