@@ -352,7 +352,16 @@ async function applyCreateDocument(
     // Register the real id so a sibling edit-document can reference this
     // proposal symbolically ("$<proposalId>") in the same batch.
     if (doc) ctx.resolvedIds?.set(p.id, doc.id)
-    const label = p.docType === 'sheet' ? 'spreadsheet' : p.docType === 'slides' ? 'deck' : 'document'
+    const label =
+      p.docType === 'sheet'
+        ? 'spreadsheet'
+        : p.docType === 'slides'
+          ? 'deck'
+          : p.docType === 'map'
+            ? 'diagram'
+            : p.docType === 'design'
+              ? 'design'
+              : 'document'
     // File the new document into the meeting's folder when one was chosen, so
     // deliverables stay with the meeting rather than scattering to the root.
     if (doc && ctx.destinationFolderId) {
@@ -1060,8 +1069,26 @@ export function describeProposal(
     case 'create-knowledge-entry':
       return { icon: 'psychology', verb: 'Add to PlexiBrain', subject: p.title }
     case 'create-document': {
-      const verb = p.docType === 'sheet' ? 'New spreadsheet' : p.docType === 'slides' ? 'New deck' : 'New document'
-      const icon = p.docType === 'sheet' ? 'table_chart' : p.docType === 'slides' ? 'slideshow' : 'description'
+      const verb =
+        p.docType === 'sheet'
+          ? 'New spreadsheet'
+          : p.docType === 'slides'
+            ? 'New deck'
+            : p.docType === 'map'
+              ? 'New diagram'
+              : p.docType === 'design'
+                ? 'New design'
+                : 'New document'
+      const icon =
+        p.docType === 'sheet'
+          ? 'table_chart'
+          : p.docType === 'slides'
+            ? 'slideshow'
+            : p.docType === 'map'
+              ? 'account_tree'
+              : p.docType === 'design'
+                ? 'palette'
+                : 'description'
       return { icon, verb, subject: p.title }
     }
     default:

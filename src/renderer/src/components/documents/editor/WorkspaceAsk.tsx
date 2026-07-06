@@ -1,6 +1,8 @@
 import { useRef, useState } from 'react'
+import type { ActionProposal } from '@shared/types'
 import Icon from '../../Icon'
 import { useViewStore } from '../../../stores/view'
+import { applyProposal, describeProposal } from '../../../lib/actionExecutor'
 
 // The workspace brain, shared by every editor surface (docs, sheets, slides,
 // design). Ask anything and it grounds the answer in EVERY document, sheet and
@@ -34,8 +36,24 @@ export default function WorkspaceAsk({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState<number | null>(null)
-  const [thread, setThread] = useState<Array<{ question: string; answer: string; sources: WsSource[] }>>([])
+  const [thread, setThread] = useState<
+    Array<{ question: string; answer: string; sources: WsSource[]; proposals: ActionProposal[] }>
+  >([])
+  // Per-proposal apply state, keyed by proposal id: applying → done/failed.
+  const [applied, setApplied] = useState<Record<string, 'applying' | 'done' | 'failed'>>({})
+  const [dismissed, setDismissed] = useState<Record<string, true>>({})
   const historyRef = useRef<Array<{ question: string; answer: string }>>([])
+
+  async function applyOne(p: ActionProposal): Promise<void> {
+    if (applied[p.id]) return
+    setApplied((m) => ({ ...m, [p.id]: 'applying' }))
+    try {
+      const r = await applyProposal(p, { activeTaskId: null })
+      setApplied((m) => ({ ...m, [p.id]: r.ok ? 'done' : 'failed' }))
+    } catch {
+      setApplied((m) => ({ ...m, [p.id]: 'failed' }))
+    }
+  }
 
   const STARTERS = [
     'Summarise what my workspace already says about this.',
@@ -49,7 +67,7 @@ export default function WorkspaceAsk({
     setBusy(true)
     setError(null)
     setQ('')
-    setThread((t) => [...t, { question: text, answer: '', sources: [] }])
+    setThread((t) => [...t, { question: text, answer: '', sources: [], proposals: [] }])
     const requestId = crypto.randomUUID()
     try {
       const docContext = scope === 'doc' && getDocText ? { text: getDocText() } : null
@@ -82,7 +100,8 @@ export default function WorkspaceAsk({
         copy[copy.length - 1] = {
           question: text,
           answer,
-          sources: (res.sources ?? []).map((s) => ({ docId: s.docId, title: s.title, docType: s.docType, cited: s.cited }))
+          sources: (res.sources ?? []).map((s) => ({ docId: s.docId, title: s.title, docType: s.docType, cited: s.cited })),
+          proposals: res.proposals ?? []
         }
         return copy
       })
@@ -165,6 +184,54 @@ export default function WorkspaceAsk({
               <button onClick={() => void copy(entry.answer, i)} className="inline-flex items-center gap-1 text-[11px] text-[var(--ink-60)] hover:text-[var(--ink-90)]" data-testid="workspace-ask-copy">
                 <Icon name="content_copy" size={12} /> {copied === i ? 'Copied' : 'Copy'}
               </button>
+            </div>
+          )}
+          {entry.proposals.some((p) => !dismissed[p.id]) && (
+            <div className="flex flex-col gap-1 pt-1 mt-0.5 border-t border-[var(--edge-soft)]" data-testid="workspace-ask-proposals">
+              <div className="text-[10px] uppercase tracking-wide text-[var(--ink-50)]">I can create</div>
+              {entry.proposals
+                .filter((p) => !dismissed[p.id])
+                .map((p) => {
+                  const d = describeProposal(p)
+                  const state = applied[p.id]
+                  return (
+                    <div key={p.id} className="flex items-center gap-2 rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-sunken)] px-2 py-1.5" data-testid="workspace-ask-proposal">
+                      <Icon name={d.icon} size={14} className="text-[rgb(var(--accent))] shrink-0" />
+                      <div className="min-w-0 flex-1">
+                        <div className="text-[11.5px] text-[var(--ink-90)] truncate">
+                          <span className="text-[var(--ink-60)]">{d.verb}</span> {d.subject}
+                        </div>
+                        {p.reason && <div className="text-[10.5px] text-[var(--ink-50)] leading-snug truncate">{p.reason}</div>}
+                      </div>
+                      {state === 'done' ? (
+                        <span className="inline-flex items-center gap-1 text-[11px] text-emerald-600 dark:text-emerald-400 shrink-0">
+                          <Icon name="check" size={13} /> Created
+                        </span>
+                      ) : state === 'failed' ? (
+                        <span className="text-[11px] text-red-500 shrink-0">Failed</span>
+                      ) : (
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button
+                            onClick={() => void applyOne(p)}
+                            disabled={state === 'applying'}
+                            className="rounded-md bg-[rgb(var(--accent))] px-2 py-0.5 text-[11px] text-white disabled:opacity-50"
+                            data-testid="workspace-ask-proposal-apply"
+                          >
+                            {state === 'applying' ? '…' : 'Create'}
+                          </button>
+                          <button
+                            onClick={() => setDismissed((m) => ({ ...m, [p.id]: true }))}
+                            className="rounded-md px-1.5 py-0.5 text-[11px] text-[var(--ink-50)] hover:text-[var(--ink-90)]"
+                            title="Dismiss"
+                            data-testid="workspace-ask-proposal-dismiss"
+                          >
+                            <Icon name="close" size={12} />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
             </div>
           )}
         </div>
