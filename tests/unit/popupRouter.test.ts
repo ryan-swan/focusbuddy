@@ -77,8 +77,8 @@ describe('decidePopup', () => {
     })
   })
 
-  describe('new tabs (target=_blank / window.open without features)', () => {
-    it('opens a foreground-tab as a full-content native window (so window.open returns a handle)', () => {
+  describe('new tabs (target=_blank / window.open without features) → desk widget', () => {
+    it('forwards a plain foreground-tab to a canvas widget with the URL', () => {
       const result = decidePopup(
         {
           url: 'https://docs.example.com/article',
@@ -88,38 +88,25 @@ describe('decidePopup', () => {
         },
         ctx
       )
-      expect(result.action).toBe('allow')
-      if (result.action !== 'allow') return
-      // Full content window, not the compact popup size.
-      expect(result.overrideBrowserWindowOptions.width).toBe(1180)
-      expect(result.overrideBrowserWindowOptions.height).toBe(820)
-      expect(result.overrideBrowserWindowOptions.webPreferences?.session).toBe(FAKE_SESSION)
+      expect(result.action).toBe('deny')
+      if (result.action !== 'deny') return
+      expect(result.forwardToRenderer?.url).toBe('https://docs.example.com/article')
     })
 
-    it('opens a background-tab as a native window too', () => {
+    it('forwards a background-tab to a canvas widget too', () => {
       const result = decidePopup(
         { url: 'https://x.example', frameName: '', features: '', disposition: 'background-tab' },
         ctx
       )
-      expect(result.action).toBe('allow')
+      expect(result.action).toBe('deny')
+      if (result.action !== 'deny') return
+      expect(result.forwardToRenderer?.url).toBe('https://x.example')
     })
 
-    it('denies non-http schemes (javascript:, data:, mailto:)', () => {
-      for (const url of ['javascript:alert(1)', 'data:text/html,x', 'mailto:a@b.com']) {
-        const result = decidePopup(
-          { url, frameName: '_blank', features: '', disposition: 'foreground-tab' },
-          ctx
-        )
-        expect(result.action).toBe('deny')
-      }
-    })
-  })
-
-  describe('regression guards', () => {
-    it('a foreground-tab window.open gets a real window handle, not a dead null (the menu-does-nothing bug)', () => {
-      // Google Docs "open a file" calls window.open(url) → foreground-tab. If we
-      // deny, window.open returns null and the menu silently does nothing. It
-      // MUST be allowed so the opener gets a usable handle.
+    it('a "new document" opened as a plain new tab becomes a desk object, not a stranded window', () => {
+      // The user's report: clicking "create new doc" opened a separate window
+      // with no path back to the desk. A plain new tab to a known URL now lands
+      // as a canvas widget instead.
       const result = decidePopup(
         {
           url: 'https://docs.google.com/document/d/abc/edit',
@@ -127,6 +114,48 @@ describe('decidePopup', () => {
           features: '',
           disposition: 'foreground-tab'
         },
+        ctx
+      )
+      expect(result.action).toBe('deny')
+      if (result.action !== 'deny') return
+      expect(result.forwardToRenderer?.url).toContain('docs.google.com')
+    })
+
+    it('denies non-http schemes (javascript:, data:, mailto:) without forwarding', () => {
+      for (const url of ['javascript:alert(1)', 'data:text/html,x', 'mailto:a@b.com']) {
+        const result = decidePopup(
+          { url, frameName: '_blank', features: '', disposition: 'foreground-tab' },
+          ctx
+        )
+        expect(result.action).toBe('deny')
+        if (result.action !== 'deny') return
+        expect(result.forwardToRenderer).toBeUndefined()
+      }
+    })
+  })
+
+  describe('auth exception — a plain new tab that IS an auth flow stays native', () => {
+    it('keeps a foreground-tab to an auth host (accounts.google.com) as a native window', () => {
+      const result = decidePopup(
+        { url: 'https://accounts.google.com/signin/v2', frameName: '', features: '', disposition: 'foreground-tab' },
+        ctx
+      )
+      expect(result.action).toBe('allow')
+    })
+
+    it('keeps a foreground-tab whose path is an oauth/authorize flow native', () => {
+      const result = decidePopup(
+        { url: 'https://provider.example/oauth2/authorize?client_id=x', frameName: '', features: '', disposition: 'foreground-tab' },
+        ctx
+      )
+      expect(result.action).toBe('allow')
+    })
+  })
+
+  describe('regression guards', () => {
+    it('an explicit new-window still opens as a native window (handle-dependent)', () => {
+      const result = decidePopup(
+        { url: 'https://app.example/tool', frameName: '', features: '', disposition: 'new-window' },
         ctx
       )
       expect(result.action).toBe('allow')
