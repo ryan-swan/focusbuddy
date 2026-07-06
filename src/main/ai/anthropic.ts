@@ -1132,6 +1132,127 @@ export async function askWorkspaceStream(
   }
 }
 
+// The workspace brain's "offer to create anything" pass. Given the question the
+// user just asked and the grounded answer it produced, propose 0 to 4 concrete
+// things it could create in PlexiDesk to help them act — a document, spreadsheet,
+// deck, diagram, design, task, table, saved knowledge, or a calendar block. The
+// user approves each one before anything is created; this only proposes. It is
+// deliberately allowed to return nothing: a weak suggestion is worse than none.
+const WS_ACTION_COLUMN_TYPES = new Set([
+  'text-short',
+  'text-long',
+  'number',
+  'checkbox',
+  'single-select',
+  'multi-select',
+  'date',
+  'attachment',
+  'button'
+])
+
+export async function suggestWorkspaceActions(
+  question: string,
+  answer: string,
+  context: Array<{ title: string; docType: string }>,
+  nowMs: number
+): Promise<{ ok: boolean; proposals?: ActionProposal[]; needsApiKey?: boolean; error?: string }> {
+  const c = getClient()
+  if (!c) return { ok: false, needsApiKey: true }
+  const ans = (answer ?? '').trim()
+  if (!ans) return { ok: true, proposals: [] }
+  const system =
+    'You are the PlexiDesk workspace brain. The user asked a question and you already gave them an answer. ' +
+    'Now propose concrete things you could CREATE for them that would genuinely help them act on this. ' +
+    'The user reviews and approves each one before anything is created, so only propose things that are clearly useful and directly implied by the exchange. ' +
+    'Propose AT MOST 4. Prefer returning an empty list over a weak or generic suggestion. ' +
+    'Never fabricate facts, numbers, names or dates: any content you put in a proposal must come from the question or your answer. ' +
+    'Return ONLY a single JSON object, no prose and no code fences. Schema: {"actions":[ ... ]} where each action is exactly one of:\n' +
+    '  {"kind":"create-document","docType":"doc|sheet|slides|map|design","title":"...","reason":"why this helps"}  (doc=written document, sheet=spreadsheet, slides=deck, map=diagram/flowchart, design=design canvas)\n' +
+    '  {"kind":"create-task","title":"short action","notes":"optional detail","reason":"..."}\n' +
+    '  {"kind":"create-table","title":"...","columns":[{"label":"Name","type":"text-short"}],"reason":"..."}  (column type is one of text-short,text-long,number,checkbox,single-select,multi-select,date; add "options":["a","b"] for select types)\n' +
+    '  {"kind":"create-knowledge-entry","title":"...","body":"the real fact/decision to save","tags":["optional"],"reason":"..."}\n' +
+    '  {"kind":"schedule-event","title":"...","startMs":<absolute unix ms>,"durationMinutes":30,"reason":"..."}  (the current time is ' +
+    nowMs +
+    ' ms; only schedule when the user clearly wants time set aside, and put startMs in the near future)'
+  const ctxLines = context.slice(0, 12).map((d) => `- ${d.docType}: ${d.title}`).join('\n')
+  const userMsg =
+    `Question: ${question}\n\nYour answer:\n${ans.slice(0, 4000)}\n\n` +
+    `Already in the workspace (do not duplicate these):\n${ctxLines || '(nothing relevant)'}\n\nReturn the JSON now.`
+  try {
+    const resp = await c.messages.create({
+      model: resolveModel('chat'),
+      max_tokens: 1024,
+      system,
+      messages: [{ role: 'user', content: userMsg }]
+    })
+    recordAiUsage(resolveModel('chat'), resp.usage?.input_tokens ?? 0, resp.usage?.output_tokens ?? 0)
+    if ((resp.stop_reason as string) === 'refusal') return { ok: false, error: 'Claude declined this request.' }
+    const out = resp.content.filter((b) => b.type === 'text').map((b) => ('text' in b ? b.text : '')).join('\n').trim()
+    const jsonStr = extractJson(out)
+    if (!jsonStr) return { ok: true, proposals: [] }
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(jsonStr)
+    } catch {
+      return { ok: true, proposals: [] }
+    }
+    const arr = (parsed as { actions?: unknown[] }).actions
+    if (!Array.isArray(arr)) return { ok: true, proposals: [] }
+    const proposals: ActionProposal[] = []
+    for (let i = 0; i < arr.length && proposals.length < 4; i++) {
+      const d = arr[i] as Record<string, unknown>
+      if (!d || typeof d !== 'object') continue
+      const id = makeProposalId('ws', i)
+      const reason = typeof d.reason === 'string' ? d.reason : undefined
+      const title = typeof d.title === 'string' ? d.title.trim() : ''
+      switch (d.kind) {
+        case 'create-document': {
+          const docType = String(d.docType)
+          if (title && (docType === 'doc' || docType === 'sheet' || docType === 'slides' || docType === 'map' || docType === 'design'))
+            proposals.push({ id, kind: 'create-document', docType, title, reason })
+          break
+        }
+        case 'create-task':
+          if (title) proposals.push({ id, kind: 'create-task', title, notes: typeof d.notes === 'string' ? d.notes : undefined, reason })
+          break
+        case 'create-knowledge-entry': {
+          const body = typeof d.body === 'string' ? d.body.trim() : ''
+          if (title && body)
+            proposals.push({ id, kind: 'create-knowledge-entry', title, body, tags: Array.isArray(d.tags) ? d.tags.map((t) => String(t)).slice(0, 6) : undefined, reason })
+          break
+        }
+        case 'create-table': {
+          const rawCols = Array.isArray(d.columns) ? d.columns : []
+          const columns = rawCols
+            .map((col) => {
+              const co = col as Record<string, unknown>
+              const label = typeof co.label === 'string' ? co.label.trim() : ''
+              const type = String(co.type)
+              if (!label || !WS_ACTION_COLUMN_TYPES.has(type)) return null
+              const options = Array.isArray(co.options) ? co.options.map((o) => String(o)) : undefined
+              return { label, type: type as 'text-short', options }
+            })
+            .filter(Boolean) as Array<{ label: string; type: 'text-short'; options?: string[] }>
+          if (title && columns.length) proposals.push({ id, kind: 'create-table', title, columns, reason })
+          break
+        }
+        case 'schedule-event': {
+          const startMs = typeof d.startMs === 'number' ? d.startMs : NaN
+          const durationMinutes = typeof d.durationMinutes === 'number' ? d.durationMinutes : 30
+          if (title && Number.isFinite(startMs) && startMs > 0)
+            proposals.push({ id, kind: 'schedule-event', title, startMs, durationMinutes: Math.max(5, Math.min(480, durationMinutes)), reason })
+          break
+        }
+        default:
+          break
+      }
+    }
+    return { ok: true, proposals }
+  } catch (e) {
+    return { ok: false, error: (e as Error).message }
+  }
+}
+
 // Auto-filing: read a file's text and propose the tags it should carry (it may
 // belong to several things at once). SUGGEST-ONLY — the caller decides what to
 // accept. Returns an empty list, never a guess, when the content doesn't support
@@ -3866,7 +3987,7 @@ Shape:
 Each deliverable is exactly one of:
   { "kind": "create-task", "title": "short task title", "notes": "optional detail", "reason": "what in the transcript calls for this" }
   { "kind": "create-knowledge-entry", "title": "fact or decision title", "body": "the real content from the conversation", "tags": ["optional"], "reason": "..." }
-  { "kind": "create-document", "docType": "doc", "title": "document title", "reason": "..." }   // docType is one of doc (a written document), sheet (a spreadsheet), slides (a deck)
+  { "kind": "create-document", "docType": "doc", "title": "document title", "reason": "..." }   // docType is one of doc (a written document), sheet (a spreadsheet), slides (a deck), map (a diagram / flowchart), design (a design canvas)
 
 HARD RULES:
 - The summary and every deliverable MUST be grounded in the transcript. Never invent facts, names, numbers, owners, dates, or decisions that were not stated.
@@ -3898,7 +4019,14 @@ function parseMeetingDeliverables(arr: unknown[]): ActionProposal[] {
       }
       case 'create-document': {
         const docType = String(d.docType)
-        if (title && (docType === 'doc' || docType === 'sheet' || docType === 'slides'))
+        if (
+          title &&
+          (docType === 'doc' ||
+            docType === 'sheet' ||
+            docType === 'slides' ||
+            docType === 'map' ||
+            docType === 'design')
+        )
           out.push({ id, kind: 'create-document', docType, title, reason })
         break
       }

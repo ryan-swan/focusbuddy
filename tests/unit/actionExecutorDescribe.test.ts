@@ -59,4 +59,21 @@ describe('describeProposal: AI-acts-across-suite ops', () => {
     expect(d.icon).toBe('psychology')
     expect(d.subject).toBe('Brand voice rule')
   })
+
+  it('describes every create-document docType, including map and design', () => {
+    const cases: Array<['doc' | 'sheet' | 'slides' | 'map' | 'design', string, string]> = [
+      ['doc', 'New document', 'description'],
+      ['sheet', 'New spreadsheet', 'table_chart'],
+      ['slides', 'New deck', 'slideshow'],
+      ['map', 'New diagram', 'account_tree'],
+      ['design', 'New design', 'palette']
+    ]
+    for (const [docType, verb, icon] of cases) {
+      const p: ActionProposal = { id: `cd-${docType}`, kind: 'create-document', docType, title: 'X' }
+      const d = describeProposal(p)
+      expect(d.verb).toBe(verb)
+      expect(d.icon).toBe(icon)
+      expect(d.subject).toBe('X')
+    }
+  })
 })

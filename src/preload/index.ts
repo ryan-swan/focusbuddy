@@ -752,6 +752,7 @@ const api = {
       answer?: string
       citedDocIds?: string[]
       sources?: Array<{ docId: string; title: string; docType: string; snippet: string; cited: boolean }>
+      proposals?: ActionProposal[]
       needsApiKey?: boolean
       error?: string
     }> => ipcRenderer.invoke('workspace:ask', question, history),
@@ -767,6 +768,7 @@ const api = {
       ok: boolean
       answer?: string
       sources?: Array<{ docId: string; title: string; docType: string; snippet: string; cited: boolean }>
+      proposals?: ActionProposal[]
       needsApiKey?: boolean
       error?: string
     }> => {

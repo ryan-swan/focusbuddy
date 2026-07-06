@@ -413,6 +413,7 @@ import {
   suggestFileTags,
   askWorkspace,
   askWorkspaceStream,
+  suggestWorkspaceActions,
   suggestTableRows,
   summarizeRecentTrail,
   suggestDocContent,
@@ -447,7 +448,8 @@ import type {
   Widget,
   WidgetDraft,
   WidgetPatch,
-  WireType
+  WireType,
+  ActionProposal
 } from '@shared/types'
 
 // A plain-language description of the content format a wired output widget
@@ -1356,7 +1358,20 @@ export function registerIpcHandlers(): void {
         snippet: s.snippet,
         cited: cited.has(s.docId)
       }))
-      return { ...res, sources: sourceMeta }
+      // "Offer to create anything": once the answer is in, let the brain propose
+      // concrete things it could build from it. Approval happens in the renderer;
+      // a failure here never blocks the answer.
+      let proposals: ActionProposal[] = []
+      if (res.ok && res.answer) {
+        const suggestion = await suggestWorkspaceActions(
+          question,
+          res.answer,
+          sources.map((s) => ({ title: s.title, docType: s.docType })),
+          Date.now()
+        ).catch(() => ({ ok: false as const }))
+        if (suggestion.ok && 'proposals' in suggestion && suggestion.proposals) proposals = suggestion.proposals
+      }
+      return { ...res, sources: sourceMeta, proposals }
     }
   )
   // Streaming ask-your-workspace: same retrieval + grounding, but the answer
@@ -1393,7 +1408,20 @@ export function registerIpcHandlers(): void {
         snippet: s.snippet,
         cited: cited.has(s.docId)
       }))
-      return { ...res, sources: sourceMeta }
+      // "Offer to create anything": once the answer is in, let the brain propose
+      // concrete things it could build from it. Approval happens in the renderer;
+      // a failure here never blocks the answer.
+      let proposals: ActionProposal[] = []
+      if (res.ok && res.answer) {
+        const suggestion = await suggestWorkspaceActions(
+          question,
+          res.answer,
+          sources.map((s) => ({ title: s.title, docType: s.docType })),
+          Date.now()
+        ).catch(() => ({ ok: false as const }))
+        if (suggestion.ok && 'proposals' in suggestion && suggestion.proposals) proposals = suggestion.proposals
+      }
+      return { ...res, sources: sourceMeta, proposals }
     }
   )
   // The documents most related to a given one, by content overlap. No AI.

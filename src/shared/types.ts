@@ -592,11 +592,12 @@ export type ActionProposal =
     }
   | {
       // Create a standalone document in the Documents library: a written doc, a
-      // spreadsheet, or a slide deck. Used when a conversation produces a real
-      // deliverable that belongs as its own file rather than a canvas widget.
+      // spreadsheet, a slide deck, a diagram/map, or a design canvas. Used when a
+      // conversation produces a real deliverable that belongs as its own file
+      // rather than a canvas widget.
       id: string
       kind: 'create-document'
-      docType: 'doc' | 'sheet' | 'slides'
+      docType: 'doc' | 'sheet' | 'slides' | 'map' | 'design'
       title: string
       reason?: string
     }
