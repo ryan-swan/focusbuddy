@@ -5,6 +5,7 @@
 
 import { app } from 'electron'
 import { getDb } from './database'
+import { estimateCostMicros } from '../ai/aiCost'
 
 export interface TelemetrySnapshot {
   appVersion: string
@@ -16,6 +17,33 @@ export interface TelemetrySnapshot {
   focusSessions: number
   focusMinutes: number
   aiCalls: number
+  // Real cumulative token usage from the model API, plus an estimated dollar
+  // spend at the rates in ai/aiCost. Tokens are exact; cost is an estimate.
+  aiInputTokens: number
+  aiOutputTokens: number
+  aiEstCostUsd: number
+}
+
+function bumpCounter(key: string, n: number): void {
+  if (!n) return
+  getDb()
+    .prepare(
+      `INSERT INTO usage_counters (key, value) VALUES (?, ?)
+       ON CONFLICT(key) DO UPDATE SET value = value + ?`
+    )
+    .run(key, n, n)
+}
+
+// Record REAL token usage from one model response, plus its estimated cost.
+// Never throws — telemetry must not break a feature.
+export function recordAiUsage(model: string, inputTokens: number, outputTokens: number): void {
+  try {
+    bumpCounter('ai_input_tokens', Math.max(0, Math.round(inputTokens || 0)))
+    bumpCounter('ai_output_tokens', Math.max(0, Math.round(outputTokens || 0)))
+    bumpCounter('ai_cost_micros', estimateCostMicros(model, inputTokens || 0, outputTokens || 0))
+  } catch {
+    // swallow
+  }
 }
 
 // Increment the cumulative AI-call counter. Called whenever the app makes a
@@ -91,6 +119,9 @@ export function collectTelemetry(): TelemetrySnapshot {
     folderCount,
     focusSessions,
     focusMinutes,
-    aiCalls: counter('ai_calls')
+    aiCalls: counter('ai_calls'),
+    aiInputTokens: counter('ai_input_tokens'),
+    aiOutputTokens: counter('ai_output_tokens'),
+    aiEstCostUsd: Math.round((counter('ai_cost_micros') / 1e6) * 100) / 100
   }
 }
