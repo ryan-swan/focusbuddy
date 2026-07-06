@@ -343,6 +343,17 @@ export default function DocEditor({
       const res = await window.api.office.importDocx()
       if (res.ok && res.html != null) {
         editor.chain().focus().insertContent(htmlToDocContent(res.html)).run()
+        // Bring the document's page setup across too: size, orientation, margins
+        // and the running header/footer (mammoth only converts the body).
+        if (res.page) {
+          updatePageSetup({
+            size: res.page.size,
+            orientation: res.page.orientation,
+            margin: res.page.margin,
+            ...(res.page.header ? { header: res.page.header } : {}),
+            ...(res.page.footer ? { footer: res.page.footer } : {})
+          })
+        }
         setOfficeMsg('Imported. Word styling is approximated, not pixel-perfect.')
       } else if (res.error) {
         setOfficeMsg(res.error)

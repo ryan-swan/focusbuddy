@@ -16,6 +16,10 @@ export interface OfficeImportResult {
   ok: boolean
   html?: string
   fileName?: string
+  // Page setup recovered from the .docx (size, orientation, margins) plus the
+  // running header/footer text. Absent when the file has none. mammoth converts
+  // only the body, so without this the header/footer would be silently dropped.
+  page?: PageSetupInput
   error?: string
 }
 export interface OfficeExportResult {
@@ -51,8 +55,96 @@ function focusedWindow(): BrowserWindow | undefined {
   return BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0]
 }
 
+// Text runs (<w:t> or the unprefixed <t> that some writers, incl. turbodocx's
+// header/footer parts, emit), joined and entity-decoded.
+function docxText(xml: string): string {
+  return [...xml.matchAll(/<(?:w:)?t\b[^>]*>([\s\S]*?)<\/(?:w:)?t>/g)]
+    .map((m) => m[1])
+    .join('')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&amp;/g, '&')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+// A header/footer part references an auto page number via a PAGE field, whether a
+// simple field, a complex field's instruction text, or their unprefixed forms.
+function hasPageNumberField(xml: string): boolean {
+  return /instr="[^"]*\bPAGE\b/.test(xml) || /<(?:w:)?instrText[^>]*>[^<]*\bPAGE\b/.test(xml)
+}
+
+// Parse a .docx package's section properties into our PageSetupInput: paper size,
+// orientation, margins, and the default running header/footer. Pure (takes the
+// file bytes) so it can be unit-tested against a constructed package.
+export async function parseDocxPageSetup(data: Uint8Array): Promise<PageSetupInput | undefined> {
+  const { unzipSync, strFromU8 } = await import('fflate')
+  const files = unzipSync(data) as Record<string, Uint8Array>
+  const docKey = Object.keys(files).find((n) => /word\/document\.xml$/i.test(n))
+  if (!docKey) return undefined
+  const doc = strFromU8(files[docKey])
+  const sect = /<w:sectPr\b[\s\S]*?<\/w:sectPr>/.exec(doc)?.[0] ?? ''
+
+  // Page size + orientation from pgSz (twips). Match to the nearest known paper.
+  const pgSz = /<w:pgSz\b[^>]*>/.exec(sect)?.[0] ?? ''
+  const w = Number(/w:w="(\d+)"/.exec(pgSz)?.[1] ?? 0)
+  const orientAttr = /w:orient="([^"]+)"/.exec(pgSz)?.[1]
+  const orientation: PageSetupInput['orientation'] = orientAttr === 'landscape' ? 'landscape' : 'portrait'
+  // A4 portrait width is 11906 twips, Letter 12240. Compare on the short edge.
+  const shortEdge = orientation === 'landscape' ? Number(/w:h="(\d+)"/.exec(pgSz)?.[1] ?? w) : w
+  const size: PageSetupInput['size'] = shortEdge && Math.abs(shortEdge - 11906) < Math.abs(shortEdge - 12240) ? 'a4' : 'letter'
+
+  // Margins from pgMar (twips → inches).
+  const pgMar = /<w:pgMar\b[^>]*>/.exec(sect)?.[0] ?? ''
+  const twipIn = (v: string | undefined): number => (v ? Math.round((Number(v) / 1440) * 100) / 100 : 1)
+  const margin = {
+    top: twipIn(/w:top="(-?\d+)"/.exec(pgMar)?.[1]),
+    right: twipIn(/w:right="(\d+)"/.exec(pgMar)?.[1]),
+    bottom: twipIn(/w:bottom="(-?\d+)"/.exec(pgMar)?.[1]),
+    left: twipIn(/w:left="(\d+)"/.exec(pgMar)?.[1])
+  }
+
+  // Resolve the default header/footer references through the document rels.
+  const relsKey = Object.keys(files).find((n) => /word\/_rels\/document\.xml\.rels$/i.test(n))
+  const rels = new Map<string, string>()
+  if (relsKey) {
+    for (const rel of strFromU8(files[relsKey]).match(/<Relationship\b[^>]*\/?>/g) ?? []) {
+      const id = /Id="([^"]+)"/.exec(rel)?.[1]
+      const target = /Target="([^"]+)"/.exec(rel)?.[1]
+      if (id && target) rels.set(id, target.replace(/^\//, ''))
+    }
+  }
+  const refPart = (kind: 'header' | 'footer'): PageSetupInput['header'] => {
+    // Prefer the default reference; fall back to the first of this kind. Search the
+    // whole document rather than only the extracted sectPr so a differently-shaped
+    // section (or an unmatched sectPr) still resolves the reference.
+    const refs = doc.match(new RegExp(`<w:${kind}Reference\\b[^>]*>`, 'g')) ?? []
+    const def = refs.find((r) => /w:type="default"/.test(r)) ?? refs[0]
+    if (!def) return undefined
+    const rId = /r:id="([^"]+)"/.exec(def)?.[1]
+    if (!rId) return undefined
+    const target = rels.get(rId)
+    if (!target) return undefined
+    const key = Object.keys(files).find((n) => n.toLowerCase() === `word/${target.toLowerCase()}`)
+    if (!key) return undefined
+    const xml = strFromU8(files[key])
+    const text = docxText(xml)
+    const showPageNumber = hasPageNumberField(xml)
+    if (!text && !showPageNumber) return undefined
+    return { ...(text ? { text } : {}), ...(showPageNumber ? { showPageNumber: true } : {}) }
+  }
+
+  const header = refPart('header')
+  const footer = refPart('footer')
+  return { size, orientation, margin, ...(header ? { header } : {}), ...(footer ? { footer } : {}) }
+}
+
 // Open a .docx and convert it to HTML with mammoth. The renderer turns the HTML
-// into editor JSON. Images come through as base64 data URIs.
+// into editor JSON. Images come through as base64 data URIs. The section
+// properties (page size, margins, running header/footer) are parsed separately
+// because mammoth converts only the body.
 export async function importDocx(): Promise<OfficeImportResult> {
   const win = focusedWindow()
   const res = await dialog.showOpenDialog(win!, {
@@ -69,7 +161,8 @@ export async function importDocx(): Promise<OfficeImportResult> {
     const mammoth = (await import('mammoth')).default
     const buffer = await readFile(path)
     const out = await mammoth.convertToHtml({ buffer })
-    return { ok: true, html: out.value, fileName: basename(path) }
+    const page = await parseDocxPageSetup(new Uint8Array(buffer)).catch(() => undefined)
+    return { ok: true, html: out.value, fileName: basename(path), ...(page ? { page } : {}) }
   } catch (e) {
     return { ok: false, error: `Could not read that document: ${(e as Error).message}` }
   }

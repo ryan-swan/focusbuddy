@@ -97,6 +97,8 @@ interface PageSetupInput {
   size: 'letter' | 'a4'
   orientation: 'portrait' | 'landscape'
   margin: { top: number; right: number; bottom: number; left: number }
+  header?: { text?: string; showPageNumber?: boolean }
+  footer?: { text?: string; showPageNumber?: boolean }
 }
 
 const api = {
@@ -1644,7 +1646,7 @@ const api = {
   // Office interop for the document editor: import .docx, export .docx / PDF,
   // and pick an image to embed.
   office: {
-    importDocx: (): Promise<{ ok: boolean; html?: string; fileName?: string; error?: string }> =>
+    importDocx: (): Promise<{ ok: boolean; html?: string; fileName?: string; page?: PageSetupInput; error?: string }> =>
       ipcRenderer.invoke('office:importDocx'),
     exportDocx: (input: {
       html: string
