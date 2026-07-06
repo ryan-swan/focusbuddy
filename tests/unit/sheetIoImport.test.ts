@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import * as XLSX from 'xlsx'
 import { buildStyledXlsx } from '../../src/main/sheetXlsxWriter'
-import { _worksheetToTabForTest as worksheetToTab } from '../../src/main/sheetIo'
+import { _worksheetToTabForTest as worksheetToTab, parseXlsxFreeze } from '../../src/main/sheetIo'
 import type { SheetBodyV2 } from '../../src/shared/types'
 
 // End-to-end fidelity: write a styled .xlsx (exceljs) then read it back through
@@ -54,5 +54,19 @@ describe('xlsx export → SheetJS import round-trip', () => {
     // 40px → 30pt on write → ~40px back.
     expect(tab.rowHeights![0]).toBeGreaterThan(34)
     expect(tab.rowHeights![0]).toBeLessThan(46)
+  })
+
+  it('recovers frozen panes that SheetJS drops (read from the package XML)', async () => {
+    const withFreeze: SheetBodyV2 = {
+      version: 2,
+      sheets: [
+        { id: 't1', name: 'Budget', columns: ['A', 'B'], rows: [['a', 'b'], ['c', 'd']], freeze: { rows: 1, cols: 2 } },
+        { id: 't2', name: 'Plain', columns: ['A'], rows: [['x']] }
+      ]
+    }
+    const buf = await buildStyledXlsx(withFreeze)
+    const freeze = await parseXlsxFreeze(new Uint8Array(buf))
+    expect(freeze['Budget']).toEqual({ rows: 1, cols: 2 })
+    expect(freeze['Plain']).toBeUndefined() // no pane written, none invented
   })
 })

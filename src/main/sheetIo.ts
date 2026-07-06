@@ -110,6 +110,43 @@ export function _worksheetToTabForTest(ws: XLSX.WorkSheet, name: string): SheetT
   return worksheetToTab(ws, name)
 }
 
+// Frozen panes keyed by sheet name. SheetJS does not surface freeze panes, so we
+// read them straight from the package XML (<pane xSplit ySplit state="frozen">).
+// xSplit is the number of frozen columns, ySplit the frozen rows.
+export async function parseXlsxFreeze(data: Uint8Array): Promise<Record<string, { rows: number; cols: number }>> {
+  const out: Record<string, { rows: number; cols: number }> = {}
+  try {
+    const { unzipSync, strFromU8 } = await import('fflate')
+    const files = unzipSync(data) as Record<string, Uint8Array>
+    const wbKey = Object.keys(files).find((n) => /xl\/workbook\.xml$/i.test(n))
+    const relsKey = Object.keys(files).find((n) => /xl\/_rels\/workbook\.xml\.rels$/i.test(n))
+    if (!wbKey || !relsKey) return out
+    const rels = new Map<string, string>()
+    for (const rel of strFromU8(files[relsKey]).match(/<Relationship\b[^>]*\/?>/g) ?? []) {
+      const id = /Id="([^"]+)"/.exec(rel)?.[1]
+      const target = /Target="([^"]+)"/.exec(rel)?.[1]
+      if (id && target) rels.set(id, target.replace(/^\//, '').replace(/^xl\//, ''))
+    }
+    for (const sheetTag of strFromU8(files[wbKey]).match(/<sheet\b[^>]*\/?>/g) ?? []) {
+      const name = /name="([^"]+)"/.exec(sheetTag)?.[1]
+      const rid = /r:id="([^"]+)"/.exec(sheetTag)?.[1]
+      if (!name || !rid) continue
+      const target = rels.get(rid)
+      if (!target) continue
+      const key = Object.keys(files).find((n) => n.toLowerCase() === `xl/${target.toLowerCase()}`)
+      if (!key) continue
+      const pane = /<pane\b[^>]*>/.exec(strFromU8(files[key]))?.[0]
+      if (!pane || !/state="frozen(Split)?"/.test(pane)) continue
+      const cols = Number(/xSplit="(\d+)"/.exec(pane)?.[1] ?? 0)
+      const rows = Number(/ySplit="(\d+)"/.exec(pane)?.[1] ?? 0)
+      if (rows > 0 || cols > 0) out[name] = { rows, cols }
+    }
+  } catch {
+    // A malformed package just yields no freeze info; never throw here.
+  }
+  return out
+}
+
 export async function importSheet(): Promise<SheetImportResult> {
   const win = focusedWindow()
   const res = await dialog.showOpenDialog(win!, {
@@ -126,6 +163,12 @@ export async function importSheet(): Promise<SheetImportResult> {
     const wb = XLSX.read(buf, { type: 'buffer', cellFormula: true, cellNF: true, cellText: true, cellStyles: true })
     const sheets = wb.SheetNames.map((sn) => worksheetToTab(wb.Sheets[sn], sn))
     if (!sheets.length) return { ok: false, error: 'That workbook has no sheets.' }
+    // Recover frozen panes (SheetJS drops them) straight from the package XML.
+    const freeze = await parseXlsxFreeze(new Uint8Array(buf))
+    for (const tab of sheets) {
+      const f = freeze[tab.name]
+      if (f) tab.freeze = f
+    }
     return { ok: true, name: basename(path), body: { version: 2, sheets, activeSheet: 0 } }
   } catch (e) {
     return { ok: false, error: `Could not read that file: ${(e as Error).message}` }
