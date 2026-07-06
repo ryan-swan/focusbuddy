@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import * as XLSX from 'xlsx'
 import { buildStyledXlsx } from '../../src/main/sheetXlsxWriter'
-import { _worksheetToTabForTest as worksheetToTab, parseXlsxFreeze } from '../../src/main/sheetIo'
+import { _worksheetToTabForTest as worksheetToTab, parseXlsxFreeze, parseXlsxValidations } from '../../src/main/sheetIo'
 import type { SheetBodyV2 } from '../../src/shared/types'
 
 // End-to-end fidelity: write a styled .xlsx (exceljs) then read it back through
@@ -54,6 +54,35 @@ describe('xlsx export → SheetJS import round-trip', () => {
     // 40px → 30pt on write → ~40px back.
     expect(tab.rowHeights![0]).toBeGreaterThan(34)
     expect(tab.rowHeights![0]).toBeLessThan(46)
+  })
+
+  it('round-trips data validations (dropdown list, number bound, non-empty)', async () => {
+    const withVal: SheetBodyV2 = {
+      version: 2,
+      sheets: [
+        {
+          id: 't1',
+          name: 'Form',
+          columns: ['A', 'B', 'C'],
+          rows: [['', '', '']],
+          validations: [
+            { id: 'v1', range: 'A1:A10', rule: { kind: 'list', values: ['Yes', 'No', 'Maybe'] } },
+            { id: 'v2', range: 'B1:B10', rule: { kind: 'number', op: 'between', value: 1, value2: 100 } },
+            { id: 'v3', range: 'C1:C10', rule: { kind: 'textNotEmpty' }, strict: true }
+          ]
+        }
+      ]
+    }
+    const buf = await buildStyledXlsx(withVal)
+    const vals = await parseXlsxValidations(new Uint8Array(buf))
+    const rules = vals['Form']
+    expect(rules).toBeTruthy()
+    const list = rules.find((r) => r.rule.kind === 'list')
+    expect(list?.range.startsWith('A1')).toBe(true)
+    expect((list!.rule as { values: string[] }).values).toEqual(['Yes', 'No', 'Maybe'])
+    const num = rules.find((r) => r.rule.kind === 'number')
+    expect(num?.rule).toMatchObject({ kind: 'number', op: 'between', value: 1, value2: 100 })
+    expect(rules.some((r) => r.rule.kind === 'textNotEmpty')).toBe(true)
   })
 
   it('recovers frozen panes that SheetJS drops (read from the package XML)', async () => {
