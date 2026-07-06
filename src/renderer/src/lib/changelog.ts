@@ -36,6 +36,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.2.0',
+    date: '2026-07-06T20:30:00Z',
+    title: 'PlexiDesk 3.2 — an assistant that knows your whole workspace',
+    tag: 'feature',
+    summary:
+      'The assistant grows from a document helper into a brain for your whole workspace. Open any document and the AI panel now has Ask your workspace at the top: ask anything and it draws on every document, sheet and note across all your desks, answers grounded with citations, and inserts the result straight into your document. It is honest by design, it says plainly when it cannot find something rather than inventing an answer. And the dashboard gains a Daily Brief that, the moment you open the app, reads your real open tasks, your calendar for the week ahead and your recent documents, then tells you the single most important thing to do today and flags any deadline that is at risk or not yet scheduled. Both features run on your own Anthropic key, and both degrade gracefully without one.',
+    highlights: [
+      'Ask your workspace, in the document sidebar: grounded, cited answers drawn from every doc, sheet and note across all your desks, insertable into the page.',
+      'Daily Brief on the dashboard: a proactive, prioritised summary built from your real tasks, calendar and recent documents.',
+      'Grounded and honest: answers cite their sources and say when they do not know; an empty day is reported as clear, never fabricated.'
+    ]
+  },
+  {
     version: '3.1.1',
     date: '2026-07-06T18:00:00Z',
     title: 'PlexiDesk 3.1.1 — spreadsheet feel and a way back from the browser',
