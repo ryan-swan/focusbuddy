@@ -6,8 +6,17 @@ import Icon from '../Icon'
 // they typed). Loads once on mount and can be refreshed. Honest states throughout:
 // a missing API key and an empty/quiet workspace each say so plainly rather than
 // showing a fabricated plan.
+interface BriefAction {
+  taskId: string
+  title: string
+  startMs: number
+  durationMin: number
+}
+
 export default function DailyBriefCard(): JSX.Element {
   const [brief, setBrief] = useState<string | null>(null)
+  const [actions, setActions] = useState<BriefAction[]>([])
+  const [scheduled, setScheduled] = useState<Set<string>>(new Set())
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [needsKey, setNeedsKey] = useState(false)
@@ -18,8 +27,10 @@ export default function DailyBriefCard(): JSX.Element {
     setBusy(true)
     setError(null)
     setNeedsKey(false)
+    setScheduled(new Set())
     try {
       const res = await window.api.ai.dailyBrief()
+      setActions(res.actions ?? [])
       if (res.ok) setBrief(res.brief ?? '')
       else if (res.needsApiKey) setNeedsKey(true)
       else setError(res.error ?? 'Could not build your brief.')
@@ -28,6 +39,19 @@ export default function DailyBriefCard(): JSX.Element {
     } finally {
       setBusy(false)
     }
+  }
+
+  async function schedule(a: BriefAction): Promise<void> {
+    try {
+      await window.api.timeBlocks.create({ taskId: a.taskId, title: a.title, startMs: a.startMs, durationMin: a.durationMin })
+      setScheduled((s) => new Set(s).add(a.taskId))
+    } catch (e) {
+      setError((e as Error).message)
+    }
+  }
+
+  function whenLabel(ms: number): string {
+    return new Date(ms).toLocaleString(undefined, { weekday: 'short', hour: 'numeric', minute: '2-digit' })
   }
 
   useEffect(() => {
@@ -76,6 +100,32 @@ export default function DailyBriefCard(): JSX.Element {
           <p className="whitespace-pre-wrap text-[12.5px] leading-relaxed text-[var(--ink-90)]" data-testid="daily-brief-text">
             {brief}
           </p>
+        )}
+
+        {actions.length > 0 && !busy && (
+          <div className="mt-2 flex flex-col gap-1" data-testid="daily-brief-actions">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--ink-40)]">Plan your time</div>
+            {actions.map((a) => {
+              const done = scheduled.has(a.taskId)
+              return (
+                <div key={a.taskId} className="flex items-center gap-2 rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-base)] px-2 py-1.5">
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-[12px] text-[var(--ink-90)]">{a.title}</div>
+                    <div className="text-[10.5px] text-[var(--ink-50)]">{whenLabel(a.startMs)} · {a.durationMin} min</div>
+                  </div>
+                  <button
+                    onClick={() => void schedule(a)}
+                    disabled={done}
+                    className={`shrink-0 inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] ${done ? 'text-emerald-600 dark:text-emerald-400' : 'bg-[rgb(var(--accent))] text-white'}`}
+                    data-testid="daily-brief-schedule"
+                  >
+                    <Icon name={done ? 'check' : 'calendar_add_on'} size={12} />
+                    {done ? 'Scheduled' : 'Schedule'}
+                  </button>
+                </div>
+              )
+            })}
+          </div>
         )}
       </div>
     </div>

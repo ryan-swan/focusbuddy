@@ -5,11 +5,52 @@
 // to hallucinate a plan.
 
 export interface BriefTask {
+  id?: string
   title: string
   status: string
   priority: number
   importance: number
   dueDate: number | null
+}
+
+// A concrete, grounded action the brief proposes and the user approves: block
+// time for a real task. Computed deterministically from the task list, not by
+// the model, so it never proposes work that doesn't exist.
+export interface BriefAction {
+  taskId: string
+  title: string
+  startMs: number
+  durationMin: number
+}
+
+// Suggest time blocks for the most important tasks that are not already on the
+// calendar. Slots them into tomorrow morning. Deterministic and grounded.
+export function buildBriefActions(
+  tasks: BriefTask[],
+  scheduledTaskIds: Set<string>,
+  nowMs: number,
+  max = 3
+): BriefAction[] {
+  const candidates = tasks
+    .filter((t) => t.id && !scheduledTaskIds.has(t.id) && t.status !== 'done')
+    .sort((a, b) => b.importance - a.importance || a.priority - b.priority || (a.dueDate ?? Infinity) - (b.dueDate ?? Infinity))
+    .slice(0, max)
+
+  const base = new Date(nowMs)
+  base.setDate(base.getDate() + 1)
+  base.setHours(9, 0, 0, 0)
+  const start = base.getTime()
+  const slots = [
+    { offsetMin: 0, durationMin: 90 },
+    { offsetMin: 120, durationMin: 60 },
+    { offsetMin: 240, durationMin: 60 }
+  ]
+  return candidates.map((t, i) => ({
+    taskId: t.id as string,
+    title: t.title,
+    startMs: start + (slots[i]?.offsetMin ?? i * 120) * 60_000,
+    durationMin: slots[i]?.durationMin ?? 60
+  }))
 }
 export interface BriefBlock {
   title: string

@@ -931,34 +931,38 @@ export async function generateProactiveWelcome(taskId: string): Promise<ChatResp
 // not from anything they typed. This is the standing habit that makes the app the
 // first thing opened. Grounded only in the assembled state; an empty workspace
 // returns an honest "your day is clear" without a model call (no fabricated plan).
-export async function generateDailyBrief(): Promise<{ ok: boolean; brief?: string; needsApiKey?: boolean; error?: string }> {
+export async function generateDailyBrief(): Promise<{ ok: boolean; brief?: string; actions?: import('./dailyBriefContext').BriefAction[]; needsApiKey?: boolean; error?: string }> {
   const { listNodes } = require('../db/nodes') as typeof import('../db/nodes')
   const { listBlocksInRange } = require('../db/timeBlocks') as typeof import('../db/timeBlocks')
   const { listDocuments } = require('../db/documents') as typeof import('../db/documents')
   const {
     buildBriefContext,
+    buildBriefActions,
     briefIsEmpty
   } = require('./dailyBriefContext') as typeof import('./dailyBriefContext')
 
   const now = Date.now()
   const tasks = listNodes()
     .filter((n) => n.kind === 'task' && (n.status === 'open' || n.status === 'in_progress'))
-    .map((n) => ({ title: n.title, status: n.status, priority: n.priority, importance: n.importance, dueDate: n.dueDate }))
-  const blocks = listBlocksInRange(now, now + 7 * 24 * 60 * 60 * 1000).map((b) => ({
-    title: b.title,
-    startMs: b.startMs,
-    durationMin: b.durationMin
-  }))
+    .map((n) => ({ id: n.id, title: n.title, status: n.status, priority: n.priority, importance: n.importance, dueDate: n.dueDate }))
+  const weekBlocks = listBlocksInRange(now, now + 7 * 24 * 60 * 60 * 1000)
+  const blocks = weekBlocks.map((b) => ({ title: b.title, startMs: b.startMs, durationMin: b.durationMin }))
   const docs = listDocuments()
     .slice(0, 8)
     .map((d) => ({ title: d.title, docType: d.docType }))
 
+  // Concrete, grounded "block time for this" suggestions the user approves. Built
+  // deterministically from real tasks that aren't already on the calendar, so
+  // they work with or without an API key.
+  const scheduled = new Set(weekBlocks.map((b) => b.taskId).filter((id): id is string => !!id))
+  const actions = buildBriefActions(tasks, scheduled, now)
+
   if (briefIsEmpty(tasks, blocks, docs)) {
-    return { ok: true, brief: 'Your workspace is clear — no open tasks or scheduled blocks. A good moment to decide the one thing that would move the needle, and put it on the calendar.' }
+    return { ok: true, brief: 'Your workspace is clear — no open tasks or scheduled blocks. A good moment to decide the one thing that would move the needle, and put it on the calendar.', actions: [] }
   }
 
   const c = getClient()
-  if (!c) return { ok: false, needsApiKey: true, error: 'No Anthropic API key set. Open Settings → AI · API keys to paste one.' }
+  if (!c) return { ok: false, needsApiKey: true, actions, error: 'No Anthropic API key set. Open Settings → AI · API keys to paste one.' }
 
   const system =
     "You are the user's sharp, trusted chief of staff. From the real workspace state below, write a short morning brief. Lead with the single most important thing to do today. Then give 3 to 5 prioritised, specific items. Call out any deadline that is at risk or not yet on the calendar. Ground everything strictly in the state provided: never invent tasks, dates, meetings or documents. Keep it under 150 words, plain confident prose, no preamble and no sign-off."
@@ -978,7 +982,7 @@ export async function generateDailyBrief(): Promise<{ ok: boolean; brief?: strin
       .join('\n')
       .trim()
     if (!text) return { ok: false, error: 'Empty response from model.' }
-    return { ok: true, brief: text }
+    return { ok: true, brief: text, actions }
   } catch (e) {
     return { ok: false, error: (e as Error).message }
   }
