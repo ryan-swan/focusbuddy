@@ -36,6 +36,20 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.2.2',
+    date: '2026-07-07T09:00:00Z',
+    title: 'PlexiDesk 3.2.2 — the assistant, everywhere and sharper',
+    tag: 'feature',
+    summary:
+      'The workspace assistant is now the same on every surface and better at its job. Ask your workspace lives at the top of the AI panel in Docs, Sheets, Slides and Design, so wherever you are you can ask a question grounded in everything across your desks. Answers now stream in as they are written, cite sources you can click to open, find facts buried deep in long documents rather than only their opening, and can be scoped to just the open document when you want a focused answer. Under the hood, AI token usage and an estimated spend are now measured and shown in Settings so you can see what the assistant costs. Sharing also now records who shared, groundwork for crediting the person who invited you.',
+    highlights: [
+      'Ask your workspace is now on every editor — Docs, Sheets, Slides and Design.',
+      'Answers stream live, cite clickable sources, and search deep passages, not just the top of a document.',
+      'Scope a question to the whole workspace or just the open document.',
+      'AI usage and estimated spend are measured and shown in Settings → AI.'
+    ]
+  },
+  {
     version: '3.2.1',
     date: '2026-07-07T06:00:00Z',
     title: 'PlexiDesk 3.2.1 — the assistant sees more, and plans your day',
