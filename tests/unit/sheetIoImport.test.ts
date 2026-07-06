@@ -1,7 +1,12 @@
 import { describe, it, expect } from 'vitest'
 import * as XLSX from 'xlsx'
 import { buildStyledXlsx } from '../../src/main/sheetXlsxWriter'
-import { _worksheetToTabForTest as worksheetToTab, parseXlsxFreeze, parseXlsxValidations } from '../../src/main/sheetIo'
+import {
+  _worksheetToTabForTest as worksheetToTab,
+  parseXlsxFreeze,
+  parseXlsxValidations,
+  parseXlsxCondFormatting
+} from '../../src/main/sheetIo'
 import type { SheetBodyV2 } from '../../src/shared/types'
 
 // End-to-end fidelity: write a styled .xlsx (exceljs) then read it back through
@@ -83,6 +88,42 @@ describe('xlsx export → SheetJS import round-trip', () => {
     const num = rules.find((r) => r.rule.kind === 'number')
     expect(num?.rule).toMatchObject({ kind: 'number', op: 'between', value: 1, value2: 100 })
     expect(rules.some((r) => r.rule.kind === 'textNotEmpty')).toBe(true)
+  })
+
+  it('round-trips conditional formatting (compare styles + colour scale)', async () => {
+    const withCf: SheetBodyV2 = {
+      version: 2,
+      sheets: [
+        {
+          id: 't1',
+          name: 'Report',
+          columns: ['A', 'B', 'C', 'D'],
+          rows: [['1', 'x', 'y', '5']],
+          condRules: [
+            { id: 'c1', range: 'A1:A20', kind: 'compare', op: 'gt', value: '10', bg: '#fde68a', color: '#ff0000', bold: true },
+            { id: 'c2', range: 'B1:B20', kind: 'compare', op: 'contains', value: 'urgent', bg: '#fecaca' },
+            { id: 'c3', range: 'C1:C20', kind: 'compare', op: 'notEmpty', bg: '#bbf7d0' },
+            { id: 'c4', range: 'D1:D20', kind: 'colorScale', minColor: '#ffffff', midColor: '#fdba74', maxColor: '#3b82f6' }
+          ]
+        }
+      ]
+    }
+    const buf = await buildStyledXlsx(withCf)
+    const cf = await parseXlsxCondFormatting(new Uint8Array(buf))
+    const rules = cf['Report']
+    expect(rules).toBeTruthy()
+
+    const gt = rules.find((r) => r.range.startsWith('A1'))!
+    expect(gt).toMatchObject({ kind: 'compare', op: 'gt', value: '10', bg: '#fde68a', color: '#ff0000', bold: true })
+
+    const contains = rules.find((r) => r.range.startsWith('B1'))!
+    expect(contains).toMatchObject({ kind: 'compare', op: 'contains', value: 'urgent', bg: '#fecaca' })
+
+    const notEmpty = rules.find((r) => r.range.startsWith('C1'))!
+    expect(notEmpty).toMatchObject({ kind: 'compare', op: 'notEmpty', bg: '#bbf7d0' })
+
+    const scale = rules.find((r) => r.range.startsWith('D1'))!
+    expect(scale).toMatchObject({ kind: 'colorScale', minColor: '#ffffff', midColor: '#fdba74', maxColor: '#3b82f6' })
   })
 
   it('recovers frozen panes that SheetJS drops (read from the package XML)', async () => {

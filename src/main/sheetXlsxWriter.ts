@@ -1,5 +1,5 @@
 import ExcelJS from 'exceljs'
-import type { SheetBodyV2, SheetCellFormat, SheetValidation } from '@shared/types'
+import type { SheetBodyV2, SheetCellFormat, SheetValidation, SheetCondRule } from '@shared/types'
 import { toExcelNumFmt, hexToArgb } from '@shared/sheetNumFmt'
 
 const NUM_OP: Record<string, ExcelJS.DataValidationOperator> = {
@@ -74,6 +74,86 @@ export function applyExcelStyle(cell: ExcelJS.Cell, fmt: SheetCellFormat): void 
   if (z) cell.numFmt = z
 }
 
+const CELLIS_OP: Record<string, string> = {
+  gt: 'greaterThan',
+  lt: 'lessThan',
+  ge: 'greaterThanOrEqual',
+  le: 'lessThanOrEqual',
+  eq: 'equal',
+  ne: 'notEqual',
+  between: 'between'
+}
+
+// The top-left cell of an A1 range, used as the relative anchor for expression
+// rules (Excel applies them across the whole ref by offsetting from top-left).
+function topLeftCell(range: string): string {
+  return range.split(':')[0]
+}
+
+// A number formula stays bare; text is quoted so cellIs compares as a string.
+function condFormula(v: string | undefined): string {
+  if (v == null) return '0'
+  return Number.isFinite(Number(v)) && v.trim() !== '' ? v : `"${v.replace(/"/g, "'")}"`
+}
+
+// The exceljs dxf style for a compare rule (fill + font). Conditional-format fills
+// use bgColor in OOXML's dxf, which is the exceljs quirk we mirror.
+function condStyle(rule: SheetCondRule): Record<string, unknown> {
+  const style: Record<string, unknown> = {}
+  const fill = hexToArgb(rule.bg)
+  if (fill) style.fill = { type: 'pattern', pattern: 'solid', bgColor: { argb: fill } }
+  const font: Record<string, unknown> = {}
+  if (rule.bold) font.bold = true
+  const color = hexToArgb(rule.color)
+  if (color) font.color = { argb: color }
+  if (Object.keys(font).length) style.font = font
+  return style
+}
+
+// Map one of our conditional-format rules to an exceljs conditional-formatting
+// rule object. Compare rules round-trip fully; colour-scale / data-bar / icon-set
+// are exported for Excel but not yet re-imported (documented in the reader).
+function condRuleModel(rule: SheetCondRule, priority: number): Record<string, unknown> | null {
+  const kind = rule.kind ?? 'compare'
+  if (kind === 'colorScale') {
+    const colors = [rule.minColor, rule.midColor, rule.maxColor].filter(Boolean).map((c) => ({ argb: hexToArgb(c) }))
+    if (colors.length < 2) return null
+    const cfvo =
+      colors.length === 3
+        ? [{ type: 'min' }, { type: 'percentile', value: 50 }, { type: 'max' }]
+        : [{ type: 'min' }, { type: 'max' }]
+    return { type: 'colorScale', cfvo, color: colors, priority }
+  }
+  if (kind === 'dataBar') {
+    return { type: 'dataBar', cfvo: [{ type: 'min' }, { type: 'max' }], color: { argb: hexToArgb(rule.barColor) || 'FF638EC6' }, priority }
+  }
+  if (kind === 'iconSet') {
+    const name = rule.iconSet === 'traffic' ? '3TrafficLights1' : rule.iconSet === 'triangles' ? '3Triangles' : '3Arrows'
+    return {
+      type: 'iconSet',
+      iconSet: name,
+      cfvo: [
+        { type: 'percent', value: 0 },
+        { type: 'percent', value: 33 },
+        { type: 'percent', value: 67 }
+      ],
+      priority
+    }
+  }
+  // compare
+  const style = condStyle(rule)
+  if (rule.op === 'notEmpty') {
+    return { type: 'expression', formulae: [`LEN(TRIM(${topLeftCell(rule.range)}))>0`], style, priority }
+  }
+  if (rule.op === 'contains') {
+    return { type: 'containsText', operator: 'containsText', text: rule.value ?? '', style, priority }
+  }
+  const op = CELLIS_OP[rule.op]
+  if (!op) return null
+  const formulae = rule.op === 'between' && rule.value2 != null ? [condFormula(rule.value), condFormula(rule.value2)] : [condFormula(rule.value)]
+  return { type: 'cellIs', operator: op, formulae, style, priority }
+}
+
 // Build a fully-styled .xlsx workbook from the sheet body.
 export async function buildStyledXlsx(body: SheetBodyV2): Promise<Buffer> {
   const wb = new ExcelJS.Workbook()
@@ -119,6 +199,12 @@ export async function buildStyledXlsx(body: SheetBodyV2): Promise<Buffer> {
           ws.getCell(r, c).dataValidation = { ...model }
         }
       }
+    }
+    // Conditional formatting so highlight rules / colour scales survive into Excel.
+    let cfPriority = 1
+    for (const rule of tab.condRules ?? []) {
+      const model = condRuleModel(rule, cfPriority++)
+      if (model) ws.addConditionalFormatting({ ref: rule.range, rules: [model as unknown as ExcelJS.ConditionalFormattingRule] })
     }
   }
   return Buffer.from((await wb.xlsx.writeBuffer()) as ArrayBuffer)

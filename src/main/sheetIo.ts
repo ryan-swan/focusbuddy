@@ -8,7 +8,7 @@ import { dialog, BrowserWindow } from 'electron'
 import { basename } from 'path'
 import { readFile, writeFile } from 'fs/promises'
 import * as XLSX from 'xlsx'
-import type { SheetBodyV2, SheetTab, SheetNumberFormat, SheetValidation, SheetValidationRule } from '@shared/types'
+import type { SheetBodyV2, SheetTab, SheetNumberFormat, SheetValidation, SheetValidationRule, SheetCondRule, SheetCondOp } from '@shared/types'
 import { mapNumFmt, toExcelNumFmt } from '@shared/sheetNumFmt'
 import { buildStyledXlsx } from './sheetXlsxWriter'
 
@@ -110,13 +110,116 @@ export function _worksheetToTabForTest(ws: XLSX.WorkSheet, name: string): SheetT
   return worksheetToTab(ws, name)
 }
 
-// Resolve each worksheet's XML by sheet name (name → part XML), reading the
-// workbook's sheet list and rels. Shared by the freeze / validation readers,
-// which recover structure SheetJS does not surface.
-async function worksheetXmlByName(data: Uint8Array): Promise<Map<string, string>> {
+const CELLIS_TO_OP: Record<string, SheetCondOp> = {
+  greaterThan: 'gt',
+  lessThan: 'lt',
+  greaterThanOrEqual: 'ge',
+  lessThanOrEqual: 'le',
+  equal: 'eq',
+  notEqual: 'ne',
+  between: 'between'
+}
+
+// An 8-digit ARGB (as Excel stores colours) to a #RRGGBB hex, dropping alpha.
+function argbToHex(argb: string | undefined): string | undefined {
+  if (!argb) return undefined
+  const h = argb.length === 8 ? argb.slice(2) : argb
+  return /^[0-9a-fA-F]{6}$/.test(h) ? `#${h.toLowerCase()}` : undefined
+}
+
+// Parse styles.xml <dxfs> into an indexed list of {bg,color,bold} — the styles a
+// conditional-format compare rule points at via dxfId.
+function parseDxfs(stylesXml: string): Array<{ bg?: string; color?: string; bold?: boolean }> {
+  const block = /<dxfs\b[^>]*>([\s\S]*?)<\/dxfs>/.exec(stylesXml)?.[1] ?? ''
+  return (block.match(/<dxf>[\s\S]*?<\/dxf>/g) ?? []).map((dxf) => {
+    const font = /<font>[\s\S]*?<\/font>/.exec(dxf)?.[0] ?? ''
+    const out: { bg?: string; color?: string; bold?: boolean } = {}
+    if (/<b\/>|<b\s*\/>|<b>/.test(font)) out.bold = true
+    const fontColor = argbToHex(/<color\b[^>]*\brgb="([0-9a-fA-F]+)"/.exec(font)?.[1])
+    if (fontColor) out.color = fontColor
+    const bg = argbToHex(/<bgColor\b[^>]*\brgb="([0-9a-fA-F]+)"/.exec(dxf)?.[1])
+    if (bg) out.bg = bg
+    return out
+  })
+}
+
+// Conditional formatting keyed by sheet name. SheetJS drops it, so read the
+// <conditionalFormatting> blocks from each worksheet and resolve compare-rule
+// styling through the dxfs table. Colour-scale / data-bar / icon-set rules carry
+// their colours inline, so they round-trip too.
+export async function parseXlsxCondFormatting(data: Uint8Array): Promise<Record<string, SheetCondRule[]>> {
+  const out: Record<string, SheetCondRule[]> = {}
+  try {
+    const { unzipSync, strFromU8 } = await import('fflate')
+    const files = unzipSync(data) as XlsxFiles
+    const stylesKey = Object.keys(files).find((n) => /xl\/styles\.xml$/i.test(n))
+    const dxfs = stylesKey ? parseDxfs(strFromU8(files[stylesKey])) : []
+    let id = 0
+    for (const [name, xml] of worksheetsFromFiles(files, strFromU8)) {
+      const rules: SheetCondRule[] = []
+      for (const cf of xml.match(/<conditionalFormatting\b[\s\S]*?<\/conditionalFormatting>/g) ?? []) {
+        const range = /sqref="([^"]+)"/.exec(cf)?.[1]?.split(/\s+/)[0]
+        if (!range) continue
+        // A cfRule is either self-closing or has children (colour-scale/data-bar
+        // rules contain self-closing <cfvo/> that must not end the match early).
+        for (const cr of cf.match(/<cfRule\b[^>]*\/>|<cfRule\b[^>]*>[\s\S]*?<\/cfRule>/g) ?? []) {
+          const type = /type="([^"]+)"/.exec(cr)?.[1] ?? ''
+          const dxfId = Number(/dxfId="(\d+)"/.exec(cr)?.[1] ?? -1)
+          const style = dxfId >= 0 ? dxfs[dxfId] ?? {} : {}
+          const decode = (s?: string): string | undefined => s?.replace(/&quot;/g, '"').replace(/&amp;/g, '&').trim()
+          const formulae = [...cr.matchAll(/<formula>([\s\S]*?)<\/formula>/g)].map((m) => decode(m[1]) ?? '')
+          let rule: SheetCondRule | null = null
+          const base = { id: `imp-cf-${id++}`, range, ...style }
+          if (type === 'cellIs') {
+            const op = CELLIS_TO_OP[/operator="([^"]+)"/.exec(cr)?.[1] ?? '']
+            if (op) {
+              const val = (f?: string): string | undefined => (f == null ? undefined : /^".*"$/.test(f) ? f.slice(1, -1) : f)
+              rule = { ...base, kind: 'compare', op, value: val(formulae[0]), ...(op === 'between' ? { value2: val(formulae[1]) } : {}) }
+            }
+          } else if (type === 'containsText') {
+            const text = /SEARCH\(\s*"([^"]*)"/.exec(formulae[0] ?? '')?.[1] ?? /text="([^"]*)"/.exec(cr)?.[1]
+            rule = { ...base, kind: 'compare', op: 'contains', value: text ?? '' }
+          } else if (type === 'expression' && /LEN\(TRIM\(/.test(formulae[0] ?? '')) {
+            rule = { ...base, kind: 'compare', op: 'notEmpty' }
+          } else if (type === 'colorScale') {
+            const colors = [...cr.matchAll(/<color\b[^>]*\brgb="([0-9a-fA-F]+)"/g)].map((m) => argbToHex(m[1]))
+            if (colors.length >= 2) {
+              rule = {
+                id: base.id,
+                range,
+                kind: 'colorScale',
+                op: 'gt',
+                minColor: colors[0],
+                ...(colors.length >= 3 ? { midColor: colors[1], maxColor: colors[2] } : { maxColor: colors[colors.length - 1] })
+              }
+            }
+          } else if (type === 'dataBar') {
+            const barColor = argbToHex([...cr.matchAll(/<color\b[^>]*\brgb="([0-9a-fA-F]+)"/g)].map((m) => m[1])[0])
+            rule = { id: base.id, range, kind: 'dataBar', op: 'gt', ...(barColor ? { barColor } : {}) }
+          } else if (type === 'iconSet') {
+            const name2 = /<iconSet\b[^>]*iconSet="([^"]+)"/.exec(cr)?.[1] ?? ''
+            const set = name2.includes('Traffic') ? 'traffic' : name2.includes('Triangle') ? 'triangles' : 'arrows'
+            rule = { id: base.id, range, kind: 'iconSet', op: 'gt', iconSet: set }
+          }
+          if (rule) rules.push(rule)
+        }
+      }
+      if (rules.length) out[name] = rules
+    }
+  } catch {
+    // Malformed package: no conditional formatting recovered, never throw.
+  }
+  return out
+}
+
+type XlsxFiles = Record<string, Uint8Array>
+
+// Resolve each worksheet's XML by sheet name (name → part XML) from an already
+// unzipped package, reading the workbook's sheet list and rels. Shared by the
+// freeze / validation / conditional-format readers, which recover structure
+// SheetJS does not surface.
+function worksheetsFromFiles(files: XlsxFiles, strFromU8: (u: Uint8Array) => string): Map<string, string> {
   const out = new Map<string, string>()
-  const { unzipSync, strFromU8 } = await import('fflate')
-  const files = unzipSync(data) as Record<string, Uint8Array>
   const wbKey = Object.keys(files).find((n) => /xl\/workbook\.xml$/i.test(n))
   const relsKey = Object.keys(files).find((n) => /xl\/_rels\/workbook\.xml\.rels$/i.test(n))
   if (!wbKey || !relsKey) return out
@@ -136,6 +239,11 @@ async function worksheetXmlByName(data: Uint8Array): Promise<Map<string, string>
     if (key) out.set(name, strFromU8(files[key]))
   }
   return out
+}
+
+async function worksheetXmlByName(data: Uint8Array): Promise<Map<string, string>> {
+  const { unzipSync, strFromU8 } = await import('fflate')
+  return worksheetsFromFiles(unzipSync(data) as XlsxFiles, strFromU8)
 }
 
 // Frozen panes keyed by sheet name. SheetJS does not surface freeze panes, so we
@@ -225,15 +333,19 @@ export async function importSheet(): Promise<SheetImportResult> {
     const wb = XLSX.read(buf, { type: 'buffer', cellFormula: true, cellNF: true, cellText: true, cellStyles: true })
     const sheets = wb.SheetNames.map((sn) => worksheetToTab(wb.Sheets[sn], sn))
     if (!sheets.length) return { ok: false, error: 'That workbook has no sheets.' }
-    // Recover frozen panes and data validations (SheetJS drops both) from the XML.
+    // Recover frozen panes, data validations and conditional formatting (SheetJS
+    // drops all three) from the package XML.
     const bytes = new Uint8Array(buf)
     const freeze = await parseXlsxFreeze(bytes)
     const validations = await parseXlsxValidations(bytes)
+    const condFormatting = await parseXlsxCondFormatting(bytes)
     for (const tab of sheets) {
       const f = freeze[tab.name]
       if (f) tab.freeze = f
       const v = validations[tab.name]
       if (v) tab.validations = v
+      const c = condFormatting[tab.name]
+      if (c) tab.condRules = c
     }
     return { ok: true, name: basename(path), body: { version: 2, sheets, activeSheet: 0 } }
   } catch (e) {
