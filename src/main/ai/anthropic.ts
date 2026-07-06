@@ -1076,6 +1076,58 @@ export async function askWorkspace(
   }
 }
 
+// Streaming variant of askWorkspace: same grounding, but the answer is written as
+// plain prose with inline [n] citation markers (no JSON envelope) so it can stream
+// token by token. Deltas go to onDelta; cited docs are derived from the [n]
+// markers present in the final answer. Feels alive without losing citations.
+export async function askWorkspaceStream(
+  question: string,
+  sources: Array<{ docId: string; title: string; docType: string; text: string }>,
+  history: Array<{ question: string; answer: string }>,
+  onDelta: (text: string) => void
+): Promise<{ ok: boolean; answer?: string; citedDocIds?: string[]; needsApiKey?: boolean; error?: string }> {
+  const c = getClient()
+  if (!c) return { ok: false, needsApiKey: true, error: 'No Anthropic API key set. Open Settings · AI · API keys to paste one.' }
+  if (!sources.length) {
+    const msg = "I couldn't find anything in your workspace about that."
+    onDelta(msg)
+    return { ok: true, answer: msg, citedDocIds: [] }
+  }
+  const system =
+    "You answer the user's question using ONLY the workspace documents provided below. Ground every claim in them.\n" +
+    '- If the documents do not contain the answer, say so plainly. NEVER invent facts, numbers, names, dates or quotes that are not present in the sources.\n' +
+    '- This may be a follow-up: resolve references like "it" or "that" using the earlier conversation, but still ground the answer in the documents.\n' +
+    '- Cite the documents you used inline with [n] markers matching their numbers.\n' +
+    '- Be concise and direct. Write a plain-text answer only — no JSON, no markdown code fences.'
+  const docList = sources.map((s, i) => `[${i + 1}] ${s.title} (${s.docType})\n${s.text}`).join('\n\n---\n\n')
+  const convo = history.length
+    ? 'Earlier in this conversation:\n' + history.map((h) => `Q: ${h.question}\nA: ${h.answer}`).join('\n') + '\n\n'
+    : ''
+  const userMsg = `${convo}Question: ${question}\n\nWorkspace documents:\n${docList}\n\nAnswer now:`
+  try {
+    const stream = c.messages.stream({
+      model: resolveModel('chat'),
+      max_tokens: 1500,
+      system,
+      messages: [{ role: 'user', content: userMsg }]
+    })
+    let full = ''
+    stream.on('text', (delta: string) => {
+      full += delta
+      onDelta(delta)
+    })
+    const final = await stream.finalMessage()
+    if ((final.stop_reason as string) === 'refusal') return { ok: false, error: 'Claude declined this request.' }
+    const answer = full.trim().slice(0, 4000)
+    const citedDocIds = sources
+      .filter((_, i) => new RegExp(`\\[${i + 1}\\]`).test(answer))
+      .map((s) => s.docId)
+    return { ok: true, answer, citedDocIds: [...new Set(citedDocIds)] }
+  } catch (e) {
+    return { ok: false, error: (e as Error).message }
+  }
+}
+
 // Auto-filing: read a file's text and propose the tags it should carry (it may
 // belong to several things at once). SUGGEST-ONLY — the caller decides what to
 // accept. Returns an empty list, never a guess, when the content doesn't support

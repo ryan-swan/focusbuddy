@@ -742,6 +742,29 @@ const api = {
       needsApiKey?: boolean
       error?: string
     }> => ipcRenderer.invoke('workspace:ask', question, history),
+    // Streaming ask: deltas arrive via onDelta as the answer is written; the
+    // promise resolves with the final answer + cited sources.
+    askStream: (
+      question: string,
+      history: Array<{ question: string; answer: string }> | undefined,
+      requestId: string,
+      onDelta: (text: string) => void
+    ): Promise<{
+      ok: boolean
+      answer?: string
+      sources?: Array<{ docId: string; title: string; docType: string; snippet: string; cited: boolean }>
+      needsApiKey?: boolean
+      error?: string
+    }> => {
+      const channel = `workspace:askStream:${requestId}`
+      const handler = (_: unknown, ev: { type: string; payload: string }): void => {
+        if (ev?.type === 'delta') onDelta(ev.payload)
+      }
+      ipcRenderer.on(channel, handler)
+      return ipcRenderer
+        .invoke('workspace:askStream', question, history, requestId)
+        .finally(() => ipcRenderer.removeListener(channel, handler))
+    },
     related: (
       docId: string
     ): Promise<Array<{ docId: string; title: string; docType: string; snippet: string }>> =>

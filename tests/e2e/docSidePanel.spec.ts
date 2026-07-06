@@ -32,16 +32,20 @@ async function stubDocAi(app: LaunchedApp['app'], html: string): Promise<void> {
   }, html)
 }
 
-/** Stub workspace:ask (the whole-workspace brain) with a grounded, cited answer. */
+/** Stub workspace:askStream (the whole-workspace brain) — streams a delta, then
+ * resolves with a grounded, cited answer. */
 async function stubWorkspaceAsk(app: LaunchedApp['app'], answer: string): Promise<void> {
   await app.evaluate(({ ipcMain }, a: string) => {
-    ipcMain.removeHandler('workspace:ask')
-    ipcMain.handle('workspace:ask', async () => ({
-      ok: true,
-      answer: a,
-      citedDocIds: ['doc-1'],
-      sources: [{ docId: 'doc-1', title: 'Q3 Revenue', docType: 'sheet', snippet: '…', cited: true }]
-    }))
+    ipcMain.removeHandler('workspace:askStream')
+    ipcMain.handle('workspace:askStream', async (e, _q: string, _h: unknown, requestId: string) => {
+      e.sender.send(`workspace:askStream:${requestId}`, { type: 'delta', payload: a })
+      return {
+        ok: true,
+        answer: a,
+        citedDocIds: ['doc-1'],
+        sources: [{ docId: 'doc-1', title: 'Q3 Revenue', docType: 'sheet', snippet: '…', cited: true }]
+      }
+    })
   }, answer)
 }
 
