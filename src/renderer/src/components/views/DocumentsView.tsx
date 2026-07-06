@@ -42,6 +42,7 @@ export default function DocumentsView(): JSX.Element {
   const refreshTrashed = useDocumentsStore((s) => s.refreshTrashed)
   const createWithAI = useDocumentsStore((s) => s.createWithAI)
   const createBlank = useDocumentsStore((s) => s.createBlank)
+  const importMap = useDocumentsStore((s) => s.importMap)
   const remove = useDocumentsStore((s) => s.remove)
   const restore = useDocumentsStore((s) => s.restore)
   const purge = useDocumentsStore((s) => s.purge)
@@ -111,6 +112,13 @@ export default function DocumentsView(): JSX.Element {
     goDocument(doc.id)
   }
 
+  async function importVisio(): Promise<void> {
+    setError(null)
+    const r = await importMap()
+    if (r.ok && r.id) goDocument(r.id)
+    else if (r.error) setError(r.error)
+  }
+
   const verb = docType === 'doc' ? 'document' : docType === 'sheet' ? 'spreadsheet' : 'deck'
 
   return (
@@ -176,6 +184,16 @@ export default function DocumentsView(): JSX.Element {
                 {t.label}
               </button>
             ))}
+            <span className="w-px h-3.5 bg-stone-200 dark:bg-stone-700" />
+            <button
+              onClick={() => void importVisio()}
+              className="inline-flex items-center gap-1 hover:text-accent"
+              data-testid="documents-import-vsdx"
+              title="Import a Microsoft Visio diagram (.vsdx)"
+            >
+              <Icon name="upload_file" size={13} />
+              Import Visio
+            </button>
           </div>
         </div>
 
