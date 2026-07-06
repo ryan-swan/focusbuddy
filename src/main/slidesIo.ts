@@ -234,7 +234,79 @@ export async function exportSlidesPdf(body: SlidesBody, outPath: string): Promis
   }
 }
 
-// ── PPTX import (best-effort: text + basic structure) ──────────────────────────
+// ── PPTX import (best-effort: text + speaker notes) ────────────────────────────
+
+function decodeXml(s: string): string {
+  return s
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&apos;/g, "'")
+    .replace(/&amp;/g, '&')
+}
+
+// Every run of text in a slide/notes XML sits in <a:t>…</a:t>, grouped by
+// paragraph <a:p>. Returns one string per non-empty paragraph.
+function paragraphs(xml: string): string[] {
+  return xml
+    .split(/<a:p[ >]/)
+    .slice(1)
+    .map((chunk) => [...chunk.matchAll(/<a:t>([\s\S]*?)<\/a:t>/g)].map((m) => decodeXml(m[1])).join(''))
+    .filter((t) => t.trim() !== '')
+}
+
+// The speaker notes for a slide: follow the slide's .rels to its notesSlide part
+// and read the body text, skipping the slide-number / date / footer placeholders
+// (which PowerPoint stamps into every notes page and are not real notes).
+function notesForSlide(
+  files: Record<string, Uint8Array>,
+  slideName: string,
+  strFromU8: (u: Uint8Array) => string
+): string {
+  const n = slideName.match(/slide(\d+)\.xml$/)?.[1]
+  if (!n) return ''
+  const rels = files[`ppt/slides/_rels/slide${n}.xml.rels`]
+  if (!rels) return ''
+  const target = /Target="([^"]*notesSlide\d+\.xml)"/.exec(strFromU8(rels))?.[1]
+  if (!target) return ''
+  const key = target.replace(/^\.\.\//, 'ppt/').replace(/^\//, '')
+  const notesXml = files[key]
+  if (!notesXml) return ''
+  const lines: string[] = []
+  for (const sp of strFromU8(notesXml).split(/<p:sp>/).slice(1)) {
+    const body = sp.split(/<\/p:sp>/)[0]
+    if (/type="(sldNum|dt|ftr)"/.test(body)) continue // placeholder, not notes
+    lines.push(...paragraphs(body))
+  }
+  return lines.join('\n')
+}
+
+// Pure .pptx → SlidesImportResult. Extracted so it can be unit-tested against a
+// real (pptxgenjs-generated) buffer without a file dialog.
+export async function parsePptx(data: Uint8Array, name: string): Promise<SlidesImportResult> {
+  try {
+    const { unzipSync, strFromU8 } = await import('fflate')
+    const files = unzipSync(data) as Record<string, Uint8Array>
+    const slideNames = Object.keys(files)
+      .filter((n) => /^ppt\/slides\/slide\d+\.xml$/.test(n))
+      .sort((a, b) => parseInt(a.match(/(\d+)/)![1], 10) - parseInt(b.match(/(\d+)/)![1], 10))
+    if (!slideNames.length) return { ok: false, error: 'No slides found in that file.' }
+
+    const slides: Slide[] = slideNames.map((sn, i) => {
+      const paras = paragraphs(strFromU8(files[sn]))
+      const title = paras[0] ?? `Slide ${i + 1}`
+      const bullets = paras.slice(1)
+      const notes = notesForSlide(files, sn, strFromU8)
+      return { id: `imp-${i}`, title, bullets, notes, layout: bullets.length ? 'title-content' : 'title' }
+    })
+
+    return { ok: true, name, body: migrateSlidesBody({ slides }) }
+  } catch (e) {
+    return { ok: false, error: `Could not read that file: ${(e as Error).message}` }
+  }
+}
+
 export async function importPptx(): Promise<SlidesImportResult> {
   const res = await dialog.showOpenDialog(win()!, {
     title: 'Import PowerPoint',
@@ -243,38 +315,8 @@ export async function importPptx(): Promise<SlidesImportResult> {
   })
   if (res.canceled || !res.filePaths[0]) return { ok: false }
   const path = res.filePaths[0]
-  try {
-    const { unzipSync, strFromU8 } = await import('fflate')
-    const buf = await readFile(path)
-    const files = unzipSync(new Uint8Array(buf))
-    // Slide XML parts are ppt/slides/slideN.xml; order them numerically.
-    const slideNames = Object.keys(files)
-      .filter((n) => /^ppt\/slides\/slide\d+\.xml$/.test(n))
-      .sort((a, b) => (parseInt(a.match(/(\d+)/)![1], 10) - parseInt(b.match(/(\d+)/)![1], 10)))
-    if (!slideNames.length) return { ok: false, error: 'No slides found in that file.' }
-
-    const slides: Slide[] = slideNames.map((name, i) => {
-      const xml = strFromU8(files[name])
-      // Every run of text sits in an <a:t>…</a:t>. Group by paragraph <a:p>.
-      const paras = xml
-        .split(/<a:p[ >]/)
-        .slice(1)
-        .map((chunk) => {
-          const texts = [...chunk.matchAll(/<a:t>([\s\S]*?)<\/a:t>/g)].map((m) =>
-            m[1].replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"')
-          )
-          return texts.join('')
-        })
-        .filter((t) => t.trim() !== '')
-      const title = paras[0] ?? `Slide ${i + 1}`
-      const bullets = paras.slice(1)
-      return { id: `imp-${i}`, title, bullets, notes: '', layout: bullets.length ? 'title-content' : 'title' }
-    })
-
-    return { ok: true, name: basename(path), body: migrateSlidesBody({ slides }) }
-  } catch (e) {
-    return { ok: false, error: `Could not read that file: ${(e as Error).message}` }
-  }
+  const buf = await readFile(path)
+  return await parsePptx(new Uint8Array(buf), basename(path))
 }
 
 // Save-dialog wrappers used by IPC.

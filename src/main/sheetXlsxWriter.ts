@@ -35,6 +35,12 @@ export async function buildStyledXlsx(body: SheetBodyV2): Promise<Buffer> {
         if (px) ws.getColumn(Number(c) + 1).width = Math.max(2, Math.round(px / 7))
       }
     }
+    if (tab.rowHeights) {
+      // exceljs row height is in points; our stored heights are px (96dpi).
+      for (const [r, px] of Object.entries(tab.rowHeights)) {
+        if (px) ws.getRow(Number(r) + 1).height = Math.round((px * 72) / 96)
+      }
+    }
     for (let r = 0; r < tab.rows.length; r++) {
       for (let c = 0; c < tab.rows[r].length; c++) {
         const raw = tab.rows[r][c]

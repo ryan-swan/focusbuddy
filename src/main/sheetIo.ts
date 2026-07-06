@@ -69,7 +69,45 @@ function worksheetToTab(ws: XLSX.WorkSheet, name: string): SheetTab {
   if (Object.keys(formats).length) {
     tab.formats = Object.fromEntries(Object.entries(formats).map(([k, numFmt]) => [k, { numFmt }]))
   }
+
+  // Column widths (Excel gives char units or px; we store px). Indexed relative
+  // to the tab's first column so it lines up with our columns[] array.
+  const cols = ws['!cols'] as XLSX.ColInfo[] | undefined
+  if (cols) {
+    const colWidths: Record<number, number> = {}
+    for (let i = 0; i < nCols; i++) {
+      const ci = cols[range.s.c + i]
+      if (!ci) continue
+      // Prefer char width (wch) * 7 to invert our writer's px→char (px/7); wpx is
+      // SheetJS's own conversion at a different metric, so it drifts.
+      const px =
+        ci.wch != null ? Math.round(ci.wch * 7) : ci.width != null ? Math.round(ci.width * 7) : ci.wpx != null ? ci.wpx : null
+      if (px != null && px > 0) colWidths[i] = px
+    }
+    if (Object.keys(colWidths).length) tab.colWidths = colWidths
+  }
+
+  // Row heights (Excel gives px or points; we store px).
+  const rowInfos = ws['!rows'] as XLSX.RowInfo[] | undefined
+  if (rowInfos) {
+    const rowHeights: Record<number, number> = {}
+    for (let r = 0; r < nRows; r++) {
+      const ri = rowInfos[range.s.r + r]
+      if (!ri) continue
+      // Prefer points (hpt) converted to px to invert our writer's px→pt; SheetJS's
+      // hpx echoes the point value rather than a true 96dpi px.
+      const px = ri.hpt != null ? Math.round((ri.hpt * 96) / 72) : ri.hpx != null ? ri.hpx : null
+      if (px != null && px > 0) rowHeights[r] = px
+    }
+    if (Object.keys(rowHeights).length) tab.rowHeights = rowHeights
+  }
+
   return tab
+}
+
+// Exposed for unit tests: convert a SheetJS worksheet to our tab model. Pure.
+export function _worksheetToTabForTest(ws: XLSX.WorkSheet, name: string): SheetTab {
+  return worksheetToTab(ws, name)
 }
 
 export async function importSheet(): Promise<SheetImportResult> {
@@ -83,7 +121,9 @@ export async function importSheet(): Promise<SheetImportResult> {
   const path = res.filePaths[0]
   try {
     const buf = await readFile(path)
-    const wb = XLSX.read(buf, { type: 'buffer', cellFormula: true, cellNF: true, cellText: true })
+    // cellStyles: true so SheetJS parses column widths (!cols) and row heights
+    // (!rows) out of the file; without it those structural dimensions are dropped.
+    const wb = XLSX.read(buf, { type: 'buffer', cellFormula: true, cellNF: true, cellText: true, cellStyles: true })
     const sheets = wb.SheetNames.map((sn) => worksheetToTab(wb.Sheets[sn], sn))
     if (!sheets.length) return { ok: false, error: 'That workbook has no sheets.' }
     return { ok: true, name: basename(path), body: { version: 2, sheets, activeSheet: 0 } }
