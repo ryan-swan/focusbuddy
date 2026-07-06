@@ -309,8 +309,13 @@ const api = {
   ai: {
     // The Daily Brief: a proactive summary built from real tasks / calendar /
     // recent docs. No input — it reads the environment.
-    dailyBrief: (): Promise<{ ok: boolean; brief?: string; needsApiKey?: boolean; error?: string }> =>
-      ipcRenderer.invoke('ai:dailyBrief'),
+    dailyBrief: (): Promise<{
+      ok: boolean
+      brief?: string
+      actions?: Array<{ taskId: string; title: string; startMs: number; durationMin: number }>
+      needsApiKey?: boolean
+      error?: string
+    }> => ipcRenderer.invoke('ai:dailyBrief'),
     // Mirror a compact {id,label} snapshot of chat conversations so the main
     // process prompt builder can offer real conversation ids to post-chat.
     setConversationSnapshot: (convs: Array<{ id: string; label: string }>): Promise<boolean> =>

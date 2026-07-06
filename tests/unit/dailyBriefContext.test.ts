@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildBriefContext, briefIsEmpty } from '../../src/main/ai/dailyBriefContext'
+import { buildBriefContext, briefIsEmpty, buildBriefActions } from '../../src/main/ai/dailyBriefContext'
 
 const NOW = 1_780_000_000_000
 
@@ -56,5 +56,40 @@ describe('buildBriefContext', () => {
     const many = Array.from({ length: 30 }, (_, i) => ({ title: `T${i}`, status: 'open', priority: 3, importance: 3, dueDate: null }))
     const ctx = buildBriefContext(many, [], [], NOW)
     expect((ctx.match(/^- \[/gm) ?? []).length).toBe(12)
+  })
+})
+
+describe('buildBriefActions', () => {
+  const tasks = [
+    { id: 't1', title: 'Ship launch', status: 'in_progress', priority: 1, importance: 5, dueDate: null },
+    { id: 't2', title: 'Reply to Sam', status: 'open', priority: 3, importance: 2, dueDate: null },
+    { id: 't3', title: 'Low thing', status: 'open', priority: 5, importance: 1, dueDate: null }
+  ]
+
+  it('proposes blocks for the most important unscheduled tasks, most important first', () => {
+    const actions = buildBriefActions(tasks, new Set(), NOW)
+    expect(actions.length).toBe(3)
+    expect(actions[0].taskId).toBe('t1')
+    expect(actions.every((a) => a.startMs > NOW)).toBe(true)
+    expect(actions.every((a) => a.durationMin > 0)).toBe(true)
+  })
+
+  it('skips tasks already on the calendar', () => {
+    const actions = buildBriefActions(tasks, new Set(['t1']), NOW)
+    expect(actions.some((a) => a.taskId === 't1')).toBe(false)
+  })
+
+  it('skips done tasks and tasks with no id', () => {
+    const actions = buildBriefActions(
+      [{ id: 't1', title: 'done', status: 'done', priority: 1, importance: 5, dueDate: null }, { title: 'no id', status: 'open', priority: 1, importance: 5, dueDate: null }],
+      new Set(),
+      NOW
+    )
+    expect(actions).toEqual([])
+  })
+
+  it('caps the number of suggestions', () => {
+    const many = Array.from({ length: 10 }, (_, i) => ({ id: `x${i}`, title: `X${i}`, status: 'open', priority: 3, importance: 3, dueDate: null }))
+    expect(buildBriefActions(many, new Set(), NOW).length).toBe(3)
   })
 })
