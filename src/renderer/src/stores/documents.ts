@@ -35,6 +35,8 @@ interface DocumentsStore {
     prompt: string
     audience?: string
   }) => Promise<{ ok: boolean; id?: string; error?: string; needsApiKey?: boolean }>
+  /** Import a Visio .vsdx into a new map document (opens a file picker). */
+  importMap: () => Promise<{ ok: boolean; id?: string; error?: string; canceled?: boolean }>
   saveBody: (body: unknown) => void
   rename: (title: string) => Promise<void>
   /** Move to the Documents Trash (restorable; surfaces an Undo toast). */
@@ -106,6 +108,22 @@ export const useDocumentsStore = create<DocumentsStore>((set, get) => ({
     const doc = await window.api.documents.create({
       docType: input.docType,
       title: r.title || 'Untitled',
+      body: r.body as FbDocument['body']
+    })
+    void pushCloudDoc(doc).catch(() => {})
+    await get().refresh()
+    return { ok: true, id: doc.id }
+  },
+
+  importMap: async () => {
+    const r = await window.api.map.import()
+    // A cancelled picker returns ok:false with no error — surface that distinctly
+    // from a real failure so the caller stays quiet rather than showing an error.
+    if (!r.ok) return r.error ? { ok: false, error: r.error } : { ok: false, canceled: true }
+    if (!r.body) return { ok: false, error: 'That Visio file had nothing to import.' }
+    const doc = await window.api.documents.create({
+      docType: 'map',
+      title: r.title || 'Imported Visio diagram',
       body: r.body as FbDocument['body']
     })
     void pushCloudDoc(doc).catch(() => {})
