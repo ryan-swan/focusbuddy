@@ -9,7 +9,8 @@ import { readFile, writeFile } from 'fs/promises'
 // pptxgenjs and fflate are imported lazily inside the functions that use them,
 // so they stay out of the app's startup require path; a packaging gap can only
 // degrade pptx export/import to an error, never crash launch.
-import type { DeckTheme, Slide, SlidesBody, SlideTextElement, SlideImageElement, SlideTableElement } from '@shared/types'
+import type { DeckTheme, Slide, SlidesBody, SlideTextElement, SlideImageElement, SlideTableElement, SlideChartElement } from '@shared/types'
+import type { ChartType } from '@shared/chart'
 import { resolveTheme, SLIDE_W, SLIDE_H } from '@shared/slideThemes'
 import { migrateSlidesBody } from '@shared/slidesMigrate'
 import { chartToSvg } from '@shared/chart'
@@ -405,6 +406,94 @@ function stripGraphicFrames(xml: string): string {
   return xml.replace(/<p:graphicFrame\b[\s\S]*?<\/p:graphicFrame>/g, '')
 }
 
+// The <c:v> values inside a container element (a category or value cache).
+function cacheValues(xml: string): string[] {
+  return [...xml.matchAll(/<c:v>([\s\S]*?)<\/c:v>/g)].map((m) =>
+    m[1].replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').trim()
+  )
+}
+
+const CHART_TAG_TYPE: Array<[RegExp, ChartType]> = [
+  [/<c:barChart>/, 'bar'],
+  [/<c:lineChart>/, 'line'],
+  [/<c:pie3DChart>|<c:pieChart>|<c:doughnutChart>/, 'pie'],
+  [/<c:areaChart>/, 'area'],
+  [/<c:scatterChart>/, 'scatter']
+]
+
+// The charts on a slide, as SlideChartElements carrying a data snapshot read from
+// the chart part's caches (so the deck stays self-contained). A pptx chart is a
+// <c:chart> referenced from an <a:graphicFrame> through the slide rels.
+function slideCharts(
+  files: Record<string, Uint8Array>,
+  slideName: string,
+  strFromU8: (u: Uint8Array) => string,
+  slideIndex: number,
+  sldCx: number,
+  sldCy: number
+): SlideChartElement[] {
+  const n = slideName.match(/slide(\d+)\.xml$/)?.[1]
+  if (!n) return []
+  const relsBuf = files[`ppt/slides/_rels/slide${n}.xml.rels`]
+  if (!relsBuf) return []
+  const rels = new Map<string, string>()
+  for (const rel of strFromU8(relsBuf).match(/<Relationship\b[^>]*\/?>/g) ?? []) {
+    const id = /Id="([^"]+)"/.exec(rel)?.[1]
+    const target = /Target="([^"]+)"/.exec(rel)?.[1]
+    if (id && target && /chart/i.test(target)) rels.set(id, target.replace(/^\.\.\//, 'ppt/').replace(/^\//, ''))
+  }
+  if (!rels.size) return []
+
+  const out: SlideChartElement[] = []
+  const frames = strFromU8(files[slideName]).split(/<p:graphicFrame\b/).slice(1)
+  let idx = 0
+  for (const chunk of frames) {
+    const frame = chunk.split(/<\/p:graphicFrame>/)[0]
+    const rId = /<c:chart\b[^>]*r:id="([^"]+)"/.exec(frame)?.[1]
+    if (!rId) continue
+    const key = rels.get(rId)
+    if (!key || !files[key]) continue
+    const chartXml = strFromU8(files[key])
+    const type = CHART_TAG_TYPE.find(([re]) => re.test(chartXml))?.[1] ?? 'bar'
+    const stacked = /<c:grouping\s+val="stacked"/.test(chartXml)
+    const titleBlock = /<c:title>[\s\S]*?<\/c:title>/.exec(chartXml)?.[0] ?? ''
+    const title = [...titleBlock.matchAll(/<a:t>([\s\S]*?)<\/a:t>/g)].map((m) => m[1]).join('').trim()
+
+    let categories: string[] = []
+    const series: Array<{ name: string; values: number[] }> = []
+    for (const serChunk of chartXml.split(/<c:ser>/).slice(1)) {
+      const ser = serChunk.split(/<\/c:ser>/)[0]
+      const txBlock = /<c:tx>[\s\S]*?<\/c:tx>/.exec(ser)?.[0] ?? ''
+      const name = cacheValues(txBlock)[0] ?? `Series ${series.length + 1}`
+      const catBlock = /<c:cat>[\s\S]*?<\/c:cat>/.exec(ser)?.[0] ?? ''
+      const valBlock = /<c:val>[\s\S]*?<\/c:val>/.exec(ser)?.[0] ?? ''
+      const cats = cacheValues(catBlock)
+      if (cats.length > categories.length) categories = cats
+      const values = cacheValues(valBlock).map((v) => (Number.isFinite(Number(v)) ? Number(v) : 0))
+      series.push({ name, values })
+    }
+    if (!series.length) continue
+
+    const off = /<a:off\s+x="(-?\d+)"\s+y="(-?\d+)"/.exec(frame)
+    const ext = /<a:ext\s+cx="(\d+)"\s+cy="(\d+)"/.exec(frame)
+    const emuX = off ? Number(off[1]) : sldCx * 0.1
+    const emuY = off ? Number(off[2]) : sldCy * 0.1
+    const emuW = ext ? Number(ext[1]) : sldCx * 0.6
+    const emuH = ext ? Number(ext[2]) : sldCy * 0.5
+    out.push({
+      id: `chart-${slideIndex}-${idx++}`,
+      type: 'chart',
+      x: Math.round((emuX / sldCx) * SLIDE_W),
+      y: Math.round((emuY / sldCy) * SLIDE_H),
+      w: Math.round((emuW / sldCx) * SLIDE_W),
+      h: Math.round((emuH / sldCy) * SLIDE_H),
+      z: 80 + idx,
+      chart: { type, ...(title ? { title } : {}), data: { categories, series }, ...(stacked ? { stacked: true } : {}) }
+    })
+  }
+  return out
+}
+
 // Pure .pptx → SlidesImportResult. Extracted so it can be unit-tested against a
 // real (pptxgenjs-generated) buffer without a file dialog.
 export async function parsePptx(data: Uint8Array, name: string): Promise<SlidesImportResult> {
@@ -438,7 +527,8 @@ export async function parsePptx(data: Uint8Array, name: string): Promise<SlidesI
     body.slides.forEach((slide, i) => {
       const extras = [
         ...slideImages(files, slideNames[i], strFromU8, sldCx, sldCy),
-        ...slideTables(strFromU8(files[slideNames[i]]), i, sldCx, sldCy)
+        ...slideTables(strFromU8(files[slideNames[i]]), i, sldCx, sldCy),
+        ...slideCharts(files, slideNames[i], strFromU8, i, sldCx, sldCy)
       ]
       if (extras.length) slide.elements = [...(slide.elements ?? []), ...extras]
     })

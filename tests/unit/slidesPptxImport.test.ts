@@ -101,6 +101,33 @@ describe('parsePptx — image round-trip', () => {
   })
 })
 
+async function buildPptxWithChart(): Promise<Uint8Array> {
+  const pptx = new pptxgen()
+  const s = pptx.addSlide()
+  s.addText('Growth', { x: 0.5, y: 0.3, w: 9, h: 1 })
+  s.addChart(
+    'bar',
+    [{ name: 'Sales', labels: ['Q1', 'Q2', 'Q3'], values: [10, 20, 30] }],
+    { x: 1, y: 2, w: 6, h: 3, showTitle: true, title: 'Quarterly sales' }
+  )
+  const out = await pptx.write({ outputType: 'nodebuffer' })
+  return new Uint8Array(out as Buffer)
+}
+
+describe('parsePptx — chart round-trip', () => {
+  it('imports a pptx chart as a chart element with its cached data (previously dropped)', async () => {
+    const res = await parsePptx(await buildPptxWithChart(), 'deck.pptx')
+    const charts = (res.body!.slides[0].elements ?? []).filter((e) => e.type === 'chart')
+    expect(charts).toHaveLength(1)
+    const c = charts[0] as { chart: { type: string; title?: string; data: { categories: string[]; series: Array<{ name: string; values: number[] }> } } }
+    expect(c.chart.type).toBe('bar')
+    expect(c.chart.data.categories).toEqual(['Q1', 'Q2', 'Q3'])
+    expect(c.chart.data.series[0].name).toBe('Sales')
+    expect(c.chart.data.series[0].values).toEqual([10, 20, 30])
+    expect(c.chart.title).toContain('Quarterly sales')
+  })
+})
+
 describe('parsePptx — table round-trip', () => {
   it('imports a pptx table as a table element with its cells (previously dropped)', async () => {
     const res = await parsePptx(await buildPptxWithTable(), 'deck.pptx')
