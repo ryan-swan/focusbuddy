@@ -80,11 +80,11 @@ interface FuncMenu {
   query: string
 }
 
-// Sizing defaults, in CSS px. The sheet defaults to 3cm columns and 0.75cm rows
-// (1cm = 37.795px at 96dpi), both resizable by the user.
-const CM_PX = 37.795
-const DEFAULT_COL_W = Math.round(3 * CM_PX) // ~113px
-const DEFAULT_ROW_H = Math.round(0.75 * CM_PX) // ~28px
+// Sizing defaults, in CSS px, matched to Excel: a column is 8.43 characters wide
+// (64px at the default font) and a row is 15 points tall (20px at 96dpi), so a
+// cell is a wide rectangle rather than a square. Both stay resizable by the user.
+const DEFAULT_COL_W = 64 // Excel default column width (8.43 chars)
+const DEFAULT_ROW_H = 20 // Excel default row height (15pt)
 
 // Measure rendered text width for auto-fit, using a cached canvas so a column of
 // mixed content fits its widest actual value (not a character-count guess).
@@ -262,6 +262,10 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
   // dashed marker on the grid.
   const pointRef = useRef<{ r: number; c: number; from: number; to: number } | null>(null)
   const [pointCell, setPointCell] = useState<{ r: number; c: number } | null>(null)
+  // True when the current edit began by typing over the cell (Excel "enter mode"),
+  // so an arrow key commits the value and moves that direction. False for F2 /
+  // double-click "edit mode", where arrows move the text caret instead.
+  const [enterMode, setEnterMode] = useState(false)
   // Source selection captured when a fill-handle drag begins, the live preview
   // rectangle (mirrored as a ref so the global mouseup can read it), and a ref to
   // the latest fill executor (kept fresh each render so the mouseup closure isn't
@@ -612,12 +616,16 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
     setEditValue(initial ?? tab.rows[cell.r]?.[cell.c] ?? '')
     setFuncIndex(0)
     setFuncDismissed(false)
+    // "Enter mode" (started by typing over the cell) commits on an arrow key and
+    // moves that way, like Excel. "Edit mode" (F2 / double-click) instead lets the
+    // arrows move the text caret, so a mid-value correction is possible.
+    setEnterMode(initial !== undefined)
   }
   function endPointMode(): void {
     pointRef.current = null
     setPointCell(null)
   }
-  function commitEdit(move: 'down' | 'right' | 'none'): void {
+  function commitEdit(move: 'up' | 'down' | 'left' | 'right' | 'none'): void {
     if (!editing) return
     endPointMode()
     const { r, c } = editing
@@ -634,7 +642,9 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
     mutateTab((t) => setCell(t, r, c, editValue))
     setEditing(null)
     if (move === 'down') selectCell(Math.min(tab.rows.length - 1, r + 1), c)
+    else if (move === 'up') selectCell(Math.max(0, r - 1), c)
     else if (move === 'right') selectCell(r, Math.min(tab.columns.length - 1, c + 1))
+    else if (move === 'left') selectCell(r, Math.max(0, c - 1))
     focusGrid()
   }
   function selectCell(r: number, c: number): void {
@@ -1560,6 +1570,7 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
             onCellMouseEnter={onCellMouseEnter}
             onCellDoubleClick={(r, c) => startEdit({ r, c })}
             onCommitEdit={commitEdit}
+            commitOnArrow={enterMode}
             onCancelEdit={() => { endPointMode(); setEditing(null) }}
             onFormulaArrow={handleFormulaArrow}
             pointCell={pointCell}
