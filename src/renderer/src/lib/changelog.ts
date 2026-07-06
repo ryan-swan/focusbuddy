@@ -36,6 +36,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.2.1',
+    date: '2026-07-07T06:00:00Z',
+    title: 'PlexiDesk 3.2.1 — the assistant sees more, and plans your day',
+    tag: 'feature',
+    summary:
+      'Two upgrades to the assistant. Ask your workspace now draws on more than documents: it also grounds its answers in your tasks, your database tables and the notes on your desks, so the brain reasons over your whole environment rather than just your files. And the Daily Brief no longer only advises, it acts: alongside the summary it proposes concrete time blocks for your most important unscheduled work, and you approve each with one click to drop a real calendar block linked to the task. The suggestions are computed from your actual tasks and existing calendar, so they work with or without an API key.',
+    highlights: [
+      'Ask your workspace now grounds answers in tasks, tables and canvas notes too, not just documents.',
+      'The Daily Brief proposes time blocks for your top unscheduled tasks; one click schedules them.',
+      'Scheduling suggestions are grounded in real tasks and your existing calendar, and work without an API key.'
+    ]
+  },
+  {
     version: '3.2.0',
     date: '2026-07-06T20:30:00Z',
     title: 'PlexiDesk 3.2 — an assistant that knows your whole workspace',
