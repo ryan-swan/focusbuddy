@@ -39,7 +39,11 @@ interface Props {
   onCellMouseDown: (r: number, c: number, shift: boolean) => void
   onCellMouseEnter: (r: number, c: number) => void
   onCellDoubleClick: (r: number, c: number) => void
-  onCommitEdit: (move: 'down' | 'right' | 'none') => void
+  onCommitEdit: (move: 'up' | 'down' | 'left' | 'right' | 'none') => void
+  // When true, the edit began by typing over the cell (Excel "enter mode"), so an
+  // arrow key commits the value and moves that direction. When false (F2 / double-
+  // click), arrows move the text caret instead.
+  commitOnArrow?: boolean
   onCancelEdit: () => void
   onHeaderRename: (c: number, name: string) => void
   onColResizeStart: (c: number, e: React.MouseEvent) => void
@@ -97,7 +101,7 @@ const ROW_HEADER_W = 44
 // The column-label header row is a fixed height so frozen-row sticky offsets are
 // deterministic. DEFAULT_ROW_PX mirrors the 0.75cm default used by the editor.
 const HEADER_H = 30
-const DEFAULT_ROW_PX = 28
+const DEFAULT_ROW_PX = 20 // Excel default row height (15pt at 96dpi)
 
 function inRange(range: CellRange | null, r: number, c: number): boolean {
   if (!range) return false
@@ -191,12 +195,23 @@ export default function SheetGrid(props: Props): JSX.Element {
     if (editing) editRef.current?.focus()
   }, [editing])
 
+  // The table's own width must equal the sum of the row-header + every visible
+  // column, otherwise a fixed-layout table with no explicit width collapses the
+  // columns to fit the container (making Excel-width cells render as narrow
+  // squares). With this, columns keep their real widths and the grid scrolls.
+  const totalGridWidth = useMemo(() => {
+    let w = ROW_HEADER_W
+    for (let c = 0; c < tab.columns.length; c++) if (!props.hiddenCols?.has(c)) w += props.colWidthOf(c)
+    return w
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab.columns.length, props.colWidthOf, props.hiddenCols])
+
   return (
     <div
       className="h-full overflow-auto border border-[var(--edge-soft)] rounded-xl bg-[var(--surface-raised)] shadow-sm"
       data-testid="sheet-grid"
     >
-      <table className="border-collapse text-[13px]" style={{ tableLayout: 'fixed' }}>
+      <table className="border-collapse text-[13px]" style={{ tableLayout: 'fixed', width: totalGridWidth }}>
         <colgroup>
           <col style={{ width: ROW_HEADER_W }} />
           {tab.columns.map((_, c) =>
@@ -582,6 +597,16 @@ export default function SheetGrid(props: Props): JSX.Element {
                             e.preventDefault()
                             return
                           }
+                          // In enter mode (typed a fresh value), an arrow commits
+                          // the value and moves that direction, like Excel. Formulas
+                          // are excluded so their arrows keep driving point mode /
+                          // the caret; edit mode (F2 / double-click) is excluded so
+                          // arrows can reposition the caret mid-value.
+                          if (arrow && props.commitOnArrow && !props.editValue.startsWith('=')) {
+                            e.preventDefault()
+                            props.onCommitEdit(arrow)
+                            return
+                          }
                           if (e.key === 'Enter') {
                             e.preventDefault()
                             props.onCommitEdit('down')
@@ -594,7 +619,7 @@ export default function SheetGrid(props: Props): JSX.Element {
                           }
                         }}
                         onBlur={() => props.onCommitEdit('none')}
-                        className="w-full px-2.5 py-1 bg-white dark:bg-stone-900 outline-none text-stone-900 dark:text-stone-100 font-mono"
+                        className="w-full px-1.5 py-0.5 bg-white dark:bg-stone-900 outline-none text-stone-900 dark:text-stone-100 font-mono leading-[1.3]"
                       />
                     ) : sparkline ? (
                       <div
@@ -612,7 +637,7 @@ export default function SheetGrid(props: Props): JSX.Element {
                     ) : (
                       <div
                         style={style}
-                        className={`relative z-[1] px-2.5 py-1 whitespace-pre-wrap break-words select-none text-stone-800 dark:text-stone-100 ${listValues ? 'pr-4' : ''}`}
+                        className={`relative z-[1] px-1.5 py-0.5 whitespace-pre-wrap break-words select-none text-stone-800 dark:text-stone-100 leading-[1.3] ${listValues ? 'pr-4' : ''}`}
                         title={shown}
                       >
                         {condIcon && (
