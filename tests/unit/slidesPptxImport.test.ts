@@ -20,6 +20,19 @@ async function buildPptx(): Promise<Uint8Array> {
   return new Uint8Array(out as Buffer)
 }
 
+// A 1x1 transparent PNG, embedded so we can prove images survive import.
+const PNG_1x1 =
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=='
+
+async function buildPptxWithImage(): Promise<Uint8Array> {
+  const pptx = new pptxgen()
+  const s = pptx.addSlide()
+  s.addText('Slide with a picture', { x: 0.5, y: 0.3, w: 9, h: 1 })
+  s.addImage({ data: `image/png;base64,${PNG_1x1}`, x: 1, y: 2, w: 3, h: 2 })
+  const out = await pptx.write({ outputType: 'nodebuffer' })
+  return new Uint8Array(out as Buffer)
+}
+
 describe('parsePptx — speaker notes round-trip', () => {
   it('imports slides with their text', async () => {
     const res = await parsePptx(await buildPptx(), 'deck.pptx')
@@ -44,5 +57,30 @@ describe('parsePptx — speaker notes round-trip', () => {
     const res = await parsePptx(new Uint8Array([1, 2, 3]), 'x.pptx')
     expect(res.ok).toBe(false)
     expect(res.error).toBeTruthy()
+  })
+})
+
+describe('parsePptx — image round-trip', () => {
+  it('imports an embedded picture as a positioned image element (previously dropped)', async () => {
+    const res = await parsePptx(await buildPptxWithImage(), 'deck.pptx')
+    expect(res.ok).toBe(true)
+    const images = (res.body!.slides[0].elements ?? []).filter((e) => e.type === 'image')
+    expect(images).toHaveLength(1)
+    const img = images[0] as { src: string; x: number; y: number; w: number; h: number }
+    expect(img.src.startsWith('data:image/png;base64,')).toBe(true)
+    // Positioned within the 1280x720 logical canvas, not at the origin.
+    expect(img.x).toBeGreaterThan(0)
+    expect(img.y).toBeGreaterThan(0)
+    expect(img.w).toBeGreaterThan(0)
+    expect(img.h).toBeGreaterThan(0)
+    expect(img.x).toBeLessThan(1280)
+    expect(img.y).toBeLessThan(720)
+  })
+
+  it('keeps the slide\'s text alongside the imported image', async () => {
+    const res = await parsePptx(await buildPptxWithImage(), 'deck.pptx')
+    const els = res.body!.slides[0].elements ?? []
+    expect(els.some((e) => e.type === 'text')).toBe(true)
+    expect(els.some((e) => e.type === 'image')).toBe(true)
   })
 })

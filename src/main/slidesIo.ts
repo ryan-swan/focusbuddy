@@ -9,7 +9,7 @@ import { readFile, writeFile } from 'fs/promises'
 // pptxgenjs and fflate are imported lazily inside the functions that use them,
 // so they stay out of the app's startup require path; a packaging gap can only
 // degrade pptx export/import to an error, never crash launch.
-import type { DeckTheme, Slide, SlidesBody, SlideTextElement } from '@shared/types'
+import type { DeckTheme, Slide, SlidesBody, SlideTextElement, SlideImageElement } from '@shared/types'
 import { resolveTheme, SLIDE_W, SLIDE_H } from '@shared/slideThemes'
 import { migrateSlidesBody } from '@shared/slidesMigrate'
 import { chartToSvg } from '@shared/chart'
@@ -282,6 +282,78 @@ function notesForSlide(
   return lines.join('\n')
 }
 
+// The MIME type for an embedded media part by extension. Only browser-renderable
+// raster formats are imported; vector metafiles (emf/wmf) are skipped honestly
+// rather than embedded as something that would not display.
+function imageMime(path: string): string | null {
+  const ext = path.toLowerCase().split('.').pop() ?? ''
+  if (ext === 'png') return 'image/png'
+  if (ext === 'jpg' || ext === 'jpeg') return 'image/jpeg'
+  if (ext === 'gif') return 'image/gif'
+  if (ext === 'webp') return 'image/webp'
+  if (ext === 'svg') return 'image/svg+xml'
+  return null
+}
+
+// The picture shapes on a slide, as positioned image elements in our 1280x720
+// logical space. Reads the slide rels to resolve each <a:blip r:embed> to its
+// media part and inlines it as a data URI so the deck is self-contained.
+function slideImages(
+  files: Record<string, Uint8Array>,
+  slideName: string,
+  strFromU8: (u: Uint8Array) => string,
+  sldCx: number,
+  sldCy: number
+): SlideImageElement[] {
+  const n = slideName.match(/slide(\d+)\.xml$/)?.[1]
+  if (!n) return []
+  const relsBuf = files[`ppt/slides/_rels/slide${n}.xml.rels`]
+  if (!relsBuf) return []
+  // relId -> media file key.
+  const rels = new Map<string, string>()
+  for (const rel of strFromU8(relsBuf).match(/<Relationship\b[^>]*\/?>/g) ?? []) {
+    const id = /Id="([^"]+)"/.exec(rel)?.[1]
+    const target = /Target="([^"]+)"/.exec(rel)?.[1]
+    if (id && target && /media\//i.test(target)) rels.set(id, target.replace(/^\.\.\//, 'ppt/').replace(/^\//, ''))
+  }
+  if (!rels.size) return []
+
+  const xml = strFromU8(files[slideName])
+  const out: SlideImageElement[] = []
+  const pics = xml.split(/<p:pic\b/).slice(1)
+  for (let i = 0; i < pics.length; i++) {
+    const pic = pics[i].split(/<\/p:pic>/)[0]
+    const embed = /<a:blip[^>]*r:embed="([^"]+)"/.exec(pic)?.[1]
+    if (!embed) continue
+    const key = rels.get(embed)
+    if (!key) continue
+    const mediaBuf = files[key]
+    const mime = mediaBuf ? imageMime(key) : null
+    if (!mediaBuf || !mime) continue // unresolved or non-raster: skip, don't fake
+    const off = /<a:off\s+x="(-?\d+)"\s+y="(-?\d+)"/.exec(pic)
+    const ext = /<a:ext\s+cx="(\d+)"\s+cy="(\d+)"/.exec(pic)
+    // EMU → logical units; fall back to a sensible centred box when the shape has
+    // no explicit transform (inherited from a layout, which we do not resolve).
+    const emuX = off ? Number(off[1]) : sldCx * 0.15
+    const emuY = off ? Number(off[2]) : sldCy * 0.15
+    const emuW = ext ? Number(ext[1]) : sldCx * 0.3
+    const emuH = ext ? Number(ext[2]) : sldCy * 0.3
+    const b64 = Buffer.from(mediaBuf).toString('base64')
+    out.push({
+      id: `img-${n}-${i}`,
+      type: 'image',
+      x: Math.round((emuX / sldCx) * SLIDE_W),
+      y: Math.round((emuY / sldCy) * SLIDE_H),
+      w: Math.round((emuW / sldCx) * SLIDE_W),
+      h: Math.round((emuH / sldCy) * SLIDE_H),
+      z: 100 + i,
+      src: `data:${mime};base64,${b64}`,
+      fit: 'contain'
+    })
+  }
+  return out
+}
+
 // Pure .pptx → SlidesImportResult. Extracted so it can be unit-tested against a
 // real (pptxgenjs-generated) buffer without a file dialog.
 export async function parsePptx(data: Uint8Array, name: string): Promise<SlidesImportResult> {
@@ -293,6 +365,12 @@ export async function parsePptx(data: Uint8Array, name: string): Promise<SlidesI
       .sort((a, b) => parseInt(a.match(/(\d+)/)![1], 10) - parseInt(b.match(/(\d+)/)![1], 10))
     if (!slideNames.length) return { ok: false, error: 'No slides found in that file.' }
 
+    // Slide size in EMU (default widescreen 13.333x7.5in) for the EMU→logical map.
+    const pres = files['ppt/presentation.xml'] ? strFromU8(files['ppt/presentation.xml']) : ''
+    const sz = /<p:sldSz\b[^>]*cx="(\d+)"[^>]*cy="(\d+)"/.exec(pres)
+    const sldCx = sz ? Number(sz[1]) : 12192000
+    const sldCy = sz ? Number(sz[2]) : 6858000
+
     const slides: Slide[] = slideNames.map((sn, i) => {
       const paras = paragraphs(strFromU8(files[sn]))
       const title = paras[0] ?? `Slide ${i + 1}`
@@ -301,7 +379,15 @@ export async function parsePptx(data: Uint8Array, name: string): Promise<SlidesI
       return { id: `imp-${i}`, title, bullets, notes, layout: bullets.length ? 'title-content' : 'title' }
     })
 
-    return { ok: true, name, body: migrateSlidesBody({ slides }) }
+    const body = migrateSlidesBody({ slides })
+    // Attach imported pictures onto each migrated slide's element list so they
+    // render alongside the title/body text rather than being dropped.
+    body.slides.forEach((slide, i) => {
+      const imgs = slideImages(files, slideNames[i], strFromU8, sldCx, sldCy)
+      if (imgs.length) slide.elements = [...(slide.elements ?? []), ...imgs]
+    })
+
+    return { ok: true, name, body }
   } catch (e) {
     return { ok: false, error: `Could not read that file: ${(e as Error).message}` }
   }
