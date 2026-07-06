@@ -89,8 +89,40 @@ const STOPWORDS = new Set([
   'there', 'which', 'been', 'more', 'some', 'one', 'two', 'get', 'got', 'use', 'using', 'new'
 ])
 
-// Score each document by how many query terms it contains, title matches weighted
-// higher; return the top `limit`. Returns [] for an empty/too-short query.
+// Split text into ~size-char chunks on paragraph/line boundaries so ranking can
+// find a passage buried deep in a long document instead of only its head.
+export function chunkText(text: string, size = 800): string[] {
+  const clean = (text || '').replace(/\r/g, '').trim()
+  if (clean.length <= size) return clean ? [clean] : []
+  const chunks: string[] = []
+  let cur = ''
+  for (const piece of clean.split(/\n{2,}|\n/)) {
+    if (cur && (cur.length + piece.length + 1) > size) {
+      chunks.push(cur.trim())
+      cur = piece
+    } else {
+      cur = cur ? `${cur}\n${piece}` : piece
+    }
+    // A single very long line (e.g. a wide sheet row) is hard-split.
+    while (cur.length > size * 1.5) {
+      chunks.push(cur.slice(0, size).trim())
+      cur = cur.slice(size)
+    }
+  }
+  if (cur.trim()) chunks.push(cur.trim())
+  return chunks
+}
+
+function scoreHay(hay: string, terms: string[]): number {
+  let s = 0
+  for (const t of terms) s += Math.min(hay.split(t).length - 1, 6)
+  return s
+}
+
+// Score each document, title matches weighted higher AND the body scored per
+// chunk so a mid-document match counts. The returned source text is the top
+// matching chunk(s), not the document head, so the model is grounded on the
+// passage that actually answers the query. Returns [] for an empty/short query.
 export function rankSources(
   query: string,
   docs: Array<{ docId: string; title: string; docType: string; text: string }>,
@@ -101,20 +133,27 @@ export function rankSources(
   const scored: WorkspaceSource[] = []
   for (const d of docs) {
     const titleLower = (d.title || '').toLowerCase()
-    const hay = `${titleLower}\n${d.text.toLowerCase()}`
-    let score = 0
-    for (const t of terms) {
-      if (titleLower.includes(t)) score += 4
-      const count = hay.split(t).length - 1
-      score += Math.min(count, 6)
-    }
+    let titleScore = 0
+    for (const t of terms) if (titleLower.includes(t)) titleScore += 4
+
+    const chunks = chunkText(d.text)
+    const ranked = chunks
+      .map((text) => ({ text, score: scoreHay(text.toLowerCase(), terms) }))
+      .sort((a, b) => b.score - a.score)
+    const top = ranked.filter((c) => c.score > 0).slice(0, 2)
+    const bodyScore = top.reduce((a, c) => a + c.score, 0)
+    const score = titleScore + bodyScore
+
     if (score > 0) {
+      // Ground on the best-matching passages; fall back to the head if the match
+      // was title-only.
+      const passages = top.length ? top.map((c) => c.text) : [chunks[0] ?? d.text.slice(0, 800)]
       scored.push({
         docId: d.docId,
         title: d.title || 'Untitled',
         docType: d.docType,
-        snippet: makeSnippet(d.text, terms),
-        text: d.text.slice(0, 6000),
+        snippet: makeSnippet(top[0]?.text ?? d.text, terms),
+        text: passages.join('\n…\n').slice(0, 6000),
         score
       })
     }
