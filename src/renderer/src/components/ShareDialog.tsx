@@ -188,13 +188,18 @@ export default function ShareDialog({
         // and the snapshot push to the server will simply be skipped.
         snapshot = undefined
       }
+      // The sharer's real handle, for "invited by X" attribution (distinct from
+      // the anonymous fromHandle used in the recipient snapshot).
+      const { useAccountStore } = await import('../stores/account')
+      const createdBy = useAccountStore.getState().account?.handle ?? null
       const created = await createFor({
         kind,
         entityId,
         label,
         scope,
         snapshot,
-        fromHandle
+        fromHandle,
+        createdBy
       })
       setFresh(created)
       // Auto-copy fresh links so the common path is one click → in

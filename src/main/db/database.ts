@@ -473,6 +473,10 @@ export function getDb(): Database.Database {
   // its whole subtree + every widget on those tasks, so we trash instead (hide +
   // recoverable), and purge old trash on launch. trashed_at null = live.
   ensureColumn(db, 'nodes', 'trashed_at', 'INTEGER')
+  // Share attribution: who created the share, so a recipient view can show
+  // "invited by X" and the growth loop can credit the inviter. Backfills to NULL
+  // (unknown) for shares created before attribution existed.
+  ensureColumn(db, 'share_links', 'created_by', 'TEXT')
   // Multi-org tenancy: each of these surfaces is scoped to the active
   // organisation. Existing rows predate multi-org, so the DEFAULT backfills them
   // into the reserved 'personal' org — switching to Personal shows exactly the

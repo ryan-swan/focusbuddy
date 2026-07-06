@@ -50,6 +50,9 @@ interface SharesStore {
     // dropped on the floor — only the local outgoing table tracks it.
     snapshot?: unknown
     fromHandle?: string
+    // The sharer's real handle, stamped on the share for "invited by X"
+    // attribution. Distinct from fromHandle (the recipient-facing snapshot name).
+    createdBy?: string | null
   }) => Promise<ShareLink>
   // Accept a pasted share link. Fetches the snapshot from the server (when
   // remote is configured) or treats the token as opaque (local-mock).
@@ -122,7 +125,8 @@ export const useSharesStore = create<SharesStore>((set, get) => ({
     scope,
     expiresAt,
     snapshot,
-    fromHandle
+    fromHandle,
+    createdBy
   }) => {
     const token = generateShareToken()
     // Local persistence first — this is the audit-of-record for the
@@ -133,7 +137,8 @@ export const useSharesStore = create<SharesStore>((set, get) => ({
       entityId,
       label,
       scope,
-      expiresAt: expiresAt ?? null
+      expiresAt: expiresAt ?? null,
+      createdBy: createdBy ?? null
     })
     set({ outgoing: [created, ...get().outgoing] })
     // Then push the snapshot to the hosted service (when configured) so
@@ -148,7 +153,8 @@ export const useSharesStore = create<SharesStore>((set, get) => ({
           snapshot,
           fromHandle: fromHandle ?? 'anonymous',
           scope,
-          expiresAt: expiresAt ?? null
+          expiresAt: expiresAt ?? null,
+          createdBy: createdBy ?? null
         })
       } catch (err) {
         // eslint-disable-next-line no-console

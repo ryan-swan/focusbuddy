@@ -19,6 +19,10 @@ export interface MintShareInput {
   fromHandle: string
   scope: ShareScope
   expiresAt: number | null
+  // The sharer's handle for "invited by X" attribution on the recipient view.
+  // Forward-compatible: the hosted service stores it once it understands the
+  // field, and ignores it until then.
+  createdBy?: string | null
 }
 
 export interface ShareRecipientDto {
