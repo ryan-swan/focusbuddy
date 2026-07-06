@@ -11,6 +11,7 @@ import { DEFAULT_DASHBOARD_COLUMNS } from '@shared/types'
 // dashboard) or a project node id, so every module personalises independently.
 
 export const DEFAULT_LAYOUT: DashboardCardKind[] = [
+  'daily-brief',
   'workspace-progress',
   'focus-session',
   'ai-assistant',
