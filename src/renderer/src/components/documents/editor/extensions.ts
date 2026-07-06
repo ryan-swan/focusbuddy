@@ -34,6 +34,7 @@ import { SearchHighlight } from './searchHighlight'
 import { FocusBlock } from './focusBlock'
 import { PagePagination } from './pagination'
 import { CommentMark } from './CommentMark'
+import { TrackChanges, InsertionMark, DeletionMark } from './TrackChanges'
 import { TableOfContents } from './TableOfContents'
 import { Footnote } from './Footnote'
 import Collaboration from '@tiptap/extension-collaboration'
@@ -101,6 +102,12 @@ export function buildDocExtensions(opts: BuildOptions = {}): AnyExt[] {
     // Comment anchors. Always present so a doc carrying comment marks renders the
     // highlight; the thread bodies live on the server.
     CommentMark as AnyExt,
+    // Track Changes (suggesting mode): the insertion/deletion marks are always
+    // present so a doc carrying suggestions renders them, and .docx/HTML round
+    // trips keep them; the capture plugin is inert until suggesting is toggled on.
+    InsertionMark as AnyExt,
+    DeletionMark as AnyExt,
+    TrackChanges as AnyExt,
     // Desk-widget embeds. In BOTH branches: the schema must be shared with the
     // headless converters or a document carrying an embed would lose it on an
     // HTML round trip. Headless use only exercises renderHTML/parseHTML.
