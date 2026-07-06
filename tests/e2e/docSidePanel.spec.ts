@@ -32,6 +32,19 @@ async function stubDocAi(app: LaunchedApp['app'], html: string): Promise<void> {
   }, html)
 }
 
+/** Stub workspace:ask (the whole-workspace brain) with a grounded, cited answer. */
+async function stubWorkspaceAsk(app: LaunchedApp['app'], answer: string): Promise<void> {
+  await app.evaluate(({ ipcMain }, a: string) => {
+    ipcMain.removeHandler('workspace:ask')
+    ipcMain.handle('workspace:ask', async () => ({
+      ok: true,
+      answer: a,
+      citedDocIds: ['doc-1'],
+      sources: [{ docId: 'doc-1', title: 'Q3 Revenue', docType: 'sheet', snippet: '…', cited: true }]
+    }))
+  }, answer)
+}
+
 /** Open PlexiOffice and create + open a blank document. */
 async function openOfficeDoc(window: Page): Promise<void> {
   await window.locator('[data-testid="switch-office"]').first().click()
@@ -66,6 +79,7 @@ test.describe('PlexiDocs side panel', () => {
     window = app.window
     await waitForReady(window)
     await stubDocAi(app.app, SUMMARY_HTML)
+    await stubWorkspaceAsk(app.app, 'Across your docs, Q3 revenue came in 8% over plan.')
     await openOfficeDoc(window)
   })
   test.afterAll(async () => {
@@ -108,6 +122,27 @@ test.describe('PlexiDocs side panel', () => {
     // The Insert and Copy affordances are present on the result.
     await expect(window.locator('[data-testid="doc-ai-result-apply"]')).toBeVisible()
     await expect(window.locator('[data-testid="doc-ai-result-copy"]')).toBeVisible()
+  })
+
+  test('DSP-6 — Ask your workspace answers with a cited source and inserts into the doc', async () => {
+    await window.locator('[data-testid="doc-tab-ai"]').click()
+    const brain = window.locator('[data-testid="workspace-ask"]')
+    await expect(brain).toBeVisible()
+    // Ask a whole-workspace question.
+    await window.locator('[data-testid="workspace-ask-input"]').fill('How did Q3 revenue do?')
+    await window.locator('[data-testid="workspace-ask-go"]').click()
+
+    const answer = window.locator('[data-testid="workspace-ask-answer"]')
+    await expect(answer).toBeVisible({ timeout: 8_000 })
+    await expect(answer).toContainText('8% over plan')
+    // The cited source document is shown as a chip.
+    await expect(answer).toContainText('Q3 Revenue')
+
+    // Insert the grounded answer into the open document.
+    await setDocHtml(window, '<p>Report:</p>')
+    await window.locator('[data-testid="workspace-ask-insert"]').click()
+    await window.waitForTimeout(200)
+    await expect(window.locator('[data-testid="doc-editor-surface"]')).toContainText('8% over plan')
   })
 
   test('DSP-4 — Outline tab lists a heading typed into the document', async () => {
