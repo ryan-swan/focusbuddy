@@ -135,8 +135,11 @@ test.describe('PlexiDocs side panel', () => {
     const answer = window.locator('[data-testid="workspace-ask-answer"]')
     await expect(answer).toBeVisible({ timeout: 8_000 })
     await expect(answer).toContainText('8% over plan')
-    // The cited source document is shown as a chip.
-    await expect(answer).toContainText('Q3 Revenue')
+    // The cited source is shown as a chip; a sheet source is a clickable button
+    // that opens the document.
+    const source = answer.locator('[data-testid="workspace-ask-source"]').first()
+    await expect(source).toContainText('Q3 Revenue')
+    await expect(source).toHaveJSProperty('tagName', 'BUTTON')
 
     // Insert the grounded answer into the open document.
     await setDocHtml(window, '<p>Report:</p>')

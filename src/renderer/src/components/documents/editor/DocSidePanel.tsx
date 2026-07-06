@@ -3,6 +3,7 @@ import type { Editor } from '@tiptap/react'
 import Icon from '../../Icon'
 import DocOutline from './DocOutline'
 import { sanitizeHtml } from '../../../lib/htmlSanitize'
+import { useViewStore } from '../../../stores/view'
 import { applyMention, filterMentionCandidates, matchMentionQuery } from '../../../lib/mentions'
 import MentionText from '../../views/chat/MentionText'
 import type { DocAi } from './useDocAi'
@@ -95,7 +96,13 @@ interface WsSource {
   docType: string
   cited: boolean
 }
+// Source kinds that are openable documents (live in the documents store); a
+// citation for one of these opens it. Tasks / tables / notes / knowledge are not
+// documents, so their chips are shown but not clickable.
+const OPENABLE_DOC_TYPES = new Set(['doc', 'sheet', 'slides', 'map', 'design'])
+
 function WorkspaceAsk({ editor }: { editor: Editor }): JSX.Element {
+  const goDocument = useViewStore((s) => s.goDocument)
   const [q, setQ] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -158,16 +165,28 @@ function WorkspaceAsk({ editor }: { editor: Editor }): JSX.Element {
             <div className="flex flex-wrap gap-1 pt-0.5">
               {entry.sources
                 .filter((s) => s.cited)
-                .map((s) => (
-                  <span
-                    key={s.docId}
-                    className="inline-flex items-center gap-1 rounded bg-[rgb(var(--accent)/0.1)] px-1.5 py-0.5 text-[10px] text-[rgb(var(--accent))]"
-                    title={`Source: ${s.docType}`}
-                  >
-                    <Icon name="description" size={10} />
-                    {s.title || 'Untitled'}
-                  </span>
-                ))}
+                .map((s) => {
+                  const openable = OPENABLE_DOC_TYPES.has(s.docType)
+                  const cls =
+                    'inline-flex items-center gap-1 rounded bg-[rgb(var(--accent)/0.1)] px-1.5 py-0.5 text-[10px] text-[rgb(var(--accent))]'
+                  return openable ? (
+                    <button
+                      key={s.docId}
+                      onClick={() => goDocument(s.docId)}
+                      className={`${cls} hover:bg-[rgb(var(--accent)/0.2)] cursor-pointer`}
+                      title={`Open ${s.docType}: ${s.title}`}
+                      data-testid="workspace-ask-source"
+                    >
+                      <Icon name="open_in_new" size={10} />
+                      {s.title || 'Untitled'}
+                    </button>
+                  ) : (
+                    <span key={s.docId} className={cls} title={`Source: ${s.docType}`} data-testid="workspace-ask-source">
+                      <Icon name="description" size={10} />
+                      {s.title || 'Untitled'}
+                    </span>
+                  )
+                })}
             </div>
           )}
           {entry.answer && (
