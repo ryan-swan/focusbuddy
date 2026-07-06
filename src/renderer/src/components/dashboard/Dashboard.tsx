@@ -22,6 +22,7 @@ import WorkspaceProgressCard from './WorkspaceProgressCard'
 import WorkspaceHealthCard from './WorkspaceHealthCard'
 import FocusSessionCard from './FocusSessionCard'
 import AIAssistantCard from './AIAssistantCard'
+import DailyBriefCard from './DailyBriefCard'
 import RecentNotesCard from './RecentNotesCard'
 import Icon from '../Icon'
 
@@ -95,6 +96,11 @@ const CARD_META: Record<
     label: 'Recent Notes',
     icon: 'sticky_note_2',
     description: 'Last six edited sticky / note / page widgets across the workspace'
+  },
+  'daily-brief': {
+    label: 'Daily Brief',
+    icon: 'wb_sunny',
+    description: "A proactive morning summary of what to focus on today, built from your real tasks, calendar and recent docs"
   }
 }
 
@@ -545,6 +551,8 @@ function CardBody({
       return <WorkspaceHealthCard taskIds={taskIds} nodes={nodes} />
     case 'focus-session':
       return <FocusSessionCard nodes={nodes} />
+    case 'daily-brief':
+      return <DailyBriefCard />
     case 'ai-assistant':
       return <AIAssistantCard />
     case 'recent-notes':

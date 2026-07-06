@@ -989,6 +989,7 @@ export interface EnergyLogEntry {
 // ── Dashboard layouts (Phase 6) ──────────────────────────────────────────────
 
 export type DashboardCardKind =
+  | 'daily-brief'
   | 'quick-start'
   | 'stats'
   | 'garden'

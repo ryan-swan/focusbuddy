@@ -394,6 +394,7 @@ import { getRecentActivity, recordActivity } from '../db/activity'
 import {
   generatePresenceNarration,
   generateProactiveWelcome,
+  generateDailyBrief,
   buildFromPrompt,
   generateResume,
   proposeSmartStacks,
@@ -795,6 +796,7 @@ export function registerIpcHandlers(): void {
     return sendChat(req)
   })
   ipcMain.handle('chat:hasApiKey', () => Boolean(resolveAnthropicKey()))
+  ipcMain.handle('ai:dailyBrief', () => generateDailyBrief())
   ipcMain.handle('chat:proactiveWelcome', (_e, taskId: string) =>
     generateProactiveWelcome(taskId)
   )
