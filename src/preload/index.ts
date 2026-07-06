@@ -748,7 +748,8 @@ const api = {
       question: string,
       history: Array<{ question: string; answer: string }> | undefined,
       requestId: string,
-      onDelta: (text: string) => void
+      onDelta: (text: string) => void,
+      docContext?: { title?: string; text?: string } | null
     ): Promise<{
       ok: boolean
       answer?: string
@@ -762,7 +763,7 @@ const api = {
       }
       ipcRenderer.on(channel, handler)
       return ipcRenderer
-        .invoke('workspace:askStream', question, history, requestId)
+        .invoke('workspace:askStream', question, history, requestId, docContext)
         .finally(() => ipcRenderer.removeListener(channel, handler))
     },
     related: (

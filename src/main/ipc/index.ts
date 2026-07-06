@@ -1335,10 +1335,20 @@ export function registerIpcHandlers(): void {
   // streams to the renderer over a per-request channel so it appears live.
   ipcMain.handle(
     'workspace:askStream',
-    async (e, question: string, history: Array<{ question: string; answer: string }> | undefined, requestId: string) => {
+    async (
+      e,
+      question: string,
+      history: Array<{ question: string; answer: string }> | undefined,
+      requestId: string,
+      docContext?: { title?: string; text?: string } | null
+    ) => {
       const hist = Array.isArray(history) ? history.slice(-4) : []
-      const query = [...hist.map((h) => h.question), question].join(' ')
-      const sources = await retrieveSources(query, 6)
+      // Scope: when the caller passes the open document's text, ground ONLY on it
+      // (the "This document" scope); otherwise retrieve across the whole workspace.
+      const sources =
+        docContext && docContext.text && docContext.text.trim()
+          ? [{ docId: 'current-doc', title: docContext.title || 'This document', docType: 'doc', snippet: docContext.text.slice(0, 200), text: docContext.text.slice(0, 12000), score: 1 }]
+          : await retrieveSources([...hist.map((h) => h.question), question].join(' '), 6)
       if (sources.length) recordAiCall()
       const channel = `workspace:askStream:${requestId}`
       const res = await askWorkspaceStream(
