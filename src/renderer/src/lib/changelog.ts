@@ -36,6 +36,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.1.1',
+    date: '2026-07-06T18:00:00Z',
+    title: 'PlexiDesk 3.1.1 — spreadsheet feel and a way back from the browser',
+    tag: 'fix',
+    summary:
+      'A quick follow-up with two things that were getting in the way. Spreadsheet cells now match Excel, a wide rectangle rather than a chunky square, and while you are typing a value each arrow key enters it and moves that direction the way Excel does. Pressing F2 or double-clicking a cell still lets the arrows move the cursor inside the text, and formula entry still lets you point at cells with the mouse or arrow keys. In the browser, opening something in a new tab now lands as a browser object on your desk with a clear way back to the canvas, instead of a separate window that left you stranded. Sign-in and other pop-ups that need their own window still open that way so logging in keeps working.',
+    highlights: [
+      'Sheets: Excel-sized cells (wide rectangles, not squares), and arrow keys commit the value and move while typing.',
+      'Browser: "open in new tab" becomes a browser object on the desk with an Esc path back, not a stranded window.',
+      'Sign-in / OAuth pop-ups still open as their own window so authentication keeps working.'
+    ]
+  },
+  {
     version: '3.1.0',
     date: '2026-07-06T12:00:00Z',
     title: 'PlexiDesk 3.1 — your files open the way you saved them',
