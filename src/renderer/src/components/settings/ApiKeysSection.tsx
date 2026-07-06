@@ -55,10 +55,19 @@ interface ProviderConfig {
 
 export default function ApiKeysSection({ onKeySaved }: Props): JSX.Element {
   const [encryption, setEncryption] = useState<boolean | null>(null)
+  const [usage, setUsage] = useState<{ calls: number; inTok: number; outTok: number; costUsd: number } | null>(null)
 
   useEffect(() => {
     void window.api.settings.encryptionAvailable().then(setEncryption)
+    void window.api.ai
+      .collectTelemetry()
+      .then((t) =>
+        setUsage({ calls: t.aiCalls, inTok: t.aiInputTokens, outTok: t.aiOutputTokens, costUsd: t.aiEstCostUsd })
+      )
+      .catch(() => setUsage(null))
   }, [])
+
+  const fmt = (n: number): string => (n >= 1_000_000 ? `${(n / 1e6).toFixed(1)}M` : n >= 1000 ? `${(n / 1e3).toFixed(1)}k` : String(n))
 
   return (
     <div className="px-3 py-3 border-t border-[var(--edge-soft)] space-y-3">
@@ -67,6 +76,18 @@ export default function ApiKeysSection({ onKeySaved }: Props): JSX.Element {
       </div>
 
       <AiSourceSection />
+
+      {usage && usage.calls > 0 && (
+        <div className="rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-sunken)]/40 px-3 py-2 text-[11.5px] text-[var(--ink-70)]" data-testid="ai-usage-summary">
+          <div className="flex items-center justify-between">
+            <span>AI usage on this device</span>
+            <span className="text-[var(--ink-90)] font-medium">~${usage.costUsd.toFixed(2)} est.</span>
+          </div>
+          <div className="text-[10.5px] text-[var(--ink-50)] mt-0.5">
+            {usage.calls} calls · {fmt(usage.inTok)} in / {fmt(usage.outTok)} out tokens · estimate at default rates, tokens are exact
+          </div>
+        </div>
+      )}
 
       <div className="text-[11px] uppercase tracking-[0.12em] text-[var(--ink-50)] font-medium pt-1">
         AI · API keys

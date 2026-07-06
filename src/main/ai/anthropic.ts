@@ -10,6 +10,7 @@ import { markdownToTiptap } from './markdownToTiptap'
 import { extractJson, salvageEnvelope } from './chatJson'
 import { renderAttachments } from './chatAttachments'
 import { resolveModel } from './modelRouting'
+import { recordAiUsage } from '../db/telemetry'
 import { parseSheetRows, parseSheetColumns } from './sheetParse'
 import { migrateSlidesBody } from '@shared/slidesMigrate'
 import { resolveTheme, applyThemeToDeck, BUILTIN_THEMES } from '@shared/slideThemes'
@@ -975,6 +976,7 @@ export async function generateDailyBrief(): Promise<{ ok: boolean; brief?: strin
       system,
       messages: [{ role: 'user', content: user }]
     })
+    recordAiUsage(resolveModel('welcome'), resp.usage?.input_tokens ?? 0, resp.usage?.output_tokens ?? 0)
     if ((resp.stop_reason as string) === 'refusal') return { ok: false, error: 'Claude declined this request.' }
     const text = resp.content
       .filter((b) => b.type === 'text')
@@ -1047,6 +1049,7 @@ export async function askWorkspace(
       system,
       messages: [{ role: 'user', content: userMsg }]
     })
+    recordAiUsage(resolveModel('chat'), resp.usage?.input_tokens ?? 0, resp.usage?.output_tokens ?? 0)
     if ((resp.stop_reason as string) === 'refusal') return { ok: false, error: 'Claude declined this request.' }
     if ((resp.stop_reason as string) === 'model_context_window_exceeded') {
       return { ok: false, error: 'Too much to read at once — try a narrower question.' }
@@ -1117,6 +1120,7 @@ export async function askWorkspaceStream(
       onDelta(delta)
     })
     const final = await stream.finalMessage()
+    recordAiUsage(resolveModel('chat'), final.usage?.input_tokens ?? 0, final.usage?.output_tokens ?? 0)
     if ((final.stop_reason as string) === 'refusal') return { ok: false, error: 'Claude declined this request.' }
     const answer = full.trim().slice(0, 4000)
     const citedDocIds = sources

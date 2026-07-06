@@ -385,6 +385,9 @@ const api = {
       focusSessions: number
       focusMinutes: number
       aiCalls: number
+      aiInputTokens: number
+      aiOutputTokens: number
+      aiEstCostUsd: number
     }> => ipcRenderer.invoke('telemetry:collect'),
     suggestWidgetSetup: (input: {
       widgetId: string
