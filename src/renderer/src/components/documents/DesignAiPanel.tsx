@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import Icon from '../Icon'
 import { sanitizeHtml } from '../../lib/htmlSanitize'
+import WorkspaceAsk from './editor/WorkspaceAsk'
 
 // The persistent right-side AI Assistant panel for PlexiDesign. It mirrors the
 // PlexiDocs side panel and the PlexiSheets AI panel in structure, tokens and
@@ -196,6 +197,7 @@ export default function DesignAiPanel({
 
       <div className="min-h-0 flex-1 overflow-auto">
         <div className="flex flex-col gap-3 p-3">
+          <WorkspaceAsk />
           <div className="flex items-start gap-2">
             <span className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[rgb(var(--accent)/0.12)] text-[rgb(var(--accent))]">
               <Icon name="auto_awesome" size={14} />

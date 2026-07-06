@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import Icon from '../../Icon'
 import { sanitizeHtml } from '../../../lib/htmlSanitize'
+import WorkspaceAsk from '../editor/WorkspaceAsk'
 import type { SheetAi } from './useSheetAi'
 
 // The persistent right-side AI Assistant panel for PlexiSheets. It mirrors the
@@ -59,6 +60,7 @@ export default function SheetAiPanel({ ai, onCollapse }: Props): JSX.Element {
 
       <div className="min-h-0 flex-1 overflow-auto">
         <div className="flex flex-col gap-4 p-3">
+          <WorkspaceAsk />
           {/* Insights */}
           <section className="flex flex-col gap-2">
             <div className="flex items-center justify-between">

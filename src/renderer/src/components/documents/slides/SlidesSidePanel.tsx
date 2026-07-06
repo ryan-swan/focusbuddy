@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { DeckTheme, Slide, SlideLayout } from '@shared/types'
 import { BUILTIN_THEMES } from '@shared/slideThemes'
 import Icon from '../../Icon'
+import WorkspaceAsk from '../editor/WorkspaceAsk'
 import type { SlideAi } from './useSlideAi'
 
 // The persistent right-side panel for PlexiSlides. It has two parts stacked in
@@ -96,6 +97,7 @@ function AiAssistant({
 
   return (
     <div className="flex flex-col gap-3 p-3 border-b border-[var(--edge-soft)]">
+      <WorkspaceAsk />
       <div className="flex items-center gap-1.5">
         <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[rgb(var(--accent)/0.12)] text-[rgb(var(--accent))]">
           <Icon name="auto_awesome" size={14} />
