@@ -9,6 +9,7 @@ import { listDocuments, getDocument } from './db/documents'
 import { extractDocText, rankSources, type WorkspaceSource } from './workspaceRank'
 import { semanticSearchKnowledge } from './semanticRetrieval'
 import { semanticSearchDocuments } from './documentRetrieval'
+import { collectExtraSources } from './workspaceExtras'
 
 export type { WorkspaceSource } from './workspaceRank'
 export { extractDocText } from './workspaceRank'
@@ -38,7 +39,26 @@ export async function retrieveSources(query: string, limit = 6): Promise<Workspa
   // used to live here is gone.
   const docSources = await semanticSearchDocuments(query, limit)
 
-  return [...kSources, ...docSources].slice(0, limit)
+  // Extras: tasks, tables and canvas notes — the rest of the environment, so the
+  // brain is grounded in more than documents. Keyword-ranked.
+  const extraSources = collectExtraSources(query, limit)
+
+  // Interleave the three pools round-robin so documents, tasks/tables/notes and
+  // knowledge all get a fair shot at the limited source slots. Curated knowledge
+  // still leads each round.
+  const pools = [kSources, docSources, extraSources]
+  const merged: WorkspaceSource[] = []
+  const seen = new Set<string>()
+  for (let i = 0; merged.length < limit && pools.some((p) => p[i]); i++) {
+    for (const pool of pools) {
+      const s = pool[i]
+      if (s && !seen.has(s.docId) && merged.length < limit) {
+        seen.add(s.docId)
+        merged.push(s)
+      }
+    }
+  }
+  return merged
 }
 
 // The workspace connecting itself: the documents most related to this one, by
