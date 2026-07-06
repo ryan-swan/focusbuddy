@@ -1478,6 +1478,14 @@ export interface SheetPivotSpec {
   filters?: SheetPivotFilter[]
 }
 
+// A merged cell range, 0-based and inclusive of both corners.
+export interface SheetMerge {
+  r1: number
+  c1: number
+  r2: number
+  c2: number
+}
+
 export interface SheetTab {
   id: string
   name: string
@@ -1487,6 +1495,10 @@ export interface SheetTab {
   formats?: Record<string, SheetCellFormat>
   colWidths?: Record<number, number> // px; absent = default
   rowHeights?: Record<number, number> // px; absent = default (0.75cm)
+  // Merged cell ranges (0-based, inclusive). The top-left cell holds the value;
+  // the covered cells are not rendered (the anchor spans them). Excel stores
+  // merges the same way, so they round-trip through .xlsx.
+  merges?: SheetMerge[]
   freeze?: { rows: number; cols: number }
   charts?: SheetChartSpec[]
   pivots?: SheetPivotSpec[]

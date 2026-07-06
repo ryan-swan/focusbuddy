@@ -338,6 +338,34 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
     [body, idx, tab, commit]
   )
 
+  // Whether the current selection exactly equals an existing merge, so the button
+  // reads as unmerge and toggling removes it.
+  const selectionIsMerged = (tab.merges ?? []).some(
+    (m) => m.r1 === selection.r0 && m.c1 === selection.c0 && m.r2 === selection.r1 && m.c2 === selection.c1
+  )
+
+  // Merge the selection into one cell, or unmerge if it already is one. Merging
+  // drops any merges the new range overlaps and clears the covered cells' values
+  // (the anchor keeps its own), matching how Excel stores a merge.
+  function toggleMerge(): void {
+    const { r0, c0, r1, c1 } = selection
+    if (r0 === r1 && c0 === c1 && !selectionIsMerged) return // nothing to merge
+    mutateTab((t) => {
+      const existing = t.merges ?? []
+      if (selectionIsMerged) {
+        return { ...t, merges: existing.filter((m) => !(m.r1 === r0 && m.c1 === c0 && m.r2 === r1 && m.c2 === c1)) }
+      }
+      const overlaps = (m: { r1: number; c1: number; r2: number; c2: number }): boolean =>
+        r0 <= m.r2 && r1 >= m.r1 && c0 <= m.c2 && c1 >= m.c1
+      const kept = existing.filter((m) => !overlaps(m))
+      // Clear covered cells so only the anchor carries a value.
+      const rows = t.rows.map((row) => [...row])
+      for (let r = r0; r <= r1; r++)
+        for (let c = c0; c <= c1; c++) if (!(r === r0 && c === c0) && rows[r]?.[c] != null) rows[r][c] = ''
+      return { ...t, rows, merges: [...kept, { r1: r0, c1: c0, r2: r1, c2: c1 }] }
+    })
+  }
+
   const undo = useCallback(() => {
     const prev = undoStack.current.pop()
     if (!prev) return
@@ -1306,6 +1334,8 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
         onSort={(dir) => mutateTab((t) => sortByColumn(t, selection.c0, dir))}
         onConditionalFormat={() => setCondOpen(true)}
         onDataValidation={() => setValidationOpen(true)}
+        onMergeCells={toggleMerge}
+        isMerged={selectionIsMerged}
         onInsertPivot={() => setPivotOpen(true)}
         onInsertSparkline={insertSparkline}
         onInsertLookup={() => setLookupOpen(true)}

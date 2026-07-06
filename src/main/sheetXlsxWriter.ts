@@ -187,6 +187,14 @@ export async function buildStyledXlsx(body: SheetBodyV2): Promise<Buffer> {
     if (tab.freeze && (tab.freeze.rows > 0 || tab.freeze.cols > 0)) {
       ws.views = [{ state: 'frozen', xSplit: tab.freeze.cols, ySplit: tab.freeze.rows }]
     }
+    for (const m of tab.merges ?? []) {
+      // exceljs is 1-based (top row, left col, bottom row, right col).
+      try {
+        ws.mergeCells(m.r1 + 1, m.c1 + 1, m.r2 + 1, m.c2 + 1)
+      } catch {
+        // Overlapping/invalid merges are skipped rather than aborting the export.
+      }
+    }
     // Data validation (dropdown lists, number bounds, non-empty text) so a
     // constrained cell keeps its rule in Excel. exceljs sets validation per cell,
     // so apply the model across the rule's range.
