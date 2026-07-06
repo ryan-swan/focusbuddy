@@ -42,6 +42,19 @@ export function applyMention(text: string, handle: string): string {
   return `${upto}${handle} `
 }
 
+// True when a comment authored by someone else names my handle — the trigger for
+// a cross-user mention notification. My own comments never notify me, and a body
+// that mentions nobody (or an unknown handle) does not either.
+export function isCrossUserMention(
+  body: string,
+  authorAccountId: string | null | undefined,
+  myAccountId: string | null | undefined,
+  myHandle: string | null | undefined
+): boolean {
+  if (!myAccountId || authorAccountId === myAccountId) return false
+  return bodyMentionsHandle(body, myHandle)
+}
+
 // The candidate handles for a partial query: those that start with it, deduped
 // case-insensitively, capped. Nothing is invented; an empty pool yields nothing.
 export function filterMentionCandidates(handles: string[], query: string, limit = 6): string[] {

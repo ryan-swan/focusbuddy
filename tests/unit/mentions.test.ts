@@ -5,7 +5,13 @@
 // null/undefined handle, and punctuation-boundary cases.
 
 import { describe, it, expect } from 'vitest'
-import { applyMention, bodyMentionsHandle, filterMentionCandidates, matchMentionQuery } from '@renderer/lib/mentions'
+import {
+  applyMention,
+  bodyMentionsHandle,
+  filterMentionCandidates,
+  isCrossUserMention,
+  matchMentionQuery
+} from '@renderer/lib/mentions'
 
 describe('bodyMentionsHandle', () => {
   it('matches a plain @handle mention in the body', () => {
@@ -133,5 +139,23 @@ describe('filterMentionCandidates', () => {
   })
   it('returns nothing from an empty pool — never invents a candidate', () => {
     expect(filterMentionCandidates([], 'an')).toEqual([])
+  })
+})
+
+describe('isCrossUserMention (notification trigger)', () => {
+  it('fires when another user mentions my handle', () => {
+    expect(isCrossUserMention('cc @ana please review', 'acc_bob', 'acc_ana', 'ana')).toBe(true)
+  })
+  it('does not fire for my own comment even if it mentions me', () => {
+    expect(isCrossUserMention('note to self @ana', 'acc_ana', 'acc_ana', 'ana')).toBe(false)
+  })
+  it('does not fire when the comment mentions someone else', () => {
+    expect(isCrossUserMention('cc @bob', 'acc_carol', 'acc_ana', 'ana')).toBe(false)
+  })
+  it('does not fire when I am not signed in (no account id)', () => {
+    expect(isCrossUserMention('cc @ana', 'acc_bob', null, 'ana')).toBe(false)
+  })
+  it('does not fire when I have no handle to match', () => {
+    expect(isCrossUserMention('cc @ana', 'acc_bob', 'acc_ana', null)).toBe(false)
   })
 })
