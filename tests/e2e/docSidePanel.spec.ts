@@ -37,8 +37,10 @@ async function stubDocAi(app: LaunchedApp['app'], html: string): Promise<void> {
 async function stubWorkspaceAsk(app: LaunchedApp['app'], answer: string): Promise<void> {
   await app.evaluate(({ ipcMain }, a: string) => {
     ipcMain.removeHandler('workspace:askStream')
-    ipcMain.handle('workspace:askStream', async (e, _q: string, _h: unknown, requestId: string) => {
+    ipcMain.handle('workspace:askStream', async (e, _q: string, _h: unknown, requestId: string, docContext?: { text?: string } | null) => {
       e.sender.send(`workspace:askStream:${requestId}`, { type: 'delta', payload: a })
+      // Echo the scope so the test can assert doc-scoped asks pass the doc text.
+      ;(globalThis as unknown as { __lastAskDocScoped?: boolean }).__lastAskDocScoped = !!(docContext && docContext.text)
       return {
         ok: true,
         answer: a,
@@ -150,6 +152,15 @@ test.describe('PlexiDocs side panel', () => {
     await window.locator('[data-testid="workspace-ask-insert"]').click()
     await window.waitForTimeout(200)
     await expect(window.locator('[data-testid="doc-editor-surface"]')).toContainText('8% over plan')
+
+    // Scope toggle: switching to "This document" sends the doc text as context.
+    await setDocHtml(window, '<p>Some document body to ground on.</p>')
+    await window.locator('[data-testid="workspace-ask-scope-doc"]').click()
+    await window.locator('[data-testid="workspace-ask-input"]').fill('What does this doc say?')
+    await window.locator('[data-testid="workspace-ask-go"]').click()
+    await window.waitForTimeout(400)
+    const docScoped = await app.app.evaluate(() => (globalThis as unknown as { __lastAskDocScoped?: boolean }).__lastAskDocScoped)
+    expect(docScoped).toBe(true)
   })
 
   test('DSP-4 — Outline tab lists a heading typed into the document', async () => {

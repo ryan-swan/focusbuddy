@@ -103,6 +103,7 @@ const OPENABLE_DOC_TYPES = new Set(['doc', 'sheet', 'slides', 'map', 'design'])
 
 function WorkspaceAsk({ editor }: { editor: Editor }): JSX.Element {
   const goDocument = useViewStore((s) => s.goDocument)
+  const [scope, setScope] = useState<'workspace' | 'doc'>('workspace')
   const [q, setQ] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -126,6 +127,7 @@ function WorkspaceAsk({ editor }: { editor: Editor }): JSX.Element {
     setThread((t) => [...t, { question: text, answer: '', sources: [] }])
     const requestId = crypto.randomUUID()
     try {
+      const docContext = scope === 'doc' ? { text: editor.getText() } : null
       const res = await window.api.workspace.askStream(
         text,
         historyRef.current.slice(-4),
@@ -137,7 +139,8 @@ function WorkspaceAsk({ editor }: { editor: Editor }): JSX.Element {
             const last = copy[copy.length - 1]
             copy[copy.length - 1] = { ...last, answer: last.answer + delta }
             return copy
-          })
+          }),
+        docContext
       )
       if (!res.ok) {
         setThread((t) => t.slice(0, -1)) // drop the empty entry
@@ -179,6 +182,19 @@ function WorkspaceAsk({ editor }: { editor: Editor }): JSX.Element {
       <p className="text-[11px] text-[var(--ink-50)] leading-snug">
         Draws on every document, sheet and note across all your desks, and answers with citations.
       </p>
+
+      <div className="inline-flex self-start rounded-md border border-[var(--edge-soft)] overflow-hidden text-[10.5px]" data-testid="workspace-ask-scope">
+        {(['workspace', 'doc'] as const).map((s) => (
+          <button
+            key={s}
+            onClick={() => setScope(s)}
+            className={`px-2 py-0.5 ${scope === s ? 'bg-[rgb(var(--accent))] text-white' : 'text-[var(--ink-60)] hover:bg-[var(--surface-sunken)]'}`}
+            data-testid={`workspace-ask-scope-${s}`}
+          >
+            {s === 'workspace' ? 'Whole workspace' : 'This document'}
+          </button>
+        ))}
+      </div>
 
       {thread.map((entry, i) => (
         <div key={i} className="flex flex-col gap-1 rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-base)] p-2" data-testid="workspace-ask-answer">
