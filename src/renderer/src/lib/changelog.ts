@@ -36,6 +36,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.3.3',
+    date: '2026-07-07T16:30:00Z',
+    title: 'PlexiDesk 3.3.3 — organisation licensing for apps',
+    tag: 'feature',
+    summary:
+      'Entitlements now work at the organisation level as well as per user. An admin can license an organisation for exactly the apps it needs, and an app the active organisation is not licensed for now shows greyed with a tooltip rather than vanishing: owners and admins are offered an upgrade, members are told to ask an admin, and an app an admin has deliberately turned off for you is shown as restricted with no upsell. Entitlements resolve as plan, then organisation, then user, so a specific person can still be granted or denied on top. Switch organisations and the apps you can use update to match that organisation.',
+    highlights: [
+      'License an organisation for specific apps from the admin console.',
+      'A locked app greys out with the reason: upgrade if it is a plan gap, or restricted if an admin turned it off.',
+      'Entitlements layer as plan, then organisation, then user, and update when you switch organisations.'
+    ]
+  },
+  {
     version: '3.3.2',
     date: '2026-07-07T15:00:00Z',
     title: 'PlexiDesk 3.3.2 — entitlements apply the moment they change',

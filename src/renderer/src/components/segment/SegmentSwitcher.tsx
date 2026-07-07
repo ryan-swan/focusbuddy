@@ -1,15 +1,18 @@
 import { useViewStore } from '../../stores/view'
 import { useCapabilityStore } from '../../stores/capabilities'
+import { useOrgStore, PERSONAL_ORG_ID } from '../../stores/org'
+import { PRICING_URL } from '../../lib/siteUrls'
 import Icon from '../Icon'
 
 // A small always-visible switch between the four areas, shown at the top of every
 // area's menu. Each area still shows only its own apps (the simple, contextual
-// menu), but you can always jump to another area in one click, so Docs and Sheets
-// in PlexiOffice are never more than a click away from the desk.
+// menu), but you can always jump to another area in one click.
 //
-// Each area is gated by its product entitlement (product_desk/office/brain/
-// people). An admin can switch a whole app off for a user, and it disappears
-// from this switcher. The entitlements resolve from /account/capabilities.
+// Each area is an entitlement (product_desk/office/brain/people). When the
+// active org (or the user) is not entitled to an app, the area is not hidden but
+// shown GREYED with a tooltip that explains why and, when it is a licensing gap
+// rather than an admin restriction, offers an upgrade. Desk is the floor and is
+// always available.
 const AREAS = [
   { kind: 'plexidesk', label: 'Desk', icon: 'desktop_windows', cap: 'product_desk' },
   { kind: 'office', label: 'Office', icon: 'grid_view', cap: 'product_office' },
@@ -23,38 +26,78 @@ export default function SegmentSwitcher(): JSX.Element {
   const goOffice = useViewStore((s) => s.goOffice)
   const goPlexiPeople = useViewStore((s) => s.goPlexiPeople)
   const goPlexiBrain = useViewStore((s) => s.goPlexiBrain)
-  // Subscribe to the capabilities MAP (not s.get, which is a stable function
-  // reference that never triggers a re-render) so the switcher reacts when
-  // entitlements resolve or change while the app is running.
+  // Subscribe to the capability + source MAPS (not s.get, a stable function
+  // reference that never re-renders) so the switcher reacts when entitlements
+  // resolve or change while the app is running, e.g. after an org switch.
   const capabilities = useCapabilityStore((s) => s.capabilities)
+  const sources = useCapabilityStore((s) => s.sources)
+  const orgRole = useCapabilityStore((s) => s.orgRole)
+  const activeOrgId = useOrgStore((s) => s.activeOrgId)
+  const orgName = useOrgStore((s) => s.orgs.find((o) => o.id === s.activeOrgId)?.name ?? null)
+
+  const inOrg = activeOrgId !== PERSONAL_ORG_ID && !!orgName
+  const canUpgrade = orgRole === 'owner' || orgRole === 'admin'
 
   function go(kind: string): void {
-    // Desk is the default area (the workspace, home, tasks, calendar, files and
-    // your desks), so it opens Home rather than a separate segment.
     if (kind === 'plexidesk') goHome()
     else if (kind === 'office') goOffice()
     else if (kind === 'plexipeople') goPlexiPeople()
     else if (kind === 'plexibrain') goPlexiBrain()
   }
 
-  // Only show areas the user is entitled to. An admin can switch a whole app off
-  // per user; a missing entitlement removes it from the switcher entirely. Desk
-  // is always kept as the floor so a user is never left with nowhere to go.
-  const areas = AREAS.filter((a) => a.kind === 'plexidesk' || capabilities[a.cap] === true)
+  // The tooltip for a locked app, driven by WHY it is off and who is asking.
+  // A 'user' source is a deliberate admin restriction (no upsell); anything else
+  // is a licensing gap, where owners/admins get an actionable upgrade and
+  // members are told to ask an admin.
+  function lockedReason(label: string, cap: string): string {
+    const restricted = sources[cap] === 'user'
+    if (restricted) {
+      return inOrg
+        ? `${label} is turned off for you in ${orgName} by your administrator.`
+        : `${label} is turned off for your account by your administrator.`
+    }
+    if (inOrg) {
+      return canUpgrade
+        ? `${label} is not included in ${orgName}'s plan. Upgrade to add it.`
+        : `${label} is not included in ${orgName}'s plan. Ask an admin to add it.`
+    }
+    return `${label} is not on your plan. Upgrade to add it.`
+  }
+
+  function onLockedClick(cap: string): void {
+    // Only send someone somewhere they can act: a licensing gap for an owner/
+    // admin (or a personal account) opens pricing. A restriction is a dead end
+    // by design, so it just shows its tooltip.
+    const restricted = sources[cap] === 'user'
+    if (!restricted && (canUpgrade || !inOrg)) void window.api.files.openExternal(PRICING_URL)
+  }
 
   return (
-    <div
-      className="grid gap-1 px-2 pt-2 pb-1"
-      style={{ gridTemplateColumns: `repeat(${Math.max(1, areas.length)}, minmax(0, 1fr))` }}
-      data-testid="segment-switcher"
-    >
-      {areas.map((a) => {
-        // Desk is active for every view that is not one of the other three areas,
-        // since the whole desk workspace lives under it.
+    <div className="grid grid-cols-4 gap-1 px-2 pt-2 pb-1" data-testid="segment-switcher">
+      {AREAS.map((a) => {
+        // Desk is the floor: always available even if its entitlement is unset.
+        const enabled = a.kind === 'plexidesk' || capabilities[a.cap] === true
         const active =
           a.kind === 'plexidesk'
             ? !['office', 'plexipeople', 'plexibrain'].includes(currentKind)
             : currentKind === a.kind
+        if (!enabled) {
+          return (
+            <button
+              key={a.kind}
+              onClick={() => onLockedClick(a.cap)}
+              data-testid={`switch-${a.kind}`}
+              data-locked="true"
+              aria-disabled="true"
+              title={lockedReason(a.label, a.cap)}
+              className="relative flex flex-col items-center gap-0.5 py-1.5 rounded-lg text-[10px] text-[var(--ink-40)] opacity-50 cursor-not-allowed"
+            >
+              <Icon name={a.icon} size={18} />
+              <span>{a.label}</span>
+              <Icon name="lock" size={9} className="absolute top-1 right-1.5 text-[var(--ink-40)]" />
+            </button>
+          )
+        }
         return (
           <button
             key={a.kind}

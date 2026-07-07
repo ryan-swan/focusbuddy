@@ -84,9 +84,9 @@ test('1 — default capabilities: all four segment-switcher areas render', async
   await expect(switcher.locator('[data-testid="switch-plexibrain"]')).toBeVisible()
 })
 
-// ── Test 2: entitlement off — product_office / product_brain hidden ────────
+// ── Test 2: entitlement off — product_office / product_brain greyed ────────
 
-test('2 — product_office and product_brain off: their switch buttons disappear; Desk stays as the floor', async () => {
+test('2 — product_office (licensing) and product_brain (admin) off: greyed with reason-aware tooltips; Desk stays', async () => {
   const email = `entitlement-test-${Date.now()}@example.com`
   const accountId = 'acc_test_entitlements'
   const token = 'stub-entitlement-session-token'
@@ -119,7 +119,7 @@ test('2 — product_office and product_brain off: their switch buttons disappear
   })
 
   const capsMap = freeMapWith({ product_office: false, product_brain: false })
-  await window.route('**/account/capabilities', async (route) => {
+  await window.route('**/account/capabilities**', async (route) => {
     capabilitiesCallCount++
     await route.fulfill({
       status: 200,
@@ -130,7 +130,11 @@ test('2 — product_office and product_brain off: their switch buttons disappear
         storedTier: 'free',
         effectiveTier: 'free',
         trial: { active: false, daysLeft: 0, startedAt: null, expiresAt: null },
-        capabilities: capsMap
+        capabilities: capsMap,
+        // Office off due to licensing (offer upgrade); Brain off due to an
+        // explicit admin restriction (no upsell).
+        sources: { product_office: 'org', product_brain: 'user' },
+        orgRole: null
       })
     })
   })
@@ -148,13 +152,21 @@ test('2 — product_office and product_brain off: their switch buttons disappear
   // wait for the stubbed endpoint to actually have been hit before asserting.
   await expect.poll(() => capabilitiesCallCount, { timeout: 5_000 }).toBeGreaterThan(0)
 
-  // Office and Brain are no longer entitled -> their buttons are gone.
-  await expect(switcher.locator('[data-testid="switch-office"]')).toHaveCount(0)
-  await expect(switcher.locator('[data-testid="switch-plexibrain"]')).toHaveCount(0)
+  // Office and Brain are no longer entitled -> still shown, but greyed/locked.
+  const office = switcher.locator('[data-testid="switch-office"]')
+  const brain = switcher.locator('[data-testid="switch-plexibrain"]')
+  await expect.poll(async () => await office.getAttribute('data-locked'), { timeout: 5_000 }).toBe('true')
+  await expect(brain).toHaveAttribute('data-locked', 'true')
 
-  // Desk (the floor) and People (still entitled) remain.
+  // Reason-aware tooltips: Office is a licensing gap (upgrade), Brain is an
+  // admin restriction (no upsell).
+  expect(await office.getAttribute('title')).toContain('Upgrade')
+  expect(await brain.getAttribute('title')).toContain('administrator')
+
+  // Desk (the floor) and People (still entitled) remain enabled (not locked).
   await expect(switcher.locator('[data-testid="switch-plexidesk"]')).toBeVisible()
-  await expect(switcher.locator('[data-testid="switch-plexipeople"]')).toBeVisible()
+  await expect(switcher.locator('[data-testid="switch-plexidesk"]')).not.toHaveAttribute('data-locked', 'true')
+  await expect(switcher.locator('[data-testid="switch-plexipeople"]')).not.toHaveAttribute('data-locked', 'true')
 
   expect(pageErrors, `Uncaught renderer errors: ${pageErrors.join('\n')}`).toHaveLength(0)
 })
