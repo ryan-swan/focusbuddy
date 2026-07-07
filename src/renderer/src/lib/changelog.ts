@@ -36,6 +36,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.3.1',
+    date: '2026-07-07T14:00:00Z',
+    title: 'PlexiDesk 3.3.1 — per-user control over apps and features',
+    tag: 'feature',
+    summary:
+      'Administrators can now decide exactly which apps, features and limits each person gets. PlexiDesk, PlexiOffice, PlexiBrain and PlexiTeam are each an entitlement an admin can switch on or off per user from the admin console, and any feature or numeric limit can be overridden for one person on top of their plan. The app honours it live: an area you are not entitled to simply does not appear in the switcher. Most people will see no change; this is the groundwork that lets a team hand out exactly the workspace each role needs.',
+    highlights: [
+      'Apps (Desk, Office, Brain, Team) can be turned on or off per user by an admin.',
+      'Any feature or limit can be overridden for a single user, above their plan.',
+      'The app enforces entitlements live: areas you lack are hidden from the switcher.'
+    ]
+  },
+  {
     version: '3.3.0',
     date: '2026-07-07T12:00:00Z',
     title: 'PlexiDesk 3.3.0 — real names, meetings you can schedule, and a brain that builds',
