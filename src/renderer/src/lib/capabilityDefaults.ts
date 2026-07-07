@@ -11,6 +11,10 @@ export type TierId = 'free' | 'pro' | 'team'
 export type CapabilityValue = boolean | number | string
 
 export const CAPABILITY_DEFAULTS: Record<string, Record<TierId, CapabilityValue>> = {
+  product_desk:            { free: true,  pro: true,        team: true        },
+  product_office:          { free: true,  pro: true,        team: true        },
+  product_brain:           { free: true,  pro: true,        team: true        },
+  product_people:          { free: true,  pro: true,        team: true        },
   workspace_canvas:        { free: true,  pro: true,        team: true        },
   multiple_desks:          { free: 3,     pro: 'Unlimited', team: 'Unlimited' },
   desk_themes:             { free: true,  pro: true,        team: true        },
