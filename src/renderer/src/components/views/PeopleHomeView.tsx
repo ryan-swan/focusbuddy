@@ -6,6 +6,7 @@ import { useViewStore } from '../../stores/view'
 import { usePresenceStore, type PresenceStatus } from '../../stores/presence'
 import { listOrgs, type OrgMembership } from '../../lib/orgsClient'
 import { usePeopleMap, type MapPerson } from '../../lib/peopleMap/usePeopleMap'
+import { useViewKindEnabled } from '../../lib/viewCapability'
 import { personDisplayName, personInitials, personFirstName } from '../../lib/personName'
 
 // PlexiPeople home: the front door of the team area. It reads the SAME real
@@ -110,6 +111,12 @@ export default function PeopleHomeView(): JSX.Element {
   const account = useAccountStore((s) => s.account)
   const goPeopleMap = useViewStore((s) => s.goPeopleMap)
   const goOrg = useViewStore((s) => s.goOrg)
+  // The People area itself is product_people; within it the map and the org
+  // directory are their own capabilities. Hide the entries that jump to a gated
+  // one so a teammate never lands on a locked wall from here.
+  const viewEnabled = useViewKindEnabled()
+  const mapEnabled = viewEnabled('people-map')
+  const orgEnabled = viewEnabled('organization')
   // Subscribe to presence so the counts re-render the instant the socket updates.
   usePresenceStore((s) => s.peers)
   usePresenceStore((s) => s.myStatus)
@@ -177,7 +184,7 @@ export default function PeopleHomeView(): JSX.Element {
       <Empty
         title="Create your organisation first"
         body="PlexiPeople maps a real organisation. Create one and invite your team, then their profiles appear here."
-        action={{ label: 'Open Organisations', onClick: goOrg }}
+        action={orgEnabled ? { label: 'Open Organisations', onClick: goOrg } : undefined}
       />
     )
   } else if (loading && !data) {
@@ -189,7 +196,7 @@ export default function PeopleHomeView(): JSX.Element {
       <Empty
         title="No teammates yet"
         body="Invite people to your workspace, then give them profiles so they show up in the directory and on the map."
-        action={{ label: 'Invite people to your workspace', onClick: goOrg }}
+        action={orgEnabled ? { label: 'Invite people to your workspace', onClick: goOrg } : undefined}
       />
     )
   }
@@ -217,14 +224,16 @@ export default function PeopleHomeView(): JSX.Element {
                   ))}
                 </select>
               )}
-              <button
-                onClick={goPeopleMap}
-                data-testid="people-open-map"
-                className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border border-[var(--edge-soft)] hover:border-[rgb(var(--accent)/0.5)] text-[12px] font-medium text-[var(--ink-90)] transition-colors"
-              >
-                <Icon name="travel_explore" size={15} />
-                Organisation map
-              </button>
+              {mapEnabled && (
+                <button
+                  onClick={goPeopleMap}
+                  data-testid="people-open-map"
+                  className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border border-[var(--edge-soft)] hover:border-[rgb(var(--accent)/0.5)] text-[12px] font-medium text-[var(--ink-90)] transition-colors"
+                >
+                  <Icon name="travel_explore" size={15} />
+                  Organisation map
+                </button>
+              )}
             </>
           }
         />
@@ -295,19 +304,21 @@ export default function PeopleHomeView(): JSX.Element {
                 )}
               </RailCard>
 
-              <RailCard title="Organisation map" icon="account_tree" tone="violet">
-                <p className="text-[12px] text-[var(--ink-70)] leading-snug mb-2.5">
-                  See everyone by office and reporting line, with their local day and who is reachable now.
-                </p>
-                <button
-                  onClick={goPeopleMap}
-                  data-testid="people-orgmap"
-                  className="inline-flex items-center gap-1.5 text-[12px] font-medium text-accent hover:underline"
-                >
-                  Open the organisation map
-                  <Icon name="arrow_forward" size={14} />
-                </button>
-              </RailCard>
+              {mapEnabled && (
+                <RailCard title="Organisation map" icon="account_tree" tone="violet">
+                  <p className="text-[12px] text-[var(--ink-70)] leading-snug mb-2.5">
+                    See everyone by office and reporting line, with their local day and who is reachable now.
+                  </p>
+                  <button
+                    onClick={goPeopleMap}
+                    data-testid="people-orgmap"
+                    className="inline-flex items-center gap-1.5 text-[12px] font-medium text-accent hover:underline"
+                  >
+                    Open the organisation map
+                    <Icon name="arrow_forward" size={14} />
+                  </button>
+                </RailCard>
+              )}
             </div>
           </div>
         )}

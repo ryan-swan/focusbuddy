@@ -6,6 +6,8 @@ import { useNodeStore } from '../../stores/nodes'
 import { useDocumentsStore } from '../../stores/documents'
 import { usePresenceStore } from '../../stores/presence'
 import { useCallStore } from '../../stores/call'
+import { useCapabilityEnabled } from '../../stores/capabilities'
+import { useViewKindEnabled } from '../../lib/viewCapability'
 import { personDisplayName, personInitials } from '../../lib/personName'
 import type { TimeBlock, FbNode, DocumentMeta } from '@shared/types'
 
@@ -71,6 +73,10 @@ export default function HomeDashboardRegion(): JSX.Element {
   const refreshDocs = useDocumentsStore((s) => s.refresh)
   const peersMap = usePresenceStore((s) => s.peers)
   const startCall = useCallStore((s) => s.startCall)
+  // Dashboard cards that lead to (or launch) a gated surface are hidden when the
+  // matching capability is off, using the same map the backbone enforces.
+  const viewEnabled = useViewKindEnabled()
+  const callsEnabled = useCapabilityEnabled('calls')
 
   const [blocks, setBlocks] = useState<TimeBlock[] | null>(null)
 
@@ -137,19 +143,21 @@ export default function HomeDashboardRegion(): JSX.Element {
         {/* Main column */}
         <div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <RailCard title="Upcoming" icon="calendar_today" tone="sky" action={{ label: 'Calendar', onClick: () => v.goCalendar() }}>
-              {blocks === null ? (
-                <p className="py-4 text-center text-[12px] text-[var(--ink-50)]">Loading…</p>
-              ) : upcoming.length === 0 ? (
-                <EmptyCard text="Nothing scheduled in the next week." />
-              ) : (
-                <ul className="space-y-1" data-testid="home-upcoming">
-                  {upcoming.map((b) => (
-                    <Row key={b.id} title={b.title || 'Time block'} meta={clockTime(b.startMs)} onClick={() => v.goCalendar()} />
-                  ))}
-                </ul>
-              )}
-            </RailCard>
+            {viewEnabled('calendar') && (
+              <RailCard title="Upcoming" icon="calendar_today" tone="sky" action={{ label: 'Calendar', onClick: () => v.goCalendar() }}>
+                {blocks === null ? (
+                  <p className="py-4 text-center text-[12px] text-[var(--ink-50)]">Loading…</p>
+                ) : upcoming.length === 0 ? (
+                  <EmptyCard text="Nothing scheduled in the next week." />
+                ) : (
+                  <ul className="space-y-1" data-testid="home-upcoming">
+                    {upcoming.map((b) => (
+                      <Row key={b.id} title={b.title || 'Time block'} meta={clockTime(b.startMs)} onClick={() => v.goCalendar()} />
+                    ))}
+                  </ul>
+                )}
+              </RailCard>
+            )}
 
             <RailCard title="My tasks" icon="check_circle" tone="accent" action={{ label: 'All tasks', onClick: () => v.goAllTasks() }}>
               {myTasks.length === 0 ? (
@@ -183,23 +191,25 @@ export default function HomeDashboardRegion(): JSX.Element {
               )}
             </RailCard>
 
-            <RailCard title="Recent documents" icon="description" tone="stone" action={{ label: 'All documents', onClick: () => v.goDocuments() }}>
-              {recentDocs.length === 0 ? (
-                <EmptyCard text="No documents yet." />
-              ) : (
-                <ul className="space-y-1" data-testid="home-docs">
-                  {recentDocs.map((d: DocumentMeta) => (
-                    <Row key={d.id} title={d.title || 'Untitled'} meta={ago(d.updatedAt)} onClick={() => v.goDocument(d.id)} testid={`home-doc-${d.id}`} />
-                  ))}
-                </ul>
-              )}
-            </RailCard>
+            {viewEnabled('documents') && (
+              <RailCard title="Recent documents" icon="description" tone="stone" action={{ label: 'All documents', onClick: () => v.goDocuments() }}>
+                {recentDocs.length === 0 ? (
+                  <EmptyCard text="No documents yet." />
+                ) : (
+                  <ul className="space-y-1" data-testid="home-docs">
+                    {recentDocs.map((d: DocumentMeta) => (
+                      <Row key={d.id} title={d.title || 'Untitled'} meta={ago(d.updatedAt)} onClick={() => v.goDocument(d.id)} testid={`home-doc-${d.id}`} />
+                    ))}
+                  </ul>
+                )}
+              </RailCard>
+            )}
           </div>
         </div>
 
         {/* Right rail: presence */}
         <div className="space-y-4">
-          <RailCard title="Who's online" icon="group" tone="emerald" action={{ label: 'People Map', onClick: () => v.goPeopleMap() }}>
+          <RailCard title="Who's online" icon="group" tone="emerald" action={viewEnabled('people-map') ? { label: 'People Map', onClick: () => v.goPeopleMap() } : undefined}>
             {peers.length === 0 ? (
               <EmptyCard text="Nobody else is online right now." />
             ) : (
@@ -229,15 +239,17 @@ export default function HomeDashboardRegion(): JSX.Element {
                         <p className="text-[12px] font-medium text-[var(--ink-100)] truncate">{personDisplayName(p, p.accountId)}</p>
                         {p.workingOn && <p className="text-[11px] text-[var(--ink-50)] truncate">{p.workingOn}</p>}
                       </div>
-                      <button
-                        onClick={() => void startCall({ accountId: p.accountId, handle: p.handle ?? p.accountId, firstName: p.firstName, lastName: p.lastName }, 'video')}
-                        aria-label={`Call ${personDisplayName(p, 'teammate')}`}
-                        title="Start a video call"
-                        data-testid={`home-call-${p.accountId}`}
-                        className="shrink-0 inline-flex h-7 w-7 items-center justify-center rounded-full text-[var(--ink-50)] hover:text-[rgb(var(--accent))] hover:bg-[var(--surface-sunken)]"
-                      >
-                        <Icon name="videocam" size={15} />
-                      </button>
+                      {callsEnabled && (
+                        <button
+                          onClick={() => void startCall({ accountId: p.accountId, handle: p.handle ?? p.accountId, firstName: p.firstName, lastName: p.lastName }, 'video')}
+                          aria-label={`Call ${personDisplayName(p, 'teammate')}`}
+                          title="Start a video call"
+                          data-testid={`home-call-${p.accountId}`}
+                          className="shrink-0 inline-flex h-7 w-7 items-center justify-center rounded-full text-[var(--ink-50)] hover:text-[rgb(var(--accent))] hover:bg-[var(--surface-sunken)]"
+                        >
+                          <Icon name="videocam" size={15} />
+                        </button>
+                      )}
                     </li>
                   ))}
                 </ul>

@@ -5,6 +5,8 @@ import { ConversationRecorder } from '../lib/conversationRecorder'
 import { whisperEnabled } from '../lib/whisperPref'
 import { useWrapupStore } from './wrapup'
 import { personDisplayName } from '../lib/personName'
+import { entitlementFor } from '../lib/entitlementReason'
+import { promptUpgrade } from './upgradePrompt'
 
 // PlexiCam: peer-to-peer live audio/video calls. The signal server only relays
 // the SDP offer/answer and ICE candidates between two accounts in the same
@@ -271,6 +273,13 @@ export const useCallStore = create<CallStore>((set, get) => {
 
     startCall: async (peer, media) => {
       if (get().status !== 'idle') return
+      // Placing a call needs the 'calls' capability. Answering an incoming call
+      // is not gated here (accept/decline are separate), only initiating one.
+      const ent = entitlementFor('calls', 'Calls')
+      if (!ent.enabled) {
+        promptUpgrade(ent.reason)
+        return
+      }
       const callId = genCallId()
       set({ status: 'calling', callId, peer, media, error: null, remoteStream: null })
       try {

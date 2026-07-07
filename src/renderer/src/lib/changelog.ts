@@ -36,6 +36,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.3.5',
+    date: '2026-07-07T19:30:00Z',
+    title: 'PlexiDesk 3.3.5 — every feature respects your plan',
+    tag: 'feature',
+    summary:
+      'Entitlements now apply consistently across the whole app, not just the app areas and the office editors. Every feature surface, from mail, chat and meetings to the vault, files, calendar, live collaboration and the People Map, honours what is configured for you at the plan, organisation and user level. A feature you are not entitled to is hidden from the menus and, if you reach it another way, shows a clear panel explaining why and how to get it. Creating a quick doc, sheet or note on a desk canvas stays available to everyone regardless of plan.',
+    highlights: [
+      'Every feature honours your plan, organisation and per-user settings, resolved centrally so nothing slips through.',
+      'Locked features are hidden from menus and show an honest reason (upgrade, or restricted by your admin) if reached another way.',
+      'Canvas docs, sheets, slides, drawings and designs remain creatable on a desk for everyone.'
+    ]
+  },
+  {
     version: '3.3.4',
     date: '2026-07-07T18:00:00Z',
     title: 'PlexiDesk 3.3.4 — license the office editors individually',

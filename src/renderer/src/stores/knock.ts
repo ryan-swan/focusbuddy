@@ -5,6 +5,8 @@ import { useMessagingStore } from './messaging'
 import { useViewStore } from './view'
 import { useCallStore } from './call'
 import { personDisplayName } from '../lib/personName'
+import { entitlementFor } from '../lib/entitlementReason'
+import { promptUpgrade } from './upgradePrompt'
 
 // PlexiPeople knock-to-connect. A knock is a lightweight "I want to reach you"
 // ping between two people who can see each other. The receiver answers by
@@ -51,6 +53,13 @@ export const useKnockStore = create<KnockStore>((set, get) => ({
   },
 
   knock: (to, note) => {
+    // Knock-to-connect is its own capability; block the outgoing knock and
+    // surface the reason when it is off. Answering an incoming knock is unaffected.
+    const ent = entitlementFor('knock', 'Knock to connect')
+    if (!ent.enabled) {
+      promptUpgrade(ent.reason)
+      return
+    }
     sendKnock(to.accountId, note)
     const name = personDisplayName(to, to.handle)
     set({ sentTo: name })

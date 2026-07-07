@@ -32,11 +32,34 @@ import PlexiReportsView from './views/PlexiReportsView'
 import PlexiFlowView from './views/PlexiFlowView'
 import PlexiApiView from './views/PlexiApiView'
 import PlexiMarketplaceView from './views/PlexiMarketplaceView'
+import CapabilityGate from './CapabilityGate'
+import { VIEW_CAPABILITY } from '../lib/viewCapability'
+
+// Feature surfaces that respect an entitlement live in lib/viewCapability so the
+// enforcement backbone here and every navigation surface (sidebar, per-area
+// menus, suite/home tiles) read the SAME view-kind -> capability mapping and can
+// never disagree. Anything not in that map is core and always available (home,
+// tasks, desks, search, inbox, suite, etc.). The standalone Office editors gate
+// on product_office; the doc/sheet/etc widgets on a desk canvas are NOT — they
+// live in the 'task' canvas view, which is never gated.
 
 // The MainPane routes the central area between the OS-level views.
 // Existing Canvas + chat behavior is preserved for the 'task' view; everything else
 // is new surface introduced by the OS Phase 1 sidebar restructure.
 export default function MainPane(): JSX.Element {
+  const view = useViewStore((s) => s.view)
+  const gate = VIEW_CAPABILITY[view.kind]
+  if (gate) {
+    return (
+      <CapabilityGate capabilityKey={gate.cap} label={gate.label}>
+        <MainPaneSurface />
+      </CapabilityGate>
+    )
+  }
+  return <MainPaneSurface />
+}
+
+function MainPaneSurface(): JSX.Element {
   const view = useViewStore((s) => s.view)
   switch (view.kind) {
     case 'home':

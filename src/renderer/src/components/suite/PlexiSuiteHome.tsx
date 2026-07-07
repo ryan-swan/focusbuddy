@@ -12,6 +12,7 @@ import {
 import UpvoteButton from './UpvoteButton'
 import { PLEXI_CARD } from '../plexi'
 import { useNodeStore } from '../../stores/nodes'
+import { useViewKindEnabled } from '../../lib/viewCapability'
 import HomeDashboardRegion from './HomeDashboardRegion'
 
 // PlexiSuite home: the launcher for the whole suite. Every product reads from the
@@ -174,6 +175,7 @@ export default function PlexiSuiteHome(): JSX.Element {
   const createNode = useNodeStore((s) => s.create)
   const setActive = useNodeStore((s) => s.setActive)
   const name = account ? personFirstName(account, '') : ''
+  const viewEnabled = useViewKindEnabled()
 
   async function newDesk(): Promise<void> {
     const desk = await createNode({ parentId: null, kind: 'task', title: 'New desk' })
@@ -181,12 +183,16 @@ export default function PlexiSuiteHome(): JSX.Element {
     v.goTask(desk.id)
   }
 
+  // Calendar is dropped from the quick actions when time_blocking is off, so the
+  // launcher never offers a jump into a locked surface. The rest are core.
   const quickActions: { icon: string; label: string; onClick: () => void }[] = [
     { icon: 'dashboard', label: 'Open my desk', onClick: () => v.goHome() },
     { icon: 'add', label: 'New desk', onClick: () => void newDesk() },
     { icon: 'grid_view', label: 'Templates', onClick: () => v.goMarketplace() },
     { icon: 'check_circle', label: 'All tasks', onClick: () => v.goAllTasks() },
-    { icon: 'calendar_today', label: 'Calendar', onClick: () => v.goCalendar() }
+    ...(viewEnabled('calendar')
+      ? [{ icon: 'calendar_today', label: 'Calendar', onClick: () => v.goCalendar() }]
+      : [])
   ]
 
   return (
