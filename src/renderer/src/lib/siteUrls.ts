@@ -7,3 +7,12 @@ export const SITE_BASE = 'https://haptyx-web.vercel.app'
 
 export const HELP_BASE = `${SITE_BASE}/help`
 export const PRICING_URL = `${SITE_BASE}/pricing`
+
+// Password reset happens on the web (the brochure's /account/forgot page emails
+// a one-hour reset link). The desktop links out to it so the flow is the same
+// everywhere. Pre-filling the email saves the user retyping it.
+export function forgotPasswordUrl(email?: string): string {
+  const base = `${SITE_BASE}/account/forgot`
+  const e = email?.trim()
+  return e ? `${base}?email=${encodeURIComponent(e)}` : base
+}

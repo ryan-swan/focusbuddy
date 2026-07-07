@@ -4,6 +4,7 @@ import { useAccountStore } from '../stores/account'
 import { useSignInPrompt } from '../stores/signInPrompt'
 import { useOnboarding } from '../stores/onboarding'
 import { signalConfig } from '../lib/signalConfig'
+import { forgotPasswordUrl } from '../lib/siteUrls'
 import Icon from './Icon'
 
 // LaunchSignInModal — appears on app boot when the user isn't signed in
@@ -279,6 +280,18 @@ export default function LaunchSignInModal(): JSX.Element | null {
               placeholder={mode === 'signup' ? 'at least 8 characters' : 'your password'}
               autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
             />
+            {mode === 'login' && (
+              <div className="text-right mt-1">
+                <button
+                  type="button"
+                  onClick={() => void window.api.files.openExternal(forgotPasswordUrl(email))}
+                  data-testid="signin-forgot"
+                  className="text-[11px] text-stone-400 hover:text-accent transition-colors"
+                >
+                  Forgot password?
+                </button>
+              </div>
+            )}
           </div>
 
           {mode === 'login' && twoFactor && (
