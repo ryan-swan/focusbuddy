@@ -109,7 +109,42 @@ export const CAPABILITY_DEFAULTS: Record<string, Record<TierId, CapabilityValue>
   file_import_text:        { free: true,  pro: true,        team: true        },
   file_import_csv:         { free: false, pro: true,        team: true        },
   file_import_json:        { free: false, pro: true,        team: true        },
-  file_import_docx:        { free: false, pro: true,        team: true        }
+  file_import_docx:        { free: false, pro: true,        team: true        },
+
+  // ── Cross-product functionality (Brain, Team, Comms, Calendar, Collab, Files) ──
+  // Defaulted all-true so nobody loses access; tiering is the operator's call.
+  office_interop_import:   { free: true,  pro: true,        team: true        },
+  office_interop_export:   { free: true,  pro: true,        team: true        },
+  office_ai_generate:      { free: true,  pro: true,        team: true        },
+  office_present:          { free: true,  pro: true,        team: true        },
+  office_comments:         { free: true,  pro: true,        team: true        },
+  brain_workspace_ask:     { free: true,  pro: true,        team: true        },
+  brain_create_actions:    { free: true,  pro: true,        team: true        },
+  brain_daily_brief:       { free: true,  pro: true,        team: true        },
+  brain_streaming:         { free: true,  pro: true,        team: true        },
+  brain_scope:             { free: true,  pro: true,        team: true        },
+  ai_usage_metering:       { free: true,  pro: true,        team: true        },
+  people_map:              { free: true,  pro: true,        team: true        },
+  presence:                { free: true,  pro: true,        team: true        },
+  org_directory:           { free: true,  pro: true,        team: true        },
+  multi_org:               { free: true,  pro: true,        team: true        },
+  chat:                    { free: true,  pro: true,        team: true        },
+  meet:                    { free: true,  pro: true,        team: true        },
+  meet_schedule:           { free: true,  pro: true,        team: true        },
+  calls:                   { free: true,  pro: true,        team: true        },
+  video_messages:          { free: true,  pro: true,        team: true        },
+  knock:                   { free: true,  pro: true,        team: true        },
+  mail:                    { free: true,  pro: true,        team: true        },
+  mail_ai_replies:         { free: true,  pro: true,        team: true        },
+  esign:                   { free: true,  pro: true,        team: true        },
+  time_blocking:           { free: true,  pro: true,        team: true        },
+  meeting_ics:             { free: true,  pro: true,        team: true        },
+  live_collaboration:      { free: true,  pro: true,        team: true        },
+  realtime_coediting:      { free: true,  pro: true,        team: true        },
+  file_manager:            { free: true,  pro: true,        team: true        },
+  file_auto_tagging:       { free: true,  pro: true,        team: true        },
+  password_vault:          { free: true,  pro: true,        team: true        },
+  vault_backup:            { free: true,  pro: true,        team: true        }
 }
 
 /** Resolve a capability value for a tier from the local defaults snapshot. */
