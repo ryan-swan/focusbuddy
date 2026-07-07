@@ -46,8 +46,10 @@ test('1 — meet-start-live, meet-record, meet-message and meet-add all render i
   await expect(view.locator('[data-testid="meet-message"]')).toBeVisible()
   await expect(view.locator('[data-testid="meet-add"]')).toBeVisible()
 
-  // "Start a meeting" label on the primary button.
-  await expect(view.locator('[data-testid="meet-start-live"]')).toContainText('Start a meeting')
+  // "Start or schedule a meeting" label on the primary button (NewMeetingDialog
+  // entry point — the button now opens the dialog instead of a live room
+  // directly; see newMeetingDialogAndForgotPassword.spec.ts for the dialog).
+  await expect(view.locator('[data-testid="meet-start-live"]')).toContainText('Start or schedule a meeting')
 })
 
 // ── Check 2: Message picker — honest empty state when no peers ────────────────
