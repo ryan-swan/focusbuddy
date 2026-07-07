@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import Icon from '../Icon'
+import { useEntitlement } from '../../lib/entitlementReason'
 
 // The Daily Brief card: a proactive, grounded summary of what to focus on today,
 // built from the user's real tasks, calendar and recent documents (not anything
@@ -21,6 +22,9 @@ export default function DailyBriefCard(): JSX.Element {
   const [error, setError] = useState<string | null>(null)
   const [needsKey, setNeedsKey] = useState(false)
   const loadedOnce = useRef(false)
+  // The daily brief is its own PlexiBrain capability. When off, don't call the
+  // model on mount; show the reason instead.
+  const briefEnt = useEntitlement('brain_daily_brief', 'Daily brief')
 
   async function load(): Promise<void> {
     if (busy) return
@@ -55,11 +59,31 @@ export default function DailyBriefCard(): JSX.Element {
   }
 
   useEffect(() => {
+    if (!briefEnt.enabled) return
     if (loadedOnce.current) return
     loadedOnce.current = true
     void load()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [briefEnt.enabled])
+
+  if (!briefEnt.enabled) {
+    return (
+      <div
+        className="flex h-full flex-col gap-1.5 p-3"
+        data-testid="daily-brief-card"
+        data-capability="brain_daily_brief"
+        data-locked="true"
+      >
+        <div className="flex items-center gap-1.5">
+          <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-[var(--surface-sunken)] text-[var(--ink-40)]">
+            <Icon name="lock" size={14} />
+          </span>
+          <span className="text-[13px] font-semibold text-[var(--ink-90)]">Your daily brief</span>
+        </div>
+        <p className="text-[12px] text-[var(--ink-60)] leading-relaxed">{briefEnt.reason}</p>
+      </div>
+    )
+  }
 
   return (
     <div className="flex h-full flex-col gap-2 p-3" data-testid="daily-brief-card">

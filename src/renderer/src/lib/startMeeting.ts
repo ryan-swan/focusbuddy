@@ -1,5 +1,18 @@
 import { useViewStore } from '../stores/view'
 import { useMeetingRoomStore } from '../stores/meetingRoom'
+import { entitlementFor } from './entitlementReason'
+import { promptUpgrade } from '../stores/upgradePrompt'
+
+// Block a meeting from starting when PlexiMeet is not entitled. Navigating to the
+// meetings view is already covered by MainPane's backbone, but these launchers
+// also open a live room as a side effect from outside PlexiMeet, so they check
+// the same 'meet' capability here and surface the reason instead of starting one.
+function meetBlocked(): boolean {
+  const ent = entitlementFor('meet', 'Meetings')
+  if (ent.enabled) return false
+  promptUpgrade(ent.reason)
+  return true
+}
 
 // One launcher for starting a meeting from anywhere in the app — a document, a
 // sheet, a slide deck, a drawing, a design, a chat, a desk, or the calendar.
@@ -55,6 +68,7 @@ export function isShareableArtifactOrigin(origin: MeetingOrigin | null | undefin
 // artifact before the room opens. From anywhere else it starts the room
 // immediately. Returns the room id when it starts one directly, else null.
 export async function launchMeeting(origin?: MeetingOrigin): Promise<string | null> {
+  if (meetBlocked()) return null
   currentOrigin = origin ?? { kind: 'standalone', title: 'Meeting' }
   if (origin && isShareableArtifactOrigin(origin)) {
     // Lazy import to avoid a static cycle between the launcher and the store.
@@ -71,6 +85,7 @@ export async function launchMeeting(origin?: MeetingOrigin): Promise<string | nu
 // details. Sharing of the artifact to the attendees is handled by the dialog
 // (via meetingShare) so this only has to open the room.
 export async function startArtifactMeeting(origin: MeetingOrigin): Promise<string | null> {
+  if (meetBlocked()) return null
   currentOrigin = origin
   useViewStore.getState().goMeetings()
   return useMeetingRoomStore.getState().start(origin.title?.trim() || 'Meeting')
@@ -80,6 +95,7 @@ export async function startArtifactMeeting(origin: MeetingOrigin): Promise<strin
 // scheduled calendar meeting open the SAME room id, so this is what the "Join"
 // button on a calendar meeting and the haptyx://meet?room= deep link both call.
 export async function joinMeetingRoom(roomId: string, title?: string): Promise<void> {
+  if (meetBlocked()) return
   currentOrigin = { kind: 'calendar', title: title || 'Meeting' }
   useViewStore.getState().goMeetings()
   await useMeetingRoomStore.getState().join(roomId, title || 'Meeting')

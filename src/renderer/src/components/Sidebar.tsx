@@ -12,6 +12,7 @@ import { chimeOut } from '../lib/audioBeep'
 import { catalogFor, WIDGET_CATALOG, DRAG_MIME } from '../lib/widgetCatalog'
 import SegmentSwitcher from './segment/SegmentSwitcher'
 import OrgSwitcher from './OrgSwitcher'
+import { useViewKindEnabled } from '../lib/viewCapability'
 
 // What you can drag onto the desk from the sidebar when a desk is open: the common
 // widgets AND the office things (a doc, sheet, slides or a drawing), so you can pull
@@ -177,6 +178,11 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
   const goLiveCanvas = useViewStore((s) => s.goLiveCanvas)
   const goConnectedApp = useViewStore((s) => s.goConnectedApp)
   const goVault = useViewStore((s) => s.goVault)
+
+  // Hide desk-nav entries that lead to a now-gated surface, using the same
+  // view-kind -> capability map MainPane's CapabilityGate enforces, so nav and
+  // surface agree and a user never clicks into a locked wall.
+  const viewEnabled = useViewKindEnabled()
 
   const connectedApps = useConnectedAppsStore((s) => s.apps)
   const appsLoaded = useConnectedAppsStore((s) => s.loaded)
@@ -661,36 +667,42 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
               goAllTasks()
             }}
           />
-          <NavRow
-            icon="calendar_month"
-            label="Calendar"
-            tint="bg-amber-500"
-            active={viewIsActive({ kind: 'calendar' })}
-            onClick={() => {
-              setActive(null)
-              goCalendar()
-            }}
-          />
-          <NavRow
-            icon="folder"
-            label="Files"
-            tint="bg-orange-500"
-            active={viewIsActive({ kind: 'files' })}
-            onClick={() => {
-              setActive(null)
-              goFiles()
-            }}
-          />
-          <NavRow
-            icon="lock"
-            label="Vault"
-            tint="bg-rose-500"
-            active={viewIsActive({ kind: 'vault' })}
-            onClick={() => {
-              setActive(null)
-              goVault()
-            }}
-          />
+          {viewEnabled('calendar') && (
+            <NavRow
+              icon="calendar_month"
+              label="Calendar"
+              tint="bg-amber-500"
+              active={viewIsActive({ kind: 'calendar' })}
+              onClick={() => {
+                setActive(null)
+                goCalendar()
+              }}
+            />
+          )}
+          {viewEnabled('files') && (
+            <NavRow
+              icon="folder"
+              label="Files"
+              tint="bg-orange-500"
+              active={viewIsActive({ kind: 'files' })}
+              onClick={() => {
+                setActive(null)
+                goFiles()
+              }}
+            />
+          )}
+          {viewEnabled('vault') && (
+            <NavRow
+              icon="lock"
+              label="Vault"
+              tint="bg-rose-500"
+              active={viewIsActive({ kind: 'vault' })}
+              onClick={() => {
+                setActive(null)
+                goVault()
+              }}
+            />
+          )}
         </div>
 
         {/* ── ADD TO DESK — while a desk is open (a task or a folder-desk, both

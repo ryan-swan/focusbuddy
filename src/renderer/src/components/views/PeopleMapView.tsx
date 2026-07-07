@@ -29,6 +29,8 @@ import { subsolarPoint, sunElevation } from '../../lib/peopleMap/solar'
 import { COLS, ROWS, LAND, project, cellCenter } from '../../lib/peopleMap/worldmap'
 import { groupByOffice, buildHierarchy, officeWindow } from '../../lib/peopleMap/structure'
 import { personDisplayName, personInitials, personFirstName } from '../../lib/personName'
+import { entitlementFor } from '../../lib/entitlementReason'
+import { promptUpgrade } from '../../stores/upgradePrompt'
 
 // The in-product People Map: every teammate across the org placed by office and
 // reporting line, with their real local day and live presence. Reads the org
@@ -210,6 +212,13 @@ function PersonActions({
   const target = { accountId: person.accountId, handle: person.handle }
   const name = personDisplayName(person, person.handle)
   async function chat(): Promise<void> {
+    // Starting a DM from the map is a chat initiator outside Chat, so gate it on
+    // the same 'chat' capability the backbone enforces for the messages surface.
+    const ent = entitlementFor('chat', 'Chat')
+    if (!ent.enabled) {
+      promptUpgrade(ent.reason)
+      return
+    }
     await startDm(person.handle) // opens the conversation on success
     goMessages()
   }
@@ -663,6 +672,11 @@ function CollabPerson({ person, context }: { person: MapPerson; context?: string
       data-testid="collab-person"
       title={`Message ${dispName(person)}`}
       onClick={() => {
+        const ent = entitlementFor('chat', 'Chat')
+        if (!ent.enabled) {
+          promptUpgrade(ent.reason)
+          return
+        }
         void startDm(person.handle)
         goMessages()
       }}

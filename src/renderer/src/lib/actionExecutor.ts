@@ -24,7 +24,7 @@ import { useViewStore } from '../stores/view'
 import { catalogFor } from './widgetCatalog'
 import { spawnPositionFor } from './spawnPosition'
 import { useCapabilityStore } from '../stores/capabilities'
-import { capabilityForDocType, DOC_TYPE_LABEL } from './entitlementReason'
+import { capabilityForDocType, DOC_TYPE_LABEL, entitlementFor } from './entitlementReason'
 
 // Palette for auto-assigning select option colors when the AI doesn't specify.
 const SELECT_COLORS = [
@@ -277,6 +277,10 @@ async function applyScheduleEvent(
 async function applyComposeMail(
   p: Extract<ActionProposal, { kind: 'compose-mail' }>
 ): Promise<ApplyResult> {
+  // This can be proposed from a non-mail surface (the workspace brain), so gate
+  // on the same 'mail' capability the backbone enforces before opening Mail.
+  const mailEnt = entitlementFor('mail', 'Mail')
+  if (!mailEnt.enabled) return { ok: false, message: mailEnt.reason }
   const mail = useMailStore.getState()
   if (!mail.account && mail.loadedAccount) {
     return { ok: false, message: 'Connect a mailbox in Mail first — then I can pre-fill drafts.' }
@@ -290,6 +294,9 @@ async function applyComposeMail(
 async function applyPostChat(
   p: Extract<ActionProposal, { kind: 'post-chat' }>
 ): Promise<ApplyResult> {
+  // Proposed from outside Chat, so gate on 'chat' before navigating and drafting.
+  const chatEnt = entitlementFor('chat', 'Chat')
+  if (!chatEnt.enabled) return { ok: false, message: chatEnt.reason }
   const messaging = useMessagingStore.getState()
   const conv = messaging.conversations.find((c) => c.id === p.conversationId)
   if (!conv) {

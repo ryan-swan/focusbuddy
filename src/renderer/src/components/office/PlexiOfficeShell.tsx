@@ -18,6 +18,8 @@ import {
 } from '../../lib/entitlementReason'
 import { CHANGELOG } from '../../lib/changelog'
 import { promptUpgrade } from '../../stores/upgradePrompt'
+import { VIEW_CAPABILITY, useViewKindEnabled } from '../../lib/viewCapability'
+import CapabilityGate from '../CapabilityGate'
 import DocumentEditorView from '../views/DocumentEditorView'
 import MailView from '../views/MailView'
 import InboxView from '../views/InboxView'
@@ -74,6 +76,23 @@ const COMMS_APPS: CommsApp[] = [
   { key: 'sign', label: 'Sign', blurb: 'Send and sign documents', icon: 'draw', tint: 'bg-teal-500', render: () => <PlexiSignView /> }
 ]
 
+// Which OS view kind each comms app stands in for, so we gate its menu entry and
+// its inline render on the same capability MainPane's backbone enforces. Inbox is
+// core (notifications and share invites) and is never gated.
+const COMMS_VIEW_KIND: Record<string, string | null> = {
+  mail: 'mail',
+  inbox: null,
+  chat: 'messages',
+  meet: 'meetings',
+  sign: 'sign'
+}
+
+function commsGate(key: string): { cap: string; label: string } | null {
+  const vk = COMMS_VIEW_KIND[key]
+  if (!vk) return null
+  return VIEW_CAPABILITY[vk] ?? null
+}
+
 const TYPE_ICON: Record<string, { icon: string; tint: string }> = {
   doc: { icon: 'description', tint: 'text-sky-500' },
   sheet: { icon: 'table_chart', tint: 'text-emerald-500' },
@@ -129,6 +148,9 @@ export default function PlexiOfficeShell({ initialApp }: { initialApp?: string }
   const remove = useDocumentsStore((s) => s.remove)
   const goHome = useViewStore((s) => s.goHome)
   const account = useAccountStore((s) => s.account)
+  // Same view-kind -> capability check the backbone uses, so office menu entries
+  // and initiators that lead to a gated comms surface hide/no-op when it is off.
+  const viewEnabled = useViewKindEnabled()
 
   // Per-editor entitlements. Read the capability + source maps and the active
   // org once (subscribed) and resolve each docType with the pure helper so the
@@ -319,10 +341,22 @@ export default function PlexiOfficeShell({ initialApp }: { initialApp?: string }
   // content area inline; the office side menu stays put.
   const comms = activeComms ? COMMS_APPS.find((a) => a.key === activeComms) ?? null : null
   if (comms) {
+    // These comms surfaces render inline here rather than through MainPane, so a
+    // deep link could otherwise reach a locked one. Wrap the render in the same
+    // CapabilityGate the backbone uses so a gated comms app shows the reason-aware
+    // locked panel instead of the surface. Inbox is core and never gated.
+    const gate = commsGate(comms.key)
+    const content = gate ? (
+      <CapabilityGate capabilityKey={gate.cap} label={gate.label}>
+        {comms.render()}
+      </CapabilityGate>
+    ) : (
+      comms.render()
+    )
     return (
       <div className="h-full flex bg-[var(--surface-base)]">
         <OfficeSidebar page={page} onPage={(p) => { setActiveComms(null); setPage(p) }} onLaunch={(a) => void launch(a)} onComms={openComms} activeComms={activeComms} onExit={goHome} starredCount={starred.size} entInputs={entInputs} />
-        <div className="flex-1 min-w-0 overflow-auto" data-testid={`office-comms-${comms.key}`}>{comms.render()}</div>
+        <div className="flex-1 min-w-0 overflow-auto" data-testid={`office-comms-${comms.key}`}>{content}</div>
       </div>
     )
   }
@@ -391,17 +425,19 @@ export default function PlexiOfficeShell({ initialApp }: { initialApp?: string }
                 </button>
               )
             })}
-            <button
-              onClick={openMeet}
-              data-testid="office-app-meet"
-              className="flex flex-col items-center gap-2 rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-raised)] p-3.5 hover:border-[rgb(var(--accent)/0.5)] hover:shadow-sm transition"
-            >
-              <span className="inline-flex items-center justify-center w-11 h-11 rounded-xl text-white bg-violet-500">
-                <Icon name="video_call" size={22} />
-              </span>
-              <span className="text-[12.5px] font-medium">PlexiMeet</span>
-              <span className="text-[10.5px] text-[var(--ink-50)] text-center leading-tight">Start a meeting</span>
-            </button>
+            {viewEnabled('meetings') && (
+              <button
+                onClick={openMeet}
+                data-testid="office-app-meet"
+                className="flex flex-col items-center gap-2 rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-raised)] p-3.5 hover:border-[rgb(var(--accent)/0.5)] hover:shadow-sm transition"
+              >
+                <span className="inline-flex items-center justify-center w-11 h-11 rounded-xl text-white bg-violet-500">
+                  <Icon name="video_call" size={22} />
+                </span>
+                <span className="text-[12.5px] font-medium">PlexiMeet</span>
+                <span className="text-[10.5px] text-[var(--ink-50)] text-center leading-tight">Start a meeting</span>
+              </button>
+            )}
           </div>
 
           <div className="flex gap-5">
@@ -584,11 +620,11 @@ export default function PlexiOfficeShell({ initialApp }: { initialApp?: string }
                   {/* Quick actions — every action goes to a real destination. */}
                   <RailCard title="Quick actions">
                     <div className="space-y-0.5" data-testid="office-home-quickactions">
-                      <QuickActionRow testid="office-qa-compose" icon="mail" label="Compose email" onClick={composeMail} />
+                      {viewEnabled('mail') && <QuickActionRow testid="office-qa-compose" icon="mail" label="Compose email" onClick={composeMail} />}
                       <QuickActionRow testid="office-qa-doc" icon="description" label="New document" onClick={() => void createType('doc', 'Untitled document')} />
                       <QuickActionRow testid="office-qa-sheet" icon="table_chart" label="New spreadsheet" onClick={() => void createType('sheet', 'Untitled spreadsheet')} />
                       <QuickActionRow testid="office-qa-slides" icon="slideshow" label="New presentation" onClick={() => void createType('slides', 'Untitled presentation')} />
-                      <QuickActionRow testid="office-qa-meet" icon="video_call" label="Start a meeting" onClick={openMeet} />
+                      {viewEnabled('meetings') && <QuickActionRow testid="office-qa-meet" icon="video_call" label="Start a meeting" onClick={openMeet} />}
                     </div>
                   </RailCard>
 
@@ -606,8 +642,8 @@ export default function PlexiOfficeShell({ initialApp }: { initialApp?: string }
                       ) : (
                         <div className="space-y-1">
                           <UnreadRow icon="inbox" label="Inbox" count={inboxUnread} onClick={() => openComms('inbox')} />
-                          <UnreadRow icon="forum" label="Chat messages" count={chatUnread} onClick={() => openComms('chat')} />
-                          <UnreadRow icon="mail" label="Mail" count={mailUnread} onClick={() => openComms('mail')} />
+                          {viewEnabled('messages') && <UnreadRow icon="forum" label="Chat messages" count={chatUnread} onClick={() => openComms('chat')} />}
+                          {viewEnabled('mail') && <UnreadRow icon="mail" label="Mail" count={mailUnread} onClick={() => openComms('mail')} />}
                         </div>
                       )}
                     </div>
@@ -770,6 +806,13 @@ function OfficeSidebar({
   starredCount: number
   entInputs: EntitlementInputs
 }): JSX.Element {
+  // Hide the Communicate entries that lead to a gated surface, matching the same
+  // capability MainPane enforces. Inbox is core and always shown.
+  const viewEnabled = useViewKindEnabled()
+  const visibleComms = COMMS_APPS.filter((a) => {
+    const vk = COMMS_VIEW_KIND[a.key]
+    return !vk || viewEnabled(vk)
+  })
   const NAV: { id: OfficePage; label: string; icon: string; tint: string }[] = [
     { id: 'home', label: 'Home', icon: 'home', tint: 'bg-indigo-500' },
     { id: 'recent', label: 'Recent', icon: 'schedule', tint: 'bg-rose-500' },
@@ -841,7 +884,7 @@ function OfficeSidebar({
 
       <div className="px-4 pt-3 pb-1.5 text-[10px] uppercase tracking-[0.12em] text-[var(--ink-40)] font-semibold">Communicate</div>
       <div className="px-2">
-        {COMMS_APPS.map((a) => (
+        {visibleComms.map((a) => (
           <button
             key={a.key}
             onClick={() => onComms(a.key)}

@@ -8,6 +8,7 @@ import { useAccountStore } from '../stores/account'
 import { newMeetingRoomId } from '../lib/startMeeting'
 import { sendMeetingInvites } from '../lib/meetingInvite'
 import { personDisplayName } from '../lib/personName'
+import { useEntitlement } from '../lib/entitlementReason'
 
 // Start or schedule a meeting and invite anyone by email, not only teammates who
 // happen to be online. Two modes share one invitee list:
@@ -40,6 +41,10 @@ export default function NewMeetingDialog({ onClose }: { onClose: () => void }): 
   const startRoom = useMeetingRoomStore((s) => s.start)
   const createBlock = useTimeBlockStore((s) => s.create)
   const account = useAccountStore((s) => s.account)
+  // Starting a meeting needs 'meet'; scheduling one also needs 'meet_schedule'.
+  // A blocked action reports the reason rather than starting or scheduling.
+  const meetEnt = useEntitlement('meet', 'Meetings')
+  const scheduleEnt = useEntitlement('meet_schedule', 'Meeting scheduling')
   const hostName = account ? personDisplayName(account) : undefined
 
   const [mode, setMode] = useState<Mode>('now')
@@ -76,6 +81,10 @@ export default function NewMeetingDialog({ onClose }: { onClose: () => void }): 
 
   async function startNow(): Promise<void> {
     if (busy) return
+    if (!meetEnt.enabled) {
+      setError(meetEnt.reason)
+      return
+    }
     setBusy(true)
     setError(null)
     setNote(null)
@@ -109,6 +118,10 @@ export default function NewMeetingDialog({ onClose }: { onClose: () => void }): 
 
   async function schedule(): Promise<void> {
     if (busy) return
+    if (!scheduleEnt.enabled) {
+      setError(scheduleEnt.reason)
+      return
+    }
     const emails = parseEmails()
     const startMs = new Date(`${date}T${time}`).getTime()
     if (!Number.isFinite(startMs)) {

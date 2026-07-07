@@ -3,6 +3,7 @@ import type { ActionProposal } from '@shared/types'
 import Icon from '../../Icon'
 import { useViewStore } from '../../../stores/view'
 import { applyProposal, describeProposal } from '../../../lib/actionExecutor'
+import { useEntitlement } from '../../../lib/entitlementReason'
 
 // The workspace brain, shared by every editor surface (docs, sheets, slides,
 // design). Ask anything and it grounds the answer in EVERY document, sheet and
@@ -31,6 +32,9 @@ export default function WorkspaceAsk({
   onInsert?: (text: string) => void
 }): JSX.Element {
   const goDocument = useViewStore((s) => s.goDocument)
+  // Ask-your-workspace is its own PlexiBrain capability. When it is off, the
+  // panel shows the reason instead of the input rather than calling the model.
+  const askEnt = useEntitlement('brain_workspace_ask', 'Ask your workspace')
   const [scope, setScope] = useState<'workspace' | 'doc'>('workspace')
   const [q, setQ] = useState('')
   const [busy, setBusy] = useState(false)
@@ -122,6 +126,23 @@ export default function WorkspaceAsk({
     } catch {
       /* clipboard unavailable */
     }
+  }
+
+  if (!askEnt.enabled) {
+    return (
+      <div
+        className="flex flex-col gap-1.5 rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-sunken)] p-3"
+        data-testid="workspace-ask"
+        data-capability="brain_workspace_ask"
+        data-locked="true"
+      >
+        <div className="flex items-center gap-1.5">
+          <Icon name="lock" size={14} className="text-[var(--ink-40)]" />
+          <span className="text-[12.5px] font-semibold text-[var(--ink-90)]">Ask your workspace</span>
+        </div>
+        <p className="text-[11px] text-[var(--ink-60)] leading-snug">{askEnt.reason}</p>
+      </div>
+    )
   }
 
   return (
