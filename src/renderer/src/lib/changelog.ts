@@ -36,6 +36,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.3.6',
+    date: '2026-07-08T10:00:00Z',
+    title: 'PlexiDesk 3.3.6 — directory sync for organisations',
+    tag: 'feature',
+    summary:
+      'Organisations can now connect their identity provider for automatic user management. Alongside single sign-on, an organisation admin can turn on directory sync (SCIM) from the organisation settings, generate a token, and copy the base URL into Okta, Microsoft Entra or OneLogin. People are then added and removed from the organisation automatically as they join and leave, and removing someone takes away their access without ever deleting their work. This sits on the same tamper-evident audit trail, so every provisioning action is recorded. Directory sync is a Team and Enterprise feature.',
+    highlights: [
+      'Connect Okta, Microsoft Entra or OneLogin to provision and deprovision members automatically (SCIM).',
+      'Set it up from Organisation settings: generate a token and copy the base URL into your identity provider.',
+      'Deprovisioning removes access without deleting a person’s work, and every action is on the audit trail.'
+    ]
+  },
+  {
     version: '3.3.5',
     date: '2026-07-07T19:30:00Z',
     title: 'PlexiDesk 3.3.5 — every feature respects your plan',

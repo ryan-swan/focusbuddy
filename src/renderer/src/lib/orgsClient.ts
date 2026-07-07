@@ -123,6 +123,51 @@ export async function setSso(
 export async function clearSso(token: string, id: string): Promise<void> {
   await call('DELETE', `/orgs/${id}/sso`, token)
 }
+
+export interface OrgScimStatus {
+  configured: boolean
+  lastUsedAt: number | null
+}
+
+// Directory sync (SCIM) status for this org. Returns whether a provisioning
+// token is currently active, when it was last used by the identity provider, and
+// the base URL the admin pastes into their IdP.
+export async function getScim(
+  token: string,
+  id: string
+): Promise<{ ok: boolean; status: OrgScimStatus; baseUrl: string }> {
+  const { json } = await call<{
+    ok: boolean
+    status?: OrgScimStatus
+    baseUrl?: string
+  }>('GET', `/orgs/${id}/scim`, token)
+  return {
+    ok: !!json?.ok,
+    status: json?.status ?? { configured: false, lastUsedAt: null },
+    baseUrl: json?.baseUrl ?? ''
+  }
+}
+
+// Mint a fresh SCIM provisioning token. The raw token is returned exactly once,
+// so it must be surfaced to the admin immediately and never re-fetched. Minting
+// again rotates the token and invalidates the previous one.
+export async function mintScimToken(
+  token: string,
+  id: string
+): Promise<{ ok: boolean; token?: string; baseUrl?: string; error?: string }> {
+  const { json } = await call<{ ok: boolean; token?: string; baseUrl?: string; error?: string }>(
+    'POST',
+    `/orgs/${id}/scim/token`,
+    token
+  )
+  return json ?? { ok: false, error: 'Request failed.' }
+}
+
+// Revoke the active SCIM token, turning directory sync off for this org.
+export async function revokeScimToken(token: string, id: string): Promise<{ ok: boolean; error?: string }> {
+  const { json } = await call<{ ok: boolean; error?: string }>('DELETE', `/orgs/${id}/scim/token`, token)
+  return json ?? { ok: false, error: 'Request failed.' }
+}
 export async function getOrg(token: string, id: string): Promise<OrgDetail | null> {
   const { json } = await call<{ ok: boolean } & OrgDetail>('GET', `/orgs/${id}`, token)
   return json?.ok ? { org: json.org, role: json.role, members: json.members, invites: json.invites } : null

@@ -29,8 +29,12 @@ import {
   getSso,
   setSso as setSsoConfig,
   clearSso,
+  getScim,
+  mintScimToken,
+  revokeScimToken,
   type AuditEvent,
   type OrgSsoConfig,
+  type OrgScimStatus,
   type OrgMembership,
   type OrgDetail,
   type OrgRole,
@@ -78,6 +82,14 @@ export default function OrgAdminView(): JSX.Element {
   const [sso, setSsoState] = useState<{ configured: boolean; config: OrgSsoConfig | null }>({ configured: false, config: null })
   const [ssoConn, setSsoConn] = useState('')
   const [ssoDomain, setSsoDomain] = useState('')
+  // Directory sync (SCIM) state. The base URL comes from the server; the raw
+  // token is only ever held in memory after a mint and is never re-fetched.
+  const [scim, setScimState] = useState<{ status: OrgScimStatus; baseUrl: string }>({
+    status: { configured: false, lastUsedAt: null },
+    baseUrl: ''
+  })
+  const [scimToken, setScimToken] = useState<string | null>(null)
+  const [scimBusy, setScimBusy] = useState(false)
 
   // Follow the organisation the user has switched to, so the admin/people view
   // shows the org they're actually working in rather than an arbitrary first one.
@@ -128,6 +140,9 @@ export default function OrgAdminView(): JSX.Element {
     setSsoState(s)
     setSsoConn(s.config?.connectionId ?? '')
     setSsoDomain(s.config?.domain ?? '')
+    const sc = await getScim(token, selId)
+    setScimState({ status: sc.status, baseUrl: sc.baseUrl })
+    setScimToken(null) // a freshly loaded org never reveals a previously minted token
     setProfiles({})
     setOpenProfile(null)
   }, [token, selId])
@@ -625,8 +640,159 @@ export default function OrgAdminView(): JSX.Element {
             )}
           </div>
         )}
+
+        {detail && (
+          <div className={`${PLEXI_CARD} mt-4 p-4`} data-testid="org-scim">
+            <div className="flex items-center gap-2 mb-3">
+              <Icon name="sync_alt" size={16} className="text-accent" />
+              <h2 className="text-[14px] font-semibold">Directory sync (SCIM)</h2>
+              <span className="text-[11px] text-[var(--ink-40)]">provision and deprovision members from your IdP</span>
+            </div>
+
+            {scim.status.configured ? (
+              <p className="text-[12px] text-emerald-600 dark:text-emerald-400 leading-relaxed mb-2" data-testid="org-scim-status">
+                Directory sync is on.{' '}
+                <span className="text-[var(--ink-50)]">
+                  {scim.status.lastUsedAt
+                    ? `Last used ${new Date(scim.status.lastUsedAt).toLocaleString(undefined, {
+                        month: 'short',
+                        day: 'numeric',
+                        hour: 'numeric',
+                        minute: '2-digit'
+                      })}.`
+                    : 'Not used yet.'}
+                </span>
+              </p>
+            ) : (
+              <p className="text-[12px] text-[var(--ink-50)] leading-relaxed mb-2" data-testid="org-scim-status">
+                Directory sync lets your identity provider such as Okta, Microsoft Entra, or OneLogin provision and
+                deprovision members automatically. Generate a token, then paste it and the base URL below into your
+                provider.
+              </p>
+            )}
+
+            <p className="text-[11px] text-[var(--ink-40)] leading-relaxed mb-2">
+              Directory sync is available on the Team and Enterprise plans.
+            </p>
+
+            {/* Base URL is always shown and copyable. */}
+            <label className="block text-[10px] uppercase tracking-wide text-[var(--ink-40)] mb-1">SCIM base URL</label>
+            <div className="flex items-center gap-1.5 mb-3">
+              <input
+                readOnly
+                value={scim.baseUrl}
+                placeholder="Available once the server enables directory sync."
+                data-testid="org-scim-baseurl"
+                onFocus={(e) => e.currentTarget.select()}
+                className="flex-1 bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded px-2 py-1 text-[12px] font-mono focus:outline-none focus:border-accent"
+              />
+              <CopyButton text={scim.baseUrl} disabled={!scim.baseUrl} />
+            </div>
+
+            {/* Revealed token, shown only once immediately after minting. */}
+            {scimToken && (
+              <div className="mb-3">
+                <label className="block text-[10px] uppercase tracking-wide text-[var(--ink-40)] mb-1">
+                  Provisioning token
+                </label>
+                <div className="flex items-center gap-1.5">
+                  <input
+                    readOnly
+                    value={scimToken}
+                    data-testid="org-scim-token"
+                    onFocus={(e) => e.currentTarget.select()}
+                    className="flex-1 bg-[var(--surface-sunken)] border border-accent rounded px-2 py-1 text-[12px] font-mono focus:outline-none"
+                  />
+                  <CopyButton text={scimToken} />
+                </div>
+                <p className="mt-1 text-[11px] text-amber-600 dark:text-amber-400">
+                  This token is shown only now. Copy it into your identity provider and store it there, because it
+                  cannot be retrieved again.
+                </p>
+              </div>
+            )}
+
+            {canAdmin ? (
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  onClick={async () => {
+                    if (!token || !selId) return
+                    setScimBusy(true)
+                    const r = await mintScimToken(token, selId)
+                    setScimBusy(false)
+                    if (r.ok && r.token) {
+                      setScimToken(r.token)
+                      setScimState((s) => ({ status: { configured: true, lastUsedAt: s.status.lastUsedAt }, baseUrl: r.baseUrl ?? s.baseUrl }))
+                      setMsg('Directory sync token generated.')
+                    } else {
+                      setMsg(r.error ?? 'Could not generate a token.')
+                    }
+                  }}
+                  disabled={scimBusy}
+                  className="btn-primary text-[12px] px-2.5 py-1 disabled:opacity-50"
+                  data-testid="org-scim-generate"
+                >
+                  {scim.status.configured ? 'Regenerate token' : 'Generate token'}
+                </button>
+                {scim.status.configured && (
+                  <button
+                    onClick={async () => {
+                      if (!token || !selId) return
+                      setScimBusy(true)
+                      const r = await revokeScimToken(token, selId)
+                      setScimBusy(false)
+                      if (r.ok) {
+                        setScimToken(null)
+                        setScimState((s) => ({ status: { configured: false, lastUsedAt: null }, baseUrl: s.baseUrl }))
+                        setMsg('Directory sync turned off.')
+                      } else {
+                        setMsg(r.error ?? 'Could not revoke the token.')
+                      }
+                    }}
+                    disabled={scimBusy}
+                    className="text-[12px] px-2.5 py-1 rounded text-rose-500 hover:bg-rose-500/10 disabled:opacity-50"
+                    data-testid="org-scim-revoke"
+                  >
+                    Revoke
+                  </button>
+                )}
+                <span className="text-[11px] text-[var(--ink-40)]">
+                  Generating a token rotates it, which invalidates the previous one.
+                </span>
+              </div>
+            ) : (
+              <p className="text-[11px] text-[var(--ink-40)]">Only an organization admin can generate or revoke the sync token.</p>
+            )}
+          </div>
+        )}
       </div>
     </div>
+  )
+}
+
+// Copy the given text to the clipboard and briefly confirm, matching the copy
+// affordance used elsewhere in the app.
+function CopyButton({ text, disabled }: { text: string; disabled?: boolean }): JSX.Element {
+  const [copied, setCopied] = useState(false)
+  return (
+    <button
+      onClick={async () => {
+        if (!text) return
+        try {
+          await navigator.clipboard.writeText(text)
+          setCopied(true)
+          setTimeout(() => setCopied(false), 1500)
+        } catch {
+          /* clipboard unavailable; leave state unchanged */
+        }
+      }}
+      disabled={disabled}
+      className="inline-flex items-center gap-1 text-[12px] px-2 py-1 rounded border border-[var(--edge-soft)] hover:border-accent disabled:opacity-40"
+      title="Copy"
+    >
+      <Icon name={copied ? 'check' : 'content_copy'} size={13} />
+      {copied ? 'Copied' : 'Copy'}
+    </button>
   )
 }
 
