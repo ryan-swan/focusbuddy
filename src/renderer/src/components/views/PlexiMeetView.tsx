@@ -4,7 +4,7 @@ import { whisperEnabled, setWhisperEnabled } from '../../lib/whisperPref'
 import ModuleDashboard from '../ModuleDashboard'
 import { bucketByWeek, periodDelta } from '../../lib/dashboardMetrics'
 import { useMeetingsStore } from '../../stores/meetings'
-import { useMeetingRoomStore } from '../../stores/meetingRoom'
+import NewMeetingDialog from '../NewMeetingDialog'
 import { usePresenceStore } from '../../stores/presence'
 import { useAccountStore } from '../../stores/account'
 import { useQuickCreate } from '../../stores/quickCreate'
@@ -127,7 +127,7 @@ export default function PlexiMeetView(): JSX.Element {
   }
 
   // Live meeting + record-a-message wiring.
-  const startMeeting = useMeetingRoomStore((s) => s.start)
+  const [showNew, setShowNew] = useState(false)
   const presencePeers = usePresenceStore((s) => s.peers)
   const token = useAccountStore((s) => s.sessionToken)
   const [showMsg, setShowMsg] = useState(false)
@@ -136,15 +136,18 @@ export default function PlexiMeetView(): JSX.Element {
   const [msgNote, setMsgNote] = useState<string | null>(null)
   const msgRecRef = useRef<MediaRecorder | null>(null)
 
-  function startLive(): void {
+  // Opening the New meeting dialog is the single entry point for starting or
+  // scheduling a meeting, so the invite-by-email and schedule options are always
+  // available no matter where the request comes from.
+  function openNew(): void {
     setError(null)
-    void startMeeting('Meeting')
+    setShowNew(true)
   }
 
   // Global quick-create (Cmd+K "Start a meeting").
   const quickPending = useQuickCreate((s) => s.pending)
   useEffect(() => {
-    if (quickPending === 'meet' && useQuickCreate.getState().consume('meet')) startLive()
+    if (quickPending === 'meet' && useQuickCreate.getState().consume('meet')) openNew()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [quickPending])
 
@@ -239,11 +242,11 @@ export default function PlexiMeetView(): JSX.Element {
         <div className="px-3 py-2.5 space-y-2">
           {/* Primary: a live, multi-party meeting (connect to teammates). */}
           <button
-            onClick={startLive}
+            onClick={openNew}
             data-testid="meet-start-live"
             className="w-full inline-flex items-center justify-center gap-1.5 px-2 py-2 rounded-md bg-rose-500 text-white text-[12.5px] font-semibold hover:bg-rose-600"
           >
-            <Icon name="video_call" size={17} /> Start a meeting
+            <Icon name="video_call" size={17} /> Start or schedule a meeting
           </button>
 
           {/* Whisper opt-in. Off by default (never forced); turning it on also
@@ -475,13 +478,15 @@ export default function PlexiMeetView(): JSX.Element {
                 status: m.actionItems.length ? { tone: 'accent' as const, label: `${m.actionItems.length} actions` } : undefined,
                 onOpen: () => setSelectedId(m.id)
               })),
-              onCreate: startLive,
+              onCreate: openNew,
               createLabel: 'Start a meeting',
               emptyHint: 'Start a live meeting and invite your teammates, or record notes and a message to send. Action items become real tasks.'
             }}
           />
         )}
       </div>
+
+      {showNew && <NewMeetingDialog onClose={() => setShowNew(false)} />}
     </div>
   )
 }
