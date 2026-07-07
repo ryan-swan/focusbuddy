@@ -17,8 +17,18 @@ export interface LaunchedApp {
   dispose: () => Promise<void>
 }
 
-export async function launchApp(opts?: { env?: Record<string, string> }): Promise<LaunchedApp> {
-  const userDataDir = mkdtempSync(join(tmpdir(), 'focusbuddy-e2e-'))
+export async function launchApp(opts?: {
+  env?: Record<string, string>
+  // Reuse an existing userData directory instead of minting a fresh one —
+  // for restart-persistence specs that need a second Electron instance to
+  // see what the first one saved (e.g. confirming a server-side save
+  // survives a relaunch + session revalidation, not just in-memory state).
+  // The caller owns cleanup of a reused dir; `dispose()` only removes
+  // directories this call itself created.
+  userDataDir?: string
+}): Promise<LaunchedApp> {
+  const userDataDir = opts?.userDataDir ?? mkdtempSync(join(tmpdir(), 'focusbuddy-e2e-'))
+  const ownsDir = !opts?.userDataDir
   // ELECTRON_RUN_AS_NODE=1 makes Electron boot as a plain Node process — which
   // is what happens when these tests run from inside another Electron host
   // (e.g. Claude Code's terminal). Strip it before launching so we get a real
@@ -73,10 +83,12 @@ export async function launchApp(opts?: { env?: Record<string, string> }): Promis
         // Already dead
       }
     }
-    try {
-      rmSync(userDataDir, { recursive: true, force: true })
-    } catch {
-      // Best effort
+    if (ownsDir) {
+      try {
+        rmSync(userDataDir, { recursive: true, force: true })
+      } catch {
+        // Best effort
+      }
     }
   }
   return { app, window, userDataDir, dispose }
