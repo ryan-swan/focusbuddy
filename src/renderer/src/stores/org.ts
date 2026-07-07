@@ -87,6 +87,10 @@ export const useOrgStore = create<OrgStore>((set, get) => ({
       return
     }
     set({ activeOrgId: orgId })
+    // Entitlements resolve against the active org, so re-fetch them on switch:
+    // an app the new org is not licensed for greys out (or an app the previous
+    // org restricted comes back). Lazy import avoids a store import cycle.
+    void import('./capabilities').then((m) => m.useCapabilityStore.getState().refresh())
     // Reload every org-scoped surface so the whole workspace reflects the new
     // org. Files are listed per-view, so resetting the view forces those to
     // re-query under the new org too.

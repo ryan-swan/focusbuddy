@@ -23,6 +23,7 @@ import {
 import { canCreateMore, canCreateWidget, limitFor } from '../lib/gating'
 import { signalConfig } from '../lib/signalConfig'
 import { useAccountStore } from './account'
+import { useOrgStore, PERSONAL_ORG_ID } from './org'
 
 // Trial envelope shape from /account/capabilities. The desktop reads
 // this to render the footer badge and the "Trial ended" modal. Server
@@ -47,12 +48,22 @@ interface CapabilityStore {
   storedTier: TierId
   trial: TrialState
   capabilities: Record<string, CapabilityValue>
+  // Per-capability provenance from the server ('default'|'tier'|'org'|'user').
+  // Lets the UI explain WHY an app is off: a 'user' source is an admin
+  // restriction (no upsell), anything else is a licensing gap (offer upgrade).
+  sources: Record<string, CapabilitySource>
+  // The signed-in user's role in the ACTIVE org, so a locked-app upsell can be
+  // role-aware (only owners/admins get an actionable upgrade CTA). Null in
+  // Personal or when not in an org.
+  orgRole: string | null
   loadedAt: number | null
   error: string | null
   refresh: () => Promise<void>
   /** Resolve a single capability synchronously — used by `useCapability`. */
   get: (key: string) => CapabilityValue
 }
+
+export type CapabilitySource = 'default' | 'tier' | 'org' | 'user'
 
 const DEFAULT_TRIAL: TrialState = {
   active: false,
@@ -106,6 +117,8 @@ export const useCapabilityStore = create<CapabilityStore>((set, get) => ({
   storedTier: 'free',
   trial: DEFAULT_TRIAL,
   capabilities: localMap('free'),
+  sources: {},
+  orgRole: null,
   loadedAt: null,
   error: null,
   refresh: async () => {
@@ -131,13 +144,19 @@ export const useCapabilityStore = create<CapabilityStore>((set, get) => ({
         storedTier: 'free',
         trial: DEFAULT_TRIAL,
         capabilities: localMap('free'),
+        sources: {},
+        orgRole: null,
         loadedAt: null,
         error: null
       })
       return
     }
     try {
-      const res = await fetch(`${signalConfig.httpUrl}/account/capabilities`, {
+      // Resolve entitlements against the active org so org-level licensing
+      // applies. Personal has no org layer.
+      const activeOrgId = useOrgStore.getState().activeOrgId
+      const orgQ = activeOrgId && activeOrgId !== PERSONAL_ORG_ID ? `?orgId=${encodeURIComponent(activeOrgId)}` : ''
+      const res = await fetch(`${signalConfig.httpUrl}/account/capabilities${orgQ}`, {
         headers: { authorization: `Bearer ${token}` }
       })
       if (!res.ok) {
@@ -154,6 +173,8 @@ export const useCapabilityStore = create<CapabilityStore>((set, get) => ({
             storedTier: 'free',
             trial: DEFAULT_TRIAL,
             capabilities: localMap('free'),
+            sources: {},
+            orgRole: null,
             loadedAt: Date.now(),
             error: 'session-expired'
           })
@@ -174,6 +195,8 @@ export const useCapabilityStore = create<CapabilityStore>((set, get) => ({
         effectiveTier?: TierId
         trial?: TrialState
         capabilities?: Record<string, CapabilityValue>
+        sources?: Record<string, CapabilitySource>
+        orgRole?: string | null
       }
       if (!body.ok || !body.tier || !body.capabilities) {
         set({ error: 'Unexpected /account/capabilities shape' })
@@ -188,6 +211,8 @@ export const useCapabilityStore = create<CapabilityStore>((set, get) => ({
         storedTier,
         trial,
         capabilities: body.capabilities,
+        sources: body.sources ?? {},
+        orgRole: body.orgRole ?? null,
         loadedAt: Date.now(),
         error: null
       })
