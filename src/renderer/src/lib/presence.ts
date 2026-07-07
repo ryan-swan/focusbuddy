@@ -4,9 +4,14 @@
 // testable without mounting the live-doc view. Live cursors and multi-user
 // co-editing build on top of this in later waves.
 
+import { personDisplayName, personInitials } from './personName'
+
 export interface Collaborator {
   accountId: string
   handle: string
+  // The name we SHOW for this person (real name, falling back to handle). The
+  // handle is retained above for routing/keys.
+  name: string
   // Deterministic per-account colour, so the same person is the same colour for
   // everyone and across sessions.
   color: string
@@ -37,7 +42,7 @@ export function initialsFor(handle: string): string {
 // with the current editor (lock holder) flagged and ordered first, then the rest
 // alphabetically. The current user is flagged so the UI can mark "you".
 export function collaborators(
-  members: Array<{ accountId: string; handle: string }>,
+  members: Array<{ accountId: string; handle: string; firstName?: string | null; lastName?: string | null }>,
   lock: { holder: { accountId: string } | null } | null,
   myAccountId: string | null
 ): Collaborator[] {
@@ -47,15 +52,18 @@ export function collaborators(
   for (const m of members) {
     if (seen.has(m.accountId)) continue
     seen.add(m.accountId)
+    const name = personDisplayName(m, m.handle)
     out.push({
       accountId: m.accountId,
       handle: m.handle,
+      name,
       color: presenceColor(m.accountId),
-      initials: initialsFor(m.handle),
+      initials: personInitials(m),
       editing: m.accountId === holderId,
       you: m.accountId === myAccountId
     })
   }
-  out.sort((a, b) => (a.editing === b.editing ? a.handle.localeCompare(b.handle) : a.editing ? -1 : 1))
+  // Sort by the shown name so the bar reads in the same order the user sees.
+  out.sort((a, b) => (a.editing === b.editing ? a.name.localeCompare(b.name) : a.editing ? -1 : 1))
   return out
 }

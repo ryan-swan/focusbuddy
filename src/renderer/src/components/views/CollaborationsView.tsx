@@ -4,6 +4,7 @@ import { useAccountStore } from '../../stores/account'
 import { useSignInPrompt } from '../../stores/signInPrompt'
 import { listLiveDocs, type LiveDocListItem } from '../../lib/docCollabClient'
 import Icon from '../Icon'
+import { personDisplayName } from '../../lib/personName'
 
 // Collaborations — the home for everything shared LIVE with you: desks
 // (canvases), folders, and documents under the check-out model. Its own
@@ -137,7 +138,7 @@ export default function CollaborationsView(): JSX.Element {
                       {d.title || `Untitled ${meta.label.toLowerCase()}`}
                     </div>
                     <div className="text-[11px] text-[var(--ink-40)] truncate">
-                      {meta.label} · {d.lock ? `Being edited by ${d.lock.handle}` : 'Free to edit'} ·{' '}
+                      {meta.label} · {d.lock ? `Being edited by ${personDisplayName(d.lock, d.lock.handle)}` : 'Free to edit'} ·{' '}
                       {relTime(d.updatedAt)}
                     </div>
                   </div>

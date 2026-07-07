@@ -4,6 +4,7 @@ import Icon from './Icon'
 import Tooltip from './Tooltip'
 import { usePresenceStore, type PresenceStatus } from '../stores/presence'
 import { useAccountStore } from '../stores/account'
+import { personDisplayName, personInitials } from '../lib/personName'
 
 // Header entry point for account-level presence (the "People Map"): who across
 // your org/team is online right now and what they're doing. Reads only real
@@ -25,14 +26,15 @@ function colorFor(seed: string): string {
   return AVATAR_COLORS[Math.abs(h) % AVATAR_COLORS.length]
 }
 
-function Avatar({ handle }: { handle: string }): JSX.Element {
-  const initial = (handle || '?').trim()[0]?.toUpperCase() ?? '?'
+// `handle` seeds the colour (stable per person); `name` is the shown identity we
+// take initials from, falling back to the handle when there is no real name.
+function Avatar({ handle, name }: { handle: string; name?: string }): JSX.Element {
   return (
     <span
       className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[12px] font-semibold text-white ring-1 ring-black/10"
       style={{ backgroundColor: colorFor(handle) }}
     >
-      {initial}
+      {personInitials({ name: name ?? handle })}
     </span>
   )
 }
@@ -51,7 +53,7 @@ export default function TeamPresenceButton(): JSX.Element {
   const list = Object.values(peers).sort((a, b) => {
     // Online-ish first by status weight, then by handle.
     const w = (s: PresenceStatus) => (s === 'offline' ? 3 : s === 'away' ? 1 : s === 'busy' ? 2 : 0)
-    return w(a.status) - w(b.status) || a.handle.localeCompare(b.handle)
+    return w(a.status) - w(b.status) || personDisplayName(a, a.handle).localeCompare(personDisplayName(b, b.handle))
   })
   const onlineCount = list.length
 
@@ -77,7 +79,7 @@ export default function TeamPresenceButton(): JSX.Element {
     }
   }, [open])
 
-  const myHandle = account?.handle || account?.email || 'You'
+  const myHandle = personDisplayName(account, account?.email || 'You')
 
   return (
     <div className="relative">
@@ -198,14 +200,14 @@ export default function TeamPresenceButton(): JSX.Element {
                     className="px-3 py-2 flex items-center gap-2.5 hover:bg-[var(--surface-sunken)] dark:hover:bg-white/[0.04]"
                   >
                     <span className="relative">
-                      <Avatar handle={p.handle} />
+                      <Avatar handle={p.handle} name={personDisplayName(p, p.handle)} />
                       <span
                         className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full ring-2 ring-white dark:ring-stone-900 ${meta.dot}`}
                       />
                     </span>
                     <div className="min-w-0 flex-1">
                       <div className="text-[12.5px] font-medium text-[var(--ink-100)] truncate">
-                        {p.handle}
+                        {personDisplayName(p, p.handle)}
                       </div>
                       <div className="text-[11px] text-[var(--ink-50)] truncate">
                         {p.workingOn ? p.workingOn : meta.label}

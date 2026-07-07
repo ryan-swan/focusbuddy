@@ -3,6 +3,7 @@ import { useDocCollabStore } from '../../stores/docCollab'
 import { useViewStore } from '../../stores/view'
 import { useAccountStore } from '../../stores/account'
 import { useNodeStore } from '../../stores/nodes'
+import { personDisplayName } from '../../lib/personName'
 import { useWidgetStore } from '../../stores/widgets'
 import { useLinksStore } from '../../stores/links'
 import { inviteToLiveDoc } from '../../lib/docCollabClient'
@@ -158,7 +159,7 @@ export default function LiveCanvasView({ liveCanvasId }: Props): JSX.Element {
   }
 
   const isOwner = meta.ownerAccountId === myId
-  const holderHandle = lock?.holder?.handle ?? null
+  const holderHandle = lock?.holder ? personDisplayName(lock.holder, lock.holder.handle) : null
   const lockedByOther = !!lock?.holder && lock.holder.accountId !== myId
 
   async function sendInvite(): Promise<void> {

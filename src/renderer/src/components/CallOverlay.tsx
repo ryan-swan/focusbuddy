@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import Icon from './Icon'
 import { useCallStore } from '../stores/call'
+import { personDisplayName, personInitials } from '../lib/personName'
 
 // PlexiCam call overlay: the floating call window and the incoming-call card.
 // Mounted once at the app root. Renders nothing when there is no call. The video
@@ -78,10 +79,10 @@ export default function CallOverlay(): JSX.Element | null {
       <div className="fixed bottom-5 right-5 z-[200] w-[300px] rounded-2xl bg-stone-900 text-white shadow-2xl border border-white/10 p-4" data-testid="call-incoming">
         <div className="flex items-center gap-3">
           <span className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-[15px] font-semibold uppercase">
-            {(peer?.handle ?? '?').replace(/^@/, '').slice(0, 2)}
+            {personInitials(peer)}
           </span>
           <div className="min-w-0">
-            <p className="text-[14px] font-semibold truncate">{peer?.handle ?? 'Someone'}</p>
+            <p className="text-[14px] font-semibold truncate">{personDisplayName(peer, 'Someone')}</p>
             <p className="text-[12px] text-white/60">Incoming {media === 'video' ? 'video' : 'audio'} call…</p>
           </div>
         </div>
@@ -123,9 +124,9 @@ export default function CallOverlay(): JSX.Element | null {
         ) : (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
             <span className="inline-flex h-16 w-16 items-center justify-center rounded-full bg-white/10 text-[22px] font-semibold uppercase">
-              {(peer?.handle ?? '?').replace(/^@/, '').slice(0, 2)}
+              {personInitials(peer)}
             </span>
-            <p className="text-[13px] text-white/70">{peer?.handle ?? 'Call'}</p>
+            <p className="text-[13px] text-white/70">{personDisplayName(peer, 'Call')}</p>
           </div>
         )}
 
@@ -138,7 +139,7 @@ export default function CallOverlay(): JSX.Element | null {
 
         <div className="absolute top-2 left-3 right-3 flex items-center justify-between">
           <span className="text-[12px] font-medium text-white/90 truncate" data-testid="call-status">
-            {peer?.handle ?? 'Call'} · {statusLabel}
+            {personDisplayName(peer, 'Call')} · {statusLabel}
           </span>
         </div>
       </div>

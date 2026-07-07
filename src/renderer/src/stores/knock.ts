@@ -4,6 +4,7 @@ import { notifyExternal } from '../lib/notify'
 import { useMessagingStore } from './messaging'
 import { useViewStore } from './view'
 import { useCallStore } from './call'
+import { personDisplayName } from '../lib/personName'
 
 // PlexiPeople knock-to-connect. A knock is a lightweight "I want to reach you"
 // ping between two people who can see each other. The receiver answers by
@@ -11,7 +12,7 @@ import { useCallStore } from './call'
 // already built; there is no separate answer channel. Nothing is persisted.
 
 interface IncomingKnock {
-  from: { accountId: string; handle: string }
+  from: { accountId: string; handle: string; firstName?: string | null; lastName?: string | null }
   note: string | null
   at: number
 }
@@ -25,7 +26,7 @@ interface KnockStore {
   ready: boolean
 
   init: () => void
-  knock: (to: { accountId: string; handle: string }, note?: string) => void
+  knock: (to: { accountId: string; handle: string; firstName?: string | null; lastName?: string | null }, note?: string) => void
   reply: () => Promise<void>
   callBack: () => void
   dismiss: () => void
@@ -41,7 +42,7 @@ export const useKnockStore = create<KnockStore>((set, get) => ({
     setKnockHandler((e: KnockEvent) => {
       set({ incoming: { from: e.from, note: e.note, at: Date.now() } })
       // Alert when the app is in the background; clicking opens the chat.
-      notifyExternal(`${e.from.handle} knocked`, e.note ?? 'wants to reach you', {
+      notifyExternal(`${personDisplayName(e.from, 'Someone')} knocked`, e.note ?? 'wants to reach you', {
         tag: `knock-${e.from.accountId}`,
         onClick: () => void get().reply()
       })
@@ -51,10 +52,11 @@ export const useKnockStore = create<KnockStore>((set, get) => ({
 
   knock: (to, note) => {
     sendKnock(to.accountId, note)
-    set({ sentTo: to.handle })
+    const name = personDisplayName(to, to.handle)
+    set({ sentTo: name })
     // Clear the confirmation after a few seconds.
     window.setTimeout(() => {
-      if (get().sentTo === to.handle) set({ sentTo: null })
+      if (get().sentTo === name) set({ sentTo: null })
     }, 4000)
   },
 

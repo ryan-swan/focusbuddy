@@ -3,6 +3,7 @@ import { useDocCollabStore } from '../../stores/docCollab'
 import { useViewStore } from '../../stores/view'
 import { useAccountStore } from '../../stores/account'
 import { inviteToLiveDoc } from '../../lib/docCollabClient'
+import { personDisplayName } from '../../lib/personName'
 import { uploadLiveFile } from '../../lib/liveFolderClient'
 import {
   childrenOf,
@@ -101,7 +102,7 @@ export default function LiveFolderView({ liveFolderId }: Props): JSX.Element {
   }
 
   const isOwner = meta.ownerAccountId === myId
-  const holderHandle = lock?.holder?.handle ?? null
+  const holderHandle = lock?.holder ? personDisplayName(lock.holder, lock.holder.handle) : null
   const lockedByOther = !!lock?.holder && lock.holder.accountId !== myId
   const entries = childrenOf(body, cwd)
 

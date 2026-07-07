@@ -1,5 +1,6 @@
 import type { Office, WorkWindow } from '../orgsClient'
 import type { MapPerson } from './usePeopleMap'
+import { personDisplayName } from '../personName'
 
 // Pure structural transforms for the People Map — grouping people into offices
 // and building the reporting hierarchy. Kept framework-free so they're unit
@@ -50,7 +51,8 @@ export function buildHierarchy(people: MapPerson[]): Hierarchy {
       roots.push(p)
     }
   }
-  const byName = (a: MapPerson, b: MapPerson): number => a.handle.localeCompare(b.handle)
+  const byName = (a: MapPerson, b: MapPerson): number =>
+    personDisplayName(a, a.handle).localeCompare(personDisplayName(b, b.handle))
   roots.sort(byName)
   for (const list of kids.values()) list.sort(byName)
   return { roots, childrenOf: (id) => kids.get(id) ?? [] }

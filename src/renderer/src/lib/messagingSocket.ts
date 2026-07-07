@@ -12,7 +12,7 @@ type IncomingMessage = { conversationId: string; message: ChatMessage }
 // Live-document events ride the same authenticated socket. The doc-collab store
 // registers a handler; null when no live doc work is active.
 export type DocSocketEvent =
-  | { type: 'docLockChanged'; docId: string; holder: { accountId: string; handle: string } | null; expiresAt: number | null }
+  | { type: 'docLockChanged'; docId: string; holder: { accountId: string; handle: string; firstName?: string | null; lastName?: string | null } | null; expiresAt: number | null }
   | { type: 'docUpdated'; docId: string; version: number; updatedBy: string }
   | {
       type: 'docTakeoverRequest'
@@ -21,6 +21,8 @@ export type DocSocketEvent =
       docTitle: string
       requesterAccountId: string
       requesterHandle: string
+      firstName?: string | null
+      lastName?: string | null
       message: string | null
     }
   | { type: 'docTakeoverResponse'; id: string; docId: string; accepted: boolean; message: string | null }
@@ -38,6 +40,8 @@ export type YjsSocketEvent =
 export type PresencePeer = {
   accountId: string
   handle: string
+  firstName?: string | null
+  lastName?: string | null
   status: 'online' | 'away' | 'focus' | 'busy' | 'offline'
   workingOn: string | null
   surface: string | null
@@ -49,7 +53,7 @@ export type PresenceSocketEvent =
 
 // PlexiCam live-call signaling, relayed verbatim from the server to the call store.
 export type CallSocketEvent =
-  | { type: 'callIncoming'; payload: { callId: string; from: { accountId: string; handle: string }; media: 'audio' | 'video' } }
+  | { type: 'callIncoming'; payload: { callId: string; from: { accountId: string; handle: string; firstName?: string | null; lastName?: string | null }; media: 'audio' | 'video' } }
   | { type: 'callSignal'; payload: { callId: string; from: string; data: string } }
   | { type: 'callAccepted'; payload: { callId: string; from: string } }
   | { type: 'callDeclined'; payload: { callId: string; from: string } }
@@ -58,11 +62,11 @@ export type CallSocketEvent =
 // PlexiMeet multi-party room signaling → the meeting store. A mesh of peer
 // connections; the server only relays roster + SDP/ICE, never the media.
 export type MeetingSocketEvent =
-  | { type: 'meetingRoster'; payload: { roomId: string; peers: Array<{ accountId: string; handle: string }> } }
-  | { type: 'meetingPeerJoined'; payload: { roomId: string; peer: { accountId: string; handle: string } } }
+  | { type: 'meetingRoster'; payload: { roomId: string; peers: Array<{ accountId: string; handle: string; firstName?: string | null; lastName?: string | null }> } }
+  | { type: 'meetingPeerJoined'; payload: { roomId: string; peer: { accountId: string; handle: string; firstName?: string | null; lastName?: string | null } } }
   | { type: 'meetingPeerLeft'; payload: { roomId: string; accountId: string } }
   | { type: 'meetingSignal'; payload: { roomId: string; from: string; data: string } }
-  | { type: 'meetingInvited'; payload: { roomId: string; from: { accountId: string; handle: string }; title: string | null } }
+  | { type: 'meetingInvited'; payload: { roomId: string; from: { accountId: string; handle: string; firstName?: string | null; lastName?: string | null }; title: string | null } }
 
 let currentToken: string | null = null
 let onMessageCb: ((m: IncomingMessage) => void) | null = null
@@ -85,7 +89,7 @@ export function setReactionHandler(cb: ((e: ReactionEvent) => void) | null): voi
 }
 
 // Someone is typing in a conversation. Ephemeral; the store clears it on a timeout.
-export type TypingEvent = { conversationId: string; accountId: string; handle: string }
+export type TypingEvent = { conversationId: string; accountId: string; handle: string; firstName?: string | null; lastName?: string | null }
 let onTypingCb: ((e: TypingEvent) => void) | null = null
 export function setTypingHandler(cb: ((e: TypingEvent) => void) | null): void {
   onTypingCb = cb
@@ -97,7 +101,7 @@ export function sendTyping(conversationId: string): void {
 }
 
 // PlexiPeople knock-to-connect: someone knocked to reach you.
-export type KnockEvent = { from: { accountId: string; handle: string }; note: string | null }
+export type KnockEvent = { from: { accountId: string; handle: string; firstName?: string | null; lastName?: string | null }; note: string | null }
 let onKnockCb: ((e: KnockEvent) => void) | null = null
 export function setKnockHandler(cb: ((e: KnockEvent) => void) | null): void {
   onKnockCb = cb

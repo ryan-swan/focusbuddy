@@ -15,7 +15,7 @@ export default function CollaboratorBar({ people }: { people: Collaborator[] }):
           key={p.accountId}
           data-testid={`collab-avatar-${p.accountId}`}
           data-editing={p.editing ? '1' : undefined}
-          title={`${p.handle}${p.you ? ' (you)' : ''}${p.editing ? ' — editing now' : ''}`}
+          title={`${p.name}${p.you ? ' (you)' : ''}${p.editing ? ' — editing now' : ''}`}
           className={`relative inline-flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-semibold text-white ring-2 ${
             p.editing ? 'ring-emerald-400 z-10' : 'ring-white dark:ring-stone-900'
           }`}

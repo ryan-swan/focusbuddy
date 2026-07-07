@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import Icon from './Icon'
 import { useMeetingRoomStore } from '../stores/meetingRoom'
 import { usePresenceStore } from '../stores/presence'
+import { personDisplayName, personInitials } from '../lib/personName'
 
 // PlexiMeet live room: the multi-party meeting window, mounted once at the app
 // root. Renders the incoming-invite card when someone rings you in, and a tiled
@@ -31,10 +32,6 @@ function ControlButton({ icon, label, active, danger, onClick }: { icon: string;
       <Icon name={icon} size={20} />
     </button>
   )
-}
-
-function initials(handle: string): string {
-  return handle.replace(/^@/, '').slice(0, 2).toUpperCase()
 }
 
 export default function MeetingOverlay(): JSX.Element | null {
@@ -80,10 +77,10 @@ export default function MeetingOverlay(): JSX.Element | null {
       <div className="fixed bottom-5 right-5 z-[200] w-[320px] rounded-2xl bg-stone-900 text-white shadow-2xl border border-white/10 p-4" data-testid="meeting-invite">
         <div className="flex items-center gap-3">
           <span className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-[15px] font-semibold">
-            {initials(incomingInvite.from.handle)}
+            {personInitials(incomingInvite.from)}
           </span>
           <div className="min-w-0">
-            <p className="text-[14px] font-semibold truncate">{incomingInvite.from.handle}</p>
+            <p className="text-[14px] font-semibold truncate">{personDisplayName(incomingInvite.from, 'Someone')}</p>
             <p className="text-[12px] text-white/60 truncate">invited you to {incomingInvite.title ?? 'a meeting'}</p>
           </div>
         </div>
@@ -136,11 +133,11 @@ export default function MeetingOverlay(): JSX.Element | null {
                 <Video stream={p.stream} />
               ) : (
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
-                  <span className="inline-flex h-16 w-16 items-center justify-center rounded-full bg-white/10 text-[22px] font-semibold text-white">{initials(p.handle)}</span>
+                  <span className="inline-flex h-16 w-16 items-center justify-center rounded-full bg-white/10 text-[22px] font-semibold text-white">{personInitials(p)}</span>
                   <span className="text-[12px] text-white/50">{p.connected ? 'No video' : 'Connecting…'}</span>
                 </div>
               )}
-              <span className="absolute bottom-2 left-2 text-[12px] text-white/90 bg-black/40 rounded px-1.5 py-0.5">{p.handle}</span>
+              <span className="absolute bottom-2 left-2 text-[12px] text-white/90 bg-black/40 rounded px-1.5 py-0.5">{personDisplayName(p, p.handle)}</span>
             </div>
           ))}
         </div>
@@ -168,9 +165,9 @@ export default function MeetingOverlay(): JSX.Element | null {
                       data-testid={`meeting-invite-${p.accountId}`}
                       className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-white/10 text-left"
                     >
-                      <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-white/10 text-[11px] font-semibold text-white">{initials(p.handle)}</span>
+                      <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-white/10 text-[11px] font-semibold text-white">{personInitials(p)}</span>
                       <span className="flex-1 min-w-0">
-                        <span className="block text-[12.5px] text-white truncate">{p.handle}</span>
+                        <span className="block text-[12.5px] text-white truncate">{personDisplayName(p, p.handle)}</span>
                         {(p.status === 'away' || p.status === 'busy') && <span className="block text-[10px] text-white/40">{p.status}</span>}
                       </span>
                       <Icon name="add" size={15} className="text-white/60" />

@@ -9,11 +9,15 @@ import { MENTION_RE } from '../../../lib/mentions'
 export default function MentionText({
   body,
   myHandle,
-  knownHandles
+  knownHandles,
+  nameByHandle
 }: {
   body: string
   myHandle: string | null | undefined
   knownHandles: Set<string>
+  // Lowercase handle -> the person's real display name. When a mentioned handle
+  // resolves here we show the name; the stored token is still parsed by handle.
+  nameByHandle?: Map<string, string>
 }): JSX.Element {
   const parts: Array<JSX.Element | string> = []
   let last = 0
@@ -35,7 +39,7 @@ export default function MentionText({
         }
         data-testid={isMe ? 'mention-me' : 'mention'}
       >
-        @{m[1]}
+        @{nameByHandle?.get(handle) ?? m[1]}
       </span>
     )
     last = m.index + m[0].length

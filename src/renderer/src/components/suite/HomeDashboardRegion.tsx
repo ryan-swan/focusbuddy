@@ -6,6 +6,7 @@ import { useNodeStore } from '../../stores/nodes'
 import { useDocumentsStore } from '../../stores/documents'
 import { usePresenceStore } from '../../stores/presence'
 import { useCallStore } from '../../stores/call'
+import { personDisplayName, personInitials } from '../../lib/personName'
 import type { TimeBlock, FbNode, DocumentMeta } from '@shared/types'
 
 // The live-dashboard region of the PlexiSuite home: Upcoming, My Tasks, Recent
@@ -208,7 +209,7 @@ export default function HomeDashboardRegion(): JSX.Element {
                     <li key={p.accountId} className="flex items-center gap-2.5 px-1">
                       <span className="relative shrink-0">
                         <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-[var(--surface-sunken)] text-[11px] font-semibold text-[var(--ink-90)] uppercase select-none">
-                          {(p.handle ?? '?').replace(/^@/, '').slice(0, 2)}
+                          {personInitials(p)}
                         </span>
                         <span
                           className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full ring-2 ring-[var(--surface-base)] ${
@@ -225,12 +226,12 @@ export default function HomeDashboardRegion(): JSX.Element {
                         />
                       </span>
                       <div className="min-w-0 flex-1">
-                        <p className="text-[12px] font-medium text-[var(--ink-100)] truncate">{p.handle ?? p.accountId}</p>
+                        <p className="text-[12px] font-medium text-[var(--ink-100)] truncate">{personDisplayName(p, p.accountId)}</p>
                         {p.workingOn && <p className="text-[11px] text-[var(--ink-50)] truncate">{p.workingOn}</p>}
                       </div>
                       <button
-                        onClick={() => void startCall({ accountId: p.accountId, handle: p.handle ?? p.accountId }, 'video')}
-                        aria-label={`Call ${p.handle ?? 'teammate'}`}
+                        onClick={() => void startCall({ accountId: p.accountId, handle: p.handle ?? p.accountId, firstName: p.firstName, lastName: p.lastName }, 'video')}
+                        aria-label={`Call ${personDisplayName(p, 'teammate')}`}
                         title="Start a video call"
                         data-testid={`home-call-${p.accountId}`}
                         className="shrink-0 inline-flex h-7 w-7 items-center justify-center rounded-full text-[var(--ink-50)] hover:text-[rgb(var(--accent))] hover:bg-[var(--surface-sunken)]"

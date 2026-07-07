@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import Icon from '../Icon'
 import { DashboardHeader, StatTile, PLEXI_CARD } from '../plexi'
+import { personDisplayName } from '../../lib/personName'
 import { useAccountStore } from '../../stores/account'
 import { useOrgStore } from '../../stores/org'
 import {
@@ -355,7 +356,7 @@ export default function OrgAdminView(): JSX.Element {
                         </button>
                       )}
                       <span className="text-[13px] text-[var(--ink-90)] flex-1 truncate">
-                        {m.handle}
+                        {personDisplayName(m, m.handle)}
                         {m.accountId === myId && <span className="text-[11px] text-[var(--ink-40)]"> (you)</span>}
                         {prof?.title && <span className="text-[11px] text-[var(--ink-40)]"> · {prof.title}</span>}
                         {prof?.officeId && <span className="text-[11px] text-[var(--ink-40)]"> · {officeName(prof.officeId)}</span>}
@@ -534,7 +535,8 @@ export default function OrgAdminView(): JSX.Element {
             ) : (
               <div className="space-y-1 max-h-[360px] overflow-auto">
                 {audit.map((e) => {
-                  const who = detail.members.find((m) => m.accountId === e.actorAccountId)?.handle ?? e.actorAccountId.slice(0, 8)
+                  const actor = detail.members.find((m) => m.accountId === e.actorAccountId)
+                  const who = personDisplayName(actor, e.actorAccountId.slice(0, 8))
                   return (
                     <div
                       key={e.id}
@@ -735,7 +737,7 @@ function ProfileEditor({
           <option value="">— no manager —</option>
           {members.map((m) => (
             <option key={m.accountId} value={m.accountId}>
-              {m.handle}
+              {personDisplayName(m, m.handle)}
             </option>
           ))}
         </select>

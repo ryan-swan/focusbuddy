@@ -72,6 +72,8 @@ function applyEvent(e: PresenceSocketEvent, set: (fn: (s: PresenceStore) => Part
         next[p.accountId] = {
           accountId: p.accountId,
           handle: p.handle,
+          firstName: p.firstName ?? null,
+          lastName: p.lastName ?? null,
           status: p.status,
           workingOn: p.workingOn,
           surface: p.surface,

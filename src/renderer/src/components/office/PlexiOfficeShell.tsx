@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useDocumentsStore } from '../../stores/documents'
 import { useViewStore } from '../../stores/view'
 import { useAccountStore } from '../../stores/account'
+import { personDisplayName } from '../../lib/personName'
 import SegmentSwitcher from '../segment/SegmentSwitcher'
 import OrgSwitcher from '../OrgSwitcher'
 import { useMailStore, selectMailUnread } from '../../stores/mail'
@@ -189,7 +190,7 @@ export default function PlexiOfficeShell({ initialApp }: { initialApp?: string }
     () => list.filter((d) => ['doc', 'sheet', 'slides', 'map', 'design'].includes(d.docType)).sort((a, b) => b.updatedAt - a.updatedAt),
     [list]
   )
-  const ownerName = account?.handle || 'You'
+  const ownerName = personDisplayName(account, 'You')
 
   // The Recent table reads the same real documents, filtered by the selected
   // type tab. The Mail and Meet tabs have no document records, so they resolve

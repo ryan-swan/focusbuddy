@@ -3,6 +3,7 @@ import { sendSocketMessage, setMeetingSocketHandler, type MeetingSocketEvent } f
 import { notifyExternal } from '../lib/notify'
 import { ConversationRecorder } from '../lib/conversationRecorder'
 import { useWrapupStore } from './wrapup'
+import { personDisplayName } from '../lib/personName'
 
 // PlexiMeet live rooms: a multi-party meeting built as a WebRTC mesh. Each member
 // holds one peer connection to every other member; the signal server only relays
@@ -20,13 +21,15 @@ export type MeetingStatus = 'idle' | 'joining' | 'in'
 export interface MeetingParticipant {
   accountId: string
   handle: string
+  firstName?: string | null
+  lastName?: string | null
   stream: MediaStream | null
   connected: boolean
 }
 
 export interface MeetingInvite {
   roomId: string
-  from: { accountId: string; handle: string }
+  from: { accountId: string; handle: string; firstName?: string | null; lastName?: string | null }
   title: string | null
 }
 
@@ -76,7 +79,12 @@ export const useMeetingRoomStore = create<MeetingRoomStore>((set, get) => {
 
   // Create (or fetch) the peer connection for a member, wiring local tracks, ICE
   // and the remote track sink. Idempotent: a second call returns the existing one.
-  function ensurePeer(accountId: string, handle: string): PeerConn {
+  function ensurePeer(
+    accountId: string,
+    handle: string,
+    firstName?: string | null,
+    lastName?: string | null
+  ): PeerConn {
     const found = peers.get(accountId)
     if (found) return found
     const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS })
@@ -107,7 +115,12 @@ export const useMeetingRoomStore = create<MeetingRoomStore>((set, get) => {
     peers.set(accountId, conn)
     // Register the participant tile immediately (so it shows "connecting").
     if (!get().participants[accountId]) {
-      set({ participants: { ...get().participants, [accountId]: { accountId, handle, stream: null, connected: false } } })
+      set({
+        participants: {
+          ...get().participants,
+          [accountId]: { accountId, handle, firstName, lastName, stream: null, connected: false }
+        }
+      })
     }
     return conn
   }
@@ -162,7 +175,7 @@ export const useMeetingRoomStore = create<MeetingRoomStore>((set, get) => {
     if (e.type === 'meetingInvited') {
       if (state.roomId === e.payload.roomId) return // already in it
       set({ incomingInvite: e.payload })
-      notifyExternal('Meeting invite', `${e.payload.from.handle} invited you to ${e.payload.title ?? 'a meeting'}`, {
+      notifyExternal('Meeting invite', `${personDisplayName(e.payload.from, 'Someone')} invited you to ${e.payload.title ?? 'a meeting'}`, {
         force: true,
         tag: `meet-${e.payload.roomId}`
       })
@@ -173,7 +186,7 @@ export const useMeetingRoomStore = create<MeetingRoomStore>((set, get) => {
     if (e.type === 'meetingRoster') {
       // I just joined: offer to everyone already here (I am the newcomer).
       for (const peer of e.payload.peers) {
-        const conn = ensurePeer(peer.accountId, peer.handle)
+        const conn = ensurePeer(peer.accountId, peer.handle, peer.firstName, peer.lastName)
         try {
           const offer = await conn.pc.createOffer()
           await conn.pc.setLocalDescription(offer)
@@ -186,7 +199,7 @@ export const useMeetingRoomStore = create<MeetingRoomStore>((set, get) => {
     }
     if (e.type === 'meetingPeerJoined') {
       // A newcomer arrived after me: prepare a connection but wait for their offer.
-      ensurePeer(e.payload.peer.accountId, e.payload.peer.handle)
+      ensurePeer(e.payload.peer.accountId, e.payload.peer.handle, e.payload.peer.firstName, e.payload.peer.lastName)
       return
     }
     if (e.type === 'meetingPeerLeft') {
@@ -201,7 +214,8 @@ export const useMeetingRoomStore = create<MeetingRoomStore>((set, get) => {
       } catch {
         return
       }
-      const conn = ensurePeer(from, get().participants[from]?.handle ?? from)
+      const existing = get().participants[from]
+      const conn = ensurePeer(from, existing?.handle ?? from, existing?.firstName, existing?.lastName)
       if (data.kind === 'offer' && data.sdp) {
         await conn.pc.setRemoteDescription(data.sdp)
         await flush(conn)

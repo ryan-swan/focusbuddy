@@ -5,6 +5,7 @@ import { uploadAttachment, attachmentKindForMime, type MessageAttachment } from 
 import { EmojiPicker } from './EmojiPicker'
 import { GifPicker } from './GifPicker'
 import { launchMeeting } from '../../../lib/startMeeting'
+import { personDisplayName } from '../../../lib/personName'
 
 // The message composer: text plus the ways to enrich a message — attach a file or
 // image, record a voice note, insert an emoji. A pending attachment is uploaded
@@ -43,16 +44,23 @@ export function ChatComposer({
   // member handles from this conversation. Arrow keys move, Enter/Tab or a
   // click inserts. Purely additive — typing an unknown @word sends as-is.
   const conversations = useMessagingStore((s) => s.conversations)
-  const memberHandles = useMemo(() => {
+  // Members who can be mentioned. We keep the whole member so the picker can show
+  // the person's real name while the inserted token stays the unique @handle.
+  const memberOptions = useMemo(() => {
     const conv = conversations.find((c) => c.id === conversationId)
-    return (conv?.members ?? [])
-      .map((m) => m.handle)
-      .filter((h): h is string => !!h)
+    return (conv?.members ?? []).filter(
+      (m): m is typeof m & { handle: string } => !!m.handle
+    )
   }, [conversations, conversationId])
   const [mentionIdx, setMentionIdx] = useState(0)
   const mentionMatch = /(^|\s)@([a-z0-9._-]*)$/i.exec(draft)
   const mentionCandidates = mentionMatch
-    ? memberHandles.filter((h) => h.toLowerCase().startsWith(mentionMatch[2].toLowerCase())).slice(0, 6)
+    ? memberOptions
+        .filter((m) => {
+          const q = mentionMatch[2].toLowerCase()
+          return m.handle.toLowerCase().startsWith(q) || personDisplayName(m, m.handle).toLowerCase().startsWith(q)
+        })
+        .slice(0, 6)
     : []
   function insertMention(handle: string): void {
     if (!mentionMatch) return
@@ -308,14 +316,14 @@ export function ChatComposer({
             role="listbox"
             data-testid="mention-popover"
           >
-            {mentionCandidates.map((h, i) => (
+            {mentionCandidates.map((m, i) => (
               <button
-                key={h}
+                key={m.accountId}
                 role="option"
                 aria-selected={i === mentionIdx}
                 onMouseDown={(e) => {
                   e.preventDefault()
-                  insertMention(h)
+                  insertMention(m.handle)
                 }}
                 className={`w-full text-left px-2.5 py-1 text-[12.5px] ${
                   i === mentionIdx
@@ -323,7 +331,8 @@ export function ChatComposer({
                     : 'text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]'
                 }`}
               >
-                @{h}
+                {personDisplayName(m, m.handle)}
+                <span className="text-[var(--ink-40)]"> @{m.handle}</span>
               </button>
             ))}
           </div>
@@ -346,7 +355,7 @@ export function ChatComposer({
               }
               if (e.key === 'Enter' || e.key === 'Tab') {
                 e.preventDefault()
-                insertMention(mentionCandidates[Math.min(mentionIdx, mentionCandidates.length - 1)])
+                insertMention(mentionCandidates[Math.min(mentionIdx, mentionCandidates.length - 1)].handle)
                 return
               }
               if (e.key === 'Escape') {

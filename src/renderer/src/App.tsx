@@ -50,6 +50,7 @@ import { useNodeStore } from './stores/nodes'
 import { useTemplateStore } from './stores/templates'
 import { useVaultStore } from './stores/vault'
 import { useAccountStore } from './stores/account'
+import { personDisplayName, personInitials } from './lib/personName'
 import { installInboxPoller } from './lib/inboxPoller'
 import { startWorkspaceSync, stopWorkspaceSync } from './lib/workspaceSync'
 import { applyCustomization, applyFont, applyTheme, loadCustomization, loadTheme, useTheme } from './lib/theme'
@@ -476,10 +477,10 @@ export default function App(): JSX.Element {
               title={`Signed in as ${account.email}. Click to sign out.`}
             >
               <span className="h-3.5 w-3.5 rounded-full bg-accent/30 inline-flex items-center justify-center text-[8px] font-mono text-accent uppercase">
-                {(account.handle || account.email).slice(0, 1)}
+                {personInitials(account).slice(0, 1)}
               </span>
               <span className="max-w-[120px] truncate">
-                {account.handle || account.email.split('@')[0]}
+                {personDisplayName(account, account.email.split('@')[0])}
               </span>
             </button>
           )}

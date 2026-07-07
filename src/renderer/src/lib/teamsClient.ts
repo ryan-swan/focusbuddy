@@ -15,6 +15,8 @@ export interface Team {
 export interface TeamMember {
   accountId: string
   handle: string | null
+  firstName?: string | null
+  lastName?: string | null
   role: string
   addedAt: number
 }
