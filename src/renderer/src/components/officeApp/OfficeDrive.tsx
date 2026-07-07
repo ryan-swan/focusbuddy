@@ -4,6 +4,9 @@ import type { FileEntry } from '@shared/fields'
 import { useFileManagerStore, sortEntries } from '../../stores/fileManager'
 import { useDocumentsStore } from '../../stores/documents'
 import { useSharesStore } from '../../stores/shares'
+import { useCapabilityStore } from '../../stores/capabilities'
+import { useOrgStore } from '../../stores/org'
+import { computeEntitlement, capabilityForDocType, DOC_TYPE_LABEL } from '../../lib/entitlementReason'
 import { materializeDocFolder } from '../../lib/officeShareImport'
 import type { DocFolderSnapshot } from '../../lib/shareSnapshot'
 import Icon from '../Icon'
@@ -81,6 +84,15 @@ export default function OfficeDrive({
   const createBlank = useDocumentsStore((s) => s.createBlank)
   const active = useDocumentsStore((s) => s.active)
 
+  // Per-editor entitlements for the Drive's "New <type>" buttons. Same
+  // reason-aware helper the rest of the office uses.
+  const capabilities = useCapabilityStore((s) => s.capabilities)
+  const capSources = useCapabilityStore((s) => s.sources)
+  const orgRole = useCapabilityStore((s) => s.orgRole)
+  const activeOrgId = useOrgStore((s) => s.activeOrgId)
+  const orgName = useOrgStore((s) => s.orgs.find((o) => o.id === s.activeOrgId)?.name ?? null)
+  const entInputs = { capabilities, sources: capSources, orgRole, activeOrgId, orgName }
+
   const acceptByToken = useSharesStore((s) => s.acceptByToken)
 
   const [unfiled, setUnfiled] = useState<Array<{ id: string; title: string; docType: string }>>([])
@@ -134,6 +146,13 @@ export default function OfficeDrive({
   }, [cwd, entries])
 
   async function newDoc(type: DocType): Promise<void> {
+    // Gate on the editor's entitlement. Locked editors never create; a
+    // licensing gap offers the upgrade, a restriction just no-ops.
+    const ent = computeEntitlement(entInputs, capabilityForDocType(type), DOC_TYPE_LABEL[type])
+    if (!ent.enabled) {
+      ent.onLockedClick()
+      return
+    }
     const doc = await createBlank(type)
     // File the new document into the folder you're currently looking at.
     await window.api.fileManager.fileDocument(doc.id, cwd).catch(() => {})
@@ -212,18 +231,26 @@ export default function OfficeDrive({
           )}
         </div>
         <div className="grid grid-cols-2 gap-1.5">
-          {NEW_KINDS.map((k) => (
-            <button
-              key={k.type}
-              onClick={() => void newDoc(k.type)}
-              data-testid={`office-new-${k.type}`}
-              className="flex items-center gap-1.5 rounded-lg border border-[var(--edge-soft)] px-2 py-1.5 text-[11.5px] hover:border-accent hover:bg-accent/[0.05]"
-              title={`New ${k.label.toLowerCase()}`}
-            >
-              <Icon name={k.icon} size={14} className="text-accent" />
-              {k.label}
-            </button>
-          ))}
+          {NEW_KINDS.map((k) => {
+            const ent = computeEntitlement(entInputs, capabilityForDocType(k.type), DOC_TYPE_LABEL[k.type])
+            const locked = !ent.enabled
+            return (
+              <button
+                key={k.type}
+                onClick={() => void newDoc(k.type)}
+                data-testid={`office-new-${k.type}`}
+                data-locked={locked ? 'true' : undefined}
+                aria-disabled={locked ? 'true' : undefined}
+                className={`flex items-center gap-1.5 rounded-lg border border-[var(--edge-soft)] px-2 py-1.5 text-[11.5px] ${
+                  locked ? 'opacity-50 cursor-not-allowed' : 'hover:border-accent hover:bg-accent/[0.05]'
+                }`}
+                title={locked ? ent.reason : `New ${k.label.toLowerCase()}`}
+              >
+                <Icon name={locked ? 'lock' : k.icon} size={14} className="text-accent" />
+                {k.label}
+              </button>
+            )
+          })}
         </div>
         <button
           onClick={() => void newFolder()}

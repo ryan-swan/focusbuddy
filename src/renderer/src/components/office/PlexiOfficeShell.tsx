@@ -7,6 +7,15 @@ import SegmentSwitcher from '../segment/SegmentSwitcher'
 import OrgSwitcher from '../OrgSwitcher'
 import { useMailStore, selectMailUnread } from '../../stores/mail'
 import { useMessagingStore } from '../../stores/messaging'
+import { useCapabilityStore } from '../../stores/capabilities'
+import { useOrgStore } from '../../stores/org'
+import {
+  computeEntitlement,
+  capabilityForDocType,
+  DOC_TYPE_LABEL,
+  type Entitlement,
+  type EntitlementInputs
+} from '../../lib/entitlementReason'
 import { CHANGELOG } from '../../lib/changelog'
 import { promptUpgrade } from '../../stores/upgradePrompt'
 import DocumentEditorView from '../views/DocumentEditorView'
@@ -120,6 +129,20 @@ export default function PlexiOfficeShell({ initialApp }: { initialApp?: string }
   const remove = useDocumentsStore((s) => s.remove)
   const goHome = useViewStore((s) => s.goHome)
   const account = useAccountStore((s) => s.account)
+
+  // Per-editor entitlements. Read the capability + source maps and the active
+  // org once (subscribed) and resolve each docType with the pure helper so the
+  // shell greys locked editors and blocks their create paths with the same
+  // reason-aware copy the SegmentSwitcher uses. Canvas widgets are NOT gated
+  // here — those live in PlexiDesk and stay available with Office off.
+  const capabilities = useCapabilityStore((s) => s.capabilities)
+  const capSources = useCapabilityStore((s) => s.sources)
+  const orgRole = useCapabilityStore((s) => s.orgRole)
+  const activeOrgId = useOrgStore((s) => s.activeOrgId)
+  const orgName = useOrgStore((s) => s.orgs.find((o) => o.id === s.activeOrgId)?.name ?? null)
+  const entInputs: EntitlementInputs = { capabilities, sources: capSources, orgRole, activeOrgId, orgName }
+  const docEntitlement = (docType: DocType): Entitlement =>
+    computeEntitlement(entInputs, capabilityForDocType(docType), DOC_TYPE_LABEL[docType])
 
   // Real unread sources. Mail unread is derived from the loaded IMAP envelope
   // list; the messaging store carries both the internal-inbox items and the
@@ -237,6 +260,13 @@ export default function PlexiOfficeShell({ initialApp }: { initialApp?: string }
 
   async function launch(app: OfficeApp): Promise<void> {
     if (app.docType === null) return
+    // Gate the create on the editor's entitlement. A locked editor never
+    // creates; a licensing gap offers the upgrade, a restriction is a dead end.
+    const ent = docEntitlement(app.docType)
+    if (!ent.enabled) {
+      ent.onLockedClick()
+      return
+    }
     if (busy) return
     setBusy(true)
     try {
@@ -256,6 +286,12 @@ export default function PlexiOfficeShell({ initialApp }: { initialApp?: string }
   }
 
   async function createType(docType: DocType, title: string): Promise<void> {
+    // Same gate for every "New <type>" and template create path.
+    const ent = docEntitlement(docType)
+    if (!ent.enabled) {
+      ent.onLockedClick()
+      return
+    }
     if (busy) return
     setBusy(true)
     try {
@@ -271,7 +307,7 @@ export default function PlexiOfficeShell({ initialApp }: { initialApp?: string }
   if (openDocId) {
     return (
       <div className="h-full flex bg-[var(--surface-base)]">
-        <OfficeSidebar page={page} onPage={(p) => { setOpenDocId(null); setActiveComms(null); setPage(p) }} onLaunch={(a) => void launch(a)} onComms={openComms} activeComms={null} onExit={goHome} starredCount={starred.size} />
+        <OfficeSidebar page={page} onPage={(p) => { setOpenDocId(null); setActiveComms(null); setPage(p) }} onLaunch={(a) => void launch(a)} onComms={openComms} activeComms={null} onExit={goHome} starredCount={starred.size} entInputs={entInputs} />
         <div className="flex-1 min-w-0">
           <DocumentEditorView documentId={openDocId} onBack={() => { setOpenDocId(null); void refresh() }} />
         </div>
@@ -285,7 +321,7 @@ export default function PlexiOfficeShell({ initialApp }: { initialApp?: string }
   if (comms) {
     return (
       <div className="h-full flex bg-[var(--surface-base)]">
-        <OfficeSidebar page={page} onPage={(p) => { setActiveComms(null); setPage(p) }} onLaunch={(a) => void launch(a)} onComms={openComms} activeComms={activeComms} onExit={goHome} starredCount={starred.size} />
+        <OfficeSidebar page={page} onPage={(p) => { setActiveComms(null); setPage(p) }} onLaunch={(a) => void launch(a)} onComms={openComms} activeComms={activeComms} onExit={goHome} starredCount={starred.size} entInputs={entInputs} />
         <div className="flex-1 min-w-0 overflow-auto" data-testid={`office-comms-${comms.key}`}>{comms.render()}</div>
       </div>
     )
@@ -293,7 +329,7 @@ export default function PlexiOfficeShell({ initialApp }: { initialApp?: string }
 
   return (
     <div className="h-full flex bg-[var(--surface-base)] text-[var(--ink-100)]">
-      <OfficeSidebar page={page} onPage={setPage} onLaunch={(a) => void launch(a)} onComms={openComms} activeComms={null} onExit={goHome} starredCount={starred.size} />
+      <OfficeSidebar page={page} onPage={setPage} onLaunch={(a) => void launch(a)} onComms={openComms} activeComms={null} onExit={goHome} starredCount={starred.size} entInputs={entInputs} />
 
       <div className="flex-1 min-w-0 overflow-auto">
         <div className="max-w-[1400px] mx-auto px-6 py-6">
@@ -317,20 +353,44 @@ export default function PlexiOfficeShell({ initialApp }: { initialApp?: string }
           {/* App tiles — the document apps plus Meet, which opens the real
               meeting surface rather than creating a document. */}
           <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-7 gap-2.5 mb-6">
-            {APPS.map((a) => (
-              <button
-                key={a.key}
-                onClick={() => void launch(a)}
-                data-testid={`office-app-${a.key}`}
-                className="flex flex-col items-center gap-2 rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-raised)] p-3.5 hover:border-[rgb(var(--accent)/0.5)] hover:shadow-sm transition"
-              >
-                <span className={`inline-flex items-center justify-center w-11 h-11 rounded-xl text-white ${a.tint}`}>
-                  <Icon name={a.icon} size={22} />
-                </span>
-                <span className="text-[12.5px] font-medium">{a.label}</span>
-                <span className="text-[10.5px] text-[var(--ink-50)] text-center leading-tight">{a.blurb}</span>
-              </button>
-            ))}
+            {APPS.map((a) => {
+              const ent = a.docType ? docEntitlement(a.docType) : null
+              const locked = !!ent && !ent.enabled
+              if (locked) {
+                return (
+                  <button
+                    key={a.key}
+                    onClick={ent.onLockedClick}
+                    data-testid={`office-app-${a.key}`}
+                    data-locked="true"
+                    aria-disabled="true"
+                    title={ent.reason}
+                    className="relative flex flex-col items-center gap-2 rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-raised)] p-3.5 opacity-50 cursor-not-allowed"
+                  >
+                    <span className={`inline-flex items-center justify-center w-11 h-11 rounded-xl text-white ${a.tint}`}>
+                      <Icon name={a.icon} size={22} />
+                    </span>
+                    <span className="text-[12.5px] font-medium">{a.label}</span>
+                    <span className="text-[10.5px] text-[var(--ink-50)] text-center leading-tight">{a.blurb}</span>
+                    <Icon name="lock" size={11} className="absolute top-1.5 right-2 text-[var(--ink-40)]" />
+                  </button>
+                )
+              }
+              return (
+                <button
+                  key={a.key}
+                  onClick={() => void launch(a)}
+                  data-testid={`office-app-${a.key}`}
+                  className="flex flex-col items-center gap-2 rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-raised)] p-3.5 hover:border-[rgb(var(--accent)/0.5)] hover:shadow-sm transition"
+                >
+                  <span className={`inline-flex items-center justify-center w-11 h-11 rounded-xl text-white ${a.tint}`}>
+                    <Icon name={a.icon} size={22} />
+                  </span>
+                  <span className="text-[12.5px] font-medium">{a.label}</span>
+                  <span className="text-[10.5px] text-[var(--ink-50)] text-center leading-tight">{a.blurb}</span>
+                </button>
+              )
+            })}
             <button
               onClick={openMeet}
               data-testid="office-app-meet"
@@ -698,7 +758,8 @@ function OfficeSidebar({
   onComms,
   activeComms,
   onExit,
-  starredCount
+  starredCount,
+  entInputs
 }: {
   page: OfficePage
   onPage: (p: OfficePage) => void
@@ -707,6 +768,7 @@ function OfficeSidebar({
   activeComms: string | null
   onExit: () => void
   starredCount: number
+  entInputs: EntitlementInputs
 }): JSX.Element {
   const NAV: { id: OfficePage; label: string; icon: string; tint: string }[] = [
     { id: 'home', label: 'Home', icon: 'home', tint: 'bg-indigo-500' },
@@ -750,19 +812,31 @@ function OfficeSidebar({
 
       <div className="px-4 pt-1 pb-1.5 text-[10px] uppercase tracking-[0.12em] text-[var(--ink-40)] font-semibold">Apps</div>
       <div className="px-2">
-        {APPS.map((a) => (
-          <button
-            key={a.key}
-            onClick={() => onLaunch(a)}
-            data-testid={`office-sideapp-${a.key}`}
-            className="flex items-center gap-2.5 w-full px-3 py-1.5 rounded-lg text-[13px] mb-0.5 text-[var(--ink-80)] hover:bg-[var(--surface-sunken)]"
-          >
-            <span className={`inline-flex items-center justify-center w-6 h-6 rounded-md text-white ${a.tint}`}>
-              <Icon name={a.icon} size={14} />
-            </span>
-            <span>{a.label}</span>
-          </button>
-        ))}
+        {APPS.map((a) => {
+          const ent = a.docType
+            ? computeEntitlement(entInputs, capabilityForDocType(a.docType), DOC_TYPE_LABEL[a.docType])
+            : null
+          const locked = !!ent && !ent.enabled
+          return (
+            <button
+              key={a.key}
+              onClick={() => (locked && ent ? ent.onLockedClick() : onLaunch(a))}
+              data-testid={`office-sideapp-${a.key}`}
+              data-locked={locked ? 'true' : undefined}
+              aria-disabled={locked ? 'true' : undefined}
+              title={locked && ent ? ent.reason : a.label}
+              className={`flex items-center gap-2.5 w-full px-3 py-1.5 rounded-lg text-[13px] mb-0.5 text-[var(--ink-80)] ${
+                locked ? 'opacity-50 cursor-not-allowed' : 'hover:bg-[var(--surface-sunken)]'
+              }`}
+            >
+              <span className={`inline-flex items-center justify-center w-6 h-6 rounded-md text-white ${a.tint}`}>
+                <Icon name={a.icon} size={14} />
+              </span>
+              <span>{a.label}</span>
+              {locked && <Icon name="lock" size={11} className="ml-auto text-[var(--ink-40)]" />}
+            </button>
+          )
+        })}
       </div>
 
       <div className="px-4 pt-3 pb-1.5 text-[10px] uppercase tracking-[0.12em] text-[var(--ink-40)] font-semibold">Communicate</div>

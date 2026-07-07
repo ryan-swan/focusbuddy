@@ -23,6 +23,8 @@ import { useMessagingStore } from '../stores/messaging'
 import { useViewStore } from '../stores/view'
 import { catalogFor } from './widgetCatalog'
 import { spawnPositionFor } from './spawnPosition'
+import { useCapabilityStore } from '../stores/capabilities'
+import { capabilityForDocType, DOC_TYPE_LABEL } from './entitlementReason'
 
 // Palette for auto-assigning select option colors when the AI doesn't specify.
 const SELECT_COLORS = [
@@ -347,6 +349,13 @@ async function applyCreateDocument(
   p: Extract<ActionProposal, { kind: 'create-document' }>,
   ctx: { destinationFolderId?: string | null; resolvedIds?: Map<string, string> }
 ): Promise<ApplyResult> {
+  // Close the last creation hole: the AI create-document path must respect the
+  // per-editor entitlement too. If the matching office_* capability is off, do
+  // not create — return an honest, plan-aware message instead.
+  const cap = capabilityForDocType(p.docType)
+  if (useCapabilityStore.getState().get(cap) !== true) {
+    return { ok: false, message: `${DOC_TYPE_LABEL[p.docType]} is not available on your plan.` }
+  }
   try {
     const doc = await useDocumentsStore.getState().createBlank(p.docType, p.title)
     // Register the real id so a sibling edit-document can reference this
