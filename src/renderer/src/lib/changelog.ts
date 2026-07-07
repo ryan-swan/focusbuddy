@@ -36,6 +36,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.3.4',
+    date: '2026-07-07T18:00:00Z',
+    title: 'PlexiDesk 3.3.4 — license the office editors individually',
+    tag: 'feature',
+    summary:
+      'PlexiOffice can now be licensed editor by editor. Docs, Sheets, Slides, Draw and Design are each their own entitlement, so a person or organisation can be given just the ones they need rather than the whole suite, with PlexiOffice as the master switch. Writing a quick doc on a desk stays free of all of this: the Markdown and note widgets you drop on the canvas are part of PlexiDesk and are always available, even without PlexiOffice. A locked editor greys out with the same reason-aware tooltip as the app areas.',
+    highlights: [
+      'Docs, Sheets, Slides, Draw and Design are each licensable on their own, under the PlexiOffice master switch.',
+      'Creating a doc on the desk canvas (Markdown / note widget) always works, with or without PlexiOffice.',
+      'Locked editors grey out with an upgrade or a restriction reason, everywhere they can be created.'
+    ]
+  },
+  {
     version: '3.3.3',
     date: '2026-07-07T16:30:00Z',
     title: 'PlexiDesk 3.3.3 — organisation licensing for apps',

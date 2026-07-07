@@ -131,3 +131,25 @@ describe('limitLabel', () => {
     expect(limitLabel(defaultsForTier('pro'), 'multiple_desks')).toBe('Unlimited')
   })
 })
+
+// The canvas guarantee (product decision): the five office document types can
+// always be created ON THE CANVAS as widgets, regardless of PlexiOffice
+// entitlement. Office licensing gates the standalone suite (the Office area,
+// Drive, quick-create), never the desk canvas. If someone ever adds one of
+// these to WIDGET_KIND_CAPABILITY, this test fails on purpose.
+describe('canvas office-doc widgets are never gated by Office', () => {
+  const officeOff: CapabilityMap = {
+    product_office: false,
+    office_docs: false,
+    office_sheets: false,
+    office_slides: false,
+    office_draw: false,
+    office_design: false
+  }
+  for (const kind of ['doc', 'sheet', 'slides', 'map', 'design']) {
+    it(`allows creating a ${kind} widget on the canvas with Office fully off`, () => {
+      expect(capabilityForWidgetKind(kind)).toBeNull()
+      expect(canCreateWidget(officeOff, kind)).toBe(true)
+    })
+  }
+})

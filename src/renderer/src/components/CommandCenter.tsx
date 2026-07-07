@@ -9,6 +9,7 @@ import { WIDGET_CATALOG } from '../lib/widgetCatalog'
 import { getNavPrefs, setNavPrefs } from '../lib/navPrefs'
 import Icon from './Icon'
 import { useCapabilityEnabled, useCapabilityStore } from '../stores/capabilities'
+import { entitlementFor, capabilityForDocType, DOC_TYPE_LABEL } from '../lib/entitlementReason'
 import { canCreateWidget } from '../lib/gating'
 import { promptUpgrade } from '../stores/upgradePrompt'
 import { useEditorCommandStore } from '../stores/editorCommands'
@@ -432,6 +433,14 @@ export default function CommandCenter({
         kind: 'action',
         score: (q === '' ? 57 : matchScore(t.words, q)) + recBonus('office'),
         run: () => {
+          // Gate the office create on the editor's entitlement. A locked
+          // editor never creates; a licensing gap offers the upgrade.
+          const ent = entitlementFor(capabilityForDocType(t.docType), DOC_TYPE_LABEL[t.docType])
+          if (!ent.enabled) {
+            closePalette()
+            ent.onLockedClick()
+            return
+          }
           setActive(null)
           closePalette()
           void useDocumentsStore

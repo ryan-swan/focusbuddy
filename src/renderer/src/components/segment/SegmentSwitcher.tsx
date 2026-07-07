@@ -1,7 +1,7 @@
 import { useViewStore } from '../../stores/view'
 import { useCapabilityStore } from '../../stores/capabilities'
-import { useOrgStore, PERSONAL_ORG_ID } from '../../stores/org'
-import { PRICING_URL } from '../../lib/siteUrls'
+import { useOrgStore } from '../../stores/org'
+import { computeEntitlement } from '../../lib/entitlementReason'
 import Icon from '../Icon'
 
 // A small always-visible switch between the four areas, shown at the top of every
@@ -35,8 +35,10 @@ export default function SegmentSwitcher(): JSX.Element {
   const activeOrgId = useOrgStore((s) => s.activeOrgId)
   const orgName = useOrgStore((s) => s.orgs.find((o) => o.id === s.activeOrgId)?.name ?? null)
 
-  const inOrg = activeOrgId !== PERSONAL_ORG_ID && !!orgName
-  const canUpgrade = orgRole === 'owner' || orgRole === 'admin'
+  // Shared inputs for the reason-aware entitlement helper. Read the maps once
+  // here (subscribed above) and resolve each area with the pure core so we never
+  // call a hook inside the render loop.
+  const entInputs = { capabilities, sources, orgRole, activeOrgId, orgName }
 
   function go(kind: string): void {
     if (kind === 'plexidesk') goHome()
@@ -45,38 +47,12 @@ export default function SegmentSwitcher(): JSX.Element {
     else if (kind === 'plexibrain') goPlexiBrain()
   }
 
-  // The tooltip for a locked app, driven by WHY it is off and who is asking.
-  // A 'user' source is a deliberate admin restriction (no upsell); anything else
-  // is a licensing gap, where owners/admins get an actionable upgrade and
-  // members are told to ask an admin.
-  function lockedReason(label: string, cap: string): string {
-    const restricted = sources[cap] === 'user'
-    if (restricted) {
-      return inOrg
-        ? `${label} is turned off for you in ${orgName} by your administrator.`
-        : `${label} is turned off for your account by your administrator.`
-    }
-    if (inOrg) {
-      return canUpgrade
-        ? `${label} is not included in ${orgName}'s plan. Upgrade to add it.`
-        : `${label} is not included in ${orgName}'s plan. Ask an admin to add it.`
-    }
-    return `${label} is not on your plan. Upgrade to add it.`
-  }
-
-  function onLockedClick(cap: string): void {
-    // Only send someone somewhere they can act: a licensing gap for an owner/
-    // admin (or a personal account) opens pricing. A restriction is a dead end
-    // by design, so it just shows its tooltip.
-    const restricted = sources[cap] === 'user'
-    if (!restricted && (canUpgrade || !inOrg)) void window.api.files.openExternal(PRICING_URL)
-  }
-
   return (
     <div className="grid grid-cols-4 gap-1 px-2 pt-2 pb-1" data-testid="segment-switcher">
       {AREAS.map((a) => {
+        const ent = computeEntitlement(entInputs, a.cap, a.label)
         // Desk is the floor: always available even if its entitlement is unset.
-        const enabled = a.kind === 'plexidesk' || capabilities[a.cap] === true
+        const enabled = a.kind === 'plexidesk' || ent.enabled
         const active =
           a.kind === 'plexidesk'
             ? !['office', 'plexipeople', 'plexibrain'].includes(currentKind)
@@ -85,11 +61,11 @@ export default function SegmentSwitcher(): JSX.Element {
           return (
             <button
               key={a.kind}
-              onClick={() => onLockedClick(a.cap)}
+              onClick={ent.onLockedClick}
               data-testid={`switch-${a.kind}`}
               data-locked="true"
               aria-disabled="true"
-              title={lockedReason(a.label, a.cap)}
+              title={ent.reason}
               className="relative flex flex-col items-center gap-0.5 py-1.5 rounded-lg text-[10px] text-[var(--ink-40)] opacity-50 cursor-not-allowed"
             >
               <Icon name={a.icon} size={18} />
