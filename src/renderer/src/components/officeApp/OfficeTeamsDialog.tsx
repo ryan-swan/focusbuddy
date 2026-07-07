@@ -9,6 +9,7 @@ import {
   type TeamMember
 } from '../../lib/teamsClient'
 import Icon from '../Icon'
+import { personDisplayName } from '../../lib/personName'
 
 // Manage teams: create a team, see your teams, open one to view and add members
 // (by handle). A team is then a target you can invite to a live document.
@@ -56,7 +57,7 @@ export default function OfficeTeamsDialog({ onClose }: { onClose: () => void }):
     setBusy(true)
     const res = await addTeamMember(token, selected.id, handle.trim())
     setBusy(false)
-    setMsg(res.ok ? `Added ${res.member?.handle ?? handle}.` : res.error ?? 'Could not add that handle.')
+    setMsg(res.ok ? `Added ${personDisplayName(res.member, handle)}.` : res.error ?? 'Could not add that handle.')
     if (res.ok) {
       setHandle('')
       setMembers(await listTeamMembers(token, selected.id))
@@ -161,7 +162,7 @@ export default function OfficeTeamsDialog({ onClose }: { onClose: () => void }):
                     {members.map((m) => (
                       <div key={m.accountId} className="flex items-center gap-2 text-[12px] px-1 py-1">
                         <Icon name="person" size={13} className="text-[var(--ink-40)]" />
-                        <span className="truncate flex-1">{m.handle || m.accountId}</span>
+                        <span className="truncate flex-1">{personDisplayName(m, m.handle || m.accountId)}</span>
                         {m.role === 'owner' && <span className="text-[10px] text-[var(--ink-40)]">owner</span>}
                       </div>
                     ))}

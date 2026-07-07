@@ -17,6 +17,8 @@ export interface LiveDocMeta {
 export interface LockHolder {
   accountId: string
   handle: string
+  firstName?: string | null
+  lastName?: string | null
 }
 export interface LockState {
   docId: string

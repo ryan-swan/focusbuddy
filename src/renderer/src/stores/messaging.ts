@@ -21,6 +21,7 @@ import { useAccountStore } from './account'
 import { useViewStore } from './view'
 import { notifyExternal } from '../lib/notify'
 import { bodyMentionsHandle } from '../lib/mentions'
+import { personDisplayName } from '../lib/personName'
 
 // Apply a reaction add/remove to a message in the conversation map, immutably and
 // idempotently (so the actor's own optimistic update plus the echoed broadcast do
@@ -148,7 +149,7 @@ interface MessagingStore {
   connected: boolean
   // conversationId -> accountId -> who is typing and when we last heard. The UI
   // shows recent entries and they self-clear on a timeout.
-  typingByConv: Record<string, Record<string, { handle: string; at: number }>>
+  typingByConv: Record<string, Record<string, { handle: string; name: string; at: number }>>
   // parentMessageId -> the replies loaded for that thread.
   threadsByParent: Record<string, ChatMessage[]>
   // The parent message whose thread panel is open, or null.
@@ -210,8 +211,8 @@ export const useMessagingStore = create<MessagingStore>((set, get) => ({
       // self-suppresses when the window is focused, so no banner for the chat you
       // are reading. Resolve a friendly sender name from the conversation members.
       const conv = conversations.find((c) => c.id === incoming.conversationId)
-      const sender =
-        conv?.members.find((m) => m.accountId === incoming.message.fromAccount)?.handle ?? 'New message'
+      const senderMember = conv?.members.find((m) => m.accountId === incoming.message.fromAccount)
+      const sender = personDisplayName(senderMember, 'New message')
       const preview = incoming.message.body || (incoming.message.attachment ? 'Shared something' : '')
       // A message that @mentions the signed-in handle alerts even while the
       // app is focused elsewhere: being named is the one chat event that
@@ -271,7 +272,10 @@ export const useMessagingStore = create<MessagingStore>((set, get) => ({
       set((s) => ({
         typingByConv: {
           ...s.typingByConv,
-          [e.conversationId]: { ...(s.typingByConv[e.conversationId] ?? {}), [e.accountId]: { handle: e.handle, at } }
+          [e.conversationId]: {
+            ...(s.typingByConv[e.conversationId] ?? {}),
+            [e.accountId]: { handle: e.handle, name: personDisplayName(e, e.handle), at }
+          }
         }
       }))
       window.setTimeout(() => {

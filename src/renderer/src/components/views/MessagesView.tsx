@@ -14,6 +14,7 @@ import { useNodeStore } from '../../stores/nodes'
 import { useWidgetStore } from '../../stores/widgets'
 import { catalogFor } from '../../lib/widgetCatalog'
 import { spawnPositionFor } from '../../lib/spawnPosition'
+import { personDisplayName } from '../../lib/personName'
 
 const QUICK_EMOJIS = ['👍', '❤️', '😂', '🎉', '✅', '👀']
 
@@ -137,10 +138,15 @@ function MentionBody({ m }: { m: ChatMessage }): JSX.Element {
   const myHandle = useAccountStore((s) => s.account?.handle ?? null)
   const conv = conversations.find((c) => c.id === m.conversationId)
   const known = new Set<string>()
+  const nameByHandle = new Map<string, string>()
   for (const member of conv?.members ?? []) {
-    if (member.handle) known.add(member.handle.toLowerCase())
+    if (member.handle) {
+      const h = member.handle.toLowerCase()
+      known.add(h)
+      nameByHandle.set(h, personDisplayName(member, member.handle))
+    }
   }
-  return <MentionText body={m.body} myHandle={myHandle} knownHandles={known} />
+  return <MentionText body={m.body} myHandle={myHandle} knownHandles={known} nameByHandle={nameByHandle} />
 }
 
 function MessageRow({
@@ -439,13 +445,22 @@ export default function MessagesView(): JSX.Element {
   // For a 1:1 DM, the other member is the call target. Spaces are multi-member,
   // so the header call button only shows for DMs (a 1:1 mesh call).
   const dmOther = activeConv?.kind === 'dm' ? activeConv.members.find((m) => m.accountId !== account.id) : null
-  const callTarget = dmOther ? { accountId: dmOther.accountId, handle: dmOther.handle ?? 'teammate' } : null
+  const callTarget = dmOther
+    ? { accountId: dmOther.accountId, handle: dmOther.handle ?? 'teammate', firstName: dmOther.firstName, lastName: dmOther.lastName }
+    : null
+  const callTargetName = callTarget ? personDisplayName(callTarget, callTarget.handle) : ''
+  // A DM's header reads as the other person's real name; spaces/channels carry
+  // their own title from the server.
+  const headerTitle =
+    activeConv?.kind === 'dm' && dmOther
+      ? personDisplayName(dmOther, dmOther.handle ?? 'Conversation')
+      : activeConv?.title ?? 'Conversation'
 
   // Who is currently typing in the open conversation (recent pings only).
   const typers = activeId
     ? Object.values(typingByConv[activeId] ?? {})
         .filter((t) => Date.now() - t.at < 5000)
-        .map((t) => t.handle)
+        .map((t) => t.name)
     : []
   const typingLabel =
     typers.length === 0
@@ -525,7 +540,14 @@ export default function MessagesView(): JSX.Element {
                       size={13}
                       className="text-stone-400"
                     />
-                    {c.kind === 'channel' ? `#${c.title}` : c.title}
+                    {c.kind === 'channel'
+                      ? `#${c.title}`
+                      : c.kind === 'dm'
+                        ? personDisplayName(
+                            c.members.find((m) => m.accountId !== account.id),
+                            c.title
+                          )
+                        : c.title}
                   </span>
                   {c.unreadCount > 0 && (
                     <span className="shrink-0 text-[10px] font-semibold text-white bg-accent rounded-full px-1.5 py-0.5 min-w-[18px] text-center">
@@ -560,13 +582,13 @@ export default function MessagesView(): JSX.Element {
             <div className="px-4 py-3 border-b border-stone-200 dark:border-stone-800 flex items-center justify-between gap-2">
               <h2 className="text-sm font-semibold text-stone-900 dark:text-stone-100 inline-flex items-center gap-1.5 min-w-0">
                 <Icon name={activeConv?.kind === 'space' ? 'folder_shared' : 'person'} size={14} className="text-accent shrink-0" />
-                <span className="truncate">{activeConv?.title ?? 'Conversation'}</span>
+                <span className="truncate">{headerTitle}</span>
               </h2>
               <div className="flex items-center gap-1.5 shrink-0">
                 {callTarget && (
                   <button
                     onClick={() => void startCall(callTarget, 'video')}
-                    aria-label={`Call ${callTarget.handle}`}
+                    aria-label={`Call ${callTargetName}`}
                     title="Start a video call"
                     data-testid="messages-call"
                     className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border border-[var(--edge-soft)] text-[12.5px] text-[var(--ink-90)] hover:bg-[var(--surface-sunken)]"

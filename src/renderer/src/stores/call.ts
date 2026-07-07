@@ -4,6 +4,7 @@ import { notifyExternal } from '../lib/notify'
 import { ConversationRecorder } from '../lib/conversationRecorder'
 import { whisperEnabled } from '../lib/whisperPref'
 import { useWrapupStore } from './wrapup'
+import { personDisplayName } from '../lib/personName'
 
 // PlexiCam: peer-to-peer live audio/video calls. The signal server only relays
 // the SDP offer/answer and ICE candidates between two accounts in the same
@@ -22,6 +23,8 @@ export type CallMedia = 'audio' | 'video'
 interface Peer {
   accountId: string
   handle: string
+  firstName?: string | null
+  lastName?: string | null
 }
 
 interface CallStore {
@@ -72,7 +75,7 @@ export const useCallStore = create<CallStore>((set, get) => {
       const rec = recorder
       recorder = null
       if (nextStatus === 'ended') {
-        const title = `Call with ${get().peer?.handle ?? 'someone'}`
+        const title = `Call with ${personDisplayName(get().peer, 'someone')}`
         void rec.stop().then((res) => {
           if (res && res.durationSec >= 2) {
             // begin() resolves errors internally; .catch is belt-and-braces so a
@@ -187,7 +190,7 @@ export const useCallStore = create<CallStore>((set, get) => {
       })
       // Alert even if the app is focused — an incoming call is interruptive by
       // nature. Clicking just brings the window forward; the overlay handles answer.
-      notifyExternal(`Incoming ${e.payload.media} call`, `${e.payload.from.handle} is calling`, {
+      notifyExternal(`Incoming ${e.payload.media} call`, `${personDisplayName(e.payload.from, 'Someone')} is calling`, {
         force: true,
         tag: `call-${e.payload.callId}`
       })
@@ -196,7 +199,7 @@ export const useCallStore = create<CallStore>((set, get) => {
     // All other events must match the active call.
     if (!state.callId || e.payload.callId !== state.callId) return
     if (e.type === 'callDeclined') {
-      set({ status: 'ended', error: `${state.peer?.handle ?? 'They'} declined the call.` })
+      set({ status: 'ended', error: `${personDisplayName(state.peer, 'They')} declined the call.` })
       cleanup('ended')
       return
     }

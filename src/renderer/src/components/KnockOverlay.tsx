@@ -1,5 +1,6 @@
 import { useKnockStore } from '../stores/knock'
 import Icon from './Icon'
+import { personDisplayName } from '../lib/personName'
 
 // The incoming-knock notification. When a teammate knocks to reach you, a small
 // card drops into the top-right with their note and three ways to answer: reply
@@ -24,7 +25,7 @@ export default function KnockOverlay(): JSX.Element | null {
         </span>
         <div className="min-w-0 flex-1">
           <div className="text-[13px] text-[var(--ink-100)]">
-            <span className="font-semibold">{incoming.from.handle}</span> knocked
+            <span className="font-semibold">{personDisplayName(incoming.from, 'Someone')}</span> knocked
           </div>
           {incoming.note ? (
             <div className="text-[12px] text-[var(--ink-70)] mt-0.5 break-words">{incoming.note}</div>

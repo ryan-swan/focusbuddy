@@ -28,6 +28,7 @@ import { daylightFor, dayBarGradient, fmtHour } from '../../lib/peopleMap/daylig
 import { subsolarPoint, sunElevation } from '../../lib/peopleMap/solar'
 import { COLS, ROWS, LAND, project, cellCenter } from '../../lib/peopleMap/worldmap'
 import { groupByOffice, buildHierarchy, officeWindow } from '../../lib/peopleMap/structure'
+import { personDisplayName, personInitials, personFirstName } from '../../lib/personName'
 
 // The in-product People Map: every teammate across the org placed by office and
 // reporting line, with their real local day and live presence. Reads the org
@@ -45,6 +46,11 @@ const STATUS_META: Record<PresenceStatus, { label: string; cls: string }> = {
   offline: { label: 'Offline', cls: 'pm-st-offline' }
 }
 
+// The name we SHOW for a map person, falling back to their handle. Handles stay
+// the colour seed and routing key; this is display only.
+const dispName = (p: { firstName?: string | null; lastName?: string | null; handle: string }): string =>
+  personDisplayName(p, p.handle)
+
 const AV_COLORS = ['#6366f1', '#0ea5e9', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6', '#14b8a6', '#ef4444']
 function colorFor(seed: string): string {
   let h = 0
@@ -57,13 +63,26 @@ function initials(handle: string): string {
   return (handle.replace(/^@/, '').slice(0, 2) || '?').toUpperCase()
 }
 
-function Avatar({ seed, size = 30, photoUrl }: { seed: string; size?: number; photoUrl?: string | null }): JSX.Element {
+// `seed` stays the routing handle so a person keeps the same colour everywhere;
+// `name` is the real name we show (alt text + initials), falling back to the seed.
+function Avatar({
+  seed,
+  name,
+  size = 30,
+  photoUrl
+}: {
+  seed: string
+  name?: string
+  size?: number
+  photoUrl?: string | null
+}): JSX.Element {
+  const label = name ?? seed
   if (photoUrl) {
     return (
       <img
         className="pm-av pm-av--photo"
         src={photoUrl}
-        alt={seed}
+        alt={label}
         width={size}
         height={size}
         style={{ width: size, height: size }}
@@ -73,7 +92,7 @@ function Avatar({ seed, size = 30, photoUrl }: { seed: string; size?: number; ph
   }
   return (
     <span className="pm-av" style={{ width: size, height: size, fontSize: size * 0.4, background: colorFor(seed) }}>
-      {initials(seed)}
+      {name ? personInitials({ name }) : initials(seed)}
     </span>
   )
 }
@@ -157,7 +176,7 @@ function OfficesTab({ data, now }: { data: PeopleMapData; now: Date }): JSX.Elem
             </div>
             <div className="pm-people">
               {[...people]
-                .sort((a, b) => statusRank(a.liveStatus) - statusRank(b.liveStatus) || a.handle.localeCompare(b.handle))
+                .sort((a, b) => statusRank(a.liveStatus) - statusRank(b.liveStatus) || dispName(a).localeCompare(dispName(b)))
                 .map((p) => (
                   <PersonRow key={p.accountId} person={p} now={now} />
                 ))}
@@ -189,6 +208,7 @@ function PersonActions({
   const knock = useKnockStore((s) => s.knock)
   if (person.isSelf || person.liveStatus === 'offline') return null
   const target = { accountId: person.accountId, handle: person.handle }
+  const name = personDisplayName(person, person.handle)
   async function chat(): Promise<void> {
     await startDm(person.handle) // opens the conversation on success
     goMessages()
@@ -198,8 +218,8 @@ function PersonActions({
       <button
         className="pm-iconbtn"
         data-testid="person-chat"
-        title={`Message ${person.handle}`}
-        aria-label={`Message ${person.handle}`}
+        title={`Message ${name}`}
+        aria-label={`Message ${name}`}
         onClick={() => void chat()}
       >
         <Icon name="chat_bubble" size={14} />
@@ -207,8 +227,8 @@ function PersonActions({
       <button
         className="pm-iconbtn"
         data-testid="person-knock"
-        title={offHours ? `Knock ${person.handle} (it is after hours for them)` : `Knock ${person.handle}`}
-        aria-label={`Knock ${person.handle}`}
+        title={offHours ? `Knock ${name} (it is after hours for them)` : `Knock ${name}`}
+        aria-label={`Knock ${name}`}
         onClick={() => knock(target)}
       >
         <Icon name={offHours ? 'bedtime' : 'sensor_door'} size={14} className={offHours ? 'text-[var(--ink-50)]' : ''} />
@@ -216,8 +236,8 @@ function PersonActions({
       <button
         className="pm-iconbtn"
         data-testid="call-btn"
-        title={`Call ${person.handle}`}
-        aria-label={`Call ${person.handle}`}
+        title={`Call ${name}`}
+        aria-label={`Call ${name}`}
         onClick={() => void startCall(target, 'video')}
       >
         <Icon name="video_call" size={14} />
@@ -233,12 +253,12 @@ function PersonRow({ person, now }: { person: MapPerson; now: Date }): JSX.Eleme
   return (
     <div className="pm-prow">
       <span className="pm-prow__rel">
-        <Avatar seed={person.handle} size={28} photoUrl={person.photoUrl} />
+        <Avatar seed={person.handle} name={personDisplayName(person, person.handle)} size={28} photoUrl={person.photoUrl} />
         <span className={`pm-prow__sdot pm-dot ${meta.cls}`} />
       </span>
       <span style={{ minWidth: 0, flex: 1 }}>
         <div className="pm-prow__name">
-          {person.handle}
+          {personDisplayName(person, person.handle)}
           {person.isSelf && <span style={{ color: '#8b96b3', fontWeight: 500 }}> (you)</span>}
           {person.role === 'guest' && <span className="pm-badge-guest">Guest</span>}
         </div>
@@ -331,10 +351,10 @@ function GlobalTab({ data, now }: { data: PeopleMapData; now: Date }): JSX.Eleme
             key={p.accountId}
             className={`pm-pin ${working ? '' : 'pm-pin--off'} ${sel?.kind === 'person' && sel.id === p.accountId ? 'pm-pin--sel' : ''}`}
             style={{ left: `${x * 100}%`, top: `${y * 100}%`, background: colorFor(p.handle) }}
-            title={`${p.handle} — ${meta.label}${p.city ? ` · ${p.city}` : ''}`}
+            title={`${dispName(p)} — ${meta.label}${p.city ? ` · ${p.city}` : ''}`}
             onClick={() => setSel({ kind: 'person', id: p.accountId })}
           >
-            {initials(p.handle)}
+            {personInitials(p)}
             <span className={`pm-pin__sdot pm-dot ${meta.cls}`} />
           </button>
         )
@@ -373,7 +393,7 @@ function MapPopover({
   const below = anchor.y < 0.34
   const officePeople = office
     ? [...data.people.filter((p) => p.officeId === office.id)].sort(
-        (a, b) => statusRank(a.liveStatus) - statusRank(b.liveStatus) || a.handle.localeCompare(b.handle)
+        (a, b) => statusRank(a.liveStatus) - statusRank(b.liveStatus) || dispName(a).localeCompare(dispName(b))
       )
     : []
 
@@ -422,11 +442,11 @@ function PersonCard({ person, now }: { person: MapPerson; now: Date }): JSX.Elem
     <div className="pm-pcard">
       <div className="pm-pcard__head">
         <span className="pm-prow__rel">
-          <Avatar seed={person.handle} size={34} photoUrl={person.photoUrl} />
+          <Avatar seed={person.handle} name={dispName(person)} size={34} photoUrl={person.photoUrl} />
           <span className={`pm-prow__sdot pm-dot ${meta.cls}`} />
         </span>
         <span style={{ minWidth: 0 }}>
-          <div className="pm-pcard__name">{person.handle}</div>
+          <div className="pm-pcard__name">{dispName(person)}</div>
           <div className="pm-pcard__role">
             {person.title || meta.label}
             {person.department ? ` · ${person.department}` : ''}
@@ -507,12 +527,12 @@ function HierarchyTab({ data, now, refresh }: { data: PeopleMapData; now: Date; 
             title={canEdit ? 'Drag onto another person to change who they report to' : undefined}
           >
             <span className="pm-card__rel">
-              <Avatar seed={p.handle} size={32} photoUrl={p.photoUrl} />
+              <Avatar seed={p.handle} name={dispName(p)} size={32} photoUrl={p.photoUrl} />
               <span className={`pm-card__sdot pm-dot ${meta.cls}`} />
             </span>
             <span>
               <div className="pm-card__name">
-                {p.handle}
+                {dispName(p)}
                 {p.isSelf && <span style={{ color: '#8b96b3', fontWeight: 500 }}> (you)</span>}
                 {p.role === 'guest' && <span className="pm-badge-guest">Guest</span>}
               </div>
@@ -530,7 +550,7 @@ function HierarchyTab({ data, now, refresh }: { data: PeopleMapData; now: Date; 
               {p.relationships.map((r) => (
                 <span className="pm-dotted__chip" key={`${r.toAccountId}-${r.kind}`} title={`${r.kind} relationship`}>
                   <Icon name="link" size={11} />
-                  {r.kind} · {byId.get(r.toAccountId)?.handle ?? 'unknown'}
+                  {r.kind} · {(() => { const t = byId.get(r.toAccountId); return t ? dispName(t) : 'unknown' })()}
                   {canEdit && (
                     <button
                       className="pm-dotted__x"
@@ -603,7 +623,7 @@ function DottedLineAdd({
         <option value="">to…</option>
         {people.map((p) => (
           <option key={p.accountId} value={p.accountId}>
-            {p.handle}
+            {dispName(p)}
           </option>
         ))}
       </select>
@@ -641,17 +661,17 @@ function CollabPerson({ person, context }: { person: MapPerson; context?: string
     <button
       className="pm-collab__person"
       data-testid="collab-person"
-      title={`Message ${person.handle}`}
+      title={`Message ${dispName(person)}`}
       onClick={() => {
         void startDm(person.handle)
         goMessages()
       }}
     >
       <span className="pm-prow__rel">
-        <Avatar seed={person.handle} size={24} photoUrl={person.photoUrl} />
+        <Avatar seed={person.handle} name={dispName(person)} size={24} photoUrl={person.photoUrl} />
         <span className={`pm-prow__sdot pm-dot ${meta.cls}`} />
       </span>
-      <span className="pm-collab__pname">{person.handle}</span>
+      <span className="pm-collab__pname">{dispName(person)}</span>
       {context && <span className="pm-collab__pctx">{context}</span>}
     </button>
   )
@@ -764,7 +784,7 @@ function PeopleRail({ data, now }: { data: PeopleMapData; now: Date }): JSX.Elem
   const weight = (s: PresenceStatus): number => (s === 'online' ? 0 : s === 'focus' ? 1 : s === 'away' ? 2 : 3)
   const around = data.people
     .filter((p) => p.liveStatus !== 'offline')
-    .sort((a, b) => weight(a.liveStatus) - weight(b.liveStatus) || a.handle.localeCompare(b.handle))
+    .sort((a, b) => weight(a.liveStatus) - weight(b.liveStatus) || dispName(a).localeCompare(dispName(b)))
 
   const dayOf = (p: MapPerson): ReturnType<typeof daylightFor> | null =>
     p.lat != null && p.lng != null && p.tzOffsetMin != null
@@ -773,7 +793,7 @@ function PeopleRail({ data, now }: { data: PeopleMapData; now: Date }): JSX.Elem
   const wrapping = data.people.filter((p) => dayOf(p)?.workLabel === 'Wrapping up')
   const starting = data.people.filter((p) => dayOf(p)?.workLabel === 'Early hours')
   const names = (people: MapPerson[]): string =>
-    people.slice(0, 4).map((p) => p.handle).join(', ') + (people.length > 4 ? ` +${people.length - 4}` : '')
+    people.slice(0, 4).map((p) => dispName(p)).join(', ') + (people.length > 4 ? ` +${people.length - 4}` : '')
 
   const deptCount = new Map<string, number>()
   for (const p of data.people) {
@@ -795,11 +815,11 @@ function PeopleRail({ data, now }: { data: PeopleMapData; now: Date }): JSX.Elem
               return (
                 <div key={p.accountId} className="flex items-center gap-2.5 rounded-lg px-1 py-1">
                   <span className="relative shrink-0">
-                    <Avatar seed={p.handle} size={26} photoUrl={p.photoUrl} />
+                    <Avatar seed={p.handle} name={dispName(p)} size={26} photoUrl={p.photoUrl} />
                     <span className={`pm-prow__sdot pm-dot ${STATUS_META[p.liveStatus].cls}`} />
                   </span>
                   <span className="min-w-0 flex-1">
-                    <div className="text-[12px] font-medium text-[var(--ink-90)] truncate">{p.handle}</div>
+                    <div className="text-[12px] font-medium text-[var(--ink-90)] truncate">{dispName(p)}</div>
                     <div className="text-[11px] text-[var(--ink-50)] truncate">
                       {p.liveWorkingOn || p.title || STATUS_META[p.liveStatus].label}
                     </div>
@@ -886,7 +906,7 @@ export default function PeopleMapView(): JSX.Element {
   const account = useAccountStore((s) => s.account)
 
   const hh = now.getHours()
-  const who = account?.handle || account?.email?.split('@')[0] || ''
+  const who = account ? personFirstName(account, '') : ''
   const greeting = `Good ${hh < 12 ? 'morning' : hh < 18 ? 'afternoon' : 'evening'}${who ? `, ${who}` : ''}`
   const aroundNow = data ? data.people.filter((p) => p.liveStatus !== 'offline').length : 0
   const workingNow = data

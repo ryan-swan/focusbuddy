@@ -10,6 +10,7 @@ import { useAccountStore } from '../../stores/account'
 import { useQuickCreate } from '../../stores/quickCreate'
 import { startDm, uploadAttachment, sendMessage } from '../../lib/messagingClient'
 import { useNodeStore } from '../../stores/nodes'
+import { personDisplayName } from '../../lib/personName'
 import type { Meeting } from '@shared/meetings'
 import type { ActionProposal } from '@shared/types'
 
@@ -131,7 +132,7 @@ export default function PlexiMeetView(): JSX.Element {
   const presencePeers = usePresenceStore((s) => s.peers)
   const token = useAccountStore((s) => s.sessionToken)
   const [showMsg, setShowMsg] = useState(false)
-  const [msgTo, setMsgTo] = useState<{ accountId: string; handle: string } | null>(null)
+  const [msgTo, setMsgTo] = useState<{ accountId: string; handle: string; firstName?: string | null; lastName?: string | null } | null>(null)
   const [msgRecording, setMsgRecording] = useState(false)
   const [msgNote, setMsgNote] = useState<string | null>(null)
   const msgRecRef = useRef<MediaRecorder | null>(null)
@@ -155,7 +156,7 @@ export default function PlexiMeetView(): JSX.Element {
   // "they're away, leave them something" path, like a quick Loom. Reuses the real
   // chat attachment pipeline (video kind), so a failure surfaces honestly rather
   // than pretending it sent. Falls back to audio only if there is no camera.
-  async function recordMessageTo(peer: { accountId: string; handle: string }): Promise<void> {
+  async function recordMessageTo(peer: { accountId: string; handle: string; firstName?: string | null; lastName?: string | null }): Promise<void> {
     setMsgNote(null)
     setError(null)
     let stream: MediaStream
@@ -188,11 +189,12 @@ export default function PlexiMeetView(): JSX.Element {
           return
         }
         const blob = new Blob(chunks, { type: mime })
-        setMsgNote(`Sending to ${peer.handle}…`)
+        const peerName = personDisplayName(peer, peer.handle)
+        setMsgNote(`Sending to ${peerName}…`)
         const conversationId = await startDm(token, peer.handle)
         if (!conversationId) {
           setMsgNote(null)
-          setError(`Could not open a conversation with ${peer.handle}.`)
+          setError(`Could not open a conversation with ${peerName}.`)
           return
         }
         const att = await uploadAttachment(token, conversationId, kind, await blob.arrayBuffer(), { name, mime, ext: 'webm' })
@@ -209,7 +211,7 @@ export default function PlexiMeetView(): JSX.Element {
           sizeBytes: att.sizeBytes,
           durationMs: Date.now() - startedAt
         })
-        setMsgNote(sent ? `Sent to ${peer.handle}.` : null)
+        setMsgNote(sent ? `Sent to ${peerName}.` : null)
         if (!sent) setError('Could not send the message.')
         setMsgTo(null)
       }
@@ -317,7 +319,7 @@ export default function PlexiMeetView(): JSX.Element {
                   data-testid="meet-message-stop"
                   className="w-full inline-flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-md bg-red-500 text-white text-[12px] font-medium animate-pulse"
                 >
-                  <Icon name="stop_circle" size={15} /> Stop &amp; send to {msgTo.handle}
+                  <Icon name="stop_circle" size={15} /> Stop &amp; send to {personDisplayName(msgTo, msgTo.handle)}
                 </button>
               ) : (
                 <>
@@ -328,12 +330,12 @@ export default function PlexiMeetView(): JSX.Element {
                     Object.values(presencePeers).map((p) => (
                       <button
                         key={p.accountId}
-                        onClick={() => void recordMessageTo({ accountId: p.accountId, handle: p.handle })}
+                        onClick={() => void recordMessageTo({ accountId: p.accountId, handle: p.handle, firstName: p.firstName, lastName: p.lastName })}
                         data-testid={`meet-message-to-${p.accountId}`}
                         className="w-full flex items-center gap-2 px-1.5 py-1.5 rounded-md hover:bg-[var(--surface-sunken)] text-left"
                       >
                         <Icon name="account_circle" size={16} className="text-[var(--ink-50)]" />
-                        <span className="flex-1 text-[12px] text-[var(--ink-90)] truncate">{p.handle}</span>
+                        <span className="flex-1 text-[12px] text-[var(--ink-90)] truncate">{personDisplayName(p, p.handle)}</span>
                         {(p.status === 'away' || p.status === 'busy' || p.status === 'focus') && (
                           <span className="text-[10px] text-amber-600 dark:text-amber-400">{p.status}</span>
                         )}

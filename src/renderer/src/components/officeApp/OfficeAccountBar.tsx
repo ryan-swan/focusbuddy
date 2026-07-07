@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useAccountStore } from '@runtime'
 import Icon from '../Icon'
+import { personDisplayName } from '../../lib/personName'
 
 // Minimal, self-contained account bar for the PlexiOffice shell. PlexiOffice signs
 // in to the SAME account as PlexiDesk (the shared signal server), which is what
@@ -45,7 +46,7 @@ export default function OfficeAccountBar(): JSX.Element {
     return (
       <div className="px-3 py-2 border-t border-[var(--edge-soft)] flex items-center gap-2 text-[12px]">
         <Icon name="account_circle" size={16} className="text-accent shrink-0" />
-        <span className="truncate text-[var(--ink-70)]">{account.handle || account.email}</span>
+        <span className="truncate text-[var(--ink-70)]">{personDisplayName(account, account.email)}</span>
         <button
           onClick={() => void signOut()}
           className="ml-auto text-[var(--ink-40)] hover:text-[var(--ink-70)]"

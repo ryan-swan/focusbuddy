@@ -4,6 +4,7 @@ import type { MapBody, SheetBody, SlidesBody } from '@shared/types'
 import { useDocumentsStore } from '../../stores/documents'
 import { useViewStore } from '../../stores/view'
 import { useAccountStore } from '../../stores/account'
+import { personDisplayName } from '../../lib/personName'
 import { DocEditor, SheetEditor, SlidesEditor, MapEditor, DesignEditor } from '@office'
 import { promptText } from '../plexi/PromptDialog'
 import Icon from '../Icon'
@@ -45,7 +46,7 @@ export default function DocumentEditorView({ documentId, onBack }: Props): JSX.E
   // The signed-in user's name greets them in the AI Assistant panel. Omitted when
   // signed out, so the panel falls back to a neutral greeting (no fabricated name).
   const account = useAccountStore((s) => s.account)
-  const userName = account?.handle ?? null
+  const userName = account ? personDisplayName(account, account.email) : null
 
   useEffect(() => {
     void open(documentId)

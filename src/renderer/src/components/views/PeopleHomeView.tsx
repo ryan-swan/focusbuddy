@@ -6,6 +6,7 @@ import { useViewStore } from '../../stores/view'
 import { usePresenceStore, type PresenceStatus } from '../../stores/presence'
 import { listOrgs, type OrgMembership } from '../../lib/orgsClient'
 import { usePeopleMap, type MapPerson } from '../../lib/peopleMap/usePeopleMap'
+import { personDisplayName, personInitials, personFirstName } from '../../lib/personName'
 
 // PlexiPeople home: the front door of the team area. It reads the SAME real
 // sources the People Map reads — the org directory (members, offices, profiles)
@@ -40,12 +41,12 @@ function initials(handle: string): string {
   return (handle.replace(/^@/, '').slice(0, 2) || '?').toUpperCase()
 }
 
-function Avatar({ seed, size = 34, photoUrl }: { seed: string; size?: number; photoUrl?: string | null }): JSX.Element {
+function Avatar({ seed, name, size = 34, photoUrl }: { seed: string; name?: string; size?: number; photoUrl?: string | null }): JSX.Element {
   if (photoUrl) {
     return (
       <img
         src={photoUrl}
-        alt={seed}
+        alt={name ?? seed}
         width={size}
         height={size}
         loading="lazy"
@@ -59,7 +60,7 @@ function Avatar({ seed, size = 34, photoUrl }: { seed: string; size?: number; ph
       className="inline-flex items-center justify-center rounded-full font-semibold text-white shrink-0"
       style={{ width: size, height: size, fontSize: size * 0.4, background: colorFor(seed) }}
     >
-      {initials(seed)}
+      {name ? personInitials({ name }) : initials(seed)}
     </span>
   )
 }
@@ -81,14 +82,14 @@ function MemberRow({ person }: { person: MapPerson }): JSX.Element {
       className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-[var(--surface-sunken)] transition-colors"
     >
       <span className="relative shrink-0">
-        <Avatar seed={person.handle} photoUrl={person.photoUrl} />
+        <Avatar seed={person.handle} name={personDisplayName(person, person.handle)} photoUrl={person.photoUrl} />
         <span
           className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-[var(--surface-raised)] ${meta.dot}`}
         />
       </span>
       <span className="min-w-0 flex-1">
         <div className="text-[13px] font-medium text-[var(--ink-100)] truncate">
-          {person.handle}
+          {personDisplayName(person, person.handle)}
           {person.isSelf && <span className="text-[var(--ink-50)] font-normal"> (you)</span>}
         </div>
         <div className="text-[11.5px] text-[var(--ink-50)] truncate">{sub}</div>
@@ -145,17 +146,20 @@ export default function PeopleHomeView(): JSX.Element {
       ? people.filter(
           (p) =>
             p.handle.toLowerCase().includes(q) ||
+            personDisplayName(p, p.handle).toLowerCase().includes(q) ||
             (p.title ?? '').toLowerCase().includes(q) ||
             (p.department ?? '').toLowerCase().includes(q)
         )
       : people
     return [...filtered].sort(
-      (a, b) => statusRank(a.liveStatus) - statusRank(b.liveStatus) || a.handle.localeCompare(b.handle)
+      (a, b) =>
+        statusRank(a.liveStatus) - statusRank(b.liveStatus) ||
+        personDisplayName(a, a.handle).localeCompare(personDisplayName(b, b.handle))
     )
   }, [data, query])
 
   const hh = new Date().getHours()
-  const who = account?.handle || account?.email?.split('@')[0] || ''
+  const who = account ? personFirstName(account, '') : ''
   const greeting = `Good ${hh < 12 ? 'morning' : hh < 18 ? 'afternoon' : 'evening'}${who ? `, ${who}` : ''}`
 
   // Honest, layered empty states. Each one names exactly what is missing and
@@ -277,13 +281,13 @@ export default function PeopleHomeView(): JSX.Element {
                       .map((p) => (
                         <div key={p.accountId} className="flex items-center gap-2.5 py-1">
                           <span className="relative shrink-0">
-                            <Avatar seed={p.handle} size={26} photoUrl={p.photoUrl} />
+                            <Avatar seed={p.handle} name={personDisplayName(p, p.handle)} size={26} photoUrl={p.photoUrl} />
                             <span
                               className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-[var(--surface-raised)] ${STATUS_META[p.liveStatus].dot}`}
                             />
                           </span>
                           <span className="min-w-0 flex-1 text-[12px] text-[var(--ink-90)] truncate">
-                            {p.liveWorkingOn || p.handle}
+                            {p.liveWorkingOn || personDisplayName(p, p.handle)}
                           </span>
                         </div>
                       ))}

@@ -19,6 +19,8 @@ export interface OrgMember {
   role: OrgRole
   addedAt: number
   handle: string
+  firstName?: string | null
+  lastName?: string | null
 }
 export interface OrgInvite {
   id: string
@@ -217,6 +219,8 @@ export interface WorkWindow {
 export interface PeopleMapPerson {
   accountId: string
   handle: string
+  firstName?: string | null
+  lastName?: string | null
   role: OrgRole
   title: string | null
   department: string | null

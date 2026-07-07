@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useViewStore } from '../../stores/view'
 import { useAccountStore } from '../../stores/account'
+import { personFirstName } from '../../lib/personName'
 import { useDocumentsStore } from '../../stores/documents'
 import { useNodeStore } from '../../stores/nodes'
 import { useAiCommandBar } from '../../stores/aiCommandBar'
@@ -173,7 +174,7 @@ export default function HomeDashboard(): JSX.Element {
       .catch(() => setActivity([]))
   }, [refreshDocs, refreshNodes])
 
-  const name = greetingName(account?.handle, account?.email ?? null)
+  const name = personFirstName(account, greetingName(account?.handle, account?.email ?? null))
 
   // Continue where you left off — the real documents you last touched.
   const recentDocs = useMemo<DocumentMeta[]>(

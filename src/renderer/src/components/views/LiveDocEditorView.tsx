@@ -22,6 +22,7 @@ import { DocEditor, SheetEditor, SlidesEditor, MapEditor, DesignEditor } from '@
 import Icon from '../Icon'
 import CollaboratorBar from './CollaboratorBar'
 import { collaborators } from '../../lib/presence'
+import { personDisplayName } from '../../lib/personName'
 import * as Y from 'yjs'
 import { getSchema } from '@tiptap/core'
 import { buildDocExtensions } from '../documents/editor/extensions'
@@ -284,7 +285,7 @@ export default function LiveDocEditorView({ liveDocId, onBack }: Props): JSX.Ele
             ? 'brush'
             : 'account_tree'
   const isOwner = meta.ownerAccountId === myId
-  const holderHandle = lock?.holder?.handle ?? null
+  const holderHandle = lock?.holder ? personDisplayName(lock.holder, lock.holder.handle) : null
   const lockedByOther = !!lock?.holder && lock.holder.accountId !== myId
   // Every editor type co-edits in real time (doc via Tiptap, the rest via the
   // JSON reconcile engine); nothing uses the check-out lock any more.
@@ -295,7 +296,7 @@ export default function LiveDocEditorView({ liveDocId, onBack }: Props): JSX.Ele
   const people = collaborators(meta.members ?? [], lock, myId ?? null)
   // The label + colour shown on my caret to the other editors.
   const me = people.find((p) => p.you)
-  const meUser = { name: me?.handle ?? 'You', color: me?.color ?? '#888888' }
+  const meUser = { name: me?.name ?? 'You', color: me?.color ?? '#888888' }
   // Who a comment can @mention: the real collaborators on this document (their
   // handles), restricted to handle-shaped tokens. No invented members.
   const mentionHandles = Array.from(
@@ -642,7 +643,7 @@ export default function LiveDocEditorView({ liveDocId, onBack }: Props): JSX.Ele
               ydoc={collabRef.current.ydoc}
               awareness={collabRef.current.sync.awareness}
               user={meUser}
-              userName={me?.handle ?? null}
+              userName={me?.name ?? null}
               onEditorReady={setEditor}
               comments={panelThreads}
               canComment={canComment}

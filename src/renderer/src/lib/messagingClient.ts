@@ -103,7 +103,7 @@ export interface ConversationSummary {
   title: string
   lastMessageAt: number
   unreadCount: number
-  members: Array<{ accountId: string; handle: string | null }>
+  members: Array<{ accountId: string; handle: string | null; firstName?: string | null; lastName?: string | null }>
   lastMessage: ChatMessage | null
 }
 

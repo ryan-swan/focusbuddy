@@ -39,6 +39,7 @@ import { GOOGLE_FONTS, loadGoogleFont, fontFamilyValue, familyLabel } from '../.
 import DesignAiPanel from './DesignAiPanel'
 import DesignMenuBar from './editor/DesignMenuBar'
 import { useAccountStore } from '../../stores/account'
+import { personDisplayName } from '../../lib/personName'
 import WidgetPickerDialog from './embed/WidgetPickerDialog'
 import { checkDesignA11y } from '../../lib/designA11y'
 
@@ -109,7 +110,7 @@ export default function DesignEditor({ content, title, onChange, foldExternal = 
   // The signed-in user's name for the assistant greeting. Falls back to a neutral
   // greeting when signed out (no fabricated name).
   const account = useAccountStore((s) => s.account)
-  const userName = account?.handle ?? account?.email ?? null
+  const userName = account ? personDisplayName(account, account.email) : null
   const wrapRef = useRef<HTMLDivElement | null>(null)
   // Undo / redo history. designRef always holds the current body so a commit can
   // record the prior state without a stale closure.

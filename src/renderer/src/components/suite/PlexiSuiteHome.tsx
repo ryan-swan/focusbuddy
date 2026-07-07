@@ -1,6 +1,7 @@
 import Icon from '../Icon'
 import { useViewStore } from '../../stores/view'
 import { useAccountStore } from '../../stores/account'
+import { personFirstName } from '../../lib/personName'
 import {
   PLEXI_GROUPS,
   PLEXI_DESK,
@@ -172,7 +173,7 @@ export default function PlexiSuiteHome(): JSX.Element {
   const v = useViewStore()
   const createNode = useNodeStore((s) => s.create)
   const setActive = useNodeStore((s) => s.setActive)
-  const name = (account?.handle || account?.email || '').split('@')[0]
+  const name = account ? personFirstName(account, '') : ''
 
   async function newDesk(): Promise<void> {
     const desk = await createNode({ parentId: null, kind: 'task', title: 'New desk' })

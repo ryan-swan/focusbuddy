@@ -40,6 +40,7 @@ import ShareDialog from './ShareDialog'
 import CanvasContextMenu, { type CtxMenuItem } from './CanvasContextMenu'
 import { useSharesStore } from '../stores/shares'
 import { useAccountStore } from '../stores/account'
+import { personDisplayName } from '../lib/personName'
 import { acceptShareIntoWorkspace, type ShareSnap } from '../lib/acceptShare'
 import { promoteToLiveCanvas } from '../lib/liveCanvasMirror'
 import SharedBadge from './SharedBadge'
@@ -340,10 +341,10 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
     () => new Set(outgoingShares.filter((s) => !s.revoked).map((s) => s.entityId)),
     [outgoingShares]
   )
-  const ownerHandle =
-    (account?.handle && account.handle.trim()) ||
-    (account?.email ? account.email.split('@')[0] : '') ||
-    'You'
+  const ownerHandle = personDisplayName(
+    account,
+    (account?.email ? account.email.split('@')[0] : '') || 'You'
+  )
   const [acceptingId, setAcceptingId] = useState<string | null>(null)
 
   // Reconstruct a shared copy-item into the recipient's own workspace and open
