@@ -36,6 +36,21 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.3.0',
+    date: '2026-07-07T12:00:00Z',
+    title: 'PlexiDesk 3.3.0 — real names, meetings you can schedule, and a brain that builds',
+    tag: 'feature',
+    summary:
+      'This release makes the product feel like it knows the people in it and does more of the work for you. You now appear by your real name everywhere, in chat, mentions, presence, meetings and across your team, instead of a username, and you set it at sign-up or in Settings. PlexiMeet gained a proper start-or-schedule dialog so you can put a meeting on the calendar and invite anyone by email, inside or outside your organisation, not just teammates who happen to be online. A meeting invite you receive can now be saved straight to Google, Outlook or Apple Calendar. The workspace brain no longer only answers, it offers to create what its answer implies, a document, spreadsheet, deck, diagram, task, table, saved note or calendar block, and builds it once you approve. And if you ever forget your password, there is finally a clear way to reset it from the sign-in screen.',
+    highlights: [
+      'You appear by your real first and last name across chat, mentions, presence and meetings, set at sign-up or in Settings.',
+      'PlexiMeet can start or schedule a meeting and invite anyone by email, not only people online in your org.',
+      'Save a received meeting invite to Google, Outlook or Apple Calendar.',
+      'The workspace brain offers to create documents, sheets, decks, diagrams, tasks, tables, notes or calendar blocks from its answers, applied on your approval.',
+      'Forgot your password? Reset it right from the sign-in screen.'
+    ]
+  },
+  {
     version: '3.2.2',
     date: '2026-07-07T09:00:00Z',
     title: 'PlexiDesk 3.2.2 — the assistant, everywhere and sharper',
