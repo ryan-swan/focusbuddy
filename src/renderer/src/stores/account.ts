@@ -4,6 +4,7 @@ import {
   login as serverLogin,
   logout as serverLogout,
   signup as serverSignup,
+  updateProfile as serverUpdateProfile,
   type AuthResult,
   type ServerAccount
 } from '../lib/accountClient'
@@ -44,9 +45,13 @@ interface AccountStore {
     email: string
     password: string
     handle?: string | null
+    firstName?: string | null
+    lastName?: string | null
   }) => Promise<AuthResult>
   // Log in via the server, persist + populate on success.
   login: (input: { email: string; password: string; code?: string }) => Promise<AuthResult>
+  // Update the signed-in user's real name. Returns true on success.
+  updateName: (input: { firstName: string | null; lastName: string | null }) => Promise<boolean>
   // Sign out — wipe local + main session, tell the server to invalidate.
   signOut: () => Promise<void>
   // Tell main to remember the user dismissed the launch modal.
@@ -118,6 +123,15 @@ export const useAccountStore = create<AccountStore>((set, get) => ({
       })
     }
     return result
+  },
+
+  updateName: async (input) => {
+    const token = get().sessionToken
+    if (!token) return false
+    const updated = await serverUpdateProfile(token, input)
+    if (!updated) return false
+    set({ account: updated })
+    return true
   },
 
   login: async (input) => {

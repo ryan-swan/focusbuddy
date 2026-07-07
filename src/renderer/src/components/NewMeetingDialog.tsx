@@ -7,6 +7,7 @@ import { useTimeBlockStore } from '../stores/timeBlocks'
 import { useAccountStore } from '../stores/account'
 import { newMeetingRoomId } from '../lib/startMeeting'
 import { sendMeetingInvites } from '../lib/meetingInvite'
+import { personDisplayName } from '../lib/personName'
 
 // Start or schedule a meeting and invite anyone by email, not only teammates who
 // happen to be online. Two modes share one invitee list:
@@ -39,7 +40,7 @@ export default function NewMeetingDialog({ onClose }: { onClose: () => void }): 
   const startRoom = useMeetingRoomStore((s) => s.start)
   const createBlock = useTimeBlockStore((s) => s.create)
   const account = useAccountStore((s) => s.account)
-  const hostName = account?.handle || account?.email || undefined
+  const hostName = account ? personDisplayName(account) : undefined
 
   const [mode, setMode] = useState<Mode>('now')
   const [title, setTitle] = useState('')

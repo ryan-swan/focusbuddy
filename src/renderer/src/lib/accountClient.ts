@@ -9,6 +9,8 @@ export interface ServerAccount {
   id: string
   email: string
   handle: string | null
+  firstName: string | null
+  lastName: string | null
   createdAt: number
   lastLoginAt: number | null
 }
@@ -89,6 +91,8 @@ export async function signup(input: {
   email: string
   password: string
   handle?: string | null
+  firstName?: string | null
+  lastName?: string | null
 }): Promise<AuthResult> {
   try {
     const { res, json } = await postJson<{
@@ -182,6 +186,25 @@ export async function getMe(token: string): Promise<ServerAccount | null> {
   try {
     const { res, json } = await getJson<{ ok: boolean; account?: ServerAccount }>(
       '/accounts/me',
+      token
+    )
+    if (!res.ok || !json?.ok || !json.account) return null
+    return json.account
+  } catch {
+    return null
+  }
+}
+
+// Update the signed-in user's real name. Returns the refreshed account, or null
+// on any failure so the caller can keep the old value and surface an error.
+export async function updateProfile(
+  token: string,
+  input: { firstName: string | null; lastName: string | null }
+): Promise<ServerAccount | null> {
+  try {
+    const { res, json } = await postJson<{ ok: boolean; account?: ServerAccount }>(
+      '/accounts/profile',
+      input,
       token
     )
     if (!res.ok || !json?.ok || !json.account) return null

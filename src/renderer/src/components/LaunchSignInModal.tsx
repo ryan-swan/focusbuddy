@@ -48,7 +48,8 @@ export default function LaunchSignInModal(): JSX.Element | null {
   // their password). Sync once cachedEmail is loaded.
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [handle, setHandle] = useState('')
+  const [firstName, setFirstName] = useState('')
+  const [lastName, setLastName] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   // Set once the server says this account has 2FA on; reveals the code field.
@@ -97,7 +98,8 @@ export default function LaunchSignInModal(): JSX.Element | null {
           : await signupAction({
               email: email.trim().toLowerCase(),
               password,
-              handle: handle.trim() || null
+              firstName: firstName.trim() || null,
+              lastName: lastName.trim() || null
             })
       if (result.ok) {
         // Modal will unmount because `account` is now populated. No
@@ -241,25 +243,39 @@ export default function LaunchSignInModal(): JSX.Element | null {
             />
           </div>
           {mode === 'signup' && (
-            <div>
-              <label className="block text-[10px] uppercase tracking-wider text-stone-400 font-semibold mb-1">
-                Display handle{' '}
-                <span className="text-stone-500 normal-case font-normal">
-                  (optional)
-                </span>
-              </label>
-              <input
-                type="text"
-                value={handle}
-                onChange={(e) => setHandle(e.target.value)}
-                placeholder="what your shares will say"
-                maxLength={32}
-                className="w-full px-3 py-2 rounded-md text-stone-100 placeholder:text-stone-500 focus:outline-none"
-                style={{
-                  background: 'rgba(0,0,0,0.32)',
-                  border: '1px solid rgba(255,255,255,0.08)'
-                }}
-              />
+            <div className="flex gap-2">
+              <div className="flex-1">
+                <label className="block text-[10px] uppercase tracking-wider text-stone-400 font-semibold mb-1">
+                  First name
+                </label>
+                <input
+                  type="text"
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  placeholder="Jane"
+                  maxLength={40}
+                  autoComplete="given-name"
+                  data-testid="signup-first-name"
+                  className="w-full px-3 py-2 rounded-md text-stone-100 placeholder:text-stone-500 focus:outline-none"
+                  style={{ background: 'rgba(0,0,0,0.32)', border: '1px solid rgba(255,255,255,0.08)' }}
+                />
+              </div>
+              <div className="flex-1">
+                <label className="block text-[10px] uppercase tracking-wider text-stone-400 font-semibold mb-1">
+                  Last name
+                </label>
+                <input
+                  type="text"
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  placeholder="Smith"
+                  maxLength={40}
+                  autoComplete="family-name"
+                  data-testid="signup-last-name"
+                  className="w-full px-3 py-2 rounded-md text-stone-100 placeholder:text-stone-500 focus:outline-none"
+                  style={{ background: 'rgba(0,0,0,0.32)', border: '1px solid rgba(255,255,255,0.08)' }}
+                />
+              </div>
             </div>
           )}
           <div>
