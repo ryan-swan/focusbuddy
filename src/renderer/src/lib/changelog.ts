@@ -36,6 +36,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.3.2',
+    date: '2026-07-07T15:00:00Z',
+    title: 'PlexiDesk 3.3.2 — entitlements apply the moment they change',
+    tag: 'fix',
+    summary:
+      'A fast follow to 3.3.1. The app switcher now reacts immediately when your app entitlements resolve or an admin changes them, so an area you are not entitled to is hidden right away rather than only after you happened to navigate elsewhere.',
+    highlights: [
+      'App areas hide and show live as entitlements change, no navigation needed.'
+    ]
+  },
+  {
     version: '3.3.1',
     date: '2026-07-07T14:00:00Z',
     title: 'PlexiDesk 3.3.1 — per-user control over apps and features',

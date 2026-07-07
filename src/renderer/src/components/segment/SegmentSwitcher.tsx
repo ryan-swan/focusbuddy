@@ -23,7 +23,10 @@ export default function SegmentSwitcher(): JSX.Element {
   const goOffice = useViewStore((s) => s.goOffice)
   const goPlexiPeople = useViewStore((s) => s.goPlexiPeople)
   const goPlexiBrain = useViewStore((s) => s.goPlexiBrain)
-  const capGet = useCapabilityStore((s) => s.get)
+  // Subscribe to the capabilities MAP (not s.get, which is a stable function
+  // reference that never triggers a re-render) so the switcher reacts when
+  // entitlements resolve or change while the app is running.
+  const capabilities = useCapabilityStore((s) => s.capabilities)
 
   function go(kind: string): void {
     // Desk is the default area (the workspace, home, tasks, calendar, files and
@@ -37,7 +40,7 @@ export default function SegmentSwitcher(): JSX.Element {
   // Only show areas the user is entitled to. An admin can switch a whole app off
   // per user; a missing entitlement removes it from the switcher entirely. Desk
   // is always kept as the floor so a user is never left with nowhere to go.
-  const areas = AREAS.filter((a) => a.kind === 'plexidesk' || capGet(a.cap) === true)
+  const areas = AREAS.filter((a) => a.kind === 'plexidesk' || capabilities[a.cap] === true)
 
   return (
     <div
