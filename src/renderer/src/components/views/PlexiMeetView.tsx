@@ -11,6 +11,7 @@ import { useQuickCreate } from '../../stores/quickCreate'
 import { startDm, uploadAttachment, sendMessage } from '../../lib/messagingClient'
 import { useNodeStore } from '../../stores/nodes'
 import { personDisplayName } from '../../lib/personName'
+import { transcribeRecording } from '../../lib/transcribeRecording'
 import type { Meeting } from '@shared/meetings'
 import type { ActionProposal } from '@shared/types'
 
@@ -91,7 +92,7 @@ export default function PlexiMeetView(): JSX.Element {
     setError(null)
     try {
       // Unguarded before: a rejected transcribe left the spinner stuck forever.
-      const t = await window.api.voiceNote.transcribe({ buffer, mimeType })
+      const t = await transcribeRecording(buffer, mimeType)
       if (!t.ok) {
         setError(
           t.reason === 'no_key'

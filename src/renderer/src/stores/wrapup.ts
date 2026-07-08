@@ -3,6 +3,7 @@ import type { ActionProposal } from '@shared/types'
 import { useMeetingsStore } from './meetings'
 import { getMeetingOrigin, clearMeetingOrigin } from '../lib/startMeeting'
 import { ensureMeetingFolder, saveTranscriptDoc } from '../lib/meetingWrapup'
+import { transcribeRecording } from '../lib/transcribeRecording'
 
 // End-of-conversation wrap-up. When a meeting or call ends with a recording, this
 // drives the one honest pipeline: transcribe the mixed audio, ask the AI for a
@@ -67,7 +68,7 @@ async function runWrapup(
   { title, buffer, mimeType, durationSec }: { title: string; buffer: ArrayBuffer; mimeType: string; durationSec: number },
   set: (partial: Partial<WrapupState>) => void
 ): Promise<void> {
-  const t = await window.api.voiceNote.transcribe({ buffer, mimeType })
+  const t = await transcribeRecording(buffer, mimeType)
   if (!t.ok) {
     set({
       status: 'error',

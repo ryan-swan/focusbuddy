@@ -36,6 +36,18 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.3.8',
+    date: '2026-07-08T12:00:00Z',
+    title: 'PlexiDesk 3.3.8 — meeting transcription fix',
+    tag: 'fix',
+    summary:
+      'Fixes meeting wrap-up failing to transcribe when the on-device (local) transcription provider is selected. The meeting and record-notes flows now prepare the audio correctly for whichever provider you use, so summaries and action items are produced at the end of a call on both cloud and on-device Whisper. Includes the sign-in connectivity fix from 3.3.7.',
+    highlights: [
+      'Meeting wrap-up transcribes correctly on the on-device (local) provider, not just cloud.',
+      'Record-notes uses the same provider-aware path, so both flows behave consistently.'
+    ]
+  },
+  {
     version: '3.3.7',
     date: '2026-07-08T11:00:00Z',
     title: 'PlexiDesk 3.3.7 — sign-in connectivity fix',
