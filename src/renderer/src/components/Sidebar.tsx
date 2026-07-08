@@ -757,7 +757,7 @@ export default function Sidebar({ onCollapse, onExpand, compact }: Props = {}): 
           icon="folder_shared"
           label="Shared"
           onClick={compact
-            ? () => { onExpand?.(); setSharedOpen(true) }
+            ? () => { onExpand?.() }
             : () => setSharedOpen((v) => !v)
           }
           onChevron={compact ? undefined : () => setSharedOpen((v) => !v)}
@@ -765,7 +765,7 @@ export default function Sidebar({ onCollapse, onExpand, compact }: Props = {}): 
         />
         </div>
         <AnimatePresence initial={false}>
-          {sharedOpen && (
+          {sharedOpen && !compact && (
             <motion.div
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: 'auto', opacity: 1 }}

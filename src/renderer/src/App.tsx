@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import {
   ImperativePanelHandle,
   Panel,
@@ -643,11 +644,18 @@ export default function App(): JSX.Element {
       <HyperfocusGuardian />
       <PreTaskBridge />
       <CursorSpotlight />
-      <CommandCenter
-        onOpenBodyDouble={() => setBodyDoubleOpen(true)}
-        onOpenSmartStack={() => canSmartStack && setSmartStackOpen(true)}
-        canSmartStack={canSmartStack}
-      />
+      {/* Bottom bar — search pill + mic grouped together, centred */}
+      {createPortal(
+        <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[120] flex items-center gap-2">
+          <CommandCenter
+            onOpenBodyDouble={() => setBodyDoubleOpen(true)}
+            onOpenSmartStack={() => canSmartStack && setSmartStackOpen(true)}
+            canSmartStack={canSmartStack}
+          />
+          <VoiceCommandFAB />
+        </div>,
+        document.body
+      )}
       <FirstRunOnboarding />
       <UndoToast />
       <PromptDialogHost />
@@ -657,7 +665,6 @@ export default function App(): JSX.Element {
       <UpgradePromptModal />
       <MetricsOverlay />
       <AICommandBar open={aiBarOpen} onClose={() => setAiBarOpen(false)} />
-      <VoiceCommandFAB />
       {smartStackOpen && <SmartStackModal onClose={() => setSmartStackOpen(false)} />}
       {bodyDoubleOpen && (
         <PeerBodyDoubleDialog onClose={() => setBodyDoubleOpen(false)} />

@@ -547,16 +547,14 @@ export default function VoiceCommandFAB(): JSX.Element {
 
   return (
     <>
-      {/* The mic button — fixed bottom-middle, clearly above the CommandCenter
-          pill (bottom-3) with enough gap that neither the button nor its
-          listening overlay sits on top of the pill. */}
+      {/* The mic button — inline, positioned alongside CommandCenter by App.tsx */}
       <div
-        className="fixed bottom-28 left-1/2 -translate-x-1/2 z-[125] flex flex-col items-center pointer-events-none"
+        className="relative flex flex-col items-center pointer-events-none"
         data-testid="voice-command-root"
       >
-        {/* Live captions / transcript / result overlay above the button */}
+        {/* Live captions / transcript / result overlay — floats above the button */}
         {showOverlay && (
-          <div className="mb-2 pointer-events-auto max-w-[600px] w-[min(600px,90vw)]">
+          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 pointer-events-auto w-[min(600px,90vw)]">
             {phase === 'listening' && (
               <div className="fb-glass-chrome rounded-lg border border-accent/40 px-3 py-2 text-[12px] text-stone-100 shadow-xl min-h-[44px] flex items-center">
                 <div className="text-accent text-[10px] uppercase tracking-[0.18em] mr-2 shrink-0">
@@ -681,7 +679,7 @@ export default function VoiceCommandFAB(): JSX.Element {
           </div>
         )}
 
-        {/* The button itself */}
+        {/* The button itself — pointer-events-auto so it receives clicks inside the none container */}
         <button
           onPointerDown={fabPressDown}
           onPointerUp={fabPressUp}
@@ -689,7 +687,7 @@ export default function VoiceCommandFAB(): JSX.Element {
           onClick={fabClick}
           onMouseEnter={() => setHovering(true)}
           onMouseLeave={() => setHovering(false)}
-          className={`pointer-events-auto h-12 w-12 rounded-full flex items-center justify-center shadow-2xl transition-all duration-150 ${
+          className={`pointer-events-auto h-10 w-10 rounded-full flex items-center justify-center shadow-xl transition-all duration-150 ${
             isActive
               ? 'bg-accent text-white scale-110 fb-halo'
               : 'fb-glass-chrome text-accent border border-[color:var(--glass-chrome-border)] hover:brightness-110'
