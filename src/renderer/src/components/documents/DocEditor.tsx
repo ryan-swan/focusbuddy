@@ -273,6 +273,19 @@ export default function DocEditor({
     [editor]
   )
 
+  // Let the "/" slash menu's Insert items open these React pickers. The slash
+  // extension only has the editor, so it reads these callbacks from its storage.
+  useEffect(() => {
+    if (!editor) return
+    const store = (editor.storage as unknown as Record<string, unknown>).slashCommand as
+      | { onInsertWidget?: (() => void) | null; onInsertDoc?: (() => void) | null }
+      | undefined
+    if (store) {
+      store.onInsertWidget = () => setWidgetPickerOpen(true)
+      store.onInsertDoc = () => setDocPickerOpen(true)
+    }
+  }, [editor])
+
   // Remember the page-vs-continuous viewing preference (a personal one).
   useEffect(() => {
     try {

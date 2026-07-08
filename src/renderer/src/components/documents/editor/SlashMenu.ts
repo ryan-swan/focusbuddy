@@ -19,11 +19,43 @@ const ITEMS: SlashItem[] = [
   { title: 'Table', subtitle: 'Insert a 3x3 table', icon: 'grid_on', command: ({ editor, range }) => editor.chain().focus().deleteRange(range).insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run() },
   { title: 'Quote', subtitle: 'A block quotation', icon: 'format_quote', command: ({ editor, range }) => editor.chain().focus().deleteRange(range).toggleBlockquote().run() },
   { title: 'Code block', subtitle: 'Syntax-highlighted code', icon: 'code', command: ({ editor, range }) => editor.chain().focus().deleteRange(range).toggleCodeBlock().run() },
-  { title: 'Divider', subtitle: 'A horizontal rule', icon: 'horizontal_rule', command: ({ editor, range }) => editor.chain().focus().deleteRange(range).setHorizontalRule().run() }
+  { title: 'Divider', subtitle: 'A horizontal rule', icon: 'horizontal_rule', command: ({ editor, range }) => editor.chain().focus().deleteRange(range).setHorizontalRule().run() },
+  // Insert group. These open a picker (React state in DocEditor), so they clear
+  // the "/" range then call a callback the editor registers in
+  // storage.slashCommand (see DocEditor). Guarded so a doc rendered without those
+  // callbacks (e.g. a headless/preview mount) simply no-ops instead of throwing.
+  {
+    title: 'Insert widget from a desk',
+    subtitle: 'Embed a live desk widget',
+    icon: 'widgets',
+    command: ({ editor, range }) => {
+      editor.chain().focus().deleteRange(range).run()
+      ;(editor.storage.slashCommand as SlashInsertHooks | undefined)?.onInsertWidget?.()
+    }
+  },
+  {
+    title: 'Insert office file',
+    subtitle: 'Embed a document, sheet or slides',
+    icon: 'description',
+    command: ({ editor, range }) => {
+      editor.chain().focus().deleteRange(range).run()
+      ;(editor.storage.slashCommand as SlashInsertHooks | undefined)?.onInsertDoc?.()
+    }
+  }
 ]
+
+// Callbacks the host DocEditor registers so the "/" menu can open its React
+// pickers. Null when unset (headless/preview mounts).
+export interface SlashInsertHooks {
+  onInsertWidget?: (() => void) | null
+  onInsertDoc?: (() => void) | null
+}
 
 export const SlashCommand = Extension.create({
   name: 'slashCommand',
+  addStorage() {
+    return { onInsertWidget: null, onInsertDoc: null } as SlashInsertHooks
+  },
   addOptions() {
     return {
       suggestion: {
