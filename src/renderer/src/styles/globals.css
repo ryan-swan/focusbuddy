@@ -2087,3 +2087,48 @@ body {
   }
 }
 
+/* ── Material Desk theme ────────────────────────────────────────────────── */
+/* The SVG WoodDeskTexture component handles the canvas background;
+   everything here is surface dressing for the chrome sitting on top of it. */
+
+.material-desk .desk-paper {
+  background: transparent !important;
+}
+
+.material-desk .desk-paper::before,
+.material-desk .desk-paper::after {
+  display: none !important;
+}
+
+.material-desk [data-widget-id] {
+  background: rgba(20, 12, 5, 0.82) !important;
+  border-color: rgba(130, 78, 25, 0.38) !important;
+  box-shadow: 0 2px 14px rgba(0, 0, 0, 0.60), 0 1px 0 rgba(180, 110, 40, 0.10) inset !important;
+}
+
+.material-desk [data-widget-id]:hover {
+  border-color: rgba(180, 110, 40, 0.55) !important;
+  box-shadow: 0 4px 22px rgba(0, 0, 0, 0.70), 0 1px 0 rgba(180, 110, 40, 0.16) inset !important;
+}
+
+.material-desk .fb-glass-chrome {
+  background: rgba(22, 14, 6, 0.80) !important;
+  backdrop-filter: saturate(135%) blur(20px);
+  -webkit-backdrop-filter: saturate(135%) blur(20px);
+  border-color: rgba(120, 72, 25, 0.32) !important;
+}
+
+.material-desk aside {
+  background: rgba(14, 9, 3, 0.95) !important;
+  border-color: rgba(80, 48, 14, 0.42) !important;
+}
+
+.material-desk header.titlebar-drag {
+  background: rgba(10, 6, 2, 0.97) !important;
+  border-color: rgba(60, 36, 10, 0.50) !important;
+}
+
+.material-desk.focus-session-active .desk-paper,
+.material-desk .focus-session-active .desk-paper {
+  filter: brightness(0.50) !important;
+}

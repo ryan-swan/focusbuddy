@@ -98,6 +98,7 @@ import MindmapStartingKit from './MindmapStartingKit'
 import SyncWidgetPicker from './SyncWidgetPicker'
 import HistoryPanel from './HistoryPanel'
 import CanvasBreadcrumb from './CanvasBreadcrumb'
+import WoodDeskTexture from './WoodDeskTexture'
 import type { StandardApp } from '../lib/standardApps'
 import {
   PinLayoutContext,
@@ -227,6 +228,17 @@ export default function Canvas(): JSX.Element {
   const expandFolder = useNodeStore((s) => s.expand)
   // Breadcrumb origin: if this task's canvas was opened by exploring a mind-map
   // node, show a path back to the map. Re-read on task switch + origin changes.
+  const [isMaterialDesk, setIsMaterialDesk] = useState(
+    () => document.documentElement.classList.contains('material-desk')
+  )
+  useEffect(() => {
+    const obs = new MutationObserver(() => {
+      setIsMaterialDesk(document.documentElement.classList.contains('material-desk'))
+    })
+    obs.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
+    return () => obs.disconnect()
+  }, [])
+
   const [nodeOrigin, setNodeOrigin] = useState<NodeCanvasOrigin | null>(() =>
     getOrigin(activeTaskId)
   )
@@ -2078,6 +2090,7 @@ export default function Canvas(): JSX.Element {
             cursor: grabbing ? 'grabbing' : spaceReady ? 'grab' : undefined
           }}
         >
+          {isMaterialDesk && <WoodDeskTexture />}
           {/* Breadcrumb pill — floats over the canvas, top-left */}
           <div className="absolute top-3 left-3 z-[50] pointer-events-auto">
             <CanvasBreadcrumb
