@@ -23,15 +23,6 @@ interface Props {
   canSmartStack: boolean
 }
 
-interface PillAction {
-  id: string
-  icon: string
-  label: string
-  title: string
-  disabled?: boolean
-  onClick: () => void
-}
-
 interface CommandResult {
   id: string
   label: string
@@ -98,7 +89,6 @@ export default function CommandCenter({
   const goSign = useViewStore((s) => s.goSign)
   const goMail = useViewStore((s) => s.goMail)
   const requestCreate = useQuickCreate((s) => s.request)
-  const view = useViewStore((s) => s.view)
   const activeTaskId = useNodeStore((s) => s.activeTaskId)
   const setZoom = useWidgetStore((s) => s.setZoom)
   const setPan = useWidgetStore((s) => s.setPan)
@@ -142,48 +132,6 @@ export default function CommandCenter({
     [activeTaskId, caps, createWidget]
   )
 
-  const contextActions = useMemo<PillAction[]>(() => {
-    if (view.kind === 'task' && activeTaskId) {
-      const spawn = (kind: WidgetKind): (() => void) => () => spawnWidget(kind)
-      return [
-        { id: 'w-note', icon: 'sticky_note_2', label: 'Note', title: 'Add a sticky note', onClick: spawn('sticky') },
-        { id: 'w-page', icon: 'description', label: 'Page', title: 'Add a Page widget', onClick: spawn('page') },
-        { id: 'w-table', icon: 'table_chart', label: 'Table', title: 'Add a table', onClick: spawn('table') },
-        { id: 'w-web', icon: 'public', label: 'Web', title: 'Add a browser widget', onClick: spawn('webview') },
-        { id: 'w-timer', icon: 'hourglass_empty', label: 'Timer', title: 'Add a timer widget', onClick: spawn('timer') },
-        { id: 'w-calc', icon: 'calculate', label: 'Calc', title: 'Add a calculator', onClick: spawn('calculator') }
-      ]
-    }
-    // Default (home / dashboard / all-tasks / etc.)
-    return [
-      {
-        id: 'a-new',
-        icon: 'add',
-        label: 'New',
-        title: 'New folder / task',
-        onClick: () => window.dispatchEvent(new CustomEvent('fb:command-new-task'))
-      },
-      {
-        id: 'a-pair',
-        icon: 'diversity_3',
-        label: 'Pair',
-        title: bodyDoubleEnabled
-          ? 'Find a body double'
-          : 'Body double matching is a Pro feature — upgrade or ask admin to enable.',
-        disabled: !bodyDoubleEnabled,
-        onClick: onOpenBodyDouble
-      },
-      {
-        id: 'a-stack',
-        icon: 'hub',
-        label: 'Stack',
-        title: canSmartStack ? 'Smart Stack widgets' : 'Need an active task with 3+ widgets',
-        disabled: !canSmartStack,
-        onClick: onOpenSmartStack
-      }
-    ]
-  }, [view, activeTaskId, spawnWidget, canSmartStack, onOpenBodyDouble, onOpenSmartStack, bodyDoubleEnabled])
-
   function openPalette(): void {
     setPaletteOpen(true)
     setQuery('')
@@ -211,6 +159,15 @@ export default function CommandCenter({
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [paletteOpen])
+
+  // Open the palette from elsewhere (the top-bar Search button) now that the
+  // bottom pill is gone. Keeps one canonical palette with a discoverable entry.
+  useEffect(() => {
+    const open = (): void => openPalette()
+    window.addEventListener('fb:open-command-palette', open)
+    return () => window.removeEventListener('fb:open-command-palette', open)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   useEffect(() => {
     if (paletteOpen) {
@@ -297,6 +254,37 @@ export default function CommandCenter({
         window.dispatchEvent(new CustomEvent('fb:onboarding-hub'))
       }
     })
+    // Body double + Smart Stack moved here from the (now removed) bottom pill,
+    // so they still have a home. Body double needs the capability; Smart Stack
+    // needs an active desk with enough widgets.
+    if (bodyDoubleEnabled) {
+      items.push({
+        id: 'body-double',
+        label: 'Find a body double',
+        hint: 'Quiet co-working presence',
+        icon: 'group',
+        kind: 'action',
+        score: matchScore('body double focus co-working presence', q),
+        run: () => {
+          closePalette()
+          onOpenBodyDouble()
+        }
+      })
+    }
+    if (canSmartStack) {
+      items.push({
+        id: 'smart-stack',
+        label: 'Smart Stack widgets',
+        hint: 'Auto-arrange this desk',
+        icon: 'auto_awesome_motion',
+        kind: 'action',
+        score: matchScore('smart stack arrange organise widgets desk', q),
+        run: () => {
+          closePalette()
+          onOpenSmartStack()
+        }
+      })
+    }
     items.push({
       id: 'go-all-tasks',
       label: 'All tasks',
@@ -662,36 +650,9 @@ export default function CommandCenter({
 
   return (
     <>
-      {/* Pinned pill — bottom-centre. Always visible. Lives in a portal so
-          its z-index isn't trapped by panels' stacking context. */}
-      {createPortal(
-        <div
-          className="fixed bottom-3 left-1/2 -translate-x-1/2 z-[120] fb-glass-chrome rounded-full border border-[color:var(--glass-chrome-border)] shadow-lg flex items-center gap-0.5 px-1.5 py-1"
-          role="toolbar"
-          aria-label="Quick actions"
-        >
-          <button
-            onClick={openPalette}
-            className="h-7 px-2.5 inline-flex items-center gap-1.5 rounded-full hover:bg-[var(--surface-sunken)]/80 text-[12px] text-[var(--ink-70)]"
-            title="Open command palette (⌘K)"
-          >
-            <Icon name="search" size={13} className="text-[var(--ink-50)]" />
-            <span>Search · ⌘K</span>
-          </button>
-          <span className="w-px h-4 bg-[var(--edge-firm)]/60" />
-          {contextActions.map((a) => (
-            <PillButton
-              key={a.id}
-              icon={a.icon}
-              label={a.label}
-              onClick={a.onClick}
-              disabled={a.disabled}
-              title={a.title}
-            />
-          ))}
-        </div>,
-        document.body
-      )}
+      {/* The bottom pill was removed: adding objects now lives on the desk (the
+          Add-widget button + the canvas + FAB) and everything else is in this
+          palette, opened by ⌘K or the top-bar Search button. */}
 
       {/* Palette overlay — when open */}
       {paletteOpen &&
@@ -812,35 +773,6 @@ export default function CommandCenter({
   )
 }
 
-function PillButton({
-  icon,
-  label,
-  onClick,
-  disabled,
-  title
-}: {
-  icon: string
-  label: string
-  onClick: () => void
-  disabled?: boolean
-  title?: string
-}): JSX.Element {
-  return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      title={title}
-      className={`h-7 px-2.5 inline-flex items-center gap-1 rounded-full text-[12px] ${
-        disabled
-          ? 'text-[var(--ink-40)] cursor-not-allowed'
-          : 'text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]/80'
-      }`}
-    >
-      <Icon name={icon} size={13} />
-      <span>{label}</span>
-    </button>
-  )
-}
 
 // ── Deep-search hit helpers ─────────────────────────────────────────────────
 

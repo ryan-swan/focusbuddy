@@ -32,12 +32,12 @@ test.afterEach(async () => {
   }
 })
 
-// Helper: open the command palette via the Search pill (clickable equivalent of Cmd+K).
+// Helper: open the command palette via the top-bar Search button (clickable
+// equivalent of Cmd+K; the old bottom pill was removed).
 async function openPalette(window: LaunchedApp['window']): Promise<void> {
-  // The pill button has title "Open command palette (⌘K)" and text "Search · ⌘K".
-  const pill = window.locator('button[title="Open command palette (⌘K)"]')
-  await expect(pill).toBeVisible({ timeout: 5_000 })
-  await pill.click()
+  const search = window.locator('[data-testid="topbar-search"]')
+  await expect(search).toBeVisible({ timeout: 5_000 })
+  await search.click()
   // Palette dialog mounts.
   await window.waitForSelector('[role="dialog"][aria-label="Command palette"]', { timeout: 4_000 })
 }

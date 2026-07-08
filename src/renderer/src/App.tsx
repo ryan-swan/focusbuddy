@@ -575,6 +575,16 @@ export default function App(): JSX.Element {
             </button>
           </Tooltip>
           <TeamPresenceButton />
+          <Tooltip content="Search and commands (⌘K)" placement="bottom">
+            <button
+              onClick={() => window.dispatchEvent(new CustomEvent('fb:open-command-palette'))}
+              className="icon-btn"
+              aria-label="Search and commands"
+              data-testid="topbar-search"
+            >
+              <Icon name="search" size={16} />
+            </button>
+          </Tooltip>
           <Tooltip content="Appearance settings — theme, accent colour and font" placement="bottom">
             <button
               ref={settingsBtnRef}
