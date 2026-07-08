@@ -41,7 +41,7 @@ export default function WidgetPalette({
   const [open, setOpen] = useState(false)
   const buttonRef = useRef<HTMLButtonElement | null>(null)
   const popoverRef = useRef<HTMLDivElement | null>(null)
-  const [popoverPos, setPopoverPos] = useState<{ top: number; left: number } | null>(null)
+  const [popoverPos, setPopoverPos] = useState<{ top: number; left?: number; right?: number; maxHeight: number } | null>(null)
 
   useEffect(() => {
     if (!open) return
@@ -62,42 +62,48 @@ export default function WidgetPalette({
     }
   }, [open])
 
-  // Anchor the popover relative to the button. Portal it into document.body so
-  // it escapes the toolbar's overflow/transform stacking context.
+  // Anchor the popover to the button. Portal into document.body to escape
+  // the toolbar's stacking context.
   //
-  // Strategy: if the button is in the right half of the screen (e.g. the
-  // FloatingToolbar), open the popover to the LEFT, vertically centered on the
-  // button — this keeps it fully on-screen and in the center-right area.
-  // Otherwise (button is left-side), open it below as before.
+  // Strategy:
+  //   Right-side button (FloatingToolbar) → open to the LEFT, pin via CSS
+  //   `right` from the viewport edge so width never causes overflow.
+  //   Left-side button → open below as before.
+  //
+  // maxHeight is computed so the popover never overflows the viewport bottom
+  // and overflow-y-auto provides the scroll.
   useLayoutEffect(() => {
     if (!open || !buttonRef.current) {
       setPopoverPos(null)
       return
     }
-    const POPOVER_W = 340
-    const POPOVER_MAX_H = Math.min(window.innerHeight * 0.6, 480)
     const r = buttonRef.current.getBoundingClientRect()
     const buttonCenterX = r.left + r.width / 2
     const buttonCenterY = r.top + r.height / 2
-
-    let left: number
-    let top: number
+    const MARGIN = 8
 
     if (buttonCenterX > window.innerWidth / 2) {
-      // Button is on the right side — open popover to the LEFT
-      left = Math.max(8, r.left - POPOVER_W - 8)
-      // Vertically center the popover on the button, clamped to viewport
-      top = Math.max(8, Math.min(
-        buttonCenterY - POPOVER_MAX_H / 2,
-        window.innerHeight - POPOVER_MAX_H - 8
+      // Button is on the right side — pin popover to the right edge and open LEFT.
+      // Use CSS `right` (distance from viewport right edge) so we don't have to
+      // compute left offset at all — the browser handles it correctly.
+      const right = window.innerWidth - r.right + r.width + MARGIN
+      // Available height: from top margin to bottom margin
+      const availH = window.innerHeight - MARGIN * 2
+      const maxHeight = Math.min(availH, 520)
+      // Center vertically on the button, clamp so it stays on-screen
+      const top = Math.max(MARGIN, Math.min(
+        buttonCenterY - maxHeight / 2,
+        window.innerHeight - maxHeight - MARGIN
       ))
+      setPopoverPos({ top, right, maxHeight })
     } else {
-      // Button is on the left side — open below, clamped to viewport
-      left = Math.min(Math.max(8, r.left), window.innerWidth - POPOVER_W - 8)
-      top = Math.min(r.bottom + 6, window.innerHeight - 80)
+      // Button is on the left — open below, clamped
+      const POPOVER_W = 340
+      const left = Math.min(Math.max(MARGIN, r.left), window.innerWidth - POPOVER_W - MARGIN)
+      const maxHeight = Math.min(window.innerHeight * 0.7, 520)
+      const top = Math.min(r.bottom + 6, window.innerHeight - maxHeight - MARGIN)
+      setPopoverPos({ top, left, maxHeight })
     }
-
-    setPopoverPos({ top, left })
   }, [open])
 
   const grouped = entriesByCategory()
@@ -138,8 +144,12 @@ export default function WidgetPalette({
         <div
           ref={popoverRef}
           className="fixed z-[200] w-[340px] overflow-y-auto rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-xl"
-          style={{ maxHeight: Math.min(window.innerHeight * 0.6, 480) }}
-          style={{ top: popoverPos.top, left: popoverPos.left }}
+          style={{
+            top: popoverPos.top,
+            left: popoverPos.left,
+            right: popoverPos.right,
+            maxHeight: popoverPos.maxHeight
+          }}
           role="dialog"
           aria-label="Desk objects"
           data-widget-picker="true"
