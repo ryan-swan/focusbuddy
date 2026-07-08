@@ -36,6 +36,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.3.7',
+    date: '2026-07-08T11:00:00Z',
+    title: 'PlexiDesk 3.3.7 — sign-in connectivity fix',
+    tag: 'fix',
+    summary:
+      'Fixes a bug where some builds could not reach the server at sign-in, showing "Could not reach the PlexiDesk server" even though the server was up and the network was fine. The server address is now cleaned before use so a build glitch can never turn it into an unreachable value. If you saw that error, updating to this version resolves it.',
+    highlights: [
+      'Sign-in reliably reaches the server again; the "could not reach" error on a healthy connection is fixed.'
+    ]
+  },
+  {
     version: '3.3.6',
     date: '2026-07-08T10:00:00Z',
     title: 'PlexiDesk 3.3.6 — directory sync for organisations',

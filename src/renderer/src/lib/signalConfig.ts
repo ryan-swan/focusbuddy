@@ -38,6 +38,17 @@ const LOCAL_WS = 'ws://localhost:8787/ws'
 const PROD_HTTP = 'https://focusbuddy-signal.fly.dev'
 const PROD_WS = 'wss://focusbuddy-signal.fly.dev/ws'
 
+// Sanitize a URL from a build-time env var: trim, and take only the first
+// whitespace-delimited token. This guards against an env-quoting glitch at build
+// time that could concatenate several VITE_ values into one (e.g. the http URL
+// ending up as "https://host VITE_SIGNAL_WS_URL=wss://..."). A URL with spaces
+// makes every fetch throw and looks exactly like the server being unreachable,
+// so we defend against it here rather than trust the build to be perfect.
+function firstUrl(v: string | undefined, fallback: string): string {
+  const first = (v ?? '').trim().split(/\s+/)[0]
+  return first || fallback
+}
+
 function readEnv(): SignalConfig {
   const explicit = import.meta.env.VITE_USE_REMOTE_SIGNAL
   let useRemote: boolean
@@ -53,10 +64,8 @@ function readEnv(): SignalConfig {
   // VITE_SIGNAL_HTTP_URL overrides either default.
   const defaultHttp = import.meta.env.DEV ? LOCAL_HTTP : PROD_HTTP
   const defaultWs = import.meta.env.DEV ? LOCAL_WS : PROD_WS
-  const httpUrl =
-    (import.meta.env.VITE_SIGNAL_HTTP_URL as string | undefined) ?? defaultHttp
-  const wsUrl =
-    (import.meta.env.VITE_SIGNAL_WS_URL as string | undefined) ?? defaultWs
+  const httpUrl = firstUrl(import.meta.env.VITE_SIGNAL_HTTP_URL as string | undefined, defaultHttp)
+  const wsUrl = firstUrl(import.meta.env.VITE_SIGNAL_WS_URL as string | undefined, defaultWs)
   return { useRemote, httpUrl, wsUrl }
 }
 
