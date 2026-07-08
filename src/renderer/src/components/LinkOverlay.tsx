@@ -146,6 +146,41 @@ function bezierMidpoint(x1: number, y1: number, x2: number, y2: number): { x: nu
   }
 }
 
+// Catenary-style path for context wires — a quadratic bezier with the
+// control point pulled downward so the wire sags like a physical string.
+// Sag scales with length (12%) capped at 60px so long wires stay graceful.
+function catenaryPath(x1: number, y1: number, x2: number, y2: number): string {
+  const len = Math.hypot(x2 - x1, y2 - y1)
+  if (len < 0.5) return `M ${x1} ${y1} L ${x2} ${y2}`
+  // Sag 22% of length, capped at 90px — noticeably physical like a hanging cord
+  const sag = Math.min(len * 0.22, 90)
+  const cpX = (x1 + x2) / 2
+  const cpY = (y1 + y2) / 2 + sag
+  return `M ${x1} ${y1} Q ${cpX} ${cpY} ${x2} ${y2}`
+}
+
+// Highlight path: same curve but control point pulled slightly UP — gives
+// the cord a rounded-top cross-section appearance when layered over the base.
+function catenaryHighlightPath(x1: number, y1: number, x2: number, y2: number): string {
+  const len = Math.hypot(x2 - x1, y2 - y1)
+  if (len < 0.5) return `M ${x1} ${y1} L ${x2} ${y2}`
+  const sag = Math.min(len * 0.22, 90)
+  const cpX = (x1 + x2) / 2
+  // Highlight arc is slightly shallower — sits above the main cord
+  const cpY = (y1 + y2) / 2 + sag * 0.82
+  return `M ${x1} ${y1} Q ${cpX} ${cpY} ${x2} ${y2}`
+}
+
+function catenaryMidpoint(x1: number, y1: number, x2: number, y2: number): { x: number; y: number } {
+  const sag = Math.min(Math.hypot(x2 - x1, y2 - y1) * 0.22, 90)
+  const cpX = (x1 + x2) / 2
+  const cpY = (y1 + y2) / 2 + sag
+  return {
+    x: 0.25 * x1 + 0.5 * cpX + 0.25 * x2,
+    y: 0.25 * y1 + 0.5 * cpY + 0.25 * y2
+  }
+}
+
 interface Segment {
   link: WidgetLink
   x1: number
@@ -177,6 +212,7 @@ export default function LinkOverlay({ ghost }: Props): JSX.Element | null {
   useWidgetStore((s) => s.layoutVersion)
 
   const [selectedLinkId, setSelectedLinkId] = useState<string | null>(null)
+  const [hoveredLinkId, setHoveredLinkId] = useState<string | null>(null)
   const [popoverPos, setPopoverPos] = useState<{ x: number; y: number } | null>(null)
   // Render-tick — bumped by the rAF loop while mouse is held, so the SVG
   // re-renders every frame during a drag. Without this, the line would
@@ -289,19 +325,28 @@ export default function LinkOverlay({ ghost }: Props): JSX.Element | null {
     if (!src || !tgt) continue
     const from = rectEdgePoint(src, tgt.cx, tgt.cy)
     const to = rectEdgePoint(tgt, src.cx, src.cy)
-    const mid = bezierMidpoint(from.x, from.y, to.x, to.y)
+    const mid = link.type === 'context'
+      ? catenaryMidpoint(from.x, from.y, to.x, to.y)
+      : bezierMidpoint(from.x, from.y, to.x, to.y)
     segments.push({ link, x1: from.x, y1: from.y, x2: to.x, y2: to.y, mx: mid.x, my: mid.y })
   }
 
-  // Ghost line: source widget edge → cursor.
+  // Ghost line: source widget edge → cursor. Always catenary — it previews
+  // the string feel before the wire type is chosen.
   let ghostPath: string | null = null
   if (ghost) {
     const src = readWidgetBounds(ghost.fromWidgetId)
     if (src) {
       const tip = rectEdgePoint(src, ghost.cursorScreenX, ghost.cursorScreenY)
-      ghostPath = bezierPath(tip.x, tip.y, ghost.cursorScreenX, ghost.cursorScreenY)
+      ghostPath = catenaryPath(tip.x, tip.y, ghost.cursorScreenX, ghost.cursorScreenY)
     }
   }
+
+  const isDark = document.documentElement.classList.contains('dark')
+  // Warm linen string color — slightly richer in light mode where it reads
+  // against a lighter canvas, softer/creamier in dark mode.
+  // stringColor kept for future use (ghost wire, badge tint)
+  // const stringColor = isDark ? '#D4BC96' : '#BEA882'
 
   const selectedLink = selectedLinkId ? links.find((l) => l.id === selectedLinkId) ?? null : null
 
@@ -364,11 +409,19 @@ export default function LinkOverlay({ ghost }: Props): JSX.Element | null {
           <filter id="fb-wire-glow" x="-60%" y="-60%" width="220%" height="220%">
             <feGaussianBlur stdDeviation="3" />
           </filter>
+          {/* Depth shadow for context strings — pronounced enough to read
+              as a physical object hanging above the canvas surface. */}
+          <filter id="fb-string-shadow" x="-10%" y="-30%" width="120%" height="200%">
+            <feDropShadow dx="0" dy="2.5" stdDeviation="2" floodColor="#6B4A20" floodOpacity="0.28" />
+          </filter>
         </defs>
         {segments.map((seg) => {
           const isSelected = seg.link.id === selectedLinkId
-          const d = bezierPath(seg.x1, seg.y1, seg.x2, seg.y2)
+          const isHovered = seg.link.id === hoveredLinkId
           const type = seg.link.type
+          const d = type === 'context'
+            ? catenaryPath(seg.x1, seg.y1, seg.x2, seg.y2)
+            : bezierPath(seg.x1, seg.y1, seg.x2, seg.y2)
           const meta = WIRE_META[type]
           const isReactive = type === 'transform' || type === 'mirror'
           // "Firing" = the wire is actively passing information: a transform
@@ -389,6 +442,8 @@ export default function LinkOverlay({ ghost }: Props): JSX.Element | null {
                 stroke="transparent"
                 strokeWidth={18}
                 style={{ pointerEvents: 'stroke', cursor: 'pointer' }}
+                onMouseEnter={() => setHoveredLinkId(seg.link.id)}
+                onMouseLeave={() => setHoveredLinkId(null)}
                 onClick={(e) => {
                   e.stopPropagation()
                   handleClickLine(seg.link, { x: seg.mx, y: seg.my })
@@ -455,22 +510,51 @@ export default function LinkOverlay({ ghost }: Props): JSX.Element | null {
                   </path>
                 </>
               )}
-              <path
-                d={d}
-                fill="none"
-                stroke="rgb(var(--accent))"
-                strokeOpacity={
-                  disabled ? 0.3 : isFiring ? 0.95 : isSelected ? 0.95 : isReactive ? 0.75 : 0.5
-                }
-                strokeWidth={isFiring ? 2.5 : isSelected ? 2.5 : isReactive ? 2 : 1.5}
-                strokeLinecap="round"
-                strokeDasharray={disabled ? '2 5' : isFiring ? undefined : meta.dash}
-                markerEnd={isReactive ? 'url(#fb-wire-arrow)' : undefined}
-                style={{
-                  pointerEvents: 'none',
-                  transition: 'stroke-opacity 120ms ease'
-                }}
-              />
+              {type === 'context' ? (
+                // Two-layer linen cord — base strand + highlight strand give
+                // the string a round cross-section, like a real hanging cord.
+                // Shadow filter lifts it off the canvas surface in light mode.
+                <g style={{ pointerEvents: 'none' }}>
+                  {/* Base cord — warm linen, full weight */}
+                  <path
+                    d={d}
+                    fill="none"
+                    stroke={isDark ? '#8B6840' : '#A07848'}
+                    strokeOpacity={isSelected ? 0.90 : isHovered ? 0.75 : 0.50}
+                    strokeWidth={isSelected ? 3.5 : isHovered ? 3.5 : 2.5}
+                    strokeLinecap="round"
+                    filter={isDark ? undefined : 'url(#fb-string-shadow)'}
+                    style={{ transition: 'stroke-opacity 150ms ease, stroke-width 150ms ease' }}
+                  />
+                  {/* Highlight strand — lighter, narrower, slightly shallower arc */}
+                  <path
+                    d={catenaryHighlightPath(seg.x1, seg.y1, seg.x2, seg.y2)}
+                    fill="none"
+                    stroke={isDark ? '#D4BC96' : '#D4B882'}
+                    strokeOpacity={isSelected ? 0.55 : isHovered ? 0.45 : 0.30}
+                    strokeWidth={isSelected ? 1.2 : 0.9}
+                    strokeLinecap="round"
+                    style={{ transition: 'stroke-opacity 150ms ease' }}
+                  />
+                </g>
+              ) : (
+                <path
+                  d={d}
+                  fill="none"
+                  stroke="rgb(var(--accent))"
+                  strokeOpacity={
+                    disabled ? 0.3 : isFiring ? 0.95 : isSelected ? 0.95 : isReactive ? 0.75 : 0.5
+                  }
+                  strokeWidth={isFiring ? 2.5 : isSelected ? 2.5 : isReactive ? 2 : 1.5}
+                  strokeLinecap="round"
+                  strokeDasharray={disabled ? '2 5' : isFiring ? undefined : meta.dash}
+                  markerEnd={isReactive ? 'url(#fb-wire-arrow)' : undefined}
+                  style={{
+                    pointerEvents: 'none',
+                    transition: 'stroke-opacity 120ms ease'
+                  }}
+                />
+              )}
               {/* Source endpoint — a pulsing spark ring while firing. */}
               {isFiring && (
                 <circle cx={seg.x1} cy={seg.y1} r={2} fill="none" stroke="rgb(var(--accent))" strokeWidth={1.5}>
@@ -478,28 +562,38 @@ export default function LinkOverlay({ ghost }: Props): JSX.Element | null {
                   <animate attributeName="stroke-opacity" values="0.9;0" dur="0.7s" repeatCount="indefinite" />
                 </circle>
               )}
-              <circle
-                cx={seg.x1}
-                cy={seg.y1}
-                r={isFiring ? 4 : isSelected ? 4 : 3}
-                fill="rgb(var(--accent))"
-                fillOpacity={disabled ? 0.4 : isFiring ? 1 : isSelected ? 1 : 0.8}
-                style={{ pointerEvents: 'none' }}
-              />
+              {type !== 'context' && (
+                <circle
+                  cx={seg.x1}
+                  cy={seg.y1}
+                  r={isFiring ? 4 : isSelected ? 4 : 3}
+                  fill="rgb(var(--accent))"
+                  fillOpacity={disabled ? 0.4 : isFiring ? 1 : isSelected ? 1 : 0.8}
+                  style={{ pointerEvents: 'none' }}
+                />
+              )}
             </g>
           )
         })}
         {ghostPath && (
-          <path
-            d={ghostPath}
-            fill="none"
-            stroke="rgb(var(--accent))"
-            strokeOpacity={0.7}
-            strokeWidth={2}
-            strokeDasharray="7 5"
-            strokeLinecap="round"
-            style={{ pointerEvents: 'none' }}
-          />
+          <g style={{ pointerEvents: 'none' }}>
+            <path
+              d={ghostPath}
+              fill="none"
+              stroke={isDark ? '#8B6840' : '#A07848'}
+              strokeOpacity={0.65}
+              strokeWidth={2.5}
+              strokeLinecap="round"
+            />
+            <path
+              d={ghostPath}
+              fill="none"
+              stroke={isDark ? '#D4BC96' : '#D4B882'}
+              strokeOpacity={0.35}
+              strokeWidth={0.9}
+              strokeLinecap="round"
+            />
+          </g>
         )}
       </svg>
       {/* Wire-type badges at each midpoint — click to open the wire editor. */}

@@ -551,7 +551,7 @@ export default function VoiceCommandFAB(): JSX.Element {
           pill (bottom-3) with enough gap that neither the button nor its
           listening overlay sits on top of the pill. */}
       <div
-        className="fixed bottom-20 left-1/2 -translate-x-1/2 z-[125] flex flex-col items-center pointer-events-none"
+        className="fixed bottom-28 left-1/2 -translate-x-1/2 z-[125] flex flex-col items-center pointer-events-none"
         data-testid="voice-command-root"
       >
         {/* Live captions / transcript / result overlay above the button */}

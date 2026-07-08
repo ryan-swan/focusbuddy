@@ -27,8 +27,6 @@ import VideoWidget from './widgets/VideoWidget'
 import TimerWidget from './widgets/TimerWidget'
 import SectionWidget from './widgets/SectionWidget'
 import StreamDeckWidget from './widgets/StreamDeckWidget'
-import WidgetPalette from './WidgetPalette'
-import WidgetDock from './WidgetDock'
 import WidgetFocusMode from './WidgetFocusMode'
 import ExtensionPrompt from './ExtensionPrompt'
 import ResumeModal from './ResumeModal'
@@ -36,7 +34,6 @@ import AISetupDialog from './AISetupDialog'
 import SaveTemplateDialog from './SaveTemplateDialog'
 import AiBuilderDialog from './AiBuilderDialog'
 import type { AiBuildSuggestion } from '@shared/types'
-import LoadMeter from './LoadMeter'
 import CanvasContextMenu, { type CtxMenuItem } from './CanvasContextMenu'
 import AiAssistPreview from './contextMenu/AiAssistPreview'
 import WidgetSetupPreview from './contextMenu/WidgetSetupPreview'
@@ -46,6 +43,8 @@ import BrowserContextMenu from './contextMenu/BrowserContextMenu'
 import '../lib/contextMenu'
 import FloatingToolbar, { type ToolbarAction } from './FloatingToolbar'
 import MinimapWidget from './widgets/MinimapWidget'
+import CanvasMinimapOverlay from './CanvasMinimapOverlay'
+import CanvasWidgetDock from './CanvasWidgetDock'
 import DeskGallery from './DeskGallery'
 import VoiceRecorderWidget from './widgets/VoiceRecorderWidget'
 import MindMapWidget from './widgets/MindMapWidget'
@@ -60,12 +59,12 @@ import ZoomControls from './ZoomControls'
 import CanvasEdgeIndicators from './CanvasEdgeIndicators'
 import { useEdgePan } from '../lib/useEdgePan'
 import { useNavPrefs, frictionFromGlide } from '../lib/navPrefs'
-import { launchMeeting } from '../lib/startMeeting'
+import FloatingPill from './FloatingPill'
+import StageManagerStrip from './StageManagerStrip'
 import CanvasAIAssistantRail from './CanvasAIAssistantRail'
 import Icon from './Icon'
 import { useChatStore } from '../stores/chat'
-import { useFocusSessionStore } from '../stores/focusSession'
-import { chimeIn, futuristicPowerOn, sonarPing } from '../lib/audioBeep'
+import { chimeIn, sonarPing } from '../lib/audioBeep'
 import type { WidgetSuggestion } from '@shared/types'
 import {
   CATEGORIES,
@@ -219,15 +218,6 @@ function renderWidget(w: Widget): JSX.Element | null {
   }
 }
 
-const STATUS_META: Record<
-  'open' | 'in_progress' | 'done' | 'parked',
-  { label: string; icon: string; next: 'open' | 'in_progress' | 'done' | 'parked' }
-> = {
-  open: { label: 'Start', icon: 'play_arrow', next: 'in_progress' },
-  in_progress: { label: 'Done', icon: 'check', next: 'done' },
-  done: { label: 'Reopen', icon: 'refresh', next: 'open' },
-  parked: { label: 'Resume', icon: 'play_arrow', next: 'open' }
-}
 
 export default function Canvas(): JSX.Element {
   const activeTaskId = useNodeStore((s) => s.activeTaskId)
@@ -351,6 +341,19 @@ export default function Canvas(): JSX.Element {
 
   const activeTask = activeTaskId ? nodes.find((n) => n.id === activeTaskId) ?? null : null
 
+  // ── Stage Manager hover-expand pill ─────────────────────────────────────
+  // Thin accent pill on the left edge; expands on hover to show the full strip.
+  const [smHovered, setSmHovered] = useState(false)
+  const smLeaveTimer = useRef<number | undefined>(undefined)
+  function smEnter(): void {
+    if (smLeaveTimer.current) clearTimeout(smLeaveTimer.current)
+    setSmHovered(true)
+  }
+  function smLeave(): void {
+    smLeaveTimer.current = window.setTimeout(() => setSmHovered(false), 350)
+  }
+  useEffect(() => () => { if (smLeaveTimer.current) clearTimeout(smLeaveTimer.current) }, [])
+
   // Spatial-link state — load per task, mirror the widgets pattern. The
   // overlay reads this store; Canvas owns the link-arm gesture.
   //
@@ -377,101 +380,12 @@ export default function Canvas(): JSX.Element {
     else clearLinks()
   }, [activeTaskId, loadLinksForTask, clearLinks])
 
-  // Minimap auto-create. Every task gets a minimap widget pinned to its
-  // BR zone the first time it's opened — gives users an always-available
-  // canvas overview without forcing them to dig through the widget picker.
-  //
-  // Once spawned, the minimap is a regular widget: the user can resize,
-  // pin to a different zone, drag back to the canvas, or delete it.
-  // Deletion writes a localStorage flag (fb-minimap-dismissed:{taskId})
-  // so we don't re-create the widget the next time the task opens. The
-  // user can always re-add it from the widget picker — kind 'minimap'
-  // appears in the Layout category.
-  //
-  // We poll the store via `loadingFor === null` to know when loadForTask
-  // has completed (the store doesn't expose a Promise we can await from
-  // here). The createdMinimapForRef set guards against double-creates if
-  // React strict-mode runs the effect twice in dev.
+  // Minimap auto-create is disabled — the minimap now lives as a chrome
+  // overlay (CanvasMinimapOverlay) rather than a per-task widget. The
+  // 'minimap' widget kind remains in the picker for users who want an
+  // embedded minimap on the canvas alongside the overlay.
   const widgetsLoadingFor = useWidgetStore((s) => s.loadingFor)
-  const widgetIds = useWidgetStore((s) =>
-    s.widgets.map((w) => `${w.id}:${w.kind}`).join('|')
-  )
-  const createdMinimapForRef = useRef<Set<string>>(new Set())
-  useEffect(() => {
-    if (!activeTaskId) return
-    if (widgetsLoadingFor !== null) return // wait until loadForTask has populated widgets
-
-    const mine = useWidgetStore
-      .getState()
-      .widgets.filter((w) => w.kind === 'minimap' && w.taskId === activeTaskId)
-      // Oldest first, so dedup deterministically keeps the same minimap across
-      // reloads rather than a different one each time.
-      .sort((a, b) => a.createdAt - b.createdAt)
-
-    // ALWAYS dedup to exactly one minimap, however the extras arose (a load
-    // race, an old session's bug, a stray re-add). This runs on every pass and
-    // is NOT gated by createdMinimapForRef — the previous version returned early
-    // when the task was already in the ref, so a duplicate created afterwards
-    // (on add / load / reload) was never healed. Keep the oldest, delete the rest.
-    if (mine.length > 1) {
-      for (const extra of mine.slice(1)) {
-        void useWidgetStore.getState().remove(extra.id)
-      }
-    }
-    if (mine.length >= 1) {
-      createdMinimapForRef.current.add(activeTaskId)
-      return
-    }
-
-    // No minimap exists. Create one unless the user dismissed it, or a create
-    // is already pending this session (the ref guards the async gap between
-    // calling createWidget and the store reflecting the new widget, so we don't
-    // fire a second create before the first lands).
-    if (createdMinimapForRef.current.has(activeTaskId)) return
-    const dismissed = localStorage.getItem(`fb-minimap-dismissed:${activeTaskId}`) === '1'
-    if (dismissed) {
-      createdMinimapForRef.current.add(activeTaskId)
-      return
-    }
-    createdMinimapForRef.current.add(activeTaskId)
-    void useWidgetStore.getState().createOptional({
-      taskId: activeTaskId,
-      kind: 'minimap',
-      title: '',
-      content: '',
-      x: 0,
-      y: 0,
-      width: 220,
-      height: 160,
-      pinned: true,
-      pinnedZone: 'br'
-    })
-    // widgetIds is in deps to re-evaluate after widgets load; we read the
-    // getState() snapshot rather than the joined string itself.
-    void widgetIds
-  }, [activeTaskId, widgetsLoadingFor, widgetIds, createWidget])
-
-  // Track minimap deletions → write the dismissed flag so we don't auto-
-  // resurrect. Pure observer; doesn't touch the store from inside the
-  // subscribe callback (which could loop).
-  useEffect(() => {
-    if (!activeTaskId) return
-    let prevHadMinimap = useWidgetStore
-      .getState()
-      .widgets.some((w) => w.kind === 'minimap' && w.taskId === activeTaskId)
-    const unsubscribe = useWidgetStore.subscribe((state) => {
-      const hasMinimap = state.widgets.some(
-        (w) => w.kind === 'minimap' && w.taskId === activeTaskId
-      )
-      if (prevHadMinimap && !hasMinimap) {
-        localStorage.setItem(`fb-minimap-dismissed:${activeTaskId}`, '1')
-      } else if (!prevHadMinimap && hasMinimap) {
-        localStorage.removeItem(`fb-minimap-dismissed:${activeTaskId}`)
-      }
-      prevHadMinimap = hasMinimap
-    })
-    return unsubscribe
-  }, [activeTaskId])
+  void widgetsLoadingFor
 
   // Imperative controller exposed via context to WidgetFrame / SectionWidget.
   // The .start() call is what arms the link gesture — it's invoked from a
@@ -848,6 +762,10 @@ export default function Canvas(): JSX.Element {
       const target = e.target as HTMLElement
       if (target.closest(`[data-widget-id="${activeId}"]`)) return
     }
+    // Stage Manager strip handles its own scroll — don't pan/zoom the canvas
+    if ((e.target as HTMLElement).closest('[data-stage-manager="true"]')) return
+    // Widget picker popover (React portal) — let it scroll internally
+    if ((e.target as HTMLElement).closest('[data-widget-picker="true"]')) return
     // ⌘/Ctrl + wheel = zoom toward cursor; otherwise pan (works for trackpad swipe)
     if (e.ctrlKey || e.metaKey) {
       e.preventDefault()
@@ -2112,9 +2030,6 @@ export default function Canvas(): JSX.Element {
     )
   }
 
-  const status = STATUS_META[activeTask.status]
-  const zoomPct = Math.round(zoom * 100)
-
   // Task time tracking
   const totalEstimateMin =
     (activeTask.estimateMinutes ?? 0) + (activeTask.extensionsMinutes ?? 0)
@@ -2129,176 +2044,20 @@ export default function Canvas(): JSX.Element {
   const isOverdue = isTracked && remainingMin < 0
   const showExtensionPrompt = isOverdue && Date.now() > snoozeUntil
 
-  function fmtMin(min: number): string {
-    const abs = Math.abs(min)
-    const m = Math.floor(abs)
-    const s = Math.floor((abs - m) * 60)
-    const sign = min < 0 ? '-' : ''
-    return `${sign}${m}:${s.toString().padStart(2, '0')}`
-  }
 
   return (
     <>
-      <div className="h-full flex flex-col">
-        <CanvasBreadcrumb
-          activeTask={activeTask}
-          nodes={nodes}
-          onOpenTask={(id) => setActiveTask(id)}
-          onRevealFolder={(id) => expandFolder(id, true)}
-          onHome={() => setActiveTask(null)}
-          fromMindmap={!!nodeOrigin}
+      <div className="h-full relative">
+        <FloatingPill
+          onTidy={() => void handleAutoArrange()}
+          tidyDisabled={widgets.length === 0}
+          onBuild={() => useAiCommandBar.getState().setOpen(true)}
+          onSaveTemplate={() => void handleSaveTemplate()}
+          saveDisabled={widgets.length === 0 || savingTemplate}
+          savingTemplate={savingTemplate}
+          zoom={zoom}
+          onResetZoom={resetView}
         />
-        <div
-          data-testid="canvas-task-header"
-          className="px-4 py-2.5 border-b border-[color:var(--glass-chrome-border)] fb-glass-chrome flex flex-wrap items-center gap-x-2 gap-y-1.5"
-        >
-          <Icon name="task_alt" size={18} className="text-[var(--ink-70)] shrink-0" />
-          <h2 className="text-sm font-semibold text-[var(--ink-100)] truncate flex-1 min-w-[80px]">
-            {activeTask.title}
-          </h2>
-          <div className="hidden md:flex items-center gap-3 text-[11px] text-[var(--ink-60)]">
-            <span className="flex items-center gap-1" title="Priority">
-              <Icon name="priority_high" size={14} />
-              {activeTask.priority}
-            </span>
-            <span className="flex items-center gap-1" title="Interest / Novelty">
-              <Icon name="bolt" size={14} />
-              {activeTask.interest}
-            </span>
-            <span className="flex items-center gap-1" title="Importance">
-              <Icon name="flag" size={14} />
-              {activeTask.importance}
-            </span>
-          </div>
-
-          {isTracked && (
-            <div
-              className={`flex items-center gap-1 px-2 py-0.5 rounded border text-[11px] font-mono ${
-                isOverdue
-                  ? 'border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-400 animate-pulse'
-                  : remainingMin < 5
-                    ? 'border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-400'
-                    : 'border-[var(--edge-firm)] bg-[var(--surface-raised)] text-[var(--ink-70)]'
-              }`}
-              title={`${Math.floor(elapsedMin)} of ${totalEstimateMin} min elapsed`}
-            >
-              <Icon name={isOverdue ? 'alarm' : 'timer'} size={14} />
-              <span>{fmtMin(remainingMin)}</span>
-            </div>
-          )}
-
-          {/* Zoom controls */}
-          <div className="flex items-center gap-0.5 px-1 border border-[var(--edge-firm)] rounded">
-            <button
-              onClick={() => setZoom(zoom - 0.1)}
-              className="icon-btn !h-6 !w-6"
-              title="Zoom out (⌘[)"
-            >
-              <Icon name="remove" size={14} />
-            </button>
-            <button
-              onClick={resetView}
-              className="text-[11px] text-[var(--ink-70)] font-mono px-1.5 min-w-[42px] hover:text-[var(--ink-100)]"
-              title="Reset view (⌘0)"
-            >
-              {zoomPct}%
-            </button>
-            <button
-              onClick={() => setZoom(zoom + 0.1)}
-              className="icon-btn !h-6 !w-6"
-              title="Zoom in (⌘])"
-            >
-              <Icon name="add" size={14} />
-            </button>
-          </div>
-
-          <LoadMeter />
-          <button
-            onClick={() => void handleAutoArrange()}
-            disabled={widgets.length === 0}
-            className="btn-ghost"
-            title="Lay widgets out in tidy rows by category"
-          >
-            <Icon name="grid_view" size={14} />
-            <span>Tidy</span>
-          </button>
-          <button
-            onClick={() => void updateNode(activeTask.id, { status: status.next })}
-            className="btn-ghost"
-            title={`Mark as ${status.next.replace('_', ' ')}`}
-          >
-            <Icon name={status.icon} size={14} />
-            <span>{status.label}</span>
-          </button>
-          {/* The single "Ask AI" entry, same command bar as the header (and
-              Cmd+Shift+K). It prepares object suggestions, then hands them to
-              the builder preview on the canvas for one-click placement. */}
-          <button
-            onClick={() => useAiCommandBar.getState().setOpen(true)}
-            className="btn-ghost !text-accent"
-            title="Build with AI — describe what you want and it builds it on this desk (⌘⇧K)"
-          >
-            <Icon name="auto_awesome" size={14} className="text-accent" />
-            <span>Build</span>
-          </button>
-          <FivePromiseButton taskId={activeTask.id} />
-          <button
-            onClick={() => void launchMeeting({ kind: 'desk', nodeId: activeTask.id, title: activeTask.title })}
-            className="btn-ghost"
-            title="Start a meeting from this desk and share it with the people you invite"
-            data-testid="desk-start-meeting"
-          >
-            <Icon name="videocam" size={14} />
-            <span>Meeting</span>
-          </button>
-          <button
-            onClick={() => setShowResume(true)}
-            className={`btn-ghost ${activeTask.resumeMarkdown ? '!text-[var(--ink-100)]' : ''}`}
-            title={
-              activeTask.resumeMarkdown
-                ? 'View / regenerate your handoff document'
-                : 'Generate a handoff document to resume this task later'
-            }
-          >
-            <Icon
-              name="description"
-              size={14}
-              filled={!!activeTask.resumeMarkdown}
-              className={activeTask.resumeMarkdown ? 'text-amber-600' : ''}
-            />
-            <span>Resume</span>
-          </button>
-          <button
-            onClick={() => void handleSaveTemplate()}
-            disabled={widgets.length === 0 || savingTemplate}
-            className="btn-ghost"
-            title="Save this workspace layout as a reusable template"
-          >
-            <Icon name="bookmark_add" size={14} />
-            <span>{savingTemplate ? 'Saving…' : 'Save template'}</span>
-          </button>
-          {/* Compact desk-objects palette — single "+ Add" button that
-              opens a portalled popover with categorised chips. Replaces
-              the previous full-width horizontal strip that wasted ~100px
-              of vertical real estate even when collapsed. */}
-          <WidgetPalette
-            onAdd={handleClickAdd}
-            onImport={() => void handleImportFile()}
-            onBringSynced={activeTaskId ? () => setSyncPickerOpen(true) : undefined}
-            disabled={!activeTaskId}
-          />
-          {activeTaskId && (
-            <button
-              onClick={() => setHistoryOpen(true)}
-              className="btn-ghost"
-              title="Time travel — scrub this desk's history"
-              data-testid="open-history"
-            >
-              <Icon name="history" size={14} />
-              <span>History</span>
-            </button>
-          )}
-        </div>
 
         <div
           ref={dropRef}
@@ -2313,12 +2072,62 @@ export default function Canvas(): JSX.Element {
           onPointerMove={handleCanvasPointerMove}
           onPointerUp={handleCanvasPointerUp}
           onPointerCancel={handleCanvasPointerUp}
-          className="flex-1 relative overflow-hidden desk-paper"
+          className="absolute inset-0 overflow-hidden desk-paper"
           style={{
             overscrollBehavior: 'none',
             cursor: grabbing ? 'grabbing' : spaceReady ? 'grab' : undefined
           }}
         >
+          {/* Breadcrumb pill — floats over the canvas, top-left */}
+          <div className="absolute top-3 left-3 z-[50] pointer-events-auto">
+            <CanvasBreadcrumb
+              activeTask={activeTask}
+              nodes={nodes}
+              onOpenTask={(id) => setActiveTask(id)}
+              onRevealFolder={(id) => expandFolder(id, true)}
+              onHome={() => setActiveTask(null)}
+              fromMindmap={!!nodeOrigin}
+            />
+          </div>
+
+          {/* Stage Manager — hover-expand pill on the left edge. */}
+          <div
+            data-stage-manager="true"
+            onMouseEnter={smEnter}
+            onMouseLeave={smLeave}
+            className="absolute left-0 top-1/2 -translate-y-1/2 z-[45] flex flex-col pointer-events-auto"
+            style={{
+              width: smHovered ? 164 : 10,
+              transition: 'width 280ms cubic-bezier(0.34, 1.56, 0.64, 1)',
+              overflow: 'hidden',
+              maxHeight: 'calc(100% - 80px)'
+            }}
+          >
+            {/* Thin accent pill shown when collapsed */}
+            {!smHovered && (
+              <div className="absolute inset-y-0 right-0 w-[10px] flex items-center justify-center">
+                <div
+                  className="w-[4px] rounded-full bg-[rgb(var(--accent)/0.35)] hover:bg-[rgb(var(--accent)/0.6)] transition-colors"
+                  style={{ height: 48 }}
+                />
+              </div>
+            )}
+            {/* Full Stage Manager content */}
+            <div
+              className="rounded-r-2xl overflow-hidden bg-[var(--surface-raised)] backdrop-blur-xl border-r border-t border-b border-[var(--edge-soft)] shadow-[4px_0_32px_rgba(0,0,0,0.22)] ring-1 ring-black/[0.10] dark:ring-white/[0.10] flex flex-col min-h-0 h-full"
+              style={{
+                opacity: smHovered ? 1 : 0,
+                transition: 'opacity 200ms ease',
+                pointerEvents: smHovered ? 'auto' : 'none'
+              }}
+            >
+              <StageManagerStrip
+                roomId={activeTask.parentId ?? null}
+                activeId={activeTask.id}
+              />
+            </div>
+          </div>
+
           {panPing && (
             <div
               className="absolute pointer-events-none z-[200]"
@@ -2341,6 +2150,12 @@ export default function Canvas(): JSX.Element {
               }}
             />
           )}
+          {/* Minimap chrome overlay — draggable icon in BR corner, expands on click */}
+          <CanvasMinimapOverlay />
+
+          {/* Widget dock — hover-expand strip at bottom center showing all desk items */}
+          <CanvasWidgetDock />
+
           {/* Marquee selection box — screen-space projection of the canvas-space
               rubber-band rect, so the marching ants stay 1px crisp at any zoom. */}
           {rubberRect && (
@@ -2519,14 +2334,23 @@ export default function Canvas(): JSX.Element {
               docked rect without prop-drilling through every widget kind. */}
           <PinnedLayer widgets={widgets} focusedId={focusedId} renderWidget={renderWidget} />
           <FloatingToolbar
+            onAddWidget={handleClickAdd}
+            onImport={() => void handleImportFile()}
+            onBringSynced={activeTaskId ? () => setSyncPickerOpen(true) : undefined}
+            paletteDisabled={!activeTaskId}
+            onHistory={() => setHistoryOpen(true)}
+            historyDisabled={!activeTaskId}
             actions={(() => {
-              // Quick-jump buttons for every section currently on the canvas
+              // Section quick-jump buttons — abbreviated to max 12 chars
               const sections = widgets.filter((w) => w.kind === 'section' && !w.pinned)
               const sectionJumps: ToolbarAction[] = sections.map((s, idx) => {
                 const entry = WIDGET_CATALOG.find((e) => e.label === s.title)
+                const label = (s.title || 'Section').length > 12
+                  ? (s.title || 'Section').slice(0, 11) + '…'
+                  : (s.title || 'Section')
                 return {
                   icon: entry?.icon ?? 'crop_free',
-                  label: s.title || 'Section',
+                  label,
                   color: s.color ?? undefined,
                   onClick: () => focusOn(s.id),
                   separatorAfter: idx === sections.length - 1
@@ -2534,31 +2358,31 @@ export default function Canvas(): JSX.Element {
               })
               const staticActions: ToolbarAction[] = [
                 {
-                  icon: 'layers',
+                  icon: 'format_align_justify',
                   label: 'Stack by type',
                   onClick: () => void groupByType(true)
                 },
                 {
-                  icon: 'grid_view',
-                  label: 'Tile by type',
+                  icon: 'grid_4x4',
+                  label: 'Grid by type',
                   onClick: () => void groupByType(false),
                   separatorAfter: true
                 },
                 {
-                  icon: 'auto_awesome',
-                  label: 'Clean up',
+                  icon: 'auto_fix_high',
+                  label: 'Auto-arrange',
                   onClick: () => void handleAutoArrange(),
                   separatorAfter: true
                 },
                 {
-                  icon: 'home',
-                  label: 'Home',
+                  icon: 'my_location',
+                  label: 'Center canvas',
                   shortcut: '⌘H',
                   onClick: () => centerOnHome()
                 },
                 {
-                  icon: 'center_focus_strong',
-                  label: 'Reset view',
+                  icon: 'fit_screen',
+                  label: 'Fit to screen',
                   shortcut: '⌘0',
                   onClick: () => resetView()
                 }
@@ -2639,7 +2463,6 @@ export default function Canvas(): JSX.Element {
           })()}
         </div>
 
-        <WidgetDock />
       </div>
       <WidgetFocusMode />
       {saveTemplateOpen && activeTask && (
@@ -2718,38 +2541,6 @@ export default function Canvas(): JSX.Element {
         />
       )}
     </>
-  )
-}
-
-function FivePromiseButton({ taskId }: { taskId: string }): JSX.Element {
-  const active = useFocusSessionStore((s) => s.active)
-  const start = useFocusSessionStore((s) => s.start)
-  const isOnThisTask = active?.taskId === taskId
-  if (isOnThisTask) {
-    return (
-      <span
-        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium text-accent cursor-default"
-        title="5-Minute Promise running — see the pill at top of canvas"
-      >
-        <Icon name="bolt" size={14} filled />
-        <span>In session</span>
-      </span>
-    )
-  }
-  return (
-    <button
-      onClick={() => {
-        // Fire chime on user gesture (autoplay-friendly) then start the session
-        futuristicPowerOn()
-        void start(taskId, 5 * 60, '5min')
-      }}
-      className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium text-white transition-all hover:brightness-110"
-      style={{ backgroundColor: 'rgb(var(--accent))' }}
-      title="The 5-Minute Promise: just five minutes, no commitment past that. The most-evidence-backed ADHD initiation technique."
-    >
-      <Icon name="bolt" size={14} />
-      <span>Just 5 min</span>
-    </button>
   )
 }
 

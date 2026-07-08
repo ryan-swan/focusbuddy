@@ -1,15 +1,7 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
 import type { FbNode } from '@shared/types'
 import Icon from './Icon'
-
-// System-wide canvas breadcrumb. Shows where the open task sits in the workspace
-// — Home › Folder › … › ancestor task › CURRENT — derived from the node tree's
-// parentId chain. Because explored mind-map node-canvases nest under their
-// parent task, this same chain naturally provides the path back to the map
-// (click the parent task) without any special-casing.
-//
-// Clickable: Home (→ workspace home), any ancestor TASK (→ open its canvas),
-// any FOLDER (→ reveal/expand it in the sidebar). The current task is bold.
 
 interface Props {
   activeTask: FbNode
@@ -17,10 +9,12 @@ interface Props {
   onOpenTask: (id: string) => void
   onRevealFolder: (id: string) => void
   onHome: () => void
-  // Subtle hint that this canvas was explored from a mind-map node.
   fromMindmap?: boolean
 }
 
+// Hover-expand glossy pill breadcrumb.
+// Collapsed: home icon + depth indicator + current task name.
+// Hovered: full ancestry chain expands inline with a spring animation.
 export default function CanvasBreadcrumb({
   activeTask,
   nodes,
@@ -29,6 +23,8 @@ export default function CanvasBreadcrumb({
   onHome,
   fromMindmap
 }: Props): JSX.Element {
+  const [hovered, setHovered] = useState(false)
+
   const chain = useMemo(() => {
     const byId = new Map(nodes.map((n) => [n.id, n]))
     const out: FbNode[] = []
@@ -41,55 +37,91 @@ export default function CanvasBreadcrumb({
     return out
   }, [activeTask, nodes])
 
+  // Ancestors are everything except the last item
+  const ancestors = chain.slice(0, -1)
+  const current = chain[chain.length - 1] ?? activeTask
+  const hasAncestors = ancestors.length > 0
+
   return (
-    <div
-      className="shrink-0 flex items-center gap-0.5 px-3 py-1.5 border-b border-[color:var(--glass-chrome-border)] fb-glass-chrome text-[12px] overflow-x-auto whitespace-nowrap"
-      data-testid="canvas-breadcrumb"
-    >
-      <button
-        onClick={onHome}
-        className="inline-flex items-center justify-center h-6 w-6 rounded text-[var(--ink-70)] hover:bg-[var(--surface-sunken)] shrink-0"
-        title="Workspace home"
-        aria-label="Workspace home"
+    <div data-testid="canvas-breadcrumb">
+      <div
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+        className="inline-flex items-center gap-0.5 px-2 py-1.5 rounded-full fb-glass-chrome ring-1 ring-black/[0.07] dark:ring-white/[0.07] shadow-[0_2px_10px_rgba(0,0,0,0.08)] text-[12px] max-w-full overflow-hidden cursor-default select-none"
       >
-        <Icon name="home" size={15} />
-      </button>
-      {chain.map((n, i) => {
-        const isLast = i === chain.length - 1
-        const isFolder = n.kind === 'folder'
-        return (
-          <span key={n.id} className="inline-flex items-center gap-0.5 shrink-0">
-            <Icon name="chevron_right" size={15} className="text-[var(--ink-50)]" />
-            {isLast ? (
-              <span
-                className="inline-flex items-center gap-1.5 px-1.5 py-0.5 font-semibold text-[var(--ink-100)] max-w-[280px]"
-                data-testid="breadcrumb-current"
-              >
-                <Icon
-                  name={fromMindmap ? 'account_tree' : isFolder ? 'folder' : 'task_alt'}
-                  size={14}
-                  className="text-accent shrink-0"
-                />
-                <span className="truncate">{n.title || '(untitled)'}</span>
+        {/* Home button — always visible */}
+        <button
+          onClick={onHome}
+          className="inline-flex items-center justify-center h-5 w-5 rounded-full text-[var(--ink-50)] hover:text-[var(--ink-100)] hover:bg-[var(--surface-sunken)] shrink-0 transition-colors"
+          title="Workspace home"
+          aria-label="Workspace home"
+        >
+          <Icon name="home" size={13} />
+        </button>
+
+        {/* Ancestor chain — only visible when hovered */}
+        <AnimatePresence initial={false}>
+          {hovered && hasAncestors && (
+            <motion.span
+              key="ancestors"
+              initial={{ width: 0, opacity: 0 }}
+              animate={{ width: 'auto', opacity: 1 }}
+              exit={{ width: 0, opacity: 0 }}
+              transition={{ duration: 0.22, ease: [0.34, 1.2, 0.64, 1] }}
+              className="inline-flex items-center gap-0.5 overflow-hidden shrink-0"
+            >
+              {ancestors.map((n) => {
+                const isFolder = n.kind === 'folder'
+                return (
+                  <span key={n.id} className="inline-flex items-center gap-0.5 shrink-0">
+                    <Icon name="chevron_right" size={13} className="text-[var(--ink-30)]" />
+                    <button
+                      onClick={() => (isFolder ? onRevealFolder(n.id) : onOpenTask(n.id))}
+                      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[var(--ink-60)] hover:bg-[var(--surface-sunken)] hover:text-[var(--ink-100)] max-w-[160px] transition-colors whitespace-nowrap"
+                      title={isFolder ? `Reveal "${n.title}" in sidebar` : `Open "${n.title}"`}
+                    >
+                      <Icon name={isFolder ? 'folder' : 'task_alt'} size={11} className="text-[var(--ink-40)] shrink-0" />
+                      <span className="truncate">{n.title || '(untitled)'}</span>
+                    </button>
+                  </span>
+                )
+              })}
+            </motion.span>
+          )}
+        </AnimatePresence>
+
+        {/* Collapsed depth hint — visible only when NOT hovered and ancestors exist */}
+        <AnimatePresence initial={false}>
+          {!hovered && hasAncestors && (
+            <motion.span
+              key="depth-hint"
+              initial={{ width: 0, opacity: 0 }}
+              animate={{ width: 'auto', opacity: 1 }}
+              exit={{ width: 0, opacity: 0 }}
+              transition={{ duration: 0.15, ease: 'easeOut' }}
+              className="inline-flex items-center shrink-0 overflow-hidden"
+            >
+              <Icon name="chevron_right" size={13} className="text-[var(--ink-30)]" />
+              <span className="text-[10px] text-[var(--ink-30)] px-1 font-mono">
+                {ancestors.length > 1 ? `+${ancestors.length}` : '···'}
               </span>
-            ) : (
-              <button
-                onClick={() => (isFolder ? onRevealFolder(n.id) : onOpenTask(n.id))}
-                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[var(--ink-70)] hover:bg-[var(--surface-sunken)] hover:text-[var(--ink-100)] max-w-[200px]"
-                title={isFolder ? `Reveal “${n.title}” in the sidebar` : `Open “${n.title}”`}
-                data-testid={`breadcrumb-${n.id}`}
-              >
-                <Icon
-                  name={isFolder ? 'folder' : 'task_alt'}
-                  size={13}
-                  className="text-[var(--ink-50)] shrink-0"
-                />
-                <span className="truncate">{n.title || '(untitled)'}</span>
-              </button>
-            )}
+            </motion.span>
+          )}
+        </AnimatePresence>
+
+        {/* Current item — always visible */}
+        <span className="inline-flex items-center gap-0.5 shrink-0">
+          <Icon name="chevron_right" size={13} className="text-[var(--ink-30)]" />
+          <span className="inline-flex items-center gap-1.5 px-1.5 py-0.5 font-semibold text-[var(--ink-100)] max-w-[260px]">
+            <Icon
+              name={fromMindmap ? 'account_tree' : current.kind === 'folder' ? 'folder' : 'task_alt'}
+              size={13}
+              className="text-[rgb(var(--accent))] shrink-0"
+            />
+            <span className="truncate">{current.title || '(untitled)'}</span>
           </span>
-        )
-      })}
+        </span>
+      </div>
     </div>
   )
 }

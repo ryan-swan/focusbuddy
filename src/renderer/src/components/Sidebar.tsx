@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useContext, useEffect, useMemo, useRef, useState } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
 import { confirmDialog, promptText } from './plexi/PromptDialog'
 import type { ConnectedApp, FbNode, NodeKind, WidgetSuggestion } from '@shared/types'
 import { useNodeStore } from '../stores/nodes'
@@ -8,31 +9,11 @@ import { useWidgetStore } from '../stores/widgets'
 import { useConnectedAppsStore } from '../stores/connectedApps'
 import SyncIndicator from './SyncIndicator'
 import { useViewStore, type View } from '../stores/view'
-import { chimeOut } from '../lib/audioBeep'
-import { catalogFor, WIDGET_CATALOG, DRAG_MIME } from '../lib/widgetCatalog'
+import { chimeOut, chimeIn } from '../lib/audioBeep'
+import { catalogFor } from '../lib/widgetCatalog'
 import SegmentSwitcher from './segment/SegmentSwitcher'
 import OrgSwitcher from './OrgSwitcher'
 import { useViewKindEnabled } from '../lib/viewCapability'
-
-// What you can drag onto the desk from the sidebar when a desk is open: the common
-// widgets AND the office things (a doc, sheet, slides or a drawing), so you can pull
-// both straight onto the canvas. The full widget set still lives in the on-canvas
-// palette.
-const DESK_WIDGET_KINDS = new Set([
-  'doc',
-  'sheet',
-  'slides',
-  'scratchpad',
-  'sticky',
-  'note',
-  'timer',
-  'task-link',
-  'calculator',
-  'image',
-  'page',
-  'file'
-])
-import { chimeIn } from '../lib/audioBeep'
 import { splitFavourites } from '../lib/connectedAppSort'
 import NewNodeDialog from './NewNodeDialog'
 import AISetupDialog from './AISetupDialog'
@@ -50,6 +31,8 @@ import Icon from './Icon'
 import { StatusPill } from './plexi'
 import { fieldInputClass } from './plexi/forms'
 
+const SidebarCompact = React.createContext(false)
+
 // MIME used when dragging a Connected App row from the sidebar onto the canvas.
 // The Canvas drop handler reads this to spawn a webview widget bound to the app.
 export const CONNECTED_APP_DRAG_MIME = 'text/fb-connected-app'
@@ -62,10 +45,45 @@ interface ConnectedAppRowProps {
 
 function renderConnectedAppRow(
   app: ConnectedApp,
-  props: ConnectedAppRowProps
+  props: ConnectedAppRowProps,
+  compact?: boolean
 ): JSX.Element {
   const { active, onOpen, onTogglePinned } = props
   const isLocal = app.kind === 'local'
+
+  // Compact mode: show icon-only centered button (same dock pattern as NavRow)
+  if (compact) {
+    const iconEl = app.iconPngBase64 ? (
+      <img src={`data:image/png;base64,${app.iconPngBase64}`} alt="" className="h-5 w-5 rounded shrink-0" />
+    ) : (
+      <span
+        className="h-5 w-5 rounded inline-flex items-center justify-center shrink-0"
+        style={app.color
+          ? { backgroundColor: `${app.color}1a`, color: app.color }
+          : { backgroundColor: 'rgb(var(--accent) / 0.12)', color: 'rgb(var(--accent))' }
+        }
+      >
+        <Icon name={app.icon || 'apps'} size={12} />
+      </span>
+    )
+    return (
+      <button
+        key={app.id}
+        onClick={onOpen}
+        title={app.title}
+        className={[
+          'relative w-full h-9 flex items-center justify-center rounded-xl transition-colors',
+          active
+            ? 'bg-[rgb(var(--accent)/0.10)] text-[rgb(var(--accent))]'
+            : 'text-[var(--ink-60)] hover:bg-[var(--surface-sunken)] hover:text-[var(--ink-90)]'
+        ].join(' ')}
+      >
+        {active && <span className="absolute left-0 inset-y-2 w-[3px] rounded-r-full bg-[rgb(var(--accent))]" />}
+        {iconEl}
+      </button>
+    )
+  }
+
   return (
     <div
       key={app.id}
@@ -152,9 +170,11 @@ import { buildTree, flatten, type TreeItem } from '../lib/nodeTree'
 
 interface Props {
   onCollapse?: () => void
+  onExpand?: () => void
+  compact?: boolean
 }
 
-export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
+export default function Sidebar({ onCollapse, onExpand, compact }: Props = {}): JSX.Element {
   const nodes = useNodeStore((s) => s.nodes)
   const nodesLoaded = useNodeStore((s) => s.loaded)
   const nodesError = useNodeStore((s) => s.error)
@@ -178,6 +198,8 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
   const goLiveCanvas = useViewStore((s) => s.goLiveCanvas)
   const goConnectedApp = useViewStore((s) => s.goConnectedApp)
   const goVault = useViewStore((s) => s.goVault)
+  const goRoom = useViewStore((s) => s.goRoom)
+  const goRooms = useViewStore((s) => s.goRooms)
 
   // Hide desk-nav entries that lead to a now-gated surface, using the same
   // view-kind -> capability map MainPane's CapabilityGate enforces, so nav and
@@ -442,8 +464,14 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
     goTask(id)
   }
 
-  function selectProject(id: string): void {
-    goProject(id)
+  function selectProject(id: string, node?: FbNode): void {
+    // Top-level folders are Rooms — clicking one opens the Room View (desk gallery).
+    // Nested folders behave as before (project-dashboard canvas).
+    if (node && node.parentId === null) {
+      goRoom(id)
+    } else {
+      goProject(id)
+    }
   }
 
   function archiveNode(id: string): void {
@@ -515,7 +543,7 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
         e.preventDefault()
         if (isFolder) {
           if (hasChildren) toggleExpand(node.id)
-          selectProject(node.id)
+          selectProject(node.id, node)
         } else {
           selectTask(node.id)
         }
@@ -599,48 +627,66 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
   }
 
   return (
-    <aside className="h-full flex flex-col overflow-hidden border-r border-[var(--edge-soft)] bg-[var(--surface-raised)] text-[var(--ink-100)]">
-      {/* Header — same silhouette as the PlexiOffice menu: the wordmark on the
-          left, then the desk's own actions (New desk, hide) on the right. */}
-      <div className="flex items-center gap-2 px-4 h-14 border-b border-[var(--edge-soft)]">
-        <span className="text-[15px] font-bold tracking-[0.14em] text-[var(--ink-100)]">PLEXIDESK</span>
-        <div className="ml-auto flex items-center gap-1">
-          <button
-            onClick={requestCreateDesk}
-            title="New desk"
-            className="inline-flex items-center gap-1 h-7 px-2.5 rounded-lg bg-[rgb(var(--accent))] text-white text-[12px] font-medium hover:bg-[rgb(var(--accent-hover))]"
-          >
-            <Icon name="add" size={14} />
-            <span>New</span>
-          </button>
-          {onCollapse && (
-            <button
-              onClick={onCollapse}
-              title="Hide sidebar"
-              className="text-[var(--ink-50)] hover:text-[var(--ink-90)]"
-            >
-              <Icon name="keyboard_double_arrow_left" size={18} />
-            </button>
-          )}
-        </div>
-      </div>
+    <SidebarCompact.Provider value={!!compact}>
+    <aside className="m-2 flex flex-col overflow-hidden rounded-[18px] bg-[var(--surface-raised)]/96 backdrop-blur-2xl text-[var(--ink-100)] shadow-[0_2px_20px_rgba(0,0,0,0.10),0_0_0_1px_rgba(0,0,0,0.05)] dark:shadow-[0_2px_20px_rgba(0,0,0,0.35),0_0_0_1px_rgba(255,255,255,0.05)]" style={{ height: 'calc(100% - 16px)' }} data-testid="sidebar">
+      {compact ? (
+        /* Compact dock header — expand button at top (mirrors collapse button in full mode) */
+        <>
+          <div className="h-11 flex items-center justify-center shrink-0">
+            {onExpand && (
+              <button
+                onClick={onExpand}
+                title="Expand navigation panel"
+                className="h-6 w-6 inline-flex items-center justify-center rounded-full text-[var(--ink-40)] hover:text-[var(--ink-70)] hover:bg-[var(--surface-sunken)] transition-colors"
+              >
+                <Icon name="keyboard_double_arrow_right" size={13} />
+              </button>
+            )}
+          </div>
+          <div className="h-px bg-[var(--edge-soft)] mx-2 shrink-0" />
+        </>
+      ) : (
+        <>
+          {/* Header — wordmark + collapse button. Collapse button is always top-right
+              so it mirrors the expand button in compact mode (also top). */}
+          <div className="flex items-center gap-2 px-3 h-11 shrink-0">
+            <span className="text-[12px] font-bold tracking-[0.18em] text-[var(--ink-50)] uppercase select-none">
+              Plexi
+            </span>
+            <div className="ml-auto flex items-center gap-0.5">
+              {onCollapse && (
+                <button
+                  onClick={onCollapse}
+                  title="Collapse panel (dock view)"
+                  className="inline-flex items-center justify-center h-6 w-6 rounded-full text-[var(--ink-40)] hover:text-[var(--ink-70)] hover:bg-[var(--surface-sunken)] transition-colors"
+                >
+                  <Icon name="keyboard_double_arrow_left" size={13} />
+                </button>
+              )}
+            </div>
+          </div>
+          <div className="h-px bg-[var(--edge-soft)] mx-3 shrink-0" />
+        </>
+      )}
 
-      <div className="flex-1 overflow-auto py-1">
-        {/* The organisation switcher sits at the very top of the menu, next to
-            the wordmark above. Switching org swaps the whole workspace. */}
-        <OrgSwitcher />
-        {/* One consistent area switcher at the top, the same one the Office /
-            People / Brain menus show, so the nice contextual menu and its
-            switcher live on every view, not only inside the segments. */}
-        <SegmentSwitcher />
+      <div className={`flex-1 py-1 px-0.5 ${compact ? 'overflow-hidden' : 'overflow-auto'}`}>
+        {!compact && (
+          <>
+            {/* The organisation switcher sits at the very top of the menu, next to
+                the wordmark above. Switching org swaps the whole workspace. */}
+            <OrgSwitcher />
+            {/* One consistent area switcher at the top, the same one the Office /
+                People / Brain menus show, so the nice contextual menu and its
+                switcher live on every view, not only inside the segments. */}
+            <SegmentSwitcher />
+          </>
+        )}
 
-        {/* Desk nav — one clean, single list in the same style as the Office /
-            People / Brain menus, not a stack of labelled sections. */}
-        <div className="px-2 pt-1 pb-2">
+        {/* Desk nav — top items */}
+        <div className="px-2 pt-2 pb-1 flex flex-col gap-0.5">
           <NavRow
             icon="dashboard"
             label="Home"
-            tint="bg-indigo-500"
             active={viewIsActive({ kind: 'home' })}
             onClick={() => {
               setActive(null)
@@ -650,7 +696,6 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
           <NavRow
             icon="account_tree"
             label="Plans"
-            tint="bg-violet-500"
             active={viewIsActive({ kind: 'projects' })}
             onClick={() => {
               setActive(null)
@@ -660,7 +705,6 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
           <NavRow
             icon="checklist"
             label="Tasks"
-            tint="bg-emerald-500"
             active={viewIsActive({ kind: 'all-tasks' })}
             onClick={() => {
               setActive(null)
@@ -671,7 +715,6 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
             <NavRow
               icon="calendar_month"
               label="Calendar"
-              tint="bg-amber-500"
               active={viewIsActive({ kind: 'calendar' })}
               onClick={() => {
                 setActive(null)
@@ -683,7 +726,6 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
             <NavRow
               icon="folder"
               label="Files"
-              tint="bg-orange-500"
               active={viewIsActive({ kind: 'files' })}
               onClick={() => {
                 setActive(null)
@@ -695,7 +737,6 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
             <NavRow
               icon="lock"
               label="Vault"
-              tint="bg-rose-500"
               active={viewIsActive({ kind: 'vault' })}
               onClick={() => {
                 setActive(null)
@@ -705,157 +746,146 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
           )}
         </div>
 
-        {/* ── ADD TO DESK — while a desk is open (a task or a folder-desk, both
-            canvases now); drag a widget or an office thing (doc / sheet / slides /
-            draw) straight onto the canvas ── */}
-        {(view.kind === 'task' || view.kind === 'project-dashboard') && (
-          <div className="mb-1" data-testid="sidebar-widgets">
-            <div className="px-4 pt-3 pb-1.5 flex items-center gap-1.5 text-[10px] uppercase tracking-[0.12em] text-[var(--ink-40)] font-semibold">
-              <Icon name="widgets" size={13} />
-              <span>Add to desk</span>
-              <span className="ml-auto normal-case tracking-normal text-[var(--ink-40)]">drag onto desk</span>
-            </div>
-            <div className="grid grid-cols-4 gap-1 px-2">
-              {WIDGET_CATALOG.filter((e) => DESK_WIDGET_KINDS.has(e.kind)).map((entry) => (
-                <button
-                  key={entry.kind}
-                  draggable
-                  onDragStart={(e) => {
-                    e.dataTransfer.setData(DRAG_MIME, entry.kind)
-                    e.dataTransfer.effectAllowed = 'copy'
-                  }}
-                  data-testid={`sidebar-widget-${entry.kind}`}
-                  title={`Drag ${entry.label} onto the desk`}
-                  className="flex flex-col items-center gap-1 py-2 rounded-lg text-[9.5px] text-[var(--ink-70)] hover:bg-[var(--surface-sunken)] cursor-grab active:cursor-grabbing"
-                >
-                  <Icon name={entry.icon} size={16} className="text-accent" />
-                  <span className="truncate max-w-full leading-none">{entry.label}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
+        {/* Hairline separator */}
+        <div className="h-px bg-[var(--edge-soft)] mx-3 my-1" />
 
-        {/* Documents, Inbox, Messages, Mail and PlexiSign live in the PlexiOffice
-            area; Files and Vault are in the Desk nav above. */}
+        {/* Bottom nav items */}
+        <div className="px-2 pb-1 flex flex-col gap-0.5">
 
-        {/* ── SHARED WITH ME — folders / tasks / widgets others sent you ─ */}
-        <SectionHeader
-          label="Shared with me"
-          open={sharedOpen}
-          onToggle={() => setSharedOpen((v) => !v)}
-          action={
-            <button
-              onClick={async (e) => {
-                e.stopPropagation()
-                // Paste a share link. v1: prompts for the token; future
-                // server-backed version will fetch the snapshot
-                // automatically. Accepted shares appear in this section.
-                const url = await promptText({
-                  title: 'Paste a share link',
-                  placeholder: 'https://focusbuddy-viewer.vercel.app/share/…',
-                  confirmLabel: 'Add share'
-                })
-                if (!url) return
-                const m = url.match(/\/share\/([a-z0-9]+)/i)
-                if (!m) {
-                  alert('That doesn\'t look like a PlexiDesk share link.')
-                  return
-                }
-                // The store's acceptByToken handles both modes — fetching
-                // the snapshot from the hosted service when configured, or
-                // inserting a placeholder in local-mock mode.
-                try {
-                  await useSharesStore.getState().acceptByToken(m[1])
-                } catch (err) {
-                  alert(`Could not accept share: ${(err as Error).message}`)
-                }
-              }}
-              className="icon-btn !h-5 !w-5"
-              title="Paste a share link"
-            >
-              <Icon name="content_paste" size={12} />
-            </button>
+        {/* ── SHARED WITH ME ─ */}
+        <NavRow
+          icon="folder_shared"
+          label="Shared"
+          onClick={compact
+            ? () => { onExpand?.(); setSharedOpen(true) }
+            : () => setSharedOpen((v) => !v)
           }
+          onChevron={compact ? undefined : () => setSharedOpen((v) => !v)}
+          chevronOpen={sharedOpen}
         />
-        {sharedOpen && (
-          <div className="mb-2 px-2">
-            {sharedInbox.length === 0 ? (
-              <div className="text-[11px] text-[var(--ink-70)] leading-relaxed px-2 py-2">
-                Items others share with you land here. Get a link from a
-                collaborator, then click the{' '}
-                <Icon
-                  name="content_paste"
-                  size={10}
-                  className="inline mb-0.5"
-                />{' '}
-                button above to paste it.
-              </div>
-            ) : (
-              <div role="list">
-                {sharedInbox.map((item) => {
-                  const snap = item.snapshot as { title?: string; kind?: string } | null
-                  const title = (snap && snap.title) || `Shared ${item.kind}`
-                  return (
-                    <div
-                      key={item.id}
-                      role="listitem"
-                      className="group flex items-center gap-1.5 px-2 py-1.5 rounded hover:bg-[var(--surface-sunken)]"
-                      title={`Shared by ${item.fromHandle}`}
-                    >
-                      <Icon
-                        name={
-                          item.kind === 'folder'
-                            ? 'folder_shared'
-                            : item.kind === 'task'
-                              ? 'assignment_ind'
-                              : 'widgets'
-                        }
-                        size={14}
-                        className="text-accent shrink-0"
-                      />
-                      <div className="flex-1 min-w-0">
-                        <div className="text-[12px] text-[var(--ink-90)] truncate">
-                          {title}
-                        </div>
-                        <div className="text-[9px] text-[var(--ink-50)] truncate font-mono">
-                          {item.fromHandle} ·{' '}
-                          {item.scope === 'copy' ? 'can copy' : 'view only'}
-                        </div>
-                      </div>
-                      {item.scope === 'copy' && (
-                        <button
-                          onClick={() => void acceptIntoWorkspace(item)}
-                          disabled={acceptingId === item.id}
-                          className="icon-btn !h-5 !w-5 text-accent disabled:opacity-50"
-                          title="Add to my workspace"
+        </div>
+        <AnimatePresence initial={false}>
+          {sharedOpen && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.18, ease: 'easeInOut' }}
+              className="overflow-hidden"
+            >
+              <div className="mb-2 px-2">
+                <div className="mb-1 px-2">
+                  <button
+                    onClick={async (e) => {
+                      e.stopPropagation()
+                      const url = await promptText({
+                        title: 'Paste a share link',
+                        placeholder: 'https://focusbuddy-viewer.vercel.app/share/…',
+                        confirmLabel: 'Add share'
+                      })
+                      if (!url) return
+                      const m = url.match(/\/share\/([a-z0-9]+)/i)
+                      if (!m) {
+                        alert('That doesn\'t look like a PlexiDesk share link.')
+                        return
+                      }
+                      try {
+                        await useSharesStore.getState().acceptByToken(m[1])
+                      } catch (err) {
+                        alert(`Could not accept share: ${(err as Error).message}`)
+                      }
+                    }}
+                    className="icon-btn !h-5 !w-5"
+                    title="Paste a share link"
+                  >
+                    <Icon name="content_paste" size={12} />
+                  </button>
+                </div>
+                {sharedInbox.length === 0 ? (
+                  <div className="text-[11px] text-[var(--ink-70)] leading-relaxed px-2 py-2">
+                    Items others share with you land here. Get a link from a
+                    collaborator, then click the{' '}
+                    <Icon
+                      name="content_paste"
+                      size={10}
+                      className="inline mb-0.5"
+                    />{' '}
+                    button above to paste it.
+                  </div>
+                ) : (
+                  <div role="list">
+                    {sharedInbox.map((item) => {
+                      const snap = item.snapshot as { title?: string; kind?: string } | null
+                      const title = (snap && snap.title) || `Shared ${item.kind}`
+                      return (
+                        <div
+                          key={item.id}
+                          role="listitem"
+                          className="group flex items-center gap-1.5 px-2 py-1.5 rounded hover:bg-[var(--surface-sunken)]"
+                          title={`Shared by ${item.fromHandle}`}
                         >
                           <Icon
-                            name={acceptingId === item.id ? 'hourglass_empty' : 'add_to_photos'}
-                            size={12}
+                            name={
+                              item.kind === 'folder'
+                                ? 'folder_shared'
+                                : item.kind === 'task'
+                                  ? 'assignment_ind'
+                                  : 'widgets'
+                            }
+                            size={14}
+                            className="text-accent shrink-0"
                           />
-                        </button>
-                      )}
-                      <button
-                        onClick={() => void removeFromInbox(item.id)}
-                        className="icon-btn !h-5 !w-5 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"
-                        title="Remove from Shared with me"
-                      >
-                        <Icon name="close" size={11} />
-                      </button>
-                    </div>
-                  )
-                })}
+                          <div className="flex-1 min-w-0">
+                            <div className="text-[12px] text-[var(--ink-90)] truncate">
+                              {title}
+                            </div>
+                            <div className="text-[9px] text-[var(--ink-50)] truncate font-mono">
+                              {item.fromHandle} ·{' '}
+                              {item.scope === 'copy' ? 'can copy' : 'view only'}
+                            </div>
+                          </div>
+                          {item.scope === 'copy' && (
+                            <button
+                              onClick={() => void acceptIntoWorkspace(item)}
+                              disabled={acceptingId === item.id}
+                              className="icon-btn !h-5 !w-5 text-accent disabled:opacity-50"
+                              title="Add to my workspace"
+                            >
+                              <Icon
+                                name={acceptingId === item.id ? 'hourglass_empty' : 'add_to_photos'}
+                                size={12}
+                              />
+                            </button>
+                          )}
+                          <button
+                            onClick={() => void removeFromInbox(item.id)}
+                            className="icon-btn !h-5 !w-5 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"
+                            title="Remove from Shared with me"
+                          >
+                            <Icon name="close" size={11} />
+                          </button>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
               </div>
-            )}
-          </div>
-        )}
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-        {/* ── DESKS — your folders and desks ──────────────────────────────── */}
-        <SectionHeader
-          label="Desks"
-          open={projectsOpen}
-          onToggle={() => setProjectsOpen((v) => !v)}
+        {/* ── DESKS / ROOMS ──────────────────────────────── */}
+        <div className="px-2 pb-1 flex flex-col gap-0.5">
+        <NavRow
+          icon="workspaces"
+          label="Rooms"
+          active={view.kind === 'room' || view.kind === 'rooms'}
+          onClick={compact
+            ? () => { onExpand?.(); setProjectsOpen(true) }
+            : () => { setActive(null); goRooms() }
+          }
+          onChevron={compact ? undefined : () => setProjectsOpen((v) => !v)}
+          chevronOpen={projectsOpen}
           action={
             <button
               onClick={(e) => {
@@ -869,7 +899,16 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
             </button>
           }
         />
-        {projectsOpen && (
+        </div>
+        <AnimatePresence initial={false}>
+        {projectsOpen && !compact && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.18, ease: 'easeInOut' }}
+            className="overflow-hidden"
+          >
           <div className="mb-2" role="tree" aria-label="Projects and tasks">
             {flat.length === 0 && nodesError && (
               <div className="px-4 py-3 text-xs text-amber-600 dark:text-amber-400 leading-relaxed" data-testid="sidebar-nodes-error">
@@ -901,7 +940,9 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
               const isOpen = !!expanded[node.id]
               const isFolder = node.kind === 'folder'
               const isActive = isFolder
-                ? viewIsActive({ kind: 'project-dashboard', projectId: node.id })
+                ? (node.parentId === null
+                    ? (view.kind === 'room' && view.roomId === node.id)
+                    : viewIsActive({ kind: 'project-dashboard', projectId: node.id }))
                 : viewIsActive({ kind: 'task', taskId: node.id })
               const isRenaming = renamingId === node.id
               const isDragging = draggingIdRef.current === node.id
@@ -935,7 +976,7 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
                   onFocus={() => setFocusedNodeId(node.id)}
                   onKeyDown={(e) => handleNodeKeyDown(e, item)}
                   style={{
-                    paddingLeft: `${depth * 14 + 8}px`,
+                    paddingLeft: `${depth * 10 + 6}px`,
                     borderTop:
                       dropPos === 'before' ? '2px solid rgb(var(--accent))' : '2px solid transparent',
                     borderBottom:
@@ -965,12 +1006,12 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
                   )}
                   <button
                     onClick={() => hasChildren && toggleExpand(node.id)}
-                    className={`w-5 h-5 flex items-center justify-center text-[var(--ink-50)] hover:text-[var(--ink-100)] transition-colors ${
+                    className={`w-4 h-4 flex items-center justify-center text-[var(--ink-40)] hover:text-[var(--ink-80)] transition-colors shrink-0 ${
                       hasChildren ? '' : 'invisible'
                     }`}
                     aria-label={isOpen ? 'Collapse' : 'Expand'}
                   >
-                    <Icon name={isOpen ? 'expand_more' : 'chevron_right'} size={16} />
+                    <Icon name={isOpen ? 'expand_more' : 'chevron_right'} size={13} />
                   </button>
                   <div
                     draggable={!isRenaming}
@@ -984,7 +1025,7 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
                         // putting both actions on the row makes the whole
                         // folder a single fluid click target.
                         if (hasChildren) toggleExpand(node.id)
-                        selectProject(node.id)
+                        selectProject(node.id, node)
                       } else {
                         selectTask(node.id)
                       }
@@ -1000,17 +1041,23 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
                     }`}
                   >
                     <Icon
-                      name={isFolder ? 'folder' : 'task_alt'}
-                      size={16}
-                      filled={isActive || isFolder}
+                      name={
+                        isFolder
+                          ? (node.parentId === null ? 'grid_view' : 'workspaces')
+                          : node.status === 'done'
+                            ? 'check_circle'
+                            : 'sticky_note_2'
+                      }
+                      size={14}
+                      filled={isActive}
                       className={
                         isFolder
-                          ? 'text-amber-700'
+                          ? (isActive ? 'text-[rgb(var(--accent))]' : 'text-[var(--ink-50)]')
                           : node.status === 'done'
-                            ? 'text-emerald-700'
+                            ? 'text-emerald-600'
                             : node.status === 'in_progress'
-                              ? 'text-blue-700'
-                              : 'text-[var(--ink-50)]'
+                              ? 'text-blue-600'
+                              : 'text-[var(--ink-40)]'
                       }
                     />
                     {isRenaming ? (
@@ -1037,11 +1084,11 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
                     ) : (
                       <>
                         <span
-                          className={`text-sm truncate flex-1 ${
+                          className={`text-[12.5px] truncate flex-1 leading-tight ${
                             isActive
-                              ? 'text-[var(--ink-100)] font-medium'
-                              : 'text-[var(--ink-90)]'
-                          } ${node.status === 'done' ? 'line-through text-[var(--ink-50)]' : ''}`}
+                              ? 'text-[var(--ink-100)] font-semibold'
+                              : 'text-[var(--ink-80)]'
+                          } ${node.status === 'done' ? 'line-through text-[var(--ink-40)]' : ''}`}
                         >
                           {node.title}
                         </span>
@@ -1155,27 +1202,29 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
               )
             })}
           </div>
+          </motion.div>
         )}
+        </AnimatePresence>
 
         {/* ── CONNECTED APPS ────────────────────────────────────────────── */}
-        <SectionHeader
+        <div className="px-2 pb-1 flex flex-col gap-0.5">
+        <NavRow
+          icon="apps"
           label="Connected Apps"
-          open={appsOpen}
-          onToggle={() => setAppsOpen((v) => !v)}
-          action={
-            <button
-              onClick={(e) => {
-                e.stopPropagation()
-                setAddAppOpen(true)
-              }}
-              className="icon-btn !h-5 !w-5"
-              title="Add a connected app"
-            >
-              <Icon name="add" size={12} />
-            </button>
-          }
+          onClick={() => setAppsOpen((v) => !v)}
+          onChevron={() => setAppsOpen((v) => !v)}
+          chevronOpen={appsOpen}
         />
+        </div>
+        <AnimatePresence initial={false}>
         {appsOpen && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.18, ease: 'easeInOut' }}
+            className="overflow-hidden"
+          >
           <div className="mb-2">
             {connectedApps.length === 0 ? (
               <div className="mx-3 mb-2 rounded-md border border-dashed border-[var(--edge-soft)] p-3 text-center">
@@ -1208,20 +1257,24 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
                         ? void launchLocal(app.id)
                         : goConnectedApp(app.id),
                     onTogglePinned: () => void togglePinned(app.id)
-                  })
+                  }, compact)
                 )}
                 {moreApps.length > 0 && (
                   <>
                     <button
                       type="button"
                       onClick={() => setMoreAppsOpen((v) => !v)}
-                      className="w-full mt-1 px-3 py-1 flex items-center gap-1 text-[11px] uppercase tracking-wider text-[var(--ink-50)] hover:text-[var(--ink-90)]"
+                      className={compact
+                        ? 'w-full h-9 flex items-center justify-center text-[var(--ink-40)] hover:text-[var(--ink-70)] transition-colors'
+                        : 'w-full mt-1 px-3 py-1 flex items-center gap-1 text-[11px] uppercase tracking-wider text-[var(--ink-50)] hover:text-[var(--ink-90)]'
+                      }
+                      title={compact ? `More apps (${moreApps.length})` : undefined}
                     >
                       <Icon
-                        name={moreAppsOpen ? 'expand_more' : 'chevron_right'}
-                        size={12}
+                        name={moreAppsOpen ? 'expand_less' : 'more_horiz'}
+                        size={compact ? 16 : 12}
                       />
-                      <span>More apps ({moreApps.length})</span>
+                      {!compact && <span>More apps ({moreApps.length})</span>}
                     </button>
                     {moreAppsOpen &&
                       moreApps.map((app) =>
@@ -1234,36 +1287,42 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
                               ? void launchLocal(app.id)
                               : goConnectedApp(app.id),
                           onTogglePinned: () => void togglePinned(app.id)
-                        })
+                        }, compact)
                       )}
                   </>
                 )}
               </>
             )}
           </div>
+          </motion.div>
         )}
+        </AnimatePresence>
       </div>
 
-      {/* Pro card — the same upgrade block that sits at the foot of the
-          PlexiOffice menu, so every area's menu ends the same way. */}
-      <div className="px-3 pt-2">
-        <div className="rounded-xl border border-[rgb(var(--accent)/0.3)] bg-[rgb(var(--accent)/0.06)] p-3">
-          <div className="flex items-center gap-1.5 mb-1.5">
-            <Icon name="auto_awesome" size={14} className="text-[rgb(var(--accent))]" />
-            <span className="text-[12px] font-semibold">PlexiDesk Pro</span>
+      {/* Pro card — hidden in compact mode */}
+      {!compact && (
+        <div className="px-3 pt-2">
+          <div className="rounded-xl border border-[rgb(var(--accent)/0.3)] bg-[rgb(var(--accent)/0.06)] p-3">
+            <div className="flex items-center gap-1.5 mb-1.5">
+              <Icon name="auto_awesome" size={14} className="text-[rgb(var(--accent))]" />
+              <span className="text-[12px] font-semibold">PlexiDesk Pro</span>
+            </div>
+            <button
+              onClick={() => promptUpgrade('PlexiDesk Pro')}
+              className="w-full h-7 rounded-lg bg-[rgb(var(--accent))] text-white text-[11.5px] font-medium hover:bg-[rgb(var(--accent-hover))]"
+            >
+              Upgrade Now
+            </button>
           </div>
-          <button
-            onClick={() => promptUpgrade('PlexiDesk Pro')}
-            className="w-full h-7 rounded-lg bg-[rgb(var(--accent))] text-white text-[11.5px] font-medium hover:bg-[rgb(var(--accent-hover))]"
-          >
-            Upgrade Now
-          </button>
         </div>
-      </div>
+      )}
 
-      {/* Footer — sync indicator. Stays pinned to the bottom of the
-          sidebar regardless of scroll position above. */}
-      <SyncIndicator />
+      {/* Footer — sync indicator (collapse button moved to header for consistency) */}
+      {!compact && (
+        <div className="mt-auto px-3 pb-3 pt-2 border-t border-[var(--edge-soft)]/60 flex items-center">
+          <SyncIndicator />
+        </div>
+      )}
 
       {dialog && dialog.mode === 'create' && (
         <NewNodeDialog
@@ -1361,63 +1420,56 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
         />
       )}
     </aside>
+    </SidebarCompact.Provider>
   )
 }
 
-interface SectionHeaderProps {
-  label: string
-  open: boolean
-  onToggle: () => void
-  action?: React.ReactNode
-}
-
-function SectionHeader({ label, open, onToggle, action }: SectionHeaderProps): JSX.Element {
-  // The same quiet uppercase section label the PlexiOffice menu uses for its
-  // "Apps" / "Communicate" groups, with a chevron so the group still folds.
-  return (
-    <div className="px-4 pt-3 pb-1.5 flex items-center justify-between">
+function NavRow({ icon, label, active, onClick, onChevron, chevronOpen, action }: {
+  icon: string; label: string; active?: boolean; onClick: () => void;
+  onChevron?: () => void; chevronOpen?: boolean; action?: React.ReactNode
+}): JSX.Element {
+  const isCompact = useContext(SidebarCompact)
+  if (isCompact) {
+    return (
       <button
-        onClick={onToggle}
-        className="flex items-center gap-1 text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--ink-40)] hover:text-[var(--ink-70)] transition-colors"
+        onClick={onClick}
+        title={label}
+        className={[
+          'relative w-full h-10 flex items-center justify-center rounded-xl transition-colors select-none',
+          active
+            ? 'bg-[rgb(var(--accent)/0.10)] text-[rgb(var(--accent))]'
+            : 'text-[var(--ink-60)] hover:bg-[var(--surface-sunken)] hover:text-[var(--ink-90)]'
+        ].join(' ')}
       >
-        <Icon name={open ? 'expand_more' : 'chevron_right'} size={12} />
-        <span>{label}</span>
+        {active && <span className="absolute left-0 inset-y-2 w-[3px] rounded-r-full bg-[rgb(var(--accent))]" />}
+        <Icon name={icon} size={17} className="shrink-0" />
       </button>
-      {action}
-    </div>
-  )
-}
-
-interface NavRowProps {
-  icon: string
-  label: string
-  tint: string
-  active: boolean
-  onClick: () => void
-  badge?: string
-  testid?: string
-}
-
-function NavRow({ icon, label, tint, active, onClick, badge, testid }: NavRowProps): JSX.Element {
-  // Same row as the PlexiOffice menu's app rows: a coloured rounded square with a
-  // white icon, then the label, and a soft accent fill when the row is active.
+    )
+  }
   return (
     <button
       onClick={onClick}
-      data-testid={testid}
-      className={`flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-[13px] mb-0.5 text-left transition-colors ${
+      className={[
+        'relative w-full flex items-center gap-2.5 h-9 px-3 rounded-xl text-[13px] font-medium transition-colors select-none',
         active
-          ? 'bg-[rgb(var(--accent)/0.12)] text-[rgb(var(--accent))] font-medium'
-          : 'text-[var(--ink-80)] hover:bg-[var(--surface-sunken)]'
-      }`}
+          ? 'bg-[rgb(var(--accent)/0.10)] text-[rgb(var(--accent))]'
+          : 'text-[var(--ink-60)] hover:bg-[var(--surface-sunken)] hover:text-[var(--ink-90)]'
+      ].join(' ')}
     >
-      <span className={`inline-flex items-center justify-center w-6 h-6 rounded-md text-white shrink-0 ${tint}`}>
-        <Icon name={icon} size={14} />
-      </span>
-      <span className="flex-1 min-w-0 break-words leading-tight">{label}</span>
-      {badge && (
-        <span className="ml-auto text-[10px] fb-tabular text-[var(--ink-50)]">{badge}</span>
+      {active && <span className="absolute left-0 inset-y-2 w-[3px] rounded-r-full bg-[rgb(var(--accent))]" />}
+      <Icon name={icon} size={15} className="shrink-0" />
+      <span className="flex-1 text-left">{label}</span>
+      {onChevron && (
+        <span
+          role="button"
+          tabIndex={-1}
+          onClick={(e) => { e.stopPropagation(); onChevron() }}
+          className="h-5 w-5 inline-flex items-center justify-center rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
+        >
+          <Icon name="expand_more" size={13} className={`transition-transform duration-200 ${chevronOpen ? '' : '-rotate-90'}`} />
+        </span>
       )}
+      {action && !onChevron && action}
     </button>
   )
 }

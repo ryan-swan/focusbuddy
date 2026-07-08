@@ -92,6 +92,7 @@ export default function App(): JSX.Element {
     currentView.kind === 'plexidesk' ||
     currentView.kind === 'plexipeople' ||
     currentView.kind === 'plexibrain'
+  const isCanvasMode = currentView.kind === 'task' || currentView.kind === 'project-dashboard'
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [chatCollapsed, setChatCollapsed] = useState(false)
   // On macOS the window uses hiddenInset, so the traffic lights sit at the top
@@ -322,6 +323,13 @@ export default function App(): JSX.Element {
     else if (currentView.kind === 'project-dashboard') setActive(currentView.projectId)
   }, [currentView, setActive])
 
+  // Auto-collapse sidebar to icon-dock when entering canvas mode.
+  useEffect(() => {
+    if (isCanvasMode) {
+      sidebarRef.current?.collapse()
+    }
+  }, [isCanvasMode])
+
   // Feed the active-widget id into the sound system so "Quiet while widget active" works
   useEffect(() => {
     setActiveWidgetForSound(activeWidgetId)
@@ -424,23 +432,11 @@ export default function App(): JSX.Element {
         <ReleaseModal entry={releaseEntry} onClose={() => setReleaseEntry(null)} />
       )}
       <header
-        className={`titlebar-drag fb-glass-chrome h-10 flex items-center justify-between pr-3 border-b border-[color:var(--glass-chrome-border)] transition-colors ${
+        className={`titlebar-drag fb-glass-chrome h-10 flex items-center justify-between pr-3 transition-colors shadow-[0_1px_0_rgba(0,0,0,0.05),0_2px_12px_rgba(0,0,0,0.06)] ${
           isMac ? 'pl-[78px]' : 'pl-3'
         }`}
       >
         <div className="titlebar-nodrag flex items-center gap-2">
-          {sidebarCollapsed && (
-            <Tooltip content="Show the workspace panel — your folders, tasks and projects" placement="bottom">
-              <button
-                onClick={expandSidebar}
-                className="h-7 px-2 inline-flex items-center gap-1 rounded-md text-[11px] font-medium text-stone-600 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-white/[0.06] border border-stone-200/70 dark:border-white/10 transition-colors"
-                aria-label="Show workspace panel"
-              >
-                <Icon name="keyboard_double_arrow_right" size={14} />
-                <span>Workspace</span>
-              </button>
-            </Tooltip>
-          )}
           {/* "Local · encrypted" — the trust chip. Reflects whether the
               user has set up the vault (and unlocked it). Reinforces the
               BYO-key promise without nagging. Hidden on a fresh install
@@ -589,6 +585,7 @@ export default function App(): JSX.Element {
           )}
         </div>
       </header>
+
       <main className="flex-1 min-h-0">
         {segmentTakeover ? (
           currentView.kind === 'office' ? (
@@ -608,17 +605,17 @@ export default function App(): JSX.Element {
             minSize={12}
             maxSize={40}
             collapsible
-            collapsedSize={0}
+            collapsedSize={5}
             onCollapse={() => setSidebarCollapsed(true)}
             onExpand={() => setSidebarCollapsed(false)}
           >
-            <Sidebar onCollapse={collapseSidebar} />
+            <Sidebar onCollapse={collapseSidebar} onExpand={expandSidebar} compact={sidebarCollapsed} />
           </Panel>
-          <PanelResizeHandle className="w-px bg-stone-200 dark:bg-stone-700 hover:bg-stone-400 dark:hover:bg-stone-500 transition-colors" />
+          <PanelResizeHandle className="w-1 bg-transparent hover:bg-[var(--edge-soft)] transition-colors" />
           <Panel defaultSize={65} minSize={30}>
             <MainPane />
           </Panel>
-          <PanelResizeHandle className="w-px bg-stone-200 dark:bg-stone-700 hover:bg-stone-400 dark:hover:bg-stone-500 transition-colors" />
+          <PanelResizeHandle className="w-1 bg-transparent hover:bg-[var(--edge-soft)] transition-colors" />
           <Panel
             ref={chatRef}
             defaultSize={20}

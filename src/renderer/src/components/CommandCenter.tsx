@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
 import { effectiveQuickAddMap } from '../lib/keymap'
 import { createPortal } from 'react-dom'
 import { useNodeStore } from '../stores/nodes'
@@ -67,6 +68,8 @@ export default function CommandCenter({
   canSmartStack
 }: Props): JSX.Element {
   const [paletteOpen, setPaletteOpen] = useState(false)
+  const [pillExpanded, setPillExpanded] = useState(false)
+  const pillLeaveTimer = useRef<number | undefined>(undefined)
   const [query, setQuery] = useState('')
   const [highlightIdx, setHighlightIdx] = useState(0)
   // Deep content search results (notes, doc bodies, table cells, files) from the
@@ -650,33 +653,75 @@ export default function CommandCenter({
 
   return (
     <>
-      {/* Pinned pill — bottom-centre. Always visible. Lives in a portal so
-          its z-index isn't trapped by panels' stacking context. */}
+      {/* Command pill — bottom-centre, hover-expand. Portal so z-index isn't trapped. */}
       {createPortal(
         <div
-          className="fixed bottom-3 left-1/2 -translate-x-1/2 z-[120] fb-glass-chrome rounded-full border border-[color:var(--glass-chrome-border)] shadow-lg flex items-center gap-0.5 px-1.5 py-1"
-          role="toolbar"
-          aria-label="Quick actions"
+          className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[120] flex flex-col items-center"
+          onMouseEnter={() => {
+            if (pillLeaveTimer.current) clearTimeout(pillLeaveTimer.current)
+            setPillExpanded(true)
+          }}
+          onMouseLeave={() => {
+            pillLeaveTimer.current = window.setTimeout(() => setPillExpanded(false), 300)
+          }}
         >
-          <button
-            onClick={openPalette}
-            className="h-7 px-2.5 inline-flex items-center gap-1.5 rounded-full hover:bg-[var(--surface-sunken)]/80 text-[12px] text-[var(--ink-70)]"
-            title="Open command palette (⌘K)"
+          {/* Expanded quick-actions row — appears above the search pill */}
+          <AnimatePresence>
+            {pillExpanded && (
+              <motion.div
+                key="expanded"
+                initial={{ opacity: 0, y: 8, scale: 0.96 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 6, scale: 0.96 }}
+                transition={{ duration: 0.18, ease: [0.34, 1.56, 0.64, 1] }}
+                className="mb-1.5 fb-glass-chrome rounded-full ring-1 ring-black/[0.07] dark:ring-white/[0.07] shadow-[0_4px_20px_rgba(0,0,0,0.16)] flex items-center gap-0.5 px-2 py-1"
+                role="toolbar"
+                aria-label="Quick widget actions"
+              >
+                {contextActions.map((a) => (
+                  <PillButton
+                    key={a.id}
+                    icon={a.icon}
+                    label={a.label}
+                    onClick={a.onClick}
+                    disabled={a.disabled}
+                    title={a.title}
+                  />
+                ))}
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Collapsed anchor — search pill always visible */}
+          <div
+            className="fb-glass-chrome rounded-full ring-1 ring-black/[0.07] dark:ring-white/[0.07] shadow-lg flex items-center px-1 py-1"
+            role="toolbar"
+            aria-label="Quick actions"
           >
-            <Icon name="search" size={13} className="text-[var(--ink-50)]" />
-            <span>Search · ⌘K</span>
-          </button>
-          <span className="w-px h-4 bg-[var(--edge-firm)]/60" />
-          {contextActions.map((a) => (
-            <PillButton
-              key={a.id}
-              icon={a.icon}
-              label={a.label}
-              onClick={a.onClick}
-              disabled={a.disabled}
-              title={a.title}
-            />
-          ))}
+            <button
+              onClick={openPalette}
+              className="h-7 px-2.5 inline-flex items-center gap-1.5 rounded-full hover:bg-[var(--surface-sunken)]/80 text-[12px] text-[var(--ink-70)] transition-colors"
+              title="Open command palette (⌘K)"
+            >
+              <Icon name="search" size={13} className="text-[var(--ink-50)]" />
+              <span className="text-[var(--ink-60)]">Search</span>
+              <kbd className="text-[10px] font-mono text-[var(--ink-40)] ml-0.5">⌘K</kbd>
+            </button>
+            {/* Subtle up-chevron hints that more actions are available */}
+            <div className="w-px h-4 bg-[var(--edge-firm)]/60 mx-0.5" />
+            <button
+              onClick={() => setPillExpanded((v) => !v)}
+              className="h-7 w-7 inline-flex items-center justify-center rounded-full text-[var(--ink-40)] hover:bg-[var(--surface-sunken)]/80 hover:text-[var(--ink-70)] transition-colors"
+              title={pillExpanded ? 'Collapse quick actions' : 'Show quick actions'}
+            >
+              <motion.div
+                animate={{ rotate: pillExpanded ? 180 : 0 }}
+                transition={{ duration: 0.18 }}
+              >
+                <Icon name="expand_less" size={14} />
+              </motion.div>
+            </button>
+          </div>
         </div>,
         document.body
       )}

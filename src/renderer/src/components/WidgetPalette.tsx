@@ -16,6 +16,9 @@ interface Props {
   onImport?: () => void
   onBringSynced?: () => void
   disabled: boolean
+  // compact=true renders a full-width row button instead of the accent chip,
+  // for use inside the FloatingToolbar expanded panel.
+  compact?: boolean
 }
 
 // Compact desk-objects picker.
@@ -32,7 +35,8 @@ export default function WidgetPalette({
   onAdd,
   onImport,
   onBringSynced,
-  disabled
+  disabled,
+  compact = false
 }: Props): JSX.Element {
   const [open, setOpen] = useState(false)
   const buttonRef = useRef<HTMLButtonElement | null>(null)
@@ -90,22 +94,27 @@ export default function WidgetPalette({
         ref={buttonRef}
         onClick={() => !disabled && setOpen((v) => !v)}
         disabled={disabled}
-        // Accent-tinted so the primary "create something" action is the most
-        // visible control in the toolbar, in every theme (it keys off the
-        // --accent token, not a fixed stone colour). Labelled "Widget" so its
-        // purpose is explicit rather than a generic "Add".
-        className={`inline-flex items-center gap-1.5 h-7 px-2.5 rounded-md text-[12px] font-semibold border transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
-          open
-            ? 'bg-accent/25 border-accent/60 text-accent'
-            : 'bg-accent/10 border-accent/40 text-accent hover:bg-accent/20 hover:border-accent/60'
-        }`}
+        className={compact
+          ? `w-full h-8 inline-flex items-center gap-2 rounded-xl px-2 transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
+              open
+                ? 'bg-[var(--surface-sunken)] text-[rgb(var(--accent))]'
+                : 'text-[var(--ink-70)] hover:bg-[var(--surface-sunken)] hover:text-[var(--ink-100)]'
+            }`
+          : `inline-flex items-center gap-1.5 h-7 px-2.5 rounded-md text-[12px] font-semibold border transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+              open
+                ? 'bg-accent/25 border-accent/60 text-accent'
+                : 'bg-accent/10 border-accent/40 text-accent hover:bg-accent/20 hover:border-accent/60'
+            }`
+        }
         title="Add a widget to your desk"
         aria-haspopup="dialog"
         aria-expanded={open}
         data-testid="palette-add-button"
       >
-        <Icon name="add" size={14} />
-        <span>Widget</span>
+        <Icon name={compact ? 'add_circle' : 'add'} size={compact ? 15 : 14} className="shrink-0" />
+        <span className={compact ? 'text-[12px]' : ''}>
+          {compact ? 'Add widget' : 'Widget'}
+        </span>
       </button>
       {open && popoverPos && createPortal(
         <div
@@ -114,6 +123,7 @@ export default function WidgetPalette({
           style={{ top: popoverPos.top, left: popoverPos.left }}
           role="dialog"
           aria-label="Desk objects"
+          data-widget-picker="true"
         >
           <div className="sticky top-0 bg-[var(--surface-raised)] px-3 py-2 border-b border-[var(--edge-soft)] flex items-center justify-between">
             <span className="text-[11px] uppercase tracking-[0.12em] text-[var(--ink-50)] font-semibold">

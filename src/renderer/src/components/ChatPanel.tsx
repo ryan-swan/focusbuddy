@@ -156,8 +156,8 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
   }
 
   return (
-    <aside className="h-full flex flex-col fb-glass-chrome border-l border-[color:var(--glass-chrome-border)]">
-      <div className="px-3 py-3 border-b border-[var(--edge-soft)] flex items-center justify-between gap-2">
+    <aside className="m-2 flex flex-col rounded-[18px] bg-[var(--surface-raised)]/96 backdrop-blur-2xl text-[var(--ink-100)] shadow-[0_2px_20px_rgba(0,0,0,0.10),0_0_0_1px_rgba(0,0,0,0.05)] dark:shadow-[0_2px_20px_rgba(0,0,0,0.35),0_0_0_1px_rgba(255,255,255,0.05)] overflow-hidden" style={{ height: 'calc(100% - 16px)' }}>
+      <div className="px-3 py-3 border-b border-[var(--edge-soft)]/60 flex items-center justify-between gap-2 shrink-0">
         <div className="min-w-0">
           <div className="flex items-center gap-1.5">
             <Icon name="smart_toy" size={16} className="text-[var(--ink-70)]" />

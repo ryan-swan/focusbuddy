@@ -150,7 +150,7 @@ export default function MinimapWidget({ widget, inline = false }: Props): JSX.El
   )
 }
 
-function MinimapBody({
+export function MinimapBody({
   widget,
   widgets,
   zoom,

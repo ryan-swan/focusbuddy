@@ -32,6 +32,8 @@ import PlexiReportsView from './views/PlexiReportsView'
 import PlexiFlowView from './views/PlexiFlowView'
 import PlexiApiView from './views/PlexiApiView'
 import PlexiMarketplaceView from './views/PlexiMarketplaceView'
+import RoomView from './views/RoomView'
+import AllRoomsView from './views/AllRoomsView'
 import CapabilityGate from './CapabilityGate'
 import { VIEW_CAPABILITY } from '../lib/viewCapability'
 
@@ -132,6 +134,10 @@ function MainPaneSurface(): JSX.Element {
       return <PlexiApiView />
     case 'marketplace':
       return <PlexiMarketplaceView />
+    case 'room':
+      return <RoomView roomId={view.roomId} />
+    case 'rooms':
+      return <AllRoomsView />
     default:
       return <HomeDashboard />
   }

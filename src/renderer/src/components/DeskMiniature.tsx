@@ -13,9 +13,23 @@ interface Props {
   width: number
   height: number
   padding?: number
+  // Silhouette mode: render solid colored rects instead of live content previews.
+  // Faster and cleaner for Stage Manager cards and Room View thumbnails.
+  silhouette?: boolean
 }
 
-export default function DeskMiniature({ widgets, width, height, padding = 6 }: Props): JSX.Element {
+// Kind → muted fill color for silhouette mode
+const SILHOUETTE_FILL: Record<string, string> = {
+  note: 'rgb(var(--accent) / 0.18)',
+  web: 'rgb(var(--accent) / 0.12)',
+  file: 'rgb(var(--accent) / 0.14)',
+  section: 'rgb(var(--accent) / 0.06)',
+}
+function silhouetteFill(kind: string): string {
+  return SILHOUETTE_FILL[kind] ?? 'rgb(var(--accent) / 0.13)'
+}
+
+export default function DeskMiniature({ widgets, width, height, padding = 6, silhouette = false }: Props): JSX.Element {
   // Top-level, visible, real widgets — skip archived, pinned, section children,
   // and the auto minimap (a minimap inside a miniature is just noise).
   const visible = useMemo(
@@ -80,7 +94,11 @@ export default function DeskMiniature({ widgets, width, height, padding = 6 }: P
         const y = padding + (w.y - bbox.minY) * scale
         const pw = Math.max(2, ww * scale)
         const ph = Math.max(2, hh * scale)
-        if (w.kind === 'section') {
+        if (silhouette || w.kind === 'section') {
+          const fill = w.kind === 'section'
+            ? 'rgb(var(--accent) / 0.06)'
+            : silhouetteFill(w.kind)
+          const stroke = w.kind === 'section' ? 'rgb(var(--accent) / 0.30)' : 'rgb(var(--accent) / 0.20)'
           return (
             <rect
               key={w.id}
@@ -88,8 +106,8 @@ export default function DeskMiniature({ widgets, width, height, padding = 6 }: P
               y={y}
               width={pw}
               height={ph}
-              fill="rgb(var(--accent) / 0.06)"
-              stroke="rgb(var(--accent) / 0.30)"
+              fill={fill}
+              stroke={stroke}
               strokeWidth={0.75}
               rx={2}
             />

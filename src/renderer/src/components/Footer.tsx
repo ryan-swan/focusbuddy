@@ -80,7 +80,7 @@ export default function Footer(): JSX.Element {
 
   return (
     <>
-      <footer className="h-7 px-3 flex items-center justify-between text-[11px] text-[var(--ink-50)] border-t border-[var(--edge-soft)] bg-[var(--surface-sunken)] select-none">
+      <footer className="mx-3 mb-2 mt-1 px-3 py-1 flex items-center justify-between text-[11px] text-[var(--ink-50)] rounded-full fb-glass-chrome ring-1 ring-black/[0.06] dark:ring-white/[0.06] shadow-[0_2px_10px_rgba(0,0,0,0.07)] select-none shrink-0">
         <div className="flex items-center gap-2 truncate">
           <span>© {year} PlexiDesk</span>
           <span className="text-[var(--ink-30)]">·</span>

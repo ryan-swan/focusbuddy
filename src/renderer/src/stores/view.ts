@@ -46,10 +46,12 @@ export type View =
   | { kind: 'sign' }
   | { kind: 'search' }
   | { kind: 'projects' }
+  | { kind: 'rooms' }
   | { kind: 'reports' }
   | { kind: 'flows' }
   | { kind: 'api' }
   | { kind: 'marketplace' }
+  | { kind: 'room'; roomId: string }
 
 interface ViewStore {
   view: View
@@ -88,10 +90,12 @@ interface ViewStore {
   goSign: () => void
   goSearch: () => void
   goProjects: () => void
+  goRooms: () => void
   goReports: () => void
   goFlows: () => void
   goApi: () => void
   goMarketplace: () => void
+  goRoom: (roomId: string) => void
 }
 
 const STORAGE_KEY = 'fb.view.last'
@@ -319,6 +323,11 @@ export const useViewStore = create<ViewStore>((set) => ({
     persistView(v)
     set({ view: v })
   },
+  goRooms: () => {
+    const v: View = { kind: 'rooms' }
+    persistView(v)
+    set({ view: v })
+  },
   goReports: () => {
     const v: View = { kind: 'reports' }
     persistView(v)
@@ -336,6 +345,11 @@ export const useViewStore = create<ViewStore>((set) => ({
   },
   goMarketplace: () => {
     const v: View = { kind: 'marketplace' }
+    persistView(v)
+    set({ view: v })
+  },
+  goRoom: (roomId) => {
+    const v: View = { kind: 'room', roomId }
     persistView(v)
     set({ view: v })
   }
