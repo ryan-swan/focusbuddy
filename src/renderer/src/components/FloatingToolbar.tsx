@@ -25,8 +25,6 @@ interface Props {
   historyDisabled: boolean
 }
 
-const EXPANDED_W = 178
-
 export default function FloatingToolbar({
   actions,
   onAddWidget,
@@ -58,23 +56,20 @@ export default function FloatingToolbar({
     window.removeEventListener('mouseup', onUp.current)
   })
 
-  const [defaultPos, setDefaultPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 })
+  // Only used when the user has manually dragged the toolbar
+  const [defaultY, setDefaultY] = useState<number | null>(null)
   useEffect(() => {
     function measure(): void {
       const canvas = document.querySelector('[data-canvas-surface="true"]') as HTMLElement | null
-      if (!canvas || !ref.current) return
+      if (!canvas) return
       const cr = canvas.getBoundingClientRect()
-      const tr = ref.current.getBoundingClientRect()
-      setDefaultPos({
-        x: cr.right - tr.width - 12,
-        y: cr.top + (cr.height - tr.height) / 2
-      })
+      setDefaultY(cr.top + cr.height / 2)
     }
     measure()
     window.addEventListener('resize', measure)
     const t = window.setTimeout(measure, 300)
     return () => { window.removeEventListener('resize', measure); window.clearTimeout(t) }
-  }, [expanded])
+  }, [])
 
   useEffect(() => {
     const move = onMove.current
@@ -100,7 +95,10 @@ export default function FloatingToolbar({
     window.addEventListener('mouseup', onUp.current)
   }
 
-  const currentPos = pos ?? defaultPos
+  // Default: CSS right-anchored. After dragging: absolute left/top.
+  const posStyle = pos
+    ? { left: pos.x, top: pos.y }
+    : { right: 12, top: defaultY ?? '50%', transform: defaultY ? undefined : 'translateY(-50%)' }
 
   return (
     <div
@@ -113,29 +111,23 @@ export default function FloatingToolbar({
       title="Drag to reposition · Double-click to re-center"
       onWheel={(e) => e.stopPropagation()}
       className="fixed z-[45] flex flex-col items-stretch fb-glass-chrome rounded-2xl overflow-hidden cursor-grab active:cursor-grabbing shadow-[0_4px_24px_rgba(0,0,0,0.14)] ring-1 ring-black/[0.07] dark:ring-white/[0.07]"
-      style={{
-        left: currentPos.x,
-        top: currentPos.y,
-        width: expanded ? EXPANDED_W : 40,
-        transition: pos ? 'width 200ms ease' : 'width 200ms ease, left 300ms ease, top 300ms ease'
-      }}
+      style={posStyle}
     >
-      {/* Drag handle */}
-      <div className="py-1.5 flex items-center justify-center w-full shrink-0">
-        <Icon name="drag_indicator" size={12} className="text-[var(--ink-25,var(--ink-30))] pointer-events-none" />
+      {/* Collapsed header: drag handle + toggle icon, fixed narrow width */}
+      <div className="flex flex-col items-center w-10 shrink-0">
+        <div className="pt-1.5 pb-0.5 flex items-center justify-center w-full">
+          <Icon name="drag_indicator" size={12} className="text-[var(--ink-25,var(--ink-30))] pointer-events-none" />
+        </div>
+        <button
+          onClick={() => setExpanded((v) => !v)}
+          className="h-8 w-8 mx-1 mb-1 inline-flex items-center justify-center rounded-xl text-[var(--ink-50)] hover:bg-[var(--surface-sunken)] hover:text-[var(--ink-100)] transition-colors"
+          title={expanded ? 'Collapse tools' : 'Expand tools'}
+        >
+          <Icon name={expanded ? 'keyboard_double_arrow_up' : 'construction'} size={15} className="shrink-0" />
+        </button>
       </div>
 
-      {/* Toggle button */}
-      <button
-        onClick={() => setExpanded((v) => !v)}
-        className="h-8 mx-1 mb-0.5 inline-flex items-center gap-2 rounded-xl px-2 text-[var(--ink-50)] hover:bg-[var(--surface-sunken)] hover:text-[var(--ink-100)] transition-colors"
-        title={expanded ? 'Collapse tools' : 'Expand tools'}
-      >
-        <Icon name={expanded ? 'keyboard_double_arrow_down' : 'construction'} size={15} className="shrink-0" />
-        {expanded && <span className="text-[11px] font-medium text-[var(--ink-60)] truncate">Tools</span>}
-      </button>
-
-      {/* Expandable section */}
+      {/* Expandable section — drops down, drives width to 178px */}
       <AnimatePresence initial={false}>
         {expanded && (
           <motion.div
@@ -143,8 +135,9 @@ export default function FloatingToolbar({
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.2, ease: 'easeInOut' }}
+            transition={{ duration: 0.22, ease: [0.34, 1.2, 0.64, 1] }}
             className="overflow-hidden flex flex-col"
+            style={{ width: 178 }}
             data-no-drag
           >
             <div className="mx-2 h-px bg-[var(--edge-soft)] mb-1" />
@@ -198,8 +191,6 @@ export default function FloatingToolbar({
           </motion.div>
         )}
       </AnimatePresence>
-
-      <div className="pb-1" />
     </div>
   )
 }
