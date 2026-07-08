@@ -36,6 +36,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.8.0',
+    date: '2026-07-09T00:00:00Z',
+    title: 'PlexiDesk 3.8.0 — shared docs co-edit, and a tidier Settings',
+    tag: 'feature',
+    summary:
+      'Two things. When you and a teammate open the same document in a shared organisation, your edits now merge live instead of one of you quietly overwriting the other. And Settings is now organised into tabs (Appearance, Account, Organisation, AI, Templates, Data, Advanced) instead of one long scroll, so each area is easy to find.',
+    highlights: [
+      'Shared organisation documents co-edit live: two people editing at once both keep their changes, no more silent overwrites.',
+      'Settings is tabbed now, with everything (including Organisation and Templates) grouped by area.',
+      'Opening a shared document routes it into the live editor automatically; personal documents are unchanged.'
+    ]
+  },
+  {
     version: '3.7.0',
     date: '2026-07-08T23:59:00Z',
     title: 'PlexiDesk 3.7.0 — shared org changes sync near-instantly',
