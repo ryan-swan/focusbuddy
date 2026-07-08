@@ -36,6 +36,20 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.6.0',
+    date: '2026-07-08T22:00:00Z',
+    title: 'PlexiDesk 3.6.0 — tours you can replay any time',
+    tag: 'feature',
+    summary:
+      'Onboarding is now a set of short, replayable tours instead of a one-time welcome. Each tour jumps you to the real screen it is teaching and points at the actual controls, shows how long it takes, and lets you skip or go back at any step, so it stays quick and never gets in your way. You can replay any tour whenever you like from the command palette (Take a tour) or Settings, and new features arrive as their own optional mini-tour offered on launch. Two tours ship to start: Rooms, Desks and Plans, and Connected office files.',
+    highlights: [
+      'Onboarding is modular and replayable any time, from the command palette (Take a tour) or Settings, not just on first run.',
+      'Tours are dynamic: each step opens the real screen and highlights the real control, with a time estimate and always-available Skip.',
+      'New features arrive as their own short optional tour, offered as a dismissible card on launch.',
+      'Two tours to start: Rooms, Desks and Plans, and Connected office files.'
+    ]
+  },
+  {
     version: '3.5.2',
     date: '2026-07-08T20:30:00Z',
     title: 'PlexiDesk 3.5.2 — roomier plans and documents',
