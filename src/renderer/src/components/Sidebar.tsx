@@ -49,6 +49,7 @@ import SharedRecipientBadges from './SharedRecipientBadges'
 import Icon from './Icon'
 import { StatusPill } from './plexi'
 import { fieldInputClass } from './plexi/forms'
+import { FLOATING_MENU_ASIDE, FLOATING_MENU_STYLE, MenuMinimizeButton } from './chrome/floatingMenu'
 
 // MIME used when dragging a Connected App row from the sidebar onto the canvas.
 // The Canvas drop handler reads this to spawn a webview widget bound to the app.
@@ -599,7 +600,7 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
   }
 
   return (
-    <aside className="h-full flex flex-col overflow-hidden border-r border-[var(--edge-soft)] bg-[var(--surface-raised)] text-[var(--ink-100)]">
+    <aside className={FLOATING_MENU_ASIDE} style={FLOATING_MENU_STYLE} data-testid="desk-sidebar">
       {/* Header — same silhouette as the PlexiOffice menu: the wordmark on the
           left, then the desk's own actions (New desk, hide) on the right. */}
       <div className="flex items-center gap-2 px-4 h-14 border-b border-[var(--edge-soft)]">
@@ -614,13 +615,7 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
             <span>New</span>
           </button>
           {onCollapse && (
-            <button
-              onClick={onCollapse}
-              title="Hide sidebar"
-              className="text-[var(--ink-50)] hover:text-[var(--ink-90)]"
-            >
-              <Icon name="keyboard_double_arrow_left" size={18} />
-            </button>
+            <MenuMinimizeButton onClick={onCollapse} title="Minimise the menu to free the desk" />
           )}
         </div>
       </div>
@@ -1037,7 +1032,7 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
                     ) : (
                       <>
                         <span
-                          className={`text-sm truncate flex-1 ${
+                          className={`text-sm flex-1 min-w-0 break-words line-clamp-2 leading-tight ${
                             isActive
                               ? 'text-[var(--ink-100)] font-medium'
                               : 'text-[var(--ink-90)]'

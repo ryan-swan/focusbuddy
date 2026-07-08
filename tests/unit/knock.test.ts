@@ -26,6 +26,12 @@ vi.mock('../../src/renderer/src/stores/call', () => ({
   useCallStore: { getState: () => ({ startCall }) }
 }))
 
+// Sending a knock is gated on the 'knock' entitlement; grant it here so these
+// tests exercise the knock behavior (entitlement is tested separately).
+vi.mock('../../src/renderer/src/lib/entitlementReason', () => ({
+  entitlementFor: () => ({ enabled: true, restricted: false, reason: '', canUpgrade: false, onLockedClick: () => {} })
+}))
+
 import { useKnockStore } from '../../src/renderer/src/stores/knock'
 
 function reset(): void {

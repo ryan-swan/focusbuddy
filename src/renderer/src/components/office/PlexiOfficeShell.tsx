@@ -27,6 +27,14 @@ import MessagesView from '../views/MessagesView'
 import PlexiMeetView from '../views/PlexiMeetView'
 import PlexiSignView from '../views/PlexiSignView'
 import Icon from '../Icon'
+import {
+  FLOATING_MENU_ASIDE_SCROLL,
+  FLOATING_MENU_INSET,
+  FLOATING_MENU_STYLE,
+  MenuMinimizeButton,
+  MenuRestorePill,
+  useMinimizable
+} from '../chrome/floatingMenu'
 import type { DocType, DocumentMeta, TimeBlock } from '@shared/types'
 
 // PlexiOffice — the office segment of the system. Its own full-bleed shell with a
@@ -183,6 +191,11 @@ export default function PlexiOfficeShell({ initialApp }: { initialApp?: string }
     [inboxItems]
   )
 
+  // The office menu floats as a rounded card and can be minimised to free the
+  // content area, matching the global Desk sidebar and the segment menus.
+  const { minimized: menuMinimized, minimize: minimizeMenu, restore: restoreMenu } =
+    useMinimizable('fb.officeMenu.minimized')
+
   const [page, setPage] = useState<OfficePage>('home')
   const [openDocId, setOpenDocId] = useState<string | null>(null)
   // The active communication app (Mail / Inbox / Chat / Meet / Sign), or null
@@ -328,8 +341,12 @@ export default function PlexiOfficeShell({ initialApp }: { initialApp?: string }
   // An open document takes over the content area; the office sidebar stays.
   if (openDocId) {
     return (
-      <div className="h-full flex bg-[var(--surface-base)]">
-        <OfficeSidebar page={page} onPage={(p) => { setOpenDocId(null); setActiveComms(null); setPage(p) }} onLaunch={(a) => void launch(a)} onComms={openComms} activeComms={null} onExit={goHome} starredCount={starred.size} entInputs={entInputs} />
+      <div className="h-full flex bg-[var(--surface-base)] relative">
+        {menuMinimized ? (
+          <MenuRestorePill onClick={restoreMenu} label="PlexiOffice" title="Show the PlexiOffice menu" />
+        ) : (
+          <OfficeSidebar page={page} onPage={(p) => { setOpenDocId(null); setActiveComms(null); setPage(p) }} onLaunch={(a) => void launch(a)} onComms={openComms} activeComms={null} onExit={goHome} onMinimize={minimizeMenu} starredCount={starred.size} entInputs={entInputs} />
+        )}
         <div className="flex-1 min-w-0">
           <DocumentEditorView documentId={openDocId} onBack={() => { setOpenDocId(null); void refresh() }} />
         </div>
@@ -354,16 +371,24 @@ export default function PlexiOfficeShell({ initialApp }: { initialApp?: string }
       comms.render()
     )
     return (
-      <div className="h-full flex bg-[var(--surface-base)]">
-        <OfficeSidebar page={page} onPage={(p) => { setActiveComms(null); setPage(p) }} onLaunch={(a) => void launch(a)} onComms={openComms} activeComms={activeComms} onExit={goHome} starredCount={starred.size} entInputs={entInputs} />
+      <div className="h-full flex bg-[var(--surface-base)] relative">
+        {menuMinimized ? (
+          <MenuRestorePill onClick={restoreMenu} label="PlexiOffice" title="Show the PlexiOffice menu" />
+        ) : (
+          <OfficeSidebar page={page} onPage={(p) => { setActiveComms(null); setPage(p) }} onLaunch={(a) => void launch(a)} onComms={openComms} activeComms={activeComms} onExit={goHome} onMinimize={minimizeMenu} starredCount={starred.size} entInputs={entInputs} />
+        )}
         <div className="flex-1 min-w-0 overflow-auto" data-testid={`office-comms-${comms.key}`}>{content}</div>
       </div>
     )
   }
 
   return (
-    <div className="h-full flex bg-[var(--surface-base)] text-[var(--ink-100)]">
-      <OfficeSidebar page={page} onPage={setPage} onLaunch={(a) => void launch(a)} onComms={openComms} activeComms={null} onExit={goHome} starredCount={starred.size} entInputs={entInputs} />
+    <div className="h-full flex bg-[var(--surface-base)] text-[var(--ink-100)] relative">
+      {menuMinimized ? (
+        <MenuRestorePill onClick={restoreMenu} label="PlexiOffice" title="Show the PlexiOffice menu" />
+      ) : (
+        <OfficeSidebar page={page} onPage={setPage} onLaunch={(a) => void launch(a)} onComms={openComms} activeComms={null} onExit={goHome} onMinimize={minimizeMenu} starredCount={starred.size} entInputs={entInputs} />
+      )}
 
       <div className="flex-1 min-w-0 overflow-auto">
         <div className="max-w-[1400px] mx-auto px-6 py-6">
@@ -794,6 +819,7 @@ function OfficeSidebar({
   onComms,
   activeComms,
   onExit,
+  onMinimize,
   starredCount,
   entInputs
 }: {
@@ -803,6 +829,7 @@ function OfficeSidebar({
   onComms: (key: string) => void
   activeComms: string | null
   onExit: () => void
+  onMinimize: () => void
   starredCount: number
   entInputs: EntitlementInputs
 }): JSX.Element {
@@ -822,13 +849,17 @@ function OfficeSidebar({
     { id: 'trash', label: 'Trash', icon: 'delete', tint: 'bg-slate-500' }
   ]
   return (
-    <aside className="w-60 shrink-0 h-full overflow-auto border-r border-[var(--edge-soft)] bg-[var(--surface-raised)] flex flex-col" data-testid="office-sidebar">
+    <div className={`shrink-0 h-full box-border ${FLOATING_MENU_INSET}`} style={{ width: 260 }}>
+    <aside className={FLOATING_MENU_ASIDE_SCROLL} style={FLOATING_MENU_STYLE} data-testid="office-sidebar">
       {/* Logo + app switcher */}
       <div className="flex items-center gap-2 px-4 h-14 border-b border-[var(--edge-soft)]">
         <span className="text-[15px] font-bold tracking-[0.14em] text-[var(--ink-100)]">PLEXIOFFICE</span>
-        <button onClick={onExit} className="ml-auto text-[var(--ink-50)] hover:text-[var(--ink-90)]" title="Back to PlexiDesk" data-testid="office-exit">
-          <Icon name="apps" size={18} />
-        </button>
+        <div className="ml-auto flex items-center gap-1.5">
+          <MenuMinimizeButton onClick={onMinimize} title="Minimise the PlexiOffice menu" />
+          <button onClick={onExit} className="text-[var(--ink-50)] hover:text-[var(--ink-90)]" title="Back to PlexiDesk" data-testid="office-exit">
+            <Icon name="apps" size={18} />
+          </button>
+        </div>
       </div>
 
       <OrgSwitcher />
@@ -921,5 +952,6 @@ function OfficeSidebar({
         </div>
       </div>
     </aside>
+    </div>
   )
 }

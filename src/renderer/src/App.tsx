@@ -6,6 +6,12 @@ import {
   PanelResizeHandle
 } from 'react-resizable-panels'
 import Sidebar from './components/Sidebar'
+import {
+  FLOATING_MENU_INSET,
+  MenuRestorePill,
+  useMinimizable,
+  useSidebarWidth
+} from './components/chrome/floatingMenu'
 import MainPane from './components/MainPane'
 import PlexiOfficeShell from './components/office/PlexiOfficeShell'
 import { PlexiDeskShell, PlexiPeopleShell, PlexiBrainShell } from './components/segment/segments'
@@ -82,8 +88,16 @@ export default function App(): JSX.Element {
   const refresh = useNodeStore((s) => s.refresh)
   const setActive = useNodeStore((s) => s.setActive)
   const refreshTemplates = useTemplateStore((s) => s.refresh)
-  const sidebarRef = useRef<ImperativePanelHandle>(null)
   const chatRef = useRef<ImperativePanelHandle>(null)
+  // The global Desk sidebar is now a floating, resizable, minimisable card
+  // rather than a docked resize panel. Its minimise state and width persist
+  // across reloads; on a small window it starts minimised so it doesn't cover
+  // the content.
+  const {
+    minimized: sidebarMinimized,
+    minimize: minimizeSidebar,
+    restore: restoreSidebar
+  } = useMinimizable('fb.sidebar.minimized')
   // PlexiOffice is a full-bleed segment with its own chrome: when active it takes
   // over the main area, replacing the global sidebar / desk panels.
   const currentView = useViewStore((s) => s.view)
@@ -92,7 +106,6 @@ export default function App(): JSX.Element {
     currentView.kind === 'plexidesk' ||
     currentView.kind === 'plexipeople' ||
     currentView.kind === 'plexibrain'
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [chatCollapsed, setChatCollapsed] = useState(false)
   // On macOS the window uses hiddenInset, so the traffic lights sit at the top
   // left of the header. Reserve room so the header's left controls (the show-
@@ -392,12 +405,6 @@ export default function App(): JSX.Element {
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
-  function collapseSidebar(): void {
-    sidebarRef.current?.collapse()
-  }
-  function expandSidebar(): void {
-    sidebarRef.current?.expand()
-  }
   function collapseChat(): void {
     chatRef.current?.collapse()
   }
@@ -429,10 +436,10 @@ export default function App(): JSX.Element {
         }`}
       >
         <div className="titlebar-nodrag flex items-center gap-2">
-          {sidebarCollapsed && (
+          {sidebarMinimized && !segmentTakeover && (
             <Tooltip content="Show the workspace panel — your folders, tasks and projects" placement="bottom">
               <button
-                onClick={expandSidebar}
+                onClick={restoreSidebar}
                 className="h-7 px-2 inline-flex items-center gap-1 rounded-md text-[11px] font-medium text-stone-600 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-white/[0.06] border border-stone-200/70 dark:border-white/10 transition-colors"
                 aria-label="Show workspace panel"
               >
@@ -589,7 +596,7 @@ export default function App(): JSX.Element {
           )}
         </div>
       </header>
-      <main className="flex-1 min-h-0">
+      <main className="flex-1 min-h-0 relative flex bg-[var(--surface-base)]">
         {segmentTakeover ? (
           currentView.kind === 'office' ? (
             <PlexiOfficeShell initialApp={currentView.app} />
@@ -601,37 +608,43 @@ export default function App(): JSX.Element {
             <PlexiBrainShell initialApp={currentView.app} />
           )
         ) : (
-        <PanelGroup direction="horizontal" autoSaveId="focusbuddy-main-v2">
-          <Panel
-            ref={sidebarRef}
-            defaultSize={15}
-            minSize={12}
-            maxSize={40}
-            collapsible
-            collapsedSize={0}
-            onCollapse={() => setSidebarCollapsed(true)}
-            onExpand={() => setSidebarCollapsed(false)}
-          >
-            <Sidebar onCollapse={collapseSidebar} />
-          </Panel>
-          <PanelResizeHandle className="w-px bg-stone-200 dark:bg-stone-700 hover:bg-stone-400 dark:hover:bg-stone-500 transition-colors" />
-          <Panel defaultSize={65} minSize={30}>
-            <MainPane />
-          </Panel>
-          <PanelResizeHandle className="w-px bg-stone-200 dark:bg-stone-700 hover:bg-stone-400 dark:hover:bg-stone-500 transition-colors" />
-          <Panel
-            ref={chatRef}
-            defaultSize={20}
-            minSize={16}
-            maxSize={45}
-            collapsible
-            collapsedSize={0}
-            onCollapse={() => setChatCollapsed(true)}
-            onExpand={() => setChatCollapsed(false)}
-          >
-            <ChatPanel onCollapse={collapseChat} />
-          </Panel>
-        </PanelGroup>
+        <>
+          {/* The Desk sidebar floats as a rounded card beside the content. The
+              dock column reserves its width so dashboard content is never hidden
+              behind it, while the inset margin lets the desk surface show around
+              the card so it reads as floating above the surface. Minimising it
+              collapses the column entirely, giving the content the full width. */}
+          {!sidebarMinimized && (
+            <SidebarDock onMinimize={minimizeSidebar} />
+          )}
+          {sidebarMinimized && (
+            <MenuRestorePill
+              onClick={restoreSidebar}
+              label="Workspace"
+              title="Show the workspace panel"
+            />
+          )}
+          <div className="flex-1 min-w-0 h-full">
+            <PanelGroup direction="horizontal" autoSaveId="focusbuddy-main-v3">
+              <Panel defaultSize={78} minSize={40}>
+                <MainPane />
+              </Panel>
+              <PanelResizeHandle className="w-px bg-stone-200 dark:bg-stone-700 hover:bg-stone-400 dark:hover:bg-stone-500 transition-colors" />
+              <Panel
+                ref={chatRef}
+                defaultSize={22}
+                minSize={16}
+                maxSize={45}
+                collapsible
+                collapsedSize={0}
+                onCollapse={() => setChatCollapsed(true)}
+                onExpand={() => setChatCollapsed(false)}
+              >
+                <ChatPanel onCollapse={collapseChat} />
+              </Panel>
+            </PanelGroup>
+          </div>
+        </>
         )}
       </main>
       <Footer />
@@ -684,6 +697,51 @@ export default function App(): JSX.Element {
           anchorY={settingsOpen.y}
         />
       )}
+    </div>
+  )
+}
+
+// The dock column that carries the floating Desk sidebar. It reserves the
+// sidebar's width so content sits beside the card rather than under it, applies
+// the inset margin that detaches the card from the window edges, and hosts the
+// drag-to-resize grip on its right edge. Resize is both pointer- and
+// keyboard-driven, with the width persisted by useSidebarWidth.
+function SidebarDock({ onMinimize }: { onMinimize: () => void }): JSX.Element {
+  const { width, onResizeStart, nudge, resizing } = useSidebarWidth()
+  return (
+    <div
+      className={`relative shrink-0 h-full box-border ${FLOATING_MENU_INSET}`}
+      style={{ width }}
+      data-testid="sidebar-dock"
+    >
+      <Sidebar onCollapse={onMinimize} />
+      <div
+        onPointerDown={onResizeStart}
+        onKeyDown={(e) => {
+          if (e.key === 'ArrowLeft') {
+            e.preventDefault()
+            nudge(-16)
+          } else if (e.key === 'ArrowRight') {
+            e.preventDefault()
+            nudge(16)
+          }
+        }}
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Resize the workspace panel"
+        title="Drag to resize the workspace panel"
+        tabIndex={0}
+        data-testid="sidebar-resize"
+        className="group absolute top-0 right-0 h-full w-2.5 flex items-center justify-center cursor-col-resize outline-none touch-none"
+      >
+        <span
+          className={`h-10 w-[3px] rounded-full transition-colors ${
+            resizing
+              ? 'bg-[rgb(var(--accent))]'
+              : 'bg-transparent group-hover:bg-[rgb(var(--accent)/0.5)] group-focus-visible:bg-[rgb(var(--accent))]'
+          }`}
+        />
+      </div>
     </div>
   )
 }

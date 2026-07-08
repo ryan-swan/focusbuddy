@@ -36,6 +36,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.3.9',
+    date: '2026-07-08T13:00:00Z',
+    title: 'PlexiDesk 3.3.9 — floating, minimizable menus',
+    tag: 'design',
+    summary:
+      'The side menu and the area menus are now rounded panels that float above the desk, and each can be minimized to a small handle to give the canvas the whole screen, which matters on smaller displays. Resizing the side menu no longer clips labels: names wrap to two lines and the menu has a sensible minimum width, so nothing disappears as you drag it narrower. Your menu width and minimized state are remembered.',
+    highlights: [
+      'Menus float above the desk as rounded panels and can be minimized to reclaim canvas space.',
+      'Narrowing the side menu wraps labels instead of hiding them; a minimum width prevents clipping.',
+      'Menu width and minimized state persist across restarts.'
+    ]
+  },
+  {
     version: '3.3.8',
     date: '2026-07-08T12:00:00Z',
     title: 'PlexiDesk 3.3.8 — meeting transcription fix',

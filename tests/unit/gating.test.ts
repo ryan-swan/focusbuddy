@@ -38,14 +38,16 @@ describe('isEnabledValue', () => {
 
 describe('isCapabilityEnabled — boolean gates from the matrix', () => {
   it('free user cannot use a Pro-only capability by default', () => {
+    // Uses caps that remain Pro-gated under the land-grab pricing (collaboration
+    // and backup are the wall; widgets and personal features are free).
     const free = defaultsForTier('free')
-    expect(isCapabilityEnabled(free, 'widget_table')).toBe(false) // free:false
+    expect(isCapabilityEnabled(free, 'chat')).toBe(false)
     expect(isCapabilityEnabled(free, 'body_double')).toBe(false)
-    expect(isCapabilityEnabled(free, 'drift_detection')).toBe(false)
+    expect(isCapabilityEnabled(free, 'workspace_history')).toBe(false)
   })
   it('pro user can use Pro capabilities', () => {
     const pro = defaultsForTier('pro')
-    expect(isCapabilityEnabled(pro, 'widget_table')).toBe(true)
+    expect(isCapabilityEnabled(pro, 'chat')).toBe(true)
     expect(isCapabilityEnabled(pro, 'body_double')).toBe(true)
   })
   it('an ADMIN OVERRIDE that enables a cap for free flips the verdict', () => {
@@ -80,25 +82,26 @@ describe('limitForValue — numeric limits', () => {
   })
 })
 
-describe('canCreateMore — desk limit (multiple_desks)', () => {
-  const free = defaultsForTier('free') // multiple_desks: 3
-  const pro = defaultsForTier('pro') // multiple_desks: 'Unlimited'
+describe('canCreateMore — numeric limit logic', () => {
+  // Tests the limit LOGIC with explicit maps, independent of what any tier is
+  // priced at (the free desk count is now Unlimited under land-grab pricing, so
+  // we assert the function, not a specific tier value).
+  const capped: CapabilityMap = { multiple_desks: 3 }
+  const unlimited: CapabilityMap = { multiple_desks: 'Unlimited' }
 
-  it('free user: allowed up to the limit, blocked at it', () => {
-    expect(limitFor(free, 'multiple_desks')).toBe(3)
-    expect(canCreateMore(free, 'multiple_desks', 0)).toBe(true)
-    expect(canCreateMore(free, 'multiple_desks', 2)).toBe(true) // creating the 3rd
-    expect(canCreateMore(free, 'multiple_desks', 3)).toBe(false) // would be the 4th
-    expect(canCreateMore(free, 'multiple_desks', 5)).toBe(false)
+  it('a numeric limit allows up to the limit and blocks at it', () => {
+    expect(limitFor(capped, 'multiple_desks')).toBe(3)
+    expect(canCreateMore(capped, 'multiple_desks', 0)).toBe(true)
+    expect(canCreateMore(capped, 'multiple_desks', 2)).toBe(true) // creating the 3rd
+    expect(canCreateMore(capped, 'multiple_desks', 3)).toBe(false) // would be the 4th
+    expect(canCreateMore(capped, 'multiple_desks', 5)).toBe(false)
   })
-  it('pro user: unlimited', () => {
-    expect(limitFor(pro, 'multiple_desks')).toBeNull()
-    expect(canCreateMore(pro, 'multiple_desks', 999)).toBe(true)
+  it('Unlimited never blocks', () => {
+    expect(limitFor(unlimited, 'multiple_desks')).toBeNull()
+    expect(canCreateMore(unlimited, 'multiple_desks', 999)).toBe(true)
   })
-  it('admin override raising a free user to 5 desks is respected', () => {
-    const freeBumped: CapabilityMap = { ...free, multiple_desks: 5 }
-    expect(canCreateMore(freeBumped, 'multiple_desks', 3)).toBe(true)
-    expect(canCreateMore(freeBumped, 'multiple_desks', 5)).toBe(false)
+  it('free tier is unlimited desks under current pricing', () => {
+    expect(limitFor(defaultsForTier('free'), 'multiple_desks')).toBeNull()
   })
 })
 
@@ -111,24 +114,31 @@ describe('canCreateWidget — palette gating', () => {
     expect(capabilityForWidgetKind('note')).toBe('widget_notes')
     expect(capabilityForWidgetKind('totally-unknown')).toBeNull()
   })
-  it('free user blocked from the Table widget, allowed ungated widgets', () => {
-    expect(canCreateWidget(free, 'table')).toBe(false) // widget_table free:false
-    expect(canCreateWidget(free, 'note')).toBe(true) // widget_notes free:true
-    expect(canCreateWidget(free, 'image')).toBe(true) // ungated kind
+  it('a widget whose capability is off is blocked; ungated + enabled kinds allowed', () => {
+    // Explicit map so this tests the gating logic, not a tier price point (all
+    // widgets are free under current pricing).
+    const gated: CapabilityMap = { widget_table: false, widget_notes: true }
+    expect(canCreateWidget(gated, 'table')).toBe(false)
+    expect(canCreateWidget(gated, 'note')).toBe(true)
+    expect(canCreateWidget(gated, 'image')).toBe(true) // ungated kind
+  })
+  it('widgets are all creatable on the free tier under current pricing', () => {
+    expect(canCreateWidget(free, 'table')).toBe(true)
+    expect(canCreateWidget(free, 'note')).toBe(true)
   })
   it('pro user can create the Table widget', () => {
     expect(canCreateWidget(pro, 'table')).toBe(true)
   })
-  it('admin override enabling widget_table for a free user unlocks the palette tile', () => {
-    const freeOverride: CapabilityMap = { ...free, widget_table: true }
-    expect(canCreateWidget(freeOverride, 'table')).toBe(true)
+  it('admin override disabling widget_table for a user locks the palette tile', () => {
+    const override: CapabilityMap = { ...free, widget_table: false }
+    expect(canCreateWidget(override, 'table')).toBe(false)
   })
 })
 
 describe('limitLabel', () => {
   it('renders numeric + unlimited', () => {
-    expect(limitLabel(defaultsForTier('free'), 'multiple_desks')).toBe('3')
-    expect(limitLabel(defaultsForTier('pro'), 'multiple_desks')).toBe('Unlimited')
+    expect(limitLabel({ multiple_desks: 3 } as CapabilityMap, 'multiple_desks')).toBe('3')
+    expect(limitLabel({ multiple_desks: 'Unlimited' } as CapabilityMap, 'multiple_desks')).toBe('Unlimited')
   })
 })
 

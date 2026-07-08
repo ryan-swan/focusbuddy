@@ -4,6 +4,14 @@ import SegmentSwitcher from './SegmentSwitcher'
 import OrgSwitcher from '../OrgSwitcher'
 import { promptUpgrade } from '../../stores/upgradePrompt'
 import Icon from '../Icon'
+import {
+  FLOATING_MENU_ASIDE_SCROLL,
+  FLOATING_MENU_INSET,
+  FLOATING_MENU_STYLE,
+  MenuMinimizeButton,
+  MenuRestorePill,
+  useMinimizable
+} from '../chrome/floatingMenu'
 
 // A reusable "segment" shell: a full-bleed area with its own dedicated side menu
 // and a home of app tiles. Each segment (PlexiWork, PlexiConnect, PlexiFlow) is a
@@ -40,16 +48,27 @@ export default function SegmentShell({ def, initialApp }: { def: SegmentDef; ini
     if (initialApp) setActiveKey(initialApp)
   }, [initialApp])
   const active = def.apps.find((a) => a.key === activeKey) ?? null
+  // The segment menu floats as a rounded card and can be minimised to free the
+  // area, exactly like the global Desk sidebar. Its state persists per reload.
+  const { minimized, minimize, restore } = useMinimizable('fb.segmentMenu.minimized')
 
   return (
-    <div className="h-full flex bg-[var(--surface-base)] text-[var(--ink-100)]" data-testid={`segment-${def.wordmark.toLowerCase()}`}>
-      {/* Dedicated segment side menu */}
-      <aside className="w-60 shrink-0 h-full overflow-auto border-r border-[var(--edge-soft)] bg-[var(--surface-raised)] flex flex-col" data-testid="segment-sidebar">
+    <div className="h-full flex bg-[var(--surface-base)] text-[var(--ink-100)] relative" data-testid={`segment-${def.wordmark.toLowerCase()}`}>
+      {minimized && (
+        <MenuRestorePill onClick={restore} label={def.title} title={`Show the ${def.title} menu`} />
+      )}
+      {/* Dedicated segment side menu — a floating rounded card */}
+      {!minimized && (
+      <div className={`shrink-0 h-full box-border ${FLOATING_MENU_INSET}`} style={{ width: 260 }}>
+      <aside className={FLOATING_MENU_ASIDE_SCROLL} style={FLOATING_MENU_STYLE} data-testid="segment-sidebar">
         <div className="flex items-center gap-2 px-4 h-14 border-b border-[var(--edge-soft)]">
           <span className="text-[15px] font-bold tracking-[0.14em]">{def.wordmark}</span>
-          <button onClick={goHome} className="ml-auto text-[var(--ink-50)] hover:text-[var(--ink-90)]" title="Back to PlexiDesk" data-testid="segment-exit">
-            <Icon name="apps" size={18} />
-          </button>
+          <div className="ml-auto flex items-center gap-1.5">
+            <MenuMinimizeButton onClick={minimize} title={`Minimise the ${def.title} menu`} />
+            <button onClick={goHome} className="text-[var(--ink-50)] hover:text-[var(--ink-90)]" title="Back to PlexiDesk" data-testid="segment-exit">
+              <Icon name="apps" size={18} />
+            </button>
+          </div>
         </div>
 
         <OrgSwitcher />
@@ -101,6 +120,8 @@ export default function SegmentShell({ def, initialApp }: { def: SegmentDef; ini
           </div>
         </div>
       </aside>
+      </div>
+      )}
 
       {/* Content: an app view inline, or the segment home of app tiles */}
       <div className="flex-1 min-w-0 overflow-hidden">

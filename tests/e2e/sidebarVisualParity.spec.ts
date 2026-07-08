@@ -4,7 +4,7 @@
  * Verifies that the restyled global Desk Sidebar (Sidebar.tsx) matches the
  * canonical PlexiOffice OfficeSidebar (PlexiOfficeShell.tsx) visual system:
  *
- *   - aside bg-[var(--surface-raised)] + border-r border-[var(--edge-soft)]
+ *   - aside bg-[var(--surface-raised)] + rounded-[14px] floating card, hairline border-[var(--edge-soft)]
  *   - 14-tall header with 15px bold tracking-[0.14em] wordmark
  *   - SegmentSwitcher present
  *   - Nav rows: rounded-lg, accent/0.12 tint + accent text when active
@@ -43,10 +43,12 @@ test('Desk Sidebar and OfficeSidebar share the same visual system', async () => 
     await deskSidebar.screenshot({ path: deskSidebarPath })
 
     // ── 2. Assert Desk Sidebar chrome ───────────────────────────────────────
-    // 2a. Outer aside: surface-raised bg + edge-soft right border
+    // 2a. Outer aside: surface-raised bg + a full rounded floating card edge.
+    //     The menu is now a floating rounded panel (rounded-[14px] + hairline
+    //     border all round) rather than a docked panel with a right border.
     const deskAsideClasses = await deskSidebar.getAttribute('class') ?? ''
     expect(deskAsideClasses).toContain('bg-[var(--surface-raised)]')
-    expect(deskAsideClasses).toContain('border-r')
+    expect(deskAsideClasses).toContain('rounded-[14px]')
     expect(deskAsideClasses).toContain('border-[var(--edge-soft)]')
 
     // 2b. Wordmark: 15px, font-bold, tracking-[0.14em]
@@ -104,7 +106,7 @@ test('Desk Sidebar and OfficeSidebar share the same visual system', async () => 
     // ── 4. Assert OfficeSidebar chrome (reference) ──────────────────────────
     const officeAsideClasses = await officeSidebar.getAttribute('class') ?? ''
     expect(officeAsideClasses).toContain('bg-[var(--surface-raised)]')
-    expect(officeAsideClasses).toContain('border-r')
+    expect(officeAsideClasses).toContain('rounded-[14px]')
     expect(officeAsideClasses).toContain('border-[var(--edge-soft)]')
 
     const officeWordmark = officeSidebar.locator('span.text-\\[15px\\].font-bold.tracking-\\[0\\.14em\\]').first()

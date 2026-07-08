@@ -12,6 +12,13 @@ vi.mock('../../src/renderer/src/lib/messagingSocket', () => ({
   }
 }))
 
+// Placing a call is gated on the 'calls' entitlement. These tests exercise the
+// call state machine as an entitled user; the entitlement logic itself is tested
+// separately, so grant it here.
+vi.mock('../../src/renderer/src/lib/entitlementReason', () => ({
+  entitlementFor: () => ({ enabled: true, restricted: false, reason: '', canUpgrade: false, onLockedClick: () => {} })
+}))
+
 // Minimal WebRTC + media fakes so the store's getUserMedia / RTCPeerConnection
 // paths run in node without a browser.
 class FakeTrack {
