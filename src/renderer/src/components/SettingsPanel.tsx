@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import {
   ACCENT_OPTIONS,
   THEME_OPTIONS,
@@ -139,7 +140,15 @@ export default function SettingsPanel({
       if (e.key === 'Escape') onClose()
     }
     function onClickOutside(e: MouseEvent): void {
-      if (ref.current && !ref.current.contains(e.target as Node)) onClose()
+      const target = e.target as Node
+      if (ref.current?.contains(target)) return
+      // ThemeBuilder is portalled to <body>, so it is a DOM sibling of this
+      // popover rather than a descendant of ref. A click inside the studio must
+      // still count as "inside" — otherwise it would close Settings and unmount
+      // the studio between mousedown and click, dropping the actual control's
+      // click and losing the theme change.
+      if ((target as HTMLElement).closest?.('[data-testid="theme-builder"]')) return
+      onClose()
     }
     window.addEventListener('keydown', onKey)
     const armId = window.setTimeout(() => window.addEventListener('mousedown', onClickOutside), 50)
@@ -687,22 +696,28 @@ export default function SettingsPanel({
         Preferences saved locally.
       </div>
 
-      {studioOpen && (
-        <ThemeBuilder
-          mode={mode}
-          accent={accent}
-          font={font}
-          customAccentHex={customAccentHex}
-          customization={customization}
-          onModeChange={onModeChange}
-          onAccentChange={onAccentChange}
-          onFontChange={onFontChange}
-          onCustomAccentChange={onCustomAccentChange}
-          onCustomizationChange={onCustomizationChange}
-          onResetCustomization={onResetCustomization}
-          onClose={() => setStudioOpen(false)}
-        />
-      )}
+      {/* Portalled to <body> so its `fixed inset-0` overlay is relative to the
+          viewport. The Settings popover carries `backdrop-blur`, which makes it a
+          containing block for fixed-position descendants — rendering ThemeBuilder
+          in-tree would center it on the popover (off-screen), not the window. */}
+      {studioOpen &&
+        createPortal(
+          <ThemeBuilder
+            mode={mode}
+            accent={accent}
+            font={font}
+            customAccentHex={customAccentHex}
+            customization={customization}
+            onModeChange={onModeChange}
+            onAccentChange={onAccentChange}
+            onFontChange={onFontChange}
+            onCustomAccentChange={onCustomAccentChange}
+            onCustomizationChange={onCustomizationChange}
+            onResetCustomization={onResetCustomization}
+            onClose={() => setStudioOpen(false)}
+          />,
+          document.body
+        )}
     </div>
   )
 }
