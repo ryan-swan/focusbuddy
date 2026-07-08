@@ -14,6 +14,9 @@ export type View =
   // desks index to a single room.
   | { kind: 'rooms' }
   | { kind: 'desks'; roomId?: string }
+  // Rooms and desks other people have shared with you, shown as a gallery under
+  // the Rooms nav rather than an inline tree.
+  | { kind: 'shared' }
   | { kind: 'calendar' }
   | { kind: 'project-dashboard'; projectId: string }
   | { kind: 'task'; taskId: string }
@@ -64,6 +67,7 @@ interface ViewStore {
   goAllTasks: () => void
   goRooms: () => void
   goDesks: (roomId?: string) => void
+  goShared: () => void
   goCalendar: () => void
   goProject: (projectId: string) => void
   goTask: (taskId: string) => void
@@ -174,6 +178,11 @@ export const useViewStore = create<ViewStore>((set) => ({
   },
   goDesks: (roomId?: string) => {
     const v: View = { kind: 'desks', roomId }
+    persistView(v)
+    set({ view: v })
+  },
+  goShared: () => {
+    const v: View = { kind: 'shared' }
     persistView(v)
     set({ view: v })
   },

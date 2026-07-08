@@ -4,6 +4,7 @@ import HomeDashboard from './views/HomeDashboard'
 import AllTasksView from './views/AllTasksView'
 import RoomsView from './views/RoomsView'
 import DesksView from './views/DesksView'
+import SharedView from './views/SharedView'
 import ConnectedAppView from './views/ConnectedAppView'
 import VaultView from './views/VaultView'
 import CalendarView from './views/CalendarView'
@@ -72,6 +73,8 @@ function MainPaneSurface(): JSX.Element {
       return <RoomsView />
     case 'desks':
       return <DesksView roomId={view.roomId} />
+    case 'shared':
+      return <SharedView />
     // Every desk is a canvas: a top-level folder-desk opens the same drag-onto
     // canvas as a task (App keeps activeTaskId pointed at the folder's node).
     case 'project-dashboard':
