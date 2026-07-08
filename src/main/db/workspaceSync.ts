@@ -297,13 +297,68 @@ export function applyRemote(items: RemoteItem[]): { applied: number } {
 // Kept separate from applyRemote so the personal path stays byte-for-byte
 // unchanged. Each row is applied under its own try/catch so one bad foreign key
 // (e.g. a row whose table has not synced yet) never aborts the batch.
+// Order a pulled org batch so every parent inserts before its children in a single
+// pass, which matters because the receiver applies the batch inside one FK-checked
+// transaction. Two constraints stack:
+//   1. Cross-type rank: node before widget (widgets.task_id -> nodes.id) and table
+//      before row (fb_rows.table_id -> tables.id). Everything else is rank 0 and
+//      order-independent. A stable sort preserves the server's order within a rank.
+//   2. Node ancestry: nodes self-reference (parent_id REFERENCES nodes(id)), so a
+//      Room and a Desk nested in it can arrive together. Rank keeps all nodes ahead
+//      of widgets/rows but not in ancestry order, so the node items are additionally
+//      topologically sorted: a node whose parent is also in the batch is emitted
+//      only after that parent. A node whose parent is not in the batch (already in
+//      the DB, or a genuine orphan the retry handles) keeps its rank position.
+// Deletes carry no FK to satisfy, but ordering them costs nothing and keeps the
+// function pure over the whole batch. Exported so it can be unit-tested without a DB.
+export function orderOrgItemsForApply(items: RemoteItem[]): RemoteItem[] {
+  const rank = (t: ItemType): number => (t === 'node' ? 0 : t === 'widget' ? 1 : t === 'row' ? 2 : 0)
+  const ordered = [...items].sort((a, b) => rank(a.itemType) - rank(b.itemType))
+  const nodeIdx: number[] = []
+  const idToPos = new Map<string, number>()
+  ordered.forEach((it, i) => {
+    if (it.itemType !== 'node') return
+    nodeIdx.push(i)
+    if (typeof it.id === 'string') idToPos.set(it.id, i)
+  })
+  if (nodeIdx.length > 1) {
+    const parentOf = (i: number): string | null => {
+      const b = ordered[i].body as Record<string, unknown> | null | undefined
+      const p = b && typeof b === 'object' ? b['parent_id'] : null
+      return typeof p === 'string' ? p : null
+    }
+    const emitted = new Set<number>()
+    const out: number[] = []
+    const visit = (i: number, stack: Set<number>): void => {
+      if (emitted.has(i) || stack.has(i)) return
+      stack.add(i)
+      const p = parentOf(i)
+      if (p != null) {
+        const pi = idToPos.get(p)
+        if (pi != null && pi !== i) visit(pi, stack)
+      }
+      stack.delete(i)
+      if (!emitted.has(i)) {
+        emitted.add(i)
+        out.push(i)
+      }
+    }
+    for (const i of nodeIdx) visit(i, new Set())
+    // Splice the topologically ordered node items back into the node slots, leaving
+    // every non-node item exactly where rank placed it. Snapshot the reordered
+    // items before writing so an overwritten slot is never read back.
+    const reordered = out.map((i) => ordered[i])
+    nodeIdx.forEach((slot, k) => {
+      ordered[slot] = reordered[k]
+    })
+  }
+  return ordered
+}
+
 export function applyRemoteOrg(items: RemoteItem[], orgId: string): { applied: number } {
   const db = getDb()
   if (!orgId || orgId === PERSONAL_ORG_ID) return { applied: 0 }
-  // Parents before children: node (0) before widget (1) before row (2), and table
-  // (0) before row (2). Everything else keeps rank 0 (order-independent).
-  const rank = (t: ItemType): number => (t === 'node' ? 0 : t === 'widget' ? 1 : t === 'row' ? 2 : 0)
-  const ordered = [...items].sort((a, b) => rank(a.itemType) - rank(b.itemType))
+  const ordered = orderOrgItemsForApply(items)
   let applied = 0
   const tx = db.transaction(() => {
     for (const item of ordered) {

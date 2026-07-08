@@ -8,6 +8,7 @@ import { useTimeBlockStore } from '../stores/timeBlocks'
 import { useDocumentsStore } from '../stores/documents'
 import { useTablesStore } from '../stores/tables'
 import { useOrgStore, PERSONAL_ORG_ID } from '../stores/org'
+import { setOrgWorkspaceChangedHandler } from './messagingSocket'
 
 // Every item type carried over the sync transport. The personal loop has always
 // carried node and widget; rung 2 added document, table and row alongside the
@@ -401,17 +402,39 @@ export async function syncWorkspaceOnce(): Promise<number> {
 
 let timer: number | null = null
 
+// Near-live push: the server emits orgWorkspaceChanged whenever another member of
+// an org mutates shared data. Rather than wait up to a full interval for the next
+// poll, kick an immediate cycle. Debounced so a burst of edits from a teammate
+// collapses into one pull, and scoped to the active org so an event for an org we
+// are not currently viewing does not disturb the personal/other-org loop.
+let pushDebounce: number | null = null
+function onOrgWorkspaceChanged(orgId: string): void {
+  const activeOrg = useOrgStore.getState().activeOrgId || PERSONAL_ORG_ID
+  if (orgId !== activeOrg) return
+  if (pushDebounce != null) return
+  pushDebounce = window.setTimeout(() => {
+    pushDebounce = null
+    void syncWorkspaceOnce()
+  }, 400)
+}
+
 // Start the periodic sync loop (idempotent). Runs once immediately, then on an
 // interval. Safe to call on every sign-in; stops cleanly on sign-out.
 export function startWorkspaceSync(): void {
   initPreviewGuard()
   if (timer != null) return
+  setOrgWorkspaceChangedHandler(onOrgWorkspaceChanged)
   void syncWorkspaceOnce()
   timer = window.setInterval(() => void syncWorkspaceOnce(), SYNC_INTERVAL_MS)
 }
 
 export function stopWorkspaceSync(): void {
   useSyncStatus.getState().setDisabled()
+  setOrgWorkspaceChangedHandler(null)
+  if (pushDebounce != null) {
+    window.clearTimeout(pushDebounce)
+    pushDebounce = null
+  }
   if (timer != null) {
     window.clearInterval(timer)
     timer = null

@@ -14,6 +14,7 @@ type IncomingMessage = { conversationId: string; message: ChatMessage }
 export type DocSocketEvent =
   | { type: 'docLockChanged'; docId: string; holder: { accountId: string; handle: string; firstName?: string | null; lastName?: string | null } | null; expiresAt: number | null }
   | { type: 'docUpdated'; docId: string; version: number; updatedBy: string }
+  | { type: 'orgWorkspaceChanged'; payload: { orgId: string } }
   | {
       type: 'docTakeoverRequest'
       id: string
@@ -86,6 +87,13 @@ export type ReactionEvent = { conversationId: string; messageId: string; emoji: 
 let onReactionCb: ((e: ReactionEvent) => void) | null = null
 export function setReactionHandler(cb: ((e: ReactionEvent) => void) | null): void {
   onReactionCb = cb
+}
+
+// A teammate changed shared workspace data in an org we belong to — a nudge to
+// pull the org delta now rather than waiting for the next poll.
+let onOrgWorkspaceChangedCb: ((orgId: string) => void) | null = null
+export function setOrgWorkspaceChangedHandler(cb: ((orgId: string) => void) | null): void {
+  onOrgWorkspaceChangedCb = cb
 }
 
 // Someone is typing in a conversation. Ephemeral; the store clears it on a timeout.
@@ -262,6 +270,10 @@ function open(): void {
     } else if (msg.type === 'yjsSync' || msg.type === 'yjsUpdate' || msg.type === 'yjsAwareness') {
       // Real-time co-editing updates + cursor presence → the Yjs provider.
       onYjsEventCb?.({ type: msg.type, payload: msg.payload } as YjsSocketEvent)
+    } else if (msg.type === 'orgWorkspaceChanged') {
+      // A teammate changed shared org data → pull the org delta immediately.
+      const p = msg.payload as { orgId?: string } | undefined
+      if (p?.orgId) onOrgWorkspaceChangedCb?.(p.orgId)
     } else if (msg.type === 'presenceSnapshot' || msg.type === 'presenceUpdate') {
       // Account-level presence (who's online across the org/team) → presence store.
       onPresenceCb?.({ type: msg.type, payload: msg.payload } as PresenceSocketEvent)

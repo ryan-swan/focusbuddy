@@ -103,7 +103,7 @@ async function orgPut(
   id: string,
   body: Record<string, unknown>,
   baseRev?: number,
-  itemType: 'timeblock' | 'document' | 'table' | 'row' = 'timeblock'
+  itemType: 'timeblock' | 'document' | 'table' | 'row' | 'node' | 'widget' = 'timeblock'
 ): Promise<{ status: number; json: { ok: boolean; item?: OrgItem; error?: string } }> {
   const res = await fetch(`${SIGNAL_BASE}/workspace/org/items/${id}`, {
     method: 'PUT',
@@ -316,4 +316,87 @@ test('cross-member org sync: documents, tables and rows propagate and tombstone;
   // stronger refusal than 403 since it does not confirm the org exists.
   expect(cPut.status).not.toBe(200)
   expect(cPut.json.ok).not.toBe(true)
+})
+
+// Rung 3: the node tree (Rooms/Desks/Plans) and the widgets on a desk propagate
+// cross-member too. The transport is type-agnostic, so this proves the org store
+// carries node + widget just like every other type, and that a Room plus the Desk
+// nested inside it survive a single round-trip so the receiving member's apply can
+// order them parent-before-child. The parent->child insert ordering itself is
+// enforced in main/db/workspaceSync.ts applyRemoteOrg (topological node sort).
+test('cross-member org sync: nodes (rooms/desks) and widgets propagate and tombstone', async () => {
+  const rand = Math.random().toString(36).slice(2, 8)
+  const A = await signup(`rung3.a.${rand}@example.com`, 'Test-Account-123!')
+  const B = await signup(`rung3.b.${rand}@example.com`, 'Test-Account-123!')
+  const O = await createOrg(A.token, 'Rung3 Org')
+  await addMember(A.token, O, B.email)
+
+  // A creates a Room (folder node) and a Desk (task node) nested inside it, in the
+  // one org. Both carry the same org_id; the Desk's parent_id points at the Room.
+  const roomId = `node_room_${Date.now()}`
+  const deskId = `node_desk_${Date.now()}`
+  const putRoom = await orgPut(
+    A.token,
+    O,
+    roomId,
+    { id: roomId, parent_id: null, kind: 'folder', title: 'Marketing', is_plan: 0, org_id: O },
+    undefined,
+    'node'
+  )
+  expect(putRoom.status).toBe(200)
+  const putDesk = await orgPut(
+    A.token,
+    O,
+    deskId,
+    { id: deskId, parent_id: roomId, kind: 'task', title: 'Campaign desk', is_plan: 0, org_id: O },
+    undefined,
+    'node'
+  )
+  expect(putDesk.status).toBe(200)
+
+  // A drops a widget onto the Desk. Widgets have no org_id column; their scope
+  // derives from the task (Desk) they sit on via task_id.
+  const widgetId = `widget_${Date.now()}`
+  const putWidget = await orgPut(
+    A.token,
+    O,
+    widgetId,
+    { id: widgetId, task_id: deskId, kind: 'note', x: 40, y: 40, w: 240, h: 160, data_json: '{"text":"hello"}' },
+    undefined,
+    'widget'
+  )
+  expect(putWidget.status).toBe(200)
+
+  // B pulls and sees the Room, the Desk and the widget. Both node ids and the
+  // widget id are present in a single sync response — the receiver's apply then
+  // orders Room before Desk before widget.
+  let bSync = await orgSync(B.token, O, 0)
+  const bIds = (bSync.json.items ?? []).map((i) => i.id)
+  expect(bIds, 'B receives Room node').toContain(roomId)
+  expect(bIds, 'B receives Desk node').toContain(deskId)
+  expect(bIds, 'B receives widget').toContain(widgetId)
+  const bDesk = (bSync.json.items ?? []).find((i) => i.id === deskId)
+  expect((bDesk?.body as Record<string, unknown>)?.parent_id, 'Desk still nested under Room').toBe(roomId)
+
+  // B renames the Desk (rev bump); A pulls the edit.
+  const deskRev = (bSync.json.items ?? []).find((i) => i.id === deskId)!.rev
+  const editDesk = await orgPut(
+    B.token,
+    O,
+    deskId,
+    { id: deskId, parent_id: roomId, kind: 'task', title: 'Campaign desk (Q3)', is_plan: 0, org_id: O },
+    deskRev,
+    'node'
+  )
+  expect(editDesk.status).toBe(200)
+  const aSync = await orgSync(A.token, O, 0)
+  const aDesk = (aSync.json.items ?? []).find((i) => i.id === deskId)
+  expect((aDesk?.body as Record<string, unknown>)?.title).toBe('Campaign desk (Q3)')
+
+  // A deletes the widget; tombstone propagates to B.
+  const delWidget = await orgDelete(A.token, O, widgetId)
+  expect(delWidget.status).toBe(200)
+  bSync = await orgSync(B.token, O, 0)
+  const bWidgetAfter = (bSync.json.items ?? []).find((i) => i.id === widgetId)
+  expect(bWidgetAfter?.deleted, 'widget tombstone reaches B').toBe(true)
 })

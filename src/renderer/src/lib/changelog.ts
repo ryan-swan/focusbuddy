@@ -36,6 +36,20 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.7.0',
+    date: '2026-07-08T23:59:00Z',
+    title: 'PlexiDesk 3.7.0 — shared org changes sync near-instantly',
+    tag: 'feature',
+    summary:
+      'When you work in a shared organisation, changes a teammate makes now show up on your side within a second or two instead of waiting for the next background sync. Shared rooms, desks, calendar blocks, documents and tables all travel this faster path, and a room always arrives before the desks inside it, so nothing lands out of order. Your personal workspace is untouched and stays private as before.',
+    highlights: [
+      'Teammate changes to shared org data appear near-instantly, not on a 20-second delay.',
+      'Shared rooms, desks, widgets, calendar blocks, documents and tables all sync between members.',
+      'A room always applies before the desks nested inside it, so shared structure never lands broken.',
+      'Personal (non-org) workspaces are unaffected and stay private.'
+    ]
+  },
+  {
     version: '3.6.1',
     date: '2026-07-08T23:15:00Z',
     title: 'PlexiDesk 3.6.1 — tidier canvas chrome',
