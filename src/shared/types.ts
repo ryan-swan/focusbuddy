@@ -1019,6 +1019,15 @@ export type DashboardCardKind =
   | 'ai-assistant'
   | 'recent-notes'
 
+// ── Unified dashboard model (dashboard unification, docs/DASHBOARD-UNIFICATION.md)
+// The single card taxonomy that supersedes both the domain-specific
+// DashboardCardKind union above and the declarative ModuleDashboard sections, so
+// one engine renders every surface (Home + every module). Five data-shape kinds
+// plus a `custom` escape hatch for genuinely interactive cards. A card instance
+// carries its config (built live per render from the module's real stores); the
+// engine only lays out and chromes cards, it never fetches data.
+export type PlexiCardKind = 'metric-row' | 'chart' | 'breakdown' | 'list' | 'activity' | 'custom'
+
 // The visual size a portlet occupies on the dashboard. Small/Medium/Large map to
 // grid column-span and a min-height so the choice is a real visual difference.
 export type DashboardCardSize = 'small' | 'medium' | 'large'
