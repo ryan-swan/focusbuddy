@@ -36,6 +36,20 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.6.1',
+    date: '2026-07-08T23:15:00Z',
+    title: 'PlexiDesk 3.6.1 — tidier canvas chrome',
+    tag: 'fix',
+    summary:
+      'Removed the small floating bar at the bottom of the canvas. It only offered a handful of shortcuts and duplicated better paths that already exist: the Add-widget button and the round add button on the desk open the full searchable palette of objects, and search now sits in the top bar. Nothing was lost. Body double and Smart Stack moved into the command palette, which still opens with the top-bar Search button or Cmd/Ctrl+K.',
+    highlights: [
+      'The redundant bottom floating bar is gone; the canvas is cleaner.',
+      'Search moved to the top bar (and still opens with Cmd/Ctrl+K).',
+      'Add objects from the Add-widget button or the round add button on the desk, which open the full searchable palette.',
+      'Body double and Smart Stack are now in the command palette.'
+    ]
+  },
+  {
     version: '3.6.0',
     date: '2026-07-08T22:00:00Z',
     title: 'PlexiDesk 3.6.0 — tours you can replay any time',
