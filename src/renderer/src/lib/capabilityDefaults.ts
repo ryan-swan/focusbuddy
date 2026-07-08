@@ -75,7 +75,7 @@ export const CAPABILITY_DEFAULTS: Record<string, Record<TierId, CapabilityValue>
   no_telemetry: { free: true, pro: true, team: true },
   byo_key_only: { free: true, pro: true, team: true },
   two_factor: { free: true, pro: true, team: true },
-  sso: { free: false, pro: false, team: false },
+  sso: { free: false, pro: false, team: true },
   session_audit: { free: false, pro: false, team: false },
   marketplace_browse: { free: true, pro: true, team: true },
   marketplace_install_free: { free: true, pro: true, team: true },
@@ -88,7 +88,7 @@ export const CAPABILITY_DEFAULTS: Record<string, Record<TierId, CapabilityValue>
   capability_matrix_edit: { free: false, pro: false, team: true },
   audit_log: { free: false, pro: false, team: false },
   priority_support: { free: false, pro: false, team: true },
-  scim_provisioning: { free: false, pro: false, team: false },
+  scim_provisioning: { free: false, pro: false, team: true },
   data_residency: { free: false, pro: false, team: false },
   self_hosting: { free: false, pro: false, team: false },
 
