@@ -645,7 +645,7 @@ export default function App(): JSX.Element {
       <CursorSpotlight />
       {/* Unified bottom bar — search + mic + recent widget shortcuts */}
       {createPortal(
-        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-[120]">
+        <div className="fixed bottom-3 left-1/2 -translate-x-1/2 z-[120] flex flex-col items-center justify-end">
           <UnifiedBottomBar
             onOpenBodyDouble={() => setBodyDoubleOpen(true)}
             onOpenSmartStack={() => canSmartStack && setSmartStackOpen(true)}

@@ -7,7 +7,7 @@ import CommandCenter from './CommandCenter'
 import VoiceCommandFAB from './VoiceCommandFAB'
 import Icon from './Icon'
 
-// Max widget shortcuts shown in the tray above the main pill
+// Max widget shortcuts shown in the dock tray
 const MAX_SHORTCUTS = 6
 
 interface Props {
@@ -31,7 +31,7 @@ function shortcutLabel(kind: string, title: string): string {
   return raw.length > 10 ? raw.slice(0, 9) + '…' : raw
 }
 
-// Gaussian-like magnification: hovered chip gets max scale, neighbours taper
+// Gaussian-style dock magnification
 function getScale(idx: number, hoverIdx: number | null): number {
   if (hoverIdx === null) return 1
   const dist = Math.abs(idx - hoverIdx)
@@ -56,7 +56,6 @@ export default function UnifiedBottomBar({
   const view = useViewStore((s) => s.view)
   const isOnCanvas = view.kind === 'task'
 
-  // Most-recently-updated widgets on the current desk, capped at MAX_SHORTCUTS
   const shortcuts = isOnCanvas
     ? widgets
         .filter((w) => !w.archived && !w.pinned && w.kind !== 'minimap' && w.parentSectionId === null)
@@ -73,7 +72,7 @@ export default function UnifiedBottomBar({
     leaveTimer.current = window.setTimeout(() => {
       setHovered(false)
       setItemHoverIdx(null)
-    }, 300)
+    }, 320)
   }
 
   return (
@@ -83,76 +82,101 @@ export default function UnifiedBottomBar({
       onMouseLeave={leave}
       onWheel={(e) => e.stopPropagation()}
     >
-      {/* Recent widget tray — appears above the main pill when hovered on canvas */}
-      <AnimatePresence>
-        {hovered && shortcuts.length > 0 && (
+      <AnimatePresence mode="wait" initial={false}>
+        {hovered ? (
+          /* ── Expanded dock block ────────────────────────────────────────── */
           <motion.div
-            key="tray"
-            initial={{ opacity: 0, y: 8, scale: 0.96 }}
+            key="dock"
+            initial={{ opacity: 0, y: 10, scale: 0.97 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 6, scale: 0.96 }}
+            exit={{ opacity: 0, y: 8, scale: 0.97 }}
             transition={{ duration: 0.2, ease: [0.34, 1.56, 0.64, 1] }}
-            className="mb-2 px-2 pt-2 pb-2.5 rounded-2xl fb-glass-chrome ring-1 ring-black/[0.07] dark:ring-white/[0.07] shadow-[0_-4px_28px_rgba(0,0,0,0.18)] flex items-end gap-0.5"
+            // No overflow-hidden — CommandCenter and VoiceCommandFAB render
+            // overlays via absolute bottom-full that must not be clipped.
+            className="rounded-2xl bg-[var(--surface-raised)]/90 dark:bg-[var(--surface-raised)]/95 backdrop-blur-2xl ring-1 ring-black/[0.10] dark:ring-white/[0.10] shadow-[0_-4px_40px_rgba(0,0,0,0.26),0_8px_32px_rgba(0,0,0,0.14),inset_0_1px_0_rgba(255,255,255,0.10)]"
           >
-            {/* "Recent" label */}
-            <div className="flex items-center gap-0.5 px-1.5 self-center shrink-0 mr-1">
-              <Icon name="history" size={11} className="text-[var(--ink-30)]" />
-              <span className="text-[9px] uppercase tracking-[0.14em] text-[var(--ink-30)] font-medium">Recent</span>
+            {/* Widget tray — only when on a canvas with recent widgets */}
+            {shortcuts.length > 0 && (
+              <div className="flex items-end gap-0.5 px-3 pt-3 pb-2.5 border-b border-[var(--edge-soft)]">
+                {/* Label */}
+                <div className="flex items-center gap-1 self-center shrink-0 mr-2">
+                  <Icon name="history" size={11} className="text-[var(--ink-30)]" />
+                  <span className="text-[9px] uppercase tracking-[0.14em] text-[var(--ink-30)] font-medium">
+                    Recent
+                  </span>
+                </div>
+                <div className="w-px h-6 bg-[var(--edge-firm)]/50 mr-1 self-center shrink-0" />
+
+                {/* Chips */}
+                {shortcuts.map((w, idx) => {
+                  const entry = WIDGET_CATALOG.find((e) => e.kind === w.kind)
+                  const icon = entry?.icon ?? 'widgets'
+                  const label = shortcutLabel(w.kind, w.title)
+                  const isActive = w.id === activeWidgetId
+                  const isH = itemHoverIdx === idx
+                  const scale = getScale(idx, itemHoverIdx)
+
+                  return (
+                    <motion.button
+                      key={w.id}
+                      onClick={() => zoomToWidget(w.id)}
+                      title={w.title || entry?.label || w.kind}
+                      onMouseEnter={() => setItemHoverIdx(idx)}
+                      onMouseLeave={() => setItemHoverIdx(null)}
+                      animate={{ scale, y: isH ? -6 : 0 }}
+                      transition={{ type: 'spring', stiffness: 380, damping: 24, mass: 0.7 }}
+                      style={{ originY: 1, originX: 0.5 }}
+                      className={[
+                        'flex flex-col items-center gap-0.5 shrink-0 w-12 px-1 pt-1.5 pb-1 rounded-xl text-[9px] font-medium transition-colors',
+                        isActive
+                          ? 'bg-[rgb(var(--accent)/0.15)] text-[rgb(var(--accent))] ring-1 ring-[rgb(var(--accent)/0.35)]'
+                          : 'text-[var(--ink-70)] hover:bg-[var(--surface-sunken)] hover:text-[var(--ink-100)]'
+                      ].join(' ')}
+                    >
+                      <Icon
+                        name={icon}
+                        size={18}
+                        className={isActive ? 'text-[rgb(var(--accent))]' : 'text-[var(--ink-60)]'}
+                      />
+                      <span className="w-full text-center truncate leading-tight">{label}</span>
+                      {isActive && (
+                        <div className="w-1 h-1 rounded-full bg-[rgb(var(--accent))] -mt-0.5" />
+                      )}
+                    </motion.button>
+                  )
+                })}
+              </div>
+            )}
+
+            {/* Search + mic row */}
+            <div className="flex items-center px-2 py-1.5">
+              <CommandCenter
+                onOpenBodyDouble={onOpenBodyDouble}
+                onOpenSmartStack={onOpenSmartStack}
+                canSmartStack={canSmartStack}
+              />
+              <div className="w-px h-5 bg-[var(--edge-firm)]/70 mx-1 shrink-0" />
+              <VoiceCommandFAB />
             </div>
-            <div className="w-px h-6 bg-[var(--edge-firm)]/50 mx-0.5 self-center shrink-0" />
-
-            {/* Widget chips with macOS dock magnification */}
-            {shortcuts.map((w, idx) => {
-              const entry = WIDGET_CATALOG.find((e) => e.kind === w.kind)
-              const icon = entry?.icon ?? 'widgets'
-              const label = shortcutLabel(w.kind, w.title)
-              const isActive = w.id === activeWidgetId
-              const isH = itemHoverIdx === idx
-              const scale = getScale(idx, itemHoverIdx)
-
-              return (
-                <motion.button
-                  key={w.id}
-                  onClick={() => zoomToWidget(w.id)}
-                  title={w.title || entry?.label || w.kind}
-                  onMouseEnter={() => setItemHoverIdx(idx)}
-                  onMouseLeave={() => setItemHoverIdx(null)}
-                  animate={{ scale, y: isH ? -6 : 0 }}
-                  transition={{ type: 'spring', stiffness: 380, damping: 24, mass: 0.7 }}
-                  style={{ originY: 1, originX: 0.5 }}
-                  className={[
-                    'flex flex-col items-center gap-0.5 shrink-0 w-12 px-1 pt-1.5 pb-1 rounded-xl text-[9px] font-medium transition-colors',
-                    isActive
-                      ? 'bg-[rgb(var(--accent)/0.15)] text-[rgb(var(--accent))] ring-1 ring-[rgb(var(--accent)/0.35)]'
-                      : 'text-[var(--ink-70)] hover:bg-[var(--surface-sunken)] hover:text-[var(--ink-100)]'
-                  ].join(' ')}
-                >
-                  <Icon
-                    name={icon}
-                    size={18}
-                    className={isActive ? 'text-[rgb(var(--accent))]' : 'text-[var(--ink-60)]'}
-                  />
-                  <span className="w-full text-center truncate leading-tight">{label}</span>
-                  {isActive && (
-                    <div className="w-1 h-1 rounded-full bg-[rgb(var(--accent))] -mt-0.5" />
-                  )}
-                </motion.button>
-              )
-            })}
           </motion.div>
+        ) : (
+          /* ── Collapsed: thin accent strip ───────────────────────────────── */
+          <motion.div
+            key="strip"
+            initial={{ opacity: 0, scaleX: 0.5 }}
+            animate={{ opacity: 1, scaleX: 1 }}
+            exit={{ opacity: 0, scaleX: 0.5 }}
+            transition={{ duration: 0.18, ease: 'easeOut' }}
+            className="rounded-full cursor-pointer"
+            style={{
+              width: 120,
+              height: 4,
+              background: 'rgb(var(--accent) / 0.35)',
+            }}
+            onMouseEnter={enter}
+          />
         )}
       </AnimatePresence>
-
-      {/* Main pill — liquid glass: search + divider + mic */}
-      <div className="flex items-center rounded-full bg-white/[0.12] dark:bg-white/[0.07] backdrop-blur-2xl ring-1 ring-white/[0.22] dark:ring-white/[0.14] shadow-[0_8px_32px_rgba(0,0,0,0.18),inset_0_1px_0_rgba(255,255,255,0.18)] px-1 py-0.5 transition-shadow duration-200 hover:shadow-[0_8px_44px_rgba(0,0,0,0.26),inset_0_1px_0_rgba(255,255,255,0.22)]">
-        <CommandCenter
-          onOpenBodyDouble={onOpenBodyDouble}
-          onOpenSmartStack={onOpenSmartStack}
-          canSmartStack={canSmartStack}
-        />
-        <div className="w-px h-5 bg-[var(--edge-firm)]/70 mx-1 shrink-0" />
-        <VoiceCommandFAB />
-      </div>
     </div>
   )
 }
