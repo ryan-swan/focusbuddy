@@ -59,7 +59,15 @@ export default function CanvasBreadcrumb({
   }
 
   function scheduleLeave(): void {
-    // Single timer controls BOTH pill collapse and dropdown close.
+    // Cancel any existing timer before creating a new one — multiple rapid
+    // mouseLeave events (child span → parent pill div) would otherwise queue
+    // multiple independent timers, with only the last one tracked in
+    // leaveTimer.current. The orphaned earlier timers still fire and collapse
+    // the pill even after handleEnter has cancelled the tracked timer.
+    if (leaveTimer.current) {
+      clearTimeout(leaveTimer.current)
+      leaveTimer.current = null
+    }
     leaveTimer.current = window.setTimeout(() => {
       setExpanded(false)
       setDropdown(null)

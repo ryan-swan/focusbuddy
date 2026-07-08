@@ -123,7 +123,7 @@ export default function FloatingPill({
       style={{
         ...(pos
           ? { left: pos.x, top: pos.y }
-          : { left: '50%', transform: 'translateX(-50%)', top: defaultY }),
+          : { right: 16, top: defaultY }),
         // Cognitive load ring — entire outer ring tinted by load tier
         boxShadow: `0 0 0 2px ${tier.ringColor}, 0 6px 24px ${tier.shadowColor}`,
         transition: 'box-shadow 700ms ease'
@@ -158,15 +158,15 @@ export default function FloatingPill({
         )}
       </AnimatePresence>
 
-      {/* Expanded: full controls */}
+      {/* Expanded: full controls — slides in from right to left */}
       <AnimatePresence initial={false}>
         {hovered && (
           <motion.div
             key="expanded"
-            initial={{ width: 0, opacity: 0 }}
-            animate={{ width: 'auto', opacity: 1 }}
-            exit={{ width: 0, opacity: 0 }}
-            transition={{ duration: 0.20, ease: 'easeOut' }}
+            initial={{ width: 0, opacity: 0, x: 12 }}
+            animate={{ width: 'auto', opacity: 1, x: 0 }}
+            exit={{ width: 0, opacity: 0, x: 12 }}
+            transition={{ duration: 0.22, ease: [0.34, 1.2, 0.64, 1] }}
             className="overflow-hidden flex items-center gap-0.5 pr-2 py-1"
           >
             <button
