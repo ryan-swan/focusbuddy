@@ -648,7 +648,7 @@ export default function App(): JSX.Element {
       {createPortal(
         <div className="fixed bottom-16 left-1/2 -translate-x-1/2 z-[120]">
           {/* Liquid-glass outer group — search + mic sit inside a shared chrome pill */}
-          <div className="flex items-center fb-glass-chrome rounded-full ring-1 ring-black/[0.12] dark:ring-white/[0.12] shadow-[0_8px_32px_rgba(0,0,0,0.24)] px-1 py-0.5 gap-0 transition-shadow duration-200 hover:shadow-[0_8px_44px_rgba(0,0,0,0.32)]">
+          <div className="flex items-center rounded-full bg-white/[0.12] dark:bg-white/[0.07] backdrop-blur-2xl ring-1 ring-white/[0.22] dark:ring-white/[0.14] shadow-[0_8px_32px_rgba(0,0,0,0.18),inset_0_1px_0_rgba(255,255,255,0.18)] px-1 py-0.5 gap-0 transition-shadow duration-200 hover:shadow-[0_8px_44px_rgba(0,0,0,0.26),inset_0_1px_0_rgba(255,255,255,0.22)]">
             <CommandCenter
               onOpenBodyDouble={() => setBodyDoubleOpen(true)}
               onOpenSmartStack={() => canSmartStack && setSmartStackOpen(true)}

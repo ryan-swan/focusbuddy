@@ -16,8 +16,10 @@ interface Props {
 // Hover-expand glossy pill breadcrumb.
 // Collapsed: home icon + depth indicator + current task name.
 // Hovered: full ancestry chain expands inline with a spring animation.
-// Hovering over any breadcrumb segment drops down a stage-manager panel
-// showing sibling desks (current segment) or child desks (ancestor segment).
+//
+// Stage Manager dropdown logic:
+//   Hover current desk  → roomId = current.parentId  → shows sibling desks in same room
+//   Hover ancestor room → roomId = ancestor.parentId → shows sibling rooms (NOT children)
 export default function CanvasBreadcrumb({
   activeTask,
   nodes,
@@ -27,8 +29,8 @@ export default function CanvasBreadcrumb({
   fromMindmap
 }: Props): JSX.Element {
   const [hovered, setHovered] = useState(false)
-  // undefined = closed; string | null = open with that roomId
-  const [dropdownRoomId, setDropdownRoomId] = useState<string | null | undefined>(undefined)
+  // undefined = closed. When open: roomId (string | null) + activeId to pass to StageManagerStrip.
+  const [dropdown, setDropdown] = useState<{ roomId: string | null; activeId: string } | null>(null)
   const leaveTimer = useRef<number | null>(null)
 
   const chain = useMemo(() => {
@@ -46,18 +48,17 @@ export default function CanvasBreadcrumb({
   const ancestors = chain.slice(0, -1)
   const current = chain[chain.length - 1] ?? activeTask
   const hasAncestors = ancestors.length > 0
-  const dropdownOpen = dropdownRoomId !== undefined
 
-  function openDropdown(roomId: string | null): void {
+  function openDropdown(roomId: string | null, activeId: string): void {
     if (leaveTimer.current) {
       clearTimeout(leaveTimer.current)
       leaveTimer.current = null
     }
-    setDropdownRoomId(roomId)
+    setDropdown({ roomId, activeId })
   }
 
   function scheduleClose(): void {
-    leaveTimer.current = window.setTimeout(() => setDropdownRoomId(undefined), 320)
+    leaveTimer.current = window.setTimeout(() => setDropdown(null), 320)
   }
 
   return (
@@ -65,7 +66,7 @@ export default function CanvasBreadcrumb({
       <div
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
-        className="inline-flex items-center gap-0.5 px-2 py-1.5 rounded-full fb-glass-chrome ring-1 ring-black/[0.07] dark:ring-white/[0.07] shadow-[0_2px_10px_rgba(0,0,0,0.08)] text-[12px] max-w-full overflow-hidden cursor-default select-none min-w-[240px]"
+        className="inline-flex items-center gap-0.5 px-3 py-1.5 rounded-full fb-glass-chrome ring-1 ring-black/[0.07] dark:ring-white/[0.07] shadow-[0_2px_10px_rgba(0,0,0,0.08)] text-[12px] max-w-full overflow-hidden cursor-default select-none min-w-[320px]"
       >
         {/* Home button — always visible */}
         <button
@@ -90,13 +91,11 @@ export default function CanvasBreadcrumb({
             >
               {ancestors.map((n) => {
                 const isFolder = n.kind === 'folder'
-                // For ancestors: hovering shows children of that ancestor (rooms/desks inside it)
-                const ancestorDropdownId = n.id
                 return (
                   <span
                     key={n.id}
                     className="inline-flex items-center gap-0.5 shrink-0"
-                    onMouseEnter={() => openDropdown(ancestorDropdownId)}
+                    onMouseEnter={() => openDropdown(n.parentId ?? null, n.id)}
                     onMouseLeave={scheduleClose}
                   >
                     <Icon name="chevron_right" size={13} className="text-[var(--ink-30)]" />
@@ -134,10 +133,10 @@ export default function CanvasBreadcrumb({
           )}
         </AnimatePresence>
 
-        {/* Current item — always visible. Hovering shows siblings (same room). */}
+        {/* Current item — hovering shows siblings (desks in same room) */}
         <span
           className="inline-flex items-center gap-0.5 shrink-0"
-          onMouseEnter={() => openDropdown(current.parentId ?? null)}
+          onMouseEnter={() => openDropdown(current.parentId ?? null, current.id)}
           onMouseLeave={scheduleClose}
         >
           <Icon name="chevron_right" size={13} className="text-[var(--ink-30)]" />
@@ -155,14 +154,14 @@ export default function CanvasBreadcrumb({
 
       {/* Stage Manager dropdown — falls down from the breadcrumb pill */}
       <AnimatePresence>
-        {dropdownOpen && (
+        {dropdown && (
           <motion.div
             key="stage-dropdown"
             initial={{ opacity: 0, y: -10, scale: 0.96 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -6, scale: 0.97 }}
             transition={{ duration: 0.22, ease: [0.34, 1.2, 0.64, 1] }}
-            className="absolute top-full left-0 mt-2 w-[172px] max-h-[360px] rounded-2xl overflow-hidden bg-[var(--surface-raised)] backdrop-blur-xl border border-[var(--edge-soft)] shadow-[0_8px_40px_rgba(0,0,0,0.28)] ring-1 ring-black/[0.10] dark:ring-white/[0.10] z-[60] flex flex-col"
+            className="absolute top-full left-0 mt-2 w-[172px] max-h-[360px] rounded-2xl overflow-hidden bg-[var(--surface-raised)] border border-[var(--edge-soft)] shadow-[0_8px_40px_rgba(0,0,0,0.28)] ring-1 ring-black/[0.10] dark:ring-white/[0.10] z-[60] flex flex-col"
             onMouseEnter={() => {
               if (leaveTimer.current) {
                 clearTimeout(leaveTimer.current)
@@ -172,8 +171,8 @@ export default function CanvasBreadcrumb({
             onMouseLeave={scheduleClose}
           >
             <StageManagerStrip
-              roomId={dropdownRoomId as string | null}
-              activeId={current.id}
+              roomId={dropdown.roomId}
+              activeId={dropdown.activeId}
             />
           </motion.div>
         )}

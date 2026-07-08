@@ -2115,7 +2115,7 @@ export default function Canvas(): JSX.Element {
             )}
             {/* Full Stage Manager content */}
             <div
-              className="rounded-r-2xl overflow-hidden bg-[var(--surface-raised)] backdrop-blur-xl border-r border-t border-b border-[var(--edge-soft)] shadow-[4px_0_32px_rgba(0,0,0,0.22)] ring-1 ring-black/[0.10] dark:ring-white/[0.10] flex flex-col min-h-0 h-full"
+              className="rounded-r-2xl overflow-hidden bg-[var(--surface-raised)] border-r border-t border-b border-[var(--edge-soft)] shadow-[4px_0_32px_rgba(0,0,0,0.22)] ring-1 ring-black/[0.10] dark:ring-white/[0.10] flex flex-col min-h-0 h-full"
               style={{
                 opacity: smHovered ? 1 : 0,
                 transition: 'opacity 200ms ease',

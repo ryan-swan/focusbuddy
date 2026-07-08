@@ -690,7 +690,7 @@ export default function VoiceCommandFAB(): JSX.Element {
           className={`pointer-events-auto h-10 w-10 rounded-full flex items-center justify-center shadow-xl transition-all duration-150 ${
             isActive
               ? 'bg-accent text-white scale-110 fb-halo'
-              : 'fb-glass-chrome text-accent border border-[color:var(--glass-chrome-border)] hover:brightness-110'
+              : 'bg-stone-800/90 dark:bg-stone-900/90 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.10),0_4px_16px_rgba(0,0,0,0.40)] hover:bg-stone-700/90 dark:hover:bg-stone-800/90'
           }`}
           title={
             prefs.commandMode === 'press-hold'
