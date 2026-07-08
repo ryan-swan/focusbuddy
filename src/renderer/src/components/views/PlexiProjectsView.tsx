@@ -330,16 +330,43 @@ function ProjectGantt({ projectId, onBack }: { projectId: string; onBack: () => 
 
   const selected = plan?.tasks.find((t) => t.id === selectedId) ?? null
 
-  // Timeline geometry: anchor day 0 to the later of project end and today, padded.
+  // Width of the scrollable timeline area, measured so the axis always fills the
+  // screen instead of stopping mid-way for a short plan.
+  const [viewportW, setViewportW] = useState(0)
+
+  // Timeline geometry: anchor day 0 to the later of project end and today. The
+  // axis always runs a few weeks PAST the last task so you can drag a bar into
+  // the future, and is never shorter than the visible area so it does not stop
+  // mid-screen.
   const geom = useMemo(() => {
     if (!plan) return null
     const now = Date.now()
     const end = Math.max(plan.projectEndMs, now + 2 * DAY_MS)
-    const totalDays = Math.max(7, Math.ceil((end - plan.anchorMs) / DAY_MS) + 2)
+    // Always keep ~3 weeks of empty runway after the last scheduled day so a task
+    // can be dragged/rescheduled into the future.
+    const FUTURE_RUNWAY_DAYS = 21
+    const planDays = Math.ceil((end - plan.anchorMs) / DAY_MS) + FUTURE_RUNWAY_DAYS
+    // Fill at least the visible width (fall back to a sensible minimum before the
+    // first measure) so the grid never ends in the middle of the screen.
+    const daysToFill = viewportW > 0 ? Math.ceil(viewportW / DAY_W) : 45
+    const totalDays = Math.max(7, planDays, daysToFill)
     const xOf = (ms: number): number => ((ms - plan.anchorMs) / DAY_MS) * DAY_W
     const rowIndex = new Map(plan.tasks.map((t, i) => [t.id, i]))
     return { totalDays, xOf, rowIndex, now, width: totalDays * DAY_W, height: plan.tasks.length * ROW_H }
-  }, [plan])
+  }, [plan, viewportW])
+
+  // Measure the scroll area so the timeline can fill the width available beside
+  // the sticky task-name column (rather than stopping mid-screen).
+  const scrollRef = useRef<HTMLDivElement | null>(null)
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    const measure = (): void => setViewportW(Math.max(0, el.clientWidth - NAME_W))
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
 
   const critPathSet = useMemo(() => new Set(plan?.criticalPath ?? []), [plan])
   // A task is "late" if it finished after plan (in plan.drift) or is still open
@@ -500,7 +527,7 @@ function ProjectGantt({ projectId, onBack }: { projectId: string; onBack: () => 
       </div>
 
       <div className="flex-1 min-h-0 flex">
-        <div className="flex-1 min-w-0 overflow-auto">
+        <div ref={scrollRef} className="flex-1 min-w-0 overflow-auto">
           {!plan ? (
             <div className="flex items-center gap-2 px-6 py-10 text-[13px] text-[var(--ink-70)]">
               <Icon name="progress_activity" size={16} className="text-[rgb(var(--accent))] animate-spin" /> Loading plan…
@@ -549,7 +576,7 @@ function ProjectGantt({ projectId, onBack }: { projectId: string; onBack: () => 
               </div>
 
               {/* Timeline */}
-              <div className="relative" style={{ width: geom.width }}>
+              <div className="relative shrink-0" style={{ width: geom.width }}>
                 <DateAxis anchorMs={plan.anchorMs} totalDays={geom.totalDays} />
                 <div className="relative" style={{ height: geom.height }}>
                   <GridLines totalDays={geom.totalDays} rows={plan.tasks.length} />

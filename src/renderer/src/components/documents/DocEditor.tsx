@@ -777,7 +777,11 @@ export default function DocEditor({
       {showPage ? (
         <PageSheet editor={editor} page={page} />
       ) : (
-        <div className="max-w-3xl mx-auto px-8 pb-16">
+        // Continuous view: a comfortable reading column that is centred in the
+        // available space and widens with the window, so the editor uses the
+        // screen it has instead of hugging the left. Capped so lines never get
+        // uncomfortably long on a very wide display.
+        <div className="w-full max-w-[900px] xl:max-w-[1040px] mx-auto px-10 pb-16">
           <EditorContent editor={editor} />
         </div>
       )}
