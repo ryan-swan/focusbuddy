@@ -16,6 +16,10 @@ interface Props {
   onImport?: () => void
   onBringSynced?: () => void
   disabled: boolean
+  // 'toolbar' is the compact accent chip in the desk toolbar. 'fab' is a large
+  // round always-visible button anchored on the canvas surface, so adding a
+  // widget is discoverable even when the toolbar wraps off on a small window.
+  variant?: 'toolbar' | 'fab'
 }
 
 // Compact desk-objects picker.
@@ -32,11 +36,14 @@ export default function WidgetPalette({
   onAdd,
   onImport,
   onBringSynced,
-  disabled
+  disabled,
+  variant = 'toolbar'
 }: Props): JSX.Element {
   const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState('')
   const buttonRef = useRef<HTMLButtonElement | null>(null)
   const popoverRef = useRef<HTMLDivElement | null>(null)
+  const searchRef = useRef<HTMLInputElement | null>(null)
   const [popoverPos, setPopoverPos] = useState<{ top: number; left: number } | null>(null)
 
   useEffect(() => {
@@ -70,15 +77,43 @@ export default function WidgetPalette({
       return
     }
     const POPOVER_W = 340
+    const POPOVER_MAXH = Math.round(window.innerHeight * 0.6)
     const r = buttonRef.current.getBoundingClientRect()
-    const left = Math.min(Math.max(8, r.left), window.innerWidth - POPOVER_W - 8)
-    // Prefer below the button; if there isn't room, the max-h + overflow-y-auto
-    // keeps it scrollable, but pull it up so its top stays on-screen.
-    const top = Math.min(r.bottom + 6, window.innerHeight - 80)
+    // Right-align the popover to the button when the button sits in the right
+    // half (the canvas FAB), so it never runs off the right edge; otherwise
+    // left-align. Clamp to the viewport either way.
+    const preferRight = r.left > window.innerWidth / 2
+    const rawLeft = preferRight ? r.right - POPOVER_W : r.left
+    const left = Math.min(Math.max(8, rawLeft), window.innerWidth - POPOVER_W - 8)
+    // Open below the button by default; if the button sits in the lower half of
+    // the screen (the FAB), open ABOVE it so the whole menu stays on-screen.
+    const openAbove = r.top > window.innerHeight / 2
+    const top = openAbove
+      ? Math.max(8, r.top - 6 - POPOVER_MAXH)
+      : Math.min(r.bottom + 6, window.innerHeight - 80)
     setPopoverPos({ top, left })
   }, [open])
 
+  // Reset the search and focus the box each time the picker opens.
+  useEffect(() => {
+    if (!open) {
+      setQuery('')
+      return
+    }
+    const id = window.setTimeout(() => searchRef.current?.focus(), 20)
+    return () => window.clearTimeout(id)
+  }, [open])
+
   const grouped = entriesByCategory()
+  const q = query.trim().toLowerCase()
+  function matches(entry: WidgetCatalogEntry): boolean {
+    if (!q) return true
+    return (
+      entry.label.toLowerCase().includes(q) ||
+      entry.kind.toLowerCase().includes(q) ||
+      (entry.hint?.toLowerCase().includes(q) ?? false)
+    )
+  }
   // Live, admin-overridable capability map. A widget kind whose capability
   // resolves falsy for this user renders locked + opens the upgrade prompt
   // instead of creating. This is what makes the matrix gate the app.
@@ -86,27 +121,46 @@ export default function WidgetPalette({
 
   return (
     <>
-      <button
-        ref={buttonRef}
-        onClick={() => !disabled && setOpen((v) => !v)}
-        disabled={disabled}
-        // Accent-tinted so the primary "create something" action is the most
-        // visible control in the toolbar, in every theme (it keys off the
-        // --accent token, not a fixed stone colour). Labelled "Widget" so its
-        // purpose is explicit rather than a generic "Add".
-        className={`inline-flex items-center gap-1.5 h-7 px-2.5 rounded-md text-[12px] font-semibold border transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
-          open
-            ? 'bg-accent/25 border-accent/60 text-accent'
-            : 'bg-accent/10 border-accent/40 text-accent hover:bg-accent/20 hover:border-accent/60'
-        }`}
-        title="Add a widget to your desk"
-        aria-haspopup="dialog"
-        aria-expanded={open}
-        data-testid="palette-add-button"
-      >
-        <Icon name="add" size={14} />
-        <span>Widget</span>
-      </button>
+      {variant === 'fab' ? (
+        <button
+          ref={buttonRef}
+          onClick={() => !disabled && setOpen((v) => !v)}
+          disabled={disabled}
+          // Large round always-visible add button on the canvas surface. Solid
+          // accent so it reads as the primary "add something to this desk"
+          // action no matter how the toolbar wraps.
+          className="h-12 w-12 inline-flex items-center justify-center rounded-full bg-[rgb(var(--accent))] text-white shadow-lg hover:bg-[rgb(var(--accent-hover))] disabled:opacity-40 disabled:cursor-not-allowed transition-transform active:scale-95"
+          title="Add a widget or object to this desk"
+          aria-haspopup="dialog"
+          aria-expanded={open}
+          aria-label="Add a widget or object"
+          data-testid="palette-fab-button"
+        >
+          <Icon name={open ? 'close' : 'add'} size={24} />
+        </button>
+      ) : (
+        <button
+          ref={buttonRef}
+          onClick={() => !disabled && setOpen((v) => !v)}
+          disabled={disabled}
+          // Accent-tinted so the primary "create something" action is the most
+          // visible control in the toolbar, in every theme (it keys off the
+          // --accent token, not a fixed stone colour). Labelled "Add widget" so
+          // its purpose is explicit rather than a generic "Add".
+          className={`inline-flex items-center gap-1.5 h-7 px-3 rounded-md text-[12px] font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+            open
+              ? 'bg-[rgb(var(--accent-hover))] text-white'
+              : 'bg-[rgb(var(--accent))] text-white hover:bg-[rgb(var(--accent-hover))]'
+          }`}
+          title="Add a widget to your desk"
+          aria-haspopup="dialog"
+          aria-expanded={open}
+          data-testid="palette-add-button"
+        >
+          <Icon name="add" size={14} />
+          <span>Add widget</span>
+        </button>
+      )}
       {open && popoverPos && createPortal(
         <div
           ref={popoverRef}
@@ -115,21 +169,38 @@ export default function WidgetPalette({
           role="dialog"
           aria-label="Desk objects"
         >
-          <div className="sticky top-0 bg-[var(--surface-raised)] px-3 py-2 border-b border-[var(--edge-soft)] flex items-center justify-between">
-            <span className="text-[11px] uppercase tracking-[0.12em] text-[var(--ink-50)] font-semibold">
-              Desk objects
-            </span>
-            <button
-              onClick={() => setOpen(false)}
-              className="h-5 w-5 inline-flex items-center justify-center text-[var(--ink-50)] hover:text-[var(--ink-100)]"
-              aria-label="Close picker"
-            >
-              <Icon name="close" size={12} />
-            </button>
+          <div className="sticky top-0 z-10 bg-[var(--surface-raised)] px-3 py-2 border-b border-[var(--edge-soft)]">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] uppercase tracking-[0.12em] text-[var(--ink-50)] font-semibold">
+                Add to this desk
+              </span>
+              <button
+                onClick={() => setOpen(false)}
+                className="h-5 w-5 inline-flex items-center justify-center text-[var(--ink-50)] hover:text-[var(--ink-100)]"
+                aria-label="Close picker"
+              >
+                <Icon name="close" size={12} />
+              </button>
+            </div>
+            <div className="relative mt-2">
+              <Icon
+                name="search"
+                size={13}
+                className="absolute left-2 top-1/2 -translate-y-1/2 text-[var(--ink-40)]"
+              />
+              <input
+                ref={searchRef}
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search widgets and objects"
+                data-testid="palette-search"
+                className="w-full h-7 pl-7 pr-2 rounded-md border border-[var(--edge-firm)] bg-[var(--surface-base)] text-[12px] text-[var(--ink-90)] placeholder:text-[var(--ink-40)] outline-none focus:border-[rgb(var(--accent)/0.6)]"
+              />
+            </div>
           </div>
           <div className="p-3 flex flex-col gap-3">
             {CATEGORIES.map((cat) => {
-              const items = grouped[cat]
+              const items = grouped[cat].filter(matches)
               if (items.length === 0) return null
               return (
                 <div key={cat}>
@@ -184,7 +255,12 @@ export default function WidgetPalette({
                 </div>
               )
             })}
-            {onBringSynced && (
+            {q && !CATEGORIES.some((c) => grouped[c].some(matches)) && (
+              <div className="text-[12px] text-[var(--ink-50)] text-center py-4" data-testid="palette-no-results">
+                No widgets or objects match “{query}”.
+              </div>
+            )}
+            {!q && onBringSynced && (
               <div className="border-t border-[var(--edge-soft)] pt-2">
                 <div className="text-[9px] uppercase tracking-[0.14em] text-[var(--ink-50)] font-semibold mb-1.5">
                   From elsewhere
@@ -207,7 +283,7 @@ export default function WidgetPalette({
                 </button>
               </div>
             )}
-            {onImport && (
+            {!q && onImport && (
               <div className="border-t border-[var(--edge-soft)] pt-2">
                 <div className="text-[9px] uppercase tracking-[0.14em] text-[var(--ink-50)] font-semibold mb-1.5">
                   Import
@@ -230,9 +306,11 @@ export default function WidgetPalette({
                 </button>
               </div>
             )}
-            <div className="text-[10px] text-[var(--ink-50)] leading-snug border-t border-[var(--edge-soft)] pt-2 -mb-1">
-              Tip: drag any tile onto the canvas to place it where you want, or click to add at the centre.
-            </div>
+            {!q && (
+              <div className="text-[10px] text-[var(--ink-50)] leading-snug border-t border-[var(--edge-soft)] pt-2 -mb-1">
+                Tip: drag any tile onto the canvas to place it where you want, or click to add at the centre.
+              </div>
+            )}
           </div>
         </div>,
         document.body

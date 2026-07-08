@@ -16,14 +16,18 @@ import Icon from '../Icon'
 // The floating card itself. Rounded on every corner, hairline edge all round
 // (no more one-sided right border), and it clips its own content so the rounded
 // corners read cleanly. Callers add the elevation via FLOATING_MENU_STYLE.
+// The `fb-floating-chrome` marker is a stable, non-Tailwind class used purely as
+// a hit-test hook: the canvas edge-pan (useEdgePan) suppresses panning when the
+// pointer is over any floating menu, so hovering a menu that overlays the canvas
+// no longer pushes the desk. Keep this class on every floating chrome surface.
 export const FLOATING_MENU_ASIDE =
-  'h-full w-full flex flex-col overflow-hidden rounded-[14px] border border-[var(--edge-soft)] bg-[var(--surface-raised)] text-[var(--ink-100)]'
+  'fb-floating-chrome h-full w-full flex flex-col overflow-hidden rounded-[14px] border border-[var(--edge-soft)] bg-[var(--surface-raised)] text-[var(--ink-100)]'
 
 // Same floating card, but the card itself scrolls. Used by the fixed-width
 // segment and office menus whose whole body scrolls as one column (the rounded
 // corners still clip the scrolled content because overflow is not visible).
 export const FLOATING_MENU_ASIDE_SCROLL =
-  'h-full w-full flex flex-col overflow-auto rounded-[14px] border border-[var(--edge-soft)] bg-[var(--surface-raised)]'
+  'fb-floating-chrome h-full w-full flex flex-col overflow-auto rounded-[14px] border border-[var(--edge-soft)] bg-[var(--surface-raised)]'
 
 // The elevation and a hint of the inset highlight, applied inline because they
 // reference CSS custom properties that Tailwind arbitrary values can't compose
@@ -190,7 +194,7 @@ export function MenuRestorePill({
       title={title}
       aria-label={title}
       data-testid="menu-restore-pill"
-      className="absolute top-[12px] left-[12px] z-20 inline-flex items-center gap-1.5 h-8 pl-2 pr-2.5 rounded-[12px] border border-[var(--edge-soft)] bg-[var(--surface-raised)] text-[12px] font-medium text-[var(--ink-80)] hover:text-[var(--ink-100)] hover:border-[rgb(var(--accent)/0.4)] transition-colors"
+      className="fb-floating-chrome absolute top-[12px] left-[12px] z-20 inline-flex items-center gap-1.5 h-8 pl-2 pr-2.5 rounded-[12px] border border-[var(--edge-soft)] bg-[var(--surface-raised)] text-[12px] font-medium text-[var(--ink-80)] hover:text-[var(--ink-100)] hover:border-[rgb(var(--accent)/0.4)] transition-colors"
       style={FLOATING_MENU_STYLE}
     >
       <Icon name="menu" size={16} />

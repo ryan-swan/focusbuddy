@@ -2328,6 +2328,17 @@ export default function Canvas(): JSX.Element {
               <span className="absolute inset-0 m-auto h-2 w-2 rounded-full bg-accent shadow" />
             </div>
           )}
+          {/* Always-visible Add button on the desk surface, so adding a widget
+              or object is obvious no matter how the toolbar wraps. It reuses the
+              same WidgetPalette (full categorised, searchable, gated catalog) and
+              the same handleClickAdd funnel as the toolbar button and drag-drop.
+              Marked fb-floating-chrome so hovering it in the corner does not
+              trigger edge-pan. */}
+          {activeTaskId && (
+            <div className="fb-floating-chrome absolute bottom-5 right-5 z-[150]">
+              <WidgetPalette onAdd={handleClickAdd} disabled={!activeTaskId} variant="fab" />
+            </div>
+          )}
           {showStartingKit && nodeOrigin && activeTaskId && (
             <MindmapStartingKit
               taskId={activeTaskId}

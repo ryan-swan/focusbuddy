@@ -203,7 +203,21 @@ export function useEdgePan({
       mousePosRef.current = { x, y }
     }
 
+    // The floating menus (sidebar, segment/office menus, the minimised-menu
+    // restore pill) overlay the canvas near its edges. Hovering one must not
+    // start edge-pan, so we treat a pointer over any floating chrome the same as
+    // a pointer that left the canvas. Routing through onLeave() keeps the
+    // "don't clear mid-drag" invariant so dragging a widget past a menu toward
+    // the edge still pans.
+    function isOverFloatingChrome(target: EventTarget | null): boolean {
+      return target instanceof Element && !!target.closest('.fb-floating-chrome')
+    }
+
     function onMove(e: MouseEvent): void {
+      if (isOverFloatingChrome(e.target)) {
+        onLeave()
+        return
+      }
       readPositionFromEvent(e.clientX, e.clientY)
     }
     function onLeave(): void {
@@ -220,6 +234,10 @@ export function useEdgePan({
     // also catch drags being dragged OVER docked widgets etc., and
     // hit-test against our canvas bounds in `readPositionFromEvent`.
     function onDocDragOver(e: DragEvent): void {
+      if (isOverFloatingChrome(e.target)) {
+        onLeave()
+        return
+      }
       readPositionFromEvent(e.clientX, e.clientY)
     }
 
