@@ -80,6 +80,7 @@
     "electron-updater": "^6.8.3",
     "exceljs": "^4.4.0",
     "fflate": "^0.8.3",
+    "framer-motion": "^12.42.2",
     "imapflow": "^1.4.1",
     "lowlight": "^3.3.0",
     "lru-cache": "^10.4.3",
