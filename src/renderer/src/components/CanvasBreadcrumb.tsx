@@ -71,7 +71,7 @@ export default function CanvasBreadcrumb({
     leaveTimer.current = window.setTimeout(() => {
       setExpanded(false)
       setDropdown(null)
-    }, 350)
+    }, 450)
   }
 
   // Called on mouseEnter of the pill or any dropdown panel.
@@ -116,7 +116,10 @@ export default function CanvasBreadcrumb({
 
   const ancestors = chain.slice(0, -1)
   const current = chain[chain.length - 1] ?? activeTask
-  const hasAncestors = ancestors.length > 0
+  // hasAncestors is true if we found ancestors in the chain OR if the current
+  // node has a parentId that didn't resolve into nodes yet (timing / load order).
+  // This ensures the depth hint and expand always fire when a parent exists.
+  const hasAncestors = ancestors.length > 0 || !!current.parentId
 
   // ── Render ────────────────────────────────────────────────────────────────
 
@@ -147,7 +150,7 @@ export default function CanvasBreadcrumb({
               animate={{ width: 'auto', opacity: 1 }}
               exit={{ width: 0, opacity: 0 }}
               transition={{ duration: 0.22, ease: [0.34, 1.2, 0.64, 1] }}
-              className="inline-flex items-center gap-0.5 overflow-hidden shrink-0"
+              className="inline-flex items-center gap-0.5 shrink-0"
             >
               {ancestors.map((n) => {
                 const isFolder = n.kind === 'folder'
@@ -189,8 +192,8 @@ export default function CanvasBreadcrumb({
               transition={{ duration: 0.15, ease: 'easeOut' }}
               className="inline-flex items-center shrink-0 overflow-hidden"
             >
-              <Icon name="chevron_right" size={13} className="text-[var(--ink-30)]" />
-              <span className="text-[10px] text-[var(--ink-30)] px-1 font-mono">
+              <Icon name="chevron_right" size={13} className="text-[var(--ink-40)]" />
+              <span className="text-[10px] text-[var(--ink-50)] px-1 font-mono">
                 {ancestors.length > 1 ? `+${ancestors.length}` : '···'}
               </span>
             </motion.span>
