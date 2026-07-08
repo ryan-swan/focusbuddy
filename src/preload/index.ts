@@ -836,6 +836,10 @@ const api = {
       ipcRenderer.invoke('fileManager:fileDocument', docId, parentId),
     unfiledDocuments: (): Promise<Array<{ id: string; title: string; docType: string }>> =>
       ipcRenderer.invoke('fileManager:unfiledDocuments'),
+    locateDocument: (
+      docId: string
+    ): Promise<{ entryId: string; parentId: string | null; path: Array<{ id: string; name: string }> } | null> =>
+      ipcRenderer.invoke('fileManager:locateDocument', docId),
     pickFiles: (parentId: string | null): Promise<FbFile[]> =>
       ipcRenderer.invoke('fileManager:pickFiles', parentId),
     reveal: (id: string): Promise<{ ok: boolean }> => ipcRenderer.invoke('fileManager:reveal', id)

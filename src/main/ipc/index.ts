@@ -189,7 +189,8 @@ import {
   deleteSmartFolder as deleteFileSmartFolder,
   smartFolderEntries as fileSmartFolderEntries,
   fileDocument,
-  unfiledDocuments
+  unfiledDocuments,
+  locateDocument
 } from '../db/files'
 import { extractDocText, retrieveSources, relatedDocuments } from '../workspaceSearch'
 import {
@@ -1437,6 +1438,7 @@ export function registerIpcHandlers(): void {
     fileDocument(docId, parentId)
   )
   ipcMain.handle('fileManager:unfiledDocuments', () => unfiledDocuments())
+  ipcMain.handle('fileManager:locateDocument', (_e, docId: string) => locateDocument(docId))
   ipcMain.handle('fileManager:pickFiles', (_e, parentId: string | null) => pickFilesIntoFolder(parentId))
   ipcMain.handle('fileManager:reveal', (_e, id: string) => revealFile(id))
 

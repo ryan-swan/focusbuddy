@@ -6,6 +6,7 @@ import { useViewStore } from '../../stores/view'
 import { useAccountStore } from '../../stores/account'
 import { createLiveDoc } from '../../lib/docCollabClient'
 import Icon from '../Icon'
+import DocFiledInChip from '../DocFiledInChip'
 
 // Documents hub — the home for office files. The top panel is the AI-first
 // create flow: pick what you are making, say what it is about and who it is
@@ -216,7 +217,12 @@ export default function DocumentsView(): JSX.Element {
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="text-[13px] font-medium text-stone-900 dark:text-stone-100 truncate">{d.title}</div>
-                  <div className="text-[11px] text-stone-400 dark:text-stone-500">Edited {relTime(d.updatedAt)}</div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-[11px] text-stone-400 dark:text-stone-500">Edited {relTime(d.updatedAt)}</span>
+                    <span onClick={(e) => e.stopPropagation()}>
+                      <DocFiledInChip docId={d.id} compact />
+                    </span>
+                  </div>
                 </div>
                 <div className="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 flex items-center gap-1">
                   <button

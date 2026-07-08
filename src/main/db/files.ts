@@ -705,6 +705,20 @@ export function fileDocument(docId: string, parentId: string | null): FileEntry 
   return getEntry(id)
 }
 
+// Where an office document is filed: the fb_files 'doc' row plus the folder
+// chain to it, so any surface can show "filed in Room > Folder" and offer to
+// move it. Returns null when the document has never been filed (it is loose).
+export function locateDocument(
+  docId: string
+): { entryId: string; parentId: string | null; path: Array<{ id: string; name: string }> } | null {
+  const db = getDb()
+  const row = db
+    .prepare("SELECT id, parent_id FROM fb_files WHERE kind = 'doc' AND doc_id = ? AND trashed_at IS NULL")
+    .get(docId) as { id: string; parent_id: string | null } | undefined
+  if (!row) return null
+  return { entryId: row.id, parentId: row.parent_id, path: folderPath(row.parent_id) }
+}
+
 // Documents not yet filed anywhere — offered in the "add existing document"
 // picker so a doc isn't shown twice in the same view.
 export function unfiledDocuments(): Array<{ id: string; title: string; docType: string }> {

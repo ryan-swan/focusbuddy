@@ -8,6 +8,7 @@ import { personDisplayName } from '../../lib/personName'
 import { DocEditor, SheetEditor, SlidesEditor, MapEditor, DesignEditor } from '@office'
 import { promptText } from '../plexi/PromptDialog'
 import Icon from '../Icon'
+import DocFiledInChip from '../DocFiledInChip'
 
 // Local-document comment row (matches the docComments IPC surface).
 interface LocalComment {
@@ -185,6 +186,7 @@ export default function DocumentEditorView({ documentId, onBack }: Props): JSX.E
           onChange={(e) => void rename(e.target.value)}
           className="flex-1 min-w-0 bg-transparent text-[14px] font-semibold text-stone-900 dark:text-stone-100 focus:outline-none"
         />
+        <DocFiledInChip docId={active.id} className="shrink-0 max-w-[220px]" />
         {saveError ? (
           <span
             className="text-[11px] text-red-600 dark:text-red-400 inline-flex items-center gap-1 shrink-0"
