@@ -36,6 +36,20 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.5.2',
+    date: '2026-07-08T20:30:00Z',
+    title: 'PlexiDesk 3.5.2 — roomier plans and documents',
+    tag: 'fix',
+    summary:
+      'The plan timeline now fills the width of the screen instead of stopping partway across, keeps a few weeks of empty runway after the last task so you can drag a bar into the future, and keeps each task bar lined up with its name even when the panel beside it is open. Documents in continuous view now use a wider, centred column so they make the most of the space instead of hugging the left edge.',
+    highlights: [
+      'The plan timeline fills the screen width and no longer stops mid-way for a short plan.',
+      'Timeline keeps a few weeks of runway past the last task, so you can drag a task into the future; scroll for more.',
+      'Task bars stay aligned with their names when the side panel is open.',
+      'Documents use a wider, centred column in continuous view instead of hugging the left.'
+    ]
+  },
+  {
     version: '3.5.1',
     date: '2026-07-08T19:30:00Z',
     title: 'PlexiDesk 3.5.1 — cleaner document pages',
