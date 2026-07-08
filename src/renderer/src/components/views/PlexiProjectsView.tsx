@@ -106,7 +106,7 @@ export default function PlexiProjectsView(): JSX.Element {
   async function newProject(): Promise<void> {
     setError(null)
     try {
-      const node = await window.api.nodes.create({ parentId: null, kind: 'folder', title: 'New plan' })
+      const node = await window.api.nodes.create({ parentId: null, kind: 'folder', title: 'New plan', isPlan: true })
       setOpenId(node.id)
     } catch (e) {
       setError(`Could not create the plan: ${e instanceof Error ? e.message : String(e)}`)

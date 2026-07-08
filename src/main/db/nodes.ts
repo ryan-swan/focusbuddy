@@ -25,6 +25,7 @@ interface NodeRow {
   resume_updated_at: number | null
   due_date: number | null
   archived: number | null
+  is_plan: number | null
   shared_from_handle: string | null
 }
 
@@ -50,6 +51,7 @@ function rowToNode(row: NodeRow): FbNode {
     resumeUpdatedAt: row.resume_updated_at,
     dueDate: row.due_date,
     archived: row.archived === 1,
+    isPlan: row.is_plan === 1,
     sharedFromHandle: row.shared_from_handle ?? null
   }
 }
@@ -95,8 +97,8 @@ export function createNode(draft: NodeDraft): FbNode {
   const id = randomUUID()
   const now = Date.now()
   db.prepare(
-    `INSERT INTO nodes (id, parent_id, kind, title, description, status, priority, interest, importance, sort_order, created_at, updated_at, estimate_minutes, extensions_minutes, due_date, shared_from_handle, org_id)
-     VALUES (@id, @parentId, @kind, @title, @description, 'open', @priority, @interest, @importance, @sortOrder, @now, @now, @estimateMinutes, 0, @dueDate, @sharedFromHandle, @orgId)`
+    `INSERT INTO nodes (id, parent_id, kind, title, description, status, priority, interest, importance, sort_order, created_at, updated_at, estimate_minutes, extensions_minutes, due_date, is_plan, shared_from_handle, org_id)
+     VALUES (@id, @parentId, @kind, @title, @description, 'open', @priority, @interest, @importance, @sortOrder, @now, @now, @estimateMinutes, 0, @dueDate, @isPlan, @sharedFromHandle, @orgId)`
   ).run({
     id,
     parentId: draft.parentId,
@@ -109,6 +111,7 @@ export function createNode(draft: NodeDraft): FbNode {
     sortOrder: nextSortOrder(draft.parentId),
     estimateMinutes: draft.estimateMinutes ?? null,
     dueDate: draft.dueDate ?? null,
+    isPlan: draft.isPlan ? 1 : 0,
     sharedFromHandle: draft.sharedFromHandle ?? null,
     orgId: getActiveOrgId(),
     now
@@ -148,6 +151,10 @@ export function updateNode(id: string, patch: NodePatch): FbNode | null {
   if (patch.archived !== undefined) {
     fields.push('archived = @archived')
     params.archived = patch.archived ? 1 : 0
+  }
+  if (patch.isPlan !== undefined) {
+    fields.push('is_plan = @isPlan')
+    params.isPlan = patch.isPlan ? 1 : 0
   }
   if (patch.status === 'in_progress' && existing.status !== 'in_progress') {
     fields.push('started_at = @now')

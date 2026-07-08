@@ -490,12 +490,17 @@ export function levelResources(projectId: string, nowMs = Date.now()): ProjectPl
   return getProjectPlan(projectId, nowMs)
 }
 
-// Every folder node that contains at least one task, with a rollup for the
-// portfolio view. percentComplete is real, computed from task status.
+// Every folder explicitly marked as a Plan (is_plan = 1) that contains at least
+// one task, with a rollup for the portfolio view. percentComplete is real,
+// computed from task status. A plain Room (is_plan = 0) never shows here even if
+// it holds desks — that is the Rooms/Desks/Plans decoupling. Existing folders
+// with tasks were grandfathered to is_plan = 1 (see migratePlanFlag).
 export function listProjectSummaries(nowMs = Date.now()): ProjectSummary[] {
   const db = getDb()
   const folders = db
-    .prepare(`SELECT id, title FROM nodes WHERE kind = 'folder' AND trashed_at IS NULL AND archived = 0`)
+    .prepare(
+      `SELECT id, title FROM nodes WHERE kind = 'folder' AND is_plan = 1 AND trashed_at IS NULL AND archived = 0`
+    )
     .all() as Array<{ id: string; title: string }>
   const out: ProjectSummary[] = []
   for (const f of folders) {

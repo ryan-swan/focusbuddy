@@ -165,6 +165,11 @@ export interface FbNode {
   // about the work itself (open / in_progress / done / parked); archived
   // is about whether the node should be visible in day-to-day surfaces.
   archived: boolean
+  // Rooms/Desks/Plans split. Only meaningful on folder nodes: false = a plain
+  // Room (organisation only), true = a Plan that appears in the Plans portfolio
+  // and Gantt. Task nodes (Desks) leave this false; a Desk is never auto-added
+  // to a plan. See migratePlanFlag in main/db/database.ts for the grandfather.
+  isPlan: boolean
   // Handle of the person who shared this node with you, set when the node
   // was reconstructed from an accepted share. Null for your own nodes. The
   // sidebar uses it to show a "Shared by <handle>" badge + avatar.
@@ -181,6 +186,9 @@ export interface NodeDraft {
   importance?: AxisValue
   estimateMinutes?: number | null
   dueDate?: number | null
+  // Create this folder as a Plan (is_plan = 1) rather than a plain Room. Only
+  // the Plans view sets this; every other create path leaves it a Room.
+  isPlan?: boolean
   // Set when reconstructing a node from an accepted share — stamps the
   // sharer's handle so the UI can badge it.
   sharedFromHandle?: string | null
@@ -201,6 +209,9 @@ export interface NodePatch {
   resumeUpdatedAt?: number | null
   dueDate?: number | null
   archived?: boolean
+  // Promote a Room to a Plan or demote it back. Lets the user say "this is a
+  // plan" / "this is just a room" without recreating the node.
+  isPlan?: boolean
 }
 
 // ── Time blocks (calendar time-blocking) ────────────────────────────────────

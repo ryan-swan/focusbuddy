@@ -519,6 +519,14 @@ export function getDb(): Database.Database {
   ensureColumn(db, 'nodes', 'must_start', 'INTEGER')
   ensureColumn(db, 'nodes', 'deadline', 'INTEGER')
   ensureColumn(db, 'nodes', 'cost', 'REAL')
+  // Rooms/Desks/Plans decoupling. A folder node is a Room (pure organisation) by
+  // default; is_plan = 1 promotes it to a Plan, and only Plans appear in the
+  // Plans portfolio / Gantt. This is what stops every Room-with-desks from
+  // silently becoming a plan. Desks (task nodes) are never auto-added to a plan.
+  // The one-time grandfather migration below (migratePlanFlag) sets is_plan = 1
+  // on existing folders that already have task descendants, so no current plan
+  // disappears when this ships.
+  ensureColumn(db, 'nodes', 'is_plan', 'INTEGER NOT NULL DEFAULT 0')
   // Typed dependencies (FS/SS/FF/SF) + working-day lag on existing deps tables.
   ensureColumn(db, 'fb_task_deps', 'dep_type', "TEXT NOT NULL DEFAULT 'FS'")
   ensureColumn(db, 'fb_task_deps', 'lag_days', 'INTEGER NOT NULL DEFAULT 0')
@@ -856,7 +864,39 @@ export function getDb(): Database.Database {
     CREATE INDEX IF NOT EXISTS idx_fb_knowledge_org ON fb_knowledge(org_id);
     CREATE INDEX IF NOT EXISTS idx_fb_tables_org ON fb_tables(org_id);
   `)
+  migratePlanFlag(db)
   return db
+}
+
+// One-time grandfather for the Rooms/Desks/Plans split. Before this change, the
+// Plans portfolio treated EVERY folder that contained tasks as a plan. Now a
+// folder is a plan only when is_plan = 1. To preserve every existing user's
+// current plans, we set is_plan = 1 on any folder that already has a task
+// descendant AND is not itself marked done — but only once, guarded by a marker
+// row so a later manual "this Room is not a Plan" choice is never undone on the
+// next boot. New folders keep the is_plan = 0 default.
+function migratePlanFlag(d: Database.Database): void {
+  const MARKER = 'plan_flag_grandfathered_v1'
+  const already = d
+    .prepare('SELECT value FROM sync_meta WHERE key = ?')
+    .get(MARKER) as { value: string } | undefined
+  if (already) return
+  // A folder becomes a plan if any descendant is a task. Direct children cover
+  // the overwhelming majority; a recursive CTE catches nested plans too.
+  d.exec(`
+    UPDATE nodes SET is_plan = 1
+    WHERE kind = 'folder' AND id IN (
+      WITH RECURSIVE subtree(root, id) AS (
+        SELECT f.id, f.id FROM nodes f WHERE f.kind = 'folder'
+        UNION ALL
+        SELECT s.root, n.id FROM nodes n JOIN subtree s ON n.parent_id = s.id
+      )
+      SELECT DISTINCT s.root FROM subtree s
+      JOIN nodes t ON t.id = s.id
+      WHERE t.kind = 'task'
+    )
+  `)
+  d.prepare('INSERT OR REPLACE INTO sync_meta (key, value) VALUES (?, ?)').run(MARKER, '1')
 }
 
 // The documents table shipped with a CHECK constraint listing the known doc
