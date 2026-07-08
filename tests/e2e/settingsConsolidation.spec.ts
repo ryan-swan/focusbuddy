@@ -34,8 +34,15 @@ async function openSettings(window: LaunchedApp['window']): Promise<void> {
   const settingsBtn = window.getByRole('button', { name: /appearance settings/i })
   await expect(settingsBtn).toBeVisible({ timeout: 5_000 })
   await settingsBtn.click()
-  const panel = window.locator('.fixed.z-\\[200\\].overflow-y-auto').first()
+  const panel = window.locator('[role="dialog"][aria-label="Settings"]').first()
   await expect(panel).toBeVisible({ timeout: 5_000 })
+}
+
+// Settings is tabbed now; each section lives under its tab. Open the tab that
+// hosts the section under test before asserting on it.
+async function openSettingsTab(window: LaunchedApp['window'], tab: string): Promise<void> {
+  await openSettings(window)
+  await window.locator(`[data-testid="settings-tab-${tab}"]`).click()
 }
 
 test('Settings shows an Organisation section whose Manage button opens OrgAdminView', async () => {
@@ -46,7 +53,7 @@ test('Settings shows an Organisation section whose Manage button opens OrgAdminV
   window.on('pageerror', (err) => pageErrors.push(err.message))
 
   await waitForReady(window)
-  await openSettings(window)
+  await openSettingsTab(window, 'organisation')
 
   const orgSection = window.locator('[data-testid="settings-section-organisation"]')
   await window.evaluate(() => {
@@ -74,7 +81,7 @@ test('Settings shows a Templates section listing the real starter templates', as
   window.on('pageerror', (err) => pageErrors.push(err.message))
 
   await waitForReady(window)
-  await openSettings(window)
+  await openSettingsTab(window, 'templates')
 
   const tplSection = window.locator('[data-testid="settings-section-templates"]')
   await window.evaluate(() => {

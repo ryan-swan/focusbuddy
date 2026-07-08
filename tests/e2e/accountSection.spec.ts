@@ -43,22 +43,14 @@ test('Settings Account section renders signed-out state and the sign-in modal op
   // so the app is in the signed-out state with no modal overlay.
   await waitForReady(window)
 
-  // Open Settings via the gear button in the titlebar.
+  // Open Settings via the gear button in the titlebar, then the Account tab.
   const settingsBtn = window.getByRole('button', { name: /appearance settings/i })
   await expect(settingsBtn).toBeVisible({ timeout: 5_000 })
   await settingsBtn.click()
 
-  // The settings panel is a scrollable container (max-h-[80vh] overflow-y-auto).
-  // AccountSection is mounted near the bottom, so we need to scroll to it.
-  // We wait for the panel to appear first, then scroll the Account section into view.
-  const settingsPanel = window.locator('.fixed.z-\\[200\\].overflow-y-auto').first()
+  const settingsPanel = window.locator('[role="dialog"][aria-label="Settings"]').first()
   await expect(settingsPanel).toBeVisible({ timeout: 5_000 })
-
-  // Scroll the account-signin button into view via JavaScript.
-  await window.evaluate(() => {
-    const el = document.querySelector('[data-testid="account-signin"]')
-    if (el) el.scrollIntoView({ block: 'nearest' })
-  })
+  await window.locator('[data-testid="settings-tab-account"]').click()
 
   // The Account section should render in the signed-out state.
   // Signed-out renders a "Sign in or create account" button.
@@ -93,7 +85,7 @@ test('Settings Account section renders signed-out state and the sign-in modal op
   expect(pageErrors).toHaveLength(0)
 })
 
-test('Settings Account section is mounted above ApiKeysSection in the panel', async () => {
+test('Account and API-key settings are each reachable under their own tab', async () => {
   launched = await launchApp()
   const { window } = launched
 
@@ -102,27 +94,18 @@ test('Settings Account section is mounted above ApiKeysSection in the panel', as
   // Open Settings.
   const settingsBtn = window.getByRole('button', { name: /appearance settings/i })
   await settingsBtn.click()
-
-  // Wait for panel, then scroll to Account section.
-  const settingsPanel = window.locator('.fixed.z-\\[200\\].overflow-y-auto').first()
+  const settingsPanel = window.locator('[role="dialog"][aria-label="Settings"]').first()
   await expect(settingsPanel).toBeVisible({ timeout: 5_000 })
-  await window.evaluate(() => {
-    const el = document.querySelector('[data-testid="account-signin"]')
-    if (el) el.scrollIntoView({ block: 'nearest' })
-  })
 
-  // Both AccountSection and ApiKeysSection should be visible.
-  // Account is above ApiKeys in the panel per the mount order in SettingsPanel.
-  const accountSignInBtn = window.locator('[data-testid="account-signin"]')
-  await expect(accountSignInBtn).toBeVisible({ timeout: 5_000 })
+  // The Account tab hosts the sign-in control.
+  await window.locator('[data-testid="settings-tab-account"]').click()
+  await expect(window.locator('[data-testid="account-signin"]')).toBeVisible({ timeout: 5_000 })
+  // ApiKeys content is not on the Account tab.
+  await expect(window.getByText(/anthropic api key/i)).toHaveCount(0)
 
-  // The API keys section has an "Anthropic API Key" label — confirm it renders too.
-  const apiSection = window.getByText(/anthropic api key/i)
-  await expect(apiSection).toBeVisible({ timeout: 5_000 })
-
-  // Verify vertical order: AccountSection appears before ApiKeysSection in the DOM.
-  // getBoundingClientRect().top for account-signin should be less than for the api label.
-  const accountY = await accountSignInBtn.evaluate((el) => el.getBoundingClientRect().top)
-  const apiY = await apiSection.first().evaluate((el) => el.getBoundingClientRect().top)
-  expect(accountY).toBeLessThan(apiY)
+  // The AI tab hosts the Anthropic API key setup.
+  await window.locator('[data-testid="settings-tab-ai"]').click()
+  await expect(window.getByText(/anthropic api key/i).first()).toBeVisible({ timeout: 5_000 })
+  // And the account sign-in control is not on the AI tab.
+  await expect(window.locator('[data-testid="account-signin"]')).toHaveCount(0)
 })

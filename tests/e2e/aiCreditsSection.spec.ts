@@ -38,22 +38,12 @@ async function openSettingsToAiSection(window: LaunchedApp['window']): Promise<v
   await expect(settingsBtn).toBeVisible({ timeout: 5_000 })
   await settingsBtn.click()
 
-  const settingsPanel = window.locator('.fixed.z-\\[200\\].overflow-y-auto').first()
+  const settingsPanel = window.locator('[role="dialog"][aria-label="Settings"]').first()
   await expect(settingsPanel).toBeVisible({ timeout: 5_000 })
 
-  // The settings panel is a max-h-[80vh] overflow-y-auto container. The AI source
-  // section is near the bottom. scrollIntoView on the element scrolls the nearest
-  // scrollable ancestor (the panel itself), which makes the element visible in the
-  // Playwright sense (not clipped). We wait for the element to exist in the DOM
-  // first, then scroll it into view.
-  await window.locator('[data-testid="ai-source-section"]').waitFor({ state: 'attached', timeout: 5_000 })
-  await window.evaluate(() => {
-    const el = document.querySelector('[data-testid="ai-source-section"]')
-    if (el) el.scrollIntoView({ block: 'nearest', behavior: 'instant' })
-  })
-
-  // After scrolling, wait for the first mode button to be visible (it's inside
-  // ai-source-section; if it's visible, the section is in the viewport).
+  // Settings is tabbed; the AI source section (keys + credit chooser) lives on the
+  // AI tab. Open it, then wait for the first mode button to be visible.
+  await window.locator('[data-testid="settings-tab-ai"]').click()
   await expect(window.locator('[data-testid="ai-mode-auto"]')).toBeVisible({ timeout: 5_000 })
 }
 
@@ -254,19 +244,13 @@ test('AI credits: no regression — Settings panel fully renders without errors'
 
   await waitForReady(window)
 
-  // Open settings.
+  // Open settings, then the AI tab (where the key rows live).
   const settingsBtn = window.getByRole('button', { name: /appearance settings/i })
   await settingsBtn.click()
 
-  const settingsPanel = window.locator('.fixed.z-\\[200\\].overflow-y-auto').first()
+  const settingsPanel = window.locator('[role="dialog"][aria-label="Settings"]').first()
   await expect(settingsPanel).toBeVisible({ timeout: 5_000 })
-
-  // Scroll to Anthropic row.
-  await window.evaluate(() => {
-    const spans = Array.from(document.querySelectorAll('span'))
-    const el = spans.find((s) => s.textContent?.toLowerCase().includes('anthropic api key'))
-    if (el) el.scrollIntoView({ block: 'nearest' })
-  })
+  await window.locator('[data-testid="settings-tab-ai"]').click()
 
   // Anthropic row renders.
   await expect(window.getByText(/anthropic api key/i).first()).toBeVisible({ timeout: 5_000 })
