@@ -29,6 +29,7 @@ import { Markdown } from 'tiptap-markdown'
 import { createLowlight, common } from 'lowlight'
 import { ResizableImage } from './ResizableImage'
 import { WidgetEmbedNode } from '../embed/WidgetEmbedNode'
+import { DocEmbedNode } from '../embed/DocEmbedNode'
 import { SlashCommand } from './SlashMenu'
 import { SearchHighlight } from './searchHighlight'
 import { FocusBlock } from './focusBlock'
@@ -112,6 +113,10 @@ export function buildDocExtensions(opts: BuildOptions = {}): AnyExt[] {
     // headless converters or a document carrying an embed would lose it on an
     // HTML round trip. Headless use only exercises renderHTML/parseHTML.
     WidgetEmbedNode as AnyExt,
+    // PlexiOffice document embeds (a doc/sheet/slides/etc referenced inside a
+    // doc). Same shared-schema requirement as widget embeds so it round-trips
+    // through the headless HTML / .docx converters.
+    DocEmbedNode as AnyExt,
     // A Word-style Table of Contents built from the document's headings.
     TableOfContents as AnyExt,
     // Auto-numbered inline footnotes with editable note text.

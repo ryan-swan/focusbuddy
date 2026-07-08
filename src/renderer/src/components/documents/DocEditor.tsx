@@ -27,6 +27,8 @@ import type { Doc as YDoc } from 'yjs'
 import type { Awareness } from 'y-protocols/awareness'
 import Icon from '../Icon'
 import WidgetPickerDialog from './embed/WidgetPickerDialog'
+import DocPickerModal from '../DocPickerModal'
+import { primeDocMeta } from '../../lib/docMetaCache'
 
 // Focus mode dims every block except the one under the cursor, so a long draft
 // collapses to the single sentence being written. The FocusBlock decoration tags
@@ -166,6 +168,7 @@ export default function DocEditor({
   const [busyOffice, setBusyOffice] = useState<string | null>(null)
   const [officeMsg, setOfficeMsg] = useState<string | null>(null)
   const [widgetPickerOpen, setWidgetPickerOpen] = useState(false)
+  const [docPickerOpen, setDocPickerOpen] = useState(false)
 
   // Parse the (possibly legacy) body once into the Tiptap doc + named heading
   // styles + page setup. The body is persisted wrapped as { doc, headingStyles,
@@ -262,6 +265,7 @@ export default function DocEditor({
         insertTable: () =>
           editor?.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run(),
         insertWidget: () => setWidgetPickerOpen(true),
+        insertDoc: () => setDocPickerOpen(true),
         importDocx: () => void importDocx(),
         exportDocx: () => void exportDocx(),
         exportPdf: () => void exportPdf()
@@ -789,6 +793,18 @@ export default function DocEditor({
         />
       )}
 
+      {docPickerOpen && (
+        <DocPickerModal
+          title="Insert an office file"
+          onPick={(d) => {
+            primeDocMeta(d.id, { title: d.title, docType: d.docType })
+            setDocPickerOpen(false)
+            editor.chain().focus().insertDocEmbed(d.id).run()
+          }}
+          onClose={() => setDocPickerOpen(false)}
+        />
+      )}
+
       {showPanel && (
         <DocSidePanel
           editor={editor}
@@ -1099,6 +1115,7 @@ interface DocCommandHandlers {
   insertImage: () => void
   insertTable: () => void
   insertWidget: () => void
+  insertDoc: () => void
   importDocx: () => void
   exportDocx: () => void
   exportPdf: () => void
@@ -1140,6 +1157,7 @@ function buildDocCommands(editor: Editor | null, h: DocCommandHandlers): EditorC
     { id: 'doc-insert-image', label: 'Insert image', icon: 'image', group: 'Insert', keywords: 'picture photo', run: h.insertImage },
     { id: 'doc-insert-table', label: 'Insert table', icon: 'table_chart', group: 'Insert', keywords: 'grid', run: h.insertTable },
     { id: 'doc-insert-widget', label: 'Insert widget from a desk', icon: 'widgets', group: 'Insert', keywords: 'embed desk canvas', run: h.insertWidget },
+    { id: 'doc-insert-doc', label: 'Insert office file', icon: 'description', group: 'Insert', keywords: 'embed document sheet slides plexioffice', run: h.insertDoc },
     // Find
     { id: 'doc-find', label: 'Find and replace', icon: 'search', shortcut: '⌘F', group: 'Edit', keywords: 'search replace', run: h.openFind },
     // AI
