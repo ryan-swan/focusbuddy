@@ -13,7 +13,7 @@ import InboxView from './views/InboxView'
 import MailView from './views/MailView'
 import DocumentsView from './views/DocumentsView'
 import DesignsView from './views/DesignsView'
-import DocumentEditorView from './views/DocumentEditorView'
+import DocumentOpen from './views/DocumentOpen'
 import LiveDocEditorView from './views/LiveDocEditorView'
 import LiveCanvasView from './views/LiveCanvasView'
 import LiveFolderView from './views/LiveFolderView'
@@ -98,7 +98,7 @@ function MainPaneSurface(): JSX.Element {
     case 'design':
       return <DesignsView />
     case 'document':
-      return <DocumentEditorView documentId={view.documentId} />
+      return <DocumentOpen documentId={view.documentId} />
     case 'livedoc':
       return <LiveDocEditorView liveDocId={view.liveDocId} />
     case 'livecanvas':

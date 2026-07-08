@@ -1813,6 +1813,10 @@ export interface FbDocument {
   archived: boolean
   createdAt: number
   updatedAt: number
+  // Owning scope: 'personal' (or null, treated as personal) for a private doc, or
+  // a real org id for an org-shared doc. Drives whether opening it routes into the
+  // CRDT co-editing path (org-shared) instead of the last-write-wins editor.
+  orgId: string | null
 }
 
 // List row — everything except the (potentially large) body.

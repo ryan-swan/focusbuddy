@@ -88,6 +88,35 @@ export async function createLiveDoc(
   return json?.ok ? json.doc ?? null : null
 }
 
+// Ensure a CRDT room exists for an org-shared document, reusing the document's own
+// id as the live-doc id. Idempotent on the server. Sends x-plexi-org so the server
+// resolves the doc's org and grants the whole org edit access. Returns the room
+// meta on success, or null if this account cannot make the doc live (not an org
+// member, offline, etc.) so the caller can fall back to the plain LWW editor.
+export async function ensureOrgLiveDoc(
+  token: string,
+  id: string,
+  orgId: string,
+  input: { docType: string; title: string; body: string }
+): Promise<LiveDocMeta | null> {
+  try {
+    const res = await fetch(urlFor(`/livedocs/${id}/ensure-org`), {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        'x-plexi-org': orgId
+      },
+      body: JSON.stringify(input)
+    })
+    if (!res.ok) return null
+    const json = (await res.json()) as { ok: boolean; doc?: LiveDocMeta }
+    return json?.ok ? json.doc ?? null : null
+  } catch {
+    return null
+  }
+}
+
 export async function listLiveDocs(token: string): Promise<LiveDocListItem[]> {
   const { json } = await call<{ ok: boolean; docs?: LiveDocListItem[] }>('GET', '/livedocs', token)
   return json?.ok ? json.docs ?? [] : []

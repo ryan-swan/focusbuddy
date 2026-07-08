@@ -31,6 +31,7 @@ interface DocumentRow {
   archived: number
   created_at: number
   updated_at: number
+  org_id: string | null
 }
 
 // Spreadsheet-style column label for a zero-based index: 0->A, 25->Z, 26->AA, …
@@ -106,7 +107,8 @@ function rowToDoc(row: DocumentRow): FbDocument {
     body: parseBody(row.doc_type, row.body),
     archived: row.archived === 1,
     createdAt: row.created_at,
-    updatedAt: row.updated_at
+    updatedAt: row.updated_at,
+    orgId: row.org_id ?? null
   }
 }
 
