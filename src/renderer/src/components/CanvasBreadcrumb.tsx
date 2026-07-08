@@ -13,17 +13,20 @@ interface Props {
   fromMindmap?: boolean
 }
 
-// Hover-expand glossy pill breadcrumb.
-// Collapsed: home icon + depth indicator + current task name.
-// Hovered: full ancestry chain expands inline with a spring animation.
+// Hover-expand glossy pill breadcrumb with Stage Manager dropdowns.
+//
+// Expansion / collapse is driven by a SINGLE shared leave timer so that
+// moving the mouse from the pill into a dropdown (or between dropdowns)
+// never collapses the pill prematurely. The pill stays expanded — showing
+// the full ancestor chain — for as long as the pointer is anywhere over
+// the pill OR any open dropdown panel.
 //
 // Stage Manager dropdown logic:
-//   Hover current desk  → roomId = current.parentId  → shows sibling desks in same room
-//   Hover ancestor room → roomId = ancestor.parentId → shows sibling rooms (NOT children)
+//   Hover current desk  → roomId = current.parentId  → shows sibling desks
+//   Hover ancestor room → roomId = ancestor.parentId → shows sibling rooms
 //
-// The dropdown is positioned centered UNDER the specific segment being hovered,
-// not at the left edge of the pill. This is achieved by measuring each segment's
-// center via getBoundingClientRect() relative to the outer wrapper at hover time.
+// The dropdown is centered under the specific segment that triggered it
+// by measuring getBoundingClientRect() relative to the outer wrapper.
 export default function CanvasBreadcrumb({
   activeTask,
   nodes,
@@ -32,16 +35,64 @@ export default function CanvasBreadcrumb({
   onHome,
   fromMindmap
 }: Props): JSX.Element {
-  const [hovered, setHovered] = useState(false)
+  // `expanded` drives both pill breadcrumb visibility AND dropdown presence.
+  // It is set true on any mouseEnter into the system (pill or dropdown) and
+  // scheduled false by a shared timer on any mouseLeave — cancelled if the
+  // pointer re-enters any part of the system before the timer fires.
+  const [expanded, setExpanded] = useState(false)
   const [dropdown, setDropdown] = useState<{
     roomId: string | null
     activeId: string
-    // Horizontal center of the hovered segment, in px relative to the outer wrapper.
-    // Used to position the dropdown panel directly below the segment.
-    x: number
+    x: number // horizontal center relative to outer wrapper, for centering the panel
   } | null>(null)
+
   const leaveTimer = useRef<number | null>(null)
   const wrapperRef = useRef<HTMLDivElement>(null)
+
+  // ── Shared hover helpers ──────────────────────────────────────────────────
+
+  function cancelLeave(): void {
+    if (leaveTimer.current) {
+      clearTimeout(leaveTimer.current)
+      leaveTimer.current = null
+    }
+  }
+
+  function scheduleLeave(): void {
+    // Single timer controls BOTH pill collapse and dropdown close.
+    leaveTimer.current = window.setTimeout(() => {
+      setExpanded(false)
+      setDropdown(null)
+    }, 350)
+  }
+
+  // Called on mouseEnter of the pill or any dropdown panel.
+  function handleEnter(): void {
+    cancelLeave()
+    setExpanded(true)
+  }
+
+  // Called on mouseLeave of the pill or any dropdown panel.
+  const handleLeave = scheduleLeave
+
+  // ── Dropdown positioning ──────────────────────────────────────────────────
+
+  function openDropdownAt(
+    e: React.MouseEvent<HTMLElement>,
+    roomId: string | null,
+    activeId: string
+  ): void {
+    cancelLeave()
+    setExpanded(true)
+    if (wrapperRef.current) {
+      const wrapperRect = wrapperRef.current.getBoundingClientRect()
+      const targetRect = e.currentTarget.getBoundingClientRect()
+      const x = targetRect.left - wrapperRect.left + targetRect.width / 2
+      setDropdown({ roomId, activeId, x })
+    }
+  }
+
+  // ── Data ─────────────────────────────────────────────────────────────────
 
   const chain = useMemo(() => {
     const byId = new Map(nodes.map((n) => [n.id, n]))
@@ -59,40 +110,14 @@ export default function CanvasBreadcrumb({
   const current = chain[chain.length - 1] ?? activeTask
   const hasAncestors = ancestors.length > 0
 
-  function openDropdownAt(
-    e: React.MouseEvent<HTMLElement>,
-    roomId: string | null,
-    activeId: string
-  ): void {
-    if (leaveTimer.current) {
-      clearTimeout(leaveTimer.current)
-      leaveTimer.current = null
-    }
-    if (wrapperRef.current) {
-      const wrapperRect = wrapperRef.current.getBoundingClientRect()
-      const targetRect = e.currentTarget.getBoundingClientRect()
-      // Center of the hovered element relative to the outer wrapper left edge
-      const x = targetRect.left - wrapperRect.left + targetRect.width / 2
-      setDropdown({ roomId, activeId, x })
-    }
-  }
-
-  function scheduleClose(): void {
-    leaveTimer.current = window.setTimeout(() => setDropdown(null), 320)
-  }
-
-  function cancelClose(): void {
-    if (leaveTimer.current) {
-      clearTimeout(leaveTimer.current)
-      leaveTimer.current = null
-    }
-  }
+  // ── Render ────────────────────────────────────────────────────────────────
 
   return (
     <div ref={wrapperRef} data-testid="canvas-breadcrumb" className="relative">
+      {/* Breadcrumb pill */}
       <div
-        onMouseEnter={() => setHovered(true)}
-        onMouseLeave={() => setHovered(false)}
+        onMouseEnter={handleEnter}
+        onMouseLeave={handleLeave}
         className="inline-flex items-center gap-0.5 px-3 py-1.5 rounded-full fb-glass-chrome ring-1 ring-black/[0.07] dark:ring-white/[0.07] shadow-[0_2px_10px_rgba(0,0,0,0.08)] text-[12px] max-w-full overflow-hidden cursor-default select-none min-w-[320px]"
       >
         {/* Home button — always visible */}
@@ -105,9 +130,9 @@ export default function CanvasBreadcrumb({
           <Icon name="home" size={13} />
         </button>
 
-        {/* Ancestor chain — only visible when hovered */}
+        {/* Ancestor chain — visible when expanded */}
         <AnimatePresence initial={false}>
-          {hovered && hasAncestors && (
+          {expanded && hasAncestors && (
             <motion.span
               key="ancestors"
               initial={{ width: 0, opacity: 0 }}
@@ -123,7 +148,7 @@ export default function CanvasBreadcrumb({
                     key={n.id}
                     className="inline-flex items-center gap-0.5 shrink-0"
                     onMouseEnter={(e) => openDropdownAt(e, n.parentId ?? null, n.id)}
-                    onMouseLeave={scheduleClose}
+                    onMouseLeave={handleLeave}
                   >
                     <Icon name="chevron_right" size={13} className="text-[var(--ink-30)]" />
                     <button
@@ -145,9 +170,9 @@ export default function CanvasBreadcrumb({
           )}
         </AnimatePresence>
 
-        {/* Collapsed depth hint — visible only when NOT hovered and ancestors exist */}
+        {/* Collapsed depth hint — visible only when NOT expanded and ancestors exist */}
         <AnimatePresence initial={false}>
-          {!hovered && hasAncestors && (
+          {!expanded && hasAncestors && (
             <motion.span
               key="depth-hint"
               initial={{ width: 0, opacity: 0 }}
@@ -164,11 +189,11 @@ export default function CanvasBreadcrumb({
           )}
         </AnimatePresence>
 
-        {/* Current item — hovering shows siblings (desks in same room) */}
+        {/* Current item — hovering opens desk siblings dropdown */}
         <span
           className="inline-flex items-center gap-0.5 shrink-0"
           onMouseEnter={(e) => openDropdownAt(e, current.parentId ?? null, current.id)}
-          onMouseLeave={scheduleClose}
+          onMouseLeave={handleLeave}
         >
           <Icon name="chevron_right" size={13} className="text-[var(--ink-30)]" />
           <span className="inline-flex items-center gap-1.5 px-1.5 py-0.5 font-semibold text-[var(--ink-100)] max-w-[260px] rounded-full hover:bg-[var(--surface-sunken)] transition-colors">
@@ -183,7 +208,7 @@ export default function CanvasBreadcrumb({
         </span>
       </div>
 
-      {/* Stage Manager dropdown — centered under the specific hovered segment */}
+      {/* Stage Manager dropdown — centered under the hovered segment */}
       <AnimatePresence>
         {dropdown && (
           <motion.div
@@ -193,12 +218,9 @@ export default function CanvasBreadcrumb({
             exit={{ opacity: 0, y: -6, scale: 0.97 }}
             transition={{ duration: 0.22, ease: [0.34, 1.2, 0.64, 1] }}
             className="absolute top-full mt-2 w-[172px] max-h-[360px] rounded-2xl overflow-hidden bg-[var(--surface-raised)] border border-[var(--edge-soft)] shadow-[0_8px_40px_rgba(0,0,0,0.28)] ring-1 ring-black/[0.10] dark:ring-white/[0.10] z-[60] flex flex-col"
-            style={{
-              left: dropdown.x,
-              transform: 'translateX(-50%)'
-            }}
-            onMouseEnter={cancelClose}
-            onMouseLeave={scheduleClose}
+            style={{ left: dropdown.x, transform: 'translateX(-50%)' }}
+            onMouseEnter={handleEnter}
+            onMouseLeave={handleLeave}
           >
             <StageManagerStrip
               roomId={dropdown.roomId}
