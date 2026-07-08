@@ -159,17 +159,6 @@ function catenaryPath(x1: number, y1: number, x2: number, y2: number): string {
   return `M ${x1} ${y1} Q ${cpX} ${cpY} ${x2} ${y2}`
 }
 
-// Highlight path: same curve but control point pulled slightly UP — gives
-// the cord a rounded-top cross-section appearance when layered over the base.
-function catenaryHighlightPath(x1: number, y1: number, x2: number, y2: number): string {
-  const len = Math.hypot(x2 - x1, y2 - y1)
-  if (len < 0.5) return `M ${x1} ${y1} L ${x2} ${y2}`
-  const sag = Math.min(len * 0.22, 90)
-  const cpX = (x1 + x2) / 2
-  // Highlight arc is slightly shallower — sits above the main cord
-  const cpY = (y1 + y2) / 2 + sag * 0.82
-  return `M ${x1} ${y1} Q ${cpX} ${cpY} ${x2} ${y2}`
-}
 
 function catenaryMidpoint(x1: number, y1: number, x2: number, y2: number): { x: number; y: number } {
   const sag = Math.min(Math.hypot(x2 - x1, y2 - y1) * 0.22, 90)
@@ -342,12 +331,6 @@ export default function LinkOverlay({ ghost }: Props): JSX.Element | null {
     }
   }
 
-  const isDark = document.documentElement.classList.contains('dark')
-  // String colors — warm amber linen, slightly richer in dark mode.
-  const cordColor = isDark ? '#9B7448' : '#A07848'
-  const cordShadowColor = '#5A2E08'
-  const highlightColor = isDark ? '#D4BC96' : '#D4B882'
-
   const selectedLink = selectedLinkId ? links.find((l) => l.id === selectedLinkId) ?? null : null
 
   function handleClickLine(link: WidgetLink, mid: { x: number; y: number }): void {
@@ -408,11 +391,6 @@ export default function LinkOverlay({ ghost }: Props): JSX.Element | null {
               core into a halo so a firing wire reads as live current. */}
           <filter id="fb-wire-glow" x="-60%" y="-60%" width="220%" height="220%">
             <feGaussianBlur stdDeviation="3" />
-          </filter>
-          {/* Depth shadow for context strings — pronounced enough to read
-              as a physical object hanging above the canvas surface. */}
-          <filter id="fb-string-shadow" x="-10%" y="-40%" width="120%" height="240%">
-            <feDropShadow dx="0" dy="3" stdDeviation="2.5" floodColor="#3B1A06" floodOpacity="0.45" />
           </filter>
         </defs>
         {segments.map((seg) => {
@@ -510,77 +488,24 @@ export default function LinkOverlay({ ghost }: Props): JSX.Element | null {
                   </path>
                 </>
               )}
-              {type === 'context' ? (
-                // Multi-layer twine cord:
-                //  1. Deep shadow pass — lifts the cord off the surface
-                //  2. Base cord — warm amber/linen, full weight
-                //  3. Twist dash — alternating darker segments simulate rope twist
-                //  4. Highlight strand — lighter, narrower, slightly shallower arc
-                //     for a round cross-section feel
-                // On material-desk, the texture filter adds woven fibre detail.
-                <g style={{ pointerEvents: 'none' }}>
-                  {/* Shadow / depth layer — drawn below everything else */}
-                  <path
-                    d={d}
-                    fill="none"
-                    stroke={cordShadowColor}
-                    strokeOpacity={isSelected ? 0.70 : isHovered ? 0.55 : 0.38}
-                    strokeWidth={isSelected ? 6 : isHovered ? 6 : 5}
-                    strokeLinecap="round"
-                    style={{ transition: 'stroke-opacity 150ms ease, stroke-width 150ms ease' }}
-                  />
-                  {/* Base cord — warm amber linen */}
-                  <path
-                    d={d}
-                    fill="none"
-                    stroke={cordColor}
-                    strokeOpacity={isSelected ? 0.95 : isHovered ? 0.85 : 0.72}
-                    strokeWidth={isSelected ? 4 : isHovered ? 4 : 3}
-                    strokeLinecap="round"
-                    filter="url(#fb-string-shadow)"
-                    style={{ transition: 'stroke-opacity 150ms ease, stroke-width 150ms ease' }}
-                  />
-                  {/* Twist pattern — alternating darker dashes simulate the over/under
-                      twist of physical twine. Only visible at the base opacity level. */}
-                  <path
-                    d={d}
-                    fill="none"
-                    stroke={cordShadowColor}
-                    strokeOpacity={isSelected ? 0.40 : isHovered ? 0.32 : 0.22}
-                    strokeWidth={isSelected ? 4 : 3}
-                    strokeLinecap="round"
-                    strokeDasharray="5 9"
-                    style={{ pointerEvents: 'none', transition: 'stroke-opacity 150ms ease' }}
-                  />
-                  {/* Highlight strand — lighter, narrower, shallower arc, round cross-section */}
-                  <path
-                    d={catenaryHighlightPath(seg.x1, seg.y1, seg.x2, seg.y2)}
-                    fill="none"
-                    stroke={highlightColor}
-                    strokeOpacity={isSelected ? 0.75 : isHovered ? 0.60 : 0.42}
-                    strokeWidth={isSelected ? 1.5 : 1.1}
-                    strokeLinecap="round"
-                    style={{ transition: 'stroke-opacity 150ms ease' }}
-                  />
-                </g>
-              ) : (
-                <path
-                  d={d}
-                  fill="none"
-                  stroke="rgb(var(--accent))"
-                  strokeOpacity={
-                    disabled ? 0.3 : isFiring ? 0.95 : isSelected ? 0.95 : isReactive ? 0.75 : 0.5
-                  }
-                  strokeWidth={isFiring ? 2.5 : isSelected ? 2.5 : isReactive ? 2 : 1.5}
-                  strokeLinecap="round"
-                  strokeDasharray={disabled ? '2 5' : isFiring ? undefined : meta.dash}
-                  markerEnd={isReactive ? 'url(#fb-wire-arrow)' : undefined}
-                  style={{
-                    pointerEvents: 'none',
-                    transition: 'stroke-opacity 120ms ease'
-                  }}
-                />
-              )}
+              {/* All wire types — single styled path. context uses its dash from
+                  WIRE_META ('5 5') on a catenary arc; reactive wires are solid. */}
+              <path
+                d={d}
+                fill="none"
+                stroke="rgb(var(--accent))"
+                strokeOpacity={
+                  disabled ? 0.3 : isFiring ? 0.95 : isSelected ? 0.95 : isReactive ? 0.75 : 0.5
+                }
+                strokeWidth={isFiring ? 2.5 : isSelected ? 2.5 : isReactive ? 2 : 1.5}
+                strokeLinecap="round"
+                strokeDasharray={disabled ? '2 5' : isFiring ? undefined : meta.dash}
+                markerEnd={isReactive ? 'url(#fb-wire-arrow)' : undefined}
+                style={{
+                  pointerEvents: 'none',
+                  transition: 'stroke-opacity 120ms ease'
+                }}
+              />
               {/* Source endpoint — a pulsing spark ring while firing. */}
               {isFiring && (
                 <circle cx={seg.x1} cy={seg.y1} r={2} fill="none" stroke="rgb(var(--accent))" strokeWidth={1.5}>
@@ -598,69 +523,20 @@ export default function LinkOverlay({ ghost }: Props): JSX.Element | null {
                   style={{ pointerEvents: 'none' }}
                 />
               )}
-              {/* Pushpin tacks at context wire endpoints — source and target.
-                  A small filled circle (pin head) over a tiny shadow ring gives
-                  the physical "pinned to a corkboard" feel of the desk theme,
-                  but is subtle enough to work in all themes. */}
-              {type === 'context' && (
-                <>
-                  {[{ cx: seg.x1, cy: seg.y1 }, { cx: seg.x2, cy: seg.y2 }].map((pt, pi) => (
-                    <g key={pi} style={{ pointerEvents: 'none' }}>
-                      {/* Pin shadow */}
-                      <circle
-                        cx={pt.cx} cy={pt.cy + 1.5}
-                        r={isSelected ? 5.5 : 4.5}
-                        fill="#1A0A02"
-                        fillOpacity={0.40}
-                      />
-                      {/* Pin body — warm metal dome */}
-                      <circle
-                        cx={pt.cx} cy={pt.cy}
-                        r={isSelected ? 5 : 4}
-                        fill={isDark ? '#9B6830' : '#A07030'}
-                        fillOpacity={isSelected ? 1 : isHovered ? 0.90 : 0.75}
-                      />
-                      {/* Pin highlight — specular glint on top-left */}
-                      <circle
-                        cx={pt.cx - 1.2} cy={pt.cy - 1.2}
-                        r={isSelected ? 1.8 : 1.4}
-                        fill="#FFFFFF"
-                        fillOpacity={isSelected ? 0.65 : 0.45}
-                      />
-                    </g>
-                  ))}
-                </>
-              )}
             </g>
           )
         })}
         {ghostPath && (
-          <g style={{ pointerEvents: 'none' }}>
-            <path
-              d={ghostPath}
-              fill="none"
-              stroke={cordShadowColor}
-              strokeOpacity={0.35}
-              strokeWidth={5}
-              strokeLinecap="round"
-            />
-            <path
-              d={ghostPath}
-              fill="none"
-              stroke={cordColor}
-              strokeOpacity={0.70}
-              strokeWidth={3}
-              strokeLinecap="round"
-            />
-            <path
-              d={ghostPath}
-              fill="none"
-              stroke={highlightColor}
-              strokeOpacity={0.45}
-              strokeWidth={1.1}
-              strokeLinecap="round"
-            />
-          </g>
+          <path
+            d={ghostPath}
+            fill="none"
+            stroke="rgb(var(--accent))"
+            strokeOpacity={0.5}
+            strokeWidth={1.5}
+            strokeLinecap="round"
+            strokeDasharray="5 5"
+            style={{ pointerEvents: 'none' }}
+          />
         )}
       </svg>
       {/* Wire-type badges at each midpoint — click to open the wire editor. */}

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { futuristicPowerOn, futuristicPowerOff } from './audioBeep'
 
-export type ThemeMode = 'light' | 'dark' | 'auto' | 'futuristic' | 'atelier' | 'gemstone' | 'material-desk'
+export type ThemeMode = 'light' | 'dark' | 'auto' | 'futuristic' | 'atelier' | 'gemstone'
 // The hand-tuned presets, plus 'custom' for a user-chosen accent (any hex).
 // The presets carry a light/dark palette pair; 'custom' is resolved at
 // apply-time from the stored hex with an auto-derived hover. ruby + sapphire are
@@ -256,12 +256,11 @@ export const THEME_OPTIONS: Array<{ value: ThemeMode; label: string; icon: strin
   // prismatic light refraction on edges, and a slow, whisper-soft sparkle.
   // Pairs with the emerald / ruby / sapphire gem accents. The "this is
   // exquisite" theme.
-  { value: 'gemstone', label: 'Gemstone', icon: 'diamond' },
-  { value: 'material-desk', label: 'Material Desk', icon: 'table_restaurant' }
+  { value: 'gemstone', label: 'Gemstone', icon: 'diamond' }
 ]
 
 export function getEffectiveTheme(mode: ThemeMode): 'light' | 'dark' {
-  if (mode === 'futuristic' || mode === 'atelier' || mode === 'gemstone' || mode === 'material-desk') return 'dark'
+  if (mode === 'futuristic' || mode === 'atelier' || mode === 'gemstone') return 'dark'
   if (mode === 'auto') {
     if (typeof window === 'undefined') return 'light'
     return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
@@ -278,7 +277,6 @@ export function applyTheme(mode: ThemeMode, accent: AccentColor, customHex?: str
   root.classList.toggle('futuristic', mode === 'futuristic')
   root.classList.toggle('atelier', mode === 'atelier')
   root.classList.toggle('gemstone', mode === 'gemstone')
-  root.classList.toggle('material-desk', mode === 'material-desk')
   // Atelier locks the accent to heritage gold — overriding the user's pick.
   // We don't persist this back; if they switch off atelier, their preferred
   // accent returns. (atelier IS the look — the whole point is the cohesion.)
@@ -327,9 +325,9 @@ export function loadTheme(): {
   const font = localStorage.getItem(KEY_FONT) as FontChoice | null
   return {
     mode:
-      mode && ['light', 'dark', 'auto', 'futuristic', 'atelier', 'gemstone', 'material-desk'].includes(mode) ? mode : 'auto',
+      mode && ['light', 'dark', 'auto', 'futuristic', 'atelier', 'gemstone'].includes(mode) ? mode : 'auto',
     accent:
-      accent && ['violet', 'blue', 'emerald', 'rose', 'heritage', 'custom'].includes(accent)
+      accent && ['violet', 'blue', 'emerald', 'rose', 'heritage', 'ruby', 'sapphire', 'custom'].includes(accent)
         ? accent
         : 'violet',
     font: font && ['system', 'atkinson', 'lexend'].includes(font) ? font : 'system',
