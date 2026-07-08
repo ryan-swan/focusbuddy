@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import UnifiedBottomBar from './UnifiedBottomBar'
 import { effectiveShortcutToKind } from '../lib/keymap'
 import { useNodeStore } from '../stores/nodes'
 import { useWidgetStore } from '../stores/widgets'
@@ -2074,6 +2075,11 @@ export default function Canvas(): JSX.Element {
               onHome={() => setActiveTask(null)}
               fromMindmap={!!nodeOrigin}
             />
+          </div>
+
+          {/* Unified bottom dock — mic + recent widgets. Collapses to thin strip. */}
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-[44] pointer-events-auto">
+            <UnifiedBottomBar />
           </div>
 
           {panPing && (

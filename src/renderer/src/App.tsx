@@ -36,7 +36,7 @@ import SmartStackModal from './components/SmartStackModal'
 import CursorSpotlight from './components/CursorSpotlight'
 import PeerBodyDoubleDialog from './components/PeerBodyDoubleDialog'
 import AICommandBar from './components/AICommandBar'
-import UnifiedBottomBar from './components/UnifiedBottomBar'
+import CommandCenter from './components/CommandCenter'
 import MetricsOverlay from './components/MetricsOverlay'
 import LaunchSignInModal from './components/LaunchSignInModal'
 import UpgradePromptModal from './components/UpgradePromptModal'
@@ -488,6 +488,23 @@ export default function App(): JSX.Element {
           </span>
         </h1>
         <div className="titlebar-nodrag flex items-center gap-1">
+          {/* Search — opens command palette. ⌘K works from anywhere; this button
+              is the visible affordance for discoverability. */}
+          <Tooltip content="Search everything — tasks, notes, docs, actions (⌘K)" placement="bottom">
+            <button
+              onClick={() =>
+                window.dispatchEvent(
+                  new KeyboardEvent('keydown', { key: 'k', metaKey: true, bubbles: true })
+                )
+              }
+              className="h-7 px-2.5 inline-flex items-center gap-1.5 rounded-md text-[11px] font-medium text-stone-700 dark:text-stone-200 hover:bg-stone-100 dark:hover:bg-white/[0.06] border border-transparent hover:border-stone-200 dark:hover:border-white/[0.06] transition-colors"
+              aria-label="Search"
+            >
+              <Icon name="search" size={12} className="text-[var(--ink-50)]" />
+              <span>Search</span>
+              <kbd className="text-[9px] font-mono opacity-60 ml-0.5">⌘K</kbd>
+            </button>
+          </Tooltip>
           {/* AI command bar trigger — the "AI as the operating system"
               entry point. Sits prominently in the header so it's the
               first affordance the eye lands on. Cmd+Shift+K opens it
@@ -643,10 +660,11 @@ export default function App(): JSX.Element {
       <HyperfocusGuardian />
       <PreTaskBridge />
       <CursorSpotlight />
-      {/* Unified bottom bar — search + mic + recent widget shortcuts */}
+      {/* CommandCenter mounted headless — keeps ⌘K listener and palette portal alive
+          without rendering a visible pill. The visual search trigger is in the header. */}
       {createPortal(
-        <div className="fixed bottom-3 left-1/2 -translate-x-1/2 z-[120] flex flex-col items-center justify-end">
-          <UnifiedBottomBar
+        <div style={{ display: 'none' }} aria-hidden="true">
+          <CommandCenter
             onOpenBodyDouble={() => setBodyDoubleOpen(true)}
             onOpenSmartStack={() => canSmartStack && setSmartStackOpen(true)}
             canSmartStack={canSmartStack}

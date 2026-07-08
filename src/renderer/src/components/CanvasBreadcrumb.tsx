@@ -208,6 +208,23 @@ export default function CanvasBreadcrumb({
         </span>
       </div>
 
+      {/* Transparent bridge — fills the mt-2 gap between pill and dropdown so
+          moving the mouse from pill to dropdown never triggers a collapse. */}
+      {dropdown && (
+        <div
+          className="absolute z-[59]"
+          style={{
+            top: '100%',
+            left: dropdown.x,
+            transform: 'translateX(-50%)',
+            width: 200,
+            height: 12,
+          }}
+          onMouseEnter={handleEnter}
+          onMouseLeave={handleLeave}
+        />
+      )}
+
       {/* Stage Manager dropdown — centered under the hovered segment */}
       <AnimatePresence>
         {dropdown && (

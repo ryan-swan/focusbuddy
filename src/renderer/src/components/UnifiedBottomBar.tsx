@@ -3,18 +3,11 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { useWidgetStore } from '../stores/widgets'
 import { useViewStore } from '../stores/view'
 import { WIDGET_CATALOG } from '../lib/widgetCatalog'
-import CommandCenter from './CommandCenter'
 import VoiceCommandFAB from './VoiceCommandFAB'
 import Icon from './Icon'
 
 // Max widget shortcuts shown in the dock tray
 const MAX_SHORTCUTS = 6
-
-interface Props {
-  onOpenBodyDouble: () => void
-  onOpenSmartStack: () => void
-  canSmartStack: boolean
-}
 
 function shortcutLabel(kind: string, title: string): string {
   if (kind === 'webview' || kind === 'browser') {
@@ -41,11 +34,7 @@ function getScale(idx: number, hoverIdx: number | null): number {
   return 1
 }
 
-export default function UnifiedBottomBar({
-  onOpenBodyDouble,
-  onOpenSmartStack,
-  canSmartStack
-}: Props): JSX.Element {
+export default function UnifiedBottomBar(): JSX.Element {
   const [hovered, setHovered] = useState(false)
   const [itemHoverIdx, setItemHoverIdx] = useState<number | null>(null)
   const leaveTimer = useRef<number | null>(null)
@@ -148,14 +137,8 @@ export default function UnifiedBottomBar({
               </div>
             )}
 
-            {/* Search + mic row */}
-            <div className="flex items-center px-2 py-1.5">
-              <CommandCenter
-                onOpenBodyDouble={onOpenBodyDouble}
-                onOpenSmartStack={onOpenSmartStack}
-                canSmartStack={canSmartStack}
-              />
-              <div className="w-px h-5 bg-[var(--edge-firm)]/70 mx-1 shrink-0" />
+            {/* Mic row */}
+            <div className="flex items-center justify-center px-3 py-2">
               <VoiceCommandFAB />
             </div>
           </motion.div>
