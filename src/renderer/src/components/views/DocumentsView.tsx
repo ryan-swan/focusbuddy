@@ -7,6 +7,7 @@ import { useAccountStore } from '../../stores/account'
 import { createLiveDoc } from '../../lib/docCollabClient'
 import Icon from '../Icon'
 import DocFiledInChip from '../DocFiledInChip'
+import { setDocDrag } from '../../lib/docMetaCache'
 
 // Documents hub — the home for office files. The top panel is the AI-first
 // create flow: pick what you are making, say what it is about and who it is
@@ -209,6 +210,8 @@ export default function DocumentsView(): JSX.Element {
             {list.map((d) => (
               <div
                 key={d.id}
+                draggable
+                onDragStart={(e) => setDocDrag(e, { id: d.id, docType: d.docType, title: d.title })}
                 onClick={() => goDocument(d.id)}
                 className="group flex items-center gap-3 rounded-xl border border-stone-200 dark:border-stone-700 bg-white/70 dark:bg-stone-900/70 px-3.5 py-3 cursor-pointer hover:border-accent/50 hover:shadow-sm transition"
               >

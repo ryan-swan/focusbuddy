@@ -21,6 +21,7 @@ export type FieldType =
   | 'attachment' // references one or more fb_files entries
   | 'button' // programmable: runs a shell command or AI prompt
   | 'relation' // links to rows of another fb_tables table
+  | 'doc-ref' // references one or more PlexiOffice documents (doc/sheet/slides/draw/design)
 
 // Per-type config. Discriminated by `type` at runtime via a parent
 // FieldDefinition so we never need to inspect this in isolation.
@@ -61,6 +62,13 @@ export interface FieldConfigByType {
     // the cardinality.
     multi?: boolean
   }
+  'doc-ref': {
+    // Optional restriction to a single office document kind (e.g. only sheets).
+    // Empty = any office document may be referenced.
+    docType?: string
+    // false = one document, true = many. Stored as string[] either way.
+    multi?: boolean
+  }
 }
 
 // Type-safe field definition: the runtime value of `type` selects which
@@ -91,6 +99,7 @@ export type FieldValueByType = {
   attachment: string[] // fb_files.id[]
   button: never // buttons don't store values; they have execution history elsewhere
   relation: string[] // fb_rows.id[] in the target table
+  'doc-ref': string[] // documents.id[] (PlexiOffice documents)
 }
 
 export type FieldValue = FieldValueByType[FieldType]
@@ -126,6 +135,8 @@ export function defaultConfig<T extends FieldType>(type: T): FieldConfigByType[T
         displayColumnId: null,
         multi: true
       } as unknown as FieldConfigByType[T]
+    case 'doc-ref':
+      return { multi: true } as unknown as FieldConfigByType[T]
     default:
       return {} as FieldConfigByType[T]
   }
@@ -152,6 +163,8 @@ export function defaultValue<T extends FieldType>(type: T): FieldValueByType[T] 
     case 'button':
       return null as unknown as FieldValueByType[T]
     case 'relation':
+      return [] as unknown as FieldValueByType[T]
+    case 'doc-ref':
       return [] as unknown as FieldValueByType[T]
     default:
       return null as unknown as FieldValueByType[T]
@@ -214,7 +227,8 @@ export const FIELD_TYPE_LABELS: Record<FieldType, string> = {
   date: 'Date',
   attachment: 'Attachment',
   button: 'Button',
-  relation: 'Related records'
+  relation: 'Related records',
+  'doc-ref': 'Office file'
 }
 
 export const FIELD_TYPE_ICONS: Record<FieldType, string> = {
@@ -228,7 +242,8 @@ export const FIELD_TYPE_ICONS: Record<FieldType, string> = {
   date: 'calendar_today',
   attachment: 'attach_file',
   button: 'smart_button',
-  relation: 'link'
+  relation: 'link',
+  'doc-ref': 'description'
 }
 
 // ── Tables ──────────────────────────────────────────────────────────────────

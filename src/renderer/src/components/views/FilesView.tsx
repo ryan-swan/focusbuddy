@@ -7,6 +7,8 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { FileEntry } from '@shared/fields'
+import type { DocType } from '@shared/types'
+import { setDocDrag } from '../../lib/docMetaCache'
 import { useFileManagerStore, sortEntries, type FileSortKey, type FileViewMode } from '../../stores/fileManager'
 import { useViewStore } from '../../stores/view'
 import { useAccountStore } from '../../stores/account'
@@ -465,7 +467,18 @@ function ListRow({ entry, ...h }: { entry: FileEntry } & RowHandlers & { onRenam
       data-testid={`file-entry-${entry.id}`}
       data-kind={entry.kind}
       draggable={h.renaming !== entry.id}
-      onDragStart={(e) => e.dataTransfer.setData(ENTRY_MIME, entry.id)}
+      onDragStart={(e) => {
+        e.dataTransfer.setData(ENTRY_MIME, entry.id)
+        // An office document entry also carries the doc drag payload, so it can
+        // be dropped into a table cell (doc-ref) or a doc embed elsewhere.
+        if (entry.kind === 'doc' && entry.docId) {
+          setDocDrag(e, {
+            id: entry.docId,
+            docType: (entry.docType ?? 'doc') as DocType,
+            title: entry.name
+          })
+        }
+      }}
       onDragOver={(e) => {
         if (isFolder && (e.dataTransfer.types.includes(ENTRY_MIME) || e.dataTransfer.types.includes('Files'))) {
           e.preventDefault()

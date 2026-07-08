@@ -31,7 +31,8 @@ export const OPERATORS_BY_TYPE: Record<FieldType, FilterOperator[]> = {
   date: ['is', 'before', 'after', 'on-or-before', 'on-or-after', 'is-empty', 'is-not-empty'],
   attachment: ['is-empty', 'is-not-empty'],
   relation: ['is-empty', 'is-not-empty'],
-  button: []
+  button: [],
+  'doc-ref': ['is-empty', 'is-not-empty']
 }
 
 export const OPERATOR_LABELS: Record<FilterOperator, string> = {

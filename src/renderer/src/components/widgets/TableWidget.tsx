@@ -22,6 +22,7 @@ import { useTablesStore } from '../../stores/tables'
 import { useActionHistory } from '../../stores/actionHistory'
 import { useWidgetStore } from '../../stores/widgets'
 import FieldEditor from '../fields/FieldEditor'
+import { DOC_DRAG_MIME, readDocDrag, primeDocMeta } from '../../lib/docMetaCache'
 import RelationConfigEditor from '../fields/RelationConfigEditor'
 import { coerceCellValue } from '../../lib/actionExecutor'
 import {
@@ -449,6 +450,37 @@ export default function TableWidget({ widget, inline = false }: Props): JSX.Elem
     void updateCells(rowId, { [columnId]: value })
   }
 
+  // Drop a PlexiOffice document onto a cell to reference it. Only cells in an
+  // "Office file" (doc-ref) column accept the drop; the id is appended (single
+  // -value columns replace). Priming the meta cache makes the chip render at
+  // once. Non-doc-ref columns ignore the drop so ordinary drag behaviour is
+  // unaffected.
+  function onCellDocDrop(
+    e: React.DragEvent,
+    rowId: string,
+    col: { id: string; type: string; config?: unknown }
+  ): void {
+    const payload = readDocDrag(e.dataTransfer)
+    if (!payload || col.type !== 'doc-ref') return
+    e.preventDefault()
+    e.stopPropagation()
+    primeDocMeta(payload.id, { title: payload.title, docType: payload.docType })
+    const cfg = (col.config ?? {}) as { multi?: boolean }
+    const current = Array.isArray(row0Cells(rowId)[col.id]) ? (row0Cells(rowId)[col.id] as string[]) : []
+    if (current.includes(payload.id)) return
+    const next = cfg.multi === false ? [payload.id] : [...current, payload.id]
+    void updateCells(rowId, { [col.id]: next })
+  }
+  function row0Cells(rowId: string): Record<string, unknown> {
+    return rows.find((r) => r.id === rowId)?.cells ?? {}
+  }
+  function cellAcceptsDoc(e: React.DragEvent, col: { type: string }): void {
+    if (col.type === 'doc-ref' && e.dataTransfer.types.includes(DOC_DRAG_MIME)) {
+      e.preventDefault()
+      e.dataTransfer.dropEffect = 'copy'
+    }
+  }
+
   function renameTable(title: string): void {
     void updateTable(table!.id, { title })
   }
@@ -845,6 +877,8 @@ export default function TableWidget({ widget, inline = false }: Props): JSX.Elem
             style={{ minWidth: 140 }}
             onMouseDown={(e) => onCellSelDown(idx, ci, e.shiftKey)}
             onMouseEnter={() => onCellSelEnter(idx, ci)}
+            onDragOver={(e) => cellAcceptsDoc(e, col)}
+            onDrop={(e) => onCellDocDrop(e, row.id, col)}
             onContextMenu={(e) => {
               // Shift bypasses our menu and gives the OS clipboard menu.
               if (e.shiftKey) return

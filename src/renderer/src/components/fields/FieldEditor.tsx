@@ -7,8 +7,12 @@ import type {
   SelectOption
 } from '@shared/fields'
 import { defaultValue } from '@shared/fields'
+import type { DocType } from '@shared/types'
 import { useTablesStore } from '../../stores/tables'
+import { useViewStore } from '../../stores/view'
 import Icon from '../Icon'
+import DocPickerModal from '../DocPickerModal'
+import { useDocMetas, primeDocMeta } from '../../lib/docMetaCache'
 
 // One field editor used everywhere a typed value is edited: standalone canvas
 // field widgets, table cells, page-block fields. The component is variant-
@@ -74,12 +78,114 @@ export default function FieldEditor(rawProps: FieldEditorProps): JSX.Element {
       return (
         <RelationField {...props} value={Array.isArray(value) ? (value as string[]) : []} />
       )
+    case 'doc-ref':
+      return (
+        <DocRefField {...props} value={Array.isArray(value) ? (value as string[]) : []} />
+      )
     default:
       // All FieldType variants are covered above; if this branch is ever
       // reached at runtime, `def` is something we don't know how to render
       // (e.g. a future type loaded from an upgraded DB).
       return <UnsupportedField type={(def as FieldDefinition).type} />
   }
+}
+
+const DOC_TYPE_ICON: Record<DocType, string> = {
+  doc: 'description',
+  sheet: 'table_chart',
+  slides: 'slideshow',
+  map: 'account_tree',
+  design: 'palette'
+}
+
+// Cell/widget editor for the doc-ref field: chips referencing PlexiOffice
+// documents. Click a chip to open the document; add via a searchable office-file
+// picker; a table cell also accepts documents dropped onto it (handled by the
+// table, which commits the id here). Renders the document's live title/type via
+// the shared doc-meta cache.
+function DocRefField(props: FieldEditorProps & { value: string[] }): JSX.Element {
+  const { value, variant, onCommit, def } = props
+  const cfg = (def.config ?? {}) as { docType?: string; multi?: boolean }
+  const multi = cfg.multi !== false
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const metas = useDocMetas(value)
+  const goDocument = useViewStore((s) => s.goDocument)
+
+  function addDoc(id: string): void {
+    if (value.includes(id)) return
+    onCommit(multi ? [...value, id] : [id])
+  }
+  function removeDoc(id: string): void {
+    onCommit(value.filter((v) => v !== id))
+  }
+
+  const compact = variant === 'cell'
+  return (
+    <div className={`flex flex-wrap items-center gap-1 ${compact ? '' : 'p-1'}`}>
+      {value.map((id) => {
+        const meta = metas[id]
+        return (
+          <span
+            key={id}
+            className="inline-flex items-center gap-1 max-w-full rounded-md bg-[var(--surface-sunken)] border border-[var(--edge-soft)] pl-1.5 pr-1 py-0.5"
+          >
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                goDocument(id)
+              }}
+              className="inline-flex items-center gap-1 min-w-0"
+              title={meta ? `Open ${meta.title}` : 'Open document'}
+            >
+              <Icon
+                name={meta ? DOC_TYPE_ICON[meta.docType] : 'description'}
+                size={12}
+                className="text-[rgb(var(--accent))] shrink-0"
+              />
+              <span className="text-[11.5px] text-[var(--ink-80)] truncate">
+                {meta ? meta.title || 'Untitled' : 'Document'}
+              </span>
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                removeDoc(id)
+              }}
+              className="text-[var(--ink-40)] hover:text-[var(--ink-90)] shrink-0"
+              title="Remove"
+            >
+              <Icon name="close" size={11} />
+            </button>
+          </span>
+        )
+      })}
+      {(multi || value.length === 0) && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation()
+            setPickerOpen(true)
+          }}
+          data-testid="doc-ref-add"
+          className="inline-flex items-center gap-0.5 rounded-md border border-dashed border-[var(--edge-firm)] text-[var(--ink-50)] hover:text-[var(--ink-100)] hover:border-[rgb(var(--accent)/0.5)] px-1.5 py-0.5 text-[11px]"
+          title="Reference an office file"
+        >
+          <Icon name="add" size={12} /> {value.length === 0 ? 'Office file' : ''}
+        </button>
+      )}
+      {pickerOpen && (
+        <DocPickerModal
+          title="Reference an office file"
+          onlyType={cfg.docType as DocType | undefined}
+          onPick={(d) => {
+            primeDocMeta(d.id, { title: d.title, docType: d.docType })
+            addDoc(d.id)
+            setPickerOpen(false)
+          }}
+          onClose={() => setPickerOpen(false)}
+        />
+      )}
+    </div>
+  )
 }
 
 function UnsupportedField({ type }: { type: FieldType }): JSX.Element {
