@@ -8,6 +8,12 @@ import { recordViewVisit } from '../lib/viewRecency'
 export type View =
   | { kind: 'home' }
   | { kind: 'all-tasks' }
+  // The Rooms/Desks index pages. 'rooms' lists every Room (folder node) and
+  // 'desks' lists every Desk (canvas / task node) across all rooms, each with
+  // gallery / list / kanban / table / timeline modes. optional roomId scopes the
+  // desks index to a single room.
+  | { kind: 'rooms' }
+  | { kind: 'desks'; roomId?: string }
   | { kind: 'calendar' }
   | { kind: 'project-dashboard'; projectId: string }
   | { kind: 'task'; taskId: string }
@@ -56,6 +62,8 @@ interface ViewStore {
   go: (view: View) => void
   goHome: () => void
   goAllTasks: () => void
+  goRooms: () => void
+  goDesks: (roomId?: string) => void
   goCalendar: () => void
   goProject: (projectId: string) => void
   goTask: (taskId: string) => void
@@ -156,6 +164,16 @@ export const useViewStore = create<ViewStore>((set) => ({
   },
   goAllTasks: () => {
     const v: View = { kind: 'all-tasks' }
+    persistView(v)
+    set({ view: v })
+  },
+  goRooms: () => {
+    const v: View = { kind: 'rooms' }
+    persistView(v)
+    set({ view: v })
+  },
+  goDesks: (roomId?: string) => {
+    const v: View = { kind: 'desks', roomId }
     persistView(v)
     set({ view: v })
   },

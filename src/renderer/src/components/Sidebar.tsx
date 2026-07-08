@@ -173,6 +173,8 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
   const goAllTasks = useViewStore((s) => s.goAllTasks)
   const goCalendar = useViewStore((s) => s.goCalendar)
   const goProjects = useViewStore((s) => s.goProjects)
+  const goRooms = useViewStore((s) => s.goRooms)
+  const goDesks = useViewStore((s) => s.goDesks)
   const goFiles = useViewStore((s) => s.goFiles)
   const goProject = useViewStore((s) => s.goProject)
   const goTask = useViewStore((s) => s.goTask)
@@ -307,6 +309,7 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
 
   // Section collapse state for the remaining sections.
   const [projectsOpen, setProjectsOpen] = useState(true)
+  const [roomsNavOpen, setRoomsNavOpen] = useState(true)
   const [appsOpen, setAppsOpen] = useState(true)
 
   // Archived nodes are hidden from the day-to-day tree but still live in
@@ -608,7 +611,7 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
         <div className="ml-auto flex items-center gap-1">
           <button
             onClick={requestCreateDesk}
-            title="New desk"
+            title="New room"
             className="inline-flex items-center gap-1 h-7 px-2.5 rounded-lg bg-[rgb(var(--accent))] text-white text-[12px] font-medium hover:bg-[rgb(var(--accent-hover))]"
           >
             <Icon name="add" size={14} />
@@ -642,6 +645,53 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
               goHome()
             }}
           />
+          {/* Rooms — the workspace organiser. Clicking opens All Rooms; the
+              chevron expands to the two index pages (All Rooms, All Desks). */}
+          <div className="flex items-center">
+            <div className="flex-1 min-w-0">
+              <NavRow
+                icon="meeting_room"
+                label="Rooms"
+                tint="bg-sky-500"
+                active={viewIsActive({ kind: 'rooms' }) || viewIsActive({ kind: 'desks' })}
+                onClick={() => {
+                  setActive(null)
+                  goRooms()
+                }}
+              />
+            </div>
+            <button
+              onClick={() => setRoomsNavOpen((v) => !v)}
+              title={roomsNavOpen ? 'Collapse' : 'Expand'}
+              className="icon-btn !h-6 !w-6 shrink-0 -ml-1"
+            >
+              <Icon name={roomsNavOpen ? 'expand_more' : 'chevron_right'} size={16} />
+            </button>
+          </div>
+          {roomsNavOpen && (
+            <div className="ml-4 pl-2 border-l border-[var(--edge-soft)]">
+              <NavRow
+                icon="grid_view"
+                label="All rooms"
+                tint="bg-sky-400"
+                active={viewIsActive({ kind: 'rooms' })}
+                onClick={() => {
+                  setActive(null)
+                  goRooms()
+                }}
+              />
+              <NavRow
+                icon="desk"
+                label="All desks"
+                tint="bg-teal-500"
+                active={viewIsActive({ kind: 'desks' })}
+                onClick={() => {
+                  setActive(null)
+                  goDesks()
+                }}
+              />
+            </div>
+          )}
           <NavRow
             icon="account_tree"
             label="Plans"
@@ -846,9 +896,9 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
           </div>
         )}
 
-        {/* ── DESKS — your folders and desks ──────────────────────────────── */}
+        {/* ── ROOMS & DESKS — your rooms (folders) and the desks inside them ── */}
         <SectionHeader
-          label="Desks"
+          label="Rooms & desks"
           open={projectsOpen}
           onToggle={() => setProjectsOpen((v) => !v)}
           action={
@@ -858,14 +908,14 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
                 requestCreateDesk()
               }}
               className="icon-btn !h-5 !w-5"
-              title="New top-level project"
+              title="New top-level room"
             >
               <Icon name="add" size={12} />
             </button>
           }
         />
         {projectsOpen && (
-          <div className="mb-2" role="tree" aria-label="Projects and tasks">
+          <div className="mb-2" role="tree" aria-label="Rooms and desks">
             {flat.length === 0 && nodesError && (
               <div className="px-4 py-3 text-xs text-amber-600 dark:text-amber-400 leading-relaxed" data-testid="sidebar-nodes-error">
                 Your workspaces could not be loaded just now. Your data is safe on this
@@ -880,7 +930,7 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
             )}
             {flat.length === 0 && !nodesError && nodesLoaded && (
               <div className="px-4 py-3 text-xs text-[var(--ink-70)] leading-relaxed">
-                No projects yet.{' '}
+                No rooms yet.{' '}
                 <button
                   onClick={requestCreateDesk}
                   className="underline hover:text-[var(--ink-100)]"
@@ -995,12 +1045,14 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
                     }`}
                   >
                     <Icon
-                      name={isFolder ? 'folder' : 'task_alt'}
+                      name={isFolder ? (node.isPlan ? 'account_tree' : 'meeting_room') : 'desk'}
                       size={16}
                       filled={isActive || isFolder}
                       className={
                         isFolder
-                          ? 'text-amber-700'
+                          ? node.isPlan
+                            ? 'text-violet-600'
+                            : 'text-sky-600'
                           : node.status === 'done'
                             ? 'text-emerald-700'
                             : node.status === 'in_progress'
@@ -1087,14 +1139,14 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
                       <>
                         <button
                           onClick={() => setDialog({ mode: 'create', parentId: node.id, kind: 'folder' })}
-                          title="Add sub-project"
+                          title="Add sub-room"
                           className="icon-btn"
                         >
                           <Icon name="create_new_folder" size={14} />
                         </button>
                         <button
                           onClick={() => setDialog({ mode: 'create', parentId: node.id, kind: 'task' })}
-                          title="Add task"
+                          title="Add desk"
                           className="icon-btn"
                         >
                           <Icon name="add_task" size={14} />
@@ -1104,7 +1156,7 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
                     {!isFolder && (
                       <button
                         onClick={() => setDialog({ mode: 'create', parentId: node.id, kind: 'task' })}
-                        title="Add subtask"
+                        title="Add nested desk"
                         className="icon-btn"
                       >
                         <Icon name="add" size={14} />
@@ -1112,14 +1164,14 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
                     )}
                     <button
                       onClick={() => setDialog({ mode: 'edit', node })}
-                      title={`Edit ${isFolder ? 'project' : 'task'}`}
+                      title={`Edit ${isFolder ? 'room' : 'desk'}`}
                       className="icon-btn"
                     >
                       <Icon name="edit" size={14} />
                     </button>
                     <button
                       onClick={() => archiveNode(node.id)}
-                      title={`Archive ${isFolder ? 'folder' : 'task'} (Cmd+Delete) — recoverable from Home → Archived`}
+                      title={`Archive ${isFolder ? 'room' : 'desk'} (Cmd+Delete) — recoverable from Home → Archived`}
                       className="icon-btn"
                     >
                       <Icon name="inventory_2" size={14} />
@@ -1132,8 +1184,8 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
                         void confirmDialog({
                           title: `Delete "${node.title}" permanently?`,
                           body: isFolder
-                            ? 'This folder and everything inside it are removed for good. Use Archive instead if you might want it back.'
-                            : 'This task is removed for good. Use Archive instead if you might want it back.',
+                            ? 'This room and everything inside it are removed for good. Use Archive instead if you might want it back.'
+                            : 'This desk is removed for good. Use Archive instead if you might want it back.',
                           confirmLabel: 'Delete permanently',
                           danger: true
                         }).then((ok) => {

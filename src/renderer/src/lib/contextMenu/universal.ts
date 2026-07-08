@@ -158,7 +158,7 @@ export function buildAdvanced(ctx: MenuContext): MenuContribution[] {
       id: 'core/advanced/make-task',
       section: MenuSection.Advanced,
       priority: 0,
-      label: 'Make this a task...',
+      label: 'Make this a Desk...',
       icon: 'task_alt',
       onSelect: (c) => c.frame?.onMakeTask()
     })
@@ -183,7 +183,7 @@ export function buildAdvanced(ctx: MenuContext): MenuContribution[] {
         id: 'core/advanced/duplicate-folder',
         section: MenuSection.Advanced,
         priority: 3,
-        label: 'Duplicate into another folder / task...',
+        label: 'Duplicate into another Room / Desk...',
         icon: 'drive_file_move',
         onSelect: (c) => c.frame?.onDuplicateToFolder?.()
       })

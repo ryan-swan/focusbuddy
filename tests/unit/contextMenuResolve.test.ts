@@ -191,7 +191,7 @@ describe('resolveMenu — frame actions (unified header menu)', () => {
   it('surfaces make-task, share, and synced/independent duplicate when frame callbacks are present', () => {
     const items = resolveMenu(frameCtx(widget('timer', ''), {}))
     const labels = allLabels(items)
-    expect(labels).toContain('Make this a task...')
+    expect(labels).toContain('Make this a Desk...')
     expect(labels).toContain('Share...')
     expect(labels).toContain('Duplicate (keep synced)')
     expect(labels).toContain('Duplicate (independent copy)')

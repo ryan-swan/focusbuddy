@@ -289,9 +289,9 @@ export default function FoldersCard({ nodes }: Props): JSX.Element {
 
   return (
     <div className="flex flex-col h-full">
-      {/* Header row — tabs + a "New folder" button */}
+      {/* Header row — tabs + a "New Room" button */}
       <div className="flex items-center justify-between gap-2 mb-2 border-b border-[var(--edge-soft)]">
-        <div role="tablist" aria-label="Folder buckets" className="flex gap-0.5">
+        <div role="tablist" aria-label="Room buckets" className="flex gap-0.5">
           {TABS.map((t) => {
             const active = tab === t.value
             return (
@@ -341,10 +341,10 @@ export default function FoldersCard({ nodes }: Props): JSX.Element {
               setDialog({ mode: 'create', parentId: null, kind: 'folder' })
             }
             className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded text-accent hover:bg-accent/10"
-            title="New top-level folder"
+            title="New top-level Room"
           >
             <Icon name="create_new_folder" size={13} />
-            <span>New folder</span>
+            <span>New Room</span>
           </button>
         )}
       </div>
@@ -368,10 +368,10 @@ export default function FoldersCard({ nodes }: Props): JSX.Element {
             />
             <span className="text-[12px]">
               {tab === 'active'
-                ? 'No folders with active tasks.'
+                ? 'No Rooms with active Desks.'
                 : tab === 'closed'
-                  ? 'No closed folders yet.'
-                  : 'No archived folders.'}
+                  ? 'No closed Rooms yet.'
+                  : 'No archived Rooms.'}
             </span>
             {tab === 'active' && (
               <button
@@ -380,12 +380,12 @@ export default function FoldersCard({ nodes }: Props): JSX.Element {
                 }
                 className="text-[11px] text-accent hover:underline"
               >
-                Create your first folder
+                Create your first Room
               </button>
             )}
           </div>
         ) : (
-          <div role="tree" aria-label={`${tab} folders`}>
+          <div role="tree" aria-label={`${tab} Rooms`}>
             {flat.map((item) => {
               const { node, depth } = item
               const hasChildren = item.children.length > 0
@@ -508,7 +508,7 @@ export default function FoldersCard({ nodes }: Props): JSX.Element {
                                   kind: 'folder'
                                 })
                               }
-                              title="Add sub-folder"
+                              title="Add sub-Room"
                               className="icon-btn"
                             >
                               <Icon name="create_new_folder" size={14} />
@@ -521,7 +521,7 @@ export default function FoldersCard({ nodes }: Props): JSX.Element {
                                   kind: 'task'
                                 })
                               }
-                              title="Add task to this folder"
+                              title="Add Desk to this Room"
                               className="icon-btn"
                             >
                               <Icon name="add_task" size={14} />

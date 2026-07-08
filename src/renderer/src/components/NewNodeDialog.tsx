@@ -238,7 +238,7 @@ export default function NewNodeDialog({
     }
   }
 
-  const dialogTitle = `${isEdit ? 'Edit' : 'New'} ${effectiveKind === 'folder' ? 'project' : 'task'}${
+  const dialogTitle = `${isEdit ? 'Edit' : 'New'} ${effectiveKind === 'folder' ? 'Room' : 'Desk'}${
     isEdit || parentId ? '' : ' (top level)'
   }`
   const submitLabel = isEdit ? 'Save changes' : 'Create'
@@ -285,13 +285,13 @@ export default function NewNodeDialog({
             <div ref={jumpRef}>
               <FieldLabel className="flex items-center gap-1.5">
                 <Icon name="bolt" size={12} />
-                Jump to an existing task
+                Jump to an existing Desk
                 <span className="normal-case text-[var(--ink-40)]">or fill in a new one below</span>
               </FieldLabel>
               <input
                 value={jumpQuery}
                 onChange={(e) => setJumpQuery(e.target.value)}
-                placeholder="Search your tasks…"
+                placeholder="Search your Desks…"
                 className={fieldInputClass()}
               />
               {jumpQuery.trim() && (
@@ -313,7 +313,7 @@ export default function NewNodeDialog({
                           }}
                           className="w-full text-left px-3 py-1.5 text-sm flex items-center justify-between gap-2 text-[var(--ink-90)] hover:bg-[var(--surface-sunken)]"
                         >
-                          <span className="truncate">{t.title || '(untitled task)'}</span>
+                          <span className="truncate">{t.title || '(untitled Desk)'}</span>
                           {folder && (
                             <span className="text-[10px] text-[var(--ink-50)] shrink-0 truncate max-w-[140px]">
                               {folder.title}
@@ -325,13 +325,13 @@ export default function NewNodeDialog({
                   {existingTasks.filter((t) =>
                     (t.title || '').toLowerCase().includes(jumpQuery.trim().toLowerCase())
                   ).length === 0 && (
-                    <div className="px-3 py-1.5 text-[11px] text-[var(--ink-50)]">No tasks match.</div>
+                    <div className="px-3 py-1.5 text-[11px] text-[var(--ink-50)]">No Desks match.</div>
                   )}
                 </div>
               )}
             </div>
           )}
-          <FormField label={effectiveKind === 'folder' ? 'Project name' : 'Task title'}>
+          <FormField label={effectiveKind === 'folder' ? 'Room name' : 'Desk title'}>
             <input
               autoFocus
               data-testid="newnode-name"
@@ -358,7 +358,7 @@ export default function NewNodeDialog({
 
           {effectiveKind === 'task' && !isEdit && (
             <div>
-              <FieldLabel>Folder</FieldLabel>
+              <FieldLabel>Room</FieldLabel>
               {!folderPickerOpen ? (
                 <button
                   type="button"
@@ -368,10 +368,10 @@ export default function NewNodeDialog({
                   <span className="truncate flex items-center gap-1.5">
                     <Icon name="folder" size={14} className="text-[var(--ink-50)]" />
                     {destParent === NEW_FOLDER
-                      ? newFolderName.trim() || 'New folder…'
+                      ? newFolderName.trim() || 'New Room…'
                       : destParent
-                        ? folders.find((f) => f.id === destParent)?.title || '(folder)'
-                        : 'Top level (no folder)'}
+                        ? folders.find((f) => f.id === destParent)?.title || '(Room)'
+                        : 'Top level (no Room)'}
                   </span>
                   <span className="text-[11px] text-[var(--ink-50)] shrink-0">Change</span>
                 </button>
@@ -381,7 +381,7 @@ export default function NewNodeDialog({
                     autoFocus
                     value={folderQuery}
                     onChange={(e) => setFolderQuery(e.target.value)}
-                    placeholder="Search folders…"
+                    placeholder="Search Rooms…"
                     className="w-full bg-[var(--surface-sunken)] border-b border-[var(--edge-soft)] px-3 py-2 text-sm text-[var(--ink-100)] placeholder:text-[var(--ink-40)] focus:outline-none"
                   />
                   <div className="max-h-40 overflow-auto">
@@ -393,7 +393,7 @@ export default function NewNodeDialog({
                       }}
                       className="w-full text-left px-3 py-1.5 text-sm text-[var(--ink-90)] hover:bg-[var(--surface-sunken)]"
                     >
-                      Top level (no folder)
+                      Top level (no Room)
                     </button>
                     {folders
                       .filter((f) =>
@@ -413,7 +413,7 @@ export default function NewNodeDialog({
                               : 'text-[var(--ink-90)]'
                           }`}
                         >
-                          {f.title || '(untitled folder)'}
+                          {f.title || '(untitled Room)'}
                         </button>
                       ))}
                     <button
@@ -425,7 +425,7 @@ export default function NewNodeDialog({
                       }}
                       className="w-full text-left px-3 py-1.5 text-sm text-accent border-t border-[var(--edge-soft)] hover:bg-accent/5"
                     >
-                      + Create new folder{folderQuery.trim() ? ` "${folderQuery.trim()}"` : '…'}
+                      + Create new Room{folderQuery.trim() ? ` "${folderQuery.trim()}"` : '…'}
                     </button>
                   </div>
                 </div>
@@ -434,7 +434,7 @@ export default function NewNodeDialog({
                 <input
                   value={newFolderName}
                   onChange={(e) => setNewFolderName(e.target.value)}
-                  placeholder="New folder name"
+                  placeholder="New Room name"
                   className={`${fieldInputClass()} mt-1.5`}
                 />
               )}
@@ -504,7 +504,7 @@ export default function NewNodeDialog({
                       )}
                     {estimateMinutes.trim() === '' && (
                       <div className="mt-0.5">
-                        Median task takes{' '}
+                        Median Desk takes{' '}
                         <strong>{Math.round(velocity.medianActualMin)} min</strong>
                       </div>
                     )}
@@ -634,7 +634,7 @@ export default function NewNodeDialog({
                     <span className="ml-auto text-[9px] uppercase tracking-wider text-accent">Pro</span>
                   </div>
                   <div className="text-[11px] text-[var(--ink-50)] mt-0.5">
-                    Upgrade to let the assistant propose widgets, browsers and notes for this task.
+                    Upgrade to let the assistant propose widgets, browsers and notes for this Desk.
                   </div>
                 </button>
               )}
@@ -654,7 +654,7 @@ export default function NewNodeDialog({
                           Have AI suggest the setup
                         </div>
                         <div className="text-[11px] text-[var(--ink-70)] mt-0.5">
-                          After creating, the assistant will propose widgets, browsers and notes that fit this task.
+                          After creating, the assistant will propose widgets, browsers and notes that fit this Desk.
                         </div>
                       </div>
                     </label>
