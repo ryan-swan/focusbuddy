@@ -9,7 +9,7 @@ test('drift marker: overdue open task shows gantt-late-<id>, future/undated task
     await waitForReady(window)
 
     const folder = await window.evaluate(async () =>
-      window.api.nodes.create({ parentId: null, kind: 'folder', title: 'Late Marker Project' })
+      window.api.nodes.create({ parentId: null, kind: 'folder', isPlan: true, title: 'Late Marker Project' })
     )
     const folderId: string = (folder as { id: string }).id
 

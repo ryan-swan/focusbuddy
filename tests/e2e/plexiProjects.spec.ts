@@ -33,7 +33,7 @@ test('2. portfolio: folder + 3 tasks shows project card with real task count, Ga
 
     // Seed folder + tasks via IPC
     const folder = await window.evaluate(async () => {
-      return window.api.nodes.create({ parentId: null, kind: 'folder', title: 'Alpha Project' })
+      return window.api.nodes.create({ parentId: null, kind: 'folder', isPlan: true, title: 'Alpha Project' })
     })
     const folderId: string = (folder as { id: string }).id
 
@@ -85,7 +85,7 @@ test('3. date editing: set plan-start and plan-due, bar repositions on reload', 
     await waitForReady(window)
 
     const folder = await window.evaluate(async () =>
-      window.api.nodes.create({ parentId: null, kind: 'folder', title: 'Date Project' })
+      window.api.nodes.create({ parentId: null, kind: 'folder', isPlan: true, title: 'Date Project' })
     )
     const folderId: string = (folder as { id: string }).id
     const task = await window.evaluate(
@@ -160,7 +160,7 @@ test('4. dependency: add dep persists, successor bar starts at/after predecessor
     await waitForReady(window)
 
     const folder = await window.evaluate(async () =>
-      window.api.nodes.create({ parentId: null, kind: 'folder', title: 'Dep Project' })
+      window.api.nodes.create({ parentId: null, kind: 'folder', isPlan: true, title: 'Dep Project' })
     )
     const folderId: string = (folder as { id: string }).id
 
@@ -235,7 +235,7 @@ test('5. milestone toggle: toggled task renders diamond bar, not a rect bar', as
     await waitForReady(window)
 
     const folder = await window.evaluate(async () =>
-      window.api.nodes.create({ parentId: null, kind: 'folder', title: 'Milestone Project' })
+      window.api.nodes.create({ parentId: null, kind: 'folder', isPlan: true, title: 'Milestone Project' })
     )
     const folderId: string = (folder as { id: string }).id
     const task = await window.evaluate(
@@ -297,7 +297,7 @@ test('6. reschedule button: returns without error and plan reloads', async () =>
     await waitForReady(window)
 
     const folder = await window.evaluate(async () =>
-      window.api.nodes.create({ parentId: null, kind: 'folder', title: 'Resched Project' })
+      window.api.nodes.create({ parentId: null, kind: 'folder', isPlan: true, title: 'Resched Project' })
     )
     const folderId: string = (folder as { id: string }).id
     await window.evaluate(
@@ -391,7 +391,7 @@ test('8. no-fakery: percentComplete and task count are real; empty workspace sho
 
     // Now seed 1 folder with 2 tasks, 1 done
     const folder = await window.evaluate(async () =>
-      window.api.nodes.create({ parentId: null, kind: 'folder', title: 'Real Project' })
+      window.api.nodes.create({ parentId: null, kind: 'folder', isPlan: true, title: 'Real Project' })
     )
     const folderId: string = (folder as { id: string }).id
     await window.evaluate(

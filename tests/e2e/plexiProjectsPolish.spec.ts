@@ -57,7 +57,7 @@ test('2. duration input: setting task-estimate-days=3 drives durationDays===3 in
 
     // Seed folder + task with no dates
     const folder = await window.evaluate(async () =>
-      window.api.nodes.create({ parentId: null, kind: 'folder', title: 'Duration Project' })
+      window.api.nodes.create({ parentId: null, kind: 'folder', isPlan: true, title: 'Duration Project' })
     )
     const folderId: string = (folder as { id: string }).id
     const task = await window.evaluate(
@@ -113,7 +113,7 @@ test('3. drift marker: completed-late task shows amber glyph; on-time task does 
     // Seed folder + task with plan_due set 4 days in the past.
     // When we mark it done, completed_at = now > scheduled finish => slipDays > 0 => drift.
     const folder = await window.evaluate(async () =>
-      window.api.nodes.create({ parentId: null, kind: 'folder', title: 'Drift Project' })
+      window.api.nodes.create({ parentId: null, kind: 'folder', isPlan: true, title: 'Drift Project' })
     )
     const folderId: string = (folder as { id: string }).id
 
@@ -205,7 +205,7 @@ test('3b. late marker: an overdue, not-done task shows the late marker', async (
     await waitForReady(window)
 
     const folder = await window.evaluate(async () =>
-      window.api.nodes.create({ parentId: null, kind: 'folder', title: 'Glyph Project' })
+      window.api.nodes.create({ parentId: null, kind: 'folder', isPlan: true, title: 'Glyph Project' })
     )
     const folderId: string = (folder as { id: string }).id
     const task = await window.evaluate(

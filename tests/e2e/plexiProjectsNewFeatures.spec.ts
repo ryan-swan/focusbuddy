@@ -110,7 +110,7 @@ test('F1-3. task-editor has all required controls including new task-add-succ pi
 
     // Seed two tasks so both predecessor and successor pickers have candidates
     const folder = await window.evaluate(async () =>
-      window.api.nodes.create({ parentId: null, kind: 'folder', title: 'Editor Controls Project' })
+      window.api.nodes.create({ parentId: null, kind: 'folder', isPlan: true, title: 'Editor Controls Project' })
     )
     const folderId: string = (folder as { id: string }).id
 
@@ -153,7 +153,7 @@ test('F1-4. task-title rename via Enter persists to IPC', async () => {
     await waitForReady(window)
 
     const folder = await window.evaluate(async () =>
-      window.api.nodes.create({ parentId: null, kind: 'folder', title: 'Rename Project' })
+      window.api.nodes.create({ parentId: null, kind: 'folder', isPlan: true, title: 'Rename Project' })
     )
     const folderId: string = (folder as { id: string }).id
     const task = await window.evaluate(
@@ -190,7 +190,7 @@ test('F1-5. task-add-succ (successor picker) creates a link and engine honours i
     await waitForReady(window)
 
     const folder = await window.evaluate(async () =>
-      window.api.nodes.create({ parentId: null, kind: 'folder', title: 'Succ Project' })
+      window.api.nodes.create({ parentId: null, kind: 'folder', isPlan: true, title: 'Succ Project' })
     )
     const folderId: string = (folder as { id: string }).id
 
@@ -257,7 +257,7 @@ test('F1-6. gantt-bar drag commits new planStart; click (no-drag) opens editor',
     await waitForReady(window)
 
     const folder = await window.evaluate(async () =>
-      window.api.nodes.create({ parentId: null, kind: 'folder', title: 'Drag Project' })
+      window.api.nodes.create({ parentId: null, kind: 'folder', isPlan: true, title: 'Drag Project' })
     )
     const folderId: string = (folder as { id: string }).id
     const task = await window.evaluate(
@@ -350,7 +350,7 @@ test('F1-7. task-delete removes the task from the Gantt', async () => {
     await waitForReady(window)
 
     const folder = await window.evaluate(async () =>
-      window.api.nodes.create({ parentId: null, kind: 'folder', title: 'Delete Project' })
+      window.api.nodes.create({ parentId: null, kind: 'folder', isPlan: true, title: 'Delete Project' })
     )
     const folderId: string = (folder as { id: string }).id
     const task = await window.evaluate(

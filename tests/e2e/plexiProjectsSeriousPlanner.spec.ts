@@ -33,7 +33,7 @@ async function setupProject(
   await waitForReady(window)
 
   const folder = await window.evaluate(
-    (title: string) => window.api.nodes.create({ parentId: null, kind: 'folder', title }),
+    (title: string) => window.api.nodes.create({ parentId: null, kind: 'folder', isPlan: true, title }),
     'Planner Test Project'
   )
   const folderId = (folder as { id: string }).id
@@ -274,7 +274,7 @@ test('B2. costs entered via IPC appear in grid-cost-<id> cells and grid-total-co
     // Create the project outside setupProject so we can set costs before the
     // Gantt component ever mounts (avoids the stale-plan problem).
     const folder = await window.evaluate(
-      (title: string) => window.api.nodes.create({ parentId: null, kind: 'folder', title }),
+      (title: string) => window.api.nodes.create({ parentId: null, kind: 'folder', isPlan: true, title }),
       'Cost Budget Project'
     )
     const folderId = (folder as { id: string }).id
@@ -419,7 +419,7 @@ test('L2. leveling resolves overlapping tasks for the same assignee; unassigned 
     await waitForReady(window)
 
     const folder = await window.evaluate(
-      (title: string) => window.api.nodes.create({ parentId: null, kind: 'folder', title }),
+      (title: string) => window.api.nodes.create({ parentId: null, kind: 'folder', isPlan: true, title }),
       'Level Test Project'
     )
     const folderId = (folder as { id: string }).id
@@ -519,7 +519,7 @@ test('L3. milestones are untouched by leveling', async () => {
     await waitForReady(window)
 
     const folder = await window.evaluate(
-      (t: string) => window.api.nodes.create({ parentId: null, kind: 'folder', title: t }),
+      (t: string) => window.api.nodes.create({ parentId: null, kind: 'folder', isPlan: true, title: t }),
       'Milestone Level Test'
     )
     const folderId = (folder as { id: string }).id

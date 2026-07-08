@@ -15,7 +15,7 @@ async function setupProjectInGantt(
 
   // Create the folder first
   const folder = await window.evaluate(
-    async (title: string) => window.api.nodes.create({ parentId: null, kind: 'folder', title }),
+    async (title: string) => window.api.nodes.create({ parentId: null, kind: 'folder', isPlan: true, title }),
     'E2E Project'
   )
   const folderId = (folder as { id: string }).id
@@ -396,7 +396,7 @@ test('P1. portfolio stats tile visible when projects exist', async () => {
 
     // Seed a project with tasks
     const folder = await window.evaluate(
-      async (title: string) => window.api.nodes.create({ parentId: null, kind: 'folder', title }),
+      async (title: string) => window.api.nodes.create({ parentId: null, kind: 'folder', isPlan: true, title }),
       'Stats Project'
     )
     const folderId = (folder as { id: string }).id

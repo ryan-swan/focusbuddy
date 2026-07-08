@@ -1381,6 +1381,20 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
                   }
                 ]
               : []),
+            // Promote a Room to a Plan (or demote) right from the tree, so a room
+            // you built the normal way can join the Plans timeline without being
+            // recreated. Only meaningful for folders (Rooms).
+            ...(rowCtxMenu.node.kind === 'folder'
+              ? [
+                  {
+                    label: rowCtxMenu.node.isPlan ? 'Make this a plain room' : 'Make this a plan',
+                    icon: rowCtxMenu.node.isPlan ? 'layers_clear' : 'account_tree',
+                    onClick: () => {
+                      void update(rowCtxMenu.node.id, { isPlan: !rowCtxMenu.node.isPlan })
+                    }
+                  }
+                ]
+              : []),
             { separator: true },
             {
               label: 'Rename',

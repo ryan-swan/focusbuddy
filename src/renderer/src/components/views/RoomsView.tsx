@@ -20,6 +20,7 @@ export default function RoomsView(): JSX.Element {
   const nodes = useNodeStore((s) => s.nodes)
   const move = useNodeStore((s) => s.move)
   const create = useNodeStore((s) => s.create)
+  const update = useNodeStore((s) => s.update)
   const goDesks = useViewStore((s) => s.goDesks)
 
   const rooms = useMemo(
@@ -165,16 +166,28 @@ export default function RoomsView(): JSX.Element {
       })()
     },
     actions: (r) => (
-      <button
-        onClick={(e) => {
-          e.stopPropagation()
-          goDesks(r.id)
-        }}
-        title="Open this room's desks"
-        className="inline-flex items-center justify-center h-6 w-6 rounded-md bg-[var(--surface-raised)]/90 border border-[var(--edge-firm)] text-[var(--ink-60)] hover:text-[var(--ink-100)]"
-      >
-        <Icon name="chevron_right" size={15} />
-      </button>
+      <div className="flex items-center gap-1">
+        <button
+          onClick={(e) => {
+            e.stopPropagation()
+            void update(r.id, { isPlan: !r.isPlan })
+          }}
+          title={r.isPlan ? 'Make this a plain room (removes it from Plans)' : 'Make this a plan (adds it to the Plans timeline)'}
+          className="inline-flex items-center justify-center h-6 w-6 rounded-md bg-[var(--surface-raised)]/90 border border-[var(--edge-firm)] text-[var(--ink-60)] hover:text-[var(--ink-100)]"
+        >
+          <Icon name={r.isPlan ? 'layers_clear' : 'account_tree'} size={14} />
+        </button>
+        <button
+          onClick={(e) => {
+            e.stopPropagation()
+            goDesks(r.id)
+          }}
+          title="Open this room's desks"
+          className="inline-flex items-center justify-center h-6 w-6 rounded-md bg-[var(--surface-raised)]/90 border border-[var(--edge-firm)] text-[var(--ink-60)] hover:text-[var(--ink-100)]"
+        >
+          <Icon name="chevron_right" size={15} />
+        </button>
+      </div>
     )
   }
 

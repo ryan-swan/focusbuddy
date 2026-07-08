@@ -23,7 +23,7 @@ async function setup(
   await waitForReady(window)
 
   const folder = await window.evaluate(
-    (title: string) => window.api.nodes.create({ parentId: null, kind: 'folder', title }),
+    (title: string) => window.api.nodes.create({ parentId: null, kind: 'folder', isPlan: true, title }),
     'Test Project'
   )
   const folderId = (folder as { id: string }).id
