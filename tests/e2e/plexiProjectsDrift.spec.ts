@@ -43,10 +43,13 @@ test('drift marker: overdue open task shows gantt-late-<id>, future/undated task
       [taskBId, now + 7 * DAY_MS, now + 14 * DAY_MS] as [string, number, number]
     )
 
-    // Open Gantt
+    // Open the plan, then switch to the Timeline (Gantt) view — the project
+    // detail now opens on the Overview tab by default, so the gantt bars only
+    // render once the Timeline tab is selected.
     await openProduct(window, 'projects')
     await expect(window.locator(`[data-testid="project-card-${folderId}"]`)).toBeVisible({ timeout: 8_000 })
     await window.locator(`[data-testid="project-card-${folderId}"]`).click()
+    await window.locator('[data-testid="projects-view-gantt"]').click()
     await expect(window.locator(`[data-testid="gantt-bar-${taskAId}"]`)).toBeVisible({ timeout: 8_000 })
 
     // Task A: amber late marker must be present
