@@ -44,37 +44,63 @@ function spacerDom(px: number): HTMLElement {
   return el
 }
 
-// Walk the top-level blocks using their laid-out heights (which do not depend on
-// the spacers above them, so the result is stable and never oscillates) and place
-// a spacer before every block that would cross a page bottom.
+// Place a spacer before every top-level block that would cross a page bottom, so
+// no block straddles the grey gap. Correctness hinges on using the blocks' REAL
+// laid-out positions rather than summing per-block heights: CSS collapses the
+// margin between adjacent blocks, so summing marginTop+marginBottom drifts from
+// reality and makes spacers land short (text spilling into the gap). Instead we
+// read each block's actual top/bottom from the DOM and subtract the heights of
+// the spacers already inserted above it, which recovers the natural (un-
+// paginated) flow position exactly, margin-collapse included. Measuring against
+// the natural flow means the result is stable: re-measuring with the spacers in
+// place reproduces the same natural positions and therefore the same breaks.
 function computeDecorations(view: EditorView): { set: DecorationSet; pages: number; sig: string } {
   if (!cfg.enabled || cfg.pageContentPx <= 0) return { set: DecorationSet.empty, pages: 1, sig: 'off' }
   const { pageContentPx, gapPx, mTop, mBottom } = cfg
   const decos: Decoration[] = []
   const parts: string[] = []
-  let flowY = 0
-  let page = 0
   const doc = view.state.doc
+
+  const contentTop = (view.dom as HTMLElement).getBoundingClientRect().top
+  // Heights + tops of spacers already in the DOM, so we can subtract the ones
+  // sitting above any given block to get its natural (un-spacered) position.
+  const spacerRects = Array.from(
+    (view.dom as HTMLElement).querySelectorAll('.fb-page-spacer')
+  ).map((el) => {
+    const r = (el as HTMLElement).getBoundingClientRect()
+    return { top: r.top, h: r.height }
+  })
+  const spacerAbove = (domTop: number): number =>
+    spacerRects.reduce((sum, s) => (s.top < domTop - 0.5 ? sum + s.h : sum), 0)
+
+  // pageTop is the natural-flow Y at which the current page's content begins.
+  // It rebaselines to a pushed block's own natural top so subsequent blocks are
+  // measured against the page they actually land on.
+  let pageTop = 0
   doc.forEach((_node, offset) => {
     const dom = view.nodeDOM(offset)
     if (!(dom instanceof HTMLElement) || typeof dom.getBoundingClientRect !== 'function') return
-    const cs = window.getComputedStyle(dom)
-    const h = dom.offsetHeight + (parseFloat(cs.marginTop) || 0) + (parseFloat(cs.marginBottom) || 0)
-    const pageBottom = (page + 1) * pageContentPx
-    // Push to the next page when this block would spill over — but never push the
-    // first block on a page (a block taller than a whole page simply overflows,
+    const r = dom.getBoundingClientRect()
+    const above = spacerAbove(r.top)
+    const nTop = r.top - contentTop - above
+    const nBottom = r.bottom - contentTop - above
+    // Push when this block's box would cross the page bottom, unless it is the
+    // first block on the page (a block taller than a whole page simply overflows,
     // as it does in every word processor).
-    if (flowY + h > pageBottom + 0.5 && flowY > page * pageContentPx + 0.5) {
-      const spacerPx = pageBottom - flowY + mBottom + gapPx + mTop
+    if (nBottom > pageTop + pageContentPx + 0.5 && nTop > pageTop + 0.5) {
+      // Fill the rest of this page, cross the bottom margin, the gap, and the
+      // next page's top margin, so the block starts exactly at the next page's
+      // content top.
+      const spacerPx = pageTop + pageContentPx - nTop + mBottom + gapPx + mTop
       const px = Math.max(0, Math.round(spacerPx))
-      decos.push(Decoration.widget(offset, () => spacerDom(px), { side: -1, key: `pb-${page}-${px}` }))
+      decos.push(Decoration.widget(offset, () => spacerDom(px), { side: -1, key: `pb-${offset}-${px}` }))
       parts.push(`${offset}:${px}`)
-      flowY = pageBottom
-      page += 1
+      // The pushed block now begins a fresh page at its own natural top.
+      pageTop = nTop
     }
-    flowY += h
   })
-  return { set: DecorationSet.create(doc, decos), pages: page + 1, sig: parts.join('|') }
+  const pages = parts.length + 1
+  return { set: DecorationSet.create(doc, decos), pages, sig: parts.join('|') }
 }
 
 export const PagePagination = Extension.create({
