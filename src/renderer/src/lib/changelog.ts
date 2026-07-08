@@ -36,6 +36,21 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.5.0',
+    date: '2026-07-08T18:00:00Z',
+    title: 'PlexiDesk 3.5.0 — connected office files, clearer desks',
+    tag: 'feature',
+    summary:
+      'Office files now connect to the rest of your work. A table cell can reference a PlexiOffice document with a new Office file column, and you can drag a document straight from the Documents list or Drive onto the cell. You can embed a document inside another document from the slash menu or the command palette. Every office file now says where it is filed and lets you file or move it in one click. Adding things to a desk is far more obvious: a solid Add widget button plus an always-visible round button on the canvas, both opening a searchable palette, with the keyboard shortcuts unchanged. The sidebar is simpler too: rooms and desks live on their own All rooms and All desks pages, shared items sit under a Shared entry, and the old inline trees are gone. Hovering a floating menu no longer nudges the desk.',
+    highlights: [
+      'Reference a PlexiOffice document from a table cell with the new Office file column, by picker or by dragging the file in.',
+      'Embed a document inside another document from the slash menu or the command palette.',
+      'Every office file shows where it is filed and can be filed or moved in one click.',
+      'Adding to a desk is obvious: a solid Add widget button and an always-visible add button, both with a searchable palette; shortcuts unchanged.',
+      'Simpler sidebar: All rooms / All desks / Shared pages replace the inline trees; hovering a floating menu no longer scrolls the desk.'
+    ]
+  },
+  {
     version: '3.4.0',
     date: '2026-07-08T15:00:00Z',
     title: 'PlexiDesk 3.4.0 — Rooms, Desks and independent Plans',
