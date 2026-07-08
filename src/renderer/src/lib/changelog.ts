@@ -36,6 +36,21 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.4.0',
+    date: '2026-07-08T15:00:00Z',
+    title: 'PlexiDesk 3.4.0 — Rooms, Desks and independent Plans',
+    tag: 'feature',
+    summary:
+      'Folders are now Rooms and canvases are Desks, and the two are no longer tangled up with planning. A Desk is just a canvas that lives in a Room, and creating one no longer drops a task into your Plans. Plans are their own thing now: a Room becomes a Plan only when you say so, and you can promote or demote a Room to a Plan at any time from the Rooms page or the sidebar right-click menu. Your existing plans are preserved automatically. There are two new browsable index pages, All Rooms and All Desks, each with gallery, list, board, table and timeline views plus search, grouping, filtering and drag-to-reorder, and rooms and desks show live thumbnails of their contents.',
+    highlights: [
+      'Folders are Rooms and canvases are Desks; a Desk is a canvas that lives in a Room.',
+      'Desks no longer auto-become planning tasks. Plans are independent, and a Room becomes a Plan only when you choose.',
+      'Promote or demote a Room to a Plan in place, from the Rooms page or the sidebar menu; existing plans are kept.',
+      'New All Rooms and All Desks pages with gallery, list, board, table and timeline views, plus search, group, filter and reorder.',
+      'Rooms and Desks show live thumbnails: a Desk shows its canvas, a Room shows a composite of its desks.'
+    ]
+  },
+  {
     version: '3.3.9',
     date: '2026-07-08T13:00:00Z',
     title: 'PlexiDesk 3.3.9 — floating, minimizable menus',
