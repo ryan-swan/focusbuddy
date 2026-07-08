@@ -123,7 +123,7 @@ export default function FloatingPill({
       style={{
         ...(pos
           ? { left: pos.x, top: pos.y }
-          : { right: 16, top: defaultY }),
+          : { left: '50%', transform: 'translateX(-50%)', top: defaultY }),
         // Cognitive load ring — entire outer ring tinted by load tier
         boxShadow: `0 0 0 2px ${tier.ringColor}, 0 6px 24px ${tier.shadowColor}`,
         transition: 'box-shadow 700ms ease'

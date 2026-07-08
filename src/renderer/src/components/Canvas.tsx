@@ -2132,15 +2132,15 @@ export default function Canvas(): JSX.Element {
               }}
               onPointerDown={(e) => e.stopPropagation()}
             >
-              <div className="flex items-center gap-0.5 rounded-full bg-stone-900/92 backdrop-blur px-1.5 py-1 shadow-xl ring-1 ring-white/10 text-stone-100">
-                <span className="px-2 text-[11px] font-medium tabular-nums whitespace-nowrap">
+              <div className="flex items-center gap-0.5 rounded-full bg-[var(--surface-raised)]/95 backdrop-blur px-1.5 py-1 shadow-xl ring-1 ring-black/[0.07] dark:ring-white/[0.07] text-[var(--ink-80)]">
+                <span className="px-2 text-[11px] font-medium tabular-nums whitespace-nowrap text-[var(--ink-70)]">
                   {selectionBBox.count} selected
                 </span>
-                <div className="h-4 w-px bg-white/20" />
+                <div className="h-4 w-px bg-[var(--edge-firm)]" />
                 <button
                   onClick={() => void groupIntoSection()}
                   title="Group into a section"
-                  className="h-7 px-2 inline-flex items-center gap-1 rounded-full hover:bg-white/15 text-[11px]"
+                  className="h-7 px-2 inline-flex items-center gap-1 rounded-full hover:bg-[var(--surface-sunken)] text-[11px] text-[var(--ink-70)] hover:text-[var(--ink-100)]"
                 >
                   <Icon name="dashboard" size={13} />
                   <span>Group</span>
@@ -2149,7 +2149,7 @@ export default function Canvas(): JSX.Element {
                   onClick={() => void duplicateSelection()}
                   title="Duplicate all selected"
                   aria-label="Duplicate selected"
-                  className="h-7 w-7 inline-flex items-center justify-center rounded-full hover:bg-white/15"
+                  className="h-7 w-7 inline-flex items-center justify-center rounded-full text-[var(--ink-70)] hover:bg-[var(--surface-sunken)] hover:text-[var(--ink-100)]"
                 >
                   <Icon name="content_copy" size={13} />
                 </button>
@@ -2157,7 +2157,7 @@ export default function Canvas(): JSX.Element {
                   onClick={() => void deleteSelection()}
                   title="Delete all selected"
                   aria-label="Delete selected"
-                  className="h-7 w-7 inline-flex items-center justify-center rounded-full hover:bg-rose-500/30 text-rose-200"
+                  className="h-7 w-7 inline-flex items-center justify-center rounded-full hover:bg-rose-500/20 text-rose-500 dark:text-rose-400"
                 >
                   <Icon name="delete" size={13} />
                 </button>
@@ -2165,7 +2165,7 @@ export default function Canvas(): JSX.Element {
                     distribute). Each is a single undo step. */}
                 {selectionBBox.count >= 2 && (
                   <>
-                    <div className="h-4 w-px bg-white/20" />
+                    <div className="h-4 w-px bg-[var(--edge-firm)]" />
                     {(
                       [
                         ['left', 'align_horizontal_left', 'Align left'],
@@ -2181,7 +2181,7 @@ export default function Canvas(): JSX.Element {
                         onClick={() => alignSelection(mode)}
                         title={label}
                         aria-label={label}
-                        className="h-7 w-7 inline-flex items-center justify-center rounded-full hover:bg-white/15"
+                        className="h-7 w-7 inline-flex items-center justify-center rounded-full text-[var(--ink-70)] hover:bg-[var(--surface-sunken)] hover:text-[var(--ink-100)]"
                       >
                         <Icon name={icon} size={13} />
                       </button>
@@ -2192,7 +2192,7 @@ export default function Canvas(): JSX.Element {
                           onClick={() => distributeSelection('horizontal')}
                           title="Distribute horizontally (equal gaps)"
                           aria-label="Distribute horizontally"
-                          className="h-7 w-7 inline-flex items-center justify-center rounded-full hover:bg-white/15"
+                          className="h-7 w-7 inline-flex items-center justify-center rounded-full text-[var(--ink-70)] hover:bg-[var(--surface-sunken)] hover:text-[var(--ink-100)]"
                         >
                           <Icon name="horizontal_distribute" size={13} />
                         </button>
@@ -2200,7 +2200,7 @@ export default function Canvas(): JSX.Element {
                           onClick={() => distributeSelection('vertical')}
                           title="Distribute vertically (equal gaps)"
                           aria-label="Distribute vertically"
-                          className="h-7 w-7 inline-flex items-center justify-center rounded-full hover:bg-white/15"
+                          className="h-7 w-7 inline-flex items-center justify-center rounded-full text-[var(--ink-70)] hover:bg-[var(--surface-sunken)] hover:text-[var(--ink-100)]"
                         >
                           <Icon name="vertical_distribute" size={13} />
                         </button>
@@ -2208,12 +2208,12 @@ export default function Canvas(): JSX.Element {
                     )}
                   </>
                 )}
-                <div className="h-4 w-px bg-white/20" />
+                <div className="h-4 w-px bg-[var(--edge-firm)]" />
                 <button
                   onClick={() => clearSelection()}
                   title="Clear selection (Esc)"
                   aria-label="Clear selection"
-                  className="h-7 w-7 inline-flex items-center justify-center rounded-full hover:bg-white/15"
+                  className="h-7 w-7 inline-flex items-center justify-center rounded-full text-[var(--ink-70)] hover:bg-[var(--surface-sunken)] hover:text-[var(--ink-100)]"
                 >
                   <Icon name="close" size={13} />
                 </button>
