@@ -2086,3 +2086,124 @@ body {
     animation: none !important;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   MATERIAL DESK THEME
+   Dark walnut wood surface. Horizontal grain lines, warm lamp-glow from
+   above, deep shadow at edges. Canvas strings render as visible twine.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Base desk surface — dark walnut */
+.material-desk .desk-paper {
+  background-color: #130b04;
+  background-image:
+    /* Fine grain lines — near-horizontal with slight angular drift so they
+       read as natural wood rather than a mechanical pattern */
+    repeating-linear-gradient(
+      90.2deg,
+      transparent 0px,
+      transparent 3px,
+      rgba(6, 3, 1, 0.30) 3px,
+      rgba(6, 3, 1, 0.30) 4px
+    ),
+    repeating-linear-gradient(
+      89.7deg,
+      transparent 0px,
+      transparent 9px,
+      rgba(50, 25, 6, 0.22) 9px,
+      rgba(50, 25, 6, 0.22) 10px
+    ),
+    repeating-linear-gradient(
+      90.6deg,
+      transparent 0px,
+      transparent 20px,
+      rgba(80, 42, 10, 0.15) 20px,
+      rgba(80, 42, 10, 0.15) 21px
+    ),
+    repeating-linear-gradient(
+      89.3deg,
+      transparent 0px,
+      transparent 44px,
+      rgba(100, 55, 14, 0.10) 44px,
+      rgba(100, 55, 14, 0.10) 46px
+    ),
+    /* Warm brown base gradient — darker at edges, slightly lighter at centre */
+    radial-gradient(ellipse 120% 60% at 50% 35%, rgba(42, 22, 6, 0.0) 0%, rgba(8, 4, 1, 0.55) 100%),
+    linear-gradient(175deg, #1e1008 0%, #140c04 25%, #0e0802 60%, #160d05 100%);
+  filter: none;
+}
+
+/* Ambient desk-lamp warm glow from top — like a physical lamp above the desk */
+.material-desk .desk-paper::before {
+  background:
+    radial-gradient(
+      ellipse 90% 22% at 50% -2%,
+      rgba(255, 175, 70, 0.14) 0%,
+      rgba(255, 150, 50, 0.06) 45%,
+      transparent 70%
+    ),
+    radial-gradient(
+      ellipse 40% 10% at 28% 0%,
+      rgba(255, 180, 80, 0.07) 0%,
+      transparent 50%
+    ),
+    radial-gradient(
+      ellipse 180% 50% at 50% 100%,
+      rgba(0, 0, 0, 0.40) 0%,
+      transparent 60%
+    );
+  transition: none;
+}
+
+/* No animated accent beam — wood is static */
+.material-desk .desk-paper::after {
+  display: none !important;
+}
+
+/* Widget cards — dark wood surface, inset/floating feel with warm hairline borders */
+.material-desk [data-widget-id] {
+  background: rgba(26, 15, 6, 0.82) !important;
+  border-color: rgba(120, 72, 28, 0.35) !important;
+  box-shadow:
+    0 2px 12px rgba(0, 0, 0, 0.55),
+    0 1px 0 rgba(180, 120, 50, 0.12) inset !important;
+}
+.material-desk [data-widget-id]:hover {
+  border-color: rgba(180, 120, 50, 0.50) !important;
+  box-shadow:
+    0 4px 20px rgba(0, 0, 0, 0.65),
+    0 1px 0 rgba(180, 120, 50, 0.18) inset !important;
+}
+
+/* Widget interiors — dark felt/baize feel on widget bodies */
+.material-desk [data-widget-id] [class*="bg-white"],
+.material-desk [data-widget-id] [class*="dark:bg-stone-900"],
+.material-desk [data-widget-id] [class*="dark:bg-stone-800"] {
+  background-color: rgba(22, 13, 5, 0.90) !important;
+}
+
+/* Glass chrome — warm amber tint on panels in desk mode */
+.material-desk .fb-glass-chrome {
+  background: rgba(26, 16, 6, 0.78) !important;
+  backdrop-filter: saturate(140%) blur(20px);
+  -webkit-backdrop-filter: saturate(140%) blur(20px);
+  border-color: rgba(120, 72, 28, 0.30) !important;
+}
+
+/* Sidebar in desk mode — darker panel, warm border */
+.material-desk aside {
+  background: rgba(16, 10, 4, 0.92) !important;
+  border-color: rgba(80, 45, 14, 0.40) !important;
+}
+
+/* Title bar drag region */
+.material-desk header.titlebar-drag {
+  background: rgba(12, 7, 2, 0.95) !important;
+  border-color: rgba(60, 35, 10, 0.50) !important;
+}
+
+/* Focus-session overlay preserves wood ground */
+.material-desk.focus-session-active .desk-paper,
+.material-desk .focus-session-active .desk-paper {
+  filter: brightness(0.65) saturate(0.8) !important;
+}

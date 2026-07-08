@@ -343,10 +343,12 @@ export default function LinkOverlay({ ghost }: Props): JSX.Element | null {
   }
 
   const isDark = document.documentElement.classList.contains('dark')
-  // Warm linen string color — slightly richer in light mode where it reads
-  // against a lighter canvas, softer/creamier in dark mode.
-  // stringColor kept for future use (ghost wire, badge tint)
-  // const stringColor = isDark ? '#D4BC96' : '#BEA882'
+  const isMaterialDesk = document.documentElement.classList.contains('material-desk')
+  // String colors — richer + more visible on the wood desk theme where the dark
+  // background provides maximum contrast. Standard dark/light variants for other themes.
+  const cordColor = isMaterialDesk ? '#C4954A' : isDark ? '#9B7448' : '#A07848'
+  const cordShadowColor = isMaterialDesk ? '#3B1A04' : '#5A2E08'
+  const highlightColor = isMaterialDesk ? '#F0D098' : isDark ? '#D4BC96' : '#D4B882'
 
   const selectedLink = selectedLinkId ? links.find((l) => l.id === selectedLinkId) ?? null : null
 
@@ -411,8 +413,22 @@ export default function LinkOverlay({ ghost }: Props): JSX.Element | null {
           </filter>
           {/* Depth shadow for context strings — pronounced enough to read
               as a physical object hanging above the canvas surface. */}
-          <filter id="fb-string-shadow" x="-10%" y="-30%" width="120%" height="200%">
-            <feDropShadow dx="0" dy="2.5" stdDeviation="2" floodColor="#6B4A20" floodOpacity="0.28" />
+          <filter id="fb-string-shadow" x="-10%" y="-40%" width="120%" height="240%">
+            <feDropShadow dx="0" dy="3" stdDeviation="2.5" floodColor="#3B1A06" floodOpacity="0.45" />
+          </filter>
+          {/* Fibrous twine texture — feTurbulence noise composited as a multiply
+              overlay gives the cord a woven/braided look without image assets.
+              Applied to the base strand only so the highlight stays clean. */}
+          <filter id="fb-string-texture" x="-5%" y="-80%" width="110%" height="260%" colorInterpolationFilters="sRGB">
+            <feTurbulence type="fractalNoise" baseFrequency="0.015 0.75" numOctaves="3" seed="7" result="noise" />
+            <feColorMatrix type="matrix" in="noise"
+              values="0 0 0 0 0.55
+                      0 0 0 0 0.32
+                      0 0 0 0 0.08
+                      0 0 0 0.55 0"
+              result="tinted-noise" />
+            <feBlend in="SourceGraphic" in2="tinted-noise" mode="multiply" result="blended" />
+            <feDropShadow dx="0" dy="3" stdDeviation="2.5" floodColor="#2A1004" floodOpacity="0.55" />
           </filter>
         </defs>
         {segments.map((seg) => {
@@ -511,28 +527,54 @@ export default function LinkOverlay({ ghost }: Props): JSX.Element | null {
                 </>
               )}
               {type === 'context' ? (
-                // Two-layer linen cord — base strand + highlight strand give
-                // the string a round cross-section, like a real hanging cord.
-                // Shadow filter lifts it off the canvas surface in light mode.
+                // Multi-layer twine cord:
+                //  1. Deep shadow pass — lifts the cord off the surface
+                //  2. Base cord — warm amber/linen, full weight
+                //  3. Twist dash — alternating darker segments simulate rope twist
+                //  4. Highlight strand — lighter, narrower, slightly shallower arc
+                //     for a round cross-section feel
+                // On material-desk, the texture filter adds woven fibre detail.
                 <g style={{ pointerEvents: 'none' }}>
-                  {/* Base cord — warm linen, full weight */}
+                  {/* Shadow / depth layer — drawn below everything else */}
                   <path
                     d={d}
                     fill="none"
-                    stroke={isDark ? '#8B6840' : '#A07848'}
-                    strokeOpacity={isSelected ? 0.90 : isHovered ? 0.75 : 0.50}
-                    strokeWidth={isSelected ? 3.5 : isHovered ? 3.5 : 2.5}
+                    stroke={cordShadowColor}
+                    strokeOpacity={isSelected ? 0.70 : isHovered ? 0.55 : 0.38}
+                    strokeWidth={isSelected ? 6 : isHovered ? 6 : 5}
                     strokeLinecap="round"
-                    filter={isDark ? undefined : 'url(#fb-string-shadow)'}
                     style={{ transition: 'stroke-opacity 150ms ease, stroke-width 150ms ease' }}
                   />
-                  {/* Highlight strand — lighter, narrower, slightly shallower arc */}
+                  {/* Base cord — warm amber linen with fibrous texture on desk theme */}
+                  <path
+                    d={d}
+                    fill="none"
+                    stroke={cordColor}
+                    strokeOpacity={isSelected ? 0.95 : isHovered ? 0.85 : 0.72}
+                    strokeWidth={isSelected ? 4 : isHovered ? 4 : 3}
+                    strokeLinecap="round"
+                    filter={isMaterialDesk ? 'url(#fb-string-texture)' : 'url(#fb-string-shadow)'}
+                    style={{ transition: 'stroke-opacity 150ms ease, stroke-width 150ms ease' }}
+                  />
+                  {/* Twist pattern — alternating darker dashes simulate the over/under
+                      twist of physical twine. Only visible at the base opacity level. */}
+                  <path
+                    d={d}
+                    fill="none"
+                    stroke={cordShadowColor}
+                    strokeOpacity={isSelected ? 0.40 : isHovered ? 0.32 : 0.22}
+                    strokeWidth={isSelected ? 4 : 3}
+                    strokeLinecap="round"
+                    strokeDasharray="5 9"
+                    style={{ pointerEvents: 'none', transition: 'stroke-opacity 150ms ease' }}
+                  />
+                  {/* Highlight strand — lighter, narrower, shallower arc, round cross-section */}
                   <path
                     d={catenaryHighlightPath(seg.x1, seg.y1, seg.x2, seg.y2)}
                     fill="none"
-                    stroke={isDark ? '#D4BC96' : '#D4B882'}
-                    strokeOpacity={isSelected ? 0.55 : isHovered ? 0.45 : 0.30}
-                    strokeWidth={isSelected ? 1.2 : 0.9}
+                    stroke={highlightColor}
+                    strokeOpacity={isSelected ? 0.75 : isHovered ? 0.60 : 0.42}
+                    strokeWidth={isSelected ? 1.5 : 1.1}
                     strokeLinecap="round"
                     style={{ transition: 'stroke-opacity 150ms ease' }}
                   />
@@ -572,6 +614,39 @@ export default function LinkOverlay({ ghost }: Props): JSX.Element | null {
                   style={{ pointerEvents: 'none' }}
                 />
               )}
+              {/* Pushpin tacks at context wire endpoints — source and target.
+                  A small filled circle (pin head) over a tiny shadow ring gives
+                  the physical "pinned to a corkboard" feel of the desk theme,
+                  but is subtle enough to work in all themes. */}
+              {type === 'context' && (
+                <>
+                  {[{ cx: seg.x1, cy: seg.y1 }, { cx: seg.x2, cy: seg.y2 }].map((pt, pi) => (
+                    <g key={pi} style={{ pointerEvents: 'none' }}>
+                      {/* Pin shadow */}
+                      <circle
+                        cx={pt.cx} cy={pt.cy + 1.5}
+                        r={isSelected ? 5.5 : 4.5}
+                        fill="#1A0A02"
+                        fillOpacity={0.40}
+                      />
+                      {/* Pin body — warm metal dome */}
+                      <circle
+                        cx={pt.cx} cy={pt.cy}
+                        r={isSelected ? 5 : 4}
+                        fill={isMaterialDesk ? '#C8863A' : isDark ? '#9B6830' : '#A07030'}
+                        fillOpacity={isSelected ? 1 : isHovered ? 0.90 : 0.75}
+                      />
+                      {/* Pin highlight — specular glint on top-left */}
+                      <circle
+                        cx={pt.cx - 1.2} cy={pt.cy - 1.2}
+                        r={isSelected ? 1.8 : 1.4}
+                        fill="#FFFFFF"
+                        fillOpacity={isSelected ? 0.65 : 0.45}
+                      />
+                    </g>
+                  ))}
+                </>
+              )}
             </g>
           )
         })}
@@ -580,17 +655,25 @@ export default function LinkOverlay({ ghost }: Props): JSX.Element | null {
             <path
               d={ghostPath}
               fill="none"
-              stroke={isDark ? '#8B6840' : '#A07848'}
-              strokeOpacity={0.65}
-              strokeWidth={2.5}
+              stroke={cordShadowColor}
+              strokeOpacity={0.35}
+              strokeWidth={5}
               strokeLinecap="round"
             />
             <path
               d={ghostPath}
               fill="none"
-              stroke={isDark ? '#D4BC96' : '#D4B882'}
-              strokeOpacity={0.35}
-              strokeWidth={0.9}
+              stroke={cordColor}
+              strokeOpacity={0.70}
+              strokeWidth={3}
+              strokeLinecap="round"
+            />
+            <path
+              d={ghostPath}
+              fill="none"
+              stroke={highlightColor}
+              strokeOpacity={0.45}
+              strokeWidth={1.1}
               strokeLinecap="round"
             />
           </g>
