@@ -36,6 +36,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.5.1',
+    date: '2026-07-08T19:30:00Z',
+    title: 'PlexiDesk 3.5.1 — cleaner document pages',
+    tag: 'fix',
+    summary:
+      'Fixes text spilling across the gap between pages in a document opened in Page view. Page breaks are now measured from the real page layout, so a paragraph that reaches the bottom of a page moves cleanly to the top margin of the next page, the way Word does, instead of running over the page break. Pages keep their standard one-inch margins, still adjustable from the Margins menu.',
+    highlights: [
+      'Text no longer runs across the gap between pages in Page view; blocks break to the next page cleanly.',
+      'Page breaks are measured from the real layout, so long documents stay aligned to their sheets all the way down.',
+      'Standard one-inch page margins, still adjustable from the Margins menu.'
+    ]
+  },
+  {
     version: '3.5.0',
     date: '2026-07-08T18:00:00Z',
     title: 'PlexiDesk 3.5.0 — connected office files, clearer desks',
