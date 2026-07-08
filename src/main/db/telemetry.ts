@@ -22,6 +22,10 @@ export interface TelemetrySnapshot {
   aiInputTokens: number
   aiOutputTokens: number
   aiEstCostUsd: number
+  // Onboarding progress, so the admin can see per-user whether someone completed
+  // the first-run flow and how many tours they finished. Aggregate flags only.
+  onboardingCoreCompleted: boolean
+  onboardingModules: number
 }
 
 function bumpCounter(key: string, n: number): void {
@@ -58,6 +62,23 @@ export function recordAiCall(n = 1): void {
       .run(n, n)
   } catch {
     // Telemetry must never break a real feature; swallow.
+  }
+}
+
+// Overwrite (not increment) an onboarding summary counter. Called from the
+// renderer via IPC when a module completes/skips, so the value rides the next
+// telemetry snapshot up to the admin. Never throws.
+export function setOnboardingSummary(summary: { coreCompleted: boolean; modulesCompleted: number }): void {
+  try {
+    const db = getDb()
+    const put = db.prepare(
+      `INSERT INTO usage_counters (key, value) VALUES (?, ?)
+       ON CONFLICT(key) DO UPDATE SET value = excluded.value`
+    )
+    put.run('onboarding_core', summary.coreCompleted ? 1 : 0)
+    put.run('onboarding_modules', Math.max(0, Math.round(summary.modulesCompleted || 0)))
+  } catch {
+    // swallow — telemetry must never break a feature
   }
 }
 
@@ -122,6 +143,8 @@ export function collectTelemetry(): TelemetrySnapshot {
     aiCalls: counter('ai_calls'),
     aiInputTokens: counter('ai_input_tokens'),
     aiOutputTokens: counter('ai_output_tokens'),
-    aiEstCostUsd: Math.round((counter('ai_cost_micros') / 1e6) * 100) / 100
+    aiEstCostUsd: Math.round((counter('ai_cost_micros') / 1e6) * 100) / 100,
+    onboardingCoreCompleted: counter('onboarding_core') >= 1,
+    onboardingModules: counter('onboarding_modules')
   }
 }

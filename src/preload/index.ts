@@ -388,6 +388,8 @@ const api = {
       aiInputTokens: number
       aiOutputTokens: number
       aiEstCostUsd: number
+      onboardingCoreCompleted: boolean
+      onboardingModules: number
     }> => ipcRenderer.invoke('telemetry:collect'),
     suggestWidgetSetup: (input: {
       widgetId: string
@@ -551,6 +553,12 @@ const api = {
       ipcRenderer.invoke('dashboard:setLayout', key, input),
     resetLayout: (key: string): Promise<boolean> =>
       ipcRenderer.invoke('dashboard:resetLayout', key)
+  },
+  onboarding: {
+    // Persist onboarding progress locally so it rides the next telemetry
+    // snapshot up to the admin as a per-user completion record.
+    record: (summary: { coreCompleted: boolean; modulesCompleted: number }): Promise<void> =>
+      ipcRenderer.invoke('onboarding:record', summary)
   },
   session: {
     // The active organisation is the tenancy boundary for the local workspace.

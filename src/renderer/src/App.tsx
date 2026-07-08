@@ -47,6 +47,9 @@ import MetricsOverlay from './components/MetricsOverlay'
 import LaunchSignInModal from './components/LaunchSignInModal'
 import UpgradePromptModal from './components/UpgradePromptModal'
 import FirstRunOnboarding from './components/FirstRunOnboarding'
+import OnboardingTour from './components/onboarding/OnboardingTour'
+import FeatureSpotlightPopup from './components/onboarding/FeatureSpotlightPopup'
+import OnboardingHub from './components/onboarding/OnboardingHub'
 import { useOnboarding } from './stores/onboarding'
 import { useMessagingStore } from './stores/messaging'
 import { useDocCollabStore } from './stores/docCollab'
@@ -665,6 +668,9 @@ export default function App(): JSX.Element {
         canSmartStack={canSmartStack}
       />
       <FirstRunOnboarding />
+      <OnboardingTour />
+      <FeatureSpotlightPopup />
+      <OnboardingHub />
       <UndoToast />
       <PromptDialogHost />
       <DocHistoryPanelHost />

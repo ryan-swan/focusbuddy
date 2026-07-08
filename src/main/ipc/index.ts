@@ -94,7 +94,7 @@ import {
   listWidgetsByTask,
   listWidgetsByKind,
   updateWidget, createWidgetIfTaskExists } from '../db/widgets'
-import { collectTelemetry, recordAiCall } from '../db/telemetry'
+import { collectTelemetry, recordAiCall, setOnboardingSummary } from '../db/telemetry'
 import { getLaunchInfo } from '../launchVersion'
 import {
   createLink,
@@ -944,6 +944,11 @@ export function registerIpcHandlers(): void {
   })
   // Telemetry snapshot for the renderer to report to the signal server.
   ipcMain.handle('telemetry:collect', () => collectTelemetry())
+  // Persist onboarding progress locally so it rides the next telemetry snapshot.
+  ipcMain.handle(
+    'onboarding:record',
+    (_e, summary: { coreCompleted: boolean; modulesCompleted: number }) => setOnboardingSummary(summary)
+  )
   ipcMain.handle(
     'ai:transformText',
     (_e, input: { text: string; instruction: string; kind?: string }) => {

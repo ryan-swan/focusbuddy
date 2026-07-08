@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { useOnboarding } from '../stores/onboarding'
+import { useOnboarding, CORE_MODULE_ID } from '../stores/onboarding'
 import { useNodeStore } from '../stores/nodes'
 import { useViewStore } from '../stores/view'
 import Icon from './Icon'
@@ -21,8 +21,11 @@ type KeyStatus =
   | { kind: 'error'; message: string }
 
 export default function FirstRunOnboarding(): JSX.Element | null {
-  const status = useOnboarding((s) => s.status)
+  // The core flow is now one module of the modular onboarding system, so it can
+  // be replayed at any time (the tour hub / command palette call start('core')).
+  const activeModuleId = useOnboarding((s) => s.activeModuleId)
   const complete = useOnboarding((s) => s.complete)
+  const skip = useOnboarding((s) => s.skip)
   const refreshNodes = useNodeStore((s) => s.refresh)
   const goTask = useViewStore((s) => s.goTask)
 
@@ -31,7 +34,18 @@ export default function FirstRunOnboarding(): JSX.Element | null {
   const [keyStatus, setKeyStatus] = useState<KeyStatus>({ kind: 'idle' })
   const [seeding, setSeeding] = useState(false)
 
-  if (status !== 'active') return null
+  const isActive = activeModuleId === CORE_MODULE_ID
+  // Reset to the first step each time the core module (re)opens, so a replay
+  // starts from the top rather than wherever the last run left off.
+  useEffect(() => {
+    if (isActive) {
+      setStep(0)
+      setKey('')
+      setKeyStatus({ kind: 'idle' })
+    }
+  }, [isActive])
+
+  if (!isActive) return null
 
   async function testAndSaveKey(): Promise<void> {
     const pasted = key.trim()
@@ -131,9 +145,12 @@ export default function FirstRunOnboarding(): JSX.Element | null {
               side. Describe what you need and the AI builds it onto your desk.
             </p>
             <p className="text-[13px] text-stone-400 leading-relaxed">
-              A key, a quick tour, and you are working. You can skip any step.
+              A key, a quick tour, and you are working. About a minute, and you can skip any step.
             </p>
-            <div className="flex justify-end mt-6">
+            <div className="flex items-center justify-between mt-6">
+              <button onClick={() => skip()} className="text-[13px] text-stone-400 hover:text-stone-200" data-testid="onboarding-skip-all">
+                Skip for now
+              </button>
               <button onClick={() => setStep(1)} className="btn-primary">
                 <span>Get started</span>
                 <Icon name="arrow_forward" size={14} />

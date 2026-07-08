@@ -80,3 +80,49 @@ test('ONB-3 — an existing user (already has data) is grandfathered and never s
   await window.waitForTimeout(800)
   await expect(onboarding(launched)).toHaveCount(0)
 })
+
+test('ONB-4 — a feature tour replays from the hub, navigates the app, completes and is remembered', async () => {
+  launched = await launchApp()
+  const { window } = launched
+  await waitForReady(window, { dismissModals: false })
+  // Dismiss the fresh-install core flow so we can drive a feature tour.
+  if (await onboarding(launched).isVisible().catch(() => false)) {
+    await window.getByRole('button', { name: 'Get started' }).click()
+    await window.locator('[data-testid="onboarding-key-skip"]').click()
+    await window.locator('[data-testid="onboarding-tour-continue"]').click()
+    await window.locator('[data-testid="onboarding-start-blank"]').click()
+    await expect(onboarding(launched)).toHaveCount(0, { timeout: 4000 })
+  }
+  // Clear the launch sign-in modal (continue without account) so it does not sit
+  // over the hub in the test environment.
+  await waitForReady(window)
+
+  // The onboarding record IPC exists (feeds the admin per-user record).
+  const hasRecord = await window.evaluate(
+    () => typeof (window as unknown as { api?: { onboarding?: { record?: unknown } } }).api?.onboarding?.record === 'function'
+  )
+  expect(hasRecord).toBe(true)
+
+  // Open the tour hub (same event the command palette / Settings fire).
+  await window.evaluate(() => window.dispatchEvent(new CustomEvent('fb:onboarding-hub')))
+  const hub = window.locator('[data-testid="onboarding-hub"]')
+  await expect(hub).toBeVisible({ timeout: 5000 })
+  await hub.locator('[data-testid="onboarding-hub-start-rooms-desks"]').click()
+
+  const tour = window.locator('[data-testid="onboarding-step-tour"]')
+  await expect(tour).toBeVisible({ timeout: 5000 })
+  // Step 1 navigates to All rooms.
+  await expect(window.locator('[data-testid="rooms-index-view"]')).toBeVisible({ timeout: 6000 })
+  await tour.locator('[data-testid="onboarding-tour-next"]').click()
+  await expect(window.locator('[data-testid="desks-index-view"]')).toBeVisible({ timeout: 6000 })
+  await tour.locator('[data-testid="onboarding-tour-next"]').click() // -> plans
+  await tour.locator('[data-testid="onboarding-tour-next"]').click() // Done
+  await expect(tour).toHaveCount(0, { timeout: 5000 })
+
+  // Remembered: reopen the hub and the module shows Done.
+  await window.evaluate(() => window.dispatchEvent(new CustomEvent('fb:onboarding-hub')))
+  await expect(hub).toBeVisible({ timeout: 5000 })
+  await expect(hub.locator('[data-testid="onboarding-hub-start-rooms-desks"]')).toContainText('Done')
+  const persisted = await window.evaluate(() => localStorage.getItem('fb.onboarding.v2'))
+  expect(persisted).toContain('rooms-desks')
+})

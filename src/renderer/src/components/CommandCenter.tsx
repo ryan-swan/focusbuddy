@@ -286,6 +286,18 @@ export default function CommandCenter({
       }
     })
     items.push({
+      id: 'onboarding-hub',
+      label: 'Take a tour',
+      hint: 'Replay onboarding',
+      icon: 'explore',
+      kind: 'action',
+      score: matchScore('take a tour replay onboarding help getting started guide', q),
+      run: () => {
+        closePalette()
+        window.dispatchEvent(new CustomEvent('fb:onboarding-hub'))
+      }
+    })
+    items.push({
       id: 'go-all-tasks',
       label: 'All tasks',
       hint: 'Browse + filter every task',

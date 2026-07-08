@@ -45,6 +45,13 @@ export default function PrivacyHelpSection(): JSX.Element {
         </div>
         <div className="space-y-1.5">
           <button
+            onClick={() => window.dispatchEvent(new CustomEvent('fb:onboarding-hub'))}
+            data-testid="help-replay-onboarding"
+            className="w-full inline-flex items-center gap-2 px-2.5 py-1.5 rounded-md text-[12px] border border-[var(--edge-soft)] text-[var(--ink-70)] hover:border-accent hover:text-accent transition-colors"
+          >
+            <Icon name="explore" size={14} /> Take a tour / replay onboarding
+          </button>
+          <button
             onClick={() => void window.api.files.openExternal(HELP_BASE)}
             data-testid="help-guides"
             className="w-full inline-flex items-center gap-2 px-2.5 py-1.5 rounded-md text-[12px] border border-[var(--edge-soft)] text-[var(--ink-70)] hover:border-accent hover:text-accent transition-colors"
