@@ -56,21 +56,6 @@ export default function FloatingToolbar({
     window.removeEventListener('mouseup', onUp.current)
   })
 
-  // Only used when the user has manually dragged the toolbar
-  const [defaultY, setDefaultY] = useState<number | null>(null)
-  useEffect(() => {
-    function measure(): void {
-      const canvas = document.querySelector('[data-canvas-surface="true"]') as HTMLElement | null
-      if (!canvas) return
-      const cr = canvas.getBoundingClientRect()
-      setDefaultY(cr.top + cr.height / 2)
-    }
-    measure()
-    window.addEventListener('resize', measure)
-    const t = window.setTimeout(measure, 300)
-    return () => { window.removeEventListener('resize', measure); window.clearTimeout(t) }
-  }, [])
-
   useEffect(() => {
     const move = onMove.current
     const up = onUp.current
@@ -95,10 +80,12 @@ export default function FloatingToolbar({
     window.addEventListener('mouseup', onUp.current)
   }
 
-  // Default: CSS right-anchored. After dragging: absolute left/top.
+  // Default: CSS right-anchored, always vertically centered via translateY(-50%).
+  // This means the toolbar stays centered as its height changes on expand/collapse.
+  // After dragging: switch to absolute left/top (no transform).
   const posStyle = pos
     ? { left: pos.x, top: pos.y }
-    : { right: 12, top: defaultY ?? '50%', transform: defaultY ? undefined : 'translateY(-50%)' }
+    : { right: 12, top: '50%', transform: 'translateY(-50%)' }
 
   return (
     <div
