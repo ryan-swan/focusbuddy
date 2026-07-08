@@ -35,9 +35,8 @@ import PreTaskBridge from './components/PreTaskBridge'
 import SmartStackModal from './components/SmartStackModal'
 import CursorSpotlight from './components/CursorSpotlight'
 import PeerBodyDoubleDialog from './components/PeerBodyDoubleDialog'
-import CommandCenter from './components/CommandCenter'
 import AICommandBar from './components/AICommandBar'
-import VoiceCommandFAB from './components/VoiceCommandFAB'
+import UnifiedBottomBar from './components/UnifiedBottomBar'
 import MetricsOverlay from './components/MetricsOverlay'
 import LaunchSignInModal from './components/LaunchSignInModal'
 import UpgradePromptModal from './components/UpgradePromptModal'
@@ -644,20 +643,14 @@ export default function App(): JSX.Element {
       <HyperfocusGuardian />
       <PreTaskBridge />
       <CursorSpotlight />
-      {/* Bottom bar — search pill + mic grouped together, centred */}
+      {/* Unified bottom bar — search + mic + recent widget shortcuts */}
       {createPortal(
-        <div className="fixed bottom-16 left-1/2 -translate-x-1/2 z-[120]">
-          {/* Liquid-glass outer group — search + mic sit inside a shared chrome pill */}
-          <div className="flex items-center rounded-full bg-white/[0.12] dark:bg-white/[0.07] backdrop-blur-2xl ring-1 ring-white/[0.22] dark:ring-white/[0.14] shadow-[0_8px_32px_rgba(0,0,0,0.18),inset_0_1px_0_rgba(255,255,255,0.18)] px-1 py-0.5 gap-0 transition-shadow duration-200 hover:shadow-[0_8px_44px_rgba(0,0,0,0.26),inset_0_1px_0_rgba(255,255,255,0.22)]">
-            <CommandCenter
-              onOpenBodyDouble={() => setBodyDoubleOpen(true)}
-              onOpenSmartStack={() => canSmartStack && setSmartStackOpen(true)}
-              canSmartStack={canSmartStack}
-            />
-            {/* Divider between search and mic */}
-            <div className="w-px h-5 bg-[var(--edge-firm)]/70 mx-1 shrink-0" />
-            <VoiceCommandFAB />
-          </div>
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-[120]">
+          <UnifiedBottomBar
+            onOpenBodyDouble={() => setBodyDoubleOpen(true)}
+            onOpenSmartStack={() => canSmartStack && setSmartStackOpen(true)}
+            canSmartStack={canSmartStack}
+          />
         </div>,
         document.body
       )}

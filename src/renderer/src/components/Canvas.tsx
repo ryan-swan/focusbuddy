@@ -44,7 +44,6 @@ import '../lib/contextMenu'
 import FloatingToolbar, { type ToolbarAction } from './FloatingToolbar'
 import MinimapWidget from './widgets/MinimapWidget'
 import CanvasMinimapOverlay from './CanvasMinimapOverlay'
-import CanvasWidgetDock from './CanvasWidgetDock'
 import DeskGallery from './DeskGallery'
 import VoiceRecorderWidget from './widgets/VoiceRecorderWidget'
 import MindMapWidget from './widgets/MindMapWidget'
@@ -60,7 +59,6 @@ import CanvasEdgeIndicators from './CanvasEdgeIndicators'
 import { useEdgePan } from '../lib/useEdgePan'
 import { useNavPrefs, frictionFromGlide } from '../lib/navPrefs'
 import FloatingPill from './FloatingPill'
-import StageManagerStrip from './StageManagerStrip'
 import CanvasAIAssistantRail from './CanvasAIAssistantRail'
 import Icon from './Icon'
 import { useChatStore } from '../stores/chat'
@@ -341,19 +339,6 @@ export default function Canvas(): JSX.Element {
   } | null>(null)
 
   const activeTask = activeTaskId ? nodes.find((n) => n.id === activeTaskId) ?? null : null
-
-  // ── Stage Manager hover-expand pill ─────────────────────────────────────
-  // Thin accent pill on the left edge; expands on hover to show the full strip.
-  const [smHovered, setSmHovered] = useState(false)
-  const smLeaveTimer = useRef<number | undefined>(undefined)
-  function smEnter(): void {
-    if (smLeaveTimer.current) clearTimeout(smLeaveTimer.current)
-    setSmHovered(true)
-  }
-  function smLeave(): void {
-    smLeaveTimer.current = window.setTimeout(() => setSmHovered(false), 350)
-  }
-  useEffect(() => () => { if (smLeaveTimer.current) clearTimeout(smLeaveTimer.current) }, [])
 
   // Spatial-link state — load per task, mirror the widgets pattern. The
   // overlay reads this store; Canvas owns the link-arm gesture.
@@ -2091,44 +2076,6 @@ export default function Canvas(): JSX.Element {
             />
           </div>
 
-          {/* Stage Manager — hover-expand pill on the left edge. */}
-          <div
-            data-stage-manager="true"
-            onMouseEnter={smEnter}
-            onMouseLeave={smLeave}
-            className="absolute left-0 top-1/2 -translate-y-1/2 z-[45] flex flex-col pointer-events-auto"
-            style={{
-              width: smHovered ? 164 : 10,
-              transition: 'width 280ms cubic-bezier(0.34, 1.56, 0.64, 1)',
-              overflow: 'hidden',
-              maxHeight: 'calc(100% - 80px)'
-            }}
-          >
-            {/* Thin accent pill shown when collapsed */}
-            {!smHovered && (
-              <div className="absolute inset-y-0 right-0 w-[10px] flex items-center justify-center">
-                <div
-                  className="w-[4px] rounded-full bg-[rgb(var(--accent)/0.35)] hover:bg-[rgb(var(--accent)/0.6)] transition-colors"
-                  style={{ height: 48 }}
-                />
-              </div>
-            )}
-            {/* Full Stage Manager content */}
-            <div
-              className="rounded-r-2xl overflow-hidden bg-[var(--surface-raised)] border-r border-t border-b border-[var(--edge-soft)] shadow-[4px_0_32px_rgba(0,0,0,0.22)] ring-1 ring-black/[0.10] dark:ring-white/[0.10] flex flex-col min-h-0 h-full"
-              style={{
-                opacity: smHovered ? 1 : 0,
-                transition: 'opacity 200ms ease',
-                pointerEvents: smHovered ? 'auto' : 'none'
-              }}
-            >
-              <StageManagerStrip
-                roomId={activeTask.parentId ?? null}
-                activeId={activeTask.id}
-              />
-            </div>
-          </div>
-
           {panPing && (
             <div
               className="absolute pointer-events-none z-[200]"
@@ -2153,9 +2100,6 @@ export default function Canvas(): JSX.Element {
           )}
           {/* Minimap chrome overlay — draggable icon in BR corner, expands on click */}
           <CanvasMinimapOverlay />
-
-          {/* Widget dock — hover-expand strip at bottom center showing all desk items */}
-          <CanvasWidgetDock />
 
           {/* Marquee selection box — screen-space projection of the canvas-space
               rubber-band rect, so the marching ants stay 1px crisp at any zoom. */}
