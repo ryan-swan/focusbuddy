@@ -343,12 +343,10 @@ export default function LinkOverlay({ ghost }: Props): JSX.Element | null {
   }
 
   const isDark = document.documentElement.classList.contains('dark')
-  const isMaterialDesk = document.documentElement.classList.contains('material-desk')
-  // String colors — richer + more visible on the wood desk theme where the dark
-  // background provides maximum contrast. Standard dark/light variants for other themes.
-  const cordColor = isMaterialDesk ? '#C4954A' : isDark ? '#9B7448' : '#A07848'
-  const cordShadowColor = isMaterialDesk ? '#3B1A04' : '#5A2E08'
-  const highlightColor = isMaterialDesk ? '#F0D098' : isDark ? '#D4BC96' : '#D4B882'
+  // String colors — warm amber linen, slightly richer in dark mode.
+  const cordColor = isDark ? '#9B7448' : '#A07848'
+  const cordShadowColor = '#5A2E08'
+  const highlightColor = isDark ? '#D4BC96' : '#D4B882'
 
   const selectedLink = selectedLinkId ? links.find((l) => l.id === selectedLinkId) ?? null : null
 
@@ -415,20 +413,6 @@ export default function LinkOverlay({ ghost }: Props): JSX.Element | null {
               as a physical object hanging above the canvas surface. */}
           <filter id="fb-string-shadow" x="-10%" y="-40%" width="120%" height="240%">
             <feDropShadow dx="0" dy="3" stdDeviation="2.5" floodColor="#3B1A06" floodOpacity="0.45" />
-          </filter>
-          {/* Fibrous twine texture — feTurbulence noise composited as a multiply
-              overlay gives the cord a woven/braided look without image assets.
-              Applied to the base strand only so the highlight stays clean. */}
-          <filter id="fb-string-texture" x="-5%" y="-80%" width="110%" height="260%" colorInterpolationFilters="sRGB">
-            <feTurbulence type="fractalNoise" baseFrequency="0.015 0.75" numOctaves="3" seed="7" result="noise" />
-            <feColorMatrix type="matrix" in="noise"
-              values="0 0 0 0 0.55
-                      0 0 0 0 0.32
-                      0 0 0 0 0.08
-                      0 0 0 0.55 0"
-              result="tinted-noise" />
-            <feBlend in="SourceGraphic" in2="tinted-noise" mode="multiply" result="blended" />
-            <feDropShadow dx="0" dy="3" stdDeviation="2.5" floodColor="#2A1004" floodOpacity="0.55" />
           </filter>
         </defs>
         {segments.map((seg) => {
@@ -545,7 +529,7 @@ export default function LinkOverlay({ ghost }: Props): JSX.Element | null {
                     strokeLinecap="round"
                     style={{ transition: 'stroke-opacity 150ms ease, stroke-width 150ms ease' }}
                   />
-                  {/* Base cord — warm amber linen with fibrous texture on desk theme */}
+                  {/* Base cord — warm amber linen */}
                   <path
                     d={d}
                     fill="none"
@@ -553,7 +537,7 @@ export default function LinkOverlay({ ghost }: Props): JSX.Element | null {
                     strokeOpacity={isSelected ? 0.95 : isHovered ? 0.85 : 0.72}
                     strokeWidth={isSelected ? 4 : isHovered ? 4 : 3}
                     strokeLinecap="round"
-                    filter={isMaterialDesk ? 'url(#fb-string-texture)' : 'url(#fb-string-shadow)'}
+                    filter="url(#fb-string-shadow)"
                     style={{ transition: 'stroke-opacity 150ms ease, stroke-width 150ms ease' }}
                   />
                   {/* Twist pattern — alternating darker dashes simulate the over/under
@@ -633,7 +617,7 @@ export default function LinkOverlay({ ghost }: Props): JSX.Element | null {
                       <circle
                         cx={pt.cx} cy={pt.cy}
                         r={isSelected ? 5 : 4}
-                        fill={isMaterialDesk ? '#C8863A' : isDark ? '#9B6830' : '#A07030'}
+                        fill={isDark ? '#9B6830' : '#A07030'}
                         fillOpacity={isSelected ? 1 : isHovered ? 0.90 : 0.75}
                       />
                       {/* Pin highlight — specular glint on top-left */}
