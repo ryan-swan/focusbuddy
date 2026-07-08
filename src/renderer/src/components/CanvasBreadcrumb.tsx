@@ -20,6 +20,10 @@ interface Props {
 // Stage Manager dropdown logic:
 //   Hover current desk  → roomId = current.parentId  → shows sibling desks in same room
 //   Hover ancestor room → roomId = ancestor.parentId → shows sibling rooms (NOT children)
+//
+// The dropdown is positioned centered UNDER the specific segment being hovered,
+// not at the left edge of the pill. This is achieved by measuring each segment's
+// center via getBoundingClientRect() relative to the outer wrapper at hover time.
 export default function CanvasBreadcrumb({
   activeTask,
   nodes,
@@ -29,9 +33,15 @@ export default function CanvasBreadcrumb({
   fromMindmap
 }: Props): JSX.Element {
   const [hovered, setHovered] = useState(false)
-  // undefined = closed. When open: roomId (string | null) + activeId to pass to StageManagerStrip.
-  const [dropdown, setDropdown] = useState<{ roomId: string | null; activeId: string } | null>(null)
+  const [dropdown, setDropdown] = useState<{
+    roomId: string | null
+    activeId: string
+    // Horizontal center of the hovered segment, in px relative to the outer wrapper.
+    // Used to position the dropdown panel directly below the segment.
+    x: number
+  } | null>(null)
   const leaveTimer = useRef<number | null>(null)
+  const wrapperRef = useRef<HTMLDivElement>(null)
 
   const chain = useMemo(() => {
     const byId = new Map(nodes.map((n) => [n.id, n]))
@@ -49,20 +59,37 @@ export default function CanvasBreadcrumb({
   const current = chain[chain.length - 1] ?? activeTask
   const hasAncestors = ancestors.length > 0
 
-  function openDropdown(roomId: string | null, activeId: string): void {
+  function openDropdownAt(
+    e: React.MouseEvent<HTMLElement>,
+    roomId: string | null,
+    activeId: string
+  ): void {
     if (leaveTimer.current) {
       clearTimeout(leaveTimer.current)
       leaveTimer.current = null
     }
-    setDropdown({ roomId, activeId })
+    if (wrapperRef.current) {
+      const wrapperRect = wrapperRef.current.getBoundingClientRect()
+      const targetRect = e.currentTarget.getBoundingClientRect()
+      // Center of the hovered element relative to the outer wrapper left edge
+      const x = targetRect.left - wrapperRect.left + targetRect.width / 2
+      setDropdown({ roomId, activeId, x })
+    }
   }
 
   function scheduleClose(): void {
     leaveTimer.current = window.setTimeout(() => setDropdown(null), 320)
   }
 
+  function cancelClose(): void {
+    if (leaveTimer.current) {
+      clearTimeout(leaveTimer.current)
+      leaveTimer.current = null
+    }
+  }
+
   return (
-    <div data-testid="canvas-breadcrumb" className="relative">
+    <div ref={wrapperRef} data-testid="canvas-breadcrumb" className="relative">
       <div
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
@@ -95,7 +122,7 @@ export default function CanvasBreadcrumb({
                   <span
                     key={n.id}
                     className="inline-flex items-center gap-0.5 shrink-0"
-                    onMouseEnter={() => openDropdown(n.parentId ?? null, n.id)}
+                    onMouseEnter={(e) => openDropdownAt(e, n.parentId ?? null, n.id)}
                     onMouseLeave={scheduleClose}
                   >
                     <Icon name="chevron_right" size={13} className="text-[var(--ink-30)]" />
@@ -104,7 +131,11 @@ export default function CanvasBreadcrumb({
                       className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[var(--ink-60)] hover:bg-[var(--surface-sunken)] hover:text-[var(--ink-100)] max-w-[160px] transition-colors whitespace-nowrap"
                       title={isFolder ? `Reveal "${n.title}" in sidebar` : `Open "${n.title}"`}
                     >
-                      <Icon name={isFolder ? 'folder' : 'task_alt'} size={11} className="text-[var(--ink-40)] shrink-0" />
+                      <Icon
+                        name={isFolder ? 'folder' : 'task_alt'}
+                        size={11}
+                        className="text-[var(--ink-40)] shrink-0"
+                      />
                       <span className="truncate">{n.title || '(untitled)'}</span>
                     </button>
                   </span>
@@ -136,7 +167,7 @@ export default function CanvasBreadcrumb({
         {/* Current item — hovering shows siblings (desks in same room) */}
         <span
           className="inline-flex items-center gap-0.5 shrink-0"
-          onMouseEnter={() => openDropdown(current.parentId ?? null, current.id)}
+          onMouseEnter={(e) => openDropdownAt(e, current.parentId ?? null, current.id)}
           onMouseLeave={scheduleClose}
         >
           <Icon name="chevron_right" size={13} className="text-[var(--ink-30)]" />
@@ -152,7 +183,7 @@ export default function CanvasBreadcrumb({
         </span>
       </div>
 
-      {/* Stage Manager dropdown — falls down from the breadcrumb pill */}
+      {/* Stage Manager dropdown — centered under the specific hovered segment */}
       <AnimatePresence>
         {dropdown && (
           <motion.div
@@ -161,13 +192,12 @@ export default function CanvasBreadcrumb({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -6, scale: 0.97 }}
             transition={{ duration: 0.22, ease: [0.34, 1.2, 0.64, 1] }}
-            className="absolute top-full left-0 mt-2 w-[172px] max-h-[360px] rounded-2xl overflow-hidden bg-[var(--surface-raised)] border border-[var(--edge-soft)] shadow-[0_8px_40px_rgba(0,0,0,0.28)] ring-1 ring-black/[0.10] dark:ring-white/[0.10] z-[60] flex flex-col"
-            onMouseEnter={() => {
-              if (leaveTimer.current) {
-                clearTimeout(leaveTimer.current)
-                leaveTimer.current = null
-              }
+            className="absolute top-full mt-2 w-[172px] max-h-[360px] rounded-2xl overflow-hidden bg-[var(--surface-raised)] border border-[var(--edge-soft)] shadow-[0_8px_40px_rgba(0,0,0,0.28)] ring-1 ring-black/[0.10] dark:ring-white/[0.10] z-[60] flex flex-col"
+            style={{
+              left: dropdown.x,
+              transform: 'translateX(-50%)'
             }}
+            onMouseEnter={cancelClose}
             onMouseLeave={scheduleClose}
           >
             <StageManagerStrip
