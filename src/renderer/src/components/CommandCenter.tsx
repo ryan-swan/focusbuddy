@@ -693,7 +693,7 @@ export default function CommandCenter({
 
         {/* Collapsed anchor — search pill always visible */}
         <div
-          className="fb-glass-chrome rounded-full ring-1 ring-black/[0.07] dark:ring-white/[0.07] shadow-lg flex items-center px-1 py-1"
+          className="flex items-center px-1 py-1"
           role="toolbar"
           aria-label="Quick actions"
         >
