@@ -136,3 +136,54 @@ flow continues to work.
 - `scripts/verify-release-assets.sh [version]` — the standalone completeness gate
   used by `npm run release:verify`. Runs on macOS and Linux/CI (uses `openssl`).
   Version defaults to `package.json`.
+
+## Notarised macOS builds (Developer ID) — the real fix for "won't open on download"
+
+An ad-hoc-signed app is rejected by Gatekeeper on modern macOS (`spctl -a` →
+rejected), so a freshly-downloaded copy will not open without the user manually
+stripping quarantine / using "Open Anyway". The permanent fix is to sign with an
+Apple **Developer ID Application** cert and **notarise** with Apple. The build is
+already wired for this — it switches on automatically when the credentials are
+present in the environment (see electron-builder.cjs), and falls back to ad-hoc
+when they are not, so credential-less builds are unchanged.
+
+Credentials required (from the Apple Developer account):
+- A "Developer ID Application" certificate installed in the login keychain (or
+  passed as a base64 `.p12` via `CSC_LINK` + `CSC_KEY_PASSWORD`).
+- `APPLE_ID` — the Apple account email.
+- `APPLE_APP_SPECIFIC_PASSWORD` — an app-specific password (appleid.apple.com →
+  Sign-In and Security → App-Specific Passwords), NOT the account password.
+- `APPLE_TEAM_ID` — the 10-char team id.
+
+Cut a notarised mac build (produces a notarised `.zip` for auto-update AND a
+`.dmg` for first-download install):
+
+```bash
+export APPLE_ID=... APPLE_APP_SPECIFIC_PASSWORD=... APPLE_TEAM_ID=...
+VITE_USE_REMOTE_SIGNAL=true \
+VITE_SIGNAL_HTTP_URL=https://focusbuddy-signal.fly.dev \
+VITE_SIGNAL_WS_URL=wss://focusbuddy-signal.fly.dev/ws \
+VITE_VIEWER_URL=https://focusbuddy-viewer.vercel.app \
+  npm run dist:mac:signed        # zip + blockmap + latest-mac.yml + dmg, all notarised
+```
+
+Then attach the full mac set as usual (`npm run release:mac`) AND upload the dmg
+to the same release so new users can download-and-double-click:
+
+```bash
+gh release upload vX.Y.Z release/Haptyx-X.Y.Z-mac-arm64.dmg --clobber
+```
+
+Verify it actually notarised before shipping (this is the equivalent of the
+release gate for signing — do not skip):
+
+```bash
+spctl -a -vvv "release/mac-arm64/PlexiDesk.app"   # must say: accepted, source=Notarized Developer ID
+codesign -dvv "release/mac-arm64/PlexiDesk.app" 2>&1 | grep -i Signature   # must NOT say adhoc
+```
+
+Distribute the **.dmg** as the download link on the landing page. The .zip stays
+the auto-update artifact (electron-updater reads it via latest-mac.yml); the .dmg
+is the human install. Shipping a raw `.app`-in-`.zip` as the download is what
+corrupts the signature on browser download + Archive Utility unzip — the dmg
+avoids that.

@@ -17,6 +17,7 @@
     "rebuild": "electron-builder install-app-deps",
     "dist": "npm run build && electron-builder --mac --publish never",
     "dist:zip": "npm run build && electron-builder --mac zip --publish never",
+    "dist:mac:signed": "npm run build && electron-builder --mac --publish never",
     "dev:office": "PLEXI_APP=office node scripts/dev.cjs dev",
     "dev:preview": "PLEXI_APP=preview3 node scripts/dev.cjs dev",
     "dist:preview": "npm run build && electron-builder --mac zip --publish never --config electron-builder.plexi3preview.yml",
