@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Icon from '../../Icon'
 import { useMessagingStore } from '../../../stores/messaging'
-import { uploadAttachment, attachmentKindForMime, type MessageAttachment } from '../../../lib/messagingClient'
+import { uploadAttachment, attachmentKindForMime, composeIntentDraft, type MessageAttachment } from '../../../lib/messagingClient'
 import { EmojiPicker } from './EmojiPicker'
 import { GifPicker } from './GifPicker'
 import { launchMeeting } from '../../../lib/startMeeting'
@@ -74,6 +74,27 @@ export function ChatComposer({
   const [recording, setRecording] = useState(false)
   const [showEmoji, setShowEmoji] = useState(false)
   const [showGif, setShowGif] = useState(false)
+  const [clarifying, setClarifying] = useState(false)
+  // Holds the pre-clarify draft so the writer can revert a rewrite in one tap.
+  const [preClarify, setPreClarify] = useState<string | null>(null)
+
+  async function onClarify(): Promise<void> {
+    const body = draft.trim()
+    if (!body || clarifying) return
+    if (preClarify !== null) {
+      // Toggle back to the original.
+      setDraft(preClarify)
+      setPreClarify(null)
+      return
+    }
+    setClarifying(true)
+    const res = await composeIntentDraft(token, conversationId, body)
+    setClarifying(false)
+    if (res.text && res.text.trim() && res.text.trim() !== body) {
+      setPreClarify(body)
+      setDraft(res.text.trim())
+    }
+  }
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const recorderRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<Blob[]>([])
@@ -310,6 +331,17 @@ export function ChatComposer({
         >
           <Icon name="videocam" size={16} />
         </button>
+        {draft.trim().length > 0 && (
+          <button
+            onClick={() => void onClarify()}
+            disabled={clarifying}
+            className={`icon-btn shrink-0 ${preClarify !== null ? 'text-accent' : ''}`}
+            title={preClarify !== null ? 'Revert to your original wording' : 'Clarify this draft before sending'}
+            data-testid="composer-clarify"
+          >
+            <Icon name={clarifying ? 'hourglass_empty' : preClarify !== null ? 'undo' : 'auto_fix_high'} size={16} />
+          </button>
+        )}
         {mentionCandidates.length > 0 && (
           <div
             className="absolute bottom-full mb-1 left-0 z-40 min-w-[180px] rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-lg py-1"
@@ -341,6 +373,7 @@ export function ChatComposer({
           value={draft}
           onChange={(e) => {
             setDraft(e.target.value)
+            setPreClarify(null)
             onTyping()
           }}
           onKeyDown={(e) => {

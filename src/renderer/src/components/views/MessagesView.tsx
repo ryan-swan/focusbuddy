@@ -24,6 +24,7 @@ import {
   listBotRoles,
   createBotRole,
   deleteBotRole,
+  translateMessage,
   type ChannelSchedule,
   type RecallResult,
   type PulseItem,
@@ -185,7 +186,8 @@ function MessageRow({
   onEdit,
   onDelete,
   onTogglePin,
-  pinned
+  pinned,
+  translateLang
 }: {
   m: ChatMessage
   mine: boolean
@@ -196,15 +198,35 @@ function MessageRow({
   onDelete?: () => void
   onTogglePin?: () => void
   pinned?: boolean
+  translateLang?: string
 }): JSX.Element {
   const reactions = m.reactions ?? []
   const replyCount = m.replyCount ?? 0
   const deleted = !!m.deletedAt
   const consumeProposal = useMessagingStore((s) => s.consumeProposal)
+  const token = useMessagingStore((s) => s.token)
   const proposals = !deleted ? m.proposals ?? [] : []
   const [menuOpen, setMenuOpen] = useState(false)
   const [editing, setEditing] = useState(false)
   const [editText, setEditText] = useState(m.body)
+  const [translated, setTranslated] = useState<string | null>(null)
+  const [showOriginal, setShowOriginal] = useState(false)
+  const [translating, setTranslating] = useState(false)
+
+  async function onTranslate(): Promise<void> {
+    if (!token) return
+    if (translated) {
+      setShowOriginal((v) => !v)
+      return
+    }
+    setTranslating(true)
+    const r = await translateMessage(token, m.conversationId, m.id, translateLang || 'English')
+    setTranslating(false)
+    if (r.text) {
+      setTranslated(r.text)
+      setShowOriginal(false)
+    }
+  }
   return (
     <div
       id={`msg-${m.id}`}
@@ -295,16 +317,38 @@ function MessageRow({
             <>
               {m.body && (
                 <div className="whitespace-pre-wrap break-words">
-                  <MentionBody m={m} />
+                  {translated && !showOriginal ? translated : <MentionBody m={m} />}
                 </div>
+              )}
+              {translated && (
+                <button
+                  onClick={() => setShowOriginal((v) => !v)}
+                  className={`mt-0.5 text-[10px] ${mine ? 'text-white/70' : 'text-[var(--ink-50)]'} hover:underline`}
+                  data-testid={`msg-translate-toggle-${m.id}`}
+                >
+                  {showOriginal ? `Show ${translateLang || 'translation'}` : 'Show original'}
+                </button>
               )}
               <AttachmentView m={m} mine={mine} />
             </>
           )}
           {!editing && (
-            <div className={`text-[9px] mt-0.5 ${deleted ? 'text-[var(--ink-40)]' : mine ? 'text-white/70' : 'text-stone-400'}`}>
-              {fmtTime(m.createdAt)}
-              {!deleted && m.editedAt ? ' · edited' : ''}
+            <div className={`text-[9px] mt-0.5 flex items-center gap-1.5 ${deleted ? 'text-[var(--ink-40)]' : mine ? 'text-white/70' : 'text-stone-400'}`}>
+              <span>
+                {fmtTime(m.createdAt)}
+                {!deleted && m.editedAt ? ' · edited' : ''}
+              </span>
+              {!deleted && m.body && !translated && (
+                <button
+                  onClick={() => void onTranslate()}
+                  disabled={translating}
+                  className={`opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity inline-flex items-center gap-0.5 ${mine ? 'text-white/70' : 'text-stone-400'} hover:underline disabled:opacity-40`}
+                  title={`Translate to ${translateLang || 'English'}`}
+                  data-testid={`msg-translate-${m.id}`}
+                >
+                  <Icon name="translate" size={11} /> {translating ? '…' : 'Translate'}
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -429,6 +473,12 @@ export default function MessagesView(): JSX.Element {
   const [showRecall, setShowRecall] = useState(false)
   const [showPulse, setShowPulse] = useState(false)
   const [showBriefing, setShowBriefing] = useState(false)
+  const [translateLang, setTranslateLang] = useState<string>(
+    () => localStorage.getItem('plexi-translate-lang') || 'English'
+  )
+  useEffect(() => {
+    localStorage.setItem('plexi-translate-lang', translateLang)
+  }, [translateLang])
   const [addMemberHandle, setAddMemberHandle] = useState('')
   const [memberError, setMemberError] = useState<string | null>(null)
   const [searching, setSearching] = useState(false)
@@ -803,6 +853,29 @@ export default function MessagesView(): JSX.Element {
                   <Icon name="groups" size={15} /> Meet
                 </button>
                 {activeId && (
+                  <select
+                    value={translateLang}
+                    onChange={(e) => setTranslateLang(e.target.value)}
+                    title="Translate messages to"
+                    data-testid="messages-translate-lang"
+                    className="h-8 rounded-lg border border-[var(--edge-soft)] bg-transparent text-[12px] text-[var(--ink-70)] px-1.5 hover:bg-[var(--surface-sunken)]"
+                  >
+                    {['English', 'Spanish', 'French', 'German', 'Portuguese', 'Italian', 'Chinese', 'Japanese', 'Korean', 'Hindi', 'Arabic']
+                      .concat(
+                        ['English', 'Spanish', 'French', 'German', 'Portuguese', 'Italian', 'Chinese', 'Japanese', 'Korean', 'Hindi', 'Arabic'].includes(
+                          translateLang
+                        )
+                          ? []
+                          : [translateLang]
+                      )
+                      .map((l) => (
+                        <option key={l} value={l}>
+                          {l}
+                        </option>
+                      ))}
+                  </select>
+                )}
+                {activeId && (
                   <button
                     onClick={() => setShowRecall(true)}
                     title="Catch up or ask this channel"
@@ -982,6 +1055,7 @@ export default function MessagesView(): JSX.Element {
                   m={m}
                   mine={m.fromAccount === account.id}
                   myId={account.id}
+                  translateLang={translateLang}
                   onReact={(emoji) => void react(m.id, emoji)}
                   onOpenThread={() => void openThread(m.id)}
                   onEdit={(b) => void editMessage(m.id, b)}
@@ -1125,14 +1199,27 @@ function ThreadPanel({
       <div className="flex-1 overflow-auto px-4 py-3 space-y-2">
         {parent && (
           <>
-            <MessageRow m={parent} mine={parent.fromAccount === myId} myId={myId} onReact={(e) => void react(parent.id, e)} />
+            <MessageRow
+              m={parent}
+              mine={parent.fromAccount === myId}
+              myId={myId}
+              translateLang={localStorage.getItem('plexi-translate-lang') || 'English'}
+              onReact={(e) => void react(parent.id, e)}
+            />
             <div className="text-[10px] uppercase tracking-wide text-stone-400 border-b border-stone-100 dark:border-stone-800/60 pb-1">
               {replies.length} {replies.length === 1 ? 'reply' : 'replies'}
             </div>
           </>
         )}
         {replies.map((m) => (
-          <MessageRow key={m.id} m={m} mine={m.fromAccount === myId} myId={myId} onReact={(e) => void react(m.id, e)} />
+          <MessageRow
+            key={m.id}
+            m={m}
+            mine={m.fromAccount === myId}
+            myId={myId}
+            translateLang={localStorage.getItem('plexi-translate-lang') || 'English'}
+            onReact={(e) => void react(m.id, e)}
+          />
         ))}
         <div ref={endRef} />
       </div>

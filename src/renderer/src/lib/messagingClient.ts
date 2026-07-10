@@ -645,6 +645,42 @@ export async function deleteBotRole(token: string, orgId: string, roleId: string
   return json?.ok ?? false
 }
 
+// PlexiChat 2100 — translate a message into your language (opt-in, cached by the
+// caller). Returns null text on no key or a failed call; the caller keeps the
+// original, never a fabricated translation.
+export async function translateMessage(
+  token: string,
+  conversationId: string,
+  messageId: string,
+  lang: string
+): Promise<{ available: boolean; text: string | null }> {
+  const json = await req<{ ok: boolean; available?: boolean; text?: string | null }>(
+    'POST',
+    `/conversations/${conversationId}/messages/${messageId}/translate`,
+    token,
+    { lang }
+  )
+  if (!json?.ok) return { available: false, text: null }
+  return { available: json.available ?? false, text: json.text ?? null }
+}
+
+// PlexiChat 2100 — intent composer: rewrite a draft to be clearer before sending.
+// Returns null text on no key or a failed call; the caller keeps the draft.
+export async function composeIntentDraft(
+  token: string,
+  conversationId: string,
+  draft: string
+): Promise<{ available: boolean; text: string | null }> {
+  const json = await req<{ ok: boolean; available?: boolean; text?: string | null }>(
+    'POST',
+    `/conversations/${conversationId}/intent`,
+    token,
+    { draft }
+  )
+  if (!json?.ok) return { available: false, text: null }
+  return { available: json.available ?? false, text: json.text ?? null }
+}
+
 export async function getUnreadTotal(token: string): Promise<number> {
   const json = await req<{ ok: boolean; count?: number }>('GET', '/messaging/unread', token)
   return json?.ok ? json.count ?? 0 : 0
