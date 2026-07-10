@@ -5,7 +5,7 @@ import { useAccountStore } from '../../stores/account'
 import { useCallStore } from '../../stores/call'
 import { useSignInPrompt } from '../../stores/signInPrompt'
 import type { ChatMessage, OrgChannel, SearchHit } from '../../lib/messagingClient'
-import { attachmentUrl } from '../../lib/messagingClient'
+import { attachmentUrl, getOrgAiKeyStatus, setOrgAiKey, clearOrgAiKey } from '../../lib/messagingClient'
 import { listOrgs, type OrgMembership } from '../../lib/orgsClient'
 import Icon from '../Icon'
 import { ChatComposer } from './chat/ChatComposer'
@@ -1018,6 +1018,119 @@ function ThreadPanel({
   )
 }
 
+// PlexiChat P3: an org admin can give the workspace's AI chat member (@plexi) an
+// Anthropic key so it can reply on the server. The key is write-only from here —
+// we only ever learn whether one is configured, never read it back. Honest states
+// throughout: if the server can't store keys we say so rather than pretending.
+function AiMemberConfig({ token, orgId }: { token: string; orgId: string }): JSX.Element | null {
+  const [status, setStatus] = useState<{ configured: boolean; serverSupported: boolean } | null>(null)
+  const [key, setKey] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState<string | null>(null)
+
+  useEffect(() => {
+    let alive = true
+    setStatus(null)
+    setKey('')
+    setMsg(null)
+    void (async () => {
+      const s = await getOrgAiKeyStatus(token, orgId)
+      if (alive) setStatus(s)
+    })()
+    return () => {
+      alive = false
+    }
+  }, [token, orgId])
+
+  if (!status) return null
+
+  async function onSave(): Promise<void> {
+    if (!key.trim()) return
+    setBusy(true)
+    setMsg(null)
+    const ok = await setOrgAiKey(token, orgId, key.trim())
+    setBusy(false)
+    if (ok) {
+      setKey('')
+      setStatus((s) => (s ? { ...s, configured: true } : s))
+      setMsg('Key saved. @plexi can now reply in this workspace.')
+    } else {
+      setMsg('Could not save the key.')
+    }
+  }
+
+  async function onRemove(): Promise<void> {
+    setBusy(true)
+    setMsg(null)
+    const ok = await clearOrgAiKey(token, orgId)
+    setBusy(false)
+    if (ok) {
+      setStatus((s) => (s ? { ...s, configured: false } : s))
+      setMsg('Key removed. @plexi will stay quiet until a new key is added.')
+    }
+  }
+
+  return (
+    <div className="px-4 py-3 border-t border-[var(--edge-soft)]" data-testid="ai-member-config">
+      <div className="flex items-center gap-1.5 mb-1.5">
+        <Icon name="sparkles" size={14} className="text-accent" />
+        <span className="text-[12px] font-semibold text-[var(--ink-100)]">AI member (@plexi)</span>
+        <span
+          className={`ml-auto text-[11px] ${status.configured ? 'text-emerald-500' : 'text-[var(--ink-50)]'}`}
+          data-testid="ai-member-status"
+        >
+          {status.configured ? 'Active' : 'Not configured'}
+        </span>
+      </div>
+      {!status.serverSupported ? (
+        <p className="text-[11px] text-[var(--ink-50)] leading-snug">
+          Server-side AI replies are not enabled on this workspace&apos;s server yet, so @plexi cannot reply. Once the
+          server is configured for it, add your key here.
+        </p>
+      ) : (
+        <>
+          <p className="text-[11px] text-[var(--ink-50)] leading-snug mb-1.5">
+            Paste your organisation&apos;s Anthropic API key. Mention @plexi in any channel and it replies as a member.
+            The key is stored encrypted and is never shown again.
+          </p>
+          <div className="flex gap-1.5">
+            <input
+              type="password"
+              value={key}
+              onChange={(e) => {
+                setKey(e.target.value)
+                setMsg(null)
+              }}
+              placeholder={status.configured ? 'Replace key (sk-ant-…)' : 'sk-ant-…'}
+              data-testid="ai-member-key-input"
+              className="flex-1 bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded px-2 py-1 text-[12px] text-[var(--ink-90)]"
+            />
+            <button
+              onClick={() => void onSave()}
+              disabled={!key.trim() || busy}
+              className="btn-primary px-3 py-1 text-[12px] disabled:opacity-40"
+              data-testid="ai-member-key-save"
+            >
+              Save
+            </button>
+            {status.configured && (
+              <button
+                onClick={() => void onRemove()}
+                disabled={busy}
+                className="px-3 py-1 rounded-lg border border-[var(--edge-soft)] text-[12px] text-[var(--ink-90)] hover:bg-[var(--surface-sunken)] disabled:opacity-40"
+                data-testid="ai-member-key-remove"
+              >
+                Remove
+              </button>
+            )}
+          </div>
+          {msg && <div className="text-[11px] text-[var(--ink-50)] mt-1">{msg}</div>}
+        </>
+      )}
+    </div>
+  )
+}
+
 // Browse the channels in your organization, join one, or create a new one.
 // Channels are org-scoped: only people in the same organization see and join them.
 function ChannelBrowser({ onClose }: { onClose: () => void }): JSX.Element {
@@ -1186,6 +1299,11 @@ function ChannelBrowser({ onClose }: { onClose: () => void }): JSX.Element {
             {err && <div className="text-[11px] text-red-500 mt-1">{err}</div>}
           </div>
         )}
+
+        {token && orgId && (() => {
+          const role = orgs.find((o) => o.id === orgId)?.role
+          return role === 'owner' || role === 'admin' ? <AiMemberConfig token={token} orgId={orgId} /> : null
+        })()}
       </div>
     </div>
   )

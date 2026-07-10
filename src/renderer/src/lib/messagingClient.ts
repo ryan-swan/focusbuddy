@@ -117,7 +117,7 @@ function urlFor(path: string): string {
 }
 
 async function req<T>(
-  method: 'GET' | 'POST' | 'DELETE' | 'PATCH',
+  method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH',
   path: string,
   token: string,
   body?: unknown
@@ -354,6 +354,34 @@ export async function createChannel(token: string, orgId: string, name: string):
 
 export async function joinChannel(token: string, conversationId: string): Promise<boolean> {
   const json = await req<{ ok: boolean }>('POST', `/conversations/${conversationId}/join`, token, {})
+  return json?.ok ?? false
+}
+
+// PlexiChat P3 (AI member): an org's Anthropic key so its @plexi chat member can
+// reply on the server. Admin-only server-side. The key itself is never returned;
+// only whether one is configured (and whether the server supports storing one).
+export interface OrgAiKeyStatus {
+  configured: boolean
+  serverSupported: boolean
+}
+
+export async function getOrgAiKeyStatus(token: string, orgId: string): Promise<OrgAiKeyStatus | null> {
+  const json = await req<{ ok: boolean; configured?: boolean; serverSupported?: boolean }>(
+    'GET',
+    `/orgs/${orgId}/ai-key`,
+    token
+  )
+  if (!json?.ok) return null
+  return { configured: !!json.configured, serverSupported: !!json.serverSupported }
+}
+
+export async function setOrgAiKey(token: string, orgId: string, key: string): Promise<boolean> {
+  const json = await req<{ ok: boolean }>('PUT', `/orgs/${orgId}/ai-key`, token, { key })
+  return json?.ok ?? false
+}
+
+export async function clearOrgAiKey(token: string, orgId: string): Promise<boolean> {
+  const json = await req<{ ok: boolean }>('DELETE', `/orgs/${orgId}/ai-key`, token)
   return json?.ok ?? false
 }
 
