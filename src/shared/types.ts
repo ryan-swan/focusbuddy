@@ -37,6 +37,7 @@ export type WidgetKind =
   | 'local-app-launcher'
   // New: rich data primitives
   | 'file' // unified file widget — type detected from MIME / extension
+  | 'drive' // a bound Files folder on the desk — lists it, opens it, saves into it
   | 'field' // single field (text, number, select, checkbox, etc.) on canvas
   | 'page' // Tiptap-based Notion-style document
   | 'table' // Notion/Airtable-style database with typed columns

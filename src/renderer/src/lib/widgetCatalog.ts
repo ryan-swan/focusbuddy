@@ -78,6 +78,17 @@ export const WIDGET_CATALOG: WidgetCatalogEntry[] = [
     isWebBased: false
   },
   {
+    kind: 'drive',
+    category: 'Files',
+    label: 'Drive (folder)',
+    icon: 'folder_open',
+    hint: 'A folder from your Files, pinned to this desk. Lists its contents, opens it in Files, and any file you drop or add saves straight into that folder.',
+    defaultWidth: 300,
+    defaultHeight: 260,
+    defaultContent: '',
+    isWebBased: false
+  },
+  {
     kind: 'field',
     category: 'Tools',
     label: 'Field',

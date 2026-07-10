@@ -7,6 +7,7 @@ import MarkdownWidget from './widgets/MarkdownWidget'
 import TaskLinkWidget from './widgets/TaskLinkWidget'
 import LocalAppLauncherWidget from './widgets/LocalAppLauncherWidget'
 import FileWidget from './widgets/FileWidget'
+import DriveWidget from './widgets/DriveWidget'
 import FieldWidget from './widgets/FieldWidget'
 import PageWidget from './widgets/PageWidget'
 import LivingDocWidget from './widgets/LivingDocWidget'
@@ -41,6 +42,8 @@ function renderInline(w: Widget): JSX.Element | null {
       return <LocalAppLauncherWidget widget={w} inline />
     case 'file':
       return <FileWidget widget={w} inline />
+    case 'drive':
+      return <DriveWidget widget={w} inline />
     case 'field':
       return <FieldWidget widget={w} inline />
     case 'page':
