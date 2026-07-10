@@ -14,7 +14,9 @@ import {
   createSchedule,
   setScheduleEnabled,
   deleteSchedule,
-  type ChannelSchedule
+  recallChannel,
+  type ChannelSchedule,
+  type RecallResult
 } from '../../lib/messagingClient'
 import { listOrgs, type OrgMembership } from '../../lib/orgsClient'
 import Icon from '../Icon'
@@ -190,7 +192,10 @@ function MessageRow({
   const [editing, setEditing] = useState(false)
   const [editText, setEditText] = useState(m.body)
   return (
-    <div className={`group flex items-center gap-1.5 ${mine ? 'justify-end' : 'justify-start'}`}>
+    <div
+      id={`msg-${m.id}`}
+      className={`group flex items-center gap-1.5 ${mine ? 'justify-end' : 'justify-start'} rounded-lg transition-colors`}
+    >
       {mine && !deleted && !editing && <ReactPicker onPick={onReact} />}
       {/* Own-message menu (edit / delete) */}
       {mine && !deleted && (onEdit || onDelete) && !editing && (
@@ -407,6 +412,7 @@ export default function MessagesView(): JSX.Element {
   const setVisibility = useMessagingStore((s) => s.setVisibility)
   const [showMembers, setShowMembers] = useState(false)
   const [showSchedules, setShowSchedules] = useState(false)
+  const [showRecall, setShowRecall] = useState(false)
   const [addMemberHandle, setAddMemberHandle] = useState('')
   const [memberError, setMemberError] = useState<string | null>(null)
   const [searching, setSearching] = useState(false)
@@ -603,6 +609,7 @@ export default function MessagesView(): JSX.Element {
         {showSchedules && activeId && (
           <SchedulesPanel conversationId={activeId} onClose={() => setShowSchedules(false)} />
         )}
+        {showRecall && activeId && <RecallPanel conversationId={activeId} onClose={() => setShowRecall(false)} />}
 
         {composingNew && (
           <div className="px-3 pb-2">
@@ -769,6 +776,16 @@ export default function MessagesView(): JSX.Element {
                 >
                   <Icon name="groups" size={15} /> Meet
                 </button>
+                {activeId && (
+                  <button
+                    onClick={() => setShowRecall(true)}
+                    title="Catch up or ask this channel"
+                    data-testid="messages-recall"
+                    className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border border-[var(--edge-soft)] text-[12.5px] text-[var(--ink-90)] hover:bg-[var(--surface-sunken)]"
+                  >
+                    <Icon name="bolt" size={15} /> Recall
+                  </button>
+                )}
                 {activeId && activeConv && activeConv.kind !== 'dm' && (
                   <button
                     onClick={() => setShowSchedules(true)}
@@ -1050,6 +1067,155 @@ function ThreadPanel({
         >
           <Icon name="send" size={14} />
         </button>
+      </div>
+    </div>
+  )
+}
+
+// Scroll a message into view and flash it, so a recall source citation links
+// back to the real message it came from.
+function jumpToMessage(messageId: string): void {
+  const el = document.getElementById(`msg-${messageId}`)
+  if (!el) return
+  el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  el.style.backgroundColor = 'rgb(var(--accent) / 0.14)'
+  window.setTimeout(() => {
+    el.style.backgroundColor = ''
+  }, 1600)
+}
+
+// PlexiChat 2100 — Channel Recall. The end of scroll-archaeology: catch up on what
+// changed since you last read, or ask the channel a question and get an answer
+// pulled from its real history with clickable source citations. Read-only and
+// private to you; nothing is posted to the channel. Honest states throughout:
+// when the workspace AI key is not set it says so instead of faking an answer.
+function RecallPanel({ conversationId, onClose }: { conversationId: string; onClose: () => void }): JSX.Element {
+  const token = useMessagingStore((s) => s.token)
+  const [catchup, setCatchup] = useState<RecallResult | null>(null)
+  const [question, setQuestion] = useState('')
+  const [asked, setAsked] = useState<RecallResult | null>(null)
+  const [askBusy, setAskBusy] = useState(false)
+
+  useEffect(() => {
+    let alive = true
+    setCatchup(null)
+    void (async () => {
+      if (!token) return
+      const r = await recallChannel(token, conversationId, 'catchup')
+      if (alive) setCatchup(r)
+    })()
+    return () => {
+      alive = false
+    }
+  }, [token, conversationId])
+
+  async function onAsk(): Promise<void> {
+    if (!token || !question.trim()) return
+    setAskBusy(true)
+    setAsked(null)
+    const r = await recallChannel(token, conversationId, 'ask', question.trim())
+    setAskBusy(false)
+    setAsked(r)
+  }
+
+  function unavailableNote(r: RecallResult): string | null {
+    if (r.available) return null
+    if (r.reason === 'no-key')
+      return 'Recall needs the workspace AI key. An admin can add it under Channels, AI member.'
+    if (r.reason === 'no-org') return 'Recall works in organisation channels, not personal DMs.'
+    return 'Recall is unavailable right now.'
+  }
+
+  function Result({ r, emptyText }: { r: RecallResult; emptyText: string }): JSX.Element {
+    const note = unavailableNote(r)
+    if (note) return <p className="text-[12px] text-[var(--ink-50)] leading-snug">{note}</p>
+    if (r.empty) return <p className="text-[12px] text-[var(--ink-50)]">{emptyText}</p>
+    if (!r.answer)
+      return <p className="text-[12px] text-[var(--ink-50)]">Could not generate that right now. Try again shortly.</p>
+    return (
+      <div>
+        <div className="text-[12.5px] text-[var(--ink-100)] whitespace-pre-wrap leading-snug">{r.answer}</div>
+        {r.sources.length > 0 && (
+          <div className="mt-2 space-y-1">
+            <div className="text-[10.5px] uppercase tracking-wide text-[var(--ink-40)]">Sources</div>
+            {r.sources.map((s) => (
+              <button
+                key={s.ref}
+                onClick={() => {
+                  jumpToMessage(s.messageId)
+                  onClose()
+                }}
+                className="w-full text-left flex gap-1.5 px-1.5 py-1 rounded hover:bg-[var(--surface-sunken)]"
+                data-testid={`recall-source-${s.ref}`}
+              >
+                <span className="text-[11px] text-accent shrink-0">[{s.ref}]</span>
+                <span className="min-w-0 text-[11px] text-[var(--ink-70)] truncate">
+                  <span className="text-[var(--ink-90)]">{s.fromName}:</span> {s.excerpt}
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-40 flex items-center justify-center bg-black/30"
+      onClick={onClose}
+      data-testid="recall-panel"
+    >
+      <div
+        className="w-[480px] max-h-[78vh] flex flex-col rounded-xl bg-[var(--surface-raised)] border border-[var(--edge-soft)] shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="px-4 py-3 border-b border-[var(--edge-soft)] flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-[var(--ink-100)] inline-flex items-center gap-1.5">
+            <Icon name="bolt" size={15} className="text-accent" /> Recall
+          </h2>
+          <button onClick={onClose} className="icon-btn" aria-label="Close" data-testid="recall-close">
+            <Icon name="close" size={15} />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-auto">
+          <div className="px-4 py-3 border-b border-[var(--edge-soft)]">
+            <div className="text-[11px] font-semibold text-[var(--ink-70)] mb-1.5">Since you last read</div>
+            {catchup === null ? (
+              <p className="text-[12px] text-[var(--ink-50)]">Reading the channel…</p>
+            ) : (
+              <Result r={catchup} emptyText="Nothing new since you last read." />
+            )}
+          </div>
+
+          <div className="px-4 py-3">
+            <div className="text-[11px] font-semibold text-[var(--ink-70)] mb-1.5">Ask this channel</div>
+            <div className="flex gap-1.5">
+              <input
+                value={question}
+                onChange={(e) => setQuestion(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && void onAsk()}
+                placeholder="e.g. what did we decide about the launch date?"
+                data-testid="recall-ask-input"
+                className="flex-1 bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded px-2 py-1 text-[12px] text-[var(--ink-90)]"
+              />
+              <button
+                onClick={() => void onAsk()}
+                disabled={!question.trim() || askBusy}
+                className="btn-primary px-3 py-1 text-[12px] disabled:opacity-40"
+                data-testid="recall-ask"
+              >
+                {askBusy ? '…' : 'Ask'}
+              </button>
+            </div>
+            {asked && (
+              <div className="mt-2">
+                <Result r={asked} emptyText="Nothing to answer from." />
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   )

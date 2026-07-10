@@ -443,6 +443,47 @@ export async function deleteSchedule(token: string, conversationId: string, sche
   return json?.ok ?? false
 }
 
+// PlexiChat 2100 Channel Recall: answer privately from the channel's own history,
+// citing source messages. Never posts to the channel. Honest availability: no org
+// key => available false, and a failed call => answer null, never a fabricated one.
+export interface RecallSource {
+  ref: number
+  messageId: string
+  fromName: string
+  excerpt: string
+}
+export interface RecallResult {
+  available: boolean
+  reason?: 'no-org' | 'no-key'
+  empty?: boolean
+  answer: string | null
+  sources: RecallSource[]
+}
+
+export async function recallChannel(
+  token: string,
+  conversationId: string,
+  mode: 'catchup' | 'ask',
+  question?: string
+): Promise<RecallResult> {
+  const json = await req<{
+    ok: boolean
+    available?: boolean
+    reason?: 'no-org' | 'no-key'
+    empty?: boolean
+    answer?: string | null
+    sources?: RecallSource[]
+  }>('POST', `/conversations/${conversationId}/recall`, token, { mode, question })
+  if (!json?.ok) return { available: false, answer: null, sources: [] }
+  return {
+    available: json.available ?? false,
+    reason: json.reason,
+    empty: json.empty,
+    answer: json.answer ?? null,
+    sources: json.sources ?? []
+  }
+}
+
 export async function getUnreadTotal(token: string): Promise<number> {
   const json = await req<{ ok: boolean; count?: number }>('GET', '/messaging/unread', token)
   return json?.ok ? json.count ?? 0 : 0
