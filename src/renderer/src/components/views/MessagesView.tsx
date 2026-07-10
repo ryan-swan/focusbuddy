@@ -9,6 +9,7 @@ import { attachmentUrl, getOrgAiKeyStatus, setOrgAiKey, clearOrgAiKey } from '..
 import { listOrgs, type OrgMembership } from '../../lib/orgsClient'
 import Icon from '../Icon'
 import { ChatComposer } from './chat/ChatComposer'
+import { ProposalCards } from '../ChatPanel'
 import { useViewStore } from '../../stores/view'
 import { useNodeStore } from '../../stores/nodes'
 import { useWidgetStore } from '../../stores/widgets'
@@ -173,6 +174,8 @@ function MessageRow({
   const reactions = m.reactions ?? []
   const replyCount = m.replyCount ?? 0
   const deleted = !!m.deletedAt
+  const consumeProposal = useMessagingStore((s) => s.consumeProposal)
+  const proposals = !deleted ? m.proposals ?? [] : []
   const [menuOpen, setMenuOpen] = useState(false)
   const [editing, setEditing] = useState(false)
   const [editText, setEditText] = useState(m.body)
@@ -296,6 +299,16 @@ function MessageRow({
                 </button>
               )
             })}
+          </div>
+        )}
+        {proposals.length > 0 && (
+          <div className="mt-1 w-full max-w-[420px]" data-testid={`chat-proposals-${m.id}`}>
+            <ProposalCards
+              proposals={proposals}
+              messageTs={m.createdAt}
+              activeTaskId={null}
+              onConsume={(pid) => consumeProposal(m.conversationId, m.id, pid)}
+            />
           </div>
         )}
         {onOpenThread &&

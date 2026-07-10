@@ -381,7 +381,10 @@ interface ProposalCardsProps {
   onConsume: (proposalId: string) => void
 }
 
-function ProposalCards({
+// Exported so PlexiChat can render the AI member's proposals as the same
+// confirm-before-apply cards used by the desk AI assistant. Reused as-is: the
+// apply / dependency-resolution / no-fakery-toast logic is shared, not forked.
+export function ProposalCards({
   proposals,
   activeTaskId,
   onConsume

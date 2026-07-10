@@ -1,4 +1,5 @@
 import { signalConfig } from './signalConfig'
+import type { ActionProposal } from '@shared/types'
 
 // REST client for the messaging / collaboration backend on the signal server.
 // Persistence + history go over REST; real-time delivery arrives over the
@@ -87,6 +88,9 @@ export interface ChatMessage {
   editedAt?: number | null
   // When the message was deleted (soft delete); body is blanked when set.
   deletedAt?: number | null
+  // PlexiChat P4: confirm-before-apply ActionProposals from the AI member, or
+  // null/absent for human messages. Rendered as cards under the message.
+  proposals?: ActionProposal[] | null
 }
 
 export interface OrgChannel {

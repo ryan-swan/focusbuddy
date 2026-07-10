@@ -173,6 +173,10 @@ interface MessagingStore {
   react: (messageId: string, emoji: string) => Promise<void>
   editMessage: (messageId: string, body: string) => Promise<boolean>
   deleteMessage: (messageId: string) => Promise<boolean>
+  // PlexiChat P4: drop one AI-proposal card from a message after it is applied or
+  // dismissed, so it does not linger. Local only; proposals are not persisted per
+  // user, they are a one-time offer on the message.
+  consumeProposal: (conversationId: string, messageId: string, proposalId: string) => void
   openThread: (parentId: string) => Promise<void>
   closeThread: () => void
   sendThreadReply: (parentId: string, body: string) => Promise<void>
@@ -459,6 +463,15 @@ export const useMessagingStore = create<MessagingStore>((set, get) => ({
     }))
     void get().refreshConversations()
     return true
+  },
+
+  consumeProposal: (conversationId, messageId, proposalId) => {
+    set((s) => ({
+      messagesByConv: mapMessage(s.messagesByConv, conversationId, messageId, (m) => ({
+        ...m,
+        proposals: (m.proposals ?? []).filter((p) => p.id !== proposalId)
+      }))
+    }))
   },
 
   openThread: async (parentId) => {
