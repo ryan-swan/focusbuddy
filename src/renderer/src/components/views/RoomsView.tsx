@@ -6,6 +6,7 @@ import { useDeskWidgets } from '../../lib/useDeskWidgets'
 import { formatRelativeTime } from '../../lib/changelog'
 import RoomThumb from '../RoomThumb'
 import Icon from '../Icon'
+import { promptText } from '../plexi/PromptDialog'
 import RoomsDesksIndex, { type IndexConfig } from './RoomsDesksIndex'
 
 // The All Rooms index. A Room is a folder node — a place desks live. Clicking a
@@ -167,6 +168,25 @@ export default function RoomsView(): JSX.Element {
     },
     actions: (r) => (
       <div className="flex items-center gap-1">
+        <button
+          onClick={(e) => {
+            e.stopPropagation()
+            void (async () => {
+              const next = await promptText({
+                title: 'Rename room',
+                label: 'Room name',
+                initial: r.title || '',
+                confirmLabel: 'Rename'
+              })
+              const trimmed = next?.trim()
+              if (trimmed && trimmed !== (r.title || '')) await update(r.id, { title: trimmed })
+            })()
+          }}
+          title="Rename room"
+          className="inline-flex items-center justify-center h-6 w-6 rounded-md bg-[var(--surface-raised)]/90 border border-[var(--edge-firm)] text-[var(--ink-60)] hover:text-[var(--ink-100)]"
+        >
+          <Icon name="edit" size={14} />
+        </button>
         <button
           onClick={(e) => {
             e.stopPropagation()

@@ -326,6 +326,10 @@ export default function Canvas(): JSX.Element {
   })
   const [, setNowTick] = useState(0) // for the running-task clock
   const [snoozeUntil, setSnoozeUntil] = useState<number>(0)
+  // Inline rename of the open desk from its header title (double-click or the
+  // pencil). Mirrors the widget-title rename in WidgetFrame.
+  const [deskTitleEditing, setDeskTitleEditing] = useState(false)
+  const [deskTitleDraft, setDeskTitleDraft] = useState('')
   const [showResume, setShowResume] = useState(false)
   const [showAISetup, setShowAISetup] = useState(false)
   // AI Builder: free-form "describe what you want" prompt that returns
@@ -2153,9 +2157,58 @@ export default function Canvas(): JSX.Element {
           className="px-4 py-2.5 border-b border-[color:var(--glass-chrome-border)] fb-glass-chrome flex flex-wrap items-center gap-x-2 gap-y-1.5"
         >
           <Icon name="task_alt" size={18} className="text-[var(--ink-70)] shrink-0" />
-          <h2 className="text-sm font-semibold text-[var(--ink-100)] truncate flex-1 min-w-[80px]">
-            {activeTask.title}
-          </h2>
+          {deskTitleEditing ? (
+            <input
+              autoFocus
+              data-testid="desk-title-input"
+              value={deskTitleDraft}
+              onChange={(e) => setDeskTitleDraft(e.target.value)}
+              onBlur={() => {
+                const next = deskTitleDraft.trim()
+                if (next && next !== (activeTask.title || '')) void updateNode(activeTask.id, { title: next })
+                setDeskTitleEditing(false)
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                  const next = deskTitleDraft.trim()
+                  if (next && next !== (activeTask.title || '')) void updateNode(activeTask.id, { title: next })
+                  setDeskTitleEditing(false)
+                } else if (e.key === 'Escape') {
+                  e.preventDefault()
+                  setDeskTitleEditing(false)
+                }
+              }}
+              placeholder="Desk name"
+              aria-label="Desk name"
+              className="text-sm font-semibold text-[var(--ink-100)] flex-1 min-w-[80px] bg-transparent border-b border-accent/60 outline-none"
+            />
+          ) : (
+            <h2
+              data-testid="desk-title"
+              onDoubleClick={() => {
+                setDeskTitleDraft(activeTask.title || '')
+                setDeskTitleEditing(true)
+              }}
+              title="Double-click to rename"
+              className="text-sm font-semibold text-[var(--ink-100)] truncate flex-1 min-w-[80px] cursor-text"
+            >
+              {activeTask.title}
+            </h2>
+          )}
+          {!deskTitleEditing && (
+            <button
+              onClick={() => {
+                setDeskTitleDraft(activeTask.title || '')
+                setDeskTitleEditing(true)
+              }}
+              className="icon-btn !h-6 !w-6 text-[var(--ink-40)] hover:text-accent shrink-0"
+              aria-label="Rename desk"
+              title="Rename desk"
+            >
+              <Icon name="edit" size={13} />
+            </button>
+          )}
           <div className="hidden md:flex items-center gap-3 text-[11px] text-[var(--ink-60)]">
             <span className="flex items-center gap-1" title="Priority">
               <Icon name="priority_high" size={14} />

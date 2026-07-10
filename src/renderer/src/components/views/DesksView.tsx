@@ -6,6 +6,7 @@ import { useDeskWidgets, realWidgetCount } from '../../lib/useDeskWidgets'
 import { formatRelativeTime } from '../../lib/changelog'
 import DeskMiniature from '../DeskMiniature'
 import Icon from '../Icon'
+import { promptText } from '../plexi/PromptDialog'
 import RoomsDesksIndex, { type IndexConfig } from './RoomsDesksIndex'
 
 // The All Desks index. A Desk is a task node (a canvas). Optionally scoped to a
@@ -33,6 +34,7 @@ export default function DesksView({ roomId }: { roomId?: string }): JSX.Element 
   const move = useNodeStore((s) => s.move)
   const setActive = useNodeStore((s) => s.setActive)
   const create = useNodeStore((s) => s.create)
+  const update = useNodeStore((s) => s.update)
   const goTask = useViewStore((s) => s.goTask)
   const goRooms = useViewStore((s) => s.goRooms)
 
@@ -171,6 +173,27 @@ export default function DesksView({ roomId }: { roomId?: string }): JSX.Element 
         }
       })()
     },
+    actions: (d) => (
+      <button
+        onClick={(e) => {
+          e.stopPropagation()
+          void (async () => {
+            const next = await promptText({
+              title: 'Rename desk',
+              label: 'Desk name',
+              initial: d.title || '',
+              confirmLabel: 'Rename'
+            })
+            const trimmed = next?.trim()
+            if (trimmed && trimmed !== (d.title || '')) await update(d.id, { title: trimmed })
+          })()
+        }}
+        title="Rename desk"
+        className="inline-flex items-center justify-center h-6 w-6 rounded-md bg-[var(--surface-raised)]/90 border border-[var(--edge-firm)] text-[var(--ink-60)] hover:text-[var(--ink-100)]"
+      >
+        <Icon name="edit" size={14} />
+      </button>
+    ),
     headerActions: roomId ? (
       <button
         onClick={() => goRooms()}
