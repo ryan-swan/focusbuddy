@@ -21,11 +21,15 @@ import {
   deletePulseItem,
   getBriefing,
   summarizeThread,
+  listBotRoles,
+  createBotRole,
+  deleteBotRole,
   type ChannelSchedule,
   type RecallResult,
   type PulseItem,
   type Briefing,
-  type ThreadSummaryResult
+  type ThreadSummaryResult,
+  type BotRole
 } from '../../lib/messagingClient'
 import { applyProposal } from '../../lib/actionExecutor'
 import { listOrgs, type OrgMembership } from '../../lib/orgsClient'
@@ -1785,6 +1789,118 @@ function SchedulesPanel({ conversationId, onClose }: { conversationId: string; o
   )
 }
 
+// PlexiChat 2100 named role-agents: an org admin can add extra AI teammates
+// beyond @plexi, each with its own @handle, name, and role. Mention one in any
+// channel to get a reply in that persona. Requires the org AI key to actually
+// reply (honest: it says so). Admin-gated by the caller.
+function BotRolesConfig({ token, orgId }: { token: string; orgId: string }): JSX.Element {
+  const [roles, setRoles] = useState<BotRole[] | null>(null)
+  const [handle, setHandle] = useState('')
+  const [name, setName] = useState('')
+  const [instructions, setInstructions] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+
+  async function refresh(): Promise<void> {
+    setRoles(await listBotRoles(token, orgId))
+  }
+  useEffect(() => {
+    void refresh()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, orgId])
+
+  async function onAdd(): Promise<void> {
+    if (!handle.trim() || !name.trim()) return
+    setBusy(true)
+    setErr(null)
+    const res = await createBotRole(token, orgId, {
+      handle: handle.trim(),
+      name: name.trim(),
+      instructions: instructions.trim()
+    })
+    setBusy(false)
+    if (res.ok) {
+      setHandle('')
+      setName('')
+      setInstructions('')
+      void refresh()
+    } else {
+      setErr(res.error)
+    }
+  }
+
+  return (
+    <div className="px-4 py-3 border-t border-[var(--edge-soft)]" data-testid="bot-roles-config">
+      <div className="flex items-center gap-1.5 mb-1.5">
+        <Icon name="smart_toy" size={14} className="text-accent" />
+        <span className="text-[12px] font-semibold text-[var(--ink-100)]">AI teammates</span>
+      </div>
+      <p className="text-[11px] text-[var(--ink-50)] leading-snug mb-1.5">
+        Add named AI members beyond @plexi. Mention one by its handle in any channel and it replies in its role.
+      </p>
+      {roles && roles.length > 0 && (
+        <div className="space-y-1 mb-1.5">
+          {roles.map((r) => (
+            <div key={r.id} className="flex items-center gap-2 text-[12px]" data-testid="bot-role-row">
+              <span className="text-accent">@{r.handle}</span>
+              <span className="text-[var(--ink-70)] truncate flex-1">{r.name}</span>
+              <button
+                onClick={async () => {
+                  await deleteBotRole(token, orgId, r.id)
+                  void refresh()
+                }}
+                className="text-[var(--ink-40)] hover:text-red-500"
+                title="Remove"
+                data-testid={`bot-role-delete-${r.id}`}
+              >
+                <Icon name="close" size={14} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+      <div className="flex gap-1.5">
+        <input
+          value={handle}
+          onChange={(e) => {
+            setHandle(e.target.value)
+            setErr(null)
+          }}
+          placeholder="handle"
+          data-testid="bot-role-handle"
+          className="w-24 bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded px-2 py-1 text-[12px] text-[var(--ink-90)]"
+        />
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Name"
+          data-testid="bot-role-name"
+          className="flex-1 bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded px-2 py-1 text-[12px] text-[var(--ink-90)]"
+        />
+      </div>
+      <textarea
+        value={instructions}
+        onChange={(e) => setInstructions(e.target.value)}
+        placeholder="What is this agent's role? (e.g. research questions and summarise findings)"
+        rows={2}
+        data-testid="bot-role-instructions"
+        className="w-full mt-1.5 bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded px-2 py-1 text-[12px] text-[var(--ink-90)] resize-none"
+      />
+      <div className="flex items-center gap-2 mt-1.5">
+        <button
+          onClick={() => void onAdd()}
+          disabled={!handle.trim() || !name.trim() || busy}
+          className="btn-primary px-3 py-1 text-[12px] disabled:opacity-40"
+          data-testid="bot-role-add"
+        >
+          Add agent
+        </button>
+        {err && <span className="text-[11px] text-red-500">{err}</span>}
+      </div>
+    </div>
+  )
+}
+
 // PlexiChat P3: an org admin can give the workspace's AI chat member (@plexi) an
 // Anthropic key so it can reply on the server. The key is write-only from here —
 // we only ever learn whether one is configured, never read it back. Honest states
@@ -2069,7 +2185,13 @@ function ChannelBrowser({ onClose }: { onClose: () => void }): JSX.Element {
 
         {token && orgId && (() => {
           const role = orgs.find((o) => o.id === orgId)?.role
-          return role === 'owner' || role === 'admin' ? <AiMemberConfig token={token} orgId={orgId} /> : null
+          if (role !== 'owner' && role !== 'admin') return null
+          return (
+            <>
+              <AiMemberConfig token={token} orgId={orgId} />
+              <BotRolesConfig token={token} orgId={orgId} />
+            </>
+          )
         })()}
       </div>
     </div>

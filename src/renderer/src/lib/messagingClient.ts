@@ -608,6 +608,43 @@ export async function summarizeThread(
   }
 }
 
+// PlexiChat 2100 named role-agents: extra AI teammates beyond the default @plexi,
+// each with its own @handle, name, and role instructions. Mention one to get a
+// reply in that persona. Admin-managed; dark without the org key.
+export interface BotRole {
+  id: string
+  accountId: string
+  handle: string
+  name: string
+  promptSuffix: string
+  createdAt: number
+}
+
+export async function listBotRoles(token: string, orgId: string): Promise<BotRole[]> {
+  const json = await req<{ ok: boolean; roles?: BotRole[] }>('GET', `/orgs/${orgId}/bot-roles`, token)
+  return json?.ok ? json.roles ?? [] : []
+}
+
+export async function createBotRole(
+  token: string,
+  orgId: string,
+  input: { handle: string; name: string; instructions: string }
+): Promise<{ ok: true; role: BotRole } | { ok: false; error: string }> {
+  const json = await req<{ ok: boolean; role?: BotRole; error?: string }>(
+    'POST',
+    `/orgs/${orgId}/bot-roles`,
+    token,
+    input
+  )
+  if (json?.ok && json.role) return { ok: true, role: json.role }
+  return { ok: false, error: json?.error ?? 'Could not create the agent.' }
+}
+
+export async function deleteBotRole(token: string, orgId: string, roleId: string): Promise<boolean> {
+  const json = await req<{ ok: boolean }>('DELETE', `/orgs/${orgId}/bot-roles/${roleId}`, token)
+  return json?.ok ?? false
+}
+
 export async function getUnreadTotal(token: string): Promise<number> {
   const json = await req<{ ok: boolean; count?: number }>('GET', '/messaging/unread', token)
   return json?.ok ? json.count ?? 0 : 0
