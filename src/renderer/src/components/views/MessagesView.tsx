@@ -156,7 +156,9 @@ function MessageRow({
   onReact,
   onOpenThread,
   onEdit,
-  onDelete
+  onDelete,
+  onTogglePin,
+  pinned
 }: {
   m: ChatMessage
   mine: boolean
@@ -165,6 +167,8 @@ function MessageRow({
   onOpenThread?: () => void
   onEdit?: (body: string) => void
   onDelete?: () => void
+  onTogglePin?: () => void
+  pinned?: boolean
 }): JSX.Element {
   const reactions = m.reactions ?? []
   const replyCount = m.replyCount ?? 0
@@ -312,6 +316,20 @@ function MessageRow({
               <Icon name="reply" size={12} /> Reply in thread
             </button>
           ))}
+        {onTogglePin && !deleted && (
+          <button
+            onClick={onTogglePin}
+            data-testid={`msg-pin-${m.id}`}
+            title={pinned ? 'Unpin message' : 'Pin message'}
+            className={`mt-1 ml-2 text-[11px] inline-flex items-center gap-1 transition-opacity hover:text-accent ${
+              pinned
+                ? 'text-accent'
+                : 'text-[var(--ink-50)] opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100'
+            }`}
+          >
+            <Icon name="keep" size={12} filled={pinned} /> {pinned ? 'Pinned' : 'Pin'}
+          </button>
+        )}
       </div>
       {!mine && <ReactPicker onPick={onReact} />}
     </div>
@@ -354,6 +372,10 @@ export default function MessagesView(): JSX.Element {
   const [error, setError] = useState<string | null>(null)
   const threadRef = useRef<HTMLDivElement | null>(null)
   const search = useMessagingStore((s) => s.search)
+  const pinsByConv = useMessagingStore((s) => s.pinsByConv)
+  const loadPins = useMessagingStore((s) => s.loadPins)
+  const pinMsg = useMessagingStore((s) => s.pin)
+  const unpinMsg = useMessagingStore((s) => s.unpin)
   const [searching, setSearching] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [searchHits, setSearchHits] = useState<SearchHit[]>([])
@@ -376,6 +398,13 @@ export default function MessagesView(): JSX.Element {
   }, [account, refresh])
 
   const messages = activeId ? messagesByConv[activeId] ?? [] : []
+  const pins = activeId ? pinsByConv[activeId] ?? [] : []
+  const pinnedIds = new Set(pins.map((p) => p.id))
+
+  // Load pinned messages whenever the open conversation changes.
+  useEffect(() => {
+    if (activeId) void loadPins(activeId)
+  }, [activeId, loadPins])
 
   // Keep the thread pinned to the newest message.
   useEffect(() => {
@@ -677,6 +706,36 @@ export default function MessagesView(): JSX.Element {
                 </button>
               </div>
             </div>
+            {pins.length > 0 && (
+              <div
+                className="shrink-0 border-b border-[var(--edge-soft)] bg-[var(--surface-sunken)]/60 px-4 py-1.5"
+                data-testid="pinned-bar"
+              >
+                <div className="text-[10px] uppercase tracking-[0.1em] text-[var(--ink-45)] mb-1 inline-flex items-center gap-1">
+                  <Icon name="keep" size={11} filled /> {pins.length} pinned
+                </div>
+                <div className="space-y-1">
+                  {pins.map((p) => (
+                    <div
+                      key={p.id}
+                      className="flex items-start gap-2 text-[11.5px] text-[var(--ink-80)]"
+                      data-testid={`pinned-item-${p.id}`}
+                    >
+                      <span className="flex-1 truncate">{p.body || '(attachment)'}</span>
+                      {activeId && (
+                        <button
+                          onClick={() => void unpinMsg(activeId, p.id)}
+                          title="Unpin"
+                          className="shrink-0 text-[var(--ink-40)] hover:text-accent"
+                        >
+                          <Icon name="close" size={12} />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
             <div ref={threadRef} className="flex-1 overflow-auto px-4 py-3 space-y-2">
               {messages.map((m) => (
                 <MessageRow
@@ -688,6 +747,15 @@ export default function MessagesView(): JSX.Element {
                   onOpenThread={() => void openThread(m.id)}
                   onEdit={(b) => void editMessage(m.id, b)}
                   onDelete={() => void deleteMessage(m.id)}
+                  pinned={pinnedIds.has(m.id)}
+                  onTogglePin={
+                    activeId
+                      ? () =>
+                          void (pinnedIds.has(m.id)
+                            ? unpinMsg(activeId, m.id)
+                            : pinMsg(activeId, m.id))
+                      : undefined
+                  }
                 />
               ))}
             </div>
