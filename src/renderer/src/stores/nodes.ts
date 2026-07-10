@@ -7,6 +7,7 @@ import { hapticSuccess } from '../lib/haptics'
 import { canCreateMore, limitFor } from '../lib/gating'
 import { useCapabilityStore } from './capabilities'
 import { promptUpgrade } from './upgradePrompt'
+import { useMessagingStore } from './messaging'
 
 // A "desk" (marketing) / "project" (sidebar) is a top-level folder. The
 // multiple_desks capability caps how many a tier may have. Thrown by
@@ -162,6 +163,13 @@ export const useNodeStore = create<NodeStore>((set, get) => ({
       nodes: get().nodes.filter((n) => !ids.includes(n.id)),
       activeTaskId: ids.includes(get().activeTaskId ?? '') ? null : get().activeTaskId
     })
+    // Best-effort: archive the deleted room/desk's chat channel (keeps history,
+    // hides it from lists). No-op if the object never had a channel.
+    if (target) {
+      void useMessagingStore
+        .getState()
+        .archiveObjectChannel(target.kind === 'folder' ? 'room' : 'desk', id)
+    }
     if (ids.length) {
       recordActionWithToast({
         label: `Delete ${target?.kind ?? 'item'}${target?.title ? ` “${target.title}”` : ''}`,

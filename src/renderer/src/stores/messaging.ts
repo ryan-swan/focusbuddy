@@ -19,6 +19,7 @@ import {
 import { usePresenceStore } from './presence'
 import { useAccountStore } from './account'
 import { useViewStore } from './view'
+import { useOrgStore, PERSONAL_ORG_ID } from './org'
 import { notifyExternal } from '../lib/notify'
 import { bodyMentionsHandle } from '../lib/mentions'
 import { personDisplayName } from '../lib/personName'
@@ -179,6 +180,15 @@ interface MessagingStore {
   browseChannels: (orgId: string) => Promise<api.OrgChannel[]>
   createChannel: (orgId: string, name: string) => Promise<{ ok: true; id: string } | { ok: false; error: string }>
   joinChannel: (conversationId: string) => Promise<void>
+  // Open (get-or-create) the chat channel bound to a Room/Desk/Document and jump to
+  // it. memberIds = the object's collaborators (the caller is added server-side).
+  openObjectChannel: (
+    objectKind: 'room' | 'desk' | 'document',
+    objectId: string,
+    title: string,
+    memberIds?: string[]
+  ) => Promise<void>
+  archiveObjectChannel: (objectKind: 'room' | 'desk' | 'document', objectId: string) => Promise<void>
   inviteContact: (
     email: string
   ) => Promise<{ ok: true; status: 'requested' | 'invited' } | { ok: false; error: string }>
@@ -494,6 +504,24 @@ export const useMessagingStore = create<MessagingStore>((set, get) => ({
     if (!ok) return
     await get().refreshConversations()
     await get().openConversation(conversationId)
+  },
+
+  openObjectChannel: async (objectKind, objectId, title, memberIds) => {
+    const { token } = get()
+    if (!token) return
+    const activeOrg = useOrgStore.getState().activeOrgId
+    const orgId = activeOrg && activeOrg !== PERSONAL_ORG_ID ? activeOrg : null
+    const id = await api.getOrCreateObjectChannel(token, { objectKind, objectId, orgId, memberIds, title })
+    if (!id) return
+    await get().refreshConversations()
+    await get().openConversation(id)
+  },
+
+  archiveObjectChannel: async (objectKind, objectId) => {
+    const { token } = get()
+    if (!token) return
+    await api.archiveObjectChannel(token, objectKind, objectId)
+    await get().refreshConversations()
   },
 
   inviteContact: async (email) => {

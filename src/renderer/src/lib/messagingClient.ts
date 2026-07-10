@@ -105,6 +105,9 @@ export interface ConversationSummary {
   unreadCount: number
   members: Array<{ accountId: string; handle: string | null; firstName?: string | null; lastName?: string | null }>
   lastMessage: ChatMessage | null
+  // Set when this channel is bound to a Room/Desk/Document (PlexiChat epic P1).
+  objectKind?: string | null
+  objectId?: string | null
 }
 
 function urlFor(path: string): string {
@@ -254,6 +257,20 @@ export async function removeReaction(
 export async function listOrgChannels(token: string, orgId: string): Promise<OrgChannel[]> {
   const json = await req<{ ok: boolean; channels?: OrgChannel[] }>('GET', `/orgs/${orgId}/channels`, token)
   return json?.ok ? json.channels ?? [] : []
+}
+
+// Get (or lazily create) the chat channel bound to a Room/Desk/Document.
+export async function getOrCreateObjectChannel(
+  token: string,
+  input: { objectKind: 'room' | 'desk' | 'document'; objectId: string; orgId: string | null; memberIds?: string[]; title: string }
+): Promise<string | null> {
+  const json = await req<{ ok: boolean; conversationId?: string }>('POST', '/conversations/object', token, input)
+  return json?.ok ? json.conversationId ?? null : null
+}
+
+// Soft-archive an object's channel when the object is deleted (best-effort).
+export async function archiveObjectChannel(token: string, objectKind: string, objectId: string): Promise<void> {
+  await req('POST', '/conversations/object/archive', token, { objectKind, objectId })
 }
 
 export async function createChannel(token: string, orgId: string, name: string): Promise<string | null> {

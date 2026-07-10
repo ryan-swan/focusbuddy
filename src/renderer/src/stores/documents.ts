@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import type { DocType, DocumentMeta, FbDocument } from '@shared/types'
 import { pullCloudDocs, pushCloudDoc, pushCloudDelete } from '../lib/cloudDocsSync'
 import { recordActionWithToast } from './actionHistory'
+import { useMessagingStore } from './messaging'
 
 // Documents store — the standalone office files (doc / sheet / slides). Holds
 // the list for the hub and the one open document for the editor. Body edits are
@@ -181,6 +182,8 @@ export const useDocumentsStore = create<DocumentsStore>((set, get) => ({
     await window.api.documents.delete(id)
     // No cloud delete here: the document is only in the local Trash. The cloud
     // copy is forgotten when (and only when) the user purges it.
+    // Best-effort archive of this doc's chat channel (un-archives if restored+reopened).
+    void useMessagingStore.getState().archiveObjectChannel('document', id)
     if (get().active?.id === id) set({ active: null })
     await Promise.all([get().refresh(), get().refreshTrashed()])
     recordActionWithToast({

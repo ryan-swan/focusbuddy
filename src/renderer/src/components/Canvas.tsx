@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { effectiveShortcutToKind } from '../lib/keymap'
 import { useNodeStore } from '../stores/nodes'
 import { useWidgetStore } from '../stores/widgets'
+import { useMessagingStore } from '../stores/messaging'
 import { useAiCommandBar } from '../stores/aiCommandBar'
 import { useConnectedAppsStore } from '../stores/connectedApps'
 import { CONNECTED_APP_DRAG_MIME } from './Sidebar'
@@ -236,6 +237,7 @@ export default function Canvas(): JSX.Element {
   const activeTaskId = useNodeStore((s) => s.activeTaskId)
   const nodes = useNodeStore((s) => s.nodes)
   const updateNode = useNodeStore((s) => s.update)
+  const openObjectChannel = useMessagingStore((s) => s.openObjectChannel)
   const setActiveTask = useNodeStore((s) => s.setActive)
   const expandFolder = useNodeStore((s) => s.expand)
   // Breadcrumb origin: if this task's canvas was opened by exploring a mind-map
@@ -2242,6 +2244,17 @@ export default function Canvas(): JSX.Element {
               <span>{fmtMin(remainingMin)}</span>
             </div>
           )}
+
+          {/* This desk's chat — opens (or creates) the channel bound to this desk. */}
+          <button
+            onClick={() => void openObjectChannel('desk', activeTask.id, activeTask.title || 'Desk')}
+            className="icon-btn !h-6 !w-6 text-[var(--ink-50)] hover:text-accent shrink-0"
+            aria-label="Open this desk's chat"
+            title="Chat about this desk"
+            data-testid="desk-chat-button"
+          >
+            <Icon name="forum" size={15} />
+          </button>
 
           {/* Zoom controls */}
           <div className="flex items-center gap-0.5 px-1 border border-[var(--edge-firm)] rounded">

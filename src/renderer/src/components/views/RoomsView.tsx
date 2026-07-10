@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import type { FbNode, Widget } from '@shared/types'
 import { useNodeStore } from '../../stores/nodes'
 import { useViewStore } from '../../stores/view'
+import { useMessagingStore } from '../../stores/messaging'
 import { useDeskWidgets } from '../../lib/useDeskWidgets'
 import { formatRelativeTime } from '../../lib/changelog'
 import RoomThumb from '../RoomThumb'
@@ -23,6 +24,7 @@ export default function RoomsView(): JSX.Element {
   const create = useNodeStore((s) => s.create)
   const update = useNodeStore((s) => s.update)
   const goDesks = useViewStore((s) => s.goDesks)
+  const openObjectChannel = useMessagingStore((s) => s.openObjectChannel)
 
   const rooms = useMemo(
     () => nodes.filter((n) => n.kind === 'folder' && !n.archived),
@@ -168,6 +170,16 @@ export default function RoomsView(): JSX.Element {
     },
     actions: (r) => (
       <div className="flex items-center gap-1">
+        <button
+          onClick={(e) => {
+            e.stopPropagation()
+            void openObjectChannel('room', r.id, r.title || 'Room')
+          }}
+          title="Chat about this room"
+          className="inline-flex items-center justify-center h-6 w-6 rounded-md bg-[var(--surface-raised)]/90 border border-[var(--edge-firm)] text-[var(--ink-60)] hover:text-[var(--ink-100)]"
+        >
+          <Icon name="forum" size={14} />
+        </button>
         <button
           onClick={(e) => {
             e.stopPropagation()
