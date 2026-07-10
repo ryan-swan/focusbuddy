@@ -189,6 +189,12 @@ interface MessagingStore {
     memberIds?: string[]
   ) => Promise<void>
   archiveObjectChannel: (objectKind: 'room' | 'desk' | 'document', objectId: string) => Promise<void>
+  // Slack-class polish (P6): search + pinned messages.
+  search: (query: string) => Promise<api.SearchHit[]>
+  pinsByConv: Record<string, ChatMessage[]>
+  loadPins: (conversationId: string) => Promise<void>
+  pin: (conversationId: string, messageId: string) => Promise<void>
+  unpin: (conversationId: string, messageId: string) => Promise<void>
   inviteContact: (
     email: string
   ) => Promise<{ ok: true; status: 'requested' | 'invited' } | { ok: false; error: string }>
@@ -207,6 +213,7 @@ export const useMessagingStore = create<MessagingStore>((set, get) => ({
   connected: false,
   typingByConv: {},
   threadsByParent: {},
+  pinsByConv: {},
   activeThreadId: null,
 
   connect: async (token) => {
@@ -316,6 +323,7 @@ export const useMessagingStore = create<MessagingStore>((set, get) => ({
       unreadTotal: 0,
       typingByConv: {},
       threadsByParent: {},
+      pinsByConv: {},
       activeThreadId: null
     })
   },
@@ -522,6 +530,33 @@ export const useMessagingStore = create<MessagingStore>((set, get) => ({
     if (!token) return
     await api.archiveObjectChannel(token, objectKind, objectId)
     await get().refreshConversations()
+  },
+
+  search: async (query) => {
+    const { token } = get()
+    if (!token || !query.trim()) return []
+    return api.searchMessages(token, query.trim())
+  },
+
+  loadPins: async (conversationId) => {
+    const { token } = get()
+    if (!token) return
+    const pins = await api.listPins(token, conversationId)
+    set({ pinsByConv: { ...get().pinsByConv, [conversationId]: pins } })
+  },
+
+  pin: async (conversationId, messageId) => {
+    const { token } = get()
+    if (!token) return
+    await api.pinMessage(token, conversationId, messageId)
+    await get().loadPins(conversationId)
+  },
+
+  unpin: async (conversationId, messageId) => {
+    const { token } = get()
+    if (!token) return
+    await api.unpinMessage(token, conversationId, messageId)
+    await get().loadPins(conversationId)
   },
 
   inviteContact: async (email) => {

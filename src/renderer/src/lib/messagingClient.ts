@@ -259,6 +259,33 @@ export async function listOrgChannels(token: string, orgId: string): Promise<Org
   return json?.ok ? json.channels ?? [] : []
 }
 
+export interface SearchHit {
+  messageId: string
+  conversationId: string
+  conversationTitle: string
+  body: string
+  fromAccount: string
+  createdAt: number
+}
+
+// Search messages across the account's conversations in the active org.
+export async function searchMessages(token: string, q: string): Promise<SearchHit[]> {
+  const json = await req<{ ok: boolean; hits?: SearchHit[] }>('GET', `/messages/search?q=${encodeURIComponent(q)}`, token)
+  return json?.ok ? json.hits ?? [] : []
+}
+
+// Pinned messages for a conversation.
+export async function listPins(token: string, conversationId: string): Promise<ChatMessage[]> {
+  const json = await req<{ ok: boolean; pins?: ChatMessage[] }>('GET', `/conversations/${conversationId}/pins`, token)
+  return json?.ok ? json.pins ?? [] : []
+}
+export async function pinMessage(token: string, conversationId: string, messageId: string): Promise<void> {
+  await req('POST', `/conversations/${conversationId}/messages/${messageId}/pin`, token, {})
+}
+export async function unpinMessage(token: string, conversationId: string, messageId: string): Promise<void> {
+  await req('DELETE', `/conversations/${conversationId}/messages/${messageId}/pin`, token)
+}
+
 // Get (or lazily create) the chat channel bound to a Room/Desk/Document.
 export async function getOrCreateObjectChannel(
   token: string,

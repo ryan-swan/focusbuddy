@@ -4,7 +4,7 @@ import { useMessagingStore } from '../../stores/messaging'
 import { useAccountStore } from '../../stores/account'
 import { useCallStore } from '../../stores/call'
 import { useSignInPrompt } from '../../stores/signInPrompt'
-import type { ChatMessage, OrgChannel } from '../../lib/messagingClient'
+import type { ChatMessage, OrgChannel, SearchHit } from '../../lib/messagingClient'
 import { attachmentUrl } from '../../lib/messagingClient'
 import { listOrgs, type OrgMembership } from '../../lib/orgsClient'
 import Icon from '../Icon'
@@ -353,6 +353,23 @@ export default function MessagesView(): JSX.Element {
   const [browsing, setBrowsing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const threadRef = useRef<HTMLDivElement | null>(null)
+  const search = useMessagingStore((s) => s.search)
+  const [searching, setSearching] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchHits, setSearchHits] = useState<SearchHit[]>([])
+
+  // Debounced message search across the account's conversations.
+  useEffect(() => {
+    const q = searchQuery.trim()
+    if (!q) {
+      setSearchHits([])
+      return
+    }
+    const t = window.setTimeout(() => {
+      void search(q).then(setSearchHits)
+    }, 250)
+    return () => window.clearTimeout(t)
+  }, [searchQuery, search])
 
   useEffect(() => {
     if (account) void refresh()
@@ -479,6 +496,17 @@ export default function MessagesView(): JSX.Element {
           <h1 className="text-sm font-semibold text-stone-900 dark:text-stone-100">Messages</h1>
           <div className="flex items-center gap-1">
             <button
+              onClick={() => {
+                setSearching((v) => !v)
+                setSearchQuery('')
+              }}
+              className="icon-btn"
+              title="Search messages"
+              data-testid="messages-search-toggle"
+            >
+              <Icon name="search" size={15} />
+            </button>
+            <button
               onClick={() => setBrowsing(true)}
               className="icon-btn"
               title="Browse and create channels"
@@ -518,8 +546,43 @@ export default function MessagesView(): JSX.Element {
           </div>
         )}
 
+        {searching && (
+          <div className="px-3 pb-2">
+            <input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search messages…"
+              autoFocus
+              data-testid="messages-search-input"
+              className="w-full bg-white dark:bg-stone-800 border border-stone-300 dark:border-stone-600 rounded px-2 py-1 text-[12px]"
+            />
+          </div>
+        )}
+
         <div className="flex-1 overflow-auto">
-          {conversations.length === 0 ? (
+          {searching && searchQuery.trim() ? (
+            searchHits.length === 0 ? (
+              <p className="text-[11px] text-stone-500 dark:text-stone-400 px-3 py-2">No matches.</p>
+            ) : (
+              searchHits.map((h) => (
+                <button
+                  key={h.messageId}
+                  onClick={() => {
+                    void open(h.conversationId)
+                    setSearching(false)
+                    setSearchQuery('')
+                  }}
+                  data-testid="search-hit"
+                  className="w-full text-left px-3 py-2 border-b border-stone-100 dark:border-stone-800/60 hover:bg-stone-100 dark:hover:bg-stone-800/50 transition-colors"
+                >
+                  <div className="text-[11px] font-medium text-stone-700 dark:text-stone-300 truncate">
+                    {h.conversationTitle}
+                  </div>
+                  <div className="text-[12px] text-stone-600 dark:text-stone-400 truncate">{h.body}</div>
+                </button>
+              ))
+            )
+          ) : conversations.length === 0 ? (
             <p className="text-[11px] text-stone-500 dark:text-stone-400 px-3 py-2 leading-snug">
               No conversations yet. Start one with someone&apos;s handle.
             </p>
