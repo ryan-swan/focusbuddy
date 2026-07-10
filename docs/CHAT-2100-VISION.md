@@ -56,34 +56,39 @@ Metaverse or spatial-presence theatre. Gamified streaks and confetti. Anything
 that adds a surface to monitor rather than removing work. Latency: a spinner
 kills the feeling of the future faster than any missing feature.
 
-## The build ladder
+## The build ladder — ALL SHIPPED
 
-Grounded in the authority's seam analysis. Each rung reuses the one below.
+Grounded in the authority's seam analysis. Each rung reuses the one below. The
+whole ladder is built, tested, and committed; every feature is dormant until the
+signal server is deployed and an org sets its Anthropic key, then all light up.
 
 1. **Channel Recall (SHIPPED).** Catch-me-up (what changed since you last read,
    as Decided / Open / Blocked / Needs you) and Ask-this-channel (answer from
    history with clickable source citations). User-invoked, private to the
-   requester, never posted to the channel. Reuses `getMessages` +
-   `getMessagesSince` + `getMemberLastRead` and a dedicated `composeChannelRecall`
-   that cites sources by number. Server: `src/ai/channelRecall.ts`, route
-   `POST /conversations/:id/recall`. Client: the Recall panel in `MessagesView`
-   with jump-to-source. Honest: no key means available:false, a failed call means
-   a null answer, never an invented one.
-2. **Meaning extraction.** Decisions / questions / action items surfaced as
-   structured, source-linked objects. Batched on a low-frequency tick (not per
-   message, for cost), stored in a `channel_extracts` table, shown in a channel
-   pulse panel. Action items can become P4 create-task proposals (confirm).
-3. **What-needs-me briefing.** Replaces the unread badge with a ranked "needs
-   you" digest. Mostly aggregation over (2) plus mentions plus pending proposal
-   cards; degrades honestly to the plain unread count when no key.
-4. **Self-summarizing threads.** A long thread collapses to a running one-line
-   summary in the parent timeline, using (2)'s extractor pointed at the thread.
-5. **Named role-agents as members.** Beyond one @plexi: multiple AI personas per
-   channel, each its own account row with a distinct prompt and scope, each
-   mentionable and bound to the same safe-proposal allowlist.
-
-Translation (per-message, opt-in, cached) and an intent-composer (clarify a draft
-before sending) are valuable but do not compound, so they slot in any time.
+   requester, never posted. `src/ai/channelRecall.ts`, `POST /conversations/:id/recall`,
+   Recall panel with jump-to-source.
+2. **Channel Pulse / meaning extraction (SHIPPED).** Decisions / questions /
+   action items surfaced as source-linked objects. On-demand refresh (not per
+   message, for cost), deduped, stored in `channel_extracts`, shown in a Pulse
+   panel; action items convert to confirm-gated create-task proposals.
+   `src/ai/channelExtract.ts`, `src/extracts.ts`, `/pulse` routes.
+3. **What-needs-me briefing (SHIPPED).** Replaces the unread badge with a ranked
+   cross-channel "needs you" digest. Pure aggregation over mentions + pending
+   proposals + open Pulse items; no AI call; degrades to unread when no key.
+   `src/briefing.ts`, `GET /briefing`, the Needs-you panel.
+4. **Self-summarizing threads (SHIPPED).** A long thread collapses to a one or
+   two sentence summary on demand, with citations. Reuses the recall engine's
+   `thread` mode; `POST /conversations/:id/messages/:mid/summary`.
+5. **Named role-agents (SHIPPED).** Beyond @plexi: multiple AI personas per org,
+   each its own bot account with a handle, name, and role prompt, each mentionable
+   and bound to the same safe-proposal allowlist. `org_bot_roles`,
+   `resolveMentionedBot`, `/orgs/:id/bot-roles`.
+6. **Real-time translation (SHIPPED).** Read any message in your language on
+   demand: opt-in, cached, preserves mentions/URLs/emoji. `src/ai/translate.ts`,
+   `POST /conversations/:id/messages/:mid/translate`.
+7. **Intent composer (SHIPPED).** Rewrite a rough draft into a clearer
+   ask/decision/FYI before sending, with one-tap revert. `src/ai/intent.ts`,
+   `POST /conversations/:id/intent`.
 
 ## Cost and honesty discipline
 
