@@ -379,6 +379,12 @@ export default function MessagesView(): JSX.Element {
   const activity = useMessagingStore((s) => s.activity)
   const loadActivity = useMessagingStore((s) => s.loadActivity)
   const setNotif = useMessagingStore((s) => s.setNotif)
+  const addMemberByHandle = useMessagingStore((s) => s.addMemberByHandle)
+  const removeMember = useMessagingStore((s) => s.removeMember)
+  const setVisibility = useMessagingStore((s) => s.setVisibility)
+  const [showMembers, setShowMembers] = useState(false)
+  const [addMemberHandle, setAddMemberHandle] = useState('')
+  const [memberError, setMemberError] = useState<string | null>(null)
   const [searching, setSearching] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [searchHits, setSearchHits] = useState<SearchHit[]>([])
@@ -736,6 +742,86 @@ export default function MessagesView(): JSX.Element {
                 >
                   <Icon name="groups" size={15} /> Meet
                 </button>
+                {activeId && activeConv && (
+                  <div className="relative">
+                    <button
+                      onClick={() => setShowMembers((v) => !v)}
+                      title="Members"
+                      data-testid="messages-members"
+                      className="inline-flex items-center gap-1 h-8 px-2 rounded-lg border border-[var(--edge-soft)] text-[12px] text-[var(--ink-90)] hover:bg-[var(--surface-sunken)]"
+                    >
+                      <Icon name="group" size={15} /> {activeConv.members.length}
+                    </button>
+                    {showMembers && (
+                      <div
+                        className="absolute right-0 top-full mt-1 z-30 w-64 rounded-lg bg-[var(--surface-raised)] border border-[var(--edge-soft)] shadow-lg p-2"
+                        data-testid="members-popover"
+                      >
+                        {activeConv.kind === 'channel' && (
+                          <button
+                            onClick={() =>
+                              void setVisibility(activeId, activeConv.visibility === 'public' ? 'private' : 'public')
+                            }
+                            className="w-full flex items-center gap-1.5 text-[11px] text-[var(--ink-70)] hover:text-[var(--ink-100)] px-1 py-1 mb-1"
+                          >
+                            <Icon name={activeConv.visibility === 'public' ? 'public' : 'lock'} size={13} />
+                            {activeConv.visibility === 'public' ? 'Public channel' : 'Private channel'} · make{' '}
+                            {activeConv.visibility === 'public' ? 'private' : 'public'}
+                          </button>
+                        )}
+                        <div className="max-h-48 overflow-auto space-y-0.5">
+                          {activeConv.members.map((mem) => (
+                            <div key={mem.accountId} className="flex items-center gap-2 px-1 py-1 text-[12px]">
+                              <span className="flex-1 truncate text-[var(--ink-90)]">
+                                {personDisplayName(mem, mem.handle ?? 'Member')}
+                                {mem.accountId === account.id && ' (you)'}
+                              </span>
+                              {mem.accountId !== account.id && (
+                                <button
+                                  onClick={() => void removeMember(activeId, mem.accountId)}
+                                  title="Remove"
+                                  className="text-[var(--ink-40)] hover:text-red-500"
+                                >
+                                  <Icon name="close" size={12} />
+                                </button>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                        <div className="mt-1.5 flex gap-1">
+                          <input
+                            value={addMemberHandle}
+                            onChange={(e) => setAddMemberHandle(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' && addMemberHandle.trim()) {
+                                void addMemberByHandle(activeId, addMemberHandle).then((r) => {
+                                  if (r.ok) {
+                                    setAddMemberHandle('')
+                                    setMemberError(null)
+                                  } else setMemberError(r.error ?? 'Could not add.')
+                                })
+                              }
+                            }}
+                            placeholder="@handle to add"
+                            data-testid="members-add-handle"
+                            className="flex-1 bg-white dark:bg-stone-800 border border-stone-300 dark:border-stone-600 rounded px-2 py-1 text-[11px]"
+                          />
+                        </div>
+                        {memberError && <div className="text-[10px] text-red-500 mt-1">{memberError}</div>}
+                        <button
+                          onClick={() => {
+                            void removeMember(activeId, account.id)
+                            setShowMembers(false)
+                          }}
+                          className="w-full mt-1.5 text-[11px] text-red-500 hover:text-red-600 px-1 py-1 text-left"
+                          data-testid="members-leave"
+                        >
+                          Leave conversation
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
                 {activeId && (
                   <button
                     onClick={() => {

@@ -108,6 +108,7 @@ export interface ConversationSummary {
   // Set when this channel is bound to a Room/Desk/Document (PlexiChat epic P1).
   objectKind?: string | null
   objectId?: string | null
+  visibility?: 'public' | 'private'
   notifLevel?: 'all' | 'mentions' | 'muted'
 }
 
@@ -304,6 +305,32 @@ export async function pinMessage(token: string, conversationId: string, messageI
 }
 export async function unpinMessage(token: string, conversationId: string, messageId: string): Promise<void> {
   await req('DELETE', `/conversations/${conversationId}/messages/${messageId}/pin`, token)
+}
+
+// P2 membership: add by handle / remove-or-leave / set visibility.
+export async function addConversationMember(
+  token: string,
+  conversationId: string,
+  handle: string
+): Promise<{ ok: boolean; error?: string }> {
+  const json = await req<{ ok: boolean; error?: string }>(
+    'POST',
+    `/conversations/${conversationId}/members`,
+    token,
+    { handle }
+  )
+  return json ?? { ok: false, error: 'Could not reach the server.' }
+}
+export async function removeConversationMember(token: string, conversationId: string, accountId: string): Promise<boolean> {
+  const json = await req<{ ok: boolean }>('DELETE', `/conversations/${conversationId}/members/${accountId}`, token)
+  return !!json?.ok
+}
+export async function setConversationVisibility(
+  token: string,
+  conversationId: string,
+  visibility: 'public' | 'private'
+): Promise<void> {
+  await req('POST', `/conversations/${conversationId}/visibility`, token, { visibility })
 }
 
 // Get (or lazily create) the chat channel bound to a Room/Desk/Document.

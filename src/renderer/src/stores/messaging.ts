@@ -198,6 +198,9 @@ interface MessagingStore {
   activity: api.ActivityItem[]
   loadActivity: () => Promise<void>
   setNotif: (conversationId: string, level: 'all' | 'mentions' | 'muted') => Promise<void>
+  addMemberByHandle: (conversationId: string, handle: string) => Promise<{ ok: boolean; error?: string }>
+  removeMember: (conversationId: string, accountId: string) => Promise<void>
+  setVisibility: (conversationId: string, visibility: 'public' | 'private') => Promise<void>
   inviteContact: (
     email: string
   ) => Promise<{ ok: true; status: 'requested' | 'invited' } | { ok: false; error: string }>
@@ -581,6 +584,28 @@ export const useMessagingStore = create<MessagingStore>((set, get) => ({
     const { token } = get()
     if (!token) return
     await api.setNotifLevel(token, conversationId, level)
+    await get().refreshConversations()
+  },
+
+  addMemberByHandle: async (conversationId, handle) => {
+    const { token } = get()
+    if (!token) return { ok: false, error: 'Not signed in.' }
+    const res = await api.addConversationMember(token, conversationId, handle.trim().replace(/^@/, ''))
+    if (res.ok) await get().refreshConversations()
+    return res
+  },
+
+  removeMember: async (conversationId, accountId) => {
+    const { token } = get()
+    if (!token) return
+    await api.removeConversationMember(token, conversationId, accountId)
+    await get().refreshConversations()
+  },
+
+  setVisibility: async (conversationId, visibility) => {
+    const { token } = get()
+    if (!token) return
+    await api.setConversationVisibility(token, conversationId, visibility)
     await get().refreshConversations()
   },
 
