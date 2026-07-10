@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import MentionText from './chat/MentionText'
 import { useMessagingStore } from '../../stores/messaging'
 import { useAccountStore } from '../../stores/account'
@@ -19,9 +19,13 @@ import {
   refreshPulse,
   setPulseStatus,
   deletePulseItem,
+  getBriefing,
+  summarizeThread,
   type ChannelSchedule,
   type RecallResult,
-  type PulseItem
+  type PulseItem,
+  type Briefing,
+  type ThreadSummaryResult
 } from '../../lib/messagingClient'
 import { applyProposal } from '../../lib/actionExecutor'
 import { listOrgs, type OrgMembership } from '../../lib/orgsClient'
@@ -420,6 +424,7 @@ export default function MessagesView(): JSX.Element {
   const [showSchedules, setShowSchedules] = useState(false)
   const [showRecall, setShowRecall] = useState(false)
   const [showPulse, setShowPulse] = useState(false)
+  const [showBriefing, setShowBriefing] = useState(false)
   const [addMemberHandle, setAddMemberHandle] = useState('')
   const [memberError, setMemberError] = useState<string | null>(null)
   const [searching, setSearching] = useState(false)
@@ -576,6 +581,14 @@ export default function MessagesView(): JSX.Element {
           <h1 className="text-sm font-semibold text-stone-900 dark:text-stone-100">Messages</h1>
           <div className="flex items-center gap-1">
             <button
+              onClick={() => setShowBriefing(true)}
+              className="icon-btn"
+              title="Needs you — a briefing across all your channels"
+              data-testid="messages-briefing"
+            >
+              <Icon name="flag" size={15} />
+            </button>
+            <button
               onClick={() => setViewingActivity((v) => !v)}
               className={`icon-btn ${viewingActivity ? 'text-accent' : ''}`}
               title="Activity — mentions & replies to you"
@@ -618,6 +631,7 @@ export default function MessagesView(): JSX.Element {
         )}
         {showRecall && activeId && <RecallPanel conversationId={activeId} onClose={() => setShowRecall(false)} />}
         {showPulse && activeId && <PulsePanel conversationId={activeId} onClose={() => setShowPulse(false)} />}
+        {showBriefing && <BriefingPanel onClose={() => setShowBriefing(false)} />}
 
         {composingNew && (
           <div className="px-3 pb-2">
@@ -1021,9 +1035,21 @@ function ThreadPanel({
   const sendThreadReply = useMessagingStore((s) => s.sendThreadReply)
   const react = useMessagingStore((s) => s.react)
   const closeThread = useMessagingStore((s) => s.closeThread)
+  const token = useMessagingStore((s) => s.token)
   const replies = threadsByParent[parentId] ?? []
   const [draft, setDraft] = useState('')
+  const [summary, setSummary] = useState<ThreadSummaryResult | null>(null)
+  const [summarising, setSummarising] = useState(false)
   const endRef = useRef<HTMLDivElement | null>(null)
+  const conversationId = parent?.conversationId ?? null
+
+  async function onSummarise(): Promise<void> {
+    if (!token || !conversationId) return
+    setSummarising(true)
+    const r = await summarizeThread(token, conversationId, parentId)
+    setSummarising(false)
+    setSummary(r)
+  }
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ block: 'end' })
@@ -1044,10 +1070,54 @@ function ThreadPanel({
         <h2 className="text-sm font-semibold text-stone-900 dark:text-stone-100 inline-flex items-center gap-1.5">
           <Icon name="forum" size={14} className="text-accent" /> Thread
         </h2>
-        <button onClick={closeThread} className="icon-btn" aria-label="Close thread" data-testid="thread-close">
-          <Icon name="close" size={15} />
-        </button>
+        <div className="flex items-center gap-1">
+          {replies.length >= 3 && (
+            <button
+              onClick={() => void onSummarise()}
+              disabled={summarising}
+              className="inline-flex items-center gap-1 h-7 px-2 rounded-lg border border-[var(--edge-soft)] text-[11px] text-[var(--ink-90)] hover:bg-[var(--surface-sunken)] disabled:opacity-40"
+              title="Summarise this thread"
+              data-testid="thread-summarise"
+            >
+              <Icon name="bolt" size={12} /> {summarising ? '…' : 'Summarise'}
+            </button>
+          )}
+          <button onClick={closeThread} className="icon-btn" aria-label="Close thread" data-testid="thread-close">
+            <Icon name="close" size={15} />
+          </button>
+        </div>
       </div>
+      {summary && (
+        <div className="px-4 py-2 border-b border-[var(--edge-soft)] bg-[var(--surface-sunken)]" data-testid="thread-summary">
+          {!summary.available ? (
+            <p className="text-[11px] text-[var(--ink-50)]">
+              {summary.reason === 'no-key'
+                ? 'Summaries need the workspace AI key (Channels, AI member).'
+                : 'Summary unavailable here.'}
+            </p>
+          ) : summary.summary ? (
+            <>
+              <div className="text-[12px] text-[var(--ink-100)] leading-snug">{summary.summary}</div>
+              {summary.sources.length > 0 && (
+                <div className="mt-1 flex flex-wrap gap-1">
+                  {summary.sources.map((s) => (
+                    <button
+                      key={s.ref}
+                      onClick={() => jumpToMessage(s.messageId)}
+                      className="text-[10.5px] text-accent hover:underline"
+                      title={`${s.fromName}: ${s.excerpt}`}
+                    >
+                      [{s.ref}]
+                    </button>
+                  ))}
+                </div>
+              )}
+            </>
+          ) : (
+            <p className="text-[11px] text-[var(--ink-50)]">Could not summarise right now.</p>
+          )}
+        </div>
+      )}
       <div className="flex-1 overflow-auto px-4 py-3 space-y-2">
         {parent && (
           <>
@@ -1100,6 +1170,160 @@ function jumpToMessage(messageId: string): void {
   window.setTimeout(() => {
     el.style.backgroundColor = ''
   }, 1600)
+}
+
+// PlexiChat 2100 — the "what needs me" briefing. One cross-channel view of what
+// actually requires you: where you were named, AI proposals waiting on your
+// decision, and the open questions and action items across your channels. Real
+// data only, no AI call. Each item jumps you to the exact place. This is the
+// antidote to the unread badge: read what needs you, not everything.
+function BriefingPanel({ onClose }: { onClose: () => void }): JSX.Element {
+  const token = useMessagingStore((s) => s.token)
+  const openConversation = useMessagingStore((s) => s.openConversation)
+  const [b, setB] = useState<Briefing | null>(null)
+
+  useEffect(() => {
+    let alive = true
+    void (async () => {
+      if (!token) return
+      const res = await getBriefing(token)
+      if (alive) setB(res)
+    })()
+    return () => {
+      alive = false
+    }
+  }, [token])
+
+  function go(conversationId: string, messageId?: string): void {
+    void openConversation(conversationId)
+    onClose()
+    if (messageId) window.setTimeout(() => jumpToMessage(messageId), 500)
+  }
+
+  const total = b ? b.mentions.length + b.pendingProposals.length + b.questions.length + b.actions.length : 0
+
+  function Section({
+    title,
+    icon,
+    children,
+    count
+  }: {
+    title: string
+    icon: string
+    count: number
+    children: ReactNode
+  }): JSX.Element | null {
+    if (count === 0) return null
+    return (
+      <div>
+        <div className="text-[10.5px] uppercase tracking-wide text-[var(--ink-40)] inline-flex items-center gap-1 mb-1">
+          <Icon name={icon} size={12} /> {title} <span className="text-[var(--ink-30)]">{count}</span>
+        </div>
+        <div className="space-y-1">{children}</div>
+      </div>
+    )
+  }
+
+  function Row({
+    title,
+    sub,
+    onClick,
+    testid
+  }: {
+    title: string
+    sub: string
+    onClick: () => void
+    testid: string
+  }): JSX.Element {
+    return (
+      <button
+        onClick={onClick}
+        data-testid={testid}
+        className="w-full text-left rounded-lg border border-[var(--edge-soft)] p-2 hover:bg-[var(--surface-sunken)]"
+      >
+        <div className="text-[12.5px] text-[var(--ink-100)] break-words">{title}</div>
+        <div className="text-[11px] text-[var(--ink-50)] truncate">{sub}</div>
+      </button>
+    )
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-40 flex items-center justify-center bg-black/30"
+      onClick={onClose}
+      data-testid="briefing-panel"
+    >
+      <div
+        className="w-[500px] max-h-[80vh] flex flex-col rounded-xl bg-[var(--surface-raised)] border border-[var(--edge-soft)] shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="px-4 py-3 border-b border-[var(--edge-soft)] flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-[var(--ink-100)] inline-flex items-center gap-1.5">
+            <Icon name="flag" size={15} className="text-accent" /> Needs you
+          </h2>
+          <button onClick={onClose} className="icon-btn" aria-label="Close" data-testid="briefing-close">
+            <Icon name="close" size={15} />
+          </button>
+        </div>
+        <div className="flex-1 overflow-auto px-4 py-3 space-y-3">
+          {b === null ? (
+            <p className="text-[12px] text-[var(--ink-50)]">Gathering what needs you…</p>
+          ) : total === 0 ? (
+            <p className="text-[12px] text-[var(--ink-50)] leading-snug">
+              Nothing needs you right now. No unread mentions, no proposals waiting, no open questions in your channels.
+            </p>
+          ) : (
+            <>
+              <Section title="Mentioned you" icon="alternate_email" count={b.mentions.length}>
+                {b.mentions.map((m) => (
+                  <Row
+                    key={m.messageId}
+                    testid="briefing-mention"
+                    title={`${m.fromName}: ${m.excerpt}`}
+                    sub={m.conversationTitle}
+                    onClick={() => go(m.conversationId, m.messageId)}
+                  />
+                ))}
+              </Section>
+              <Section title="Awaiting your decision" icon="task_alt" count={b.pendingProposals.length}>
+                {b.pendingProposals.map((p) => (
+                  <Row
+                    key={p.messageId}
+                    testid="briefing-proposal"
+                    title="Plexi proposed an action"
+                    sub={p.conversationTitle}
+                    onClick={() => go(p.conversationId, p.messageId)}
+                  />
+                ))}
+              </Section>
+              <Section title="Open questions" icon="help" count={b.questions.length}>
+                {b.questions.map((q) => (
+                  <Row
+                    key={q.extractId}
+                    testid="briefing-question"
+                    title={q.text}
+                    sub={q.conversationTitle}
+                    onClick={() => go(q.conversationId, q.sourceMessageId ?? undefined)}
+                  />
+                ))}
+              </Section>
+              <Section title="Action items" icon="checklist" count={b.actions.length}>
+                {b.actions.map((a) => (
+                  <Row
+                    key={a.extractId}
+                    testid="briefing-action"
+                    title={a.text}
+                    sub={a.conversationTitle}
+                    onClick={() => go(a.conversationId, a.sourceMessageId ?? undefined)}
+                  />
+                ))}
+              </Section>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  )
 }
 
 // PlexiChat 2100 — Channel Pulse. A channel's durable meaning: the decisions it

@@ -537,6 +537,77 @@ export async function deletePulseItem(token: string, conversationId: string, ite
   return json?.ok ?? false
 }
 
+// PlexiChat 2100 — the "what needs me" briefing across all your conversations.
+// Pure aggregation on the server (mentions, pending AI proposals, open Pulse
+// questions/actions); no AI call. Replaces the unread badge as the primary signal.
+export interface BriefingMention {
+  conversationId: string
+  conversationTitle: string
+  messageId: string
+  fromName: string
+  excerpt: string
+  createdAt: number
+}
+export interface BriefingProposal {
+  conversationId: string
+  conversationTitle: string
+  messageId: string
+  createdAt: number
+}
+export interface BriefingExtract {
+  conversationId: string
+  conversationTitle: string
+  extractId: string
+  text: string
+  sourceMessageId: string | null
+}
+export interface Briefing {
+  mentions: BriefingMention[]
+  pendingProposals: BriefingProposal[]
+  questions: BriefingExtract[]
+  actions: BriefingExtract[]
+}
+
+export async function getBriefing(token: string): Promise<Briefing> {
+  const json = await req<{ ok: boolean; briefing?: Briefing }>('GET', '/briefing', token)
+  const b = json?.ok ? json.briefing : undefined
+  return b ?? { mentions: [], pendingProposals: [], questions: [], actions: [] }
+}
+
+// PlexiChat 2100 — self-summarizing thread. One or two sentences summarising a
+// message thread, with source citations. Honest: no key => available false, a
+// failed call => summary null, never fabricated.
+export interface ThreadSummaryResult {
+  available: boolean
+  reason?: 'no-org' | 'no-key'
+  empty?: boolean
+  summary: string | null
+  sources: RecallSource[]
+}
+
+export async function summarizeThread(
+  token: string,
+  conversationId: string,
+  messageId: string
+): Promise<ThreadSummaryResult> {
+  const json = await req<{
+    ok: boolean
+    available?: boolean
+    reason?: 'no-org' | 'no-key'
+    empty?: boolean
+    summary?: string | null
+    sources?: RecallSource[]
+  }>('POST', `/conversations/${conversationId}/messages/${messageId}/summary`, token)
+  if (!json?.ok) return { available: false, summary: null, sources: [] }
+  return {
+    available: json.available ?? false,
+    reason: json.reason,
+    empty: json.empty,
+    summary: json.summary ?? null,
+    sources: json.sources ?? []
+  }
+}
+
 export async function getUnreadTotal(token: string): Promise<number> {
   const json = await req<{ ok: boolean; count?: number }>('GET', '/messaging/unread', token)
   return json?.ok ? json.count ?? 0 : 0
