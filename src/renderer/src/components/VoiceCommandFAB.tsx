@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import Icon from './Icon'
 import { applyProposal, describeProposal } from '../lib/actionExecutor'
 import { buildCanvasSnapshot } from '../lib/canvasSnapshot'
-import { useViewStore } from '../stores/view'
+import { resolveVoiceContext } from '../lib/voiceContext'
 import { useWidgetStore } from '../stores/widgets'
 import type { ActionProposal, Widget } from '@shared/types'
 
@@ -52,11 +52,6 @@ const DEFAULT_PREFS: VoicePrefs = {
   commandMode: 'press-hold',
   autoStopSilenceMs: 2000,
   voiceback: true
-}
-
-function activeTaskId(): string | null {
-  const v = useViewStore.getState().view
-  return v.kind === 'task' ? v.taskId : null
 }
 
 interface SpeechRecognitionLike {
@@ -407,7 +402,13 @@ export default function VoiceCommandFAB(): JSX.Element {
     // Switch to the streaming variant so cards pop in as Claude emits
     // them. The first reply / proposal lands in ~600ms instead of
     // waiting ~1.5s for the full response — feels alive.
-    const snapshot = buildCanvasSnapshot(activeTaskId())
+    //
+    // Context routing seam (docs/VOICE-CONTEXT-ROUTING.md): resolve fresh at
+    // send-time. Today only the canvas path is wired; a document context still
+    // falls through to a (null-task) canvas snapshot, i.e. unchanged behaviour,
+    // until the per-docType handlers land checkpoint by checkpoint.
+    const ctx = resolveVoiceContext()
+    const snapshot = buildCanvasSnapshot(ctx.kind === 'canvas' ? ctx.taskId : null)
     const requestId = `vc-${Date.now().toString(36)}-${Math.random()
       .toString(36)
       .slice(2, 8)}`
@@ -476,7 +477,12 @@ export default function VoiceCommandFAB(): JSX.Element {
     async (id: string): Promise<void> => {
       const p = proposals.find((x) => x.id === id)
       if (!p) return
-      const result = await applyProposal(p, { activeTaskId: activeTaskId() })
+      // Resolve context fresh at apply-time too — the user may have navigated
+      // since the proposal streamed in.
+      const ctx = resolveVoiceContext()
+      const result = await applyProposal(p, {
+        activeTaskId: ctx.kind === 'canvas' ? ctx.taskId : null
+      })
       setProposals((prev) =>
         prev.map((q) =>
           q.id === id
