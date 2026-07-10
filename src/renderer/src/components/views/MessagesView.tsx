@@ -376,9 +376,17 @@ export default function MessagesView(): JSX.Element {
   const loadPins = useMessagingStore((s) => s.loadPins)
   const pinMsg = useMessagingStore((s) => s.pin)
   const unpinMsg = useMessagingStore((s) => s.unpin)
+  const activity = useMessagingStore((s) => s.activity)
+  const loadActivity = useMessagingStore((s) => s.loadActivity)
+  const setNotif = useMessagingStore((s) => s.setNotif)
   const [searching, setSearching] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [searchHits, setSearchHits] = useState<SearchHit[]>([])
+  const [viewingActivity, setViewingActivity] = useState(false)
+
+  useEffect(() => {
+    if (viewingActivity) void loadActivity()
+  }, [viewingActivity, loadActivity])
 
   // Debounced message search across the account's conversations.
   useEffect(() => {
@@ -525,6 +533,14 @@ export default function MessagesView(): JSX.Element {
           <h1 className="text-sm font-semibold text-stone-900 dark:text-stone-100">Messages</h1>
           <div className="flex items-center gap-1">
             <button
+              onClick={() => setViewingActivity((v) => !v)}
+              className={`icon-btn ${viewingActivity ? 'text-accent' : ''}`}
+              title="Activity — mentions & replies to you"
+              data-testid="messages-activity-toggle"
+            >
+              <Icon name="notifications" size={15} />
+            </button>
+            <button
               onClick={() => {
                 setSearching((v) => !v)
                 setSearchQuery('')
@@ -589,7 +605,31 @@ export default function MessagesView(): JSX.Element {
         )}
 
         <div className="flex-1 overflow-auto">
-          {searching && searchQuery.trim() ? (
+          {viewingActivity ? (
+            activity.length === 0 ? (
+              <p className="text-[11px] text-stone-500 dark:text-stone-400 px-3 py-2">
+                Nothing yet. Mentions of you and replies to your messages show up here.
+              </p>
+            ) : (
+              activity.map((a) => (
+                <button
+                  key={a.messageId}
+                  onClick={() => {
+                    void open(a.conversationId)
+                    setViewingActivity(false)
+                  }}
+                  data-testid="activity-item"
+                  className="w-full text-left px-3 py-2 border-b border-stone-100 dark:border-stone-800/60 hover:bg-stone-100 dark:hover:bg-stone-800/50 transition-colors"
+                >
+                  <div className="text-[11px] font-medium text-stone-700 dark:text-stone-300 truncate inline-flex items-center gap-1">
+                    <Icon name={a.reason === 'mention' ? 'alternate_email' : 'reply'} size={11} className="text-accent" />
+                    {a.conversationTitle}
+                  </div>
+                  <div className="text-[12px] text-stone-600 dark:text-stone-400 truncate">{a.body}</div>
+                </button>
+              ))
+            )
+          ) : searching && searchQuery.trim() ? (
             searchHits.length === 0 ? (
               <p className="text-[11px] text-stone-500 dark:text-stone-400 px-3 py-2">No matches.</p>
             ) : (
@@ -696,6 +736,29 @@ export default function MessagesView(): JSX.Element {
                 >
                   <Icon name="groups" size={15} /> Meet
                 </button>
+                {activeId && (
+                  <button
+                    onClick={() => {
+                      const cur = activeConv?.notifLevel ?? 'all'
+                      const next = cur === 'all' ? 'mentions' : cur === 'mentions' ? 'muted' : 'all'
+                      void setNotif(activeId, next)
+                    }}
+                    title={`Notifications: ${activeConv?.notifLevel ?? 'all'} (click to cycle all → mentions → muted)`}
+                    data-testid="messages-notif"
+                    className="inline-flex items-center justify-center h-8 w-8 rounded-lg border border-[var(--edge-soft)] text-[var(--ink-90)] hover:bg-[var(--surface-sunken)]"
+                  >
+                    <Icon
+                      name={
+                        activeConv?.notifLevel === 'muted'
+                          ? 'notifications_off'
+                          : activeConv?.notifLevel === 'mentions'
+                            ? 'alternate_email'
+                            : 'notifications'
+                      }
+                      size={15}
+                    />
+                  </button>
+                )}
                 <button
                   onClick={() => pinToCanvas()}
                   title="Pin this conversation to your current desk"

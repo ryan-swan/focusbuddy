@@ -108,6 +108,7 @@ export interface ConversationSummary {
   // Set when this channel is bound to a Room/Desk/Document (PlexiChat epic P1).
   objectKind?: string | null
   objectId?: string | null
+  notifLevel?: 'all' | 'mentions' | 'muted'
 }
 
 function urlFor(path: string): string {
@@ -266,6 +267,25 @@ export interface SearchHit {
   body: string
   fromAccount: string
   createdAt: number
+}
+
+export interface ActivityItem extends SearchHit {
+  reason: 'mention' | 'reply'
+}
+
+// Activity feed: @mentions of me + replies to my messages, active org.
+export async function getActivity(token: string): Promise<ActivityItem[]> {
+  const json = await req<{ ok: boolean; items?: ActivityItem[] }>('GET', '/activity', token)
+  return json?.ok ? json.items ?? [] : []
+}
+
+// Set my notification level for a conversation.
+export async function setNotifLevel(
+  token: string,
+  conversationId: string,
+  level: 'all' | 'mentions' | 'muted'
+): Promise<void> {
+  await req('POST', `/conversations/${conversationId}/notif`, token, { level })
 }
 
 // Search messages across the account's conversations in the active org.

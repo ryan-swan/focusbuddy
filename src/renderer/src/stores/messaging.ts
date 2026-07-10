@@ -195,6 +195,9 @@ interface MessagingStore {
   loadPins: (conversationId: string) => Promise<void>
   pin: (conversationId: string, messageId: string) => Promise<void>
   unpin: (conversationId: string, messageId: string) => Promise<void>
+  activity: api.ActivityItem[]
+  loadActivity: () => Promise<void>
+  setNotif: (conversationId: string, level: 'all' | 'mentions' | 'muted') => Promise<void>
   inviteContact: (
     email: string
   ) => Promise<{ ok: true; status: 'requested' | 'invited' } | { ok: false; error: string }>
@@ -214,6 +217,7 @@ export const useMessagingStore = create<MessagingStore>((set, get) => ({
   typingByConv: {},
   threadsByParent: {},
   pinsByConv: {},
+  activity: [],
   activeThreadId: null,
 
   connect: async (token) => {
@@ -236,17 +240,25 @@ export const useMessagingStore = create<MessagingStore>((set, get) => ({
       // should cut through.
       const myHandle = useAccountStore.getState().account?.handle ?? null
       const mentioned = bodyMentionsHandle(incoming.message.body ?? '', myHandle)
-      notifyExternal(
-        mentioned ? `${sender} mentioned you` : conv ? conv.title : sender,
-        conv ? `${sender}: ${preview}` : preview,
-        {
-        force: mentioned,
-        tag: `msg-${incoming.conversationId}`,
-        onClick: () => {
-          useViewStore.getState().goMessages()
-          void get().openConversation(incoming.conversationId)
-        }
-      })
+      // Honour the member's per-conversation notification level: muted = never,
+      // mentions = only when named, all = every message. A mention still cuts
+      // through 'mentions' but not 'muted' (mute is absolute).
+      const level = conv?.notifLevel ?? 'all'
+      const shouldNotify = level === 'all' || (level === 'mentions' && mentioned)
+      if (shouldNotify) {
+        notifyExternal(
+          mentioned ? `${sender} mentioned you` : conv ? conv.title : sender,
+          conv ? `${sender}: ${preview}` : preview,
+          {
+            force: mentioned,
+            tag: `msg-${incoming.conversationId}`,
+            onClick: () => {
+              useViewStore.getState().goMessages()
+              void get().openConversation(incoming.conversationId)
+            }
+          }
+        )
+      }
       void get().refreshConversations()
       if (incoming.conversationId === activeId) {
         void api.markRead(token, incoming.conversationId)
@@ -557,6 +569,19 @@ export const useMessagingStore = create<MessagingStore>((set, get) => ({
     if (!token) return
     await api.unpinMessage(token, conversationId, messageId)
     await get().loadPins(conversationId)
+  },
+
+  loadActivity: async () => {
+    const { token } = get()
+    if (!token) return
+    set({ activity: await api.getActivity(token) })
+  },
+
+  setNotif: async (conversationId, level) => {
+    const { token } = get()
+    if (!token) return
+    await api.setNotifLevel(token, conversationId, level)
+    await get().refreshConversations()
   },
 
   inviteContact: async (email) => {
