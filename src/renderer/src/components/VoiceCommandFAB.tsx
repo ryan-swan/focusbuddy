@@ -3,6 +3,7 @@ import Icon from './Icon'
 import { applyProposal, describeProposal } from '../lib/actionExecutor'
 import { buildCanvasSnapshot } from '../lib/canvasSnapshot'
 import { resolveVoiceContext } from '../lib/voiceContext'
+import { getDictationTarget, dictateInto, initDictationTracker } from '../lib/dictation'
 import { useWidgetStore } from '../stores/widgets'
 import type { ActionProposal, Widget } from '@shared/types'
 
@@ -96,6 +97,16 @@ export default function VoiceCommandFAB(): JSX.Element {
   // actual mic level to know when the user has genuinely stopped talking.
   const audioCtxRef = useRef<AudioContext | null>(null)
   const analyserRef = useRef<AnalyserNode | null>(null)
+  // The editable the user was in when they started talking, captured at
+  // stop-time so a Whisper transcript can be dictated straight into it (docs,
+  // note/sticky widgets, sheet cells, any field) instead of only commanding the
+  // canvas. Null when they weren't in a text surface → the AI-command path runs.
+  const dictationTargetRef = useRef<HTMLElement | null>(null)
+
+  // Track the last-focused editable app-wide so dictation knows where to insert.
+  useEffect(() => {
+    initDictationTracker()
+  }, [])
 
   // Load persisted prefs.
   useEffect(() => {
@@ -341,6 +352,11 @@ export default function VoiceCommandFAB(): JSX.Element {
     const blob = new Blob(chunksRef.current, { type: 'audio/webm' })
     // eslint-disable-next-line no-console
     console.log('[voice] audio blob bytes:', blob.size)
+    // Capture the dictation target NOW (before the FAB's own review textarea can
+    // steal focus): if the user was in a text surface, the transcript will be
+    // typed straight in rather than staged for an AI command.
+    dictationTargetRef.current = getDictationTarget()
+
     // Spec: "when finished are staged for correction" — both modes land
     // here. The user reviews / edits the transcript and clicks Send when
     // ready. We never auto-send: the user always controls when the
@@ -362,6 +378,17 @@ export default function VoiceCommandFAB(): JSX.Element {
       console.log('[voice] transcribe result:', JSON.stringify(res))
       if (res.ok) {
         const final = res.transcript.trim() || captionText
+        // Dictation: if the user was editing a text surface, type the transcript
+        // straight in and finish — no AI, no review dock. This is press-to-talk
+        // "dictate" across docs / note widgets / sheet cells / any field.
+        if (final && dictationTargetRef.current && dictateInto(dictationTargetRef.current, final)) {
+          dictationTargetRef.current = null
+          setTranscript('')
+          setEditedTranscript('')
+          setReply('Inserted')
+          setPhase('idle')
+          return
+        }
         setTranscript(final)
         setEditedTranscript(final)
       } else {
@@ -559,6 +586,7 @@ export default function VoiceCommandFAB(): JSX.Element {
       <div
         className="fixed bottom-20 left-1/2 -translate-x-1/2 z-[125] flex flex-col items-center pointer-events-none"
         data-testid="voice-command-root"
+        data-voice-fab
       >
         {/* Live captions / transcript / result overlay above the button */}
         {showOverlay && (
