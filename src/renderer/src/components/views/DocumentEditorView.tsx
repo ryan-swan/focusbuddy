@@ -3,6 +3,7 @@ import type { Editor } from '@tiptap/react'
 import type { MapBody, SheetBody, SlidesBody } from '@shared/types'
 import { useDocumentsStore } from '../../stores/documents'
 import { useViewStore } from '../../stores/view'
+import { useMessagingStore } from '../../stores/messaging'
 import { useAccountStore } from '../../stores/account'
 import { personDisplayName } from '../../lib/personName'
 import { DocEditor, SheetEditor, SlidesEditor, MapEditor, DesignEditor } from '@office'
@@ -43,6 +44,7 @@ export default function DocumentEditorView({ documentId, onBack }: Props): JSX.E
   const saveBody = useDocumentsStore((s) => s.saveBody)
   const rename = useDocumentsStore((s) => s.rename)
   const goDocuments = useViewStore((s) => s.goDocuments)
+  const openObjectChannel = useMessagingStore((s) => s.openObjectChannel)
   const goDesign = useViewStore((s) => s.goDesign)
   // The signed-in user's name greets them in the AI Assistant panel. Omitted when
   // signed out, so the panel falls back to a neutral greeting (no fabricated name).
@@ -187,6 +189,14 @@ export default function DocumentEditorView({ documentId, onBack }: Props): JSX.E
           className="flex-1 min-w-0 bg-transparent text-[14px] font-semibold text-stone-900 dark:text-stone-100 focus:outline-none"
         />
         <DocFiledInChip docId={active.id} className="shrink-0 max-w-[220px]" />
+        <button
+          onClick={() => void openObjectChannel('document', active.id, active.title || 'Document')}
+          title="Chat about this document"
+          data-testid="doc-chat-button"
+          className="shrink-0 icon-btn !h-7 !w-7 text-stone-400 dark:text-stone-500 hover:text-accent"
+        >
+          <Icon name="forum" size={15} />
+        </button>
         {saveError ? (
           <span
             className="text-[11px] text-red-600 dark:text-red-400 inline-flex items-center gap-1 shrink-0"

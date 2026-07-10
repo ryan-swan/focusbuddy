@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { SheetBody, SlidesBody, MapBody } from '@shared/types'
 import { useDocCollabStore } from '../../stores/docCollab'
 import { useViewStore } from '../../stores/view'
+import { useMessagingStore } from '../../stores/messaging'
 import { useAccountStore } from '../../stores/account'
 import {
   inviteToLiveDoc,
@@ -70,6 +71,7 @@ export default function LiveDocEditorView({ liveDocId, onBack }: Props): JSX.Ele
   const acquire = useDocCollabStore((s) => s.acquire)
   const requestTakeoverForOpen = useDocCollabStore((s) => s.requestTakeoverForOpen)
   const goDocuments = useViewStore((s) => s.goDocuments)
+  const openObjectChannel = useMessagingStore((s) => s.openObjectChannel)
   const back = onBack ?? goDocuments
   const myId = useAccountStore((s) => s.account?.id)
   const token = useAccountStore((s) => s.sessionToken)
@@ -461,6 +463,14 @@ export default function LiveDocEditorView({ liveDocId, onBack }: Props): JSX.Ele
         <span className="flex-1 min-w-0 text-[14px] font-semibold text-[var(--ink-100)] truncate">
           {meta.title}
         </span>
+        <button
+          onClick={() => void openObjectChannel('document', liveDocId, meta.title || 'Document')}
+          title="Chat about this document"
+          data-testid="doc-chat-button"
+          className="shrink-0 icon-btn text-[var(--ink-50)] hover:text-accent"
+        >
+          <Icon name="forum" size={15} />
+        </button>
         <CollaboratorBar people={people} />
         {canComment && (
           <>
