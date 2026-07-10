@@ -5,7 +5,17 @@ import { useAccountStore } from '../../stores/account'
 import { useCallStore } from '../../stores/call'
 import { useSignInPrompt } from '../../stores/signInPrompt'
 import type { ChatMessage, OrgChannel, SearchHit } from '../../lib/messagingClient'
-import { attachmentUrl, getOrgAiKeyStatus, setOrgAiKey, clearOrgAiKey } from '../../lib/messagingClient'
+import {
+  attachmentUrl,
+  getOrgAiKeyStatus,
+  setOrgAiKey,
+  clearOrgAiKey,
+  listSchedules,
+  createSchedule,
+  setScheduleEnabled,
+  deleteSchedule,
+  type ChannelSchedule
+} from '../../lib/messagingClient'
 import { listOrgs, type OrgMembership } from '../../lib/orgsClient'
 import Icon from '../Icon'
 import { ChatComposer } from './chat/ChatComposer'
@@ -396,6 +406,7 @@ export default function MessagesView(): JSX.Element {
   const removeMember = useMessagingStore((s) => s.removeMember)
   const setVisibility = useMessagingStore((s) => s.setVisibility)
   const [showMembers, setShowMembers] = useState(false)
+  const [showSchedules, setShowSchedules] = useState(false)
   const [addMemberHandle, setAddMemberHandle] = useState('')
   const [memberError, setMemberError] = useState<string | null>(null)
   const [searching, setSearching] = useState(false)
@@ -589,6 +600,9 @@ export default function MessagesView(): JSX.Element {
           </div>
         </div>
         {browsing && <ChannelBrowser onClose={() => setBrowsing(false)} />}
+        {showSchedules && activeId && (
+          <SchedulesPanel conversationId={activeId} onClose={() => setShowSchedules(false)} />
+        )}
 
         {composingNew && (
           <div className="px-3 pb-2">
@@ -755,6 +769,16 @@ export default function MessagesView(): JSX.Element {
                 >
                   <Icon name="groups" size={15} /> Meet
                 </button>
+                {activeId && activeConv && activeConv.kind !== 'dm' && (
+                  <button
+                    onClick={() => setShowSchedules(true)}
+                    title="Scheduled AI tasks for this channel"
+                    data-testid="messages-schedules"
+                    className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border border-[var(--edge-soft)] text-[12.5px] text-[var(--ink-90)] hover:bg-[var(--surface-sunken)]"
+                  >
+                    <Icon name="schedule" size={15} /> Schedules
+                  </button>
+                )}
                 {activeId && activeConv && (
                   <div className="relative">
                     <button
@@ -1026,6 +1050,153 @@ function ThreadPanel({
         >
           <Icon name="send" size={14} />
         </button>
+      </div>
+    </div>
+  )
+}
+
+// PlexiChat P5: recurring AI tasks bound to a channel. Members create a plain-
+// language instruction on a daily/weekly/monthly cadence; the server runs it as
+// the AI member even when everyone is offline. No fabrication: an honest empty
+// state and real enabled/next-run status.
+function SchedulesPanel({ conversationId, onClose }: { conversationId: string; onClose: () => void }): JSX.Element {
+  const token = useMessagingStore((s) => s.token)
+  const [items, setItems] = useState<ChannelSchedule[] | null>(null)
+  const [instruction, setInstruction] = useState('')
+  const [recurrence, setRecurrence] = useState<'daily' | 'weekly' | 'monthly'>('daily')
+  const [busy, setBusy] = useState(false)
+
+  async function refresh(): Promise<void> {
+    if (!token) return
+    setItems(await listSchedules(token, conversationId))
+  }
+  useEffect(() => {
+    void refresh()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, conversationId])
+
+  async function onAdd(): Promise<void> {
+    if (!token || !instruction.trim()) return
+    setBusy(true)
+    const created = await createSchedule(token, conversationId, { instruction: instruction.trim(), recurrence })
+    setBusy(false)
+    if (created) {
+      setInstruction('')
+      void refresh()
+    }
+  }
+
+  function fmtNext(ms: number): string {
+    try {
+      return new Date(ms).toLocaleString()
+    } catch {
+      return '—'
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-40 flex items-center justify-center bg-black/30"
+      onClick={onClose}
+      data-testid="schedules-panel"
+    >
+      <div
+        className="w-[460px] max-h-[75vh] flex flex-col rounded-xl bg-[var(--surface-raised)] border border-[var(--edge-soft)] shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="px-4 py-3 border-b border-[var(--edge-soft)] flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-[var(--ink-100)] inline-flex items-center gap-1.5">
+            <Icon name="schedule" size={15} className="text-accent" /> Scheduled AI tasks
+          </h2>
+          <button onClick={onClose} className="icon-btn" aria-label="Close" data-testid="schedules-close">
+            <Icon name="close" size={15} />
+          </button>
+        </div>
+
+        <div className="px-4 pt-3 pb-2 border-b border-[var(--edge-soft)]">
+          <p className="text-[11px] text-[var(--ink-50)] leading-snug mb-1.5">
+            Plexi runs these on a timer, even when everyone is offline, and posts the result here. It needs the org&apos;s
+            AI key set (Channels, AI member).
+          </p>
+          <textarea
+            value={instruction}
+            onChange={(e) => setInstruction(e.target.value)}
+            placeholder="e.g. Post a short standup prompt and summarise yesterday's messages"
+            data-testid="schedule-instruction"
+            rows={2}
+            className="w-full bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded px-2 py-1 text-[12px] text-[var(--ink-90)] resize-none"
+          />
+          <div className="flex gap-1.5 mt-1.5">
+            <select
+              value={recurrence}
+              onChange={(e) => setRecurrence(e.target.value as 'daily' | 'weekly' | 'monthly')}
+              data-testid="schedule-recurrence"
+              className="bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded px-2 py-1 text-[12px] text-[var(--ink-90)]"
+            >
+              <option value="daily">Daily</option>
+              <option value="weekly">Weekly</option>
+              <option value="monthly">Monthly</option>
+            </select>
+            <button
+              onClick={() => void onAdd()}
+              disabled={!instruction.trim() || busy}
+              className="btn-primary px-3 py-1 text-[12px] disabled:opacity-40"
+              data-testid="schedule-add"
+            >
+              Add task
+            </button>
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-auto px-4 py-3 space-y-2">
+          {items === null ? (
+            <p className="text-[12px] text-[var(--ink-50)]">Loading…</p>
+          ) : items.length === 0 ? (
+            <p className="text-[12px] text-[var(--ink-50)] leading-snug">No scheduled tasks yet.</p>
+          ) : (
+            items.map((s) => (
+              <div
+                key={s.id}
+                className="rounded-lg border border-[var(--edge-soft)] p-2 flex items-start gap-2"
+                data-testid="schedule-row"
+              >
+                <div className="min-w-0 flex-1">
+                  <div className="text-[12.5px] text-[var(--ink-100)] break-words">{s.instruction}</div>
+                  <div className="text-[11px] text-[var(--ink-50)] mt-0.5">
+                    {s.recurrence} · next {fmtNext(s.nextRunAt)}
+                    {s.enabled ? '' : ' · paused'}
+                  </div>
+                </div>
+                <button
+                  onClick={async () => {
+                    if (token) {
+                      await setScheduleEnabled(token, conversationId, s.id, !s.enabled)
+                      void refresh()
+                    }
+                  }}
+                  title={s.enabled ? 'Pause' : 'Resume'}
+                  className="text-[var(--ink-50)] hover:text-[var(--ink-100)]"
+                  data-testid={`schedule-toggle-${s.id}`}
+                >
+                  <Icon name={s.enabled ? 'pause' : 'play_arrow'} size={16} />
+                </button>
+                <button
+                  onClick={async () => {
+                    if (token) {
+                      await deleteSchedule(token, conversationId, s.id)
+                      void refresh()
+                    }
+                  }}
+                  title="Delete"
+                  className="text-[var(--ink-40)] hover:text-red-500"
+                  data-testid={`schedule-delete-${s.id}`}
+                >
+                  <Icon name="delete" size={16} />
+                </button>
+              </div>
+            ))
+          )}
+        </div>
       </div>
     </div>
   )

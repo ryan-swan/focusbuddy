@@ -389,6 +389,60 @@ export async function clearOrgAiKey(token: string, orgId: string): Promise<boole
   return json?.ok ?? false
 }
 
+// PlexiChat P5: recurring AI tasks bound to a channel, run server-side on a timer
+// (always-on, even when every member is offline).
+export interface ChannelSchedule {
+  id: string
+  conversationId: string
+  createdBy: string
+  instruction: string
+  recurrence: 'daily' | 'weekly' | 'monthly'
+  nextRunAt: number
+  lastRunAt: number | null
+  enabled: boolean
+  createdAt: number
+}
+
+export async function listSchedules(token: string, conversationId: string): Promise<ChannelSchedule[]> {
+  const json = await req<{ ok: boolean; schedules?: ChannelSchedule[] }>(
+    'GET',
+    `/conversations/${conversationId}/schedules`,
+    token
+  )
+  return json?.ok ? json.schedules ?? [] : []
+}
+
+export async function createSchedule(
+  token: string,
+  conversationId: string,
+  input: { instruction: string; recurrence: 'daily' | 'weekly' | 'monthly'; firstRunAt?: number }
+): Promise<ChannelSchedule | null> {
+  const json = await req<{ ok: boolean; schedule?: ChannelSchedule }>(
+    'POST',
+    `/conversations/${conversationId}/schedules`,
+    token,
+    input
+  )
+  return json?.ok ? json.schedule ?? null : null
+}
+
+export async function setScheduleEnabled(
+  token: string,
+  conversationId: string,
+  scheduleId: string,
+  enabled: boolean
+): Promise<boolean> {
+  const json = await req<{ ok: boolean }>('PATCH', `/conversations/${conversationId}/schedules/${scheduleId}`, token, {
+    enabled
+  })
+  return json?.ok ?? false
+}
+
+export async function deleteSchedule(token: string, conversationId: string, scheduleId: string): Promise<boolean> {
+  const json = await req<{ ok: boolean }>('DELETE', `/conversations/${conversationId}/schedules/${scheduleId}`, token)
+  return json?.ok ?? false
+}
+
 export async function getUnreadTotal(token: string): Promise<number> {
   const json = await req<{ ok: boolean; count?: number }>('GET', '/messaging/unread', token)
   return json?.ok ? json.count ?? 0 : 0
