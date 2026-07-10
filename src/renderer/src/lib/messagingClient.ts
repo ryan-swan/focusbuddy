@@ -484,6 +484,59 @@ export async function recallChannel(
   }
 }
 
+// PlexiChat 2100 Channel Pulse: durable decisions / open questions / action items
+// extracted from a channel, each linked to its source message. Read state, not
+// transcript. Refresh is opt-in (no per-message AI cost) and dark without a key.
+export interface PulseItem {
+  id: string
+  conversationId: string
+  kind: 'decision' | 'question' | 'action'
+  text: string
+  sourceMessageId: string | null
+  status: 'open' | 'resolved'
+  createdAt: number
+}
+export interface PulseRefreshResult {
+  available: boolean
+  reason?: 'no-org' | 'no-key'
+  added: number
+  items: PulseItem[]
+}
+
+export async function getPulse(token: string, conversationId: string): Promise<PulseItem[]> {
+  const json = await req<{ ok: boolean; items?: PulseItem[] }>('GET', `/conversations/${conversationId}/pulse`, token)
+  return json?.ok ? json.items ?? [] : []
+}
+
+export async function refreshPulse(token: string, conversationId: string): Promise<PulseRefreshResult> {
+  const json = await req<{
+    ok: boolean
+    available?: boolean
+    reason?: 'no-org' | 'no-key'
+    added?: number
+    items?: PulseItem[]
+  }>('POST', `/conversations/${conversationId}/pulse/refresh`, token)
+  if (!json?.ok) return { available: false, added: 0, items: [] }
+  return { available: json.available ?? false, reason: json.reason, added: json.added ?? 0, items: json.items ?? [] }
+}
+
+export async function setPulseStatus(
+  token: string,
+  conversationId: string,
+  itemId: string,
+  status: 'open' | 'resolved'
+): Promise<boolean> {
+  const json = await req<{ ok: boolean }>('PATCH', `/conversations/${conversationId}/pulse/${itemId}`, token, {
+    status
+  })
+  return json?.ok ?? false
+}
+
+export async function deletePulseItem(token: string, conversationId: string, itemId: string): Promise<boolean> {
+  const json = await req<{ ok: boolean }>('DELETE', `/conversations/${conversationId}/pulse/${itemId}`, token)
+  return json?.ok ?? false
+}
+
 export async function getUnreadTotal(token: string): Promise<number> {
   const json = await req<{ ok: boolean; count?: number }>('GET', '/messaging/unread', token)
   return json?.ok ? json.count ?? 0 : 0

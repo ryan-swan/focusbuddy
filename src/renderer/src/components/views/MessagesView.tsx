@@ -15,9 +15,15 @@ import {
   setScheduleEnabled,
   deleteSchedule,
   recallChannel,
+  getPulse,
+  refreshPulse,
+  setPulseStatus,
+  deletePulseItem,
   type ChannelSchedule,
-  type RecallResult
+  type RecallResult,
+  type PulseItem
 } from '../../lib/messagingClient'
+import { applyProposal } from '../../lib/actionExecutor'
 import { listOrgs, type OrgMembership } from '../../lib/orgsClient'
 import Icon from '../Icon'
 import { ChatComposer } from './chat/ChatComposer'
@@ -413,6 +419,7 @@ export default function MessagesView(): JSX.Element {
   const [showMembers, setShowMembers] = useState(false)
   const [showSchedules, setShowSchedules] = useState(false)
   const [showRecall, setShowRecall] = useState(false)
+  const [showPulse, setShowPulse] = useState(false)
   const [addMemberHandle, setAddMemberHandle] = useState('')
   const [memberError, setMemberError] = useState<string | null>(null)
   const [searching, setSearching] = useState(false)
@@ -610,6 +617,7 @@ export default function MessagesView(): JSX.Element {
           <SchedulesPanel conversationId={activeId} onClose={() => setShowSchedules(false)} />
         )}
         {showRecall && activeId && <RecallPanel conversationId={activeId} onClose={() => setShowRecall(false)} />}
+        {showPulse && activeId && <PulsePanel conversationId={activeId} onClose={() => setShowPulse(false)} />}
 
         {composingNew && (
           <div className="px-3 pb-2">
@@ -784,6 +792,16 @@ export default function MessagesView(): JSX.Element {
                     className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border border-[var(--edge-soft)] text-[12.5px] text-[var(--ink-90)] hover:bg-[var(--surface-sunken)]"
                   >
                     <Icon name="bolt" size={15} /> Recall
+                  </button>
+                )}
+                {activeId && activeConv && activeConv.kind !== 'dm' && (
+                  <button
+                    onClick={() => setShowPulse(true)}
+                    title="Decisions, questions and action items in this channel"
+                    data-testid="messages-pulse"
+                    className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border border-[var(--edge-soft)] text-[12.5px] text-[var(--ink-90)] hover:bg-[var(--surface-sunken)]"
+                  >
+                    <Icon name="radar" size={15} /> Pulse
                   </button>
                 )}
                 {activeId && activeConv && activeConv.kind !== 'dm' && (
@@ -1082,6 +1100,181 @@ function jumpToMessage(messageId: string): void {
   window.setTimeout(() => {
     el.style.backgroundColor = ''
   }, 1600)
+}
+
+// PlexiChat 2100 — Channel Pulse. A channel's durable meaning: the decisions it
+// reached, the questions still open, the action items someone owns, each linked to
+// the message it came from. Read the state of the room, not the transcript.
+// Refresh is opt-in (no background AI cost); honest and dark without the org key.
+function PulsePanel({ conversationId, onClose }: { conversationId: string; onClose: () => void }): JSX.Element {
+  const token = useMessagingStore((s) => s.token)
+  const [items, setItems] = useState<PulseItem[] | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [note, setNote] = useState<string | null>(null)
+
+  useEffect(() => {
+    let alive = true
+    void (async () => {
+      if (!token) return
+      const list = await getPulse(token, conversationId)
+      if (alive) setItems(list)
+    })()
+    return () => {
+      alive = false
+    }
+  }, [token, conversationId])
+
+  async function onRefresh(): Promise<void> {
+    if (!token) return
+    setBusy(true)
+    setNote(null)
+    const r = await refreshPulse(token, conversationId)
+    setBusy(false)
+    setItems(r.items)
+    if (!r.available) {
+      setNote(
+        r.reason === 'no-key'
+          ? 'Pulse needs the workspace AI key (Channels, AI member).'
+          : r.reason === 'no-org'
+            ? 'Pulse works in organisation channels.'
+            : 'Pulse is unavailable right now.'
+      )
+    } else {
+      setNote(r.added > 0 ? `Found ${r.added} new item${r.added === 1 ? '' : 's'}.` : 'Nothing new to surface.')
+    }
+  }
+
+  async function onCreateTask(it: PulseItem): Promise<void> {
+    if (!token) return
+    const res = await applyProposal(
+      { id: `pulse-${it.id}`, kind: 'create-task', title: it.text.slice(0, 200) },
+      { activeTaskId: null }
+    )
+    setNote(res.ok ? 'Task created.' : res.message || 'Could not create the task.')
+  }
+
+  const open = (items ?? []).filter((i) => i.status === 'open')
+  const groups: Array<{ kind: PulseItem['kind']; label: string; icon: string }> = [
+    { kind: 'decision', label: 'Decisions', icon: 'check_circle' },
+    { kind: 'question', label: 'Open questions', icon: 'help' },
+    { kind: 'action', label: 'Action items', icon: 'task_alt' }
+  ]
+
+  return (
+    <div
+      className="fixed inset-0 z-40 flex items-center justify-center bg-black/30"
+      onClick={onClose}
+      data-testid="pulse-panel"
+    >
+      <div
+        className="w-[500px] max-h-[80vh] flex flex-col rounded-xl bg-[var(--surface-raised)] border border-[var(--edge-soft)] shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="px-4 py-3 border-b border-[var(--edge-soft)] flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-[var(--ink-100)] inline-flex items-center gap-1.5">
+            <Icon name="radar" size={15} className="text-accent" /> Pulse
+          </h2>
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => void onRefresh()}
+              disabled={busy}
+              className="inline-flex items-center gap-1 h-7 px-2.5 rounded-lg border border-[var(--edge-soft)] text-[11.5px] text-[var(--ink-90)] hover:bg-[var(--surface-sunken)] disabled:opacity-40"
+              data-testid="pulse-refresh"
+            >
+              <Icon name="refresh" size={13} /> {busy ? 'Reading…' : 'Refresh'}
+            </button>
+            <button onClick={onClose} className="icon-btn" aria-label="Close" data-testid="pulse-close">
+              <Icon name="close" size={15} />
+            </button>
+          </div>
+        </div>
+
+        {note && <div className="px-4 pt-2 text-[11px] text-[var(--ink-50)]">{note}</div>}
+
+        <div className="flex-1 overflow-auto px-4 py-3 space-y-3">
+          {items === null ? (
+            <p className="text-[12px] text-[var(--ink-50)]">Loading…</p>
+          ) : open.length === 0 ? (
+            <p className="text-[12px] text-[var(--ink-50)] leading-snug">
+              No pulse yet. Refresh to surface the decisions, open questions, and action items from this channel.
+            </p>
+          ) : (
+            groups.map((g) => {
+              const groupItems = open.filter((i) => i.kind === g.kind)
+              if (groupItems.length === 0) return null
+              return (
+                <div key={g.kind}>
+                  <div className="text-[10.5px] uppercase tracking-wide text-[var(--ink-40)] inline-flex items-center gap-1 mb-1">
+                    <Icon name={g.icon} size={12} /> {g.label}
+                  </div>
+                  <div className="space-y-1">
+                    {groupItems.map((it) => (
+                      <div
+                        key={it.id}
+                        className="rounded-lg border border-[var(--edge-soft)] p-2 flex items-start gap-2"
+                        data-testid="pulse-item"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <div className="text-[12.5px] text-[var(--ink-100)] break-words">{it.text}</div>
+                          {it.sourceMessageId && (
+                            <button
+                              onClick={() => {
+                                jumpToMessage(it.sourceMessageId as string)
+                                onClose()
+                              }}
+                              className="mt-0.5 text-[11px] text-accent hover:underline inline-flex items-center gap-0.5"
+                            >
+                              <Icon name="arrow_outward" size={11} /> source
+                            </button>
+                          )}
+                        </div>
+                        {it.kind === 'action' && (
+                          <button
+                            onClick={() => void onCreateTask(it)}
+                            title="Create a task"
+                            className="text-[var(--ink-50)] hover:text-accent"
+                            data-testid={`pulse-task-${it.id}`}
+                          >
+                            <Icon name="add_task" size={16} />
+                          </button>
+                        )}
+                        <button
+                          onClick={async () => {
+                            if (token) {
+                              await setPulseStatus(token, conversationId, it.id, 'resolved')
+                              setItems((cur) => (cur ?? []).map((x) => (x.id === it.id ? { ...x, status: 'resolved' } : x)))
+                            }
+                          }}
+                          title="Resolve"
+                          className="text-[var(--ink-50)] hover:text-emerald-500"
+                          data-testid={`pulse-resolve-${it.id}`}
+                        >
+                          <Icon name="done" size={16} />
+                        </button>
+                        <button
+                          onClick={async () => {
+                            if (token) {
+                              await deletePulseItem(token, conversationId, it.id)
+                              setItems((cur) => (cur ?? []).filter((x) => x.id !== it.id))
+                            }
+                          }}
+                          title="Dismiss"
+                          className="text-[var(--ink-40)] hover:text-red-500"
+                          data-testid={`pulse-delete-${it.id}`}
+                        >
+                          <Icon name="close" size={15} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )
+            })
+          )}
+        </div>
+      </div>
+    </div>
+  )
 }
 
 // PlexiChat 2100 — Channel Recall. The end of scroll-archaeology: catch up on what
