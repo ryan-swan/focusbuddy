@@ -109,6 +109,8 @@ export async function applyProposal(
       return applyComposeMail(proposal)
     case 'post-chat':
       return applyPostChat(proposal)
+    case 'navigate-to':
+      return applyNavigateTo(proposal)
     default: {
       // Compile-time exhaustiveness: adding a kind to the union without a case
       // here fails `npm run typecheck` instead of silently no-oping at Apply
@@ -306,6 +308,61 @@ async function applyPostChat(
   useViewStore.getState().goOffice('chat')
   void messaging.setActive(p.conversationId)
   return { ok: true, message: `Drafted a message in "${p.conversationLabel ?? 'the conversation'}" — press send yourself` }
+}
+
+// System-wide navigation: jump to any area of the app from anywhere. Each target
+// maps to a real useViewStore go* action; targets that need an id (a specific
+// desk-room, task, document, knowledge entry, product) use targetId, and fall back
+// to the area's index when it's missing rather than failing.
+async function applyNavigateTo(
+  p: Extract<ActionProposal, { kind: 'navigate-to' }>
+): Promise<ApplyResult> {
+  const v = useViewStore.getState()
+  switch (p.target) {
+    case 'home': v.goHome(); break
+    case 'rooms': v.goRooms(); break
+    case 'desks': p.targetId ? v.goDesks(p.targetId) : v.goDesks(); break
+    case 'shared': v.goShared(); break
+    case 'documents': v.goDocuments(); break
+    case 'files': v.goFiles(); break
+    case 'mail': v.goMail(); break
+    case 'messages': v.goMessages(); break
+    case 'inbox': v.goInbox(); break
+    case 'calendar': v.goCalendar(); break
+    case 'meetings': v.goMeetings(); break
+    case 'forms': v.goForms(); break
+    case 'vault': v.goVault(); break
+    case 'search': v.goSearch(); break
+    case 'reports': v.goReports(); break
+    case 'insights': v.goInsights(); break
+    case 'org': v.goOrg(); break
+    case 'peoplemap': v.goPeopleMap(); break
+    case 'knowledge': v.goKnowledge(p.targetId); break
+    case 'apps': v.goApps(); break
+    case 'sign': v.goSign(); break
+    case 'projects': v.goProjects(); break
+    case 'flows': v.goFlows(); break
+    case 'marketplace': v.goMarketplace(); break
+    case 'design': v.goDesign(); break
+    case 'task':
+      if (!p.targetId) return { ok: false, message: 'No desk/task specified to open.' }
+      v.goTask(p.targetId)
+      break
+    case 'document':
+      if (!p.targetId) return { ok: false, message: 'No document specified to open.' }
+      v.goDocument(p.targetId)
+      break
+    case 'product':
+      if (!p.targetId) return { ok: false, message: 'No product specified to open.' }
+      v.goProduct(p.targetId)
+      break
+    default: {
+      const _x: never = p.target
+      void _x
+      return { ok: false, message: 'Unknown place to open.' }
+    }
+  }
+  return { ok: true, message: `Opened ${p.label}` }
 }
 
 // Update an existing task. taskId comes from the model's context (a real node
@@ -1036,6 +1093,8 @@ export function describeProposal(
       return { icon: 'drafts', verb: 'Draft email', subject: p.subject || p.to?.join(', ') || 'new message' }
     case 'post-chat':
       return { icon: 'chat', verb: 'Draft message', subject: p.conversationLabel ?? 'a conversation' }
+    case 'navigate-to':
+      return { icon: 'north_east', verb: 'Open', subject: p.label }
     case 'create-table':
       return {
         icon: 'table_chart',

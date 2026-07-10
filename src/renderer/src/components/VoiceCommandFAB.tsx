@@ -378,10 +378,16 @@ export default function VoiceCommandFAB(): JSX.Element {
       console.log('[voice] transcribe result:', JSON.stringify(res))
       if (res.ok) {
         const final = res.transcript.trim() || captionText
-        // Dictation: if the user was editing a text surface, type the transcript
-        // straight in and finish — no AI, no review dock. This is press-to-talk
-        // "dictate" across docs / note widgets / sheet cells / any field.
-        if (final && dictationTargetRef.current && dictateInto(dictationTargetRef.current, final)) {
+        // Wake word makes the mic system-wide: "Plexi, ..." / "Hey Plexi, ..."
+        // addresses the assistant as a COMMAND even while a text field is focused,
+        // so you can act on anything from anywhere without it being restrictive.
+        // The prefix is stripped from the command text.
+        const WAKE = /^\s*(hey\s+)?plexi\b[,:]?\s*/i
+        const hasWake = WAKE.test(final)
+        // Dictation: a text surface is focused AND the user did NOT address the
+        // assistant → type the transcript in VERBATIM (the original Whisper text,
+        // never an AI echo) and finish. Mutually exclusive with the command path.
+        if (final && !hasWake && dictationTargetRef.current && dictateInto(dictationTargetRef.current, final)) {
           dictationTargetRef.current = null
           setTranscript('')
           setEditedTranscript('')
@@ -389,8 +395,12 @@ export default function VoiceCommandFAB(): JSX.Element {
           setPhase('idle')
           return
         }
-        setTranscript(final)
-        setEditedTranscript(final)
+        // Command path (wake word, or nothing editable focused): stage the
+        // wake-stripped command for review → the system-wide AI.
+        dictationTargetRef.current = null
+        const command = hasWake ? final.replace(WAKE, '').trim() || final : final
+        setTranscript(command)
+        setEditedTranscript(command)
       } else {
         // Whisper failed — fall back to the live caption text. Better
         // a slightly-wrong transcript the user can edit than nothing.

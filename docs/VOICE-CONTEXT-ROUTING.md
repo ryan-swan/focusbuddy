@@ -77,3 +77,51 @@ Key files: VoiceCommandFAB.tsx, main/ai/voiceCommand.ts, shared/types.ts
 (ActionProposal), lib/actionExecutor.ts, main/ai/anthropic.ts (3461/3494), the four
 use*Ai hooks + DesignAiPanel, stores/view.ts, stores/documents.ts, stores/widgets.ts,
 main/ai/modelRouting.ts.
+
+## SUPERSEDING DESIGN 2026-07-10 — unified system-wide voice brain (ai-proposal-owner)
+
+Operator intent: the mic is ONE system-wide assistant — do anything from anywhere;
+context (room/desk/open doc/focused widget) BIASES but never RESTRICTS; verbatim
+dictation by default, commands on a wake word. Supersedes the per-context routing
+above (keep its steps 2-5 only as the backlog for the deferred office-edit kinds).
+
+Key decisions:
+1. Dictation vs command — wake word `Plexi`/`Hey Plexi`, regex
+   `/^\s*(hey\s+)?plexi\b[,:]?\s*/i`, tested on the raw Whisper `final` in
+   VoiceCommandFAB before the dictation short-circuit. Matrix: editable focused +
+   no wake word -> dictate VERBATIM (insert the original transcript, never an AI
+   echo); editable focused + wake word -> strip prefix, command; no editable
+   focused -> command (strip wake word if present). Dictation & command paths are
+   mutually exclusive per capture.
+2. ONE unified prompt (no classifier — avoids a round trip on the hot path). Model
+   unchanged (resolveModel('setup') = Sonnet). Expose all system-wide kinds; split
+   the prompt into canvas-target kinds (need a widget id from the snapshot) vs
+   system-wide kinds (work anywhere, no widget id). Context header reframed to
+   "Current focus (bias only, not a restriction): you may propose ANY system-wide
+   action even if it targets something other than what's below." No new scope field
+   — the kind's own fields say what it acts on.
+3. Net-new `navigate-to` proposal: { target: home|rooms|desks|calendar|mail|chat|
+   documents|plexibrain|search|files|meetings|forms|insights|org|peoplemap|vault|
+   sign|apps|marketplace|reports|flows|api|task|document|knowledge|product,
+   targetId?, label, reason? } applied by applyNavigateTo -> useViewStore go*.
+   (open-url only opens an external webview widget; it is NOT navigation.)
+4. sanitiseProposal (12 today) -> add open-url (https only), start-focus-session
+   (1-480), create-field, update-task (needs known-tasks ctx), create-knowledge-
+   entry (grounding), create-document (docType enum), edit-document (real docId or
+   $ref), schedule-event (currentTimeMs ctx; dur 1-1440), compose-mail, post-chat
+   (real conversationId only), navigate-to. Exclude create-page + set-cell (no
+   reliable ctx yet). applyProposal ALREADY handles all 24 kinds — the gap was only
+   the voice whitelist + prompt.
+5. Context plumbing (voiceContext + VoiceCommandInput, additive): roomId (desk's
+   parent), focusedWidgetId (currently unforwarded), currentTimeMs, open-doc text
+   preview, capped known-task + known-doc/conversation inventories.
+6. Guards: never invent an id (copy from a context block or ask in reply); explicit
+   'replace' only for destructive edit-document/bulk update-task; grounding clause
+   for knowledge/summaries; dictation never altered. PRE-EXISTING BUG to fix first:
+   runVoiceCommand (voiceCommand.ts ~124) and the streaming finalMessage (~644)
+   read content with NO stop_reason guard for 'refusal'/'model_context_window_
+   exceeded' (invariant 1) — fix both first.
+
+Build order: 0 stop_reason fixes -> 1 wake-word (FAB only) -> 2 context additions
+-> 3 sanitiser whitelist -> 4 prompt rewrite -> 5 navigate-to. Deferred: set-cell,
+create-page, real conversation inventory, and edit-sheet/slide/design/map.

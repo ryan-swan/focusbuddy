@@ -413,6 +413,38 @@ export interface ChatResponse {
 // and a typed payload. The renderer's actionExecutor.ts knows how to apply
 // each kind.
 
+// Where the navigate-to proposal can send the user. Each value maps to a
+// useViewStore go* action in actionExecutor's applyNavigateTo.
+export type NavigateTarget =
+  | 'home'
+  | 'rooms'
+  | 'desks'
+  | 'shared'
+  | 'documents'
+  | 'files'
+  | 'mail'
+  | 'messages'
+  | 'inbox'
+  | 'calendar'
+  | 'meetings'
+  | 'forms'
+  | 'vault'
+  | 'search'
+  | 'reports'
+  | 'insights'
+  | 'org'
+  | 'peoplemap'
+  | 'knowledge'
+  | 'apps'
+  | 'sign'
+  | 'projects'
+  | 'flows'
+  | 'marketplace'
+  | 'design'
+  | 'task'
+  | 'document'
+  | 'product'
+
 export type ActionProposal =
   | {
       id: string
@@ -435,6 +467,18 @@ export type ActionProposal =
       kind: 'open-url'
       url: string
       title?: string
+      reason?: string
+    }
+  | {
+      // System-wide navigation: jump to any area of the app. This is what lets the
+      // voice assistant "open my calendar / go to Files / show the org chart" from
+      // anywhere, regardless of the current context. Distinct from open-url, which
+      // opens an external web page in a canvas webview widget.
+      id: string
+      kind: 'navigate-to'
+      target: NavigateTarget
+      targetId?: string // for target 'desks'(roomId) 'task' 'document' 'knowledge' 'product'
+      label: string
       reason?: string
     }
   | {

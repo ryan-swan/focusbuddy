@@ -21,7 +21,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { randomUUID } from 'crypto'
 import { resolveAnthropicKey } from '../settingsStore'
 import { resolveModel } from './modelRouting'
-import type { ActionProposal, WidgetKind } from '@shared/types'
+import type { ActionProposal, WidgetKind, NavigateTarget } from '@shared/types'
 
 // What the renderer hands us about the current canvas. Kept deliberately
 // flat — the AI never sees the full widget shape, only the fields it
@@ -121,6 +121,16 @@ export async function runVoiceCommand(
       system,
       messages: [{ role: 'user', content: userMsg }]
     })
+    // Invariant 1: guard the stop reason before reading content, so a refusal or a
+    // context-window overflow surfaces as an honest error instead of silently
+    // returning an empty (no-op) result.
+    const sr = resp.stop_reason as string
+    if (sr === 'refusal') {
+      return { ok: false, error: 'The model declined to act on that request.', reason: 'api' }
+    }
+    if (sr === 'model_context_window_exceeded') {
+      return { ok: false, error: 'That was too much context for one request — try a shorter command.', reason: 'api' }
+    }
     raw = resp.content
       .filter((b) => b.type === 'text')
       .map((b) => ('text' in b ? b.text : ''))
@@ -169,6 +179,9 @@ function buildContextBlock(input: VoiceCommandInput): string {
     }`
   )
   lines.push(`totalWidgetsVisible: ${input.widgets.length}`)
+  // Current time so schedule-event can resolve "tomorrow at 3pm" to an absolute
+  // startMs. The model must compute from this, never guess a date.
+  lines.push(`now: ${new Date().toString()} (epoch ms: ${Date.now()})`)
   return lines.join('\n')
 }
 
@@ -239,6 +252,28 @@ Available proposal kinds (return as a JSON array under "proposals"):
     Column "type" is one of: text-short, text-long, number, checkbox, single-select, multi-select, date, attachment, button. Include "options" for the select types. Pick the most natural type per field (phone/email/name → text-short, a notes field → text-long, an amount → number, a yes/no → checkbox, a stage/status → single-select).
     Example: "make a table to track calls with name, phone number, date and status" → exactly the columns shown above.
 
+SYSTEM-WIDE actions (these work from ANYWHERE — they do NOT need a canvas or a widget id, so propose them even when the user is inside a document, a room, or any other view):
+
+13. "navigate-to" — open any area of the app ("open my calendar", "go to Files", "show the org chart", "take me to Mail", "open the People map").
+    { "kind": "navigate-to", "target": "home|rooms|desks|shared|documents|files|mail|messages|inbox|calendar|meetings|forms|vault|search|reports|insights|org|peoplemap|knowledge|apps|sign|projects|flows|marketplace|design|task|document|product", "targetId": "<id, only for task/document/product/desks/knowledge>", "label": "<what you're opening, e.g. 'Calendar'>", "reason": "..." }
+    Use targetId ONLY when you have a real id from a context block; for task/document/product it is required — if you don't have the id, don't guess, ask in reply.
+
+14. "create-document" — make a new office file (Word-style doc, spreadsheet, slide deck, diagram, or design).
+    { "kind": "create-document", "docType": "doc|sheet|slides|map|design", "title": "...", "reason": "..." }
+
+15. "schedule-event" — put an event on the calendar. Compute startMs (epoch ms) from the "now" value in the context; NEVER invent a date.
+    { "kind": "schedule-event", "title": "...", "startMs": 0, "durationMinutes": 30, "recurrence": null, "reason": "..." }
+
+16. "compose-mail" — draft an email (the user always sends it themselves).
+    { "kind": "compose-mail", "to": ["..."], "subject": "...", "body": "...", "reason": "..." }
+
+17. "create-knowledge-entry" — save a note into the knowledge base. Only from what the user actually said — never invent facts, figures, or citations.
+    { "kind": "create-knowledge-entry", "title": "...", "body": "...", "tags": ["..."], "reason": "..." }
+
+18. "start-focus-session" — begin a focus timer. { "kind": "start-focus-session", "minutes": 25, "reason": "..." }
+
+19. "open-url" — open an external web page as a canvas webview (NOT app navigation — use navigate-to for that). { "kind": "open-url", "url": "https://…", "title": "...", "reason": "..." }
+
 Resolving "this" / "that" / "it":
 - If "selectedWidget" is set, that's "this".
 - Otherwise, pick the widget whose title or content most plausibly matches the user's reference. If two are equally likely, ask in the "reply" field instead of guessing.
@@ -252,12 +287,14 @@ Return valid JSON ONLY (no prose, no code fence). Schema:
 }
 
 Rules:
-- All "widgetId", "sourceWidgetId", "targetWidgetId" MUST be exact ids copied from the snapshot. Never invent ids.
+- SCOPE — the current focus (activeTaskId, selectedWidget, the widget snapshot) is a BIAS, not a restriction. Canvas-target actions (create-widget, update/delete/link/focus/drill/toggle/arrange/add-table-row) need a widget id from the snapshot. But the SYSTEM-WIDE actions (13-19) plus create-task/create-todo-list/create-table work from anywhere — always propose them when that's what the user wants, even if the user is inside a document or a different view than what's shown below.
+- All "widgetId", "sourceWidgetId", "targetWidgetId" MUST be exact ids copied from the snapshot. Never invent ids. The same applies to every "targetId": copy it from a context block or omit it — if a required id isn't available, ask in "reply" instead of guessing.
+- NO FAKERY: never invent facts, figures, quotes, dates, emails, or ids. create-knowledge-entry / any summary must come only from what the user said or the real context; if there isn't enough, say so in "reply". Compute schedule-event startMs from the "now" value, never a guessed date.
 - Mutation proposals (update / delete / link / focus) require the target to exist in the snapshot.
 - If the user's intent is conversational ("what does this do?"), return [] proposals and answer in "reply".
-- If activeTaskId is NONE, you CAN still propose create-task. You CAN'T propose create-widget (no canvas to put it on) — say so in "reply".
+- If activeTaskId is NONE, you CAN still propose create-task and any system-wide action. You CAN'T propose create-widget (no canvas to put it on) — say so in "reply".
 - Never propose more than 6 actions in one response. If the user asked for more, propose the most important 6 and mention the rest in "reply".
-- Destructive ops (delete-widget) need a clear user trigger — only propose if the user explicitly said delete / remove / clear / trash / get rid of.`
+- Destructive ops (delete-widget, update-widget/edit-document with operation "replace") need a clear user trigger — only propose if the user explicitly said delete / remove / clear / trash / get rid of / replace / overwrite. Default to non-destructive (append).`
 }
 
 interface ParseResult {
@@ -299,7 +336,9 @@ function parseResponse(raw: string): ParseResult | VoiceCommandError {
   return { ok: true, reply, proposals }
 }
 
-function sanitiseProposal(
+// Exported for unit testing — it is the whitelist-and-drop gate that stops the
+// model's output from ever producing an unsupported or id-fabricating action.
+export function sanitiseProposal(
   raw: unknown,
   known: Map<string, CanvasSnapshotWidget>,
   activeTaskId: string | null,
@@ -529,6 +568,63 @@ function sanitiseProposal(
         reason
       }
     }
+    // ── System-wide kinds (work from anywhere; no canvas widget id needed) ──
+    case 'navigate-to': {
+      const NAV_TARGETS = [
+        'home', 'rooms', 'desks', 'shared', 'documents', 'files', 'mail', 'messages',
+        'inbox', 'calendar', 'meetings', 'forms', 'vault', 'search', 'reports',
+        'insights', 'org', 'peoplemap', 'knowledge', 'apps', 'sign', 'projects',
+        'flows', 'marketplace', 'design', 'task', 'document', 'product'
+      ]
+      const target = typeof o.target === 'string' && NAV_TARGETS.includes(o.target) ? o.target : ''
+      if (!target) return null
+      const targetId = typeof o.targetId === 'string' && o.targetId.trim() ? o.targetId.trim() : undefined
+      // Targets that address a specific object can't be invented — drop if the id
+      // is missing rather than guess.
+      if ((target === 'task' || target === 'document' || target === 'product') && !targetId) return null
+      const label = typeof o.label === 'string' && o.label.trim() ? o.label.trim() : target
+      return { id, kind: 'navigate-to', target: target as NavigateTarget, targetId, label, reason }
+    }
+    case 'open-url': {
+      const url = typeof o.url === 'string' ? o.url.trim() : ''
+      if (!/^https?:\/\//i.test(url)) return null
+      return { id, kind: 'open-url', url, title: typeof o.title === 'string' ? o.title : undefined, reason }
+    }
+    case 'start-focus-session': {
+      const raw = typeof o.minutes === 'number' ? o.minutes : 25
+      const minutes = Math.min(480, Math.max(1, Math.round(raw)))
+      return { id, kind: 'start-focus-session', minutes, reason }
+    }
+    case 'create-document': {
+      const docType = typeof o.docType === 'string' ? o.docType : ''
+      if (!['doc', 'sheet', 'slides', 'map', 'design'].includes(docType)) return null
+      const title = typeof o.title === 'string' && o.title.trim() ? o.title.trim() : 'Untitled'
+      return { id, kind: 'create-document', docType: docType as 'doc' | 'sheet' | 'slides' | 'map' | 'design', title, reason }
+    }
+    case 'create-knowledge-entry': {
+      const title = typeof o.title === 'string' ? o.title.trim() : ''
+      const body = typeof o.body === 'string' ? o.body.trim() : ''
+      if (!title || !body) return null
+      const tags = Array.isArray(o.tags) ? o.tags.filter((x): x is string => typeof x === 'string') : undefined
+      return { id, kind: 'create-knowledge-entry', title, body, tags, reason }
+    }
+    case 'schedule-event': {
+      const title = typeof o.title === 'string' ? o.title.trim() : ''
+      const startMs = typeof o.startMs === 'number' && Number.isFinite(o.startMs) && o.startMs > 0 ? o.startMs : 0
+      if (!title || !startMs) return null
+      const durRaw = typeof o.durationMinutes === 'number' ? o.durationMinutes : 30
+      const durationMinutes = Math.min(1440, Math.max(1, Math.round(durRaw)))
+      const rec = o.recurrence
+      const recurrence = rec === 'daily' || rec === 'weekly' || rec === 'monthly' ? rec : null
+      return { id, kind: 'schedule-event', title, startMs, durationMinutes, recurrence, reason }
+    }
+    case 'compose-mail': {
+      const subject = typeof o.subject === 'string' ? o.subject.trim() : ''
+      const body = typeof o.body === 'string' ? o.body.trim() : ''
+      if (!subject && !body) return null
+      const to = Array.isArray(o.to) ? o.to.filter((x): x is string => typeof x === 'string') : undefined
+      return { id, kind: 'compose-mail', to, subject, body, reason }
+    }
     default:
       return null
   }
@@ -641,7 +737,18 @@ export async function runVoiceCommandStreaming(
       }
     })
 
-    await stream.finalMessage()
+    const finalMsg = await stream.finalMessage()
+    // Invariant 1: honour the stop reason. A refusal / context overflow means the
+    // model produced nothing usable — surface it rather than completing silently.
+    const sr = (finalMsg.stop_reason as string) ?? ''
+    if (sr === 'refusal') {
+      cb.onError({ ok: false, error: 'The model declined to act on that request.', reason: 'api' })
+      return
+    }
+    if (sr === 'model_context_window_exceeded') {
+      cb.onError({ ok: false, error: 'That was too much context for one request — try a shorter command.', reason: 'api' })
+      return
+    }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
     cb.onError({ ok: false, error: msg.length > 240 ? msg.slice(0, 240) + '…' : msg, reason: 'api' })
