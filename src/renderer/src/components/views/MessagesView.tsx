@@ -177,7 +177,7 @@ function MentionBody({ m }: { m: ChatMessage }): JSX.Element {
   return <MentionText body={m.body} myHandle={myHandle} knownHandles={known} nameByHandle={nameByHandle} />
 }
 
-function MessageRow({
+export function MessageRow({
   m,
   mine,
   myId,
@@ -1268,7 +1268,7 @@ function jumpToMessage(messageId: string): void {
 // decision, and the open questions and action items across your channels. Real
 // data only, no AI call. Each item jumps you to the exact place. This is the
 // antidote to the unread badge: read what needs you, not everything.
-function BriefingPanel({ onClose }: { onClose: () => void }): JSX.Element {
+export function BriefingPanel({ onClose }: { onClose: () => void }): JSX.Element {
   const token = useMessagingStore((s) => s.token)
   const openConversation = useMessagingStore((s) => s.openConversation)
   const [b, setB] = useState<Briefing | null>(null)
@@ -1421,7 +1421,7 @@ function BriefingPanel({ onClose }: { onClose: () => void }): JSX.Element {
 // reached, the questions still open, the action items someone owns, each linked to
 // the message it came from. Read the state of the room, not the transcript.
 // Refresh is opt-in (no background AI cost); honest and dark without the org key.
-function PulsePanel({ conversationId, onClose }: { conversationId: string; onClose: () => void }): JSX.Element {
+export function PulsePanel({ conversationId, onClose }: { conversationId: string; onClose: () => void }): JSX.Element {
   const token = useMessagingStore((s) => s.token)
   const [items, setItems] = useState<PulseItem[] | null>(null)
   const [busy, setBusy] = useState(false)
@@ -1597,7 +1597,7 @@ function PulsePanel({ conversationId, onClose }: { conversationId: string; onClo
 // pulled from its real history with clickable source citations. Read-only and
 // private to you; nothing is posted to the channel. Honest states throughout:
 // when the workspace AI key is not set it says so instead of faking an answer.
-function RecallPanel({ conversationId, onClose }: { conversationId: string; onClose: () => void }): JSX.Element {
+export function RecallPanel({ conversationId, onClose }: { conversationId: string; onClose: () => void }): JSX.Element {
   const token = useMessagingStore((s) => s.token)
   const [catchup, setCatchup] = useState<RecallResult | null>(null)
   const [question, setQuestion] = useState('')
@@ -1733,7 +1733,7 @@ function RecallPanel({ conversationId, onClose }: { conversationId: string; onCl
 // language instruction on a daily/weekly/monthly cadence; the server runs it as
 // the AI member even when everyone is offline. No fabrication: an honest empty
 // state and real enabled/next-run status.
-function SchedulesPanel({ conversationId, onClose }: { conversationId: string; onClose: () => void }): JSX.Element {
+export function SchedulesPanel({ conversationId, onClose }: { conversationId: string; onClose: () => void }): JSX.Element {
   const token = useMessagingStore((s) => s.token)
   const [items, setItems] = useState<ChannelSchedule[] | null>(null)
   const [instruction, setInstruction] = useState('')
@@ -2103,7 +2103,7 @@ function AiMemberConfig({ token, orgId }: { token: string; orgId: string }): JSX
 
 // Browse the channels in your organization, join one, or create a new one.
 // Channels are org-scoped: only people in the same organization see and join them.
-function ChannelBrowser({ onClose }: { onClose: () => void }): JSX.Element {
+export function ChannelBrowser({ onClose }: { onClose: () => void }): JSX.Element {
   const token = useMessagingStore((s) => s.token)
   const browseChannels = useMessagingStore((s) => s.browseChannels)
   const createChannel = useMessagingStore((s) => s.createChannel)

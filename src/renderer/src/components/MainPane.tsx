@@ -8,7 +8,7 @@ import SharedView from './views/SharedView'
 import ConnectedAppView from './views/ConnectedAppView'
 import VaultView from './views/VaultView'
 import CalendarView from './views/CalendarView'
-import MessagesView from './views/MessagesView'
+import FlowView from './views/FlowView'
 import InboxView from './views/InboxView'
 import MailView from './views/MailView'
 import DocumentsView from './views/DocumentsView'
@@ -88,7 +88,7 @@ function MainPaneSurface(): JSX.Element {
     case 'calendar':
       return <CalendarView />
     case 'messages':
-      return <MessagesView />
+      return <FlowView />
     case 'inbox':
       return <InboxView />
     case 'mail':
