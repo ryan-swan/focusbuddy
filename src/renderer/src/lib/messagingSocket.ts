@@ -38,6 +38,10 @@ export type YjsSocketEvent =
 
 // Account-level presence (the People Map) rides the same authenticated socket.
 // The presence store registers a handler; null when presence isn't active.
+// Where a teammate currently is in the app, so a collaboration surface (a desk)
+// can show who is here. Mirrors the signal server's PresenceLocation.
+export type PresenceLocation = { kind: 'desk' | 'room' | 'document'; id: string; label?: string | null }
+
 export type PresencePeer = {
   accountId: string
   handle: string
@@ -45,7 +49,7 @@ export type PresencePeer = {
   lastName?: string | null
   status: 'online' | 'away' | 'focus' | 'busy' | 'offline'
   workingOn: string | null
-  surface: string | null
+  location: PresenceLocation | null
   updatedAt: number
 }
 export type PresenceSocketEvent =

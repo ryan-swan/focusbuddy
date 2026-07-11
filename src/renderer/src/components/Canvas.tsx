@@ -18,6 +18,7 @@ import FieldWidget from './widgets/FieldWidget'
 import PageWidget from './widgets/PageWidget'
 import LivingDocWidget from './widgets/LivingDocWidget'
 import ChatThreadWidget from './widgets/ChatThreadWidget'
+import DeskPresenceBar from './DeskPresenceBar'
 import TableWidget from './widgets/TableWidget'
 import ChartWidget from './widgets/ChartWidget'
 import OfficeDocWidget from './widgets/OfficeDocWidget'
@@ -2245,6 +2246,9 @@ export default function Canvas(): JSX.Element {
               <span>{fmtMin(remainingMin)}</span>
             </div>
           )}
+
+          {/* Who else is on this desk right now, plus who's invited. */}
+          <DeskPresenceBar taskId={activeTask.id} />
 
           {/* This desk's chat — drops a live chat panel bound to the desk's channel
               onto the canvas (or focuses the one already there), so you can read

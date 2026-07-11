@@ -4,9 +4,11 @@ import {
   setPresenceSocketHandler,
   setPresenceOpenHandler,
   type PresencePeer,
+  type PresenceLocation,
   type PresenceSocketEvent
 } from '../lib/messagingSocket'
 import { useFocusSessionStore } from './focusSession'
+import { useViewStore } from './view'
 
 // Account-level presence (the "People Map"): who across your org/team is online
 // right now and what they're doing. Rides the same authenticated messaging
@@ -39,6 +41,10 @@ interface PresenceStore {
 }
 
 let unsubFocus: (() => void) | null = null
+let unsubView: (() => void) | null = null
+// The desk id we last announced, so a view change only re-sends presence when the
+// desk actually changes (not on every unrelated view store update).
+let lastLocationId: string | null = null
 
 // The appear-offline choice is the user's, so it persists locally and is
 // re-asserted on every (re)connect. The client is the authority on its own
@@ -76,7 +82,7 @@ function applyEvent(e: PresenceSocketEvent, set: (fn: (s: PresenceStore) => Part
           lastName: p.lastName ?? null,
           status: p.status,
           workingOn: p.workingOn,
-          surface: p.surface,
+          location: p.location ?? null,
           updatedAt: p.updatedAt
         }
       } else {
@@ -95,6 +101,14 @@ function deriveStatus(): { status: PresenceStatus; workingOn: string | null } {
   return { status: 'online', workingOn: null }
 }
 
+// Where we currently are, so a desk can show who is on it. Only a desk (a 'task'
+// view) is a collaboration surface today; every other view reports no location.
+function deriveLocation(): PresenceLocation | null {
+  const view = useViewStore.getState().view
+  if (view.kind === 'task' && view.taskId) return { kind: 'desk', id: view.taskId }
+  return null
+}
+
 export const usePresenceStore = create<PresenceStore>((set, get) => ({
   peers: {},
   myStatus: 'online',
@@ -110,12 +124,18 @@ export const usePresenceStore = create<PresenceStore>((set, get) => ({
     // choice every time so a reconnect never briefly outs an invisible user.
     setPresenceOpenHandler(() => {
       const { status, workingOn } = deriveStatus()
-      sendSocketMessage({ type: 'presenceJoin', payload: { status, workingOn, visible: !get().myInvisible } })
+      sendSocketMessage({
+        type: 'presenceJoin',
+        payload: { status, workingOn, location: deriveLocation(), visible: !get().myInvisible }
+      })
       set(() => ({ myStatus: status, myWorkingOn: workingOn }))
     })
     // Join now in case the socket is already authenticated (no open event coming).
     const { status, workingOn } = deriveStatus()
-    sendSocketMessage({ type: 'presenceJoin', payload: { status, workingOn, visible: !get().myInvisible } })
+    sendSocketMessage({
+      type: 'presenceJoin',
+      payload: { status, workingOn, location: deriveLocation(), visible: !get().myInvisible }
+    })
     // Keep our status in sync with focus-session changes.
     unsubFocus = useFocusSessionStore.subscribe(() => {
       const d = deriveStatus()
@@ -123,6 +143,17 @@ export const usePresenceStore = create<PresenceStore>((set, get) => ({
         get().setStatus(d.status, d.workingOn)
       }
     })
+    // Re-announce our location when we move between desks (or leave one), so a
+    // desk's "who is here" stays honest. Only fires when the desk id changes.
+    unsubView = useViewStore.subscribe(() => {
+      const loc = deriveLocation()
+      const id = loc?.id ?? null
+      if (id !== lastLocationId) {
+        lastLocationId = id
+        if (get().active) get().setStatus(get().myStatus, get().myWorkingOn)
+      }
+    })
+    lastLocationId = deriveLocation()?.id ?? null
     set(() => ({ active: true, myStatus: status, myWorkingOn: workingOn }))
   },
 
@@ -132,6 +163,10 @@ export const usePresenceStore = create<PresenceStore>((set, get) => ({
       unsubFocus()
       unsubFocus = null
     }
+    if (unsubView) {
+      unsubView()
+      unsubView = null
+    }
     sendSocketMessage({ type: 'presenceLeave' })
     setPresenceSocketHandler(null)
     setPresenceOpenHandler(null)
@@ -139,9 +174,12 @@ export const usePresenceStore = create<PresenceStore>((set, get) => ({
   },
 
   setStatus: (status, workingOn) => {
-    // Carry visibility on every update so a status change while invisible never
-    // accidentally re-announces us as online.
-    sendSocketMessage({ type: 'presenceUpdate', payload: { status, workingOn: workingOn ?? null, visible: !get().myInvisible } })
+    // Carry visibility + current location on every update so a status change
+    // while invisible never re-announces us, and a desk always knows where we are.
+    sendSocketMessage({
+      type: 'presenceUpdate',
+      payload: { status, workingOn: workingOn ?? null, location: deriveLocation(), visible: !get().myInvisible }
+    })
     set(() => ({ myStatus: status, myWorkingOn: workingOn ?? null }))
   },
 
@@ -151,6 +189,9 @@ export const usePresenceStore = create<PresenceStore>((set, get) => ({
     // Tell the server. The server turns this into an honest offline (going
     // invisible) or online (coming back) event for our audience.
     const { myStatus, myWorkingOn } = get()
-    sendSocketMessage({ type: 'presenceUpdate', payload: { status: myStatus, workingOn: myWorkingOn, visible: !invisible } })
+    sendSocketMessage({
+      type: 'presenceUpdate',
+      payload: { status: myStatus, workingOn: myWorkingOn, location: deriveLocation(), visible: !invisible }
+    })
   }
 }))
