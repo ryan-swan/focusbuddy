@@ -21,6 +21,7 @@ import SettingsPanel from './components/SettingsPanel'
 import TeamPresenceButton from './components/TeamPresenceButton'
 import Footer from './components/Footer'
 import FocusSessionOverlay from './components/FocusSessionOverlay'
+import DemoOverlay from './demo/DemoOverlay'
 import CallOverlay from './components/CallOverlay'
 import MeetingOverlay from './components/MeetingOverlay'
 import MeetingLaunchDialog from './components/MeetingLaunchDialog'
@@ -650,6 +651,7 @@ export default function App(): JSX.Element {
       </main>
       <Footer />
 
+      <DemoOverlay />
       <FocusSessionOverlay />
       <CallOverlay />
       <MeetingOverlay />

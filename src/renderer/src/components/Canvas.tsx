@@ -55,6 +55,7 @@ import CardWidget from './widgets/CardWidget'
 import CustomBlockWidget from './widgets/CustomBlockWidget'
 import AgentWidget from './widgets/AgentWidget'
 import PortalWidget from './widgets/PortalWidget'
+import TaskListWidget from './widgets/TaskListWidget'
 import ZoomControls from './ZoomControls'
 import CanvasEdgeIndicators from './CanvasEdgeIndicators'
 import { useEdgePan } from '../lib/useEdgePan'
@@ -97,6 +98,7 @@ import MindmapStartingKit from './MindmapStartingKit'
 import SyncWidgetPicker from './SyncWidgetPicker'
 import HistoryPanel from './HistoryPanel'
 import CanvasBreadcrumb from './CanvasBreadcrumb'
+import { useFreeDesk } from '../hooks/useFreeDesk'
 import type { StandardApp } from '../lib/standardApps'
 import {
   PinLayoutContext,
@@ -201,6 +203,8 @@ function renderWidget(w: Widget): JSX.Element | null {
       return <PortalWidget widget={w} />
     case 'living-doc':
       return <LivingDocWidget widget={w} />
+    case 'task-list':
+      return <TaskListWidget widget={w} />
     case 'section':
       return <SectionWidget widget={w} renderChild={renderWidget} />
     case 'webview':
@@ -224,6 +228,7 @@ export default function Canvas(): JSX.Element {
   const updateNode = useNodeStore((s) => s.update)
   const setActiveTask = useNodeStore((s) => s.setActive)
   const expandFolder = useNodeStore((s) => s.expand)
+  const { assignToRoom, createRoomAndAssign } = useFreeDesk()
   // Breadcrumb origin: if this task's canvas was opened by exploring a mind-map
   // node, show a path back to the map. Re-read on task switch + origin changes.
 
@@ -2074,6 +2079,9 @@ export default function Canvas(): JSX.Element {
               onRevealFolder={(id) => expandFolder(id, true)}
               onHome={() => setActiveTask(null)}
               fromMindmap={!!nodeOrigin}
+              onAssignToRoom={(deskId, roomId) => void assignToRoom(deskId, roomId)}
+              onCreateRoomFromDesk={(deskId) => void createRoomAndAssign(deskId)}
+              onRenameTask={(id, title) => void updateNode(id, { title })}
             />
           </div>
 

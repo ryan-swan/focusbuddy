@@ -2,42 +2,41 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import Icon from './Icon'
 import { applyProposal, describeProposal } from '../lib/actionExecutor'
 import { buildCanvasSnapshot } from '../lib/canvasSnapshot'
-import { useViewStore } from '../stores/view'
+import { useNodeStore } from '../stores/nodes'
 import { useWidgetStore } from '../stores/widgets'
+import { useVoicePhaseStore } from '../stores/voicePhase'
 import type { ActionProposal, Widget } from '@shared/types'
 
-// VoiceCommandFAB — the always-available floating mic for voice control
+// VoiceCommandFAB -- the always-available floating mic for voice control
 // of the canvas. Spec:
 //   - Bottom-middle, fixed, chrome-aware (sits above the CommandCenter
 //     pill, both centered)
-//   - Two trigger modes (user preference in Settings → Voice):
+//   - Two trigger modes (user preference in Settings -> Voice):
 //       press-hold   : record while held, submit on release
 //       click-toggle : click to start, auto-stop after N ms of silence
 //   - Live captions overlay while listening
-//   - On stop: transcript stages for correction → user clicks Send
-//   - AI returns ActionProposal[] → cards stack near the FAB with the
+//   - On stop: transcript stages for correction -> user clicks Send
+//   - AI returns ActionProposal[] -> cards stack near the FAB with the
 //     usual Apply / Dismiss UX
 //   - Optional spoken voice-back when proposals return
 //
 // We deliberately reuse the existing Whisper pipeline (window.api.voiceNote)
 // rather than introducing a parallel one. The mic is wired via MediaRecorder
-// with audio-only constraints (no video for the FAB — it's not a recorder).
+// with audio-only constraints (no video for the FAB -- it is not a recorder).
 
 type Phase =
   | 'idle'
   | 'listening'
-  | 'staged' // transcript ready for review/edit, not sent yet
-  | 'sending' // hit Anthropic
-  | 'result' // proposals dock visible
-  | 'error' // capture/transcribe failed — show the reason (don't silently hide it)
+  | 'staged'
+  | 'sending'
+  | 'result'
+  | 'error'
 
 // Intersection (not `interface extends`): ActionProposal is a discriminated
 // union, and an interface extending a union silently drops the per-member
-// discriminants (kind/id/widgetId). `ActionProposal & {…}` distributes over the
-// union so each member keeps its fields AND gains the local UI status.
+// discriminants (kind/id/widgetId). `ActionProposal & {...}` distributes over
+// the union so each member keeps its fields AND gains the local UI status.
 type Proposal = ActionProposal & {
-  // status tracked locally so we can mark a card consumed without
-  // mutating the AI's payload.
   _status?: 'pending' | 'applied' | 'dismissed' | 'failed'
   _message?: string
 }
@@ -55,8 +54,7 @@ const DEFAULT_PREFS: VoicePrefs = {
 }
 
 function activeTaskId(): string | null {
-  const v = useViewStore.getState().view
-  return v.kind === 'task' ? v.taskId : null
+  return useNodeStore.getState().activeTaskId
 }
 
 interface SpeechRecognitionLike {
@@ -73,7 +71,21 @@ type SpeechRecognitionCtor = new () => SpeechRecognitionLike
 
 export default function VoiceCommandFAB(): JSX.Element {
   const [prefs, setPrefs] = useState<VoicePrefs>(DEFAULT_PREFS)
-  const [phase, setPhase] = useState<Phase>('idle')
+  const [phase, setPhaseLocal] = useState<Phase>('idle')
+  const setVoicePhaseStore = useVoicePhaseStore((s) => s.setPhase)
+
+  // Wrap setPhase so every phase change is mirrored to the shared store.
+  // UnifiedBottomBar reads the store to add a violet tint when voice is active.
+  const setPhase = useCallback(
+    (next: Phase | ((prev: Phase) => Phase)): void => {
+      setPhaseLocal((prev) => {
+        const resolved = typeof next === 'function' ? next(prev) : next
+        setVoicePhaseStore(resolved)
+        return resolved
+      })
+    },
+    [setVoicePhaseStore]
+  )
   const [liveCaption, setLiveCaption] = useState<string>('')
   const [transcript, setTranscript] = useState<string>('')
   const [editedTranscript, setEditedTranscript] = useState<string>('')
@@ -87,29 +99,19 @@ export default function VoiceCommandFAB(): JSX.Element {
   const streamRef = useRef<MediaStream | null>(null)
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null)
   const silenceTimerRef = useRef<number | null>(null)
-  const interimAtRef = useRef<number>(0) // last time we saw interim or final speech
+  const interimAtRef = useRef<number>(0)
   const pressHoldArmedRef = useRef<boolean>(false)
-  // Re-entrancy guard. Set synchronously the moment a capture begins and
-  // cleared only when that capture's whole stop+transcribe cycle ends. Without
-  // it, a second click/tap before phase flips to 'listening' (getUserMedia is
-  // async) spins up a SECOND MediaRecorder; both push into chunksRef and the
-  // interleaved webm from two streams is a corrupt file Whisper rejects with
-  // "Invalid file format … seconds: 0".
   const capturingRef = useRef<boolean>(false)
-  // Web-Audio analyser for REAL silence detection. webkitSpeechRecognition
-  // (the old interim-result source) doesn't work in Electron, so we measure
-  // actual mic level to know when the user has genuinely stopped talking.
   const audioCtxRef = useRef<AudioContext | null>(null)
   const analyserRef = useRef<AnalyserNode | null>(null)
 
-  // Load persisted prefs.
   useEffect(() => {
     void (async () => {
       try {
         const p = await window.api.voiceCommand.getPrefs()
         setPrefs(p)
       } catch {
-        // Fall back to defaults — IPC may not be ready yet on first paint.
+        // Fall back to defaults
       }
     })()
   }, [])
@@ -153,7 +155,6 @@ export default function VoiceCommandFAB(): JSX.Element {
     }
   }, [stopCaptureStream, stopLiveCaptions, clearSilenceTimer])
 
-  // ── Live captions via Web Speech API (Chromium-only, works in Electron)
   const startLiveCaptions = useCallback((): void => {
     const SR: SpeechRecognitionCtor | undefined =
       (window as unknown as { webkitSpeechRecognition?: SpeechRecognitionCtor })
@@ -177,8 +178,7 @@ export default function VoiceCommandFAB(): JSX.Element {
         setLiveCaption((finalText + ' ' + interim).trim())
       }
       rec.onerror = (): void => {
-        // Captions are non-essential — Whisper provides the authoritative
-        // transcript on stop. Swallow.
+        // Captions are non-essential -- Whisper provides the authoritative transcript.
       }
       rec.start()
       recognitionRef.current = rec
@@ -187,13 +187,9 @@ export default function VoiceCommandFAB(): JSX.Element {
     }
   }, [])
 
-  // ── Begin / end capture
   const beginCapture = useCallback(async (): Promise<void> => {
-    // Non-reentrant: a second start while one is already in flight would create
-    // a second MediaRecorder whose chunks corrupt the first's webm.
     if (capturingRef.current) {
-      // eslint-disable-next-line no-console
-      console.log('[voice] ignored duplicate beginCapture — already capturing')
+      console.log('[voice] ignored duplicate beginCapture -- already capturing') // eslint-disable-line no-console
       return
     }
     capturingRef.current = true
@@ -203,21 +199,12 @@ export default function VoiceCommandFAB(): JSX.Element {
     setEditedTranscript('')
     setReply('')
     setProposals([])
-    // eslint-disable-next-line no-console
-    console.log('[voice] beginCapture — mode:', prefs.commandMode)
+    console.log('[voice] beginCapture -- mode:', prefs.commandMode) // eslint-disable-line no-console
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false })
-      // eslint-disable-next-line no-console
-      console.log(
-        '[voice] getUserMedia OK — audio tracks:',
-        stream.getAudioTracks().map((t) => t.label || t.kind)
-      )
-      // Press-hold race: if the user released during the async getUserMedia,
-      // don't start recording — release the just-acquired mic and bail, so a
-      // quick tap can't leave the recorder running with no way to stop it.
+      console.log('[voice] getUserMedia OK -- audio tracks:', stream.getAudioTracks().map((t) => t.label || t.kind)) // eslint-disable-line no-console
       if (prefs.commandMode === 'press-hold' && !pressHoldArmedRef.current) {
-        // eslint-disable-next-line no-console
-        console.log('[voice] ABORTED — released during getUserMedia (too-quick tap); nothing recorded')
+        console.log('[voice] ABORTED -- released during getUserMedia') // eslint-disable-line no-console
         stream.getTracks().forEach((t) => t.stop())
         capturingRef.current = false
         setPhase('idle')
@@ -233,19 +220,9 @@ export default function VoiceCommandFAB(): JSX.Element {
       recorderRef.current = mr
       interimAtRef.current = Date.now()
       setPhase('listening')
-      // eslint-disable-next-line no-console
-      console.log('[voice] recording started (phase=listening) — hold and speak')
+      console.log('[voice] recording started (phase=listening)') // eslint-disable-line no-console
       startLiveCaptions()
-      // Click-toggle mode: arm the silence watchdog. When silence
-      // exceeds the threshold, stop capture — the transcript still
-      // stages for correction; we don't auto-send. The user always
-      // decides what to send.
       if (prefs.commandMode === 'click-toggle') {
-        // Real silence detection from actual mic level. Stops only after a
-        // forgiving window of GENUINE silence, so a minor mid-sentence pause
-        // never cuts you off (the old path relied on webkitSpeechRecognition
-        // interim results, which never fire in Electron — so it was really a
-        // fixed timer from start).
         try {
           const ctx = new AudioContext()
           const srcNode = ctx.createMediaStreamSource(stream)
@@ -255,11 +232,9 @@ export default function VoiceCommandFAB(): JSX.Element {
           audioCtxRef.current = ctx
           analyserRef.current = analyser
         } catch {
-          // Web Audio unavailable — fall back to the fixed-timer behaviour.
+          // Web Audio unavailable
         }
-        const SPEECH_RMS = 6 // idle hiss ~1-3, speech ~12-40
-        // Clamp to a sane, responsive window regardless of any stale stored
-        // pref (the old default was 5000ms = a 5s fixed cutoff).
+        const SPEECH_RMS = 6
         const silenceWindowMs = Math.max(1500, Math.min(prefs.autoStopSilenceMs || 2000, 3000))
         const tick = (): void => {
           if (recorderRef.current?.state !== 'recording') return
@@ -272,7 +247,6 @@ export default function VoiceCommandFAB(): JSX.Element {
               const d = lv[i] - 128
               sum += d * d
             }
-            // Above the noise floor → user is speaking; reset the silence clock.
             if (Math.sqrt(sum / lv.length) > SPEECH_RMS) interimAtRef.current = Date.now()
           }
           if (Date.now() - interimAtRef.current >= silenceWindowMs) {
@@ -285,12 +259,11 @@ export default function VoiceCommandFAB(): JSX.Element {
       }
     } catch (err) {
       const e = err as Error
-      // eslint-disable-next-line no-console
-      console.error('[voice] getUserMedia FAILED:', e?.name, '·', e?.message)
+      console.error('[voice] getUserMedia FAILED:', e?.name, ':', e?.message) // eslint-disable-line no-console
       capturingRef.current = false
       setError(
         e?.name === 'NotAllowedError'
-          ? 'Microphone access is blocked. Allow it in System Settings → Privacy & Security → Microphone, then try again. (In dev the app appears as “Electron”.)'
+          ? 'Microphone access is blocked. Allow it in System Settings, then try again.'
           : e?.name === 'NotFoundError'
             ? 'No microphone found. Connect one and try again.'
             : e?.message || 'Microphone unavailable.'
@@ -303,15 +276,13 @@ export default function VoiceCommandFAB(): JSX.Element {
     clearSilenceTimer()
     stopLiveCaptions()
     const rec = recorderRef.current
-    // eslint-disable-next-line no-console
-    console.log('[voice] stopCapture — recorder present:', !!rec, rec ? `(state=${rec.state})` : '')
+    console.log('[voice] stopCapture -- recorder present:', !!rec) // eslint-disable-line no-console
     if (!rec) {
       capturingRef.current = false
       return
     }
-    // Wait for the final dataavailable to land before we package.
     await new Promise<void>((resolve) => {
-      const t = window.setTimeout(resolve, 600) // hard cap
+      const t = window.setTimeout(resolve, 600)
       rec.onstop = (): void => {
         window.clearTimeout(t)
         resolve()
@@ -319,7 +290,6 @@ export default function VoiceCommandFAB(): JSX.Element {
       try {
         if (rec.state !== 'inactive') rec.stop()
       } catch {
-        // already stopped
         resolve()
       }
     })
@@ -333,29 +303,21 @@ export default function VoiceCommandFAB(): JSX.Element {
     }
 
     const captionText = liveCaption.trim()
-    // eslint-disable-next-line no-console
-    console.log('[voice] captured chunks:', chunksRef.current.length, '· caption:', JSON.stringify(captionText))
+    console.log('[voice] captured chunks:', chunksRef.current.length, 'caption:', JSON.stringify(captionText)) // eslint-disable-line no-console
     if (chunksRef.current.length === 0 && !captionText) {
-      // eslint-disable-next-line no-console
-      console.error('[voice] NO AUDIO CAPTURED — 0 chunks. The mic stream delivered no data.')
+      console.error('[voice] NO AUDIO CAPTURED -- 0 chunks.') // eslint-disable-line no-console
       capturingRef.current = false
       setError('No audio captured. Check your microphone, then hold the mic a moment longer while you speak.')
       setPhase('error')
       return
     }
     const blob = new Blob(chunksRef.current, { type: 'audio/webm' })
-    // eslint-disable-next-line no-console
-    console.log('[voice] audio blob bytes:', blob.size)
-    // Spec: "when finished are staged for correction" — both modes land
-    // here. The user reviews / edits the transcript and clicks Send when
-    // ready. We never auto-send: the user always controls when the
-    // canvas snapshot is shipped to the AI.
+    console.log('[voice] audio blob bytes:', blob.size) // eslint-disable-line no-console
     setPhase('staged')
     const buf = await blob.arrayBuffer()
     try {
       const provider = await window.api.voiceNote.getProvider()
-      // eslint-disable-next-line no-console
-      console.log('[voice] transcribing via provider:', provider, '· bytes:', buf.byteLength)
+      console.log('[voice] transcribing via provider:', provider, 'bytes:', buf.byteLength) // eslint-disable-line no-console
       let res
       if (provider === 'local') {
         const samples = await decodeToMono16k(buf)
@@ -363,15 +325,12 @@ export default function VoiceCommandFAB(): JSX.Element {
       } else {
         res = await window.api.voiceNote.transcribe({ buffer: buf, mimeType: 'audio/webm' })
       }
-      // eslint-disable-next-line no-console
-      console.log('[voice] transcribe result:', JSON.stringify(res))
+      console.log('[voice] transcribe result:', JSON.stringify(res)) // eslint-disable-line no-console
       if (res.ok) {
         const final = res.transcript.trim() || captionText
         setTranscript(final)
         setEditedTranscript(final)
       } else {
-        // Whisper failed — fall back to the live caption text. Better
-        // a slightly-wrong transcript the user can edit than nothing.
         setTranscript(captionText)
         setEditedTranscript(captionText)
         if (!captionText) {
@@ -381,8 +340,7 @@ export default function VoiceCommandFAB(): JSX.Element {
         }
       }
     } catch (err) {
-      // eslint-disable-next-line no-console
-      console.error('[voice] transcribe threw:', (err as Error)?.name, '·', (err as Error)?.message)
+      console.error('[voice] transcribe threw:', (err as Error)?.name, ':', (err as Error)?.message) // eslint-disable-line no-console
       setTranscript(captionText)
       setEditedTranscript(captionText)
       if (!captionText) {
@@ -390,8 +348,6 @@ export default function VoiceCommandFAB(): JSX.Element {
         setPhase('error')
       }
     } finally {
-      // Capture cycle complete — release the re-entrancy guard so the next
-      // recording can start.
       capturingRef.current = false
     }
   }, [clearSilenceTimer, liveCaption, stopLiveCaptions])
@@ -404,13 +360,8 @@ export default function VoiceCommandFAB(): JSX.Element {
     setProposals([])
     setReply('')
 
-    // Switch to the streaming variant so cards pop in as Claude emits
-    // them. The first reply / proposal lands in ~600ms instead of
-    // waiting ~1.5s for the full response — feels alive.
     const snapshot = buildCanvasSnapshot(activeTaskId())
-    const requestId = `vc-${Date.now().toString(36)}-${Math.random()
-      .toString(36)
-      .slice(2, 8)}`
+    const requestId = `vc-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
 
     return new Promise<void>((resolve) => {
       const unsubscribe = window.api.voiceCommand.runStream(
@@ -432,12 +383,9 @@ export default function VoiceCommandFAB(): JSX.Element {
         {
           onReply: (replyText) => {
             setReply(replyText)
-            // Move to result phase on first signal — so the dock appears
-            // immediately instead of waiting for the first proposal.
             setPhase('result')
           },
           onProposal: (proposal) => {
-            // Each new proposal appears as its own card.
             setProposals((prev) => {
               if (prev.some((p) => p.id === proposal.id)) return prev
               return [...prev, { ...proposal, _status: 'pending' }]
@@ -446,21 +394,15 @@ export default function VoiceCommandFAB(): JSX.Element {
           },
           onError: (err) => {
             setError(err.error)
-            // If we already had some proposals streamed, keep them up
-            // and surface the error inline; otherwise fall back to
-            // staged so the user can edit + resend.
             setPhase((prev) => (prev === 'result' ? 'result' : 'staged'))
             unsubscribe()
             resolve()
           },
           onComplete: (summary) => {
-            // Speak the reply (or a fallback) for voice-back users.
             if (prefs.voiceback) {
               speak(
                 summary.replyText ||
-                  `${summary.totalProposals} suggestion${
-                    summary.totalProposals === 1 ? '' : 's'
-                  }`
+                  `${summary.totalProposals} suggestion${summary.totalProposals === 1 ? '' : 's'}`
               )
             }
             unsubscribe()
@@ -471,7 +413,6 @@ export default function VoiceCommandFAB(): JSX.Element {
     })
   }, [editedTranscript, transcript, prefs.voiceback])
 
-  // ── Apply / Dismiss
   const onApply = useCallback(
     async (id: string): Promise<void> => {
       const p = proposals.find((x) => x.id === id)
@@ -503,7 +444,6 @@ export default function VoiceCommandFAB(): JSX.Element {
     setPhase('idle')
   }, [])
 
-  // ── FAB interaction handlers
   const fabPressDown = useCallback(
     async (e: React.PointerEvent): Promise<void> => {
       if (prefs.commandMode === 'press-hold') {
@@ -520,9 +460,6 @@ export default function VoiceCommandFAB(): JSX.Element {
       if (prefs.commandMode === 'press-hold' && pressHoldArmedRef.current) {
         e.preventDefault()
         pressHoldArmedRef.current = false
-        // Stop based on the live recorder ref, not the (possibly stale) phase:
-        // if recording started, stop + transcribe; if getUserMedia is still
-        // pending, clearing the armed flag above makes beginCapture abort.
         if (recorderRef.current) {
           await stopCapture()
         }
@@ -541,40 +478,52 @@ export default function VoiceCommandFAB(): JSX.Element {
     }
   }, [prefs.commandMode, phase, beginCapture, stopCapture])
 
-  // ── Render
   const isActive = phase === 'listening'
   const showOverlay = phase !== 'idle'
 
   return (
     <>
-      {/* The mic button — inline, positioned alongside CommandCenter by App.tsx */}
       <div
         className="relative flex flex-col items-center pointer-events-none"
         data-testid="voice-command-root"
       >
-        {/* Live captions / transcript / result overlay — floats above the button */}
         {showOverlay && (
           <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 pointer-events-auto w-[min(600px,90vw)]">
             {phase === 'listening' && (
-              <div className="fb-glass-chrome rounded-lg border border-accent/40 px-3 py-2 text-[12px] text-stone-100 shadow-xl min-h-[44px] flex items-center">
-                <div className="text-accent text-[10px] uppercase tracking-[0.18em] mr-2 shrink-0">
+              <div className="bg-[oklch(11%_0.18_280deg)] rounded-2xl border border-violet-400/25 shadow-[0_12px_48px_rgba(88,28,220,0.55),inset_0_1px_0_rgba(255,255,255,0.06)] px-3 py-2 text-[12px] text-white min-h-[44px] flex items-center">
+                <div className="text-violet-300 text-[10px] uppercase tracking-[0.18em] mr-2 shrink-0 font-semibold">
                   Listening
                 </div>
                 <div className="flex-1 leading-snug">
-                  {liveCaption || <span className="text-stone-500 italic">Say it…</span>}
+                  {liveCaption || <span className="text-violet-400/60 italic">Say it...</span>}
                 </div>
               </div>
             )}
-            {phase === 'staged' && (
-              <div className="fb-glass-chrome rounded-lg border border-[color:var(--glass-chrome-border)] p-3 shadow-xl">
-                <div className="text-accent text-[10px] uppercase tracking-[0.18em] mb-1.5">
-                  Transcript · edit and send
+            {(phase === 'staged' || phase === 'sending') && (
+              <div className="bg-[oklch(11%_0.18_280deg)] rounded-2xl border border-violet-400/25 shadow-[0_12px_48px_rgba(88,28,220,0.55),inset_0_1px_0_rgba(255,255,255,0.06)] p-3">
+                {/* Header label — changes based on what is happening */}
+                <div className="text-violet-300 text-[10px] uppercase tracking-[0.18em] mb-1.5 font-semibold flex items-center gap-1.5">
+                  {phase === 'sending' ? (
+                    <>
+                      <span className="inline-flex gap-0.5">
+                        <span className="h-1 w-1 rounded-full bg-violet-400 animate-bounce [animation-delay:0ms]" />
+                        <span className="h-1 w-1 rounded-full bg-violet-400 animate-bounce [animation-delay:150ms]" />
+                        <span className="h-1 w-1 rounded-full bg-violet-400 animate-bounce [animation-delay:300ms]" />
+                      </span>
+                      Interpreting...
+                    </>
+                  ) : transcript ? (
+                    'Review and send'
+                  ) : (
+                    <>
+                      <span className="h-1.5 w-1.5 rounded-full bg-violet-400 animate-pulse" />
+                      Transcribing...
+                    </>
+                  )}
                 </div>
                 <textarea
                   ref={(el) => {
-                    // Auto-focus when staged so the user can immediately
-                    // correct without reaching for the mouse.
-                    if (el && document.activeElement !== el) el.focus()
+                    if (el && document.activeElement !== el && phase === 'staged') el.focus()
                   }}
                   value={editedTranscript}
                   onChange={(e) => setEditedTranscript(e.target.value)}
@@ -587,48 +536,64 @@ export default function VoiceCommandFAB(): JSX.Element {
                       onDismissAll()
                     }
                   }}
+                  disabled={phase === 'sending'}
                   rows={3}
-                  placeholder={transcript ? '' : 'Transcribing…'}
-                  className="w-full bg-stone-50/40 dark:bg-stone-800/40 border border-stone-200/60 dark:border-stone-700/60 rounded px-2 py-1.5 text-[12px] text-stone-900 dark:text-stone-100 focus:outline-none focus:border-accent resize-none"
+                  placeholder={transcript ? '' : 'Transcribing...'}
+                  className={`w-full bg-violet-900/40 border border-violet-600/40 rounded-lg px-2 py-1.5 text-[12px] text-white placeholder:text-violet-400/50 focus:outline-none focus:border-violet-400/70 resize-none transition-opacity ${
+                    phase === 'sending' ? 'opacity-60 cursor-not-allowed' : ''
+                  }`}
                   data-testid="voice-command-transcript"
                 />
                 <div className="flex items-center justify-between mt-2">
-                  <span className="text-[9px] text-stone-500">⌘⏎ to send · Esc to cancel</span>
+                  <span className="text-[9px] text-violet-400/60">
+                    {phase === 'sending' ? '' : 'Cmd+Enter to send · Esc to cancel'}
+                  </span>
                   <div className="flex gap-1.5">
                     <button
                       onClick={onDismissAll}
-                      className="text-[11px] px-2 py-1 rounded hover:bg-stone-100/10 text-stone-300"
+                      className="text-[11px] px-2 py-1 rounded hover:bg-violet-800/40 text-violet-300/70 hover:text-white transition-colors"
                     >
                       Cancel
                     </button>
-                    <button
-                      onClick={() => void sendToAi()}
-                      disabled={!editedTranscript.trim()}
-                      className="text-[11px] px-2.5 py-1 rounded bg-accent text-white disabled:opacity-50 hover:brightness-110"
-                      data-testid="voice-command-send"
-                    >
-                      Send
-                    </button>
+                    {phase === 'sending' ? (
+                      <div className="text-[11px] px-2.5 py-1 rounded bg-violet-500/50 text-white/60 flex items-center gap-1.5 cursor-not-allowed select-none">
+                        <span className="inline-flex gap-0.5">
+                          <span className="h-1 w-1 rounded-full bg-white/70 animate-bounce [animation-delay:0ms]" />
+                          <span className="h-1 w-1 rounded-full bg-white/70 animate-bounce [animation-delay:150ms]" />
+                          <span className="h-1 w-1 rounded-full bg-white/70 animate-bounce [animation-delay:300ms]" />
+                        </span>
+                        Sending
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => void sendToAi()}
+                        disabled={!editedTranscript.trim()}
+                        className="text-[11px] px-2.5 py-1 rounded bg-violet-500 text-white disabled:opacity-40 hover:bg-violet-400 transition-colors"
+                        data-testid="voice-command-send"
+                      >
+                        Send
+                      </button>
+                    )}
                   </div>
                 </div>
                 {error && (
-                  <div className="text-[10px] text-amber-400 mt-1.5">{error}</div>
+                  <div className="text-[10px] text-amber-300 mt-1.5">{error}</div>
                 )}
               </div>
             )}
             {phase === 'error' && (
-              <div className="fb-glass-chrome rounded-lg border border-amber-500/40 p-3 shadow-xl">
-                <div className="text-amber-400 text-[10px] uppercase tracking-[0.18em] mb-1 flex items-center gap-1">
+              <div className="bg-[oklch(11%_0.18_280deg)] rounded-2xl border border-amber-500/35 shadow-[0_12px_48px_rgba(88,28,220,0.55),inset_0_1px_0_rgba(255,255,255,0.06)] p-3">
+                <div className="text-amber-300 text-[10px] uppercase tracking-[0.18em] mb-1 flex items-center gap-1 font-semibold">
                   <Icon name="warning" size={12} />
-                  Voice command couldn’t run
+                  Voice command could not run
                 </div>
-                <div className="text-[12px] text-stone-200 leading-snug">
+                <div className="text-[12px] text-white/90 leading-snug">
                   {error || 'Something went wrong. Try again.'}
                 </div>
                 <div className="flex justify-end mt-2">
                   <button
                     onClick={onDismissAll}
-                    className="text-[11px] px-2.5 py-1 rounded bg-stone-100/10 hover:bg-stone-100/20 text-stone-200"
+                    className="text-[11px] px-2.5 py-1 rounded bg-violet-800/50 hover:bg-violet-700/60 text-violet-200 transition-colors"
                     data-testid="voice-command-error-dismiss"
                   >
                     Dismiss
@@ -636,22 +601,19 @@ export default function VoiceCommandFAB(): JSX.Element {
                 </div>
               </div>
             )}
-            {phase === 'sending' && (
-              <div className="fb-glass-chrome rounded-lg border border-accent/40 px-3 py-2 text-[12px] text-stone-100 shadow-xl inline-flex items-center gap-2">
-                <Icon name="hourglass_empty" size={12} className="text-accent" />
-                Interpreting…
-              </div>
-            )}
             {phase === 'result' && (
               <div
-                className="fb-glass-chrome rounded-lg border border-[color:var(--glass-chrome-border)] p-3 shadow-xl"
+                className="bg-[oklch(11%_0.18_280deg)] rounded-2xl border border-violet-400/25 shadow-[0_12px_48px_rgba(88,28,220,0.55),inset_0_1px_0_rgba(255,255,255,0.06)] p-3"
                 data-testid="voice-command-result"
               >
+                <div className="text-violet-300 text-[10px] uppercase tracking-[0.18em] mb-2 font-semibold">
+                  Plexi AI
+                </div>
                 {reply && (
-                  <div className="text-[12px] text-stone-200 mb-2 leading-snug">{reply}</div>
+                  <div className="text-[12px] text-white/90 mb-2 leading-snug">{reply}</div>
                 )}
                 {proposals.length === 0 ? (
-                  <div className="text-[11px] text-stone-400 italic">
+                  <div className="text-[11px] text-violet-400/60 italic">
                     No actions proposed.
                   </div>
                 ) : (
@@ -669,7 +631,7 @@ export default function VoiceCommandFAB(): JSX.Element {
                 <div className="flex justify-end mt-2">
                   <button
                     onClick={onDismissAll}
-                    className="text-[10px] text-stone-400 hover:text-stone-200"
+                    className="text-[10px] text-violet-400/60 hover:text-white transition-colors"
                   >
                     Close
                   </button>
@@ -679,7 +641,6 @@ export default function VoiceCommandFAB(): JSX.Element {
           </div>
         )}
 
-        {/* The button itself — pointer-events-auto so it receives clicks inside the none container */}
         <button
           onPointerDown={fabPressDown}
           onPointerUp={fabPressUp}
@@ -729,9 +690,6 @@ function ProposalCard({ proposal, onApply, onDismiss }: ProposalCardProps): JSX.
   const isUpdate = proposal.kind === 'update-widget'
   const status = proposal._status ?? 'pending'
 
-  // Look up the target widget so update cards can render a before/after
-  // diff inline. Subscribed reactively — if the widget mutates while a
-  // proposal is pending, the card stays accurate.
   const target = useWidgetStore((s) =>
     proposal.kind === 'update-widget' || proposal.kind === 'delete-widget' || proposal.kind === 'focus-widget'
       ? s.widgets.find((w) => w.id === proposal.widgetId)
@@ -740,7 +698,7 @@ function ProposalCard({ proposal, onApply, onDismiss }: ProposalCardProps): JSX.
 
   if (status === 'applied') {
     return (
-      <div className="flex items-center gap-1.5 px-2 py-1.5 rounded bg-emerald-500/10 border border-emerald-500/30 text-[11px] text-emerald-200">
+      <div className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-[11px] text-emerald-300">
         <Icon name="check" size={12} />
         <span className="flex-1 truncate">{proposal._message || `${desc.verb} ${desc.subject}`}</span>
       </div>
@@ -748,20 +706,20 @@ function ProposalCard({ proposal, onApply, onDismiss }: ProposalCardProps): JSX.
   }
   if (status === 'dismissed') {
     return (
-      <div className="flex items-center gap-1.5 px-2 py-1.5 rounded bg-stone-700/20 border border-stone-600/20 text-[11px] text-stone-500 italic">
+      <div className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg bg-violet-900/20 border border-violet-700/20 text-[11px] text-violet-400/50 italic">
         <Icon name="close" size={12} />
-        <span className="flex-1 truncate">Dismissed · {desc.subject}</span>
+        <span className="flex-1 truncate">Dismissed - {desc.subject}</span>
       </div>
     )
   }
   if (status === 'failed') {
     return (
-      <div className="flex items-center gap-1.5 px-2 py-1.5 rounded bg-amber-500/10 border border-amber-500/30 text-[11px] text-amber-200">
+      <div className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-[11px] text-amber-300">
         <Icon name="warning" size={12} />
         <span className="flex-1 truncate">{proposal._message || 'Failed'}</span>
         <button
           onClick={onDismiss}
-          className="text-[10px] text-stone-400 hover:text-stone-200"
+          className="text-[10px] text-violet-400/60 hover:text-white transition-colors"
         >
           Close
         </button>
@@ -770,33 +728,33 @@ function ProposalCard({ proposal, onApply, onDismiss }: ProposalCardProps): JSX.
   }
   return (
     <div
-      className={`px-2 py-1.5 rounded border text-[11px] ${
+      className={`px-2 py-1.5 rounded-lg border text-[11px] ${
         isDestructive
-          ? 'bg-rose-500/5 border-rose-500/30'
-          : 'bg-stone-800/40 border-stone-700/60'
+          ? 'bg-rose-500/10 border-rose-500/30'
+          : 'bg-violet-800/30 border-violet-600/40'
       }`}
     >
       <div className="flex items-center gap-1.5">
         <Icon
           name={desc.icon}
           size={12}
-          className={isDestructive ? 'text-rose-400' : 'text-accent'}
+          className={isDestructive ? 'text-rose-400' : 'text-violet-300'}
         />
         <div className="flex-1 min-w-0">
-          <div className="text-stone-100 font-medium truncate">{desc.verb}</div>
-          <div className="text-stone-400 text-[10px] truncate">{desc.subject}</div>
+          <div className="text-white font-medium truncate">{desc.verb}</div>
+          <div className="text-violet-300/70 text-[10px] truncate">{desc.subject}</div>
         </div>
         <button
           onClick={onDismiss}
-          className="text-[10px] text-stone-400 hover:text-stone-200 px-1"
+          className="text-[10px] text-violet-400/60 hover:text-white px-1 transition-colors"
           data-testid={`voice-proposal-dismiss-${proposal.id}`}
         >
           Dismiss
         </button>
         <button
           onClick={onApply}
-          className={`text-[10px] px-2 py-0.5 rounded text-white hover:brightness-110 ${
-            isDestructive ? 'bg-rose-600' : 'bg-accent'
+          className={`text-[10px] px-2 py-0.5 rounded-md text-white hover:brightness-110 transition-colors ${
+            isDestructive ? 'bg-rose-600' : 'bg-violet-500 hover:bg-violet-400'
           }`}
           data-testid={`voice-proposal-apply-${proposal.id}`}
         >
@@ -813,11 +771,6 @@ function ProposalCard({ proposal, onApply, onDismiss }: ProposalCardProps): JSX.
   )
 }
 
-// Inline before/after diff for update-widget proposals. Only renders
-// rows for fields the proposal actually mutates — keeps the card
-// compact when only one attribute changes. Long text values are
-// clipped to a single ellipsised line; the full content is in the
-// canvas after Apply.
 interface UpdateDiffProps {
   before: Widget
   proposal: Extract<ActionProposal, { kind: 'update-widget' }>
@@ -867,17 +820,17 @@ function UpdateDiff({ before, proposal }: UpdateDiffProps): JSX.Element {
   if (rows.length === 0) return <></>
   return (
     <div
-      className="mt-1.5 pt-1.5 border-t border-stone-700/60 space-y-0.5"
+      className="mt-1.5 pt-1.5 border-t border-violet-700/40 space-y-0.5"
       data-testid="voice-proposal-diff"
     >
       {rows.map((r) => (
         <div key={r.field} className="flex items-center gap-1 text-[10px] min-w-0">
-          <span className="text-stone-500 w-14 shrink-0">{r.field}</span>
-          <span className="text-stone-400 truncate flex-1" title={r.from}>
+          <span className="text-violet-400/50 w-14 shrink-0">{r.field}</span>
+          <span className="text-violet-300/60 truncate flex-1" title={r.from}>
             {r.from}
           </span>
-          <Icon name="arrow_right_alt" size={10} className="text-stone-500 shrink-0" />
-          <span className="text-accent truncate flex-1" title={r.to}>
+          <Icon name="arrow_right_alt" size={10} className="text-violet-500/60 shrink-0" />
+          <span className="text-violet-200 truncate flex-1" title={r.to}>
             {r.to}
           </span>
         </div>
@@ -894,9 +847,6 @@ function clip(s: string, n: number): string {
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-// Decode an arbitrary audio blob (webm/opus etc) into mono 16kHz Float32 PCM
-// samples — the format the local Whisper model expects. Matches the
-// VoiceRecorderWidget's helper but inlined here so the FAB is standalone.
 async function decodeToMono16k(arrayBuffer: ArrayBuffer): Promise<Float32Array> {
   const AC: typeof AudioContext =
     (window as unknown as { AudioContext?: typeof AudioContext }).AudioContext ||
@@ -917,13 +867,11 @@ async function decodeToMono16k(arrayBuffer: ArrayBuffer): Promise<Float32Array> 
   return mono
 }
 
-// Spoken voice-back via Web Speech API. Best-effort: any platform that
-// doesn't have synthesis (rare in Chromium / Electron) just no-ops.
 function speak(text: string): void {
   try {
     const synth = (window as unknown as { speechSynthesis?: SpeechSynthesis }).speechSynthesis
     if (!synth) return
-    synth.cancel() // kill any in-flight utterance
+    synth.cancel()
     const u = new SpeechSynthesisUtterance(text)
     u.rate = 1.05
     u.pitch = 1.0

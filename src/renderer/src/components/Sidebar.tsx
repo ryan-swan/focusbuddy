@@ -1,6 +1,6 @@
 import React, { useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { confirmDialog, promptText } from './plexi/PromptDialog'
+import { confirmDialog } from './plexi/PromptDialog'
 import type { ConnectedApp, FbNode, NodeKind, WidgetSuggestion } from '@shared/types'
 import { useNodeStore } from '../stores/nodes'
 import { useCanCreateMore } from '../stores/capabilities'
@@ -30,6 +30,7 @@ import SharedRecipientBadges from './SharedRecipientBadges'
 import Icon from './Icon'
 import { StatusPill } from './plexi'
 import { fieldInputClass } from './plexi/forms'
+import { useFreeDesk } from '../hooks/useFreeDesk'
 
 const SidebarCompact = React.createContext(false)
 
@@ -69,6 +70,13 @@ function renderConnectedAppRow(
     return (
       <button
         key={app.id}
+        draggable
+        onDragStart={(e) => {
+          e.dataTransfer.setData(CONNECTED_APP_DRAG_MIME, app.id)
+          e.dataTransfer.setData('text/uri-list', app.url)
+          e.dataTransfer.setData('text/plain', app.url)
+          e.dataTransfer.effectAllowed = 'copy'
+        }}
         onClick={onOpen}
         title={app.title}
         className={[
@@ -184,6 +192,7 @@ export default function Sidebar({ onCollapse, onExpand, compact }: Props = {}): 
   const setActive = useNodeStore((s) => s.setActive)
   const remove = useNodeStore((s) => s.remove)
   const update = useNodeStore((s) => s.update)
+  const create = useNodeStore((s) => s.create)
   const moveNode = useNodeStore((s) => s.move)
   const createWidget = useWidgetStore((s) => s.create)
   const bumpLayout = useWidgetStore((s) => s.bumpLayoutVersion)
@@ -332,9 +341,27 @@ export default function Sidebar({ onCollapse, onExpand, compact }: Props = {}): 
 
   // Archived nodes are hidden from the day-to-day tree but still live in
   // the database — the dashboard's archived view is where they surface.
+  // Task-items live on the canvas (scoped to a desk), not in the sidebar
+  // hierarchy, so they are also excluded at this level.
+  // Standalone desks (kind: 'task', parentId: null) are shown in their own
+  // "Free Desks" section rather than mixed into the Rooms tree.
   // Filter at this level so every downstream use (tree, flat list,
   // keyboard nav, drop targets) shares the same "what's visible" model.
-  const visibleNodes = useMemo(() => nodes.filter((n) => !n.archived), [nodes])
+  const visibleNodes = useMemo(
+    () => nodes.filter((n) => !n.archived && n.kind !== 'task-item' && !(n.kind === 'task' && n.parentId === null)),
+    [nodes]
+  )
+
+  // Standalone desks: kind === 'task' with no parentId. Shown in the
+  // "Free Desks" section below Rooms, not in the main tree.
+  const ungroupedDesks = useMemo(
+    () => nodes
+      .filter((n) => !n.archived && n.kind === 'task' && n.parentId === null)
+      .sort((a, b) => a.sortOrder - b.sortOrder || a.createdAt - b.createdAt),
+    [nodes]
+  )
+
+  const [ungroupedOpen, setUngroupedOpen] = useState(true)
 
   // Right-click context menu state for sidebar rows. Single state since
   // only one menu can be open at a time. `node` is the row that was
@@ -431,6 +458,8 @@ export default function Sidebar({ onCollapse, onExpand, compact }: Props = {}): 
     }
     setDialog({ mode: 'create', parentId: null, kind: 'folder' })
   }
+
+  const { createFreeDesk } = useFreeDesk()
 
   const tree = useMemo(() => buildTree(visibleNodes), [visibleNodes])
   const flat = useMemo(() => flatten(tree, expanded), [tree, expanded])
@@ -1201,6 +1230,186 @@ export default function Sidebar({ onCollapse, onExpand, compact }: Props = {}): 
                 </div>
               )
             })}
+          </div>
+          </motion.div>
+        )}
+        </AnimatePresence>
+
+        {/* ── FREE DESKS ────────────────────────────────────────────────── */}
+        <div className="px-2 pb-1 flex flex-col gap-0.5">
+        <NavRow
+          icon="sticky_note_2"
+          label="Free Desks"
+          onClick={compact
+            ? () => { onExpand?.(); setUngroupedOpen(true) }
+            : () => setUngroupedOpen((v) => !v)
+          }
+          onChevron={compact ? undefined : () => setUngroupedOpen((v) => !v)}
+          chevronOpen={ungroupedOpen}
+        />
+        {/* Compact-only quick-create button for Free Desks */}
+        {compact && (
+          <button
+            onClick={() => void createFreeDesk()}
+            title="New Free Desk"
+            className="relative w-full h-10 flex items-center justify-center rounded-xl transition-colors text-[var(--ink-60)] hover:bg-[var(--surface-sunken)] hover:text-[var(--ink-90)]"
+          >
+            <Icon name="note_add" size={17} className="shrink-0" />
+          </button>
+        )}
+        </div>
+        <AnimatePresence initial={false}>
+        {ungroupedOpen && !compact && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.18, ease: 'easeInOut' }}
+            className="overflow-hidden"
+          >
+          <div className="mb-2">
+            {/* + New Free Desk button */}
+            <div className="mb-1 px-4 flex items-center">
+              <button
+                onClick={() => void createFreeDesk()}
+                className="icon-btn !h-5 !w-5"
+                title="New Free Desk"
+              >
+                <Icon name="add" size={12} />
+              </button>
+            </div>
+            {ungroupedDesks.length === 0 ? (
+              <div className="px-4 py-1 text-xs text-[var(--ink-70)] leading-relaxed">
+                No Free Desks yet.
+              </div>
+            ) : (
+              <div>
+                {ungroupedDesks.map((desk) => {
+                  const isActive = viewIsActive({ kind: 'task', taskId: desk.id })
+                  const isRenaming = renamingId === desk.id
+                  const isDeskDragging = draggingIdRef.current === desk.id
+                  return (
+                    <div
+                      key={desk.id}
+                      className={`relative group flex items-center pr-1.5 py-0.5 ${
+                        isActive ? 'bg-[rgb(var(--accent)/0.08)]' : ''
+                      }`}
+                      style={{ opacity: isDeskDragging ? 0.4 : 1, transition: 'opacity 80ms' }}
+                      onContextMenu={(e) => {
+                        e.preventDefault()
+                        setRowCtxMenu({ x: e.clientX, y: e.clientY, node: desk })
+                      }}
+                    >
+                      {isActive && (
+                        <span className="absolute left-0 h-6 w-[3px] rounded-r bg-accent" />
+                      )}
+                      {/* chevron placeholder for alignment */}
+                      <span className="w-4 h-4 shrink-0" />
+                      <div
+                        draggable={!isRenaming}
+                        onDragStart={(e) => handleRowDragStart(e, desk)}
+                        onDragEnd={handleRowDragEnd}
+                        onClick={() => {
+                          if (isRenaming) return
+                          setActive(desk.id)
+                          goTask(desk.id)
+                        }}
+                        onDoubleClick={() => {
+                          setRenamingId(desk.id)
+                          setRenameText(desk.title)
+                        }}
+                        className={`flex-1 flex items-center gap-1.5 px-1.5 py-1 rounded min-w-0 ${
+                          isRenaming ? 'cursor-default' : 'cursor-grab active:cursor-grabbing'
+                        } ${
+                          !isActive ? 'hover:bg-[var(--surface-sunken)]' : ''
+                        }`}
+                        style={{ paddingLeft: '6px' }}
+                      >
+                        <Icon
+                          name={desk.status === 'done' ? 'check_circle' : 'sticky_note_2'}
+                          size={14}
+                          filled={isActive}
+                          className={
+                            desk.status === 'done'
+                              ? 'text-emerald-600'
+                              : desk.status === 'in_progress'
+                                ? 'text-blue-600'
+                                : 'text-[var(--ink-40)]'
+                          }
+                        />
+                        {isRenaming ? (
+                          <input
+                            autoFocus
+                            value={renameText}
+                            onChange={(e) => setRenameText(e.target.value)}
+                            onBlur={() => {
+                              if (renameText.trim() && renameText !== desk.title) {
+                                void update(desk.id, { title: renameText.trim() })
+                              }
+                              setRenamingId(null)
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
+                              if (e.key === 'Escape') {
+                                setRenameText(desk.title)
+                                setRenamingId(null)
+                              }
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                            className={`${fieldInputClass()} flex-1 !px-1.5 !py-0.5`}
+                          />
+                        ) : (
+                          <span
+                            className={`text-[12.5px] truncate flex-1 leading-tight ${
+                              isActive
+                                ? 'text-[var(--ink-100)] font-semibold'
+                                : 'text-[var(--ink-80)]'
+                            } ${desk.status === 'done' ? 'line-through text-[var(--ink-40)]' : ''}`}
+                          >
+                            {desk.title}
+                          </span>
+                        )}
+                      </div>
+                      <div className="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 flex items-center transition-opacity">
+                        <button
+                          onClick={() => {
+                            setRenamingId(desk.id)
+                            setRenameText(desk.title)
+                          }}
+                          title="Rename"
+                          className="icon-btn"
+                        >
+                          <Icon name="edit" size={14} />
+                        </button>
+                        <button
+                          onClick={() => archiveNode(desk.id)}
+                          title="Archive (recoverable from Home → Archived)"
+                          className="icon-btn"
+                        >
+                          <Icon name="inventory_2" size={14} />
+                        </button>
+                        <button
+                          onClick={() => {
+                            void confirmDialog({
+                              title: `Delete "${desk.title}" permanently?`,
+                              body: 'This desk is removed for good. Use Archive instead if you might want it back.',
+                              confirmLabel: 'Delete permanently',
+                              danger: true
+                            }).then((ok) => {
+                              if (ok) void remove(desk.id)
+                            })
+                          }}
+                          title="Delete permanently"
+                          className="icon-btn hover:!text-rose-600"
+                        >
+                          <Icon name="delete" size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
           </div>
           </motion.div>
         )}

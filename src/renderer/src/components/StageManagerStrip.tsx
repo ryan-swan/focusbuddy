@@ -37,6 +37,7 @@ export default function StageManagerStrip({ roomId, activeId }: Props): JSX.Elem
   const goRoom = useViewStore((s) => s.goRoom)
   const goHome = useViewStore((s) => s.goHome)
   const [widgetsByDesk, setWidgetsByDesk] = useState<Record<string, Widget[]>>({})
+  const [transitioning, setTransitioning] = useState(false)
 
   const desks = useMemo(() => {
     const candidates = nodes.filter(
@@ -48,6 +49,7 @@ export default function StageManagerStrip({ roomId, activeId }: Props): JSX.Elem
   const deskIdsKey = desks.map((d) => d.id).join(',')
 
   useEffect(() => {
+    setTransitioning(true)
     let cancelled = false
     void (async () => {
       const entries = await Promise.all(
@@ -59,7 +61,10 @@ export default function StageManagerStrip({ roomId, activeId }: Props): JSX.Elem
           }
         })
       )
-      if (!cancelled) setWidgetsByDesk(Object.fromEntries(entries))
+      if (!cancelled) {
+        setWidgetsByDesk(Object.fromEntries(entries))
+        setTransitioning(false)
+      }
     })()
     return () => { cancelled = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -92,10 +97,13 @@ export default function StageManagerStrip({ roomId, activeId }: Props): JSX.Elem
 
       <div className="w-full h-px bg-[var(--edge-soft)]/60 shrink-0" />
 
-      {/* Scrollable desk cards — wheel events stop here so canvas doesn't scroll */}
-      <div
+      {/* Scrollable desk cards — wheel events stop here so canvas doesn't scroll.
+          Fades to 0.4 opacity while widget data is loading to smooth the flash. */}
+      <motion.div
+        animate={{ opacity: transitioning ? 0.4 : 1 }}
+        transition={{ duration: 0.1 }}
         data-stage-manager="true"
-        className="flex-1 overflow-y-auto overflow-x-hidden py-2 px-2 flex flex-col gap-2"
+        className="flex-1 overflow-y-auto overflow-x-hidden py-2 px-2 flex flex-col gap-2 min-h-[80px]"
         onWheel={(e) => e.stopPropagation()}
         style={{ scrollbarWidth: 'none' }}
       >
@@ -108,30 +116,26 @@ export default function StageManagerStrip({ roomId, activeId }: Props): JSX.Elem
             return (
               <motion.div
                 key={desk.id}
-                layout
-                initial={{ opacity: 0, x: -16 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -16 }}
-                transition={SPRING}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.12, ease: 'easeOut' }}
               >
                 <motion.button
                   onClick={() => openDesk(desk)}
                   title={desk.title || 'Untitled desk'}
                   data-testid={`stage-desk-${desk.id}`}
-                  // Tilt inactive cards; flatten + lift on hover or active
                   initial={false}
                   animate={{
-                    rotateY: isActive ? 0 : 14,
-                    scale: isActive ? 1 : 0.95,
+                    scale: isActive ? 1 : 0.96,
                   }}
                   whileHover={{
-                    rotateY: 0,
-                    scale: 1.04,
+                    scale: 1.03,
                     transition: { ...SPRING, stiffness: 220 }
                   }}
                   whileTap={{ scale: 0.97 }}
                   transition={SPRING}
-                  style={{ perspective: 280, transformStyle: 'preserve-3d' }}
+                  style={{}}
                   className={[
                     'relative w-full rounded-xl overflow-hidden text-left shrink-0 block',
                     isActive
@@ -187,7 +191,7 @@ export default function StageManagerStrip({ roomId, activeId }: Props): JSX.Elem
             )
           })}
         </AnimatePresence>
-      </div>
+      </motion.div>
     </div>
   )
 }

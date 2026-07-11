@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useDemoStore } from '../../demo/useDemo'
 import { useViewStore } from '../../stores/view'
 import { useAccountStore } from '../../stores/account'
 import { personFirstName } from '../../lib/personName'
@@ -6,6 +7,7 @@ import { useDocumentsStore } from '../../stores/documents'
 import { useNodeStore } from '../../stores/nodes'
 import { useAiCommandBar } from '../../stores/aiCommandBar'
 import { useFocusSessionStore } from '../../stores/focusSession'
+import { useFreeDesk } from '../../hooks/useFreeDesk'
 import { RailCard, PLEXI_CARD } from '../plexi'
 import Icon from '../Icon'
 import type { ActivityEvent, ActivityKind, DocumentMeta, FbNode, TimeBlock } from '@shared/types'
@@ -136,10 +138,11 @@ export default function HomeDashboard(): JSX.Element {
 
   const nodes = useNodeStore((s) => s.nodes)
   const refreshNodes = useNodeStore((s) => s.refresh)
-  const createNode = useNodeStore((s) => s.create)
   const setActive = useNodeStore((s) => s.setActive)
 
   const openAiBar = useAiCommandBar((s) => s.setOpen)
+  const { createFreeDesk } = useFreeDesk()
+  const startDemo = useDemoStore((s) => s.startScenario)
 
   const focusActive = useFocusSessionStore((s) => s.active)
   const startFocus = useFocusSessionStore((s) => s.start)
@@ -242,17 +245,6 @@ export default function HomeDashboard(): JSX.Element {
     v.goDocument(doc.id)
   }
 
-  const onNewDesk = async (): Promise<void> => {
-    try {
-      const node = await createNode({ parentId: null, kind: 'task', title: 'New desk' })
-      setActive(node.id)
-      v.goTask(node.id)
-    } catch {
-      // create() throws DESK_LIMIT_REACHED on the free tier after prompting an
-      // upgrade. Swallow it here: the prompt already told the user what happened.
-    }
-  }
-
   const toggleFocus = async (): Promise<void> => {
     if (focusActive) {
       await finishFocus('done')
@@ -313,7 +305,7 @@ export default function HomeDashboard(): JSX.Element {
         </button>
 
         {/* Quick actions */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-7">
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-7">
           <QuickAction
             testid="home-quick-create"
             icon="add"
@@ -321,6 +313,14 @@ export default function HomeDashboard(): JSX.Element {
             title="Create"
             blurb="Start a new document"
             onClick={() => void onCreate()}
+          />
+          <QuickAction
+            testid="home-quick-free-desk"
+            icon="note_add"
+            tone="amber"
+            title="New Free Desk"
+            blurb="Blank canvas, no room needed"
+            onClick={() => void createFreeDesk()}
           />
           <QuickAction
             testid="home-quick-plan"
@@ -346,6 +346,29 @@ export default function HomeDashboard(): JSX.Element {
             blurb="Build a PlexiBrain flow"
             onClick={() => v.goPlexiBrain('flows')}
           />
+        </div>
+
+        {/* Demo launchers */}
+        <div className="mb-7">
+          <SectionLabel text="Interactive demos" />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <DemoCard
+              testid="home-demo-new-user"
+              icon="play_circle"
+              tone="violet"
+              title="New User Tour"
+              blurb="See the basics in 90 seconds"
+              onClick={() => void startDemo(1)}
+            />
+            <DemoCard
+              testid="home-demo-advanced"
+              icon="rocket_launch"
+              tone="teal"
+              title="Advanced Features Tour"
+              blurb="Unlock what you're missing"
+              onClick={() => void startDemo(2)}
+            />
+          </div>
         </div>
 
         {/* PlexiBrain insights — real counts only */}
@@ -454,14 +477,14 @@ export default function HomeDashboard(): JSX.Element {
                   </button>
                 ))}
                 <button
-                  onClick={() => void onNewDesk()}
-                  data-testid="home-desk-new"
+                  onClick={() => void createFreeDesk()}
+                  data-testid="home-desk-new-free"
                   className="flex items-center gap-3 rounded-xl border border-dashed border-[var(--edge-soft)] px-3 py-2.5 text-left text-[var(--ink-60)] hover:border-[rgb(var(--accent))]/50 hover:text-[rgb(var(--accent))] transition-colors"
                 >
                   <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--surface-sunken)] shrink-0">
-                    <Icon name="add" size={18} />
+                    <Icon name="note_add" size={18} />
                   </span>
-                  <span className="text-[13px] font-medium">New desk</span>
+                  <span className="text-[13px] font-medium">New Free Desk</span>
                 </button>
               </div>
             </RailCard>
@@ -560,6 +583,49 @@ function EmptyState({ text }: { text: string }): JSX.Element {
   return <p className="py-4 text-center text-[12px] text-[var(--ink-50)]">{text}</p>
 }
 
+function DemoCard({
+  testid,
+  icon,
+  tone,
+  title,
+  blurb,
+  onClick
+}: {
+  testid: string
+  icon: string
+  tone: 'violet' | 'teal'
+  title: string
+  blurb: string
+  onClick: () => void
+}): JSX.Element {
+  const chip =
+    tone === 'violet'
+      ? 'bg-violet-500/15 text-violet-500'
+      : 'bg-teal-500/15 text-teal-500'
+  const border =
+    tone === 'violet'
+      ? 'hover:border-violet-500/40'
+      : 'hover:border-teal-500/40'
+  return (
+    <button
+      onClick={onClick}
+      data-testid={testid}
+      className={`${PLEXI_CARD} flex items-center gap-4 p-4 text-left transition-colors ${border}`}
+    >
+      <span className={`inline-flex h-10 w-10 items-center justify-center rounded-xl shrink-0 ${chip}`}>
+        <Icon name={icon} size={20} />
+      </span>
+      <span>
+        <span className="block text-[14px] font-semibold text-[var(--ink-100)]">{title}</span>
+        <span className="block text-[12px] text-[var(--ink-50)]">{blurb}</span>
+      </span>
+      <span className="ml-auto shrink-0">
+        <Icon name="arrow_forward" size={16} className="text-[var(--ink-40)]" />
+      </span>
+    </button>
+  )
+}
+
 function QuickAction({
   testid,
   icon,
@@ -570,7 +636,7 @@ function QuickAction({
 }: {
   testid: string
   icon: string
-  tone: 'accent' | 'sky' | 'emerald' | 'violet'
+  tone: 'accent' | 'sky' | 'emerald' | 'violet' | 'amber'
   title: string
   blurb: string
   onClick: () => void
@@ -582,7 +648,9 @@ function QuickAction({
         ? 'bg-sky-500/10 text-sky-500'
         : tone === 'emerald'
           ? 'bg-emerald-500/10 text-emerald-500'
-          : 'bg-violet-500/10 text-violet-500'
+          : tone === 'amber'
+            ? 'bg-amber-500/10 text-amber-500'
+            : 'bg-violet-500/10 text-violet-500'
   return (
     <button
       onClick={onClick}

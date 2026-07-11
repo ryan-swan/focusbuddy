@@ -1,8 +1,9 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useWidgetStore } from '../stores/widgets'
 import { useViewStore } from '../stores/view'
 import { WIDGET_CATALOG } from '../lib/widgetCatalog'
+import { useVoicePhaseStore } from '../stores/voicePhase'
 import VoiceCommandFAB from './VoiceCommandFAB'
 import Icon from './Icon'
 
@@ -44,6 +45,34 @@ export default function UnifiedBottomBar(): JSX.Element {
   const activeWidgetId = useWidgetStore((s) => s.activeWidgetId)
   const view = useViewStore((s) => s.view)
   const isOnCanvas = view.kind === 'task'
+  const voicePhase = useVoicePhaseStore((s) => s.phase)
+  const voiceActive = voicePhase !== 'idle'
+
+  // Lock the bar open while any voice phase is active — the listening /
+  // staged / result overlays render above the bar's bounding box, so the
+  // cursor moving to them triggers onMouseLeave and would collapse the dock
+  // (unmounting the FAB and killing the recording). We also cancel any
+  // pending close timer the instant voice activates.
+  const wasVoiceActiveRef = useRef(false)
+  useEffect(() => {
+    if (voiceActive) {
+      wasVoiceActiveRef.current = true
+      if (leaveTimer.current !== null) {
+        window.clearTimeout(leaveTimer.current)
+        leaveTimer.current = null
+      }
+      setHovered(true)
+    } else if (wasVoiceActiveRef.current) {
+      // Voice just went idle — schedule a polite close so the user can read
+      // the result card before the bar disappears, but don't force-close if
+      // the cursor is naturally still over the bar.
+      wasVoiceActiveRef.current = false
+      leaveTimer.current = window.setTimeout(() => {
+        setHovered(false)
+        setItemHoverIdx(null)
+      }, 1200)
+    }
+  }, [voiceActive])
 
   const shortcuts = isOnCanvas
     ? widgets
@@ -58,6 +87,9 @@ export default function UnifiedBottomBar(): JSX.Element {
   }
 
   function leave(): void {
+    // Don't start the close timer while the voice overlay is open — the
+    // overlay renders above the bar and the cursor naturally drifts there.
+    if (voiceActive) return
     leaveTimer.current = window.setTimeout(() => {
       setHovered(false)
       setItemHoverIdx(null)
@@ -82,7 +114,11 @@ export default function UnifiedBottomBar(): JSX.Element {
             transition={{ duration: 0.2, ease: [0.34, 1.56, 0.64, 1] }}
             // No overflow-hidden — CommandCenter and VoiceCommandFAB render
             // overlays via absolute bottom-full that must not be clipped.
-            className="rounded-2xl bg-[var(--surface-raised)]/90 dark:bg-[var(--surface-raised)]/95 backdrop-blur-2xl ring-1 ring-black/[0.10] dark:ring-white/[0.10] shadow-[0_-4px_40px_rgba(0,0,0,0.26),0_8px_32px_rgba(0,0,0,0.14),inset_0_1px_0_rgba(255,255,255,0.10)]"
+            className={`rounded-2xl bg-[var(--surface-raised)]/90 dark:bg-[var(--surface-raised)]/95 backdrop-blur-2xl shadow-[0_-4px_40px_rgba(0,0,0,0.26),0_8px_32px_rgba(0,0,0,0.14),inset_0_1px_0_rgba(255,255,255,0.10)] transition-shadow duration-300 ${
+              voiceActive
+                ? 'ring-1 ring-violet-400/30 shadow-[0_-4px_40px_rgba(0,0,0,0.26),0_8px_32px_rgba(0,0,0,0.14),inset_0_1px_0_rgba(255,255,255,0.10),0_0_0_1px_rgba(139,92,246,0.30)]'
+                : 'ring-1 ring-black/[0.10] dark:ring-white/[0.10]'
+            }`}
           >
             {/* Widget tray — only when on a canvas with recent widgets */}
             {shortcuts.length > 0 && (

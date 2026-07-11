@@ -4,8 +4,10 @@ import type { DesignBody } from './design'
 import type { ChartCore } from './chart'
 
 export type AxisValue = 1 | 2 | 3 | 4 | 5
-export type NodeKind = 'folder' | 'task'
+export type NodeKind = 'folder' | 'task' | 'task-item'
+export type TaskItemCategory = 'action' | 'review' | 'deliverable' | 'decision' | 'wait' | 'research' | 'misc'
 export type TaskStatus = 'open' | 'in_progress' | 'done' | 'parked'
+export type TaskUrgency = 'high' | 'medium' | 'low'
 export type SectionLayout = 'free' | 'grid' | 'stacks' | 'icons' | 'list'
 
 // Pin-to-screen zones. Pinned widgets dock to one of four corners; multiple
@@ -121,6 +123,10 @@ export type WidgetKind =
   // when source widgets change (see livingPageScheduler). content is serialized
   // Tiptap JSON, system-owned (never hand-edited). Reuses the living* fields.
   | 'living-doc'
+  // Task list — a checklist of task-item nodes scoped to the current desk
+  // (or room). Items are FbNodes with kind === 'task-item', not widget content,
+  // so they appear in AllTasksView and survive desk layout changes.
+  | 'task-list'
 
 export type ContextMenuAction =
   | 'createStickyFromSelection'
@@ -169,6 +175,15 @@ export interface FbNode {
   // was reconstructed from an accepted share. Null for your own nodes. The
   // sidebar uses it to show a "Shared by <handle>" badge + avatar.
   sharedFromHandle: string | null
+  // Task-item classification. Only meaningful for kind === 'task-item'.
+  category?: TaskItemCategory
+  // Task-item extended fields. Only meaningful for kind === 'task-item'.
+  urgency?: TaskUrgency
+  // ISO date string (e.g. "2025-08-15"). Separate from the numeric dueDate on
+  // folder/task nodes so the two types don't collide.
+  taskDueDate?: string
+  taskNotes?: string
+  tags?: string[]
 }
 
 export interface NodeDraft {
@@ -184,6 +199,11 @@ export interface NodeDraft {
   // Set when reconstructing a node from an accepted share — stamps the
   // sharer's handle so the UI can badge it.
   sharedFromHandle?: string | null
+  category?: TaskItemCategory
+  urgency?: TaskUrgency
+  taskDueDate?: string
+  taskNotes?: string
+  tags?: string[]
 }
 
 export interface NodePatch {
@@ -201,6 +221,11 @@ export interface NodePatch {
   resumeUpdatedAt?: number | null
   dueDate?: number | null
   archived?: boolean
+  category?: TaskItemCategory
+  urgency?: TaskUrgency
+  taskDueDate?: string
+  taskNotes?: string
+  tags?: string[]
 }
 
 // ── Time blocks (calendar time-blocking) ────────────────────────────────────

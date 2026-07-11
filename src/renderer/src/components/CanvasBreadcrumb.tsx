@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import type { FbNode } from '@shared/types'
 import Icon from './Icon'
@@ -11,6 +11,9 @@ interface Props {
   onRevealFolder: (id: string) => void
   onHome: () => void
   fromMindmap?: boolean
+  onAssignToRoom?: (deskId: string, roomId: string) => void
+  onCreateRoomFromDesk?: (deskId: string) => void
+  onRenameTask?: (id: string, title: string) => void
 }
 
 // Hover-expand glossy pill breadcrumb with Stage Manager dropdowns.
@@ -33,7 +36,10 @@ export default function CanvasBreadcrumb({
   onOpenTask,
   onRevealFolder,
   onHome,
-  fromMindmap
+  fromMindmap,
+  onAssignToRoom,
+  onCreateRoomFromDesk,
+  onRenameTask
 }: Props): JSX.Element {
   // `expanded` drives both pill breadcrumb visibility AND dropdown presence.
   // It is set true on any mouseEnter into the system (pill or dropdown) and
@@ -45,9 +51,24 @@ export default function CanvasBreadcrumb({
     activeId: string
     x: number // horizontal center relative to outer wrapper, for centering the panel
   } | null>(null)
+  // Room assignment popover — shown when clicking "Add to room…" on a free desk
+  const [roomPickerOpen, setRoomPickerOpen] = useState(false)
 
   const leaveTimer = useRef<number | null>(null)
   const wrapperRef = useRef<HTMLDivElement>(null)
+
+  // ── Inline rename state ───────────────────────────────────────────────────
+  const [renaming, setRenaming] = useState(false)
+  const [renameValue, setRenameValue] = useState('')
+  const renameInputRef = useRef<HTMLInputElement>(null)
+
+  // Auto-focus and select-all when rename mode activates
+  useEffect(() => {
+    if (renaming && renameInputRef.current) {
+      renameInputRef.current.focus()
+      renameInputRef.current.select()
+    }
+  }, [renaming])
 
   // ── Shared hover helpers ──────────────────────────────────────────────────
 
@@ -121,15 +142,45 @@ export default function CanvasBreadcrumb({
   // This ensures the depth hint and expand always fire when a parent exists.
   const hasAncestors = ancestors.length > 0 || !!current.parentId
 
+  // Rooms available for desk assignment (top-level folders)
+  const rooms = useMemo(
+    () => nodes.filter((n) => !n.archived && n.kind === 'folder' && n.parentId === null),
+    [nodes]
+  )
+
+  // Whether the current desk is free (no parent) and we have assign callbacks
+  const isFreeDesk = current.kind === 'task' && !current.parentId && (onAssignToRoom || onCreateRoomFromDesk)
+
+  // ── Inline rename helpers (depend on `current`) ────────────────────────────
+
+  function startRename(): void {
+    setRenameValue(current.title || '')
+    setRenaming(true)
+  }
+
+  function commitRename(): void {
+    if (!renaming) return
+    setRenaming(false)
+    const trimmed = renameValue.trim()
+    if (trimmed && trimmed !== current.title) {
+      onRenameTask?.(current.id, trimmed)
+    }
+  }
+
+  function cancelRename(): void {
+    setRenaming(false)
+    setRenameValue('')
+  }
+
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div ref={wrapperRef} data-testid="canvas-breadcrumb" className="relative">
+    <div ref={wrapperRef} data-testid="canvas-breadcrumb" className="relative w-fit">
       {/* Breadcrumb pill */}
       <div
         onMouseEnter={handleEnter}
         onMouseLeave={handleLeave}
-        className="inline-flex items-center gap-0.5 px-3 py-1.5 rounded-full fb-glass-chrome ring-1 ring-black/[0.07] dark:ring-white/[0.07] shadow-[0_2px_10px_rgba(0,0,0,0.08)] text-[12px] max-w-full overflow-hidden cursor-default select-none min-w-[320px]"
+        className="inline-flex items-center gap-0.5 px-3 py-1.5 rounded-full fb-glass-chrome ring-1 ring-black/[0.07] dark:ring-white/[0.07] shadow-[0_2px_10px_rgba(0,0,0,0.08)] text-[12px] max-w-full overflow-hidden cursor-default select-none"
       >
         {/* Home button — always visible */}
         <button
@@ -200,10 +251,10 @@ export default function CanvasBreadcrumb({
           )}
         </AnimatePresence>
 
-        {/* Current item — hovering opens desk siblings dropdown */}
+        {/* Current item — hovering opens desk siblings dropdown; double-click to rename */}
         <span
           className="inline-flex items-center gap-0.5 shrink-0"
-          onMouseEnter={(e) => openDropdownAt(e, current.parentId ?? null, current.id)}
+          onMouseEnter={(e) => !renaming && openDropdownAt(e, current.parentId ?? null, current.id)}
           onMouseLeave={handleLeave}
         >
           <Icon name="chevron_right" size={13} className="text-[var(--ink-30)]" />
@@ -213,40 +264,88 @@ export default function CanvasBreadcrumb({
               size={13}
               className="text-[rgb(var(--accent))] shrink-0"
             />
-            <span className="truncate">{current.title || '(untitled)'}</span>
-            <Icon name="expand_more" size={12} className="text-[var(--ink-30)] shrink-0 ml-0.5" />
+            {renaming ? (
+              <input
+                ref={renameInputRef}
+                type="text"
+                value={renameValue}
+                onChange={(e) => setRenameValue(e.target.value)}
+                onBlur={commitRename}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') { e.preventDefault(); commitRename() }
+                  if (e.key === 'Escape') { e.preventDefault(); cancelRename() }
+                }}
+                onClick={(e) => e.stopPropagation()}
+                className="bg-transparent outline-none border-none text-[var(--ink-100)] font-semibold text-[12px] min-w-0 w-[180px] max-w-[220px] cursor-text"
+                style={{ fontFamily: 'inherit' }}
+              />
+            ) : (
+              <span
+                className="truncate cursor-default"
+                onDoubleClick={(e) => {
+                  e.stopPropagation()
+                  if (onRenameTask) startRename()
+                }}
+                title={onRenameTask ? 'Double-click to rename' : undefined}
+              >
+                {current.title || '(untitled)'}
+              </span>
+            )}
+            {!renaming && (
+              <Icon name="expand_more" size={12} className="text-[var(--ink-30)] shrink-0 ml-0.5" />
+            )}
           </span>
         </span>
+
+        {/* "Add to room…" button — only for free desks */}
+        {isFreeDesk && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              cancelLeave()
+              setRoomPickerOpen((v) => !v)
+            }}
+            onMouseEnter={handleEnter}
+            title="Add to a room"
+            className="inline-flex items-center gap-1 ml-1 px-1.5 py-0.5 rounded-full text-[var(--ink-50)] hover:text-[rgb(var(--accent))] hover:bg-[var(--surface-sunken)] transition-colors shrink-0"
+          >
+            <Icon name="move_to_inbox" size={12} />
+            <span className="text-[11px] font-medium">Add to room</span>
+          </button>
+        )}
       </div>
 
       {/* Transparent bridge — fills the mt-2 gap between pill and dropdown so
-          moving the mouse from pill to dropdown never triggers a collapse. */}
+          moving the mouse from pill to dropdown never triggers a collapse.
+          Spans full width so it works regardless of dropdown x position. */}
       {dropdown && (
         <div
           className="absolute z-[59]"
-          style={{
-            top: '100%',
-            left: dropdown.x,
-            transform: 'translateX(-50%)',
-            width: 200,
-            height: 12,
-          }}
+          style={{ top: '100%', left: 0, right: 0, height: 12 }}
           onMouseEnter={handleEnter}
           onMouseLeave={handleLeave}
         />
       )}
 
-      {/* Stage Manager dropdown — centered under the hovered segment */}
+      {/* Stage Manager dropdown — centered under the hovered segment.
+          Position is managed entirely via framer-motion `x` so that when
+          `dropdown.x` changes (user hovers a different segment) the panel
+          springs to the new position instead of jumping. The panel is 172px
+          wide, so centering at dropdown.x means x = dropdown.x - 86. */}
       <AnimatePresence>
         {dropdown && (
           <motion.div
             key="stage-dropdown"
-            initial={{ opacity: 0, y: -10, scale: 0.96 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -6, scale: 0.97 }}
-            transition={{ duration: 0.22, ease: [0.34, 1.2, 0.64, 1] }}
+            initial={{ opacity: 0, y: -6, x: dropdown.x - 86 }}
+            animate={{ opacity: 1, y: 0, x: dropdown.x - 86 }}
+            exit={{ opacity: 0, y: -4 }}
+            transition={{
+              opacity: { duration: 0.14, ease: 'easeOut' },
+              y: { duration: 0.14, ease: 'easeOut' },
+              x: { type: 'spring', stiffness: 380, damping: 32, mass: 0.8 }
+            }}
             className="absolute top-full mt-2 w-[172px] max-h-[360px] rounded-2xl overflow-hidden bg-[var(--surface-raised)] border border-[var(--edge-soft)] shadow-[0_8px_40px_rgba(0,0,0,0.28)] ring-1 ring-black/[0.10] dark:ring-white/[0.10] z-[60] flex flex-col"
-            style={{ left: dropdown.x, transform: 'translateX(-50%)' }}
+            style={{ left: 0 }}
             onMouseEnter={handleEnter}
             onMouseLeave={handleLeave}
           >
@@ -255,6 +354,64 @@ export default function CanvasBreadcrumb({
               activeId={dropdown.activeId}
             />
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Room picker popover — opens when clicking "Add to room" on a free desk */}
+      <AnimatePresence>
+        {roomPickerOpen && isFreeDesk && (
+          <>
+            {/* Click-away backdrop */}
+            <div
+              className="fixed inset-0 z-[59]"
+              onClick={() => setRoomPickerOpen(false)}
+            />
+            <motion.div
+              key="room-picker"
+              initial={{ opacity: 0, y: -6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              transition={{ duration: 0.14, ease: [0.25, 0.46, 0.45, 0.94] }}
+              className="absolute top-full mt-2 right-0 w-[200px] max-h-[280px] rounded-2xl overflow-hidden bg-[var(--surface-raised)] border border-[var(--edge-soft)] shadow-[0_8px_40px_rgba(0,0,0,0.28)] ring-1 ring-black/[0.10] dark:ring-white/[0.10] z-[60] flex flex-col"
+            >
+              <div className="px-3 pt-2.5 pb-1">
+                <span className="text-[10px] uppercase tracking-[0.12em] text-[var(--ink-40)] font-semibold">
+                  Add to room
+                </span>
+              </div>
+              <div className="flex-1 overflow-auto">
+                {rooms.length === 0 ? (
+                  <div className="px-3 py-2 text-[12px] text-[var(--ink-50)]">No rooms yet</div>
+                ) : (
+                  rooms.map((room) => (
+                    <button
+                      key={room.id}
+                      onClick={() => {
+                        onAssignToRoom?.(current.id, room.id)
+                        setRoomPickerOpen(false)
+                      }}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-[12px] text-[var(--ink-80)] hover:bg-[var(--surface-sunken)] hover:text-[var(--ink-100)] transition-colors text-left"
+                    >
+                      <Icon name="workspaces" size={13} className="text-[var(--ink-40)] shrink-0" />
+                      <span className="truncate">{room.title || 'Untitled Room'}</span>
+                    </button>
+                  ))
+                )}
+              </div>
+              <div className="border-t border-[var(--edge-soft)]">
+                <button
+                  onClick={() => {
+                    onCreateRoomFromDesk?.(current.id)
+                    setRoomPickerOpen(false)
+                  }}
+                  className="w-full flex items-center gap-2 px-3 py-2.5 text-[12px] text-[rgb(var(--accent))] hover:bg-[var(--surface-sunken)] transition-colors text-left font-medium"
+                >
+                  <Icon name="add" size={13} className="shrink-0" />
+                  <span>Create new room</span>
+                </button>
+              </div>
+            </motion.div>
+          </>
         )}
       </AnimatePresence>
     </div>

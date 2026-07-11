@@ -8,7 +8,7 @@ const SCHEMA = `
 CREATE TABLE IF NOT EXISTS nodes (
   id TEXT PRIMARY KEY,
   parent_id TEXT REFERENCES nodes(id) ON DELETE CASCADE,
-  kind TEXT NOT NULL CHECK (kind IN ('folder', 'task')),
+  kind TEXT NOT NULL CHECK (kind IN ('folder', 'task', 'task-item')),
   title TEXT NOT NULL,
   description TEXT NOT NULL DEFAULT '',
   status TEXT NOT NULL DEFAULT 'open',
@@ -525,6 +525,15 @@ export function getDb(): Database.Database {
   // Set on nodes reconstructed from a share someone sent you. Drives the
   // "Shared by <handle>" badge + avatar in the sidebar. Null = your own node.
   ensureColumn(db, 'nodes', 'shared_from_handle', 'TEXT')
+  // Task-item category — classification for task-item nodes ('action', 'review',
+  // 'deliverable', 'decision', 'wait', 'research', 'misc'). NULL for all other kinds.
+  ensureColumn(db, 'nodes', 'category', 'TEXT')
+  // Task-item extended fields (urgency, taskDueDate as ISO string, taskNotes, tags JSON).
+  // Stored separately from the existing numeric due_date on folder/task nodes.
+  ensureColumn(db, 'nodes', 'urgency', 'TEXT')
+  ensureColumn(db, 'nodes', 'task_due_date', 'TEXT')
+  ensureColumn(db, 'nodes', 'task_notes', 'TEXT')
+  ensureColumn(db, 'nodes', 'tags', 'TEXT')
   // Soft-archive flag for nodes — separate from task `status` so folders
   // can be put away without messing with the work-state of their tasks.
   ensureColumn(db, 'nodes', 'archived', 'INTEGER NOT NULL DEFAULT 0')
@@ -726,6 +735,7 @@ export function getDb(): Database.Database {
   ensureColumn(db, 'fb_smart_folders', 'search', "TEXT NOT NULL DEFAULT ''")
   migrateDocumentsDocTypeCheck(db)
   migrateShareKindChecks(db)
+  migrateNodesKindCheck(db)
   // Multi-org tenancy for documents. Added AFTER migrateDocumentsDocTypeCheck,
   // which rebuilds the documents table to drop a legacy CHECK — adding the column
   // last means the rebuild can never drop it. Existing docs backfill to the
@@ -950,6 +960,46 @@ function migrateShareKindChecks(d: Database.Database): void {
       PRAGMA foreign_keys=on;
     `)
   }
+}
+
+// The nodes table shipped with CHECK (kind IN ('folder', 'task')). Adding
+// 'task-item' as a new kind would fail on existing DBs unless we widen the
+// constraint. This rebuilds the nodes table to replace the narrow CHECK with
+// one that includes 'task-item'. Idempotent; a no-op on fresh DBs or once done.
+function migrateNodesKindCheck(d: Database.Database): void {
+  const row = d
+    .prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='nodes'")
+    .get() as { sql?: string } | undefined
+  // Only migrate if the old narrow check is present (no 'task-item')
+  if (!row?.sql || !row.sql.includes("'folder', 'task'") || row.sql.includes("'task-item'")) return
+  d.exec(`
+    PRAGMA foreign_keys=off;
+    BEGIN;
+    CREATE TABLE nodes_new (
+      id TEXT PRIMARY KEY,
+      parent_id TEXT REFERENCES nodes_new(id) ON DELETE CASCADE,
+      kind TEXT NOT NULL CHECK (kind IN ('folder', 'task', 'task-item')),
+      title TEXT NOT NULL,
+      description TEXT NOT NULL DEFAULT '',
+      status TEXT NOT NULL DEFAULT 'open',
+      priority INTEGER NOT NULL DEFAULT 3,
+      interest INTEGER NOT NULL DEFAULT 3,
+      importance INTEGER NOT NULL DEFAULT 3,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      started_at INTEGER,
+      completed_at INTEGER
+    );
+    INSERT INTO nodes_new (id, parent_id, kind, title, description, status, priority, interest, importance, sort_order, created_at, updated_at, started_at, completed_at)
+      SELECT id, parent_id, kind, title, description, status, priority, interest, importance, sort_order, created_at, updated_at, started_at, completed_at FROM nodes;
+    DROP TABLE nodes;
+    ALTER TABLE nodes_new RENAME TO nodes;
+    CREATE INDEX IF NOT EXISTS idx_nodes_parent ON nodes(parent_id);
+    CREATE INDEX IF NOT EXISTS idx_nodes_kind ON nodes(kind);
+    COMMIT;
+    PRAGMA foreign_keys=on;
+  `)
 }
 
 export function closeDb(): void {

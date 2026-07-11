@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { FbNode } from '@shared/types'
+import type { FbNode, NodePatch, TaskItemCategory } from '@shared/types'
 import { useNodeStore } from '../../stores/nodes'
 import { useFocusSessionStore } from '../../stores/focusSession'
 import { useViewStore } from '../../stores/view'
@@ -9,16 +9,30 @@ import { energyAffinity, energyFitForTask, useEnergyStore } from '../../stores/e
 import Icon from '../Icon'
 import { DashboardHeader, ListRow, PLEXI_CARD, StatusPill } from '../plexi'
 import { fieldInputClass } from '../plexi/forms'
+import TaskDetailPanel from '../TaskDetailPanel'
+import NewTaskModal from '../NewTaskModal'
 
-type Filter = 'today' | 'overdue' | 'upcoming' | 'open' | 'done'
+type Filter = 'open' | 'today' | 'overdue' | 'upcoming' | 'done'
 type Sort = 'smart' | 'energy' | 'due' | 'updated' | 'alpha'
 
+// Fix 3: reordered to match the desired display order
 const FILTERS: Array<{ value: Filter; label: string; icon: string }> = [
+  { value: 'open', label: 'All Open', icon: 'checklist' },
   { value: 'today', label: 'Today', icon: 'today' },
   { value: 'overdue', label: 'Overdue', icon: 'alarm' },
   { value: 'upcoming', label: 'Upcoming', icon: 'event' },
-  { value: 'open', label: 'All open', icon: 'checklist' },
   { value: 'done', label: 'Done', icon: 'check_circle' }
+]
+
+// Fix 4: all 7 categories always shown
+const ALL_CATEGORIES: TaskItemCategory[] = [
+  'action',
+  'review',
+  'deliverable',
+  'decision',
+  'wait',
+  'research',
+  'misc'
 ]
 
 // 'energy' kept as a Sort enum value for backward-compat with any persisted state,
@@ -39,8 +53,15 @@ function endOfTodayMs(): number {
   return d.getTime()
 }
 
+function startOfTodayMs(): number {
+  const d = new Date()
+  d.setHours(0, 0, 0, 0)
+  return d.getTime()
+}
+
 function isOverdue(n: FbNode, now: number): boolean {
-  return n.dueDate != null && n.dueDate < now && n.status !== 'done'
+  // Fix 3: overdue = dueDate < start of today (strictly before today) and not done
+  return n.dueDate != null && n.dueDate < startOfTodayMs() && n.status !== 'done'
 }
 
 function isToday(n: FbNode): boolean {
@@ -55,21 +76,27 @@ function isToday(n: FbNode): boolean {
 }
 
 function matchesFilter(n: FbNode, filter: Filter, now: number): boolean {
+  // Fix 3: exact filter definitions
   if (filter === 'done') return n.status === 'done'
+  // All non-done filters exclude done/parked tasks
   if (n.status === 'done' || n.status === 'parked') return false
   switch (filter) {
+    case 'open':
+      // All open: status !== 'done' (parked already excluded above)
+      return true
     case 'today':
-      return n.status === 'in_progress' || isOverdue(n, now) || isToday(n)
+      // dueDate === today's date (strict date match)
+      return isToday(n)
     case 'overdue':
+      // dueDate < today and status !== 'done'
       return isOverdue(n, now)
     case 'upcoming':
+      // dueDate > today (strictly after today)
       return (
         n.dueDate != null &&
         n.dueDate > endOfTodayMs() &&
         n.dueDate <= now + ONE_WEEK
       )
-    case 'open':
-      return true
     default:
       return true
   }
@@ -133,12 +160,14 @@ function sortTasks(
 export default function AllTasksView(): JSX.Element {
   const nodes = useNodeStore((s) => s.nodes)
   const updateNode = useNodeStore((s) => s.update)
+  const removeNode = useNodeStore((s) => s.remove)
   const setActive = useNodeStore((s) => s.setActive)
   const startSession = useFocusSessionStore((s) => s.start)
   const goTask = useViewStore((s) => s.goTask)
   const goProject = useViewStore((s) => s.goProject)
   const currentEnergy = useEnergyStore((s) => s.current)
-  const [filter, setFilter] = useState<Filter>('today')
+  const [newTaskOpen, setNewTaskOpen] = useState(false)
+  const [filter, setFilter] = useState<Filter>('open')
   const [sort, setSort] = useState<Sort>('smart')
   const [search, setSearch] = useState('')
   // Progressive rendering: with years of tasks a flat .map() renders thousands
@@ -166,8 +195,41 @@ export default function AllTasksView(): JSX.Element {
     return () => io.disconnect()
   })
 
+  const [categoryFilter, setCategoryFilter] = useState<TaskItemCategory | 'all'>('all')
+  const [deskFilter, setDeskFilter] = useState<string | 'all'>('all')
+  // Fix 5: desk dropdown open state
+  const [deskDropdownOpen, setDeskDropdownOpen] = useState(false)
+  const deskDropdownRef = useRef<HTMLDivElement>(null)
+
+  // Close desk dropdown on outside click
+  useEffect(() => {
+    if (!deskDropdownOpen) return
+    function handleClick(e: MouseEvent): void {
+      if (deskDropdownRef.current && !deskDropdownRef.current.contains(e.target as Node)) {
+        setDeskDropdownOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [deskDropdownOpen])
+
   const now = Date.now()
-  const allTasks = useMemo(() => nodes.filter((n) => n.kind === 'task'), [nodes])
+  const allTasks = useMemo(
+    () => nodes.filter((n) => n.kind === 'task' || n.kind === 'task-item'),
+    [nodes]
+  )
+
+  // Unique desk names that have at least one task-item in allTasks
+  const deskOptions = useMemo(() => {
+    const seen = new Map<string, string>()
+    for (const t of allTasks) {
+      if (t.kind === 'task-item' && t.parentId) {
+        const desk = nodes.find((n) => n.id === t.parentId)
+        if (desk && !seen.has(desk.id)) seen.set(desk.id, desk.title)
+      }
+    }
+    return Array.from(seen.entries()).map(([id, title]) => ({ id, title }))
+  }, [allTasks, nodes])
 
   // Pre-compute counts for filter chips
   const counts = useMemo(() => {
@@ -197,15 +259,28 @@ export default function AllTasksView(): JSX.Element {
         const hay = `${t.title} ${t.description}`.toLowerCase()
         if (!hay.includes(q)) return false
       }
+      // Category filter only applies to task-items
+      if (categoryFilter !== 'all' && t.kind === 'task-item') {
+        if (t.category !== categoryFilter) return false
+      }
+      // Desk filter only applies to task-items
+      if (deskFilter !== 'all' && t.kind === 'task-item') {
+        if (t.parentId !== deskFilter) return false
+      }
       return true
     })
     return sortTasks(filtered, sort, now, currentEnergy?.level ?? null)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [allTasks, filter, sort, search, currentEnergy?.level])
+  }, [allTasks, filter, sort, search, currentEnergy?.level, categoryFilter, deskFilter])
 
   function openTask(task: FbNode): void {
     setActive(task.id)
     goTask(task.id)
+  }
+
+  function navigateToDesk(deskId: string): void {
+    setActive(deskId)
+    goTask(deskId)
   }
 
   function quickStart(task: FbNode): void {
@@ -225,13 +300,28 @@ export default function AllTasksView(): JSX.Element {
     taskComplete()
   }
 
+  // Fix 5: resolve selected desk name for the button label
+  const selectedDeskName = deskFilter !== 'all'
+    ? (deskOptions.find((d) => d.id === deskFilter)?.title ?? 'Desk')
+    : null
+
   return (
     <div className="h-full overflow-auto desk-paper no-tod">
       <div className="max-w-4xl mx-auto px-6 py-6 space-y-3">
         {/* Header */}
-        <DashboardHeader title="All Tasks" subtitle="Every task across every project, flat." />
+        <div className="flex items-start justify-between gap-3">
+          <DashboardHeader title="All Tasks" subtitle="Every task across every project, flat." />
+          <button
+            onClick={() => setNewTaskOpen(true)}
+            className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold text-white transition-all hover:brightness-110 mt-0.5"
+            style={{ backgroundColor: 'rgb(var(--accent))' }}
+          >
+            <Icon name="add" size={14} />
+            New Task
+          </button>
+        </div>
 
-        {/* Filter chips */}
+        {/* Fix 3: Filter chips in the new order: All Open, Today, Overdue, Upcoming, Done */}
         <div className="flex flex-wrap items-center gap-1.5">
           {FILTERS.map((f) => {
             const active = filter === f.value
@@ -260,6 +350,82 @@ export default function AllTasksView(): JSX.Element {
               </button>
             )
           })}
+        </div>
+
+        {/* Fix 4: Always show ALL 7 category filter chips */}
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="text-[10px] uppercase tracking-wider font-semibold text-[var(--ink-40)] mr-0.5">Category</span>
+          <button
+            onClick={() => setCategoryFilter('all')}
+            className={`px-2 py-0.5 rounded-full text-[11px] capitalize transition-colors ${
+              categoryFilter === 'all'
+                ? 'bg-accent/15 text-accent border border-accent/40'
+                : 'bg-[var(--surface-sunken)] border border-[var(--edge-soft)] text-[var(--ink-70)] hover:border-[var(--edge-firm)]'
+            }`}
+          >
+            All
+          </button>
+          {ALL_CATEGORIES.map((cat) => (
+            <button
+              key={cat}
+              onClick={() => setCategoryFilter(categoryFilter === cat ? 'all' : cat)}
+              className={`px-2 py-0.5 rounded-full text-[11px] capitalize transition-colors ${
+                categoryFilter === cat
+                  ? 'bg-accent/15 text-accent border border-accent/40'
+                  : 'bg-[var(--surface-sunken)] border border-[var(--edge-soft)] text-[var(--ink-70)] hover:border-[var(--edge-firm)]'
+              }`}
+            >
+              {cat}
+            </button>
+          ))}
+        </div>
+
+        {/* Fix 5: Single "Filter by Desk" button with dropdown */}
+        <div className="flex items-center gap-2">
+          <div ref={deskDropdownRef} className="relative">
+            <button
+              onClick={() => setDeskDropdownOpen((v) => !v)}
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] transition-colors ${
+                deskFilter !== 'all'
+                  ? 'bg-accent/15 text-accent border border-accent/40'
+                  : 'bg-[var(--surface-sunken)] border border-[var(--edge-soft)] text-[var(--ink-70)] hover:border-[var(--edge-firm)]'
+              }`}
+            >
+              <Icon name="grid_view" size={12} />
+              <span className="max-w-[160px] truncate">
+                {selectedDeskName != null ? `Desk: ${selectedDeskName}` : 'Filter by Desk'}
+              </span>
+              <Icon name={deskDropdownOpen ? 'expand_less' : 'expand_more'} size={12} />
+            </button>
+
+            {deskDropdownOpen && (
+              <div className="absolute top-full left-0 mt-1 z-50 min-w-[180px] rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-[0_8px_24px_rgba(0,0,0,0.12)] py-1 overflow-hidden">
+                <button
+                  onClick={() => { setDeskFilter('all'); setDeskDropdownOpen(false) }}
+                  className={`w-full text-left px-3 py-1.5 text-[12px] transition-colors ${
+                    deskFilter === 'all'
+                      ? 'bg-accent/10 text-accent font-medium'
+                      : 'text-[var(--ink-80)] hover:bg-[var(--surface-sunken)]'
+                  }`}
+                >
+                  All Desks
+                </button>
+                {deskOptions.map(({ id, title }) => (
+                  <button
+                    key={id}
+                    onClick={() => { setDeskFilter(id); setDeskDropdownOpen(false) }}
+                    className={`w-full text-left px-3 py-1.5 text-[12px] truncate transition-colors ${
+                      deskFilter === id
+                        ? 'bg-accent/10 text-accent font-medium'
+                        : 'text-[var(--ink-80)] hover:bg-[var(--surface-sunken)]'
+                    }`}
+                  >
+                    {title}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Search + sort */}
@@ -300,15 +466,26 @@ export default function AllTasksView(): JSX.Element {
           ) : (
             <ul className="divide-y divide-[var(--edge-soft)]">
               {visible.slice(0, renderCap).map((task) => (
-                <TaskRow
-                  key={task.id}
-                  task={task}
-                  nodes={nodes}
-                  onOpen={() => openTask(task)}
-                  onQuickStart={() => quickStart(task)}
-                  onMarkDone={() => markDone(task)}
-                  onOpenProject={(id) => goProject(id)}
-                />
+                task.kind === 'task-item' ? (
+                  <li key={task.id} className="px-3 py-1.5">
+                    <TaskDetailPanel
+                      node={task}
+                      onUpdate={(patch: NodePatch) => void updateNode(task.id, patch)}
+                      onDelete={(id) => void removeNode(id)}
+                      onNavigate={navigateToDesk}
+                    />
+                  </li>
+                ) : (
+                  <TaskRow
+                    key={task.id}
+                    task={task}
+                    nodes={nodes}
+                    onOpen={() => openTask(task)}
+                    onQuickStart={() => quickStart(task)}
+                    onMarkDone={() => markDone(task)}
+                    onOpenProject={(id) => goProject(id)}
+                  />
+                )
               ))}
               {visible.length > renderCap && (
                 <li ref={sentinelRef} className="py-3 text-center text-[11px] text-[var(--ink-50)]">
@@ -324,6 +501,8 @@ export default function AllTasksView(): JSX.Element {
           shown
         </div>
       </div>
+
+      <NewTaskModal open={newTaskOpen} onClose={() => setNewTaskOpen(false)} />
     </div>
   )
 }
@@ -338,7 +517,7 @@ function EmptyState({
   const msg = hasSearch
     ? "Nothing matches your search."
     : filter === 'today'
-      ? "Nothing due today, nothing overdue, nothing in progress. You're caught up."
+      ? "Nothing due today. You're caught up."
       : filter === 'overdue'
         ? 'Nothing overdue. Sweet.'
         : filter === 'upcoming'
@@ -352,6 +531,16 @@ function EmptyState({
       <p className="text-sm text-[var(--ink-70)] leading-relaxed px-6">{msg}</p>
     </div>
   )
+}
+
+const CATEGORY_COLORS: Partial<Record<TaskItemCategory, string>> = {
+  action: 'bg-blue-500/15 text-blue-600',
+  review: 'bg-amber-500/15 text-amber-600',
+  deliverable: 'bg-emerald-500/15 text-emerald-600',
+  decision: 'bg-purple-500/15 text-purple-600',
+  wait: 'bg-slate-500/15 text-slate-500',
+  research: 'bg-cyan-500/15 text-cyan-600',
+  misc: 'bg-[var(--surface-sunken)] text-[var(--ink-60)]'
 }
 
 interface RowProps {
@@ -400,6 +589,9 @@ function TaskRow({
   const path = projectPath(nodes, task.id)
   const parentNode = task.parentId ? nodes.find((n) => n.id === task.parentId) : null
   const isDone = task.status === 'done'
+  const isTaskItem = task.kind === 'task-item'
+  // For task-items, parentNode is the desk they belong to
+  const originDeskName = isTaskItem && parentNode ? parentNode.title : null
 
   return (
     <ListRow as="li" className="px-4 py-2 group">
@@ -432,7 +624,13 @@ function TaskRow({
         >
           {task.title}
         </button>
-        {path.length > 0 && (
+        {isTaskItem && originDeskName && (
+          <div className="text-[10px] text-[var(--ink-60)] truncate mt-0.5 flex items-center gap-1">
+            <Icon name="grid_view" size={9} />
+            <span>{originDeskName}</span>
+          </div>
+        )}
+        {!isTaskItem && path.length > 0 && (
           <div className="text-[10px] text-[var(--ink-70)] truncate flex items-center gap-0.5 mt-0.5">
             {path.map((segment, i) => (
               <span key={i} className="flex items-center gap-0.5">
@@ -451,6 +649,13 @@ function TaskRow({
           </div>
         )}
       </div>
+      {isTaskItem && task.category && (
+        <span
+          className={`shrink-0 px-1.5 py-0.5 rounded-full text-[9.5px] font-medium capitalize ${CATEGORY_COLORS[task.category] ?? ''}`}
+        >
+          {task.category}
+        </span>
+      )}
       {dueLabel && (
         <span
           className="shrink-0"

@@ -475,6 +475,17 @@ export const WIDGET_CATALOG: WidgetCatalogEntry[] = [
     defaultHeight: 400,
     defaultContent: '',
     isWebBased: false
+  },
+  {
+    kind: 'task-list',
+    category: 'Tools',
+    label: 'Task List',
+    icon: 'checklist',
+    hint: 'Checklist of tasks scoped to this desk',
+    defaultWidth: 320,
+    defaultHeight: 420,
+    defaultContent: '{}',
+    isWebBased: false
   }
 ]
 

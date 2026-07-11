@@ -26,6 +26,11 @@ interface NodeRow {
   due_date: number | null
   archived: number | null
   shared_from_handle: string | null
+  category: string | null
+  urgency: string | null
+  task_due_date: string | null
+  task_notes: string | null
+  tags: string | null
 }
 
 function rowToNode(row: NodeRow): FbNode {
@@ -50,7 +55,12 @@ function rowToNode(row: NodeRow): FbNode {
     resumeUpdatedAt: row.resume_updated_at,
     dueDate: row.due_date,
     archived: row.archived === 1,
-    sharedFromHandle: row.shared_from_handle ?? null
+    sharedFromHandle: row.shared_from_handle ?? null,
+    category: (row.category ?? undefined) as FbNode['category'],
+    urgency: (row.urgency ?? undefined) as FbNode['urgency'],
+    taskDueDate: row.task_due_date ?? undefined,
+    taskNotes: row.task_notes ?? undefined,
+    tags: row.tags ? (JSON.parse(row.tags) as string[]) : undefined
   }
 }
 
@@ -95,8 +105,8 @@ export function createNode(draft: NodeDraft): FbNode {
   const id = randomUUID()
   const now = Date.now()
   db.prepare(
-    `INSERT INTO nodes (id, parent_id, kind, title, description, status, priority, interest, importance, sort_order, created_at, updated_at, estimate_minutes, extensions_minutes, due_date, shared_from_handle, org_id)
-     VALUES (@id, @parentId, @kind, @title, @description, 'open', @priority, @interest, @importance, @sortOrder, @now, @now, @estimateMinutes, 0, @dueDate, @sharedFromHandle, @orgId)`
+    `INSERT INTO nodes (id, parent_id, kind, title, description, status, priority, interest, importance, sort_order, created_at, updated_at, estimate_minutes, extensions_minutes, due_date, shared_from_handle, org_id, category, urgency, task_due_date, task_notes, tags)
+     VALUES (@id, @parentId, @kind, @title, @description, 'open', @priority, @interest, @importance, @sortOrder, @now, @now, @estimateMinutes, 0, @dueDate, @sharedFromHandle, @orgId, @category, @urgency, @taskDueDate, @taskNotes, @tags)`
   ).run({
     id,
     parentId: draft.parentId,
@@ -111,6 +121,11 @@ export function createNode(draft: NodeDraft): FbNode {
     dueDate: draft.dueDate ?? null,
     sharedFromHandle: draft.sharedFromHandle ?? null,
     orgId: getActiveOrgId(),
+    category: draft.category ?? null,
+    urgency: draft.urgency ?? null,
+    taskDueDate: draft.taskDueDate ?? null,
+    taskNotes: draft.taskNotes ?? null,
+    tags: draft.tags ? JSON.stringify(draft.tags) : null,
     now
   })
   const created = getNode(id)
@@ -137,7 +152,11 @@ export function updateNode(id: string, patch: NodePatch): FbNode | null {
     ['extensionsMinutes', 'extensions_minutes'],
     ['resumeMarkdown', 'resume_markdown'],
     ['resumeUpdatedAt', 'resume_updated_at'],
-    ['dueDate', 'due_date']
+    ['dueDate', 'due_date'],
+    ['category', 'category'],
+    ['urgency', 'urgency'],
+    ['taskDueDate', 'task_due_date'],
+    ['taskNotes', 'task_notes']
   ]
   for (const [key, col] of cols) {
     if (patch[key] !== undefined) {
@@ -148,6 +167,10 @@ export function updateNode(id: string, patch: NodePatch): FbNode | null {
   if (patch.archived !== undefined) {
     fields.push('archived = @archived')
     params.archived = patch.archived ? 1 : 0
+  }
+  if (patch.tags !== undefined) {
+    fields.push('tags = @tags')
+    params.tags = patch.tags === null ? null : JSON.stringify(patch.tags)
   }
   if (patch.status === 'in_progress' && existing.status !== 'in_progress') {
     fields.push('started_at = @now')
