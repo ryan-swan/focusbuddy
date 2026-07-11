@@ -238,6 +238,7 @@ export default function Canvas(): JSX.Element {
   const nodes = useNodeStore((s) => s.nodes)
   const updateNode = useNodeStore((s) => s.update)
   const openObjectChannel = useMessagingStore((s) => s.openObjectChannel)
+  const resolveObjectChannel = useMessagingStore((s) => s.resolveObjectChannel)
   const setActiveTask = useNodeStore((s) => s.setActive)
   const expandFolder = useNodeStore((s) => s.expand)
   // Breadcrumb origin: if this task's canvas was opened by exploring a mind-map
@@ -2245,12 +2246,50 @@ export default function Canvas(): JSX.Element {
             </div>
           )}
 
-          {/* This desk's chat — opens (or creates) the channel bound to this desk. */}
+          {/* This desk's chat — drops a live chat panel bound to the desk's channel
+              onto the canvas (or focuses the one already there), so you can read
+              and reply without leaving the desk. The panel's own Open button jumps
+              to the full conversation in Messages. */}
           <button
-            onClick={() => void openObjectChannel('desk', activeTask.id, activeTask.title || 'Desk')}
+            onClick={async () => {
+              const convId = await resolveObjectChannel('desk', activeTask.id, activeTask.title || 'Desk')
+              if (!convId) {
+                // Chat unavailable (signed out / no org / offline) — fall back to
+                // the Messages view, which surfaces the honest reason.
+                void openObjectChannel('desk', activeTask.id, activeTask.title || 'Desk')
+                return
+              }
+              // If a chat panel for this channel is already on the desk, focus it
+              // rather than spawning a duplicate.
+              const existing = widgets.find((w) => {
+                if (w.kind !== 'chat-thread') return false
+                try {
+                  return (JSON.parse(w.content || '{}') as { conversationId?: string }).conversationId === convId
+                } catch {
+                  return false
+                }
+              })
+              if (existing) {
+                focusOn(existing.id)
+                return
+              }
+              const entry = catalogFor('chat-thread')
+              const pos = spawnPositionFor(entry?.defaultWidth ?? 340, entry?.defaultHeight ?? 460)
+              await createWidget({
+                taskId: activeTask.id,
+                kind: 'chat-thread',
+                title: activeTask.title || 'Desk chat',
+                content: JSON.stringify({ conversationId: convId, channelName: activeTask.title || 'Desk' }),
+                x: pos.x,
+                y: pos.y,
+                width: entry?.defaultWidth ?? 340,
+                height: entry?.defaultHeight ?? 460,
+                color: null
+              })
+            }}
             className="icon-btn !h-6 !w-6 text-[var(--ink-50)] hover:text-accent shrink-0"
-            aria-label="Open this desk's chat"
-            title="Chat about this desk"
+            aria-label="Add this desk's chat panel"
+            title="Add a chat panel for this desk"
             data-testid="desk-chat-button"
           >
             <Icon name="forum" size={15} />

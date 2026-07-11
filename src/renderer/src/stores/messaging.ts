@@ -192,6 +192,26 @@ interface MessagingStore {
     title: string,
     memberIds?: string[]
   ) => Promise<void>
+  // Get-or-create the channel bound to an object and return its id WITHOUT
+  // switching the active view. For the on-desk chat widget, which binds to the
+  // desk's channel but keeps the user on the canvas.
+  resolveObjectChannel: (
+    objectKind: 'room' | 'desk' | 'document',
+    objectId: string,
+    title: string,
+    memberIds?: string[]
+  ) => Promise<string | null>
+  // Load a conversation's history into messagesByConv without making it active,
+  // so a widget can show a channel the user has not opened in Messages. No-op if
+  // already loaded. Live updates then arrive via the same socket handler.
+  ensureConversationLoaded: (conversationId: string) => Promise<void>
+  // Send into an arbitrary conversation (not necessarily the active one), for the
+  // on-desk chat widget's inline composer.
+  sendToConversation: (
+    conversationId: string,
+    body: string,
+    attachment?: MessageAttachment | null
+  ) => Promise<void>
   archiveObjectChannel: (objectKind: 'room' | 'desk' | 'document', objectId: string) => Promise<void>
   // Slack-class polish (P6): search + pinned messages.
   search: (query: string) => Promise<api.SearchHit[]>
@@ -551,6 +571,38 @@ export const useMessagingStore = create<MessagingStore>((set, get) => ({
     if (!id) return
     await get().refreshConversations()
     await get().openConversation(id)
+  },
+
+  resolveObjectChannel: async (objectKind, objectId, title, memberIds) => {
+    const { token } = get()
+    if (!token) return null
+    const activeOrg = useOrgStore.getState().activeOrgId
+    const orgId = activeOrg && activeOrg !== PERSONAL_ORG_ID ? activeOrg : null
+    const id = await api.getOrCreateObjectChannel(token, { objectKind, objectId, orgId, memberIds, title })
+    if (id) void get().refreshConversations()
+    return id ?? null
+  },
+
+  ensureConversationLoaded: async (conversationId) => {
+    const { token, messagesByConv } = get()
+    if (!token || messagesByConv[conversationId]) return
+    const messages = await api.getMessages(token, conversationId)
+    set((s) => ({ messagesByConv: { ...s.messagesByConv, [conversationId]: messages } }))
+  },
+
+  sendToConversation: async (conversationId, body, attachment = null) => {
+    const { token } = get()
+    if (!token) return
+    const trimmed = body.trim()
+    if (!trimmed && !attachment) return
+    const message = await api.sendMessage(token, conversationId, trimmed, attachment)
+    if (!message) return
+    set((s) => {
+      const existing = s.messagesByConv[conversationId] ?? []
+      if (existing.some((m) => m.id === message.id)) return s
+      return { messagesByConv: { ...s.messagesByConv, [conversationId]: [...existing, message] } }
+    })
+    void get().refreshConversations()
   },
 
   archiveObjectChannel: async (objectKind, objectId) => {

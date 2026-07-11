@@ -275,11 +275,11 @@ export const WIDGET_CATALOG: WidgetCatalogEntry[] = [
   {
     kind: 'chat-thread',
     category: 'Comms',
-    label: 'Chat thread',
+    label: 'Chat',
     icon: 'forum',
-    hint: 'Pin a PlexiChat conversation to this desk — see the latest messages and open the full thread',
-    defaultWidth: 320,
-    defaultHeight: 300,
+    hint: 'A live chat panel bound to a channel — read and reply without leaving the desk',
+    defaultWidth: 340,
+    defaultHeight: 460,
     defaultContent: '',
     isWebBased: false
   },
