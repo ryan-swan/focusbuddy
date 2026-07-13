@@ -4,7 +4,7 @@ import { useAccountStore } from '../../stores/account'
 import Icon from '../Icon'
 import { MessageRow, RecallPanel, PulsePanel, SchedulesPanel, BriefingPanel, ChannelBrowser } from './MessagesView'
 import { ChatComposer } from './chat/ChatComposer'
-import { getBriefing, type Briefing } from '../../lib/messagingClient'
+import { getBriefing, searchMessages, type Briefing, type SearchHit } from '../../lib/messagingClient'
 import { personDisplayName, personInitials } from '../../lib/personName'
 import { presenceColor } from '../../lib/presence'
 
@@ -38,6 +38,52 @@ function fmtAgo(ms: number): string {
   return `${Math.floor(d / 86_400_000)}d`
 }
 
+// A message thread, expanded inline right under its parent message rather than in
+// a separate slide-out panel. Replies render as the same bubbles; a small input
+// posts back into the thread.
+function InlineThread({ parentId, myId }: { parentId: string; myId: string }): JSX.Element {
+  const threadsByParent = useMessagingStore((s) => s.threadsByParent)
+  const sendThreadReply = useMessagingStore((s) => s.sendThreadReply)
+  const react = useMessagingStore((s) => s.react)
+  const replies = threadsByParent[parentId] ?? []
+  const [draft, setDraft] = useState('')
+  const lang = useMemo(() => localStorage.getItem('plexi-translate-lang') || 'English', [])
+
+  async function submit(): Promise<void> {
+    const b = draft.trim()
+    if (!b) return
+    setDraft('')
+    await sendThreadReply(parentId, b)
+  }
+
+  return (
+    <div className="ml-9 mt-1 mb-1 border-l-2 border-[rgb(var(--accent)/0.35)] pl-3 py-1 space-y-1.5" data-testid="flow-thread">
+      <div className="text-[10px] uppercase tracking-wide text-[var(--ink-40)]">Thread</div>
+      {replies.map((r) => (
+        <MessageRow key={r.id} m={r} mine={r.fromAccount === myId} myId={myId} translateLang={lang} onReact={(e) => void react(r.id, e)} />
+      ))}
+      <div className="flex items-center gap-1.5 pt-0.5">
+        <input
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault()
+              void submit()
+            }
+          }}
+          placeholder="Reply in thread…"
+          data-testid="flow-thread-input"
+          className="flex-1 bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded-lg px-2.5 py-1.5 text-[12.5px] text-[var(--ink-90)] outline-none focus:border-[rgb(var(--accent)/0.5)]"
+        />
+        <button onClick={() => void submit()} disabled={!draft.trim()} className="btn-primary px-2.5 py-1.5 text-[12px] disabled:opacity-40" aria-label="Send reply">
+          <Icon name="send" size={13} />
+        </button>
+      </div>
+    </div>
+  )
+}
+
 // A single conversation's live messages + inline composer, shared by the expanded
 // card and the focus pane. The conversation is made active on mount so the
 // store's active-scoped handlers (react/edit/delete) operate on it.
@@ -49,13 +95,35 @@ function ConversationBody({ conversationId, title }: { conversationId: string; t
   const react = useMessagingStore((s) => s.react)
   const editMessage = useMessagingStore((s) => s.editMessage)
   const deleteMessage = useMessagingStore((s) => s.deleteMessage)
+  const openThread = useMessagingStore((s) => s.openThread)
+  const loadPins = useMessagingStore((s) => s.loadPins)
+  const pin = useMessagingStore((s) => s.pin)
+  const unpin = useMessagingStore((s) => s.unpin)
+  const pinsByConv = useMessagingStore((s) => s.pinsByConv)
   const account = useAccountStore((s) => s.account)
   const myId = account?.id ?? ''
   const lang = useMemo(() => localStorage.getItem('plexi-translate-lang') || 'English', [])
+  const [openThreadId, setOpenThreadId] = useState<string | null>(null)
 
   useEffect(() => {
     void ensureLoaded(conversationId)
-  }, [conversationId, ensureLoaded])
+    void loadPins(conversationId)
+  }, [conversationId, ensureLoaded, loadPins])
+
+  const pins = pinsByConv[conversationId] ?? []
+  const pinnedIds = useMemo(() => new Set(pins.map((p) => p.id)), [pins])
+  // Collapse any open thread when switching conversations.
+  useEffect(() => {
+    setOpenThreadId(null)
+  }, [conversationId])
+
+  function toggleThread(id: string): void {
+    setOpenThreadId((cur) => {
+      if (cur === id) return null
+      void openThread(id)
+      return id
+    })
+  }
 
   const messages = messagesByConv[conversationId] ?? []
 
@@ -65,21 +133,36 @@ function ConversationBody({ conversationId, title }: { conversationId: string; t
 
   return (
     <div className="flex flex-col min-h-0 h-full">
+      {pins.length > 0 && (
+        <div className="shrink-0 px-3 py-1.5 border-b border-[var(--edge-soft)] bg-[var(--surface-sunken)] flex items-center gap-2 overflow-x-auto" data-testid="flow-pins">
+          <Icon name="push_pin" size={12} className="text-[var(--ink-40)] shrink-0" />
+          {pins.map((p) => (
+            <span key={p.id} className="text-[11.5px] text-[var(--ink-70)] whitespace-nowrap bg-[var(--surface-raised)] border border-[var(--edge-soft)] rounded-full px-2 py-0.5 max-w-[220px] truncate">
+              {p.body || '[attachment]'}
+            </span>
+          ))}
+        </div>
+      )}
       <div className="flex-1 overflow-auto px-3 py-2 space-y-1.5" data-testid="flow-messages">
         {messages.length === 0 ? (
           <div className="text-[12px] text-[var(--ink-50)] py-2">No messages yet. Say something below.</div>
         ) : (
           messages.map((m) => (
-            <MessageRow
-              key={m.id}
-              m={m}
-              mine={m.fromAccount === myId}
-              myId={myId}
-              translateLang={lang}
-              onReact={(emoji) => void react(m.id, emoji)}
-              onEdit={m.fromAccount === myId ? (b) => void editMessage(m.id, b) : undefined}
-              onDelete={m.fromAccount === myId ? () => void deleteMessage(m.id) : undefined}
-            />
+            <div key={m.id}>
+              <MessageRow
+                m={m}
+                mine={m.fromAccount === myId}
+                myId={myId}
+                translateLang={lang}
+                pinned={pinnedIds.has(m.id)}
+                onTogglePin={() => void (pinnedIds.has(m.id) ? unpin(conversationId, m.id) : pin(conversationId, m.id))}
+                onReact={(emoji) => void react(m.id, emoji)}
+                onEdit={m.fromAccount === myId ? (b) => void editMessage(m.id, b) : undefined}
+                onDelete={m.fromAccount === myId ? () => void deleteMessage(m.id) : undefined}
+                onOpenThread={() => toggleThread(m.id)}
+              />
+              {openThreadId === m.id && <InlineThread parentId={m.id} myId={myId} />}
+            </div>
           ))
         )}
       </div>
@@ -101,6 +184,10 @@ export default function FlowView(): JSX.Element {
   const conversations = useMessagingStore((s) => s.conversations)
   const openConversation = useMessagingStore((s) => s.openConversation)
   const refresh = useMessagingStore((s) => s.refreshConversations)
+  const addMemberByHandle = useMessagingStore((s) => s.addMemberByHandle)
+  const removeMember = useMessagingStore((s) => s.removeMember)
+  const setVisibility = useMessagingStore((s) => s.setVisibility)
+  const setNotif = useMessagingStore((s) => s.setNotif)
   const account = useAccountStore((s) => s.account)
 
   const [filter, setFilter] = useState<Filter>('all')
@@ -111,6 +198,10 @@ export default function FlowView(): JSX.Element {
   const [briefing, setBriefing] = useState<Briefing | null>(null)
   const [order, setOrder] = useState<string[]>([])
   const [browsing, setBrowsing] = useState(false)
+  const [hits, setHits] = useState<SearchHit[] | null>(null)
+  const [showMembers, setShowMembers] = useState(false)
+  const [memberHandle, setMemberHandle] = useState('')
+  const [memberErr, setMemberErr] = useState<string | null>(null)
   // per-conversation panels (Recall / Pulse / Schedules) reused from MessagesView
   const [recallConv, setRecallConv] = useState<string | null>(null)
   const [pulseConv, setPulseConv] = useState<string | null>(null)
@@ -122,6 +213,26 @@ export default function FlowView(): JSX.Element {
     void refresh()
     void getBriefing(token).then(setBriefing)
   }, [token, refresh])
+
+  // Full message search across every conversation, debounced. Distinct from the
+  // list filter above: this finds messages, not just conversation titles.
+  useEffect(() => {
+    const term = query.trim()
+    if (!token || term.length < 2) {
+      setHits(null)
+      return
+    }
+    let alive = true
+    const t = window.setTimeout(() => {
+      void searchMessages(token, term).then((r) => {
+        if (alive) setHits(r)
+      })
+    }, 260)
+    return () => {
+      alive = false
+      window.clearTimeout(t)
+    }
+  }, [query, token])
 
   // Stable order: recompute only when the SET of conversations or the pins change,
   // never on every incoming message, so the feed does not reorder while you read.
@@ -227,6 +338,80 @@ export default function FlowView(): JSX.Element {
               </button>
             </>
           )}
+          {(() => {
+            const notif = conv?.notifLevel ?? 'all'
+            const nextN = notif === 'all' ? 'mentions' : notif === 'mentions' ? 'muted' : 'all'
+            const nIcon = notif === 'muted' ? 'notifications_off' : notif === 'mentions' ? 'alternate_email' : 'notifications'
+            return (
+              <button
+                onClick={() => void setNotif(focusId, nextN)}
+                className={`icon-btn ${notif !== 'all' ? 'text-accent' : ''}`}
+                title={`Notifications: ${notif} (tap for ${nextN})`}
+                data-testid="flow-notif"
+              >
+                <Icon name={nIcon} size={15} />
+              </button>
+            )
+          })()}
+          <div className="relative">
+            <button
+              onClick={() => setShowMembers((v) => !v)}
+              className="icon-btn inline-flex items-center gap-1 !w-auto px-2"
+              title="Members"
+              data-testid="flow-members"
+            >
+              <Icon name="group" size={15} /> <span className="text-[12px]">{conv?.members.length ?? 0}</span>
+            </button>
+            {showMembers && conv && (
+              <div className="absolute right-0 top-full mt-1 z-30 w-64 rounded-lg bg-[var(--surface-raised)] border border-[var(--edge-soft)] shadow-lg p-2" data-testid="flow-members-popover">
+                {conv.kind === 'channel' && (
+                  <button
+                    onClick={() => void setVisibility(focusId, conv.visibility === 'public' ? 'private' : 'public')}
+                    className="w-full flex items-center gap-1.5 text-[11px] text-[var(--ink-70)] hover:text-[var(--ink-100)] px-1 py-1 mb-1"
+                  >
+                    <Icon name={conv.visibility === 'public' ? 'public' : 'lock'} size={13} />
+                    {conv.visibility === 'public' ? 'Public' : 'Private'} channel · make {conv.visibility === 'public' ? 'private' : 'public'}
+                  </button>
+                )}
+                <div className="max-h-44 overflow-auto space-y-0.5 mb-1.5">
+                  {conv.members.map((mem) => (
+                    <div key={mem.accountId} className="flex items-center gap-2 px-1 py-1 text-[12px]">
+                      <span className="flex-1 truncate text-[var(--ink-90)]">
+                        {personDisplayName(mem, mem.handle ?? 'Member')}
+                        {mem.accountId === account?.id && ' (you)'}
+                      </span>
+                      {mem.accountId !== account?.id && (
+                        <button onClick={() => void removeMember(focusId, mem.accountId)} title="Remove" className="text-[var(--ink-40)] hover:text-red-500">
+                          <Icon name="close" size={13} />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                {conv.kind !== 'dm' && (
+                  <div className="flex gap-1.5">
+                    <input
+                      value={memberHandle}
+                      onChange={(e) => {
+                        setMemberHandle(e.target.value)
+                        setMemberErr(null)
+                      }}
+                      onKeyDown={async (e) => {
+                        if (e.key === 'Enter' && memberHandle.trim()) {
+                          const r = await addMemberByHandle(focusId, memberHandle.trim())
+                          if (r.ok) setMemberHandle('')
+                          else setMemberErr(r.error ?? 'Could not add')
+                        }
+                      }}
+                      placeholder="add @handle"
+                      className="flex-1 bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded px-2 py-1 text-[12px] text-[var(--ink-90)]"
+                    />
+                  </div>
+                )}
+                {memberErr && <div className="text-[11px] text-red-500 mt-1">{memberErr}</div>}
+              </div>
+            )}
+          </div>
           <button
             onClick={() => togglePin(focusId)}
             className={`icon-btn ${pins.has(focusId) ? 'text-accent' : ''}`}
@@ -387,14 +572,46 @@ export default function FlowView(): JSX.Element {
             </>
           )}
 
+          {/* Message search results (when searching) */}
+          {hits !== null && (
+            <>
+              <div className="mt-5 mb-2 flex items-center gap-2">
+                <span className="text-[11px] uppercase tracking-wide font-semibold text-[var(--ink-40)]">
+                  {hits.length} message{hits.length === 1 ? '' : 's'} matching &ldquo;{query.trim()}&rdquo;
+                </span>
+                <span className="flex-1 h-px bg-[var(--edge-soft)]" />
+              </div>
+              <div className="flex flex-col gap-1.5" data-testid="flow-search-results">
+                {hits.length === 0 ? (
+                  <div className="text-[13px] text-[var(--ink-50)] py-4 text-center">No messages found.</div>
+                ) : (
+                  hits.map((h) => (
+                    <button
+                      key={h.messageId}
+                      onClick={() => openFocus(h.conversationId)}
+                      data-testid="flow-search-hit"
+                      className="text-left rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-raised)] px-3.5 py-2.5 hover:border-[rgb(var(--accent)/0.35)]"
+                    >
+                      <div className="text-[11px] text-[var(--ink-40)] mb-0.5">{h.conversationTitle}</div>
+                      <div className="text-[13px] text-[var(--ink-90)] break-words">{h.body}</div>
+                    </button>
+                  ))
+                )}
+              </div>
+            </>
+          )}
+
           {/* THE FLOW */}
+          {hits === null && (
           <div className="mt-5 mb-2 flex items-center gap-2">
             <span className="text-[11px] uppercase tracking-wide font-semibold text-[var(--ink-40)]">
               {filter === 'all' ? 'The flow' : filter === 'unread' ? 'Unread' : filter === 'mentions' ? 'Mentions' : 'Direct messages'}
             </span>
             <span className="flex-1 h-px bg-[var(--edge-soft)]" />
           </div>
+          )}
 
+          {hits === null && (
           <div className="flex flex-col gap-2.5" data-testid="flow-stream">
             {visible.length === 0 ? (
               <div className="text-[13px] text-[var(--ink-50)] py-6 text-center">
@@ -492,6 +709,7 @@ export default function FlowView(): JSX.Element {
               })
             )}
           </div>
+          )}
 
           <div className="mt-6 text-center text-[11.5px] text-[var(--ink-40)]">
             One stream. Mentions and DMs float up, quiet channels sink. Pin what matters, Focus to go deep.
