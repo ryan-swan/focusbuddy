@@ -393,6 +393,16 @@ import {
   listRecentSessions,
   startFocusSession
 } from '../db/focusSessions'
+import { deleteCluster, listClustersForTask, saveCluster } from '../db/focusClusters'
+import {
+  listConversations as listAiChatConversations,
+  getConversation as getAiChatConversation,
+  createConversation as createAiChatConversation,
+  appendMessage as appendAiChatMessage,
+  setMessageApplied as setAiChatMessageApplied,
+  renameConversation as renameAiChatConversation,
+  deleteConversation as deleteAiChatConversation
+} from '../db/aiChat'
 import { getRecentActivity, recordActivity } from '../db/activity'
 import {
   generatePresenceNarration,
@@ -450,7 +460,9 @@ import type {
   WidgetDraft,
   WidgetPatch,
   WireType,
-  ActionProposal
+  ActionProposal,
+  AppliedProposal,
+  FocusClusterDraft
 } from '@shared/types'
 
 // A plain-language description of the content format a wired output widget
@@ -990,6 +1002,13 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('focus:recent', (_e, limit: number, taskId?: string | null) =>
     listRecentSessions(limit, taskId ?? null)
   )
+
+  // Focus-Mode clusters (split "groups") — per-desk saved split layouts.
+  ipcMain.handle('clusters:list', (_e, taskId: string) => listClustersForTask(taskId))
+  ipcMain.handle('clusters:save', (_e, draft: FocusClusterDraft) => saveCluster(draft))
+  ipcMain.handle('clusters:delete', (_e, id: string) => {
+    deleteCluster(id)
+  })
 
   ipcMain.handle('trail:record', (_e, draft: ActivityRecordDraft) => recordActivity(draft))
   ipcMain.handle(
@@ -2081,6 +2100,38 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('docComments:resolve', (_e, id: string, resolved: boolean) => resolveDocComment(id, resolved))
   ipcMain.handle('documents:reindex', () => reindexDocuments())
   ipcMain.handle('documents:semanticActive', () => documentSemanticActive())
+
+  // Persisted AI-assistant chat history (local, free-standing conversations) —
+  // backs the Focus-Mode chat surface.
+  ipcMain.handle('aiChat:listConversations', () => listAiChatConversations())
+  ipcMain.handle('aiChat:getConversation', (_e, id: string) => getAiChatConversation(id))
+  ipcMain.handle(
+    'aiChat:createConversation',
+    (_e, input: { taskId: string | null; title?: string }) => createAiChatConversation(input)
+  )
+  ipcMain.handle(
+    'aiChat:appendMessage',
+    (
+      _e,
+      conversationId: string,
+      message: {
+        role: 'user' | 'assistant' | 'system'
+        content: string
+        ts: number
+        proposals?: ActionProposal[]
+        applied?: Record<string, AppliedProposal>
+      }
+    ) => appendAiChatMessage(conversationId, message)
+  )
+  ipcMain.handle(
+    'aiChat:setMessageApplied',
+    (_e, conversationId: string, messageId: string, applied: Record<string, AppliedProposal>) =>
+      setAiChatMessageApplied(messageId, conversationId, applied)
+  )
+  ipcMain.handle('aiChat:renameConversation', (_e, id: string, title: string) =>
+    renameAiChatConversation(id, title)
+  )
+  ipcMain.handle('aiChat:deleteConversation', (_e, id: string) => deleteAiChatConversation(id))
 
   // PlexiProjects: project plans, the Gantt schedule, dependencies and reschedule.
   ipcMain.handle('projects:list', () => listProjectSummaries())

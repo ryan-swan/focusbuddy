@@ -288,6 +288,14 @@ const api = {
     proactiveWelcome: (taskId: string): Promise<ChatResponse> =>
       ipcRenderer.invoke('chat:proactiveWelcome', taskId)
   },
+  // Focus-Mode clusters (split "groups") — per-desk saved split layouts.
+  clusters: {
+    list: (taskId: string): Promise<import('@shared/types').FocusCluster[]> =>
+      ipcRenderer.invoke('clusters:list', taskId),
+    save: (draft: import('@shared/types').FocusClusterDraft): Promise<import('@shared/types').FocusCluster> =>
+      ipcRenderer.invoke('clusters:save', draft),
+    delete: (id: string): Promise<void> => ipcRenderer.invoke('clusters:delete', id)
+  },
   resume: {
     generate: (
       taskId: string
@@ -1511,6 +1519,40 @@ const api = {
     reindex: (): Promise<{ embedded: number; reason?: string }> =>
       ipcRenderer.invoke('documents:reindex'),
     semanticActive: (): Promise<boolean> => ipcRenderer.invoke('documents:semanticActive')
+  },
+  // Persisted AI-assistant chat history (local, free-standing conversations) —
+  // backs the Focus-Mode chat surface.
+  aiChat: {
+    listConversations: (): Promise<import('@shared/types').AiChatConversationMeta[]> =>
+      ipcRenderer.invoke('aiChat:listConversations'),
+    getConversation: (id: string): Promise<import('@shared/types').AiChatConversation | null> =>
+      ipcRenderer.invoke('aiChat:getConversation', id),
+    createConversation: (input: {
+      taskId: string | null
+      title?: string
+    }): Promise<import('@shared/types').AiChatConversationMeta> =>
+      ipcRenderer.invoke('aiChat:createConversation', input),
+    appendMessage: (
+      conversationId: string,
+      message: {
+        role: 'user' | 'assistant' | 'system'
+        content: string
+        ts: number
+        proposals?: import('@shared/types').ActionProposal[]
+        applied?: Record<string, import('@shared/types').AppliedProposal>
+      }
+    ): Promise<import('@shared/types').AiChatStoredMessage> =>
+      ipcRenderer.invoke('aiChat:appendMessage', conversationId, message),
+    setMessageApplied: (
+      conversationId: string,
+      messageId: string,
+      applied: Record<string, import('@shared/types').AppliedProposal>
+    ): Promise<void> =>
+      ipcRenderer.invoke('aiChat:setMessageApplied', conversationId, messageId, applied),
+    renameConversation: (id: string, title: string): Promise<void> =>
+      ipcRenderer.invoke('aiChat:renameConversation', id, title),
+    deleteConversation: (id: string): Promise<void> =>
+      ipcRenderer.invoke('aiChat:deleteConversation', id)
   },
   // PlexiProjects: roll tasks up into a scheduled plan with a critical path.
   projects: {

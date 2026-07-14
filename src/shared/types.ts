@@ -1955,3 +1955,56 @@ export interface FocusClusterDraft {
   ratios: SplitRatios
   activePaneId: string
 }
+
+// ── Persisted AI-chat history (local, free-standing conversations) ──────────
+// Ported from Caleb's Focus-Mode branch. Backs the aiChat DB module + the
+// Focus-Mode chat surface. ActionProposal / ChatRole already exist on this line.
+export interface AiChatConversationMeta {
+  id: string
+  taskId: string | null
+  title: string
+  createdAt: number
+  updatedAt: number
+  // Number of messages — for the history list preview. Populated by the list
+  // query; not stored on the row.
+  messageCount?: number
+  // First user line, for the history list preview.
+  preview?: string
+}
+// A persisted message: the ChatMessage plus its proposals + applied-state, so an
+// assistant turn restores with its green "done" cards intact.
+export interface AiChatStoredMessage {
+  id: string
+  role: ChatRole
+  content: string
+  ts: number
+  // Proposals attached to an assistant turn (empty for user/plain turns).
+  proposals: ActionProposal[]
+  // Approved-card state keyed by proposal id.
+  applied: Record<string, AppliedProposal>
+}
+export interface AiChatConversation {
+  meta: AiChatConversationMeta
+  messages: AiChatStoredMessage[]
+}
+
+// ── Applied action state (approved cards persist in the thread) ─────────────
+// When the user approves an action card it does NOT vanish — it turns green
+// (done) and stays as a durable record, optionally with a "Go to" that jumps to
+// what it made. This is the applied-state we track per proposal id.
+export interface GoToTarget {
+  // What the approved action produced/affected, so "Go to" knows where to jump.
+  kind: 'widget' | 'task' | 'document'
+  id: string
+  // A short label for the target (used in the "Go to" affordance tooltip).
+  label?: string
+}
+export interface AppliedProposal {
+  // The success message from the executor ("Created task …").
+  message: string
+  // Where "Go to" navigates, or null when the action has no navigable target
+  // (e.g. a draft email, an arrange, a focus-session).
+  target: GoToTarget | null
+  // When it was applied (ms). For ordering / future persistence.
+  appliedAt: number
+}

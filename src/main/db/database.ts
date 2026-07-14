@@ -777,6 +777,51 @@ export function getDb(): Database.Database {
     );
     CREATE INDEX IF NOT EXISTS idx_doc_comments_doc ON doc_comments(doc_id, created_at);
   `)
+  // Focus-Mode split "clusters": a per-desk (task node) saved split layout. panes
+  // and ratios are stored JSON-encoded (PaneSources by reference) so a saved
+  // cluster resolves live content on load and degrades gracefully if a member
+  // widget is gone. Org-scoped so a cluster only surfaces on the desk + org that
+  // owns it. Backs window.api.clusters.* via db/focusClusters.ts.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS focus_clusters (
+      id TEXT PRIMARY KEY,
+      task_id TEXT NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
+      org_id TEXT NOT NULL DEFAULT 'personal',
+      shape TEXT NOT NULL,
+      panes_json TEXT NOT NULL,
+      ratios_json TEXT NOT NULL,
+      active_pane_id TEXT NOT NULL DEFAULT '',
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_focus_clusters_task ON focus_clusters(task_id, updated_at DESC);
+  `)
+  // Focus-Mode AI chat conversations + messages. For assistant turns we store the
+  // JSON of any action proposals and which of them the user approved, so the green
+  // "done" cards survive a restart. Backs window.api.aiChat.* via db/aiChat.ts.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS ai_chat_conversations (
+      id TEXT PRIMARY KEY,
+      org_id TEXT NOT NULL DEFAULT 'personal',
+      task_id TEXT,
+      title TEXT NOT NULL DEFAULT '',
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_ai_chat_conv_updated ON ai_chat_conversations (org_id, updated_at DESC);
+
+    CREATE TABLE IF NOT EXISTS ai_chat_messages (
+      id TEXT PRIMARY KEY,
+      conversation_id TEXT NOT NULL,
+      role TEXT NOT NULL,
+      content TEXT NOT NULL DEFAULT '',
+      ts INTEGER NOT NULL,
+      proposals_json TEXT,
+      applied_json TEXT,
+      created_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_ai_chat_msg_conv ON ai_chat_messages (conversation_id, ts ASC);
+  `)
   // Multi-org tenancy for the remaining user-data surfaces so switching org
   // isolates the calendar, vault, knowledge and tables too, not just desks and
   // documents. Added at the end where every table exists; existing rows backfill
