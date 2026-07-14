@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { ConnectedApp, FbNode, NodeKind, WidgetSuggestion } from '@shared/types'
 import { useNodeStore } from '../stores/nodes'
+import PlexiiLogo from './PlexiiLogo'
 import { promptUpgrade } from '../stores/upgradePrompt'
 import { useWidgetStore } from '../stores/widgets'
 import { useConnectedAppsStore } from '../stores/connectedApps'
@@ -269,7 +270,7 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
       {/* Header — same silhouette as the PlexiOffice menu: the wordmark on the
           left, then the desk's own actions (New desk, hide) on the right. */}
       <div className="flex items-center gap-2 px-4 h-14 border-b border-[var(--edge-soft)]">
-        <span className="text-[15px] font-bold tracking-[0.14em] text-[var(--ink-100)]">PLEXIDESK</span>
+        <PlexiiLogo height={22} />
         <div className="ml-auto flex items-center gap-1">
           <button
             onClick={requestCreateDesk}

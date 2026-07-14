@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
+import PlexiiLogo from './PlexiiLogo'
 import { useAccountStore } from '../stores/account'
 import { useSignInPrompt } from '../stores/signInPrompt'
 import { useOnboarding } from '../stores/onboarding'
@@ -158,6 +159,9 @@ export default function LaunchSignInModal(): JSX.Element | null {
             'inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 0 0 1px rgba(139, 92, 246, 0.12), 0 24px 64px -12px rgba(139, 92, 246, 0.28), 0 32px 80px -16px rgba(0, 0, 0, 0.65)'
         }}
       >
+        <div className="flex justify-center mb-4">
+          <PlexiiLogo height={26} variant="white" />
+        </div>
         <div className="flex items-center gap-3 mb-1">
           <div
             className="h-10 w-10 rounded-xl inline-flex items-center justify-center text-[20px] shrink-0"

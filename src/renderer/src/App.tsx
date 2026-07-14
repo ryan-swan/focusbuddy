@@ -6,6 +6,7 @@ import {
   PanelResizeHandle
 } from 'react-resizable-panels'
 import Sidebar from './components/Sidebar'
+import PlexiiLogo from './components/PlexiiLogo'
 import {
   FLOATING_MENU_INSET,
   MenuRestorePill,
@@ -495,8 +496,8 @@ export default function App(): JSX.Element {
             </button>
           )}
         </div>
-        <h1 className="text-[12px] font-semibold tracking-[0.18em] text-stone-900 dark:text-stone-100 select-none flex items-center gap-1.5">
-          <span>PLEXIDESK</span>
+        <h1 className="select-none flex items-center gap-1.5">
+          <PlexiiLogo height={16} />
           <span className="text-[9px] font-mono text-accent px-1 py-px rounded bg-accent/10 border border-accent/20">
             2.0
           </span>

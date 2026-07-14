@@ -90,6 +90,9 @@ module.exports = {
 
   mac: {
     category: 'public.app-category.productivity',
+    // Plexii brand icon (build/icon.icns, generated from the wordmark). Replaces
+    // the default Electron icon in the dock, Finder, and the dmg.
+    icon: 'build/icon.icns',
     // Ship BOTH the zip (electron-updater reads it via latest-mac.yml) and a dmg
     // (what a new user downloads and double-clicks to install — and, unlike a raw
     // .app-in-.zip, a dmg does not get its code signature corrupted by the
@@ -130,6 +133,7 @@ module.exports = {
   // is compiled per-OS). Code signing via CSC_LINK + CSC_KEY_PASSWORD (unsigned
   // if unset; SmartScreen warns until signed with an OV/EV cert).
   win: {
+    icon: 'build/icon.ico',
     target: [{ target: 'nsis', arch: ['x64'] }]
   },
 
