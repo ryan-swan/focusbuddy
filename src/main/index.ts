@@ -204,16 +204,17 @@ function createCommandCenter(): BrowserWindow {
   // open it in the user's browser instead. Webview widgets are separate
   // webContents and are unaffected by this guard.
   win.webContents.on('will-navigate', (e, url) => {
-    let sameOrigin = false
-    try {
-      sameOrigin = new URL(url).origin === new URL(win.webContents.getURL()).origin
-    } catch {
-      sameOrigin = false
-    }
-    if (!sameOrigin) {
-      e.preventDefault()
-      if (/^https?:\/\//i.test(url)) shell.openExternal(url)
-    }
+    // The app shell must NEVER navigate its own top frame. Real in-app
+    // navigation is React state and never fires will-navigate, so anything that
+    // does fire here is an errant link, drag-drop or redirect. Crucially this
+    // includes SAME-ORIGIN navigations: a link that resolves to a bundle asset
+    // (e.g. /assets/index-*.js) would otherwise load that file and Chromium
+    // would render the raw minified source as plain text in the window. Block
+    // every navigation; send genuine web links to the user's browser instead.
+    const current = win.webContents.getURL()
+    if (url === current) return // reloading the shell to itself is fine
+    e.preventDefault()
+    if (/^https?:\/\//i.test(url)) void shell.openExternal(url)
   })
 
   // Which product is this build? The PlexiOffice electron-builder config sets
