@@ -6,6 +6,11 @@ import { notifyWireSource } from '../lib/wireEngine'
 import { notifyAgentInputChanged } from '../lib/deskAgentEngine'
 import { recordSnapshotSoon } from '../lib/timeTravel'
 import { recordAction, recordActionWithToast } from './actionHistory'
+import { focusNavOrder, isFocusable } from '../lib/focusNavOrder'
+
+// Re-export the Focus-Mode nav helpers so consumers (WidgetFocusMode, the split
+// surfaces) can import them from the store alongside useWidgetStore.
+export { focusNavOrder, isFocusable }
 
 // Set while a multi-widget group drag commits, so the per-widget update() calls
 // don't each push their own undo entry — endGroupDrag records one combined entry.
@@ -48,6 +53,12 @@ interface WidgetStore {
   parkAll: (keepActive: boolean) => Promise<number>
   bringToFront: (id: string) => Promise<void>
   setFocused: (id: string | null) => void
+  // Focus-mode navigation. focusNext/focusPrev cycle the focused widget through
+  // the current desk's visible widgets in spatial reading order (see
+  // focusNavOrder), wrapping at the ends. No-ops when nothing is focused or the
+  // desk has a single widget. Drives the ←/→ keys + swipe in WidgetFocusMode.
+  focusNext: () => void
+  focusPrev: () => void
   setActive: (id: string | null) => void
   setHoveredSection: (id: string | null) => void
   // ── Multi-select ──────────────────────────────────────────────────────────
@@ -146,6 +157,22 @@ export const useWidgetStore = create<WidgetStore>((set, get) => ({
       panY: 0
     }),
   setFocused: (id) => set({ focusedWidgetId: id }),
+  focusNext: () => {
+    const order = focusNavOrder(get().widgets)
+    if (order.length < 2) return
+    const cur = get().focusedWidgetId
+    const i = order.findIndex((w) => w.id === cur)
+    const next = order[(i + 1 + order.length) % order.length]
+    set({ focusedWidgetId: next.id, activeWidgetId: next.id })
+  },
+  focusPrev: () => {
+    const order = focusNavOrder(get().widgets)
+    if (order.length < 2) return
+    const cur = get().focusedWidgetId
+    const i = order.findIndex((w) => w.id === cur)
+    const prev = order[(i - 1 + order.length) % order.length]
+    set({ focusedWidgetId: prev.id, activeWidgetId: prev.id })
+  },
   setActive: (id) => set({ activeWidgetId: id }),
   setHoveredSection: (id) => set({ hoveredSectionId: id }),
   selectedIds: [],
