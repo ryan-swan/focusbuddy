@@ -1894,3 +1894,64 @@ export interface DocumentPatch {
   body?: DocBody | SheetBody | SlidesBody | MapBody | DesignBody
   archived?: boolean
 }
+
+// ── Focus Mode: split view + clusters (ported from Caleb's handoff) ──────────
+// Session-local split geometry + persisted per-desk clusters. See splitGeometry.ts
+// for the deterministic geometry and focusSplit/focusClusters stores for state.
+export type PaneSource =
+  | { kind: 'widget'; widgetId: string }
+  | { kind: 'chrome'; tab: 'add' | 'chat' }
+  | { kind: 'meet'; roomId: string } // reserved for PlexiMeet — placeholder render in v1
+
+export type SplitShape = 'single' | 'halves' | 'left-2stack' | 'quad'
+export type PaneCell = 'C0' | 'L' | 'R' | 'R1' | 'R2' | 'Q1' | 'Q2' | 'Q3' | 'Q4'
+
+export interface Pane {
+  id: string
+  cell: PaneCell
+  source: PaneSource
+}
+
+export interface SplitRatios {
+  x?: number
+  yRight?: number
+  yQuad?: number
+}
+
+export interface SplitState {
+  shape: SplitShape
+  panes: Pane[]
+  ratios: SplitRatios
+  activePaneId: string
+}
+
+export interface FocusSavedView {
+  id: string
+  name: string
+  deskId: string | null
+  shape: SplitShape
+  panes: Pane[]
+  ratios: SplitRatios
+  createdAt: number
+  updatedAt: number
+}
+
+export interface FocusCluster {
+  id: string
+  taskId: string
+  shape: SplitShape
+  panes: Pane[]
+  ratios: SplitRatios
+  activePaneId: string
+  createdAt: number
+  updatedAt: number
+}
+
+export interface FocusClusterDraft {
+  id?: string
+  taskId: string
+  shape: SplitShape
+  panes: Pane[]
+  ratios: SplitRatios
+  activePaneId: string
+}

@@ -544,3 +544,20 @@ export function entriesByCategory(): Record<WidgetCategory, WidgetCatalogEntry[]
 }
 
 export const DRAG_MIME = 'application/x-fb-widget-kind'
+
+// How a widget sits inside a split-view pane (ported from Caleb's Focus Mode).
+// Short/atmospheric widgets are framed as a contained card ('center'); anything
+// with its own scroll/fill surface fills the pane ('fill').
+const CENTER_IN_PANE: ReadonlySet<WidgetKind> = new Set<WidgetKind>([
+  'sticky',
+  'note',
+  'field',
+  'timer',
+  'color',
+  'calculator',
+  'task-link'
+])
+
+export function fitsPaneFor(kind: WidgetKind): 'center' | 'fill' {
+  return CENTER_IN_PANE.has(kind) ? 'center' : 'fill'
+}
