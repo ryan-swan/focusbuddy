@@ -4,7 +4,11 @@ import type { DesignBody } from './design'
 import type { ChartCore } from './chart'
 
 export type AxisValue = 1 | 2 | 3 | 4 | 5
-export type NodeKind = 'folder' | 'task'
+// 'task-item' is Caleb's lightweight sub-task kind (delivered as its own slice
+// with the node-table migration + task-list widget). Declared here so the
+// Focus-Mode workspace snapshot can classify it; no node of this kind is created
+// until the task-item slice lands.
+export type NodeKind = 'folder' | 'task' | 'task-item'
 export type TaskStatus = 'open' | 'in_progress' | 'done' | 'parked'
 export type SectionLayout = 'free' | 'grid' | 'stacks' | 'icons' | 'list'
 
@@ -394,6 +398,10 @@ export interface ChatRequest {
   messages: ChatMessage[]
   // Live content the user has open on the canvas, gathered by the renderer.
   attachments?: ChatAttachment[]
+  // Layer-1 structural index of the whole workspace (ids + titles, no bodies),
+  // gathered by the renderer so the assistant knows what exists and can act on
+  // real items. Optional: absent for callers that don't provide it.
+  workspace?: WorkspaceSnapshot
 }
 
 export interface ChatResponse {
@@ -2008,3 +2016,70 @@ export interface AppliedProposal {
   // When it was applied (ms). For ordering / future persistence.
   appliedAt: number
 }
+
+// ── Workspace snapshot (Layer-1 structural index for the assistant) ─────────
+// Ported from Caleb's Focus-Mode branch. A bounded ids+titles map of the whole
+// workspace so the AI knows what exists and can reference/act on real items by
+// id; heavy content is pulled on demand later, keyed on the ids surfaced here.
+export interface WorkspaceDeskSummary {
+  id: string
+  title: string
+  // Task ids belonging to this desk (top-level folder), for the tree shape.
+  taskIds: string[]
+}
+export interface WorkspaceTaskSummary {
+  id: string
+  title: string
+  status: TaskStatus
+  deskId: string | null
+  // Whether this is the task currently open on the desk.
+  active: boolean
+}
+export interface WorkspaceWidgetSummary {
+  id: string
+  taskId: string
+  kind: WidgetKind
+  title: string
+}
+export interface WorkspaceDocumentSummary {
+  id: string
+  docType: DocType
+  title: string
+}
+export interface WorkspaceSnapshot {
+  // The task currently focused on the desk, for "this" references.
+  activeTaskId: string | null
+  desks: WorkspaceDeskSummary[]
+  tasks: WorkspaceTaskSummary[]
+  widgets: WorkspaceWidgetSummary[]
+  documents: WorkspaceDocumentSummary[]
+  // Bookkeeping so a bounded snapshot can honestly say when it was capped.
+  truncated?: boolean
+}
+
+// ── Chat blocks (the typed-block thread) ────────────────────────────────────
+// The agentic chat renders each assistant turn as an ordered list of typed
+// blocks rather than one lump of markdown. Today two block kinds are populated
+// from real data — 'text' (the reply markdown) and 'action' (one per
+// ActionProposal, reusing the existing apply pipeline). The remaining kinds are
+// declared now so the union + renderer registry are stable; they render only
+// when a real data source populates them.
+export type ChatBlock =
+  | { kind: 'text'; markdown: string }
+  | { kind: 'action'; proposal: ActionProposal }
+  | {
+      kind: 'record-table'
+      title?: string
+      columns: string[]
+      rows: Array<{ id?: string; cells: string[] }>
+    }
+  | {
+      kind: 'chart'
+      title?: string
+      chartType: 'bar' | 'line' | 'area' | 'pie' | 'kpi'
+      tableId?: string
+      series?: Array<{ label: string; value: number }>
+    }
+  | { kind: 'widget-card'; widgetId?: string; documentId?: string; title: string; widgetKind?: WidgetKind }
+  | { kind: 'link'; href: string; label: string; external?: boolean }
+  | { kind: 'connector-action'; connector: string; label: string; proposal: ActionProposal }

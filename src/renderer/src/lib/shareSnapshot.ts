@@ -1,4 +1,4 @@
-import type { FbNode, SectionLayout, Widget, DocType } from '@shared/types'
+import type { FbNode, NodeKind, SectionLayout, Widget, DocType } from '@shared/types'
 
 // Snapshot shapes — the on-the-wire contract between desktop, signal
 // server, and public viewer. Versioned via `_version` so we can evolve
@@ -84,7 +84,7 @@ export type ShareSnapshot =
 // viewer's render simple.
 export interface SerializedNode {
   id: string
-  kind: 'folder' | 'task'
+  kind: NodeKind
   title: string
   description: string
   status: string
