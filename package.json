@@ -33,7 +33,9 @@
     "release:verify:office": "bash scripts/verify-office-release.sh",
     "test:unit": "vitest run",
     "test:e2e": "npm run build && playwright test",
-    "test": "npm run test:unit && npm run test:e2e"
+    "test": "npm run test:unit && npm run test:e2e",
+    "merge-check": "node scripts/merge-check.mjs",
+    "hooks:install": "sh scripts/install-git-hooks.sh"
   },
   "engines": {
     "node": ">=20.0.0 <23.0.0"

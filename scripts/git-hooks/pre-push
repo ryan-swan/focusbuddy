@@ -1,0 +1,25 @@
+#!/bin/sh
+# Pre-push merge-readiness gate.
+#
+# Blocks a push when the branch is behind the base branch (Plexi3.0) or when
+# typecheck / unit tests are red — the exact drift-and-breakage that made the
+# last big integration painful. The actual checks live in scripts/merge-check.mjs
+# so the hook and CI run identical logic.
+#
+# Bypass for an intentional work-in-progress push:
+#   SKIP_MERGE_CHECK=1 git push        (or)   git push --no-verify
+#
+# Install: sh scripts/install-git-hooks.sh   (copies this into .git/hooks)
+
+if [ "$SKIP_MERGE_CHECK" = "1" ]; then
+  echo "pre-push: SKIP_MERGE_CHECK=1 set — skipping merge-check."
+  exit 0
+fi
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+node "$REPO_ROOT/scripts/merge-check.mjs" || {
+  echo ""
+  echo "Push blocked by merge-check. Fix the above, or bypass a WIP push with:"
+  echo "  SKIP_MERGE_CHECK=1 git push"
+  exit 1
+}

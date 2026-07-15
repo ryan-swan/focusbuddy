@@ -1,0 +1,44 @@
+name: Merge check
+
+# Blocks a pull request into the base branch when it is behind base, or when
+# typecheck / unit tests are red. Runs the SAME scripts/merge-check.mjs the local
+# pre-push hook runs, so "green locally" and "green in CI" mean the same thing.
+#
+# Make this a required status check in branch protection for Plexi3.0, and turn
+# on "Require branches to be up to date before merging", so nothing stale or
+# broken can reach the shared branch.
+
+on:
+  pull_request:
+    branches: [Plexi3.0]
+  workflow_dispatch:
+
+# One run per PR; a new push cancels the previous run.
+concurrency:
+  group: merge-check-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  merge-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Check out the real branch tip (not the synthetic PR merge commit) and
+          # full history, so the "up to date with base" ancestry check is honest.
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Merge-readiness (up to date + typecheck + unit tests)
+        run: npm run merge-check
+        env:
+          BASE_BRANCH: ${{ github.base_ref || 'Plexi3.0' }}
+          CI: 'true'
