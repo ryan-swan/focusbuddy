@@ -30,16 +30,13 @@ import VideoWidget from './widgets/VideoWidget'
 import TimerWidget from './widgets/TimerWidget'
 import SectionWidget from './widgets/SectionWidget'
 import StreamDeckWidget from './widgets/StreamDeckWidget'
-import WidgetPalette from './WidgetPalette'
 import WidgetDock from './WidgetDock'
 import WidgetFocusMode from './WidgetFocusMode'
 import ExtensionPrompt from './ExtensionPrompt'
-import ResumeModal from './ResumeModal'
 import AISetupDialog from './AISetupDialog'
 import SaveTemplateDialog from './SaveTemplateDialog'
 import AiBuilderDialog from './AiBuilderDialog'
 import type { AiBuildSuggestion } from '@shared/types'
-import LoadMeter from './LoadMeter'
 import CanvasContextMenu, { type CtxMenuItem } from './CanvasContextMenu'
 import AiAssistPreview from './contextMenu/AiAssistPreview'
 import WidgetSetupPreview from './contextMenu/WidgetSetupPreview'
@@ -102,6 +99,9 @@ import MindmapStartingKit from './MindmapStartingKit'
 import SyncWidgetPicker from './SyncWidgetPicker'
 import HistoryPanel from './HistoryPanel'
 import CanvasBreadcrumb from './CanvasBreadcrumb'
+import UnifiedBottomBar from './UnifiedBottomBar'
+import FloatingPill from './FloatingPill'
+import { useFreeDesk } from '../hooks/useFreeDesk'
 import type { StandardApp } from '../lib/standardApps'
 import {
   PinLayoutContext,
@@ -328,16 +328,12 @@ export default function Canvas(): JSX.Element {
     // root cause of "edge-pan stopped working" complaints — paired
     // with the form-focus gate (now scoped to canvas-internal forms),
     // any kind of widget interaction would silently kill it.
-    disabled: animatingPan || !nav.edgePanEnabled,
+    disabled: animatingPan,
+    hardDisabled: !nav.edgePanEnabled,
     maxSpeedPerSecond: 1100 * nav.edgePanSpeed
   })
   const [, setNowTick] = useState(0) // for the running-task clock
   const [snoozeUntil, setSnoozeUntil] = useState<number>(0)
-  // Inline rename of the open desk from its header title (double-click or the
-  // pencil). Mirrors the widget-title rename in WidgetFrame.
-  const [deskTitleEditing, setDeskTitleEditing] = useState(false)
-  const [deskTitleDraft, setDeskTitleDraft] = useState('')
-  const [showResume, setShowResume] = useState(false)
   const [showAISetup, setShowAISetup] = useState(false)
   // AI Builder: free-form "describe what you want" prompt that returns
   // suggested widgets (pages, tables, fields). Independent of the existing
@@ -361,6 +357,9 @@ export default function Canvas(): JSX.Element {
   } | null>(null)
 
   const activeTask = activeTaskId ? nodes.find((n) => n.id === activeTaskId) ?? null : null
+  const { assignToRoom, createRoomAndAssign } = useFreeDesk()
+  const focusSessionActive = useFocusSessionStore((s) => !!activeTaskId && s.active?.taskId === activeTaskId)
+  const startFocusSession = useFocusSessionStore((s) => s.start)
 
   // Spatial-link state — load per task, mirror the widgets pattern. The
   // overlay reads this store; Canvas owns the link-arm gesture.
@@ -598,7 +597,7 @@ export default function Canvas(): JSX.Element {
       (w) => w.taskId === activeTask.id && !w.archived
     )
     if (!haveWidgets) return
-    if (focusedId !== null || showResume || showAISetup || showAiBuilder) return
+    if (focusedId !== null || showAISetup || showAiBuilder) return
     promptedDoneRef.current.add(activeTask.id)
     setSaveTemplateOpen({ context: 'task-done' })
   }, [
@@ -606,7 +605,6 @@ export default function Canvas(): JSX.Element {
     activeTask?.status,
     widgets,
     focusedId,
-    showResume,
     showAISetup,
     showAiBuilder
   ])
@@ -1562,127 +1560,6 @@ export default function Canvas(): JSX.Element {
     if (entry) handleClickAdd(entry)
   }
 
-  async function handleImportFile(): Promise<void> {
-    if (!activeTaskId) return
-    const path = await window.api.fileImport.pick()
-    if (!path) return // user cancelled
-    const isMarkdown = /\.(md|markdown)$/i.test(path)
-    const isTxt = /\.txt$/i.test(path)
-    // Default mapping: .txt → note, .md → markdown. Tabular formats
-    // self-elect on the backend.
-    const preferredTextKind = isMarkdown ? 'markdown' : isTxt ? 'note' : 'page'
-    const draft = await window.api.fileImport.run({ path, preferredTextKind })
-    // ImportError has no `kind`; every success draft does. Narrowing on the
-    // positive `kind` key reliably removes the error member from the union for
-    // the branches below — the prior `'ok' in draft && draft.ok === false`
-    // guard didn't narrow the fall-through, leaving draft.kind/title/etc.
-    // unresolved across the whole handler.
-    if (!('kind' in draft)) {
-      // eslint-disable-next-line no-alert
-      window.alert(draft.error)
-      return
-    }
-    const rect = dropRef.current?.getBoundingClientRect()
-    const center = rect
-      ? screenToCanvas(rect.width / 2, rect.height / 2)
-      : { x: 80, y: 80 }
-    const jitter = (): number => (Math.random() - 0.5) * 60
-    if (draft.kind === 'text') {
-      // Use the catalog entry's default size when available so import
-      // widgets feel like a natural drop, not a unique footprint.
-      const targetCatalogKind: 'page' | 'markdown' | 'note' = draft.targetKind
-      const entry = catalogFor(targetCatalogKind)
-      const w = entry?.defaultWidth ?? 360
-      const h = entry?.defaultHeight ?? 280
-      await useWidgetStore.getState().create({
-        taskId: activeTaskId,
-        kind: targetCatalogKind,
-        title: draft.title,
-        content: draft.content,
-        x: center.x - w / 2 + jitter(),
-        y: center.y - h / 2 + jitter(),
-        width: w,
-        height: h,
-        color: null
-      })
-    } else if (draft.kind === 'page-from-json') {
-      const entry = catalogFor('page')
-      const w = entry?.defaultWidth ?? 420
-      const h = entry?.defaultHeight ?? 320
-      await useWidgetStore.getState().create({
-        taskId: activeTaskId,
-        kind: 'page',
-        title: draft.title,
-        content: draft.content,
-        x: center.x - w / 2 + jitter(),
-        y: center.y - h / 2 + jitter(),
-        width: w,
-        height: h,
-        color: null
-      })
-    } else if (draft.kind === 'table') {
-      // CSV / array-of-objects JSON → create the backing table first,
-      // append every parsed row, then spawn the widget pointing at it.
-      const { useTablesStore } = await import('../stores/tables')
-      const table = await useTablesStore.getState().createTable({
-        taskId: activeTaskId,
-        title: draft.title,
-        schema: draft.schema
-      })
-      // Append rows. addRow expects cell values keyed by column id;
-      // our import emits them keyed by label, so we re-key via the
-      // schema.
-      const byLabel = new Map(
-        draft.schema.columns.map((c) => [c.label.toLowerCase(), c])
-      )
-      for (const row of draft.rows) {
-        const cells: Record<string, unknown> = {}
-        for (const [label, raw] of Object.entries(row)) {
-          const col = byLabel.get(label.toLowerCase())
-          if (!col) continue
-          cells[col.id] = coerceImportedCell(col.type, raw)
-        }
-        if (Object.keys(cells).length > 0) {
-          await useTablesStore.getState().addRow(table.id, cells)
-        }
-      }
-      const entry = catalogFor('table')
-      const w = entry?.defaultWidth ?? 480
-      const h = entry?.defaultHeight ?? 320
-      await useWidgetStore.getState().create({
-        taskId: activeTaskId,
-        kind: 'table',
-        title: draft.title,
-        content: table.id,
-        x: center.x - w / 2 + jitter(),
-        y: center.y - h / 2 + jitter(),
-        width: w,
-        height: h,
-        color: null
-      })
-    }
-  }
-
-  // Light cell coercion mirroring actionExecutor.coerceCellValue but
-  // inlined here so import doesn't have to thread its proposal through
-  // the apply pipeline.
-  function coerceImportedCell(
-    type: import('@shared/fields').FieldDefinition['type'],
-    raw: string
-  ): unknown {
-    if (raw === '') return type === 'checkbox' ? false : ''
-    switch (type) {
-      case 'number': {
-        const n = Number(raw)
-        return Number.isFinite(n) ? n : raw
-      }
-      case 'checkbox':
-        return /^(true|yes|1)$/i.test(raw)
-      default:
-        return raw
-    }
-  }
-
   function handleDragOver(e: React.DragEvent<HTMLDivElement>): void {
     const types = Array.from(e.dataTransfer.types)
     if (
@@ -1832,11 +1709,6 @@ export default function Canvas(): JSX.Element {
     const rect = e.currentTarget.getBoundingClientRect()
     const cursor = screenToCanvas(e.clientX - rect.left, e.clientY - rect.top)
     void placeWidget(entry, cursor.x - entry.defaultWidth / 2, cursor.y - 20)
-  }
-
-  function handleSaveTemplate(): void {
-    if (!activeTaskId || widgets.length === 0 || savingTemplate) return
-    setSaveTemplateOpen({ context: 'toolbar' })
   }
 
   // Spawn a browser (webview) widget for a standard app — used by the starting
@@ -2124,7 +1996,6 @@ export default function Canvas(): JSX.Element {
   }
 
   const status = STATUS_META[activeTask.status]
-  const zoomPct = Math.round(zoom * 100)
 
   // Task time tracking
   const totalEstimateMin =
@@ -2148,6 +2019,42 @@ export default function Canvas(): JSX.Element {
     return `${sign}${m}:${s.toString().padStart(2, '0')}`
   }
 
+  const timerText = isTracked ? fmtMin(remainingMin) : null
+
+  async function handleDeskChat(): Promise<void> {
+    if (!activeTask) return
+    const convId = await resolveObjectChannel('desk', activeTask.id, activeTask.title || 'Desk')
+    if (!convId) {
+      void openObjectChannel('desk', activeTask.id, activeTask.title || 'Desk')
+      return
+    }
+    const existing = widgets.find((w) => {
+      if (w.kind !== 'chat-thread') return false
+      try {
+        return (JSON.parse(w.content || '{}') as { conversationId?: string }).conversationId === convId
+      } catch {
+        return false
+      }
+    })
+    if (existing) {
+      focusOn(existing.id)
+      return
+    }
+    const entry = catalogFor('chat-thread')
+    const pos = spawnPositionFor(entry?.defaultWidth ?? 340, entry?.defaultHeight ?? 460)
+    await createWidget({
+      taskId: activeTask.id,
+      kind: 'chat-thread',
+      title: activeTask.title || 'Desk chat',
+      content: JSON.stringify({ conversationId: convId, channelName: activeTask.title || 'Desk' }),
+      x: pos.x,
+      y: pos.y,
+      width: entry?.defaultWidth ?? 340,
+      height: entry?.defaultHeight ?? 460,
+      color: null
+    })
+  }
+
   return (
     <>
       <div className="h-full flex flex-col">
@@ -2158,259 +2065,10 @@ export default function Canvas(): JSX.Element {
           onRevealFolder={(id) => expandFolder(id, true)}
           onHome={() => setActiveTask(null)}
           fromMindmap={!!nodeOrigin}
+          onRenameTask={(id, title) => void updateNode(id, { title })}
+          onAssignToRoom={(deskId, roomId) => void assignToRoom(deskId, roomId)}
+          onCreateRoomFromDesk={(deskId) => void createRoomAndAssign(deskId)}
         />
-        <div
-          data-testid="canvas-task-header"
-          className="px-4 py-2.5 border-b border-[color:var(--glass-chrome-border)] fb-glass-chrome flex flex-wrap items-center gap-x-2 gap-y-1.5"
-        >
-          <Icon name="task_alt" size={18} className="text-[var(--ink-70)] shrink-0" />
-          {deskTitleEditing ? (
-            <input
-              autoFocus
-              data-testid="desk-title-input"
-              value={deskTitleDraft}
-              onChange={(e) => setDeskTitleDraft(e.target.value)}
-              onBlur={() => {
-                const next = deskTitleDraft.trim()
-                if (next && next !== (activeTask.title || '')) void updateNode(activeTask.id, { title: next })
-                setDeskTitleEditing(false)
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault()
-                  const next = deskTitleDraft.trim()
-                  if (next && next !== (activeTask.title || '')) void updateNode(activeTask.id, { title: next })
-                  setDeskTitleEditing(false)
-                } else if (e.key === 'Escape') {
-                  e.preventDefault()
-                  setDeskTitleEditing(false)
-                }
-              }}
-              placeholder="Desk name"
-              aria-label="Desk name"
-              className="text-sm font-semibold text-[var(--ink-100)] flex-1 min-w-[80px] bg-transparent border-b border-accent/60 outline-none"
-            />
-          ) : (
-            <h2
-              data-testid="desk-title"
-              onDoubleClick={() => {
-                setDeskTitleDraft(activeTask.title || '')
-                setDeskTitleEditing(true)
-              }}
-              title="Double-click to rename"
-              className="text-sm font-semibold text-[var(--ink-100)] truncate flex-1 min-w-[80px] cursor-text"
-            >
-              {activeTask.title}
-            </h2>
-          )}
-          {!deskTitleEditing && (
-            <button
-              onClick={() => {
-                setDeskTitleDraft(activeTask.title || '')
-                setDeskTitleEditing(true)
-              }}
-              className="icon-btn !h-6 !w-6 text-[var(--ink-40)] hover:text-accent shrink-0"
-              aria-label="Rename desk"
-              title="Rename desk"
-            >
-              <Icon name="edit" size={13} />
-            </button>
-          )}
-          <div className="hidden md:flex items-center gap-3 text-[11px] text-[var(--ink-60)]">
-            <span className="flex items-center gap-1" title="Priority">
-              <Icon name="priority_high" size={14} />
-              {activeTask.priority}
-            </span>
-            <span className="flex items-center gap-1" title="Interest / Novelty">
-              <Icon name="bolt" size={14} />
-              {activeTask.interest}
-            </span>
-            <span className="flex items-center gap-1" title="Importance">
-              <Icon name="flag" size={14} />
-              {activeTask.importance}
-            </span>
-          </div>
-
-          {isTracked && (
-            <div
-              className={`flex items-center gap-1 px-2 py-0.5 rounded border text-[11px] font-mono ${
-                isOverdue
-                  ? 'border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-400 animate-pulse'
-                  : remainingMin < 5
-                    ? 'border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-400'
-                    : 'border-[var(--edge-firm)] bg-[var(--surface-raised)] text-[var(--ink-70)]'
-              }`}
-              title={`${Math.floor(elapsedMin)} of ${totalEstimateMin} min elapsed`}
-            >
-              <Icon name={isOverdue ? 'alarm' : 'timer'} size={14} />
-              <span>{fmtMin(remainingMin)}</span>
-            </div>
-          )}
-
-          {/* Who else is on this desk right now, plus who's invited. */}
-          <DeskPresenceBar taskId={activeTask.id} />
-
-          {/* This desk's chat — drops a live chat panel bound to the desk's channel
-              onto the canvas (or focuses the one already there), so you can read
-              and reply without leaving the desk. The panel's own Open button jumps
-              to the full conversation in Messages. */}
-          <button
-            onClick={async () => {
-              const convId = await resolveObjectChannel('desk', activeTask.id, activeTask.title || 'Desk')
-              if (!convId) {
-                // Chat unavailable (signed out / no org / offline) — fall back to
-                // the Messages view, which surfaces the honest reason.
-                void openObjectChannel('desk', activeTask.id, activeTask.title || 'Desk')
-                return
-              }
-              // If a chat panel for this channel is already on the desk, focus it
-              // rather than spawning a duplicate.
-              const existing = widgets.find((w) => {
-                if (w.kind !== 'chat-thread') return false
-                try {
-                  return (JSON.parse(w.content || '{}') as { conversationId?: string }).conversationId === convId
-                } catch {
-                  return false
-                }
-              })
-              if (existing) {
-                focusOn(existing.id)
-                return
-              }
-              const entry = catalogFor('chat-thread')
-              const pos = spawnPositionFor(entry?.defaultWidth ?? 340, entry?.defaultHeight ?? 460)
-              await createWidget({
-                taskId: activeTask.id,
-                kind: 'chat-thread',
-                title: activeTask.title || 'Desk chat',
-                content: JSON.stringify({ conversationId: convId, channelName: activeTask.title || 'Desk' }),
-                x: pos.x,
-                y: pos.y,
-                width: entry?.defaultWidth ?? 340,
-                height: entry?.defaultHeight ?? 460,
-                color: null
-              })
-            }}
-            className="icon-btn !h-6 !w-6 text-[var(--ink-50)] hover:text-accent shrink-0"
-            aria-label="Add this desk's chat panel"
-            title="Add a chat panel for this desk"
-            data-testid="desk-chat-button"
-          >
-            <Icon name="forum" size={15} />
-          </button>
-
-          {/* Zoom controls */}
-          <div className="flex items-center gap-0.5 px-1 border border-[var(--edge-firm)] rounded">
-            <button
-              onClick={() => setZoom(zoom - 0.1)}
-              className="icon-btn !h-6 !w-6"
-              title="Zoom out (⌘[)"
-            >
-              <Icon name="remove" size={14} />
-            </button>
-            <button
-              onClick={resetView}
-              className="text-[11px] text-[var(--ink-70)] font-mono px-1.5 min-w-[42px] hover:text-[var(--ink-100)]"
-              title="Reset view (⌘0)"
-            >
-              {zoomPct}%
-            </button>
-            <button
-              onClick={() => setZoom(zoom + 0.1)}
-              className="icon-btn !h-6 !w-6"
-              title="Zoom in (⌘])"
-            >
-              <Icon name="add" size={14} />
-            </button>
-          </div>
-
-          <LoadMeter />
-          <button
-            onClick={() => void handleAutoArrange()}
-            disabled={widgets.length === 0}
-            className="btn-ghost"
-            title="Lay widgets out in tidy rows by category"
-          >
-            <Icon name="grid_view" size={14} />
-            <span>Tidy</span>
-          </button>
-          <button
-            onClick={() => void updateNode(activeTask.id, { status: status.next })}
-            className="btn-ghost"
-            title={`Mark as ${status.next.replace('_', ' ')}`}
-          >
-            <Icon name={status.icon} size={14} />
-            <span>{status.label}</span>
-          </button>
-          {/* The single "Ask AI" entry, same command bar as the header (and
-              Cmd+Shift+K). It prepares object suggestions, then hands them to
-              the builder preview on the canvas for one-click placement. */}
-          <button
-            onClick={() => useAiCommandBar.getState().setOpen(true)}
-            className="btn-ghost !text-accent"
-            title="Build with AI — describe what you want and it builds it on this desk (⌘⇧K)"
-          >
-            <Icon name="auto_awesome" size={14} className="text-accent" />
-            <span>Build</span>
-          </button>
-          <FivePromiseButton taskId={activeTask.id} />
-          <button
-            onClick={() => void launchMeeting({ kind: 'desk', nodeId: activeTask.id, title: activeTask.title })}
-            className="btn-ghost"
-            title="Start a meeting from this desk and share it with the people you invite"
-            data-testid="desk-start-meeting"
-          >
-            <Icon name="videocam" size={14} />
-            <span>Meeting</span>
-          </button>
-          <button
-            onClick={() => setShowResume(true)}
-            className={`btn-ghost ${activeTask.resumeMarkdown ? '!text-[var(--ink-100)]' : ''}`}
-            title={
-              activeTask.resumeMarkdown
-                ? 'View / regenerate your handoff document'
-                : 'Generate a handoff document to resume this task later'
-            }
-          >
-            <Icon
-              name="description"
-              size={14}
-              filled={!!activeTask.resumeMarkdown}
-              className={activeTask.resumeMarkdown ? 'text-amber-600' : ''}
-            />
-            <span>Resume</span>
-          </button>
-          <button
-            onClick={() => void handleSaveTemplate()}
-            disabled={widgets.length === 0 || savingTemplate}
-            className="btn-ghost"
-            title="Save this workspace layout as a reusable template"
-          >
-            <Icon name="bookmark_add" size={14} />
-            <span>{savingTemplate ? 'Saving…' : 'Save template'}</span>
-          </button>
-          {/* Compact desk-objects palette — single "+ Add" button that
-              opens a portalled popover with categorised chips. Replaces
-              the previous full-width horizontal strip that wasted ~100px
-              of vertical real estate even when collapsed. */}
-          <WidgetPalette
-            onAdd={handleClickAdd}
-            onImport={() => void handleImportFile()}
-            onBringSynced={activeTaskId ? () => setSyncPickerOpen(true) : undefined}
-            disabled={!activeTaskId}
-          />
-          {activeTaskId && (
-            <button
-              onClick={() => setHistoryOpen(true)}
-              className="btn-ghost"
-              title="Time travel — scrub this desk's history"
-              data-testid="open-history"
-            >
-              <Icon name="history" size={14} />
-              <span>History</span>
-            </button>
-          )}
-        </div>
 
         <div
           ref={dropRef}
@@ -2440,15 +2098,12 @@ export default function Canvas(): JSX.Element {
               <span className="absolute inset-0 m-auto h-2 w-2 rounded-full bg-accent shadow" />
             </div>
           )}
-          {/* Always-visible Add button on the desk surface, so adding a widget
-              or object is obvious no matter how the toolbar wraps. It reuses the
-              same WidgetPalette (full categorised, searchable, gated catalog) and
-              the same handleClickAdd funnel as the toolbar button and drag-drop.
-              Marked fb-floating-chrome so hovering it in the corner does not
-              trigger edge-pan. */}
+          {/* Unified bottom bar — hover-expand dock with recent widget tray
+              and voice command FAB. Renders centered at the canvas bottom.
+              Marked fb-floating-chrome so it doesn't trigger edge-pan. */}
           {activeTaskId && (
-            <div className="fb-floating-chrome absolute bottom-5 right-5 z-[150]">
-              <WidgetPalette onAdd={handleClickAdd} disabled={!activeTaskId} variant="fab" />
+            <div className="fb-floating-chrome absolute bottom-5 left-1/2 -translate-x-1/2 z-[150]">
+              <UnifiedBottomBar />
             </div>
           )}
           {showStartingKit && nodeOrigin && activeTaskId && (
@@ -2642,6 +2297,11 @@ export default function Canvas(): JSX.Element {
               docked rect without prop-drilling through every widget kind. */}
           <PinnedLayer widgets={widgets} focusedId={focusedId} renderWidget={renderWidget} />
           <FloatingToolbar
+            onAddWidget={handleClickAdd}
+            onImport={() => setSyncPickerOpen(true)}
+            paletteDisabled={!activeTaskId}
+            onHistory={() => setHistoryOpen(true)}
+            historyDisabled={!activeTaskId}
             actions={(() => {
               // Quick-jump buttons for every section currently on the canvas
               const sections = widgets.filter((w) => w.kind === 'section' && !w.pinned)
@@ -2689,6 +2349,36 @@ export default function Canvas(): JSX.Element {
               return [...sectionJumps, ...staticActions]
             })()}
           />
+          {/* Floating pill — draggable hub with desk state + quick actions +
+              cognitive-load ring + canvas tools. Uses fixed positioning internally. */}
+          {activeTaskId && (
+            <FloatingPill
+              onTidy={() => void handleAutoArrange()}
+              tidyDisabled={!activeTaskId}
+              onBuild={() => setShowAiBuilder(true)}
+              onSaveTemplate={() => setSaveTemplateOpen({ context: 'toolbar' })}
+              saveDisabled={!activeTaskId || savingTemplate}
+              savingTemplate={savingTemplate}
+              zoom={zoom}
+              onResetZoom={() => resetView()}
+              onStatus={() => void updateNode(activeTask.id, { status: status.next })}
+              statusLabel={status.label}
+              statusIcon={status.icon}
+              onFocus={() => {
+                futuristicPowerOn()
+                void startFocusSession(activeTask.id, 5 * 60, '5min')
+              }}
+              focusActive={focusSessionActive}
+              onChat={() => void handleDeskChat()}
+              onMeeting={() => void launchMeeting({ kind: 'desk', nodeId: activeTask.id, title: activeTask.title })}
+              timerText={timerText}
+              timerOverdue={isOverdue}
+            />
+          )}
+          {/* Desk presence — who else is on this desk, floated top-right of canvas surface */}
+          <div className="fb-floating-chrome absolute top-3 right-3 z-[45] pointer-events-auto">
+            <DeskPresenceBar taskId={activeTask.id} />
+          </div>
           {activeId && !linkSourceId && (
             <div className="absolute bottom-3 left-1/2 -translate-x-1/2 px-2.5 py-1 rounded-full bg-stone-900/85 backdrop-blur text-[11px] text-stone-50 shadow flex items-center gap-1.5 pointer-events-none">
               <span className="h-1.5 w-1.5 rounded-full bg-blue-400 animate-pulse" />
@@ -2772,9 +2462,6 @@ export default function Canvas(): JSX.Element {
           onClose={() => setSaveTemplateOpen(null)}
         />
       )}
-      {showResume && activeTask && (
-        <ResumeModal task={activeTask} onClose={() => setShowResume(false)} />
-      )}
       {showAISetup && activeTask && (
         <AISetupDialog
           task={activeTask}
@@ -2841,38 +2528,6 @@ export default function Canvas(): JSX.Element {
         />
       )}
     </>
-  )
-}
-
-function FivePromiseButton({ taskId }: { taskId: string }): JSX.Element {
-  const active = useFocusSessionStore((s) => s.active)
-  const start = useFocusSessionStore((s) => s.start)
-  const isOnThisTask = active?.taskId === taskId
-  if (isOnThisTask) {
-    return (
-      <span
-        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium text-accent cursor-default"
-        title="5-Minute Promise running — see the pill at top of canvas"
-      >
-        <Icon name="bolt" size={14} filled />
-        <span>In session</span>
-      </span>
-    )
-  }
-  return (
-    <button
-      onClick={() => {
-        // Fire chime on user gesture (autoplay-friendly) then start the session
-        futuristicPowerOn()
-        void start(taskId, 5 * 60, '5min')
-      }}
-      className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium text-white transition-all hover:brightness-110"
-      style={{ backgroundColor: 'rgb(var(--accent))' }}
-      title="The 5-Minute Promise: just five minutes, no commitment past that. The most-evidence-backed ADHD initiation technique."
-    >
-      <Icon name="bolt" size={14} />
-      <span>Just 5 min</span>
-    </button>
   )
 }
 

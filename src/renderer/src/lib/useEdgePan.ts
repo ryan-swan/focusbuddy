@@ -56,15 +56,19 @@ interface Options {
   // The canvas container ref. Mouse position is read relative to its
   // bounding box.
   containerRef: React.RefObject<HTMLDivElement>
-  // When true the hook does nothing. Used so the caller can pass live
-  // disable conditions (active widget, animating pan, etc.) without
-  // unmounting the hook.
+  // Soft-disable: pauses edge-pan but is overridden during active widget
+  // drag so the user can still scroll by moving a widget toward the edge.
+  // Use for system conditions like animatingPan that shouldn't block drag.
   disabled: boolean
+  // Hard-disable: stops edge-pan completely, even during drag. Use for
+  // explicit user preferences (edgePanEnabled = false).
+  hardDisabled?: boolean
 }
 
 export function useEdgePan({
   containerRef,
   disabled,
+  hardDisabled = false,
   margin = 80,
   maxSpeedPerSecond = 1100
 }: Options): EdgeIntensity {
@@ -74,15 +78,18 @@ export function useEdgePan({
   const mousePosRef = useRef<{ x: number; y: number } | null>(null)
   const lastFrameRef = useRef<number>(0)
   const disabledRef = useRef(disabled)
+  const hardDisabledRef = useRef(hardDisabled)
+  // Sync during render (not in an effect) so the rAF loop never reads a
+  // stale value — effects run after paint, but rAF can fire in the same
+  // post-paint window before effects, leaving a gap of one or more frames.
+  disabledRef.current = disabled
+  hardDisabledRef.current = hardDisabled
   const marginRef = useRef(margin)
   const maxSpeedRef = useRef(maxSpeedPerSecond)
   // Cached size of the container — read in mousemove + rAF, so we
   // memoise via a ResizeObserver instead of calling gbcr every frame.
   const sizeRef = useRef<{ width: number; height: number }>({ width: 0, height: 0 })
 
-  useEffect(() => {
-    disabledRef.current = disabled
-  }, [disabled])
   useEffect(() => {
     marginRef.current = margin
     maxSpeedRef.current = maxSpeedPerSecond
@@ -257,18 +264,13 @@ export function useEdgePan({
       const maxSpeed = maxSpeedRef.current
       const { width, height } = sizeRef.current
 
-      // The caller's `disabled` (which we pass via `disabledRef`) is
-      // OVERRIDDEN during active drag. The Canvas wires `disabled` to
-      // `activeId !== null || animatingPan` — the activeId branch is
-      // what we want to ignore while dragging, because Rnd sets
-      // activeId on dragstart and the user clearly wants edge-pan
-      // during drag. We still respect animatingPan (a zoom-to-fit
-      // shouldn't be fought by edge-pan) — but we approximate that by
-      // saying "ignore disabled when dragging". This is fine because
-      // animatingPan + dragging at the same time is impossible: Rnd
-      // drag cancels camera animation.
+      // `disabled` (soft) is overridden during active widget drag so
+      // moving a widget toward the edge still scrolls the canvas. Use it
+      // for system conditions like animatingPan that shouldn't block drag.
+      // `hardDisabled` is NEVER overridden — it carries the user's explicit
+      // preference (edgePanEnabled = false) and must always be respected.
       const dragging = isDragging()
-      const effectiveDisabled = disabledRef.current && !dragging
+      const effectiveDisabled = hardDisabledRef.current || (disabledRef.current && !dragging)
 
       // Skip while disabled, no cursor, or container has zero size.
       if (
