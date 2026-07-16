@@ -839,20 +839,17 @@ export default function WidgetFrame({
                 ? 'border-amber-400/60'
                 : isChildOfSection
                   ? 'border-[color:var(--edge-soft)]'
-                  : 'border-[color:var(--edge-soft)]'
+                  : hovered && !isDragging && !isResizing
+                    ? 'border-[color:var(--edge-firm)] ring-1 ring-black/[0.08] dark:ring-white/[0.10]'
+                    : 'border-[color:var(--edge-soft)]'
         }`}
         style={{
           boxShadow: isActive
             ? undefined // .widget-glow owns the active state
             : isChildOfSection
               ? 'var(--shadow-soft), var(--shadow-inset-highlight)'
-              : hovered && !isDragging && !isResizing
-                ? 'var(--shadow-deep), var(--shadow-inset-highlight)'
-                : 'var(--shadow-cast), var(--shadow-inset-highlight)',
-          transform: hovered && !isDragging && !isResizing && !isPinned && !isActive
-            ? 'translateY(-2px)'
-            : undefined,
-          transitionProperty: 'box-shadow, transform, border-color'
+              : 'var(--shadow-cast), var(--shadow-inset-highlight)',
+          transitionProperty: 'box-shadow, border-color'
         }}
       >
         <div
