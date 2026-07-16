@@ -9,7 +9,6 @@ import Sidebar from './components/Sidebar'
 import PlexiiLogo from './components/PlexiiLogo'
 import {
   FLOATING_MENU_INSET,
-  MenuRestorePill,
   useMinimizable,
   useSidebarWidth
 } from './components/chrome/floatingMenu'
@@ -99,8 +98,7 @@ export default function App(): JSX.Element {
   // the content.
   const {
     minimized: sidebarMinimized,
-    minimize: minimizeSidebar,
-    restore: restoreSidebar
+    toggle: toggleSidebar
   } = useMinimizable('fb.sidebar.minimized')
   // PlexiOffice is a full-bleed segment with its own chrome: when active it takes
   // over the main area, replacing the global sidebar / desk panels.
@@ -440,18 +438,6 @@ export default function App(): JSX.Element {
         }`}
       >
         <div className="titlebar-nodrag flex items-center gap-2">
-          {sidebarMinimized && !segmentTakeover && (
-            <Tooltip content="Show the workspace panel — your folders, tasks and projects" placement="bottom">
-              <button
-                onClick={restoreSidebar}
-                className="h-7 px-2 inline-flex items-center gap-1 rounded-md text-[11px] font-medium text-stone-600 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-white/[0.06] border border-stone-200/70 dark:border-white/10 transition-colors"
-                aria-label="Show workspace panel"
-              >
-                <Icon name="keyboard_double_arrow_right" size={14} />
-                <span>Workspace</span>
-              </button>
-            </Tooltip>
-          )}
           {/* "Local · encrypted" — the trust chip. Reflects whether the
               user has set up the vault (and unlocked it). Reinforces the
               BYO-key promise without nagging. Hidden on a fresh install
@@ -628,16 +614,7 @@ export default function App(): JSX.Element {
               behind it, while the inset margin lets the desk surface show around
               the card so it reads as floating above the surface. Minimising it
               collapses the column entirely, giving the content the full width. */}
-          {!sidebarMinimized && (
-            <SidebarDock onMinimize={minimizeSidebar} />
-          )}
-          {sidebarMinimized && (
-            <MenuRestorePill
-              onClick={restoreSidebar}
-              label="Workspace"
-              title="Show the workspace panel"
-            />
-          )}
+          <SidebarDock collapsed={sidebarMinimized} onToggle={toggleSidebar} />
           <div className="flex-1 min-w-0 h-full">
             <PanelGroup direction="horizontal" autoSaveId="focusbuddy-main-v3">
               <Panel defaultSize={78} minSize={40}>
@@ -721,47 +698,53 @@ export default function App(): JSX.Element {
   )
 }
 
+// Width of the dock column when the sidebar is collapsed to icon-only strip.
+// 58px = 10px left-inset + 38px card + 8px right-inset (FLOATING_MENU_INSET).
+const SIDEBAR_COLLAPSED_DOCK_WIDTH = 58
+
 // The dock column that carries the floating Desk sidebar. It reserves the
 // sidebar's width so content sits beside the card rather than under it, applies
 // the inset margin that detaches the card from the window edges, and hosts the
-// drag-to-resize grip on its right edge. Resize is both pointer- and
-// keyboard-driven, with the width persisted by useSidebarWidth.
-function SidebarDock({ onMinimize }: { onMinimize: () => void }): JSX.Element {
+// drag-to-resize grip on its right edge. When collapsed the dock narrows to an
+// icon-only strip; the resize grip hides in that state.
+function SidebarDock({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void }): JSX.Element {
   const { width, onResizeStart, nudge, resizing } = useSidebarWidth()
   return (
     <div
-      className={`relative shrink-0 h-full box-border ${FLOATING_MENU_INSET}`}
-      style={{ width }}
+      className={`relative shrink-0 h-full box-border ${FLOATING_MENU_INSET} transition-[width] duration-200`}
+      style={{ width: collapsed ? SIDEBAR_COLLAPSED_DOCK_WIDTH : width }}
       data-testid="sidebar-dock"
     >
-      <Sidebar onCollapse={onMinimize} />
-      <div
-        onPointerDown={onResizeStart}
-        onKeyDown={(e) => {
-          if (e.key === 'ArrowLeft') {
-            e.preventDefault()
-            nudge(-16)
-          } else if (e.key === 'ArrowRight') {
-            e.preventDefault()
-            nudge(16)
-          }
-        }}
-        role="separator"
-        aria-orientation="vertical"
-        aria-label="Resize the workspace panel"
-        title="Drag to resize the workspace panel"
-        tabIndex={0}
-        data-testid="sidebar-resize"
-        className="group absolute top-0 right-0 h-full w-2.5 flex items-center justify-center cursor-col-resize outline-none touch-none"
-      >
-        <span
-          className={`h-10 w-[3px] rounded-full transition-colors ${
-            resizing
-              ? 'bg-[rgb(var(--accent))]'
-              : 'bg-transparent group-hover:bg-[rgb(var(--accent)/0.5)] group-focus-visible:bg-[rgb(var(--accent))]'
-          }`}
-        />
-      </div>
+      <Sidebar collapsed={collapsed} onToggle={onToggle} />
+      {!collapsed && (
+        <div
+          onPointerDown={onResizeStart}
+          onKeyDown={(e) => {
+            if (e.key === 'ArrowLeft') {
+              e.preventDefault()
+              nudge(-16)
+            } else if (e.key === 'ArrowRight') {
+              e.preventDefault()
+              nudge(16)
+            }
+          }}
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Resize the workspace panel"
+          title="Drag to resize the workspace panel"
+          tabIndex={0}
+          data-testid="sidebar-resize"
+          className="group absolute top-0 right-0 h-full w-2.5 flex items-center justify-center cursor-col-resize outline-none touch-none"
+        >
+          <span
+            className={`h-10 w-[3px] rounded-full transition-colors ${
+              resizing
+                ? 'bg-[rgb(var(--accent))]'
+                : 'bg-transparent group-hover:bg-[rgb(var(--accent)/0.5)] group-focus-visible:bg-[rgb(var(--accent))]'
+            }`}
+          />
+        </div>
+      )}
     </div>
   )
 }

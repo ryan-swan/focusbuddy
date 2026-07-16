@@ -7,29 +7,11 @@ import { useWidgetStore } from '../stores/widgets'
 import { useConnectedAppsStore } from '../stores/connectedApps'
 import SyncIndicator from './SyncIndicator'
 import { useViewStore, type View } from '../stores/view'
-import { catalogFor, WIDGET_CATALOG, DRAG_MIME } from '../lib/widgetCatalog'
+import { catalogFor } from '../lib/widgetCatalog'
 import SegmentSwitcher from './segment/SegmentSwitcher'
 import OrgSwitcher from './OrgSwitcher'
 import { useViewKindEnabled } from '../lib/viewCapability'
 
-// What you can drag onto the desk from the sidebar when a desk is open: the common
-// widgets AND the office things (a doc, sheet, slides or a drawing), so you can pull
-// both straight onto the canvas. The full widget set still lives in the on-canvas
-// palette.
-const DESK_WIDGET_KINDS = new Set([
-  'doc',
-  'sheet',
-  'slides',
-  'scratchpad',
-  'sticky',
-  'note',
-  'timer',
-  'task-link',
-  'calculator',
-  'image',
-  'page',
-  'file'
-])
 import { chimeIn } from '../lib/audioBeep'
 import { splitFavourites } from '../lib/connectedAppSort'
 import NewNodeDialog from './NewNodeDialog'
@@ -135,10 +117,11 @@ function renderConnectedAppRow(
 }
 
 interface Props {
-  onCollapse?: () => void
+  collapsed?: boolean
+  onToggle?: () => void
 }
 
-export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
+export default function Sidebar({ collapsed, onToggle }: Props = {}): JSX.Element {
   const setActive = useNodeStore((s) => s.setActive)
   const createWidget = useWidgetStore((s) => s.create)
   const bumpLayout = useWidgetStore((s) => s.bumpLayoutVersion)
@@ -153,6 +136,9 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
   const goFiles = useViewStore((s) => s.goFiles)
   const goConnectedApp = useViewStore((s) => s.goConnectedApp)
   const goVault = useViewStore((s) => s.goVault)
+  const goOffice = useViewStore((s) => s.goOffice)
+  const goPlexiPeople = useViewStore((s) => s.goPlexiPeople)
+  const goPlexiBrain = useViewStore((s) => s.goPlexiBrain)
 
   // Hide desk-nav entries that lead to a now-gated surface, using the same
   // view-kind -> capability map MainPane's CapabilityGate enforces, so nav and
@@ -265,6 +251,173 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
     bumpLayout()
   }
 
+  const [appsExpanded, setAppsExpanded] = useState(false)
+
+  if (collapsed) {
+    const showOffice = viewEnabled('documents')
+    const showPeople = viewEnabled('people-map')
+    const showBrain  = viewEnabled('knowledge')
+    const hasSegments = showOffice || showPeople || showBrain
+
+    return (
+      <aside
+        className={`${FLOATING_MENU_ASIDE} flex flex-col overflow-hidden`}
+        style={{ ...FLOATING_MENU_STYLE, width: '100%' }}
+        data-testid="desk-sidebar-collapsed"
+      >
+        {/* Scrollable icon column */}
+        <div
+          className="flex flex-col items-center py-2 gap-0.5 overflow-y-auto flex-1"
+          style={{ scrollbarWidth: 'none' }}
+        >
+          {/* Expand toggle */}
+          <button
+            onClick={onToggle}
+            title="Expand menu"
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-[var(--ink-50)] hover:text-[var(--ink-90)] hover:bg-[var(--surface-sunken)] transition-colors shrink-0 mb-0.5"
+          >
+            <Icon name="left_panel_open" size={16} />
+          </button>
+
+          {/* ── Segments: Office / People / Brain ── */}
+          {hasSegments && (
+            <>
+              <div className="w-6 h-px bg-[var(--edge-soft)] shrink-0 my-1" />
+              {showOffice && (
+                <CollapsedNavIcon
+                  icon="grid_view"
+                  label="Office"
+                  active={view.kind === 'office'}
+                  onClick={() => goOffice()}
+                />
+              )}
+              {showPeople && (
+                <CollapsedNavIcon
+                  icon="diversity_3"
+                  label="People"
+                  active={view.kind === 'plexipeople'}
+                  onClick={() => goPlexiPeople()}
+                />
+              )}
+              {showBrain && (
+                <CollapsedNavIcon
+                  icon="neurology"
+                  label="Brain"
+                  active={view.kind === 'plexibrain'}
+                  onClick={() => goPlexiBrain()}
+                />
+              )}
+            </>
+          )}
+
+          {/* ── Desk navigation ── */}
+          <div className="w-6 h-px bg-[var(--edge-soft)] shrink-0 my-1" />
+
+          <CollapsedNavIcon icon="dashboard"     label="Home"         active={viewIsActive({ kind: 'home' })}       onClick={() => { setActive(null); goHome() }} />
+          <CollapsedNavIcon icon="meeting_room"  label="Rooms"        active={viewIsActive({ kind: 'rooms' })}      onClick={() => { setActive(null); goRooms() }} />
+          <CollapsedNavIcon icon="desk"          label="Desks"        active={viewIsActive({ kind: 'desks' })}      onClick={() => { setActive(null); goDesks() }} />
+          <CollapsedNavIcon icon="folder_shared" label="Shared Desks" active={viewIsActive({ kind: 'shared' })}    onClick={() => { setActive(null); goShared() }} />
+          <CollapsedNavIcon icon="account_tree"  label="Plans"        active={viewIsActive({ kind: 'projects' })}  onClick={() => { setActive(null); goProjects() }} />
+          <CollapsedNavIcon icon="checklist"     label="Tasks"        active={viewIsActive({ kind: 'all-tasks' })} onClick={() => { setActive(null); goAllTasks() }} />
+          {viewEnabled('calendar') && (
+            <CollapsedNavIcon icon="calendar_month" label="Calendar" active={viewIsActive({ kind: 'calendar' })} onClick={() => { setActive(null); goCalendar() }} />
+          )}
+          {viewEnabled('files') && (
+            <CollapsedNavIcon icon="folder" label="Files" active={viewIsActive({ kind: 'files' })} onClick={() => { setActive(null); goFiles() }} />
+          )}
+          {viewEnabled('vault') && (
+            <CollapsedNavIcon icon="lock" label="Vault" active={viewIsActive({ kind: 'vault' })} onClick={() => { setActive(null); goVault() }} />
+          )}
+
+          {/* ── Connected Apps ── */}
+          <div className="w-6 h-px bg-[var(--edge-soft)] shrink-0 my-1" />
+
+          <button
+            onClick={() => setAppsExpanded(v => !v)}
+            title="Connected Apps"
+            className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors shrink-0 ${
+              appsExpanded || view.kind === 'connected-app'
+                ? 'bg-[rgb(var(--accent)/0.12)] text-[rgb(var(--accent))]'
+                : 'text-[var(--ink-50)] hover:text-[var(--ink-90)] hover:bg-[var(--surface-sunken)]'
+            }`}
+          >
+            <Icon name="apps" size={16} />
+          </button>
+
+          {appsExpanded && (
+            <>
+              {connectedApps.length === 0 ? (
+                <span className="text-[9px] text-[var(--ink-30)] text-center leading-tight px-1 py-1">
+                  No apps
+                </span>
+              ) : (
+                connectedApps.map((app) => (
+                  <div
+                    key={app.id}
+                    draggable
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData(CONNECTED_APP_DRAG_MIME, app.id)
+                      e.dataTransfer.setData('text/uri-list', app.url)
+                      e.dataTransfer.setData('text/plain', app.url)
+                      e.dataTransfer.effectAllowed = 'copy'
+                    }}
+                    className="shrink-0 cursor-grab active:cursor-grabbing"
+                  >
+                    <button
+                      onClick={() => {
+                        app.kind === 'local' ? void launchLocal(app.id) : goConnectedApp(app.id)
+                      }}
+                      title={app.title}
+                      className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${
+                        viewIsActive({ kind: 'connected-app', appId: app.id })
+                          ? 'bg-[rgb(var(--accent)/0.12)] text-[rgb(var(--accent))]'
+                          : 'hover:bg-[var(--surface-sunken)]'
+                      }`}
+                    >
+                      {app.iconPngBase64 ? (
+                        <img
+                          src={`data:image/png;base64,${app.iconPngBase64}`}
+                          alt={app.title}
+                          className="h-5 w-5 rounded shrink-0"
+                        />
+                      ) : (
+                        <span
+                          className="h-5 w-5 rounded inline-flex items-center justify-center shrink-0"
+                          style={
+                            app.color
+                              ? { backgroundColor: `${app.color}1a`, color: app.color }
+                              : { backgroundColor: 'rgb(var(--accent) / 0.12)', color: 'rgb(var(--accent))' }
+                          }
+                        >
+                          <Icon name={app.icon || 'apps'} size={12} />
+                        </span>
+                      )}
+                    </button>
+                  </div>
+                ))
+              )}
+              <button
+                onClick={() => setAddAppOpen(true)}
+                title="Add app"
+                className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors shrink-0 text-[var(--ink-40)] hover:text-[var(--ink-90)] hover:bg-[var(--surface-sunken)]"
+                style={{ border: '1.5px dashed var(--edge-firm)' }}
+              >
+                <Icon name="add" size={14} />
+              </button>
+            </>
+          )}
+        </div>
+
+        {addAppOpen && (
+          <AddConnectedAppDialog
+            onClose={() => setAddAppOpen(false)}
+            onAdded={(id) => goConnectedApp(id)}
+          />
+        )}
+      </aside>
+    )
+  }
+
   return (
     <aside className={FLOATING_MENU_ASIDE} style={FLOATING_MENU_STYLE} data-testid="desk-sidebar">
       {/* Header — same silhouette as the PlexiOffice menu: the wordmark on the
@@ -280,8 +433,8 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
             <Icon name="add" size={14} />
             <span>New</span>
           </button>
-          {onCollapse && (
-            <MenuMinimizeButton onClick={onCollapse} title="Minimise the menu to free the desk" />
+          {onToggle && (
+            <MenuMinimizeButton onClick={onToggle} title="Minimise the menu to free the desk" />
           )}
         </div>
       </div>
@@ -423,41 +576,6 @@ export default function Sidebar({ onCollapse }: Props = {}): JSX.Element {
             />
           )}
         </div>
-
-        {/* ── ADD TO DESK — while a desk is open (a task or a folder-desk, both
-            canvases now); drag a widget or an office thing (doc / sheet / slides /
-            draw) straight onto the canvas ── */}
-        {(view.kind === 'task' || view.kind === 'project-dashboard') && (
-          <div className="mb-1" data-testid="sidebar-widgets">
-            <div className="px-4 pt-3 pb-1.5 flex items-center gap-1.5 text-[10px] uppercase tracking-[0.12em] text-[var(--ink-40)] font-semibold">
-              <Icon name="widgets" size={13} />
-              <span>Add to desk</span>
-              <span className="ml-auto normal-case tracking-normal text-[var(--ink-40)]">drag onto desk</span>
-            </div>
-            <div className="grid grid-cols-4 gap-1 px-2">
-              {WIDGET_CATALOG.filter((e) => DESK_WIDGET_KINDS.has(e.kind)).map((entry) => (
-                <button
-                  key={entry.kind}
-                  draggable
-                  onDragStart={(e) => {
-                    e.dataTransfer.setData(DRAG_MIME, entry.kind)
-                    e.dataTransfer.effectAllowed = 'copy'
-                  }}
-                  data-testid={`sidebar-widget-${entry.kind}`}
-                  title={`Drag ${entry.label} onto the desk`}
-                  className="flex flex-col items-center gap-1 py-2 rounded-lg text-[9.5px] text-[var(--ink-70)] hover:bg-[var(--surface-sunken)] cursor-grab active:cursor-grabbing"
-                >
-                  <Icon name={entry.icon} size={16} className="text-accent" />
-                  <span className="truncate max-w-full leading-none">{entry.label}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Documents, Inbox, Messages, Mail and PlexiSign live in the PlexiOffice
-            area; Files and Vault are in the Desk nav above. */}
-
 
         {/* ── CONNECTED APPS ────────────────────────────────────────────── */}
         <SectionHeader
@@ -620,6 +738,29 @@ function SectionHeader({ label, open, onToggle, action }: SectionHeaderProps): J
       </button>
       {action}
     </div>
+  )
+}
+
+interface CollapsedNavIconProps {
+  icon: string
+  label: string
+  active: boolean
+  onClick: () => void
+}
+
+function CollapsedNavIcon({ icon, label, active, onClick }: CollapsedNavIconProps): JSX.Element {
+  return (
+    <button
+      onClick={onClick}
+      title={label}
+      className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors shrink-0 ${
+        active
+          ? 'bg-[rgb(var(--accent)/0.12)] text-[rgb(var(--accent))]'
+          : 'text-[var(--ink-50)] hover:text-[var(--ink-90)] hover:bg-[var(--surface-sunken)]'
+      }`}
+    >
+      <Icon name={icon} size={16} />
+    </button>
   )
 }
 
