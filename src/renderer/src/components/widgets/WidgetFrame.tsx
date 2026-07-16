@@ -85,6 +85,9 @@ export default function WidgetFrame({
   // browser's hostname); double-click the header label to set a manual name.
   const [titleEditing, setTitleEditing] = useState(false)
   const [titleDraft, setTitleDraft] = useState('')
+  const [hovered, setHovered] = useState(false)
+  const [isDragging, setIsDragging] = useState(false)
+  const [isResizing, setIsResizing] = useState(false)
   // Manual double-click detection. The native `dblclick` event is unreliable on
   // the header because the first click re-renders the frame (active-state change)
   // and swaps the label node, so the browser never pairs the two clicks. A ref
@@ -635,6 +638,7 @@ export default function WidgetFrame({
         } else {
           groupLeadRef.current = false
         }
+        setIsDragging(true)
         // Toggle a root-level class so the desk surface can render the
         // snap-to-grid hint while the user is actively positioning an
         // object. Removed on dragstop. Cheap to add/remove; CSS does the
@@ -679,6 +683,7 @@ export default function WidgetFrame({
         setHoveredSection(target)
       }}
       onDragStop={(_, d) => {
+        setIsDragging(false)
         setHoveredSection(null)
         setDragOverride(null)
         if (groupLeadRef.current) {
@@ -696,8 +701,9 @@ export default function WidgetFrame({
         // doesn't run our onClick activation logic.
         dragJustEnded.current = performance.now()
       }}
-      onResizeStart={() => setActive(widget.id)}
+      onResizeStart={() => { setActive(widget.id); setIsResizing(true) }}
       onResizeStop={(_, __, ref, ___, pos) => {
+        setIsResizing(false)
         const newW = ref.offsetWidth
         const newH = ref.offsetHeight
         if (isChildOfSection) {
@@ -767,6 +773,8 @@ export default function WidgetFrame({
       <div
         data-widget-id={widget.id}
         data-widget-kind={widget.kind}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
         // Shift-select is handled on mousedown (CAPTURE phase) — not onClick —
         // because the header IS react-rnd's drag handle: react-draggable's
         // bubble-phase mousedown consumes the gesture and onClick never fires on
@@ -834,13 +842,16 @@ export default function WidgetFrame({
                   : 'border-[color:var(--edge-soft)]'
         }`}
         style={{
-          // Light-aware cast shadow + inset highlight on top edge. Tightens
-          // when active (focus brings the widget visually closer to the user).
           boxShadow: isActive
             ? undefined // .widget-glow owns the active state
             : isChildOfSection
               ? 'var(--shadow-soft), var(--shadow-inset-highlight)'
-              : 'var(--shadow-cast), var(--shadow-inset-highlight)',
+              : hovered && !isDragging && !isResizing
+                ? 'var(--shadow-deep), var(--shadow-inset-highlight)'
+                : 'var(--shadow-cast), var(--shadow-inset-highlight)',
+          transform: hovered && !isDragging && !isResizing && !isPinned && !isActive
+            ? 'translateY(-2px)'
+            : undefined,
           transitionProperty: 'box-shadow, transform, border-color'
         }}
       >

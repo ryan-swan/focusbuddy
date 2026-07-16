@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
+import { EASING_FM, MOTION } from '../lib/spatialTokens'
 import Icon from './Icon'
 import WidgetPalette from './WidgetPalette'
 import type { WidgetCatalogEntry } from '../lib/widgetCatalog'
@@ -22,9 +23,6 @@ interface Props {
   onHistory: () => void
   historyDisabled: boolean
 }
-
-const EASE_ENTER = [0.34, 1.2, 0.64, 1] as const
-const EASE_EXIT  = [0.4, 0, 1, 1] as const
 
 export default function FloatingToolbar({
   actions,
@@ -138,8 +136,8 @@ export default function FloatingToolbar({
             <motion.div
               key="actions-h"
               initial={{ width: 0, opacity: 0 }}
-              animate={{ width: 'auto', opacity: 1, transition: { duration: 0.2, ease: EASE_ENTER } }}
-              exit={{ width: 0, opacity: 0, transition: { duration: 0.15, ease: EASE_EXIT } }}
+              animate={{ width: 'auto', opacity: 1, transition: { duration: MOTION.base / 1000, ease: EASING_FM.soft } }}
+              exit={{ width: 0, opacity: 0, transition: { duration: MOTION.quick / 1000, ease: EASING_FM.snap } }}
               className="overflow-hidden flex flex-row items-center"
               data-no-drag
             >
@@ -210,8 +208,8 @@ export default function FloatingToolbar({
           <motion.div
             key="actions-v"
             initial={{ height: 0, opacity: 0, y: -4 }}
-            animate={{ height: 'auto', opacity: 1, y: 0, transition: { duration: 0.22, ease: EASE_ENTER } }}
-            exit={{ height: 0, opacity: 0, y: -4, transition: { duration: 0.16, ease: EASE_EXIT } }}
+            animate={{ height: 'auto', opacity: 1, y: 0, transition: { duration: MOTION.base / 1000, ease: EASING_FM.soft } }}
+            exit={{ height: 0, opacity: 0, y: -4, transition: { duration: MOTION.quick / 1000, ease: EASING_FM.snap } }}
             className="overflow-hidden flex flex-col"
             style={{ width: 178 }}
             data-no-drag

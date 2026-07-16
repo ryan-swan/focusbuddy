@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import type { FbNode } from '@shared/types'
+import { EASING_FM, MOTION, SPRING } from '../lib/spatialTokens'
 import Icon from './Icon'
 import StageManagerStrip from './StageManagerStrip'
 
@@ -200,7 +201,7 @@ export default function CanvasBreadcrumb({
               initial={{ width: 0, opacity: 0 }}
               animate={{ width: 'auto', opacity: 1 }}
               exit={{ width: 0, opacity: 0 }}
-              transition={{ duration: 0.22, ease: [0.34, 1.2, 0.64, 1] }}
+              transition={{ duration: MOTION.base / 1000, ease: EASING_FM.soft }}
               className="inline-flex items-center gap-0.5 shrink-0"
             >
               {ancestors.map((n) => {
@@ -240,7 +241,7 @@ export default function CanvasBreadcrumb({
               initial={{ width: 0, opacity: 0 }}
               animate={{ width: 'auto', opacity: 1 }}
               exit={{ width: 0, opacity: 0 }}
-              transition={{ duration: 0.15, ease: 'easeOut' }}
+              transition={{ duration: MOTION.quick / 1000, ease: EASING_FM.snap }}
               className="inline-flex items-center shrink-0 overflow-hidden"
             >
               <Icon name="chevron_right" size={13} className="text-[var(--ink-40)]" />
@@ -340,9 +341,9 @@ export default function CanvasBreadcrumb({
             animate={{ opacity: 1, y: 0, x: dropdown.x - 86 }}
             exit={{ opacity: 0, y: -4 }}
             transition={{
-              opacity: { duration: 0.14, ease: 'easeOut' },
-              y: { duration: 0.14, ease: 'easeOut' },
-              x: { type: 'spring', stiffness: 380, damping: 32, mass: 0.8 }
+              opacity: { duration: MOTION.quick / 1000, ease: EASING_FM.snap },
+              y: { duration: MOTION.quick / 1000, ease: EASING_FM.snap },
+              x: SPRING.crisp
             }}
             className="absolute top-full mt-2 w-[172px] max-h-[360px] rounded-2xl overflow-hidden bg-[var(--surface-raised)] border border-[var(--edge-soft)] shadow-[0_8px_40px_rgba(0,0,0,0.28)] ring-1 ring-black/[0.10] dark:ring-white/[0.10] z-[60] flex flex-col"
             style={{ left: 0 }}
@@ -371,7 +372,7 @@ export default function CanvasBreadcrumb({
               initial={{ opacity: 0, y: -6 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -4 }}
-              transition={{ duration: 0.14, ease: [0.25, 0.46, 0.45, 0.94] }}
+              transition={{ duration: MOTION.quick / 1000, ease: EASING_FM.glide }}
               className="absolute top-full mt-2 right-0 w-[200px] max-h-[280px] rounded-2xl overflow-hidden bg-[var(--surface-raised)] border border-[var(--edge-soft)] shadow-[0_8px_40px_rgba(0,0,0,0.28)] ring-1 ring-black/[0.10] dark:ring-white/[0.10] z-[60] flex flex-col"
             >
               <div className="px-3 pt-2.5 pb-1">

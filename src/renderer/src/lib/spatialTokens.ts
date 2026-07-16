@@ -38,6 +38,15 @@ export const EASING = {
   crisp: 'cubic-bezier(0.45, 0, 0.15, 1)',    // --ease-spring-crisp
 } as const
 
+// Array form for Framer Motion's `ease` prop — same curves as EASING but as
+// [x1, y1, x2, y2] bezier control points, which is what Framer Motion accepts.
+export const EASING_FM = {
+  snap:  [0.32, 0.72, 0, 1]    as [number, number, number, number],
+  soft:  [0.34, 1.56, 0.64, 1] as [number, number, number, number],
+  glide: [0.22, 1, 0.36, 1]    as [number, number, number, number],
+  crisp: [0.45, 0, 0.15, 1]    as [number, number, number, number],
+} as const
+
 // ── Framer Motion spring configs ──────────────────────────────────────────
 // Pass these as `transition` in Framer Motion variants.
 // Spring physics feel more natural than duration-based easing for spatial UI

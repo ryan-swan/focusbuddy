@@ -3,11 +3,9 @@ import { motion, AnimatePresence } from 'framer-motion'
 import type { FbNode, Widget } from '@shared/types'
 import { useNodeStore } from '../stores/nodes'
 import { useViewStore } from '../stores/view'
+import { SPRING as SPATIAL_SPRING, MOTION } from '../lib/spatialTokens'
 import DeskMiniature from './DeskMiniature'
 import Icon from './Icon'
-
-// Apple WWDC23 Stage Manager spring — measured from Archeon research
-const SPRING = { type: 'spring' as const, stiffness: 158, damping: 25, mass: 1 }
 
 // Small branded "Plexi grid" mark for empty desks — 2×2 rounded squares
 function PlexiMark({ size = 28 }: { size?: number }): JSX.Element {
@@ -124,7 +122,7 @@ export default function StageManagerStrip({ roomId, activeId }: Props): JSX.Elem
           Fades to 0.4 opacity while widget data is loading to smooth the flash. */}
       <motion.div
         animate={{ opacity: transitioning ? 0.4 : 1 }}
-        transition={{ duration: 0.1 }}
+        transition={{ duration: MOTION.instant / 1000 }}
         data-stage-manager="true"
         className="flex-1 overflow-y-auto overflow-x-hidden py-2 px-2 flex flex-col gap-2 min-h-[80px]"
         onWheel={(e) => e.stopPropagation()}
@@ -142,7 +140,7 @@ export default function StageManagerStrip({ roomId, activeId }: Props): JSX.Elem
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                transition={{ duration: 0.12, ease: 'easeOut' }}
+                transition={{ duration: MOTION.quick / 1000, ease: 'easeOut' }}
               >
                 <motion.button
                   onClick={() => openDesk(desk)}
@@ -154,10 +152,10 @@ export default function StageManagerStrip({ roomId, activeId }: Props): JSX.Elem
                   }}
                   whileHover={{
                     scale: 1.03,
-                    transition: { ...SPRING, stiffness: 220 }
+                    transition: { ...SPATIAL_SPRING.stage, stiffness: 220 }
                   }}
                   whileTap={{ scale: 0.97 }}
-                  transition={SPRING}
+                  transition={SPATIAL_SPRING.stage}
                   style={{}}
                   className={[
                     'relative w-full rounded-xl overflow-hidden text-left shrink-0 block',

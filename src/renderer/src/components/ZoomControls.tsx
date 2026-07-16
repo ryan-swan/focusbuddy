@@ -1,10 +1,8 @@
 import { useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
+import { EASING_FM, MOTION } from '../lib/spatialTokens'
 import { useWidgetStore } from '../stores/widgets'
 import Icon from './Icon'
-
-const EASE_ENTER = [0.34, 1.2, 0.64, 1] as const
-const EASE_EXIT = [0.4, 0, 1, 1] as const
 
 // Hover-expand zoom pill — collapsed shows only %; hovered reveals – + and pan tool.
 // Expands symmetrically: – slides in from the left, +|hand from the right.
@@ -41,8 +39,8 @@ export default function ZoomControls(): JSX.Element {
           <motion.div
             key="minus"
             initial={{ width: 0, opacity: 0 }}
-            animate={{ width: 'auto', opacity: 1, transition: { duration: 0.18, ease: EASE_ENTER } }}
-            exit={{ width: 0, opacity: 0, transition: { duration: 0.13, ease: EASE_EXIT } }}
+            animate={{ width: 'auto', opacity: 1, transition: { duration: MOTION.quick / 1000, ease: EASING_FM.soft } }}
+            exit={{ width: 0, opacity: 0, transition: { duration: MOTION.instant / 1000, ease: EASING_FM.snap } }}
             className="overflow-hidden flex items-stretch"
           >
             <button
@@ -72,8 +70,8 @@ export default function ZoomControls(): JSX.Element {
           <motion.div
             key="plus-pan"
             initial={{ width: 0, opacity: 0 }}
-            animate={{ width: 'auto', opacity: 1, transition: { duration: 0.18, ease: EASE_ENTER } }}
-            exit={{ width: 0, opacity: 0, transition: { duration: 0.13, ease: EASE_EXIT } }}
+            animate={{ width: 'auto', opacity: 1, transition: { duration: MOTION.quick / 1000, ease: EASING_FM.soft } }}
+            exit={{ width: 0, opacity: 0, transition: { duration: MOTION.instant / 1000, ease: EASING_FM.snap } }}
             className="overflow-hidden flex items-stretch"
           >
             <button
