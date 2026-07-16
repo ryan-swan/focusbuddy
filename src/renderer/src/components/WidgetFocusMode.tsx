@@ -699,9 +699,13 @@ function FocusModeInner(): JSX.Element | null {
         ref={bodyRef}
         className="relative flex-1 min-h-0 flex items-center justify-center"
         style={{
+          // Generous card, small visible margin. 4vh/3.5vw keeps proportions on any
+          // screen size — on 13" MBP (~800px tall) this is ~32px top/bottom; on 27"
+          // (~1080px) it's ~43px. Clamp floor (20/24px) ensures the blurred canvas
+          // backdrop is always visible at the edges without eating card real-estate.
           padding: maximized
             ? 0
-            : 'clamp(56px, 9vh, 130px) clamp(56px, 7vw, 160px)'
+            : 'clamp(20px, 4vh, 56px) clamp(24px, 3.5vw, 64px)'
         }}
         {...(drag.active ? { 'data-fb-dragging': true } : {})}
       >

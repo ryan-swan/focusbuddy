@@ -30,7 +30,6 @@ import VideoWidget from './widgets/VideoWidget'
 import TimerWidget from './widgets/TimerWidget'
 import SectionWidget from './widgets/SectionWidget'
 import StreamDeckWidget from './widgets/StreamDeckWidget'
-import WidgetDock from './WidgetDock'
 import WidgetFocusMode from './WidgetFocusMode'
 import ExtensionPrompt from './ExtensionPrompt'
 import AISetupDialog from './AISetupDialog'
@@ -46,6 +45,7 @@ import BrowserContextMenu from './contextMenu/BrowserContextMenu'
 import '../lib/contextMenu'
 import FloatingToolbar, { type ToolbarAction } from './FloatingToolbar'
 import MinimapWidget from './widgets/MinimapWidget'
+import CanvasMinimapFAB from './CanvasMinimapFAB'
 import DeskGallery from './DeskGallery'
 import VoiceRecorderWidget from './widgets/VoiceRecorderWidget'
 import MindMapWidget from './widgets/MindMapWidget'
@@ -99,7 +99,6 @@ import MindmapStartingKit from './MindmapStartingKit'
 import SyncWidgetPicker from './SyncWidgetPicker'
 import HistoryPanel from './HistoryPanel'
 import CanvasBreadcrumb from './CanvasBreadcrumb'
-import UnifiedBottomBar from './UnifiedBottomBar'
 import FloatingPill from './FloatingPill'
 import { useFreeDesk } from '../hooks/useFreeDesk'
 import type { StandardApp } from '../lib/standardApps'
@@ -387,100 +386,13 @@ export default function Canvas(): JSX.Element {
     else clearLinks()
   }, [activeTaskId, loadLinksForTask, clearLinks])
 
-  // Minimap auto-create. Every task gets a minimap widget pinned to its
-  // BR zone the first time it's opened — gives users an always-available
-  // canvas overview without forcing them to dig through the widget picker.
-  //
-  // Once spawned, the minimap is a regular widget: the user can resize,
-  // pin to a different zone, drag back to the canvas, or delete it.
-  // Deletion writes a localStorage flag (fb-minimap-dismissed:{taskId})
-  // so we don't re-create the widget the next time the task opens. The
-  // user can always re-add it from the widget picker — kind 'minimap'
-  // appears in the Layout category.
-  //
-  // We poll the store via `loadingFor === null` to know when loadForTask
-  // has completed (the store doesn't expose a Promise we can await from
-  // here). The createdMinimapForRef set guards against double-creates if
-  // React strict-mode runs the effect twice in dev.
-  const widgetsLoadingFor = useWidgetStore((s) => s.loadingFor)
-  const widgetIds = useWidgetStore((s) =>
-    s.widgets.map((w) => `${w.id}:${w.kind}`).join('|')
-  )
-  const createdMinimapForRef = useRef<Set<string>>(new Set())
+  // Migrate: remove any legacy minimap widgets — the minimap is now a built-in FAB.
   useEffect(() => {
     if (!activeTaskId) return
-    if (widgetsLoadingFor !== null) return // wait until loadForTask has populated widgets
-
-    const mine = useWidgetStore
-      .getState()
-      .widgets.filter((w) => w.kind === 'minimap' && w.taskId === activeTaskId)
-      // Oldest first, so dedup deterministically keeps the same minimap across
-      // reloads rather than a different one each time.
-      .sort((a, b) => a.createdAt - b.createdAt)
-
-    // ALWAYS dedup to exactly one minimap, however the extras arose (a load
-    // race, an old session's bug, a stray re-add). This runs on every pass and
-    // is NOT gated by createdMinimapForRef — the previous version returned early
-    // when the task was already in the ref, so a duplicate created afterwards
-    // (on add / load / reload) was never healed. Keep the oldest, delete the rest.
-    if (mine.length > 1) {
-      for (const extra of mine.slice(1)) {
-        void useWidgetStore.getState().remove(extra.id)
-      }
-    }
-    if (mine.length >= 1) {
-      createdMinimapForRef.current.add(activeTaskId)
-      return
-    }
-
-    // No minimap exists. Create one unless the user dismissed it, or a create
-    // is already pending this session (the ref guards the async gap between
-    // calling createWidget and the store reflecting the new widget, so we don't
-    // fire a second create before the first lands).
-    if (createdMinimapForRef.current.has(activeTaskId)) return
-    const dismissed = localStorage.getItem(`fb-minimap-dismissed:${activeTaskId}`) === '1'
-    if (dismissed) {
-      createdMinimapForRef.current.add(activeTaskId)
-      return
-    }
-    createdMinimapForRef.current.add(activeTaskId)
-    void useWidgetStore.getState().createOptional({
-      taskId: activeTaskId,
-      kind: 'minimap',
-      title: '',
-      content: '',
-      x: 0,
-      y: 0,
-      width: 220,
-      height: 160,
-      pinned: true,
-      pinnedZone: 'br'
-    })
-    // widgetIds is in deps to re-evaluate after widgets load; we read the
-    // getState() snapshot rather than the joined string itself.
-    void widgetIds
-  }, [activeTaskId, widgetsLoadingFor, widgetIds, createWidget])
-
-  // Track minimap deletions → write the dismissed flag so we don't auto-
-  // resurrect. Pure observer; doesn't touch the store from inside the
-  // subscribe callback (which could loop).
-  useEffect(() => {
-    if (!activeTaskId) return
-    let prevHadMinimap = useWidgetStore
-      .getState()
-      .widgets.some((w) => w.kind === 'minimap' && w.taskId === activeTaskId)
-    const unsubscribe = useWidgetStore.subscribe((state) => {
-      const hasMinimap = state.widgets.some(
-        (w) => w.kind === 'minimap' && w.taskId === activeTaskId
-      )
-      if (prevHadMinimap && !hasMinimap) {
-        localStorage.setItem(`fb-minimap-dismissed:${activeTaskId}`, '1')
-      } else if (!prevHadMinimap && hasMinimap) {
-        localStorage.removeItem(`fb-minimap-dismissed:${activeTaskId}`)
-      }
-      prevHadMinimap = hasMinimap
-    })
-    return unsubscribe
+    const minimaps = useWidgetStore.getState().widgets.filter(
+      (w) => w.kind === 'minimap' && w.taskId === activeTaskId
+    )
+    minimaps.forEach((w) => void useWidgetStore.getState().remove(w.id))
   }, [activeTaskId])
 
   // Imperative controller exposed via context to WidgetFrame / SectionWidget.
@@ -2058,18 +1970,6 @@ export default function Canvas(): JSX.Element {
   return (
     <>
       <div className="h-full flex flex-col">
-        <CanvasBreadcrumb
-          activeTask={activeTask}
-          nodes={nodes}
-          onOpenTask={(id) => setActiveTask(id)}
-          onRevealFolder={(id) => expandFolder(id, true)}
-          onHome={() => setActiveTask(null)}
-          fromMindmap={!!nodeOrigin}
-          onRenameTask={(id, title) => void updateNode(id, { title })}
-          onAssignToRoom={(deskId, roomId) => void assignToRoom(deskId, roomId)}
-          onCreateRoomFromDesk={(deskId) => void createRoomAndAssign(deskId)}
-        />
-
         <div
           ref={dropRef}
           data-bare-canvas
@@ -2089,6 +1989,21 @@ export default function Canvas(): JSX.Element {
             cursor: grabbing ? 'grabbing' : spaceReady ? 'grab' : undefined
           }}
         >
+          {/* Breadcrumb — floated top-left of the canvas surface so it
+              sits on the desk itself rather than in a header bar above it. */}
+          <div className="fb-floating-chrome absolute top-4 left-4 z-[45]">
+            <CanvasBreadcrumb
+              activeTask={activeTask}
+              nodes={nodes}
+              onOpenTask={(id) => setActiveTask(id)}
+              onRevealFolder={(id) => expandFolder(id, true)}
+              onHome={() => setActiveTask(null)}
+              fromMindmap={!!nodeOrigin}
+              onRenameTask={(id, title) => void updateNode(id, { title })}
+              onAssignToRoom={(deskId, roomId) => void assignToRoom(deskId, roomId)}
+              onCreateRoomFromDesk={(deskId) => void createRoomAndAssign(deskId)}
+            />
+          </div>
           {panPing && (
             <div
               className="absolute pointer-events-none z-[200]"
@@ -2096,14 +2011,6 @@ export default function Canvas(): JSX.Element {
             >
               <span className="block h-10 w-10 rounded-full border-2 border-accent/70 animate-ping" />
               <span className="absolute inset-0 m-auto h-2 w-2 rounded-full bg-accent shadow" />
-            </div>
-          )}
-          {/* Unified bottom bar — hover-expand dock with recent widget tray
-              and voice command FAB. Renders centered at the canvas bottom.
-              Marked fb-floating-chrome so it doesn't trigger edge-pan. */}
-          {activeTaskId && (
-            <div className="fb-floating-chrome absolute bottom-5 left-1/2 -translate-x-1/2 z-[150]">
-              <UnifiedBottomBar />
             </div>
           )}
           {showStartingKit && nodeOrigin && activeTaskId && (
@@ -2359,8 +2266,6 @@ export default function Canvas(): JSX.Element {
               onSaveTemplate={() => setSaveTemplateOpen({ context: 'toolbar' })}
               saveDisabled={!activeTaskId || savingTemplate}
               savingTemplate={savingTemplate}
-              zoom={zoom}
-              onResetZoom={() => resetView()}
               onStatus={() => void updateNode(activeTask.id, { status: status.next })}
               statusLabel={status.label}
               statusIcon={status.icon}
@@ -2397,10 +2302,8 @@ export default function Canvas(): JSX.Element {
             intensity={edgeIntensity}
             visible={!animatingPan}
           />
-          {/* Minimap is now a standard widget kind — per-task, pinned to BR
-              by default, auto-created on first task open (see the minimap
-              auto-create effect earlier in this component). The legacy
-              standalone CanvasMinimap render lived here. */}
+          {/* Minimap FAB — always-present in the canvas bottom-right. */}
+          {activeTaskId && <CanvasMinimapFAB />}
           {/* Zoom + pan controls — bottom-left. Mirrors the 2.0 mockup. */}
           <ZoomControls />
           {/* Right-side AI Assistant rail — workspace health + next actions
@@ -2452,7 +2355,6 @@ export default function Canvas(): JSX.Element {
           })()}
         </div>
 
-        <WidgetDock />
       </div>
       <WidgetFocusMode />
       {saveTemplateOpen && activeTask && (

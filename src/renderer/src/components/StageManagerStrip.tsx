@@ -32,6 +32,7 @@ interface Props {
 export default function StageManagerStrip({ roomId, activeId }: Props): JSX.Element {
   const nodes = useNodeStore((s) => s.nodes)
   const setActive = useNodeStore((s) => s.setActive)
+  const create = useNodeStore((s) => s.create)
   const goTask = useViewStore((s) => s.goTask)
   const goProject = useViewStore((s) => s.goProject)
   const goRoom = useViewStore((s) => s.goProject)
@@ -45,6 +46,11 @@ export default function StageManagerStrip({ roomId, activeId }: Props): JSX.Elem
     )
     return candidates.sort((a, b) => a.sortOrder - b.sortOrder || a.createdAt - b.createdAt)
   }, [nodes, roomId])
+
+  // activeId is the breadcrumb segment that opened this dropdown.
+  // If it's a folder the user is navigating rooms; if it's a task they're navigating desks.
+  const activeNode = nodes.find(n => n.id === activeId)
+  const showAsRoom = activeNode?.kind === 'folder'
 
   const deskIdsKey = desks.map((d) => d.id).join(',')
 
@@ -80,6 +86,23 @@ export default function StageManagerStrip({ roomId, activeId }: Props): JSX.Elem
   function goBackToRoom(): void {
     if (roomId) goRoom(roomId)
     else goHome()
+  }
+
+  async function handleAddDesk(): Promise<void> {
+    try {
+      const created = await create({ parentId: roomId, kind: 'task', title: 'Untitled' })
+      setActive(created.id)
+      goTask(created.id)
+    } catch {
+      // create() handles user-facing feedback (e.g. desk limit upgrade prompt)
+    }
+  }
+
+  async function handleAddRoom(): Promise<void> {
+    try {
+      const created = await create({ parentId: null, kind: 'folder', title: 'New Room' })
+      goRoom(created.id)
+    } catch {}
   }
 
   return (
@@ -192,6 +215,20 @@ export default function StageManagerStrip({ roomId, activeId }: Props): JSX.Elem
           })}
         </AnimatePresence>
       </motion.div>
+
+      {/* New desk / New room — card-style button pinned at bottom */}
+      <div className="shrink-0 px-2 pb-2 pt-1">
+        <button
+          onClick={() => void (showAsRoom ? handleAddRoom() : handleAddDesk())}
+          className="w-full rounded-xl h-9 flex items-center justify-center gap-1.5 text-[rgb(var(--accent))] bg-[var(--surface-sunken)] hover:bg-[var(--surface-raised)] transition-colors"
+          style={{ border: '1.5px dashed rgb(var(--accent) / 0.4)' }}
+        >
+          <Icon name="add" size={12} />
+          <span className="text-[11px] font-medium">
+            {showAsRoom ? 'New room' : 'New desk'}
+          </span>
+        </button>
+      </div>
     </div>
   )
 }

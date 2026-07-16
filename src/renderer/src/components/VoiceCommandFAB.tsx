@@ -67,7 +67,14 @@ interface SpeechRecognitionLike {
 
 type SpeechRecognitionCtor = new () => SpeechRecognitionLike
 
-export default function VoiceCommandFAB(): JSX.Element {
+interface FABProps {
+  // When true, renders inline (relative) instead of fixed bottom-20.
+  // The overlay panels pop upward via absolute positioning rather than
+  // being absolutely placed in the viewport.
+  embedded?: boolean
+}
+
+export default function VoiceCommandFAB({ embedded = false }: FABProps): JSX.Element {
   const [prefs, setPrefs] = useState<VoicePrefs>(DEFAULT_PREFS)
   const [phase, setPhase] = useState<Phase>('idle')
   const [liveCaption, setLiveCaption] = useState<string>('')
@@ -594,13 +601,17 @@ export default function VoiceCommandFAB(): JSX.Element {
           pill (bottom-3) with enough gap that neither the button nor its
           listening overlay sits on top of the pill. */}
       <div
-        className="fixed bottom-20 left-1/2 -translate-x-1/2 z-[125] flex flex-col items-center pointer-events-none"
+        className={embedded
+          ? "relative flex flex-col items-center pointer-events-none"
+          : "fixed bottom-20 left-1/2 -translate-x-1/2 z-[125] flex flex-col items-center pointer-events-none"}
         data-testid="voice-command-root"
         data-voice-fab
       >
         {/* Live captions / transcript / result overlay above the button */}
         {showOverlay && (
-          <div className="mb-2 pointer-events-auto max-w-[600px] w-[min(600px,90vw)]">
+          <div className={embedded
+            ? "absolute bottom-[calc(100%+0.5rem)] left-1/2 -translate-x-1/2 pointer-events-auto max-w-[600px] w-[min(600px,90vw)]"
+            : "mb-2 pointer-events-auto max-w-[600px] w-[min(600px,90vw)]"}>
             {phase === 'listening' && (
               <div className="fb-glass-chrome rounded-lg border border-accent/40 px-3 py-2 text-[12px] text-stone-100 shadow-xl min-h-[44px] flex items-center">
                 <div className="text-accent text-[10px] uppercase tracking-[0.18em] mr-2 shrink-0">

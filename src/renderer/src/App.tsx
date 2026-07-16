@@ -43,8 +43,8 @@ import CursorSpotlight from './components/CursorSpotlight'
 import PeerBodyDoubleDialog from './components/PeerBodyDoubleDialog'
 import CommandCenter from './components/CommandCenter'
 import AICommandBar from './components/AICommandBar'
-import VoiceCommandFAB from './components/VoiceCommandFAB'
 import MetricsOverlay from './components/MetricsOverlay'
+import UnifiedBottomBar from './components/UnifiedBottomBar'
 import LaunchSignInModal from './components/LaunchSignInModal'
 import UpgradePromptModal from './components/UpgradePromptModal'
 import FirstRunOnboarding from './components/FirstRunOnboarding'
@@ -690,7 +690,10 @@ export default function App(): JSX.Element {
       <UpgradePromptModal />
       <MetricsOverlay />
       <AICommandBar open={aiBarOpen} onClose={() => setAiBarOpen(false)} />
-      <VoiceCommandFAB />
+      {/* Hover mic bar — collapses to accent strip, expands to voice FAB */}
+      <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-[150] pointer-events-auto">
+        <UnifiedBottomBar />
+      </div>
       {smartStackOpen && <SmartStackModal onClose={() => setSmartStackOpen(false)} />}
       {bodyDoubleOpen && (
         <PeerBodyDoubleDialog onClose={() => setBodyDoubleOpen(false)} />

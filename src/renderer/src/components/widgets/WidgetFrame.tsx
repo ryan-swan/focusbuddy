@@ -73,7 +73,6 @@ export default function WidgetFrame({
   const unpinWidget = useWidgetStore((s) => s.unpinWidget)
   const setHoveredSection = useWidgetStore((s) => s.setHoveredSection)
   const setDragOverride = useWidgetStore((s) => s.setDragOverride)
-  const focusOn = useWidgetStore((s) => s.focusOn)
   // ── Multi-select ────────────────────────────────────────────────────────
   const selected = useWidgetStore((s) => s.selectedIds.includes(widget.id))
   const toggleSelection = useWidgetStore((s) => s.toggleSelection)
@@ -817,12 +816,11 @@ export default function WidgetFrame({
           setActive(widget.id)
         }}
         onDoubleClick={(e) => {
-          // Deliberate double-click → centre the camera on this widget. Pinned
-          // widgets are screen-docked, so centring would jump to a stale
-          // world-space coord — just activate those.
+          // Double-click → enter Focus Mode on this widget (full-screen overlay).
+          // Pinned widgets are screen-docked; just activate them instead.
           e.stopPropagation()
           if (isPinned) setActive(widget.id)
-          else focusOn(widget.id)
+          else setFocused(widget.id)
         }}
         className={`h-full w-full flex flex-col rounded-[12px] overflow-hidden border bg-[var(--surface-raised)] fb-spring-snap ${
           selected

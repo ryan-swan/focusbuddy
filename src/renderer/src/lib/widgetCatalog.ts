@@ -375,7 +375,8 @@ export const WIDGET_CATALOG: WidgetCatalogEntry[] = [
     defaultWidth: 220,
     defaultHeight: 160,
     defaultContent: '',
-    isWebBased: false
+    isWebBased: false,
+    hideFromPicker: true
   },
   {
     kind: 'voice-recorder',
