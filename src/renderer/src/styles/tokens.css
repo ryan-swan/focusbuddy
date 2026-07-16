@@ -88,6 +88,48 @@
   --dur-base: 240ms;
   --dur-slow: 420ms;
   --dur-cinematic: 720ms;
+  /* Spatial additions — view enter / desk zoom / environment reveal.
+     These sit between --dur-slow and --dur-cinematic for transitions that
+     need to feel like moving through space rather than switching a state. */
+  --dur-spatial: 360ms;
+  --dur-slow-reveal: 520ms;
+
+  /* ── Depth z-order layers ───────────────────────────────────────────────── */
+  /* Named z-index tier system. Components reference these semantically
+     instead of hardcoding integers. Mirrors DEPTH in lib/spatialTokens.ts.
+     Canvas widgets use objectRest/objectFocus; chrome uses uiRest/uiElevated;
+     modals use overlay; tooltips always float at the top. */
+  --depth-environment: 0;
+  --depth-object-rest: 10;
+  --depth-object-focus: 20;
+  --depth-ui-rest: 30;
+  --depth-ui-elevated: 40;
+  --depth-overlay: 50;
+  --depth-tooltip: 60;
+
+  /* ── Spatial color palette ──────────────────────────────────────────────── */
+  /* The Plexi Spatial visual environment. These tokens are additive — they
+     do not replace --accent, --surface-base, or any existing token. Phase 2
+     will update the VALUES of existing tokens to match the spatial palette.
+     For now these named tokens let Phase 3+ components reference the spatial
+     colors explicitly without coupling to the current default theme.
+
+     RGB triplet variants (space-separated) are for rgb(var(--spatial-*-rgb) / alpha)
+     usage, matching the same pattern as --accent. */
+  --spatial-env: oklch(6% 0.018 255);         /* dark navy environment */
+  --spatial-env-rgb: 7 10 18;
+
+  --spatial-blue: oklch(72% 0.12 230);         /* electric blue — active state */
+  --spatial-blue-rgb: 105 183 255;
+
+  --spatial-cyan: oklch(90% 0.09 195);         /* active cyan — highlight, glow */
+  --spatial-cyan-rgb: 126 244 255;
+
+  /* Glass overrides for spatial (dark) surfaces — tighter fills than the
+     light-theme defaults, ready for Phase 2 to activate as new defaults. */
+  --spatial-glass-chrome-fill: oklch(10% 0.018 255 / 0.70);
+  --spatial-glass-panel-fill:  oklch(12% 0.018 255 / 0.76);
+  --spatial-glass-pillow-fill: oklch(14% 0.016 255 / 0.82);
 
   /* ── Glass surface composition ──────────────────────────────────────────── */
   /* Three tiers: chrome (sidebar/dock), panel (popovers), pillow (modal cards).
