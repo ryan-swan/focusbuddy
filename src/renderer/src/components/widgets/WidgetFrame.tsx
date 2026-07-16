@@ -840,7 +840,7 @@ export default function WidgetFrame({
                 : isChildOfSection
                   ? 'border-[color:var(--edge-soft)]'
                   : hovered && !isDragging && !isResizing
-                    ? 'border-[color:var(--edge-firm)] ring-1 ring-black/[0.12] dark:ring-white/[0.14]'
+                    ? 'border-[color:var(--edge-firm)] ring-1 ring-black/[0.15] dark:ring-white/[0.18]'
                     : 'border-[color:var(--edge-soft)]'
         }`}
         style={{
