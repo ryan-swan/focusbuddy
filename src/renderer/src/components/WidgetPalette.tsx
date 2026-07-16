@@ -85,12 +85,14 @@ export default function WidgetPalette({
     const preferRight = r.left > window.innerWidth / 2
     const rawLeft = preferRight ? r.right - POPOVER_W : r.left
     const left = Math.min(Math.max(8, rawLeft), window.innerWidth - POPOVER_W - 8)
-    // Open below the button by default; if the button sits in the lower half of
-    // the screen (the FAB), open ABOVE it so the whole menu stays on-screen.
-    const openAbove = r.top > window.innerHeight / 2
+    // Prefer opening below; flip above when there isn't enough room below.
+    // Clamp both directions so the popover never runs off the bottom or top.
+    const spaceBelow = window.innerHeight - r.bottom - 8
+    const spaceAbove = r.top - 8
+    const openAbove = spaceBelow < POPOVER_MAXH && spaceAbove >= spaceBelow
     const top = openAbove
       ? Math.max(8, r.top - 6 - POPOVER_MAXH)
-      : Math.min(r.bottom + 6, window.innerHeight - 80)
+      : Math.max(8, Math.min(r.bottom + 6, window.innerHeight - POPOVER_MAXH - 8))
     setPopoverPos({ top, left })
   }, [open])
 
@@ -143,22 +145,18 @@ export default function WidgetPalette({
           ref={buttonRef}
           onClick={() => !disabled && setOpen((v) => !v)}
           disabled={disabled}
-          // Accent-tinted so the primary "create something" action is the most
-          // visible control in the toolbar, in every theme (it keys off the
-          // --accent token, not a fixed stone colour). Labelled "Add widget" so
-          // its purpose is explicit rather than a generic "Add".
-          className={`inline-flex items-center gap-1.5 h-7 px-3 rounded-md text-[12px] font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+          className={`w-full inline-flex items-center gap-2 h-8 px-2 rounded-xl text-[12px] font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
             open
-              ? 'bg-[rgb(var(--accent-hover))] text-white'
-              : 'bg-[rgb(var(--accent))] text-white hover:bg-[rgb(var(--accent-hover))]'
+              ? 'bg-[rgb(var(--accent)/0.18)] text-[rgb(var(--accent))]'
+              : 'text-[rgb(var(--accent))] hover:bg-[rgb(var(--accent)/0.12)]'
           }`}
           title="Add a widget to your desk"
           aria-haspopup="dialog"
           aria-expanded={open}
           data-testid="palette-add-button"
         >
-          <Icon name="add" size={14} />
-          <span>Add widget</span>
+          <Icon name="add" size={15} className="shrink-0" />
+          <span className="flex-1 text-left">Add widget</span>
         </button>
       )}
       {open && popoverPos && createPortal(

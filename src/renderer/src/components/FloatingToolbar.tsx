@@ -217,7 +217,7 @@ export default function FloatingToolbar({
             <div className="mx-2 h-px bg-[var(--edge-soft)] mb-1" />
 
             {/* Widget palette */}
-            <div className="px-1.5 mb-0.5">
+            <div className="mx-1 mb-0.5">
               <WidgetPalette
                 onAdd={onAddWidget}
                 onImport={onImport}
