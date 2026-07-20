@@ -17,7 +17,12 @@ import {
   archiveWidget,
   deleteWidget,
   sourceWidget,
-  workingText
+  workingText,
+  pinWidgetToZone,
+  unpinWidget,
+  recolorWidget,
+  PIN_ZONES,
+  RECOLOR_SWATCHES
 } from './actions'
 
 // Kinds the Convert / Turn-into menu offers. Only kinds that actually exist as
@@ -117,6 +122,66 @@ export function buildOrganise(ctx: MenuContext): MenuContribution[] {
         c.frame?.onEjectFromSection ? c.frame.onEjectFromSection() : ejectFromSection(c)
     })
   }
+  // Pin ▸ dock the widget to a screen corner. When already pinned, offer Unpin.
+  const isPinned = w.pinnedZone != null
+  out.push({
+    id: 'core/organise/pin',
+    section: MenuSection.Organise,
+    priority: 2,
+    label: 'Pin to corner',
+    icon: 'push_pin',
+    children: [
+      ...PIN_ZONES.map((z) => ({
+        id: `core/organise/pin/${z.zone}`,
+        section: MenuSection.Organise,
+        priority: 0,
+        label: z.label,
+        icon: z.icon,
+        // Mark the current corner so it reads as selected.
+        ...(w.pinnedZone === z.zone ? { shortcut: '✓' } : {}),
+        onSelect: (c: MenuContext) => pinWidgetToZone(c, z.zone)
+      })),
+      ...(isPinned
+        ? [
+            {
+              id: 'core/organise/pin/off',
+              section: MenuSection.Organise,
+              priority: 1,
+              label: 'Unpin',
+              icon: 'close',
+              onSelect: (c: MenuContext) => unpinWidget(c)
+            }
+          ]
+        : [])
+    ]
+  })
+  // Recolor ▸ swatches + clear.
+  out.push({
+    id: 'core/organise/recolor',
+    section: MenuSection.Organise,
+    priority: 3,
+    label: 'Recolor',
+    icon: 'palette',
+    children: [
+      ...RECOLOR_SWATCHES.map((s) => ({
+        id: `core/organise/recolor/${s.color}`,
+        section: MenuSection.Organise,
+        priority: 0,
+        label: s.label,
+        icon: 'circle',
+        ...(w.color === s.color ? { shortcut: '✓' } : {}),
+        onSelect: (c: MenuContext) => recolorWidget(c, s.color)
+      })),
+      {
+        id: 'core/organise/recolor/clear',
+        section: MenuSection.Organise,
+        priority: 1,
+        label: 'Clear color',
+        icon: 'format_color_reset',
+        onSelect: (c: MenuContext) => recolorWidget(c, null)
+      }
+    ]
+  })
   return out
 }
 

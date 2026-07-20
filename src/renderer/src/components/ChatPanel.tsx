@@ -4,6 +4,7 @@ import remarkGfm from 'remark-gfm'
 import type { ActionProposal, ChatMessage } from '@shared/types'
 import { useNodeStore } from '../stores/nodes'
 import { useChatStore } from '../stores/chat'
+import { useAssistantContext } from '../lib/assistantContext'
 import { useWidgetStore } from '../stores/widgets'
 import { useActionHistory } from '../stores/actionHistory'
 import { chimeIn } from '../lib/audioBeep'
@@ -24,7 +25,6 @@ interface Props {
 
 export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
   const activeTaskId = useNodeStore((s) => s.activeTaskId)
-  const nodes = useNodeStore((s) => s.nodes)
   const send = useChatStore((s) => s.send)
   const sending = useChatStore((s) => s.sending)
   const hasApiKey = useChatStore((s) => s.hasApiKey)
@@ -33,9 +33,14 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
   const proposalsByMessage = useChatStore((s) => s.proposalsByMessage)
   const consumeProposal = useChatStore((s) => s.consumeProposal)
   const clear = useChatStore((s) => s.clear)
+  // The assistant is one panel that adapts to the current screen (desk / room /
+  // doc / chat / meet / design / focused widget). ctx.key threads the
+  // conversation per context; ctx.serverTaskId is the real task handed to the
+  // server for task-scoped context (null off a desk).
+  const ctx = useAssistantContext()
   const messages = useMemo(
-    () => messagesByTask[activeTaskId ?? '__global__'] ?? EMPTY_MESSAGES,
-    [messagesByTask, activeTaskId]
+    () => messagesByTask[ctx.key] ?? EMPTY_MESSAGES,
+    [messagesByTask, ctx.key]
   )
   const [draft, setDraft] = useState('')
   const [summarizing, setSummarizing] = useState(false)
@@ -145,14 +150,12 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight
   }, [messages.length, sending])
 
-  const activeTask = activeTaskId ? nodes.find((n) => n.id === activeTaskId) ?? null : null
-
   async function handleSend(e: React.FormEvent): Promise<void> {
     e.preventDefault()
     const content = draft.trim()
     if (!content || sending) return
     setDraft('')
-    await send(activeTaskId, content)
+    await send(ctx.serverTaskId, content, ctx.key)
   }
 
   return (
@@ -160,14 +163,15 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
       <div className="px-3 py-3 border-b border-[var(--edge-soft)] flex items-center justify-between gap-2">
         <div className="min-w-0">
           <div className="flex items-center gap-1.5">
-            <Icon name="smart_toy" size={16} className="text-[var(--ink-70)]" />
+            <Icon name={ctx.icon} size={16} className="text-[var(--ink-70)]" />
             <h2 className="text-[13px] font-semibold tracking-tight text-[var(--ink-100)] uppercase">
               Assistant
             </h2>
           </div>
           <p className="text-[11px] text-[var(--ink-50)] truncate flex items-center gap-1.5">
-            <span className="truncate">
-              {activeTask ? activeTask.title : 'no task selected'}
+            <span className="truncate" title={`Assistant is focused on ${ctx.label}${ctx.title ? ` — ${ctx.title}` : ''}`}>
+              {ctx.label}
+              {ctx.title ? ` · ${ctx.title}` : ''}
             </span>
             {/* Only surface the model when it is locked to something specific; in
                 the default auto mode the chip is just noise in a narrow header. */}
@@ -220,7 +224,7 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
             />
           </button>
           {messages.length > 0 && (
-            <button onClick={() => clear(activeTaskId)} className="icon-btn" title="Clear chat">
+            <button onClick={() => clear(ctx.key)} className="icon-btn" title="Clear chat">
               <Icon name="delete_sweep" size={16} />
             </button>
           )}
@@ -251,16 +255,10 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
         {messages.length === 0 && (
           <div className="mt-1 px-0.5">
             <p className="text-[12.5px] text-[var(--ink-50)] leading-relaxed mb-3">
-              Ask anything about your task. The assistant sees your active task and can research, plan, draft, and act on
-              it. Try one of these to start:
+              {ctx.intro} Try one of these to start:
             </p>
             <div className="space-y-1.5">
-              {[
-                { icon: 'list_alt', text: 'Break this into clear steps' },
-                { icon: 'edit_note', text: 'Draft a first version for me' },
-                { icon: 'travel_explore', text: 'Research this and summarize what matters' },
-                { icon: 'arrow_forward', text: 'What should I work on next?' }
-              ].map((s) => (
+              {ctx.suggestions.map((s) => (
                 <button
                   key={s.text}
                   onClick={() => setDraft(s.text)}
@@ -345,7 +343,7 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
             }
           }}
           rows={3}
-          placeholder="Ask the assistant… (⌘⏎ to send)"
+          placeholder={`${ctx.placeholder} (⌘⏎ to send)`}
           className="w-full resize-none bg-[var(--surface-raised)] text-[var(--ink-100)] border border-[var(--edge-firm)] rounded-md px-3 py-2 text-sm focus:outline-none focus:border-[var(--edge-firm)] focus:ring-2 focus:ring-[var(--edge-firm)]"
         />
         <div className="flex justify-end mt-2">

@@ -16,7 +16,10 @@ interface ChatStore {
   getProposals: (messageTs: number) => ActionProposal[]
   // Drop one proposal from a message's set (applied or dismissed).
   consumeProposal: (messageTs: number, proposalId: string) => void
-  send: (taskId: string | null, content: string) => Promise<void>
+  // threadKey scopes the conversation thread (the context the assistant is in).
+  // When omitted it falls back to taskId, preserving existing desk behaviour. The
+  // real taskId is still what's sent to the server for task context.
+  send: (taskId: string | null, content: string, threadKey?: string) => Promise<void>
   sendProactiveWelcome: (taskId: string) => Promise<void>
   // Push a synthetic assistant message into the conversation. Used by "What was I doing?"
   // and other AI features that produce output without a user prompt.
@@ -57,8 +60,8 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     }
     set({ proposalsByMessage: next })
   },
-  send: async (taskId, content) => {
-    const key = taskId ?? GLOBAL_KEY
+  send: async (taskId, content, threadKey) => {
+    const key = threadKey ?? taskId ?? GLOBAL_KEY
     const current = get().messagesByTask[key] ?? []
     const userMsg: ChatMessage = { role: 'user', content, ts: Date.now() }
     const next = [...current, userMsg]

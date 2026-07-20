@@ -5,7 +5,7 @@
 // Keeping them here means the providers stay declarative and the store calls
 // live in one auditable place.
 
-import type { WidgetKind } from '@shared/types'
+import type { PinZone, WidgetKind } from '@shared/types'
 import { useWidgetStore } from '../../stores/widgets'
 import { useAiAssistPreview } from '../../stores/aiAssistPreview'
 import { catalogFor } from '../widgetCatalog'
@@ -178,4 +178,47 @@ export function runAiAssist(
     wholeContent: whole,
     awaitInput
   })
+}
+
+// ── Pin / Recolor (previously store-only, now exposed in the right-click menu) ─
+// Ported from Caleb's desk-UX branch. The pin/recolor capabilities already exist
+// in the widget store (pinToZone/unpinWidget/update{color}); these thin wrappers
+// surface them in the universal context menu.
+
+// The four corner zones a widget can dock to, and their user-facing labels.
+export const PIN_ZONES: Array<{ zone: PinZone; label: string; icon: string }> = [
+  { zone: 'tl', label: 'Top left', icon: 'north_west' },
+  { zone: 'tr', label: 'Top right', icon: 'north_east' },
+  { zone: 'bl', label: 'Bottom left', icon: 'south_west' },
+  { zone: 'br', label: 'Bottom right', icon: 'south_east' }
+]
+
+export async function pinWidgetToZone(ctx: MenuContext, zone: PinZone): Promise<void> {
+  const w = sourceWidget(ctx)
+  if (w) await useWidgetStore.getState().pinToZone(w.id, zone)
+}
+
+export async function unpinWidget(ctx: MenuContext): Promise<void> {
+  const w = sourceWidget(ctx)
+  if (w) await useWidgetStore.getState().unpinWidget(w.id)
+}
+
+// The canonical widget colour swatches (matches StickyWidget's palette), plus a
+// "clear" that removes any custom colour.
+export const RECOLOR_SWATCHES: Array<{ color: string; label: string }> = [
+  { color: '#fef08a', label: 'Yellow' },
+  { color: '#fbcfe8', label: 'Pink' },
+  { color: '#bae6fd', label: 'Blue' },
+  { color: '#bbf7d0', label: 'Green' },
+  { color: '#fed7aa', label: 'Orange' }
+]
+
+export async function recolorWidget(ctx: MenuContext, color: string | null): Promise<void> {
+  const store = useWidgetStore.getState()
+  if (ctx.object.type === 'multi') {
+    for (const w of ctx.object.widgets) await store.update(w.id, { color })
+    return
+  }
+  const w = sourceWidget(ctx)
+  if (w) await store.update(w.id, { color })
 }
