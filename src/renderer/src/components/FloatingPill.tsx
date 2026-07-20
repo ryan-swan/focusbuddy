@@ -11,6 +11,7 @@ interface Props {
   onSaveTemplate: () => void
   saveDisabled: boolean
   savingTemplate: boolean
+  onResume: () => void
   onStatus: () => void
   statusLabel: string
   statusIcon: string
@@ -46,7 +47,7 @@ function MotionLabel({ hovered, children }: { hovered: boolean; children: React.
 // Horizontal mode: single unified button row — icons always visible, labels slide in.
 // Vertical mode: icon-column header + single AnimatePresence labeled dropdown (no duplication).
 export default function FloatingPill({
-  onTidy, tidyDisabled, onBuild, onSaveTemplate, saveDisabled, savingTemplate,
+  onTidy, tidyDisabled, onBuild, onSaveTemplate, saveDisabled, savingTemplate, onResume,
   onStatus, statusLabel, statusIcon, onFocus, focusActive,
   onChat, onMeeting, timerText, timerOverdue
 }: Props): JSX.Element {
@@ -229,6 +230,11 @@ export default function FloatingPill({
             <MotionLabel hovered={hovered}>{savingTemplate ? 'Saving…' : 'Template'}</MotionLabel>
           </button>
 
+          <button onClick={onResume} className="inline-flex items-center h-6 px-1.5 rounded-lg text-[var(--ink-50)] hover:text-[var(--ink-100)] hover:bg-[var(--surface-sunken)] transition-colors" title="Resume handoff document" data-testid="pill-resume">
+            <Icon name="description" size={12} />
+            <MotionLabel hovered={hovered}>Resume</MotionLabel>
+          </button>
+
           <div className="h-px bg-[var(--edge-firm)] mx-1 my-0.5 shrink-0" />
 
           {/* LoadMeter collapses like MotionLabel: maxWidth 24 shows only the colored dot,
@@ -328,6 +334,11 @@ export default function FloatingPill({
         <button onClick={onSaveTemplate} disabled={saveDisabled} className="inline-flex items-center h-6 px-1.5 rounded-full text-[var(--ink-50)] hover:text-[var(--ink-100)] hover:bg-[var(--surface-sunken)] disabled:opacity-30 transition-colors" title={savingTemplate ? 'Saving…' : 'Save as template'} data-testid="pill-save-template">
           <Icon name={savingTemplate ? 'hourglass_empty' : 'bookmark_add'} size={12} />
           <MotionLabel hovered={hovered}>{savingTemplate ? 'Saving…' : 'Template'}</MotionLabel>
+        </button>
+
+        <button onClick={onResume} className="inline-flex items-center h-6 px-1.5 rounded-full text-[var(--ink-50)] hover:text-[var(--ink-100)] hover:bg-[var(--surface-sunken)] transition-colors" title="Resume handoff document" data-testid="pill-resume">
+          <Icon name="description" size={12} />
+          <MotionLabel hovered={hovered}>Resume</MotionLabel>
         </button>
 
         <div className="w-px h-3 bg-[var(--edge-firm)] mx-0.5 shrink-0" />

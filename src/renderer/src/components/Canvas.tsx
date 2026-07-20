@@ -61,7 +61,6 @@ import CanvasEdgeIndicators from './CanvasEdgeIndicators'
 import { useEdgePan } from '../lib/useEdgePan'
 import { useNavPrefs, frictionFromGlide } from '../lib/navPrefs'
 import { launchMeeting } from '../lib/startMeeting'
-import CanvasAIAssistantRail from './CanvasAIAssistantRail'
 import Icon from './Icon'
 import { useChatStore } from '../stores/chat'
 import { useFocusSessionStore } from '../stores/focusSession'
@@ -98,6 +97,7 @@ import {
 import MindmapStartingKit from './MindmapStartingKit'
 import SyncWidgetPicker from './SyncWidgetPicker'
 import HistoryPanel from './HistoryPanel'
+import ResumeModal from './ResumeModal'
 import CanvasBreadcrumb from './CanvasBreadcrumb'
 import FloatingPill from './FloatingPill'
 import { useFreeDesk } from '../hooks/useFreeDesk'
@@ -257,6 +257,7 @@ export default function Canvas(): JSX.Element {
   const [officeAdd, setOfficeAdd] = useState<{ entry: WidgetCatalogEntry; x: number; y: number } | null>(null)
   const [syncPickerOpen, setSyncPickerOpen] = useState(false)
   const [historyOpen, setHistoryOpen] = useState(false)
+  const [showResume, setShowResume] = useState(false)
   const widgets = useWidgetStore((s) => s.widgets)
   // Auto-offer the starting kit on a freshly-explored, still-EMPTY node canvas.
   // "Empty" ignores the auto-created minimap + any pinned chrome.
@@ -2266,6 +2267,7 @@ export default function Canvas(): JSX.Element {
               onSaveTemplate={() => setSaveTemplateOpen({ context: 'toolbar' })}
               saveDisabled={!activeTaskId || savingTemplate}
               savingTemplate={savingTemplate}
+              onResume={() => setShowResume(true)}
               onStatus={() => void updateNode(activeTask.id, { status: status.next })}
               statusLabel={status.label}
               statusIcon={status.icon}
@@ -2306,21 +2308,10 @@ export default function Canvas(): JSX.Element {
           {activeTaskId && <CanvasMinimapFAB />}
           {/* Zoom + pan controls — bottom-left. Mirrors the 2.0 mockup. */}
           <ZoomControls />
-          {/* Right-side AI Assistant rail — workspace health + next actions
-              + AI suggestions. Collapsible; user preference persisted. The
-              projectId is resolved by walking up the active task's parent
-              chain to the first folder, so the rail's health scope matches
-              the project the user is inside. */}
-          {activeTaskId && (() => {
-            let cur: typeof nodes[number] | undefined = nodes.find(
-              (n) => n.id === activeTaskId
-            )
-            while (cur && cur.kind === 'task') {
-              const parentId: string | null = cur.parentId
-              cur = parentId ? nodes.find((n) => n.id === parentId) : undefined
-            }
-            return <CanvasAIAssistantRail projectId={cur?.id ?? null} />
-          })()}
+          {/* The desk-scoped AI rail used to live here, which meant two AI panels
+              showed at once (this one + the app-level Assistant). The assistant is
+              now a single context-aware panel (ChatPanel in App.tsx) that adapts
+              to the desk, so the duplicate canvas rail is removed. */}
           {linkSourceId && (() => {
             const src = widgets.find((w) => w.id === linkSourceId)
             const label = src?.title || src?.kind || 'widget'
@@ -2388,6 +2379,9 @@ export default function Canvas(): JSX.Element {
       )}
       {historyOpen && activeTaskId && (
         <HistoryPanel taskId={activeTaskId} onClose={() => setHistoryOpen(false)} />
+      )}
+      {showResume && activeTask && (
+        <ResumeModal task={activeTask} onClose={() => setShowResume(false)} />
       )}
       {officeAdd && (
         <OfficeDocAddDialog
