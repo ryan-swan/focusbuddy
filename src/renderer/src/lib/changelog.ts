@@ -36,6 +36,20 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.9.8',
+    date: '2026-07-21T00:00:00Z',
+    title: 'PlexiDesk 3.9.8 — screen share in meetings, Design on your desk, and the desk build wizard is back',
+    tag: 'feature',
+    summary:
+      'Meetings can now share a screen, with a collaborative mode that docks the meeting to the side so you can keep moving around Plexi while you present. PlexiDesign joins Documents, Spreadsheets, Slides and Maps as something you can drop straight onto a desk. Starting a new desk opens the build wizard again, so you name it, describe it, and set importance and a due date up front. And the floating tool menu now stays put beside the assistant instead of hiding behind it.',
+    highlights: [
+      'Share your screen in a meeting, and keep navigating Plexi while you present in collaborative screen-share mode.',
+      'PlexiDesign is now a desk tool alongside Documents, Spreadsheets, Slides and Maps.',
+      'Starting a new desk opens the build wizard again: name, notes, room, urgency, importance, duration and due date.',
+      'The floating tool menu stays visible beside the assistant panel instead of sliding under it.'
+    ]
+  },
+  {
     version: '3.8.0',
     date: '2026-07-09T00:00:00Z',
     title: 'PlexiDesk 3.8.0 — shared docs co-edit, and a tidier Settings',
