@@ -7,7 +7,7 @@
 // Each handler returns { ok, message } so the chat UI can show a confirmation
 // chip ("✓ Created Project tracker" / "✗ Couldn't open URL") inline.
 
-import type { ActionProposal, WidgetKind, WidgetPatch, NodePatch, TaskStatus } from '@shared/types'
+import type { ActionProposal, Widget, WidgetKind, WidgetPatch, NodePatch, TaskStatus } from '@shared/types'
 import type { FieldDefinition, TableSchema } from '@shared/fields'
 import { defaultConfig, defaultValue } from '@shared/fields'
 import { useNodeStore } from '../stores/nodes'
@@ -18,11 +18,13 @@ import { useLinksStore } from '../stores/links'
 import { useKnowledgeStore } from '../stores/knowledge'
 import { useDocumentsStore } from '../stores/documents'
 import { useTimeBlockStore } from '../stores/timeBlocks'
+import { sanitizeWebviewUrl } from './browserUrl'
 import { useMailStore } from '../stores/mail'
 import { useMessagingStore } from '../stores/messaging'
 import { useViewStore } from '../stores/view'
 import { catalogFor } from './widgetCatalog'
 import { spawnPositionFor } from './spawnPosition'
+import { serializeAgent, DEFAULT_AGENT } from './deskAgent'
 import { useCapabilityStore } from '../stores/capabilities'
 import { capabilityForDocType, DOC_TYPE_LABEL, entitlementFor } from './entitlementReason'
 
@@ -63,6 +65,8 @@ export async function applyProposal(
   switch (proposal.kind) {
     case 'create-widget':
       return applyCreateWidget(proposal, ctx)
+    case 'create-agent':
+      return applyCreateAgent(proposal, ctx)
     case 'open-url':
       return applyOpenUrl(proposal, ctx)
     case 'create-todo-list':
@@ -448,7 +452,7 @@ async function applyCreateDocument(
 
 async function applyCreateWidget(
   p: Extract<ActionProposal, { kind: 'create-widget' }>,
-  ctx: { activeTaskId: string | null }
+  ctx: { activeTaskId: string | null; resolvedIds?: Map<string, string> }
 ): Promise<ApplyResult> {
   if (!ctx.activeTaskId) {
     return { ok: false, message: 'Open a task first — widgets need a canvas.' }
@@ -459,8 +463,19 @@ async function applyCreateWidget(
   // table id and the widget hangs on "Loading table…". Force empty so the table
   // widget self-provisions a real backing table. (Proper table creation goes
   // through the create-table proposal, which builds the schema + rows.)
-  const content = p.widgetKind === 'table' ? '' : p.content ?? entry?.defaultContent ?? ''
-  await useWidgetStore.getState().create({
+  let content = p.widgetKind === 'table' ? '' : p.content ?? entry?.defaultContent ?? ''
+  // A webview widget's content is a URL loaded as <webview src>. If a proposal
+  // puts free text or a relative/scheme-less string here (an agent drifting
+  // off-topic has been seen to do exactly this), Electron resolves the
+  // non-absolute src against the app's own file:// bundle directory in the
+  // packaged app and can load a bundle asset, rendering its raw source as text.
+  // Normalize to a real absolute URL or a search so only a loadable address is
+  // ever stored, mirroring applyOpenUrl's scheme discipline. The WebViewWidget
+  // render path guards the same way as defence in depth.
+  if (p.widgetKind === 'webview' && content) {
+    content = sanitizeWebviewUrl(content)
+  }
+  const widget = await useWidgetStore.getState().create({
     taskId: ctx.activeTaskId,
     kind: p.widgetKind as WidgetKind,
     title: p.title ?? '',
@@ -470,10 +485,48 @@ async function applyCreateWidget(
     height: entry?.defaultHeight,
     color: p.widgetKind === 'sticky' ? '#fef08a' : null
   })
+  // Record the new widget id so a sibling link-widgets proposal in the same
+  // batch can point at it via `"$<proposal.id>"`.
+  if (ctx.resolvedIds) ctx.resolvedIds.set(p.id, widget.id)
   return {
     ok: true,
     message: `Added ${entry?.label ?? p.widgetKind}${p.title ? ` "${p.title}"` : ''}`
   }
+}
+
+// Create a configured desk agent from a plain instruction. Serialises a real
+// AgentConfig so the agent works immediately (but stays disabled + manual by
+// default, so nothing runs until the user turns it on). This is what lets the
+// planner set up a working agent from one sentence.
+async function applyCreateAgent(
+  p: Extract<ActionProposal, { kind: 'create-agent' }>,
+  ctx: { activeTaskId: string | null; resolvedIds?: Map<string, string> }
+): Promise<ApplyResult> {
+  if (!ctx.activeTaskId) {
+    return { ok: false, message: 'Open a task first — agents live on a canvas.' }
+  }
+  const entry = catalogFor('agent')
+  const content = serializeAgent({
+    ...DEFAULT_AGENT,
+    instruction: p.instruction ?? '',
+    profileId: p.profileId,
+    trigger: p.trigger ?? 'manual',
+    intervalSec: p.intervalSec ?? DEFAULT_AGENT.intervalSec,
+    // Never auto-run on creation; the user enables it after reviewing.
+    enabled: false
+  })
+  const widget = await useWidgetStore.getState().create({
+    taskId: ctx.activeTaskId,
+    kind: 'agent',
+    title: p.title ?? 'Desk agent',
+    content,
+    ...spawnPositionFor(entry?.defaultWidth ?? 320, entry?.defaultHeight ?? 300),
+    width: entry?.defaultWidth,
+    height: entry?.defaultHeight,
+    color: null
+  })
+  if (ctx.resolvedIds) ctx.resolvedIds.set(p.id, widget.id)
+  return { ok: true, message: `Added desk agent${p.title ? ` "${p.title}"` : ''}` }
 }
 
 async function applyOpenUrl(
@@ -627,22 +680,42 @@ async function applyUpdateWidget(
 
 async function applyLinkWidgets(
   p: Extract<ActionProposal, { kind: 'link-widgets' }>,
-  ctx: { activeTaskId: string | null }
+  ctx: { activeTaskId: string | null; resolvedIds?: Map<string, string> }
 ): Promise<ApplyResult> {
   if (!ctx.activeTaskId) {
     return { ok: false, message: 'Open a task first — links live on a canvas.' }
   }
+  // Resolve "$<proposalId>" references so a link can point at a widget or agent
+  // created earlier in the same batch (the planner does not know the real ids
+  // when it writes the plan).
+  const resolve = (ref: string): string =>
+    ref.startsWith('$') ? ctx.resolvedIds?.get(ref.slice(1)) ?? ref : ref
+  const sourceId = resolve(p.sourceWidgetId)
+  const targetId = resolve(p.targetWidgetId)
   const widgets = useWidgetStore.getState().widgets
-  const src = widgets.find((w) => w.id === p.sourceWidgetId)
-  const tgt = widgets.find((w) => w.id === p.targetWidgetId)
+  // Match by widget id, then fall back to a widget whose content holds this id.
+  // A create-table proposal registers its BACKING table id in resolvedIds (so
+  // add-table-row can find the table), but a link needs the table WIDGET; the
+  // table widget's content is that same backing id, so this fallback bridges the
+  // two id spaces and lets "create a table, then wire it into an agent" work.
+  const findWidget = (id: string): Widget | undefined =>
+    widgets.find((w) => w.id === id) ?? widgets.find((w) => w.content === id)
+  const src = findWidget(sourceId)
+  const tgt = findWidget(targetId)
   if (!src || !tgt) {
-    return { ok: false, message: 'One of the linked widgets no longer exists.' }
+    return { ok: false, message: 'One of the linked widgets no longer exists (or was not created yet).' }
   }
-  const link = await useLinksStore
-    .getState()
-    .create(p.sourceWidgetId, p.targetWidgetId, ctx.activeTaskId)
+  const link = await useLinksStore.getState().create(src.id, tgt.id, ctx.activeTaskId)
   if (!link) {
     return { ok: false, message: 'Link already exists or was rejected by the server.' }
+  }
+  // Apply the live-wire semantics when the planner asked for a transform/mirror
+  // wire or a verb (e.g. a source feeding INTO an agent). A plain context wire
+  // needs no update.
+  if (p.wireType && p.wireType !== 'context') {
+    await useLinksStore.getState().update(link.id, { type: p.wireType, verb: p.verb })
+  } else if (p.verb) {
+    await useLinksStore.getState().update(link.id, { verb: p.verb })
   }
   return { ok: true, message: `Linked ${p.sourceLabel} → ${p.targetLabel}` }
 }
@@ -1037,6 +1110,12 @@ export function describeProposal(
         icon: catalogFor(p.widgetKind)?.icon ?? 'widgets',
         verb: 'Add',
         subject: `${catalogFor(p.widgetKind)?.label ?? p.widgetKind}${p.title ? ` "${p.title}"` : ''}`
+      }
+    case 'create-agent':
+      return {
+        icon: 'smart_toy',
+        verb: 'Set up agent',
+        subject: p.title ? `"${p.title}"` : p.instruction.slice(0, 60)
       }
     case 'open-url': {
       let host = p.url

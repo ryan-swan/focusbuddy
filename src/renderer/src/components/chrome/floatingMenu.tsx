@@ -38,7 +38,7 @@ export const FLOATING_MENU_STYLE: React.CSSProperties = {
 
 // The inset that detaches the card from the window edges. Used as padding on the
 // dock column so the desk surface shows through the gap around the card.
-export const FLOATING_MENU_INSET = 'pl-[10px] py-[10px] pr-[8px]'
+export const FLOATING_MENU_INSET = 'fb-floating-inset pl-[10px] py-[10px] pr-[8px]'
 
 // Resizable main sidebar width bounds, in px, measured on the dock column
 // (card + inset). The MIN is deliberately generous so a narrowed menu still has

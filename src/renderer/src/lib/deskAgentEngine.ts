@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import type { ActionProposal } from '@shared/types'
 import { useLinksStore } from '../stores/links'
 import { useWidgetStore } from '../stores/widgets'
 import { parseAgent, serializeAgent, withRun } from './deskAgent'
@@ -43,11 +44,34 @@ const SELF_WRITE_COOLDOWN_MS = 4000
 interface AgentRunState {
   running: Record<string, boolean>
   setRunning: (id: string, on: boolean) => void
+  // Proposed workspace changes from an agent's latest run, awaiting the user's
+  // review on the agent widget. Keyed by agent id. Cleared as the user applies
+  // or dismisses them, or when the agent runs again.
+  proposals: Record<string, ActionProposal[]>
+  setProposals: (id: string, proposals: ActionProposal[]) => void
+  clearProposals: (id: string) => void
 }
 export const useAgentRunStore = create<AgentRunState>((set) => ({
   running: {},
-  setRunning: (id, on) => set((s) => ({ running: { ...s.running, [id]: on } }))
+  setRunning: (id, on) => set((s) => ({ running: { ...s.running, [id]: on } })),
+  proposals: {},
+  setProposals: (id, proposals) => set((s) => ({ proposals: { ...s.proposals, [id]: proposals } })),
+  clearProposals: (id) =>
+    set((s) => {
+      if (!(id in s.proposals)) return s
+      const next = { ...s.proposals }
+      delete next[id]
+      return { proposals: next }
+    })
 }))
+
+// Expose the agent-run store on window so e2e specs can push a proposal set
+// directly (bypassing a live model call) to exercise the review-before-apply
+// card path. Same convention as __fbView / __fbFocusChat: a thin handle to the
+// real store, not a mock; it changes nothing about how the app behaves.
+if (typeof window !== 'undefined') {
+  ;(window as unknown as { __fbAgentRun?: typeof useAgentRunStore }).__fbAgentRun = useAgentRunStore
+}
 
 const debounceTimers = new Map<string, ReturnType<typeof setTimeout>>()
 const inflight = new Set<string>()
@@ -120,6 +144,13 @@ export async function runAgent(agentId: string): Promise<void> {
       output: res.output ?? '',
       inputCount
     })
+    // Surface any proposed workspace changes for the user to review on the
+    // widget. Replaces any prior pending set from an earlier run.
+    if (res.proposals && res.proposals.length > 0) {
+      useAgentRunStore.getState().setProposals(agentId, res.proposals)
+    } else {
+      useAgentRunStore.getState().clearProposals(agentId)
+    }
   } catch (e) {
     await writeLog(agentId, parseAgent(latestContent(agentId) ?? agent.content), {
       at: Date.now(),

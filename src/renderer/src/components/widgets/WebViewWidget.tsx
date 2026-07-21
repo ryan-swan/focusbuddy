@@ -7,7 +7,7 @@ import { useVaultStore } from '../../stores/vault'
 import { catalogFor } from '../../lib/widgetCatalog'
 import { registerWebview, unregisterWebviewByWidgetId } from '../../lib/webviewRegistry'
 import { autofillWebview } from '../../lib/vaultAutofill'
-import { normalizeUrl } from '../../lib/browserUrl'
+import { normalizeUrl, sanitizeWebviewUrl } from '../../lib/browserUrl'
 import Icon from '../Icon'
 import ConnectedToolMenu from '../contextMenu/UnifiedConnectedMenu'
 
@@ -90,7 +90,7 @@ export default function WebViewWidget({ widget, inline = false }: Props): JSX.El
   // this webview: the user typed a new URL in the edit form, or a sibling
   // widget instance (e.g. focus-mode swap) wrote a different URL. The
   // webview navigates organically for everything else.
-  const [webviewSrc, setWebviewSrc] = useState(widget.content)
+  const [webviewSrc, setWebviewSrc] = useState(() => sanitizeWebviewUrl(widget.content))
   const headerLabel = (() => {
     const previewTitle = livePreview?.title
     const previewHost = livePreview ? hostnameOf(livePreview.url) : ''
@@ -109,7 +109,7 @@ export default function WebViewWidget({ widget, inline = false }: Props): JSX.El
     setDraft(widget.content)
     setEditing(!widget.content)
     lastPersistedUrl.current = widget.content
-    setWebviewSrc(widget.content)
+    setWebviewSrc(sanitizeWebviewUrl(widget.content))
     setLivePreview(null)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [widget.id])
@@ -123,7 +123,7 @@ export default function WebViewWidget({ widget, inline = false }: Props): JSX.El
     if (widget.content === lastPersistedUrl.current) return
     // Genuine external change — sync to webview + adopt as our new baseline.
     lastPersistedUrl.current = widget.content
-    setWebviewSrc(widget.content)
+    setWebviewSrc(sanitizeWebviewUrl(widget.content))
     setDraft(widget.content)
   }, [widget.content])
 

@@ -23,6 +23,7 @@ import { getPendingReleaseEntry, advanceRunVersion, type ChangelogEntry } from '
 import { useAiCommandBar } from './stores/aiCommandBar'
 import Icon from './components/Icon'
 import SettingsPanel from './components/SettingsPanel'
+import RelatedDesksModal from './components/RelatedDesksModal'
 import TeamPresenceButton from './components/TeamPresenceButton'
 import Footer from './components/Footer'
 import FocusSessionOverlay from './components/FocusSessionOverlay'
@@ -109,6 +110,19 @@ export default function App(): JSX.Element {
     currentView.kind === 'plexipeople' ||
     currentView.kind === 'plexibrain'
   const [chatCollapsed, setChatCollapsed] = useState(false)
+  // When a meeting is docked (collaborate mode), reserve space on that edge so the
+  // docked panel does not cover the workspace content. The panel itself is a
+  // fixed-position surface (MeetingOverlay); this just keeps the content clear.
+  const meetDocked = useMeetingRoomStore((s) => s.status !== 'idle' && s.layout === 'collaborate')
+  const meetDockSide = useMeetingRoomStore((s) => s.dockSide)
+  const meetPad: React.CSSProperties = meetDocked
+    ? {
+        paddingLeft: meetDockSide === 'left' ? 300 : undefined,
+        paddingRight: meetDockSide === 'right' ? 300 : undefined,
+        paddingTop: meetDockSide === 'top' ? 210 : undefined,
+        paddingBottom: meetDockSide === 'bottom' ? 210 : undefined
+      }
+    : {}
   // On macOS the window uses hiddenInset, so the traffic lights sit at the top
   // left of the header. Reserve room so the header's left controls (the show-
   // workspace toggle, the trust chip) never sit under them.
@@ -414,6 +428,17 @@ export default function App(): JSX.Element {
     chatRef.current?.expand()
   }
 
+  // Open the assistant on request (e.g. the empty-desk "tell the assistant what
+  // you want" entry). Kept as a window event so any surface can invoke it
+  // without threading a prop down.
+  useEffect(() => {
+    function onOpen(): void {
+      chatRef.current?.expand()
+    }
+    window.addEventListener('fb:open-assistant', onOpen)
+    return () => window.removeEventListener('fb:open-assistant', onOpen)
+  }, [])
+
   function toggleSettings(): void {
     if (settingsOpen) {
       setSettingsOpen(null)
@@ -596,7 +621,7 @@ export default function App(): JSX.Element {
           )}
         </div>
       </header>
-      <main className="flex-1 min-h-0 relative flex bg-[var(--surface-base)]">
+      <main className="flex-1 min-h-0 relative flex bg-[var(--surface-base)]" style={meetPad}>
         {segmentTakeover ? (
           currentView.kind === 'office' ? (
             <PlexiOfficeShell initialApp={currentView.app} />
@@ -672,6 +697,7 @@ export default function App(): JSX.Element {
         <UnifiedBottomBar />
       </div>
       {smartStackOpen && <SmartStackModal onClose={() => setSmartStackOpen(false)} />}
+      <RelatedDesksModal />
       {bodyDoubleOpen && (
         <PeerBodyDoubleDialog onClose={() => setBodyDoubleOpen(false)} />
       )}

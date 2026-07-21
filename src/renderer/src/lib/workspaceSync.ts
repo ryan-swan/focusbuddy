@@ -303,6 +303,16 @@ async function refreshCachedTables(): Promise<void> {
   }
 }
 
+// Which org scopes sync this cycle, in order. Every membership is included —
+// the active org first (freshest on screen), then the rest. Personal is not in
+// this list; the personal loop always runs after these. Pure so the coverage
+// guarantee (no workspace stranded unsynced) is directly unit-testable.
+export function orgSyncOrder(activeOrgId: string, memberOrgIds: string[]): string[] {
+  const members = memberOrgIds.filter((id) => id && id !== PERSONAL_ORG_ID)
+  const active = activeOrgId !== PERSONAL_ORG_ID && members.includes(activeOrgId) ? [activeOrgId] : []
+  return [...active, ...members.filter((id) => id !== activeOrgId)]
+}
+
 let running = false
 
 // Per-cycle transport outcome, so the status store can tell "could not reach
@@ -335,17 +345,22 @@ export async function syncWorkspaceOnce(): Promise<number> {
   cycleFailure = 'none'
   useSyncStatus.getState().setSyncing()
   try {
-    // Scope selection: the active org decides which single loop runs this cycle.
-    // Personal keeps the existing per-account path exactly. A real shared org runs
-    // the org loop instead (one loop per interval to avoid a double push). Read
-    // from the same store the x-plexi-org interceptor uses, so the branch and the
-    // header can never disagree.
+    // Scope selection: EVERY workspace syncs each cycle — the personal loop below
+    // plus one org loop per membership. This replaced the original active-org-only
+    // branch, which stranded content: a desk in a workspace the user had not
+    // opened since sync shipped was never pushed at all, so other devices (and
+    // the mobile web app) showed an incomplete workspace. Per-org cursors and the
+    // per-row org_id scoping in collectPending/collectPendingOrg keep the loops
+    // independent, so running them back-to-back cannot cross-contaminate scopes.
+    // The active org runs first so the workspace on screen stays the freshest.
     const activeOrg = useOrgStore.getState().activeOrgId || PERSONAL_ORG_ID
-    if (activeOrg !== PERSONAL_ORG_ID) {
-      return await syncOrgWorkspaceOnce(token, activeOrg)
+    const memberOrgIds = useOrgStore.getState().orgs.map((o) => o.id)
+    let orgApplied = 0
+    for (const orgId of orgSyncOrder(activeOrg, memberOrgIds)) {
+      orgApplied += await syncOrgWorkspaceOnce(token, orgId)
     }
 
-    // ── Push local changes ──
+    // ── Push local changes (personal scope) ──
     const pending = await window.api.workspaceSync.pending()
     for (const u of pending.upserts) {
       const res = await putItem(token, u.id, u.itemType, u.body, u.baseRev)
@@ -394,7 +409,7 @@ export async function syncWorkspaceOnce(): Promise<number> {
       // Calendar blocks sync too (rung 1): refresh whatever range is loaded.
       await useTimeBlockStore.getState().reload()
     }
-    return applied
+    return applied + orgApplied
   } finally {
     running = false
   }
@@ -405,12 +420,12 @@ let timer: number | null = null
 // Near-live push: the server emits orgWorkspaceChanged whenever another member of
 // an org mutates shared data. Rather than wait up to a full interval for the next
 // poll, kick an immediate cycle. Debounced so a burst of edits from a teammate
-// collapses into one pull, and scoped to the active org so an event for an org we
-// are not currently viewing does not disturb the personal/other-org loop.
+// collapses into one pull. Since every membership now syncs each cycle, an event
+// for ANY member org warrants the kick, not just the active one — the debounced
+// cycle covers all scopes anyway.
 let pushDebounce: number | null = null
 function onOrgWorkspaceChanged(orgId: string): void {
-  const activeOrg = useOrgStore.getState().activeOrgId || PERSONAL_ORG_ID
-  if (orgId !== activeOrg) return
+  if (!useOrgStore.getState().orgs.some((o) => o.id === orgId)) return
   if (pushDebounce != null) return
   pushDebounce = window.setTimeout(() => {
     pushDebounce = null

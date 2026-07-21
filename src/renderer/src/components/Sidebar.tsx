@@ -188,8 +188,19 @@ export default function Sidebar({ collapsed, onToggle }: Props = {}): JSX.Elemen
   // dialog. This avoids prop-drilling the dialog setter from App down
   // into the sidebar; either works, but the event keeps App.tsx lean.
   useEffect(() => {
-    function onCmd(): void {
-      setDialog({ mode: 'create', parentId: null, kind: 'task' })
+    function onCmd(e: Event): void {
+      // Callers may pass a room context and node kind so the wizard opens
+      // pre-filed into the right Room (e.g. the Stage Manager's "New desk" /
+      // "New room" buttons). Plain calls (the header "New") default to a
+      // top-level Desk.
+      const detail = (e as CustomEvent).detail as
+        | { parentId?: string | null; kind?: NodeKind }
+        | undefined
+      setDialog({
+        mode: 'create',
+        parentId: detail?.parentId ?? null,
+        kind: detail?.kind ?? 'task'
+      })
     }
     window.addEventListener('fb:command-new-task', onCmd)
     return () => window.removeEventListener('fb:command-new-task', onCmd)
@@ -781,7 +792,7 @@ function NavRow({ icon, label, tint, active, onClick, badge, testid }: NavRowPro
     <button
       onClick={onClick}
       data-testid={testid}
-      className={`flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-[13px] mb-0.5 text-left transition-colors ${
+      className={`fb-nav-item flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-[13px] mb-0.5 text-left transition-colors ${
         active
           ? 'bg-[rgb(var(--accent)/0.12)] text-[rgb(var(--accent))] font-medium'
           : 'text-[var(--ink-80)] hover:bg-[var(--surface-sunken)]'

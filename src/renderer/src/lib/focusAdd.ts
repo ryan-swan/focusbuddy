@@ -18,9 +18,9 @@ import { useWidgetStore } from '../stores/widgets'
 import { catalogFor } from './widgetCatalog'
 import { spawnPositionFor } from './spawnPosition'
 
-// The office document kinds that are ALSO widget kinds (every DocType except
-// 'design', which has no focus-mode widget). These back a real fb_documents row.
-export type OfficeAddKind = 'doc' | 'sheet' | 'slides' | 'map'
+// The office document kinds that are ALSO widget kinds (every DocType). These
+// back a real fb_documents row.
+export type OfficeAddKind = 'doc' | 'sheet' | 'slides' | 'map' | 'design'
 
 // The widget kinds the Add tab can spawn: the office kinds above, plus 'page'
 // (a self-contained Tiptap widget whose body lives in widget.content, no
@@ -37,7 +37,7 @@ export interface AddOption {
 // The create menu, in the order they read best: the everyday writing surfaces
 // first, then the diagram. Labels/icons come from the widget catalog so the Add
 // tab stays in lockstep with the palette if those ever change.
-export const ADD_OPTIONS: AddOption[] = (['doc', 'sheet', 'slides', 'map', 'page'] as const).map(
+export const ADD_OPTIONS: AddOption[] = (['doc', 'sheet', 'slides', 'map', 'design', 'page'] as const).map(
   (kind) => {
     const entry = catalogFor(kind)
     return {
@@ -54,10 +54,10 @@ export function isOfficeKind(kind: AddableKind): kind is OfficeAddKind {
   return kind !== 'page'
 }
 
-// A DocType from the existing-documents list is placeable as a widget only when
-// it has a matching widget kind — every type except 'design'.
+// A DocType from the existing-documents list is placeable as a widget when it
+// has a matching widget kind — now every office DocType, including 'design'.
 export function isPlaceableDocType(docType: DocType): docType is OfficeAddKind {
-  return docType !== 'design'
+  return docType === 'doc' || docType === 'sheet' || docType === 'slides' || docType === 'map' || docType === 'design'
 }
 
 // Create a brand-new document/page and drop it on the active desk as a widget.
@@ -107,8 +107,7 @@ export async function placeExisting(
   taskId: string | null
 ): Promise<Widget | null> {
   if (!taskId) return null
-  // 'design' documents have no focus-mode widget kind — skip rather than create
-  // a dangling widget. (The Add list filters these out, so this is a guard.)
+  // Guard: only office DocTypes map to a widget kind.
   if (!isPlaceableDocType(docType)) return null
   const entry = catalogFor(docType)
   const width = entry?.defaultWidth ?? 480

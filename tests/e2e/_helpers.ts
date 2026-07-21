@@ -26,6 +26,11 @@ export async function launchApp(opts?: {
   // The caller owns cleanup of a reused dir; `dispose()` only removes
   // directories this call itself created.
   userDataDir?: string
+  // Extra Chromium/Electron command-line switches appended after the '.'
+  // launch arg — e.g. ['--force-device-scale-factor=2'] for hi-dpi marketing
+  // screenshot captures. Opt-in; empty by default so existing specs are
+  // unaffected.
+  extraArgs?: string[]
 }): Promise<LaunchedApp> {
   const userDataDir = opts?.userDataDir ?? mkdtempSync(join(tmpdir(), 'focusbuddy-e2e-'))
   const ownsDir = !opts?.userDataDir
@@ -46,7 +51,7 @@ export async function launchApp(opts?: {
   delete cleanEnv.OPENAI_API_KEY
 
   const app = await electron.launch({
-    args: ['.'],
+    args: ['.', ...(opts?.extraArgs ?? [])],
     cwd: process.cwd(),
     env: {
       ...cleanEnv,

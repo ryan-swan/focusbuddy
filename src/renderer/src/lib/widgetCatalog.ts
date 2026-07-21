@@ -177,6 +177,17 @@ export const WIDGET_CATALOG: WidgetCatalogEntry[] = [
     isWebBased: false
   },
   {
+    kind: 'design',
+    category: 'Files',
+    label: 'Design',
+    icon: 'palette',
+    hint: 'A PlexiDesign canvas — posters, social posts, one-pagers and more. Size presets, brand templates, AI copy and images.',
+    defaultWidth: 720,
+    defaultHeight: 540,
+    defaultContent: '',
+    isWebBased: false
+  },
+  {
     kind: 'streamdeck',
     category: 'Tools',
     label: 'SpeedDeck',

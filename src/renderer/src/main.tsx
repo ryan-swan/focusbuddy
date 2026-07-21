@@ -2,7 +2,14 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App'
 import ErrorBoundary from './components/ErrorBoundary'
-import { applyUiScale, loadUiScale } from './lib/uiScale'
+import {
+  applyUiScale,
+  loadUiScale,
+  applyDensity,
+  loadDensity,
+  stepUiScale,
+  ensureFirstRunDefaults
+} from './lib/uiScale'
 import { installSignalOrgHeader } from './lib/signalOrgHeader'
 // Self-hosted fonts. These used to load from the Google Fonts CDN via a <link> in
 // index.html, which meant every icon (Material Symbols) and the UI type broke the
@@ -17,9 +24,18 @@ import '@fontsource/patrick-hand'
 import '@fontsource/atkinson-hyperlegible'
 import './styles/globals.css'
 
-// Restore the user's chosen text size before the app renders, so it comes up at
-// the size they set rather than the default.
+// Restore the user's chosen UI scale and density before the app renders. On the
+// very first launch this persists a screen-fit default so the app opens sized
+// for the display; after that it just re-applies whatever is stored. See
+// lib/uiScale.ts.
+ensureFirstRunDefaults()
 applyUiScale(loadUiScale())
+applyDensity(loadDensity())
+
+// The View menu and the Cmd +/-/0 shortcuts step the same stored scale.
+window.api.app.onZoom((dir) => {
+  stepUiScale(dir)
+})
 
 // Attach the active-organisation header to every signal-server request, before
 // any client module can fire one. Multi-org tenancy relies on this.

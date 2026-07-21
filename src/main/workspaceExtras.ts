@@ -46,22 +46,38 @@ export function noteWidgetText(kind: string, content: string): string {
 
 // Gather and keyword-rank workspace content that is NOT a document: tasks,
 // tables, and canvas notes. Returns the top matches as WorkspaceSources.
-export function collectExtraSources(query: string, limit = 6): WorkspaceSource[] {
+//
+// scopeNodeIds encodes user-driven relatedness: when provided, only content
+// belonging to those desks (the current desk plus the desks the user explicitly
+// related to it) is considered, so the brain never assumes two unrelated desks
+// in the same org have anything to do with each other. Omit it for an explicit
+// whole-workspace search.
+export function collectExtraSources(
+  query: string,
+  limit = 6,
+  scopeNodeIds?: string[]
+): WorkspaceSource[] {
+  const scope = scopeNodeIds ? new Set(scopeNodeIds) : null
+  const inScopeTask = (taskId: string | null | undefined): boolean =>
+    !scope || (taskId != null && scope.has(taskId))
   const pool: Candidate[] = []
 
   for (const n of listNodes()) {
     if (n.kind !== 'task') continue
+    if (scope && !scope.has(n.id)) continue
     const text = `${n.title}\n${n.description ?? ''}`.trim()
     if (text) pool.push({ docId: n.id, title: n.title || 'Untitled task', docType: 'task', text })
   }
 
   for (const t of listTables()) {
+    if (!inScopeTask(t.taskId)) continue
     const text = tableToText(t, listRows(t.id))
     if (text) pool.push({ docId: t.id, title: t.title || 'Untitled table', docType: 'table', text })
   }
 
   for (const kind of ['note', 'sticky', 'markdown', 'page'] as const) {
     for (const w of listWidgetsByKind(kind)) {
+      if (!inScopeTask(w.taskId)) continue
       const text = noteWidgetText(kind, w.content || '').trim()
       if (text) pool.push({ docId: w.id, title: w.title || text.slice(0, 40), docType: 'note', text })
     }

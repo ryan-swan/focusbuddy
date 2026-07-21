@@ -14,7 +14,11 @@ import { collectExtraSources } from './workspaceExtras'
 export type { WorkspaceSource } from './workspaceRank'
 export { extractDocText } from './workspaceRank'
 
-export async function retrieveSources(query: string, limit = 6): Promise<WorkspaceSource[]> {
+export async function retrieveSources(
+  query: string,
+  limit = 6,
+  scopeNodeIds?: string[]
+): Promise<WorkspaceSource[]> {
   // Knowledge: curated company truth, ranked semantically (or keyword fallback)
   // and surfaced first so it grounds the answer ahead of looser document matches.
   const kEntries = await semanticSearchKnowledge(query, limit)
@@ -41,7 +45,7 @@ export async function retrieveSources(query: string, limit = 6): Promise<Workspa
 
   // Extras: tasks, tables and canvas notes — the rest of the environment, so the
   // brain is grounded in more than documents. Keyword-ranked.
-  const extraSources = collectExtraSources(query, limit)
+  const extraSources = collectExtraSources(query, limit, scopeNodeIds)
 
   // Interleave the three pools round-robin so documents, tasks/tables/notes and
   // knowledge all get a fair shot at the limited source slots. Curated knowledge

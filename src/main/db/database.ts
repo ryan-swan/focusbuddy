@@ -909,6 +909,24 @@ export function getDb(): Database.Database {
     CREATE INDEX IF NOT EXISTS idx_fb_knowledge_org ON fb_knowledge(org_id);
     CREATE INDEX IF NOT EXISTS idx_fb_tables_org ON fb_tables(org_id);
   `)
+  // User-driven desk relatedness. Two desks are related only because the user
+  // says so, never because they share an org. The brain uses these edges to
+  // scope what it reads for a desk (this desk + explicitly related desks),
+  // instead of treating the whole org as one flat pile. Undirected: a single
+  // row (node_a < node_b, ordered) expresses the relation both ways.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS fb_node_relations (
+      id TEXT PRIMARY KEY,
+      node_a TEXT NOT NULL,
+      node_b TEXT NOT NULL,
+      org_id TEXT NOT NULL DEFAULT 'personal',
+      created_at INTEGER NOT NULL,
+      UNIQUE(node_a, node_b)
+    );
+    CREATE INDEX IF NOT EXISTS idx_node_relations_a ON fb_node_relations(node_a);
+    CREATE INDEX IF NOT EXISTS idx_node_relations_b ON fb_node_relations(node_b);
+    CREATE INDEX IF NOT EXISTS idx_node_relations_org ON fb_node_relations(org_id);
+  `)
   migratePlanFlag(db)
   return db
 }

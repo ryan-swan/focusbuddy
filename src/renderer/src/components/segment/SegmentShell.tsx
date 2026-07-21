@@ -59,7 +59,10 @@ export default function SegmentShell({ def, initialApp }: { def: SegmentDef; ini
       )}
       {/* Dedicated segment side menu — a floating rounded card */}
       {!minimized && (
-      <div className={`shrink-0 h-full box-border ${FLOATING_MENU_INSET}`} style={{ width: 260 }}>
+      <div
+        className={`shrink-0 h-full box-border ${FLOATING_MENU_INSET}`}
+        style={{ width: 'var(--fb-sidebar-fixed, 260px)' }}
+      >
       <aside className={FLOATING_MENU_ASIDE_SCROLL} style={FLOATING_MENU_STYLE} data-testid="segment-sidebar">
         <div className="flex items-center gap-2 px-4 h-14 border-b border-[var(--edge-soft)]">
           <span className="text-[15px] font-bold tracking-[0.14em]">{def.wordmark}</span>

@@ -2,10 +2,10 @@ import { useState } from 'react'
 import { cloudDocsEnabled, setCloudDocsEnabled } from '@office'
 import { useAccountStore } from '@runtime'
 
-// Settings toggle for cloud-document sync (PlexiOffice split, Phase 0). When on
-// and signed in, documents sync to the account so they're available in PlexiDesk,
-// the standalone PlexiOffice app, and later the web. Off by default; with it off
-// documents are local-only, exactly as before.
+// Settings toggle for cloud-document sync. When on (the default) and signed in,
+// documents sync to the account so they're available in PlexiDesk, the
+// standalone PlexiOffice app, and the mobile web app. Unticking opts out;
+// documents are then local-only.
 export default function DocumentsSyncSection(): JSX.Element {
   const [on, setOn] = useState(() => cloudDocsEnabled())
   const signedIn = !!useAccountStore((s) => s.sessionToken)
@@ -20,7 +20,7 @@ export default function DocumentsSyncSection(): JSX.Element {
       <div className="text-[11px] uppercase tracking-wider text-[var(--ink-40)]">Documents sync</div>
       <label className="flex items-center justify-between py-1 cursor-pointer">
         <span className="text-xs text-[var(--ink-70)]">
-          Sync documents to your account <span className="text-[var(--ink-40)]">(beta)</span>
+          Sync documents to your account <span className="text-[var(--ink-40)]">(on by default)</span>
         </span>
         <input
           type="checkbox"

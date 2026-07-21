@@ -849,7 +849,10 @@ function OfficeSidebar({
     { id: 'trash', label: 'Trash', icon: 'delete', tint: 'bg-slate-500' }
   ]
   return (
-    <div className={`shrink-0 h-full box-border ${FLOATING_MENU_INSET}`} style={{ width: 260 }}>
+    <div
+      className={`shrink-0 h-full box-border ${FLOATING_MENU_INSET}`}
+      style={{ width: 'var(--fb-sidebar-fixed, 260px)' }}
+    >
     <aside className={FLOATING_MENU_ASIDE_SCROLL} style={FLOATING_MENU_STYLE} data-testid="office-sidebar">
       {/* Logo + app switcher */}
       <div className="flex items-center gap-2 px-4 h-14 border-b border-[var(--edge-soft)]">

@@ -11,7 +11,16 @@ import {
   type ThemeMode
 } from '../lib/theme'
 import { captureRitualOrigin, playThemeRitual } from '../lib/themeRitual'
-import { UI_SCALES, loadUiScale, saveUiScale, applyUiScale } from '../lib/uiScale'
+import {
+  UI_SCALES,
+  loadUiScale,
+  saveUiScale,
+  applyUiScale,
+  loadDensity,
+  saveDensity,
+  applyDensity,
+  type Density
+} from '../lib/uiScale'
 import Icon from './Icon'
 
 interface Props {
@@ -61,10 +70,22 @@ export default function ThemeBuilder({
   // doesn't immediately clobber the live colour until it's a valid 6-digit hex.
   const [hexText, setHexText] = useState(customAccentHex)
   const [uiScale, setUiScale] = useState(loadUiScale())
+  const [density, setDensity] = useState<Density>(loadDensity())
 
   useEffect(() => {
     setHexText(customAccentHex)
   }, [customAccentHex])
+
+  // Keep the scale control in step when the View menu or the Cmd +/-/0 shortcuts
+  // change the scale while this panel is open.
+  useEffect(() => {
+    function onScale(e: Event): void {
+      const detail = (e as CustomEvent<number>).detail
+      if (typeof detail === 'number') setUiScale(detail)
+    }
+    window.addEventListener('plexi:uiscale', onScale)
+    return () => window.removeEventListener('plexi:uiscale', onScale)
+  }, [])
 
   useEffect(() => {
     function onKey(e: KeyboardEvent): void {
@@ -301,7 +322,7 @@ export default function ThemeBuilder({
             <div className="text-[11px] uppercase tracking-[0.12em] text-[var(--ink-50)] font-semibold mb-2">
               Text size
             </div>
-            <div className="grid grid-cols-5 gap-1.5">
+            <div className="grid grid-cols-6 gap-1.5">
               {UI_SCALES.map((o) => {
                 const active = Math.abs(uiScale - o.value) < 0.001
                 return (
@@ -329,7 +350,49 @@ export default function ThemeBuilder({
             </div>
             <p className="text-[10px] text-[var(--ink-50)] mt-1.5 leading-snug">
               Makes everything in the app larger or smaller, the same as your browser's zoom. Affects all menus,
-              lists, and buttons.
+              lists, and buttons. You can also use the View menu or Cmd and the plus, minus and zero keys. On a
+              small laptop the app starts a little smaller so the desk has more room.
+            </p>
+          </section>
+
+          {/* Density — tightens the chrome's spacing without shrinking text */}
+          <section>
+            <div className="text-[11px] uppercase tracking-[0.12em] text-[var(--ink-50)] font-semibold mb-2">
+              Density
+            </div>
+            <div className="grid grid-cols-2 gap-1.5">
+              {(
+                [
+                  { value: 'comfortable' as Density, label: 'Comfortable', icon: 'expand', note: 'Roomier spacing' },
+                  { value: 'compact' as Density, label: 'Compact', icon: 'compress', note: 'More room for desks' }
+                ]
+              ).map((o) => {
+                const active = density === o.value
+                return (
+                  <button
+                    key={o.value}
+                    onClick={() => {
+                      setDensity(o.value)
+                      saveDensity(o.value)
+                      applyDensity(o.value)
+                    }}
+                    className={`flex flex-col items-center gap-0.5 py-2 rounded-md border transition-colors ${
+                      active
+                        ? 'border-accent bg-accent/10 text-[var(--ink-100)]'
+                        : 'border-[var(--edge-soft)] bg-[var(--surface-raised)] text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]'
+                    }`}
+                    data-testid={`themestudio-density-${o.value}`}
+                  >
+                    <Icon name={o.icon} size={16} />
+                    <span className="text-[11px] font-medium">{o.label}</span>
+                    <span className="text-[10px] text-[var(--ink-50)]">{o.note}</span>
+                  </button>
+                )
+              })}
+            </div>
+            <p className="text-[10px] text-[var(--ink-50)] mt-1.5 leading-snug">
+              Compact trims the padding around the sidebar, toolbars, menus and pills so more of the screen is your
+              desk. Reading text stays the same size.
             </p>
           </section>
 

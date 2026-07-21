@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { effectiveQuickAddMap } from '../lib/keymap'
 import { createPortal } from 'react-dom'
 import { useNodeStore } from '../stores/nodes'
+import { useRelatedDesksStore } from '../stores/relatedDesks'
 import { useViewStore } from '../stores/view'
 import { useWidgetStore } from '../stores/widgets'
 import type { WidgetKind, SearchHit } from '@shared/types'
@@ -254,6 +255,22 @@ export default function CommandCenter({
         window.dispatchEvent(new CustomEvent('fb:onboarding-hub'))
       }
     })
+    // Relate this desk to others so the brain reads them together. Only when a
+    // desk is open (relatedness is per-desk).
+    if (activeTaskId) {
+      items.push({
+        id: 'related-desks',
+        label: 'Related desks',
+        hint: 'Choose which desks the brain reads with this one',
+        icon: 'hub',
+        kind: 'action',
+        score: matchScore('related desks link connect brain scope context associate', q),
+        run: () => {
+          closePalette()
+          useRelatedDesksStore.getState().show(activeTaskId)
+        }
+      })
+    }
     // Body double + Smart Stack moved here from the (now removed) bottom pill,
     // so they still have a home. Body double needs the capability; Smart Stack
     // needs an active desk with enough widgets.

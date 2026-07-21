@@ -117,7 +117,10 @@ export function collectPending(): { upserts: PendingUpsert[]; deletes: PendingDe
   // the org store — leaking org content into the owner's personal per-account
   // data and syncing it twice. Filtering by org_id = 'personal' keeps genuinely
   // personal content byte-for-byte as before while excluding org content entirely.
-  for (const itemType of ['node', 'timeblock'] as ItemType[]) {
+  // Tables joined the personal loop when the mobile web app learned to render
+  // table and chart widgets: their data must reach the server to be drawable on
+  // another device. fb_tables carries org_id directly, same as nodes.
+  for (const itemType of ['node', 'timeblock', 'table'] as ItemType[]) {
     const table = TABLE[itemType]
     const rows = db
       .prepare(`SELECT * FROM ${table} WHERE needs_sync = 1 AND org_id = ?`)
@@ -138,6 +141,16 @@ export function collectPending(): { upserts: PendingUpsert[]; deletes: PendingDe
     )
     .all(PERSONAL_ORG_ID) as Array<Record<string, unknown>>
   for (const row of widgetRows) pushRow(row, 'widget')
+
+  // Rows scope through their parent table, mirroring the org loop's join.
+  const rowRows = db
+    .prepare(
+      `SELECT r.* FROM fb_rows r
+       JOIN fb_tables t ON r.table_id = t.id
+       WHERE r.needs_sync = 1 AND t.org_id = ?`
+    )
+    .all(PERSONAL_ORG_ID) as Array<Record<string, unknown>>
+  for (const row of rowRows) pushRow(row, 'row')
 
   return { upserts, deletes }
 }

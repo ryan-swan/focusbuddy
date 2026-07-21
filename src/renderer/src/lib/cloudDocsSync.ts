@@ -3,9 +3,10 @@
 // documents on the signal server, so the same docs are available in PlexiDesk and
 // the standalone PlexiOffice app.
 //
-// Gated behind a default-OFF feature flag: with the flag off, nothing here runs
-// and the app behaves exactly as before (local-only). With it on and a signed-in
-// account, the store pulls on refresh and pushes on save. The local SQLite stays
+// Default-ON with an opt-out flag (Settings > Documents sync): with the flag
+// off, nothing here runs and documents are local-only. With it on (the default)
+// and a signed-in account, the store pulls on refresh and pushes on save, which
+// is also what feeds the mobile web app's Documents tab. The local SQLite stays
 // the offline source of truth; the cloud is the cross-app/device mirror.
 //
 // Sync contract (mirrors the server): last-write-wins with a per-document `rev`.
@@ -30,10 +31,13 @@ const FLAG_KEY = 'fb.clouddocs.enabled'
 const CURSOR_KEY = 'fb.clouddocs.cursor'
 const REVS_KEY = 'fb.clouddocs.revs'
 
+// Default-ON with explicit opt-out (flipped 2026-07-08 for the mobile web app,
+// which reads personal documents from the cloud copy). Only a stored '0' — the
+// user unticking the Settings toggle — disables it; absent means on.
 export function cloudDocsEnabled(): boolean {
   try {
     if (previewSyncBlocked()) return false
-    return localStorage.getItem(FLAG_KEY) === '1'
+    return localStorage.getItem(FLAG_KEY) !== '0'
   } catch {
     return false
   }

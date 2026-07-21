@@ -46,6 +46,7 @@ import '../lib/contextMenu'
 import FloatingToolbar, { type ToolbarAction } from './FloatingToolbar'
 import MinimapWidget from './widgets/MinimapWidget'
 import CanvasMinimapFAB from './CanvasMinimapFAB'
+import DeskSuggestionChip from './DeskSuggestionChip'
 import DeskGallery from './DeskGallery'
 import VoiceRecorderWidget from './widgets/VoiceRecorderWidget'
 import MindMapWidget from './widgets/MindMapWidget'
@@ -59,6 +60,7 @@ import PortalWidget from './widgets/PortalWidget'
 import ZoomControls from './ZoomControls'
 import CanvasEdgeIndicators from './CanvasEdgeIndicators'
 import { useEdgePan } from '../lib/useEdgePan'
+import { useOverlayStore, selectAnyMenuOpen } from '../stores/overlay'
 import { useNavPrefs, frictionFromGlide } from '../lib/navPrefs'
 import { launchMeeting } from '../lib/startMeeting'
 import Icon from './Icon'
@@ -172,6 +174,7 @@ function renderWidget(w: Widget): JSX.Element | null {
     case 'sheet':
     case 'slides':
     case 'map':
+    case 'design':
       return <OfficeDocWidget widget={w} />
     case 'calculator':
       return <CalculatorWidget widget={w} />
@@ -291,6 +294,27 @@ export default function Canvas(): JSX.Element {
   const removeWidget = useWidgetStore((s) => s.remove)
   const groupDragActive = useWidgetStore((s) => s.groupDrag !== null)
   const dropRef = useRef<HTMLDivElement | null>(null)
+  // Space taken on the right of the viewport by the assistant panel, measured as
+  // the gap between the canvas's right edge and the window edge. The floating
+  // toolbar (position:fixed) uses this to dock beside the assistant instead of
+  // sliding under it when it opens or is resized.
+  const [toolbarRightInset, setToolbarRightInset] = useState(0)
+  useEffect(() => {
+    const el = dropRef.current
+    if (!el) return
+    const measure = (): void => {
+      const rect = el.getBoundingClientRect()
+      setToolbarRightInset(Math.max(0, Math.round(window.innerWidth - rect.right)))
+    }
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
+    window.addEventListener('resize', measure)
+    return () => {
+      ro.disconnect()
+      window.removeEventListener('resize', measure)
+    }
+  }, [])
   const setPan = useWidgetStore((s) => s.setPan)
   const [savingTemplate] = useState(false)
   // Controls the SaveTemplateDialog. context distinguishes the toolbar
@@ -316,6 +340,10 @@ export default function Canvas(): JSX.Element {
   // while a zoom-to-fit animation is running, or when keyboard focus is
   // in a form input. Returns the live per-edge intensity (0-1) for the
   // visual indicators below.
+  // Any open menu (the control pill's fly-out, a context menu, a dropdown)
+  // stands edge-pan down completely while it is open, so reaching for a menu
+  // that sits near a screen edge never scrolls the camera out from under it.
+  const anyMenuOpen = useOverlayStore(selectAnyMenuOpen)
   const edgeIntensity = useEdgePan({
     containerRef: dropRef,
     // Only animatingPan disables edge-pan. We DELIBERATELY no longer
@@ -329,7 +357,11 @@ export default function Canvas(): JSX.Element {
     // with the form-focus gate (now scoped to canvas-internal forms),
     // any kind of widget interaction would silently kill it.
     disabled: animatingPan,
-    hardDisabled: !nav.edgePanEnabled,
+    // Hard-disable (full stop, even mid-drag) when edge-pan is turned off or
+    // any menu is open. A menu being open means the user is interacting with
+    // chrome, not dragging a widget, so the mid-drag pan invariant is not in
+    // play here.
+    hardDisabled: !nav.edgePanEnabled || anyMenuOpen,
     maxSpeedPerSecond: 1100 * nav.edgePanSpeed
   })
   const [, setNowTick] = useState(0) // for the running-task clock
@@ -1992,7 +2024,7 @@ export default function Canvas(): JSX.Element {
         >
           {/* Breadcrumb — floated top-left of the canvas surface so it
               sits on the desk itself rather than in a header bar above it. */}
-          <div className="fb-floating-chrome absolute top-4 left-4 z-[45]">
+          <div data-floating-menu className="fb-floating-chrome absolute top-4 left-4 z-[45]">
             <CanvasBreadcrumb
               activeTask={activeTask}
               nodes={nodes}
@@ -2210,6 +2242,7 @@ export default function Canvas(): JSX.Element {
             paletteDisabled={!activeTaskId}
             onHistory={() => setHistoryOpen(true)}
             historyDisabled={!activeTaskId}
+            rightInset={toolbarRightInset}
             actions={(() => {
               // Quick-jump buttons for every section currently on the canvas
               const sections = widgets.filter((w) => w.kind === 'section' && !w.pinned)
@@ -2283,7 +2316,7 @@ export default function Canvas(): JSX.Element {
             />
           )}
           {/* Desk presence — who else is on this desk, floated top-right of canvas surface */}
-          <div className="fb-floating-chrome absolute top-3 right-3 z-[45] pointer-events-auto">
+          <div data-floating-menu className="fb-floating-chrome absolute top-3 right-3 z-[45] pointer-events-auto">
             <DeskPresenceBar taskId={activeTask.id} />
           </div>
           {activeId && !linkSourceId && (
@@ -2306,6 +2339,7 @@ export default function Canvas(): JSX.Element {
           />
           {/* Minimap FAB — always-present in the canvas bottom-right. */}
           {activeTaskId && <CanvasMinimapFAB />}
+          {activeTaskId && <DeskSuggestionChip />}
           {/* Zoom + pan controls — bottom-left. Mirrors the 2.0 mockup. */}
           <ZoomControls />
           {/* The desk-scoped AI rail used to live here, which meant two AI panels

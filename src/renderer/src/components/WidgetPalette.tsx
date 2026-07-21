@@ -164,6 +164,7 @@ export default function WidgetPalette({
       {open && popoverPos && createPortal(
         <div
           ref={popoverRef}
+          data-floating-menu
           className="fixed z-[200] w-[340px] max-h-[60vh] overflow-y-auto rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-xl"
           style={{ top: popoverPos.top, left: popoverPos.left }}
           role="dialog"

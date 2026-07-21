@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Menu, MenuItem, protocol, session, shell, net } from 'electron'
+import { app, BrowserWindow, desktopCapturer, Menu, MenuItem, protocol, session, shell, net } from 'electron'
 import { join, resolve as resolvePath, sep } from 'path'
 import { existsSync } from 'fs'
 import { pathToFileURL } from 'url'
@@ -12,7 +12,7 @@ import { getFile } from './db/files'
 import { installFocusTracker } from './streamdeckActions'
 import { installActivityTracker } from './activityTracker'
 import { registerHaptyxAuthProtocol } from './authProtocol'
-import { installAutoUpdater } from './autoUpdate'
+import { installAutoUpdater, checkForUpdates } from './autoUpdate'
 import { detectOfficeBuild, detectPreviewBuild } from './appMode'
 import { runDueFlows } from './db/flows'
 import { runDueReports } from './db/reports'
@@ -141,6 +141,33 @@ function applyPermissionPolicy(ses: Electron.Session): void {
   ses.setPermissionCheckHandler((_wc, permission) => !DENIED_PERMISSIONS.has(permission))
 }
 
+// Screen sharing (PlexiMeet "Share screen" / collaborative screen-share mode).
+// Electron does NOT wire navigator.mediaDevices.getDisplayMedia by default, so a
+// call from the renderer rejects unless a display-media request handler is set.
+// We prefer the OS-native source picker where the platform has one (macOS 15+,
+// Windows), which lets the user choose a specific screen or window. Where no
+// system picker exists we fall back to the primary screen so the feature still
+// works rather than throwing. Screen recording itself is still gated by the OS
+// permission prompt, which is the honest place for that consent to live.
+function applyDisplayMediaHandler(ses: Electron.Session): void {
+  ses.setDisplayMediaRequestHandler(
+    (_request, callback) => {
+      desktopCapturer
+        .getSources({ types: ['screen', 'window'] })
+        .then((sources) => {
+          // Only reached on platforms without a system picker. Default to the
+          // whole primary screen, which is what "share my screen" means; the
+          // user can still stop from the in-app control or the OS overlay.
+          const primary = sources.find((s) => s.id.startsWith('screen:')) ?? sources[0]
+          if (primary) callback({ video: primary })
+          else callback({})
+        })
+        .catch(() => callback({}))
+    },
+    { useSystemPicker: true }
+  )
+}
+
 // Register haptyx:// before whenReady so the OS knows we own the
 // protocol scheme. Also handles second-instance / open-url events for
 // the web→desktop auth handoff. See authProtocol.ts.
@@ -149,6 +176,59 @@ function applyPermissionPolicy(ses: Electron.Session): void {
 // own single-instance lock (on its own userData) inside this call.
 // The preview must not steal haptyx:// deep links from the production install.
 registerHaptyxAuthProtocol({ claimProtocol: !isOfficeBuild && !isPreviewBuild })
+
+// Send a zoom command to the focused window's renderer, which owns the app-wide
+// UI scale (lib/uiScale.ts). Driving zoom from the menu this way keeps the
+// keyboard shortcuts, the View menu and the Settings control all in sync on a
+// single stored value, instead of Chromium's separate zoom-level roles which
+// don't touch that value (the reason Cmd +/- appeared to do nothing before).
+function sendZoom(dir: 'in' | 'out' | 'reset'): void {
+  const win = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0]
+  win?.webContents.send('app:zoom', dir)
+}
+
+// Build the application menu. There was previously no explicit menu, so the app
+// ran on Electron's default, whose View-menu zoom roles were never wired to the
+// app's own scale. This template restores the standard menus (so copy/paste,
+// window and quit behave exactly as before) and adds a View menu whose Zoom
+// items drive the app scale, with accelerators so Cmd +, Cmd - and Cmd 0 work.
+function buildAppMenu(): Electron.Menu {
+  const isMac = process.platform === 'darwin'
+  const template: Electron.MenuItemConstructorOptions[] = [
+    ...(isMac ? [{ role: 'appMenu' as const }] : []),
+    { role: 'fileMenu' },
+    { role: 'editMenu' },
+    {
+      label: 'View',
+      submenu: [
+        { label: 'Zoom In', accelerator: 'CommandOrControl+=', click: () => sendZoom('in') },
+        // Also fire on the shifted "+" and the numeric-keypad plus, which some
+        // users press. Hidden so the menu shows a single Zoom In item.
+        { label: 'Zoom In', accelerator: 'CommandOrControl+Plus', visible: false, click: () => sendZoom('in') },
+        { label: 'Zoom In', accelerator: 'CommandOrControl+numadd', visible: false, click: () => sendZoom('in') },
+        { label: 'Zoom Out', accelerator: 'CommandOrControl+-', click: () => sendZoom('out') },
+        { label: 'Zoom Out', accelerator: 'CommandOrControl+numsub', visible: false, click: () => sendZoom('out') },
+        { label: 'Actual Size', accelerator: 'CommandOrControl+0', click: () => sendZoom('reset') },
+        { type: 'separator' },
+        { role: 'togglefullscreen' },
+        ...(isDev
+          ? [{ role: 'reload' as const }, { role: 'toggleDevTools' as const }]
+          : [])
+      ]
+    },
+    { role: 'windowMenu' },
+    {
+      role: 'help',
+      submenu: [
+        {
+          label: 'Check for Updates...',
+          click: () => checkForUpdates()
+        }
+      ]
+    }
+  ]
+  return Menu.buildFromTemplate(template)
+}
 
 function createCommandCenter(): BrowserWindow {
   // The window stays opaque. Live-mirror widgets render desktopCapturer
@@ -365,6 +445,8 @@ app.whenReady().then(() => {
   // Harden the main renderer's session too (voice/video-note media stays
   // granted; dangerous device/location permissions are denied).
   applyPermissionPolicy(session.defaultSession)
+  // Enable getDisplayMedia so PlexiMeet can share a screen or window.
+  applyDisplayMediaHandler(session.defaultSession)
   registerIpcHandlers()
   // Stream Deck focus handoff — caches the previously-frontmost app so
   // ⌘C / ⌘V / ⌘⇧4 / type-text land in the user's actual workspace
@@ -378,6 +460,11 @@ app.whenReady().then(() => {
   // Auto-updater — polls GitHub Releases on boot + every 4h, broadcasts
   // state via the `update:state` IPC event. No-op in dev builds.
   installAutoUpdater()
+
+  // Install the application menu so the View-menu zoom items and the Cmd +/-/0
+  // shortcuts drive the app's UI scale. Without this the app ran on Electron's
+  // default menu, whose zoom roles never touched the app scale.
+  Menu.setApplicationMenu(buildAppMenu())
 
   // Automation scheduler — runs due PlexiFlows and scheduled PlexiReports in the
   // background so a daily digest or a weekly report actually fires whether or not

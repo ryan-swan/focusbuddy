@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { normalizeUrl } from '../../src/renderer/src/lib/browserUrl'
+import { normalizeUrl, sanitizeWebviewUrl } from '../../src/renderer/src/lib/browserUrl'
 
 describe('normalizeUrl — address bar input', () => {
   it('returns null only for empty input', () => {
@@ -48,5 +48,39 @@ describe('normalizeUrl — address bar input', () => {
 
   it('falls back to a search when a scheme is typed but the rest is unparseable', () => {
     expect(normalizeUrl('https://')).toBe('https://www.google.com/search?q=https%3A%2F%2F')
+  })
+})
+
+describe('sanitizeWebviewUrl — guard for <webview src> and stored webview content', () => {
+  it('returns empty string for empty input', () => {
+    expect(sanitizeWebviewUrl('')).toBe('')
+    expect(sanitizeWebviewUrl('   ')).toBe('')
+  })
+
+  it('passes a valid absolute http/https URL through', () => {
+    expect(sanitizeWebviewUrl('https://github.com')).toBe('https://github.com/')
+    expect(sanitizeWebviewUrl('http://localhost:5173/foo')).toBe('http://localhost:5173/foo')
+  })
+
+  it('preserves a valid fb-file:// content value (pdf/file widgets)', () => {
+    expect(sanitizeWebviewUrl('fb-file://abc-123')).toContain('fb-file://abc-123')
+  })
+
+  it('never returns a relative/scheme-less string that would resolve against the bundle', () => {
+    // The exact bug class: a relative asset path must NOT pass through, or
+    // Electron would resolve it against file:///.../out/renderer/ and render
+    // the bundle source as text.
+    const asset = sanitizeWebviewUrl('assets/index-C5zD_VfV.js')
+    expect(asset.startsWith('https://www.google.com/search')).toBe(true)
+    expect(asset).not.toContain('assets/index')
+
+    const relative = sanitizeWebviewUrl('plexioffice.html')
+    expect(relative.startsWith('https://')).toBe(true)
+    expect(relative).not.toBe('plexioffice.html')
+  })
+
+  it('turns free-text AI prose (the observed corruption) into a safe search', () => {
+    const out = sanitizeWebviewUrl('Origin of the Name Michael Etymology derives from Hebrew')
+    expect(out.startsWith('https://www.google.com/search?q=')).toBe(true)
   })
 })

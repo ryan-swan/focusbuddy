@@ -54,6 +54,10 @@ export type WidgetKind =
   // PlexiMaps — a node/edge diagram & workflow map document, embeddable on the
   // canvas like the other office docs (backed by an fb_documents row of type 'map').
   | 'map'
+  // PlexiDesign — a Canva/Publisher-class design canvas (arbitrary-size pages of
+  // freely-placed elements), embeddable on the desk like the other office docs
+  // (backed by an fb_documents row of type 'design').
+  | 'design'
   // Stream Deck — Elgato-style 10×3 button grid with folder navigation,
   // macros, app launching, media keys, and volume control. Configuration
   // (buttons, folders, action payloads) lives in widget.content as JSON.
@@ -463,6 +467,21 @@ export type ActionProposal =
       reason?: string
     }
   | {
+      // Create a configured desk agent in one step. The applier serialises a
+      // real AgentConfig (see deskAgent.ts) from these fields, so the AI can set
+      // up a working agent from a plain instruction rather than emitting an
+      // opaque agent-widget content blob. trigger/intervalSec default to a
+      // manual, disabled agent so nothing runs until the user turns it on.
+      id: string
+      kind: 'create-agent'
+      title?: string
+      instruction: string
+      profileId?: string
+      trigger?: 'manual' | 'interval' | 'onChange'
+      intervalSec?: number
+      reason?: string
+    }
+  | {
       id: string
       kind: 'create-task'
       title: string
@@ -547,6 +566,11 @@ export type ActionProposal =
       targetWidgetId: string
       sourceLabel: string
       targetLabel: string
+      // Optional live-wire semantics. Omitted -> a plain context wire (the old
+      // behaviour). A planner that wires a source INTO an agent, or sets up a
+      // transform, uses these so the wire actually carries the relationship.
+      wireType?: WireType
+      verb?: string
       reason?: string
     }
   | {

@@ -119,7 +119,12 @@ const api = {
       newParentId: string | null,
       beforeId: string | null
     ): Promise<FbNode | null> =>
-      ipcRenderer.invoke('nodes:move', id, newParentId, beforeId)
+      ipcRenderer.invoke('nodes:move', id, newParentId, beforeId),
+    // User-driven desk relatedness. relate/unrelate return the updated related-id
+    // list for the first desk so the caller can refresh without a second call.
+    relate: (a: string, b: string): Promise<string[]> => ipcRenderer.invoke('nodes:relate', a, b),
+    unrelate: (a: string, b: string): Promise<string[]> => ipcRenderer.invoke('nodes:unrelate', a, b),
+    listRelated: (id: string): Promise<string[]> => ipcRenderer.invoke('nodes:listRelated', id)
   },
   widgets: {
     listByTask: (taskId: string): Promise<Widget[]> =>
@@ -1053,6 +1058,7 @@ const api = {
     ): Promise<{
       ok: boolean
       output?: string
+      proposals?: ActionProposal[]
       needsApiKey?: boolean
       error?: string
     }> =>
@@ -1941,7 +1947,15 @@ const api = {
     // Bring the main window forward (used when a desktop notification is clicked).
     focusWindow: (): Promise<void> => ipcRenderer.invoke('app:focus-window'),
     // App-wide text size via Chromium page zoom (1 = default).
-    setZoomFactor: (factor: number): Promise<void> => ipcRenderer.invoke('app:setZoomFactor', factor)
+    setZoomFactor: (factor: number): Promise<void> => ipcRenderer.invoke('app:setZoomFactor', factor),
+    // Zoom commands from the View menu / Cmd +/-/0. The renderer owns the scale
+    // value (lib/uiScale.ts); the menu just tells it which way to step. Returns
+    // an unsubscribe function.
+    onZoom: (cb: (dir: 'in' | 'out' | 'reset') => void): (() => void) => {
+      const listener = (_e: Electron.IpcRendererEvent, dir: 'in' | 'out' | 'reset'): void => cb(dir)
+      ipcRenderer.on('app:zoom', listener)
+      return () => ipcRenderer.removeListener('app:zoom', listener)
+    }
   }
 }
 

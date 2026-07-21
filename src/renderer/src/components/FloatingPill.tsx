@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { collectMenuRects, resolvePosition } from '../lib/floatingChrome'
 import { motion } from 'framer-motion'
 import Icon from './Icon'
 import LoadMeter from './LoadMeter'
@@ -118,6 +119,41 @@ export default function FloatingPill({
 
   useEffect(() => () => { if (hoverTimer.current !== undefined) clearTimeout(hoverTimer.current) }, [])
 
+  // The pill is persistent chrome, not a transient popover, so it must NOT latch
+  // the global edge-pan disable (that stuck edge-pan off, especially when the
+  // pill relocated out from under a still cursor and never fired mouseleave).
+  // Edge-pan is instead suppressed by pointer-over: useEdgePan treats the cursor
+  // being over any floating menu (the pill is tagged data-floating-menu) the
+  // same as leaving the canvas, so panning is paused only while you are actually
+  // on the pill and resumes the instant you move off it.
+
+  // Keep the pill on screen and clear of the other floating menus. Runs after a
+  // drag settles, after the labels expand or collapse, shortly after mount (so
+  // the breadcrumb has measured), and on resize. It reads the live rects of the
+  // other floating menus (breadcrumb, toolbar, presence bar, minimap FAB,
+  // context menus) and nudges the pill to the nearest spot that overlaps none of
+  // them and stays in the viewport. The resolve is idempotent, so once the pill
+  // sits clear it stops moving. While the pill is centred by default (no pos) it
+  // only takes an explicit position if it actually needs to dodge something.
+  useEffect(() => {
+    function resolve(): void {
+      const el = pillRef.current
+      if (!el) return
+      const r = el.getBoundingClientRect()
+      const next = resolvePosition(r.left, r.top, r.width, r.height, collectMenuRects(el))
+      if (Math.round(next.left) !== Math.round(r.left) || Math.round(next.top) !== Math.round(r.top)) {
+        setPos({ x: next.left, y: next.top })
+      }
+    }
+    resolve()
+    const t = setTimeout(resolve, 350)
+    window.addEventListener('resize', resolve)
+    return () => {
+      clearTimeout(t)
+      window.removeEventListener('resize', resolve)
+    }
+  }, [hovered, pos])
+
   // Generous zones — vertical when within 200px of either side edge.
   const orient: 'h' | 'v' = useMemo(() => {
     if (!pos) return 'h'
@@ -144,6 +180,7 @@ export default function FloatingPill({
     },
     title: 'Drag to reposition · Double-click to re-center',
     'data-testid': 'floating-pill',
+    'data-floating-menu': true,
     style: { ...posStyle, ...ringStyle }
   }
 
@@ -155,7 +192,7 @@ export default function FloatingPill({
       <div
         {...sharedOuter}
         className={[
-          'fixed z-[50] flex flex-col items-stretch fb-glass-chrome rounded-2xl',
+          'fb-pill fixed z-[50] flex flex-col items-stretch fb-glass-chrome rounded-2xl',
           'select-none cursor-grab active:cursor-grabbing',
           overloaded ? 'animate-pulse' : ''
         ].join(' ')}
@@ -261,7 +298,7 @@ export default function FloatingPill({
     <div
       {...sharedOuter}
       className={[
-        'fixed z-[50] flex items-center fb-glass-chrome rounded-full',
+        'fb-pill fixed z-[50] flex items-center fb-glass-chrome rounded-full',
         'select-none cursor-grab active:cursor-grabbing',
         overloaded ? 'animate-pulse' : ''
       ].join(' ')}

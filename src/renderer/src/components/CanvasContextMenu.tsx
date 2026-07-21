@@ -1,6 +1,8 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import Icon from './Icon'
+import { useMenuOverlay } from '../lib/useMenuOverlay'
+import { collectMenuRects, resolvePosition } from '../lib/floatingChrome'
 
 export interface CtxMenuItem {
   label?: string
@@ -101,17 +103,27 @@ function MenuPanel({
     if (autoFocus) panelRef.current?.focus()
   }, [autoFocus])
 
-  // Clamp the panel inside the viewport. Submenus also flip left when opening
-  // right would run off-screen.
+  // The root menu registers as an open overlay so edge-pan stands down while it
+  // is open. Submenus are part of the same menu and do not register separately.
+  useMenuOverlay('canvas-context-menu', isRoot, panelRef)
+
+  // Place the panel: clamp inside the viewport, then (root only) nudge it clear
+  // of the other floating menus (the pill, breadcrumb, toolbar, FABs) so menus
+  // never stack. Submenus keep their own flip-left behaviour below.
   useLayoutEffect(() => {
     const el = panelRef.current
     if (!el) return
     const r = el.getBoundingClientRect()
-    setPos({
-      left: Math.max(8, Math.min(x, window.innerWidth - r.width - 8)),
-      top: Math.max(8, Math.min(y, window.innerHeight - r.height - 8))
-    })
-  }, [x, y, items])
+    if (isRoot) {
+      const placed = resolvePosition(x, y, r.width, r.height, collectMenuRects(el))
+      setPos({ left: placed.left, top: placed.top })
+    } else {
+      setPos({
+        left: Math.max(8, Math.min(x, window.innerWidth - r.width - 8)),
+        top: Math.max(8, Math.min(y, window.innerHeight - r.height - 8))
+      })
+    }
+  }, [x, y, items, isRoot])
 
   const cancelClose = (): void => {
     if (closeTimer.current !== null) {
@@ -240,9 +252,10 @@ function MenuPanel({
     <div
       ref={panelRef}
       data-canvas-ctx-menu
+      data-floating-menu
       role="menu"
       tabIndex={-1}
-      className="fixed z-[260] bg-[var(--surface-raised)] rounded-md shadow-2xl border border-[var(--edge-soft)] py-1 min-w-[210px] max-h-[85vh] overflow-y-auto text-sm outline-none"
+      className="fb-context-menu fixed z-[260] bg-[var(--surface-raised)] rounded-md shadow-2xl border border-[var(--edge-soft)] py-1 min-w-[210px] max-h-[85vh] overflow-y-auto text-sm outline-none"
       style={{ left: pos.left, top: pos.top }}
       onKeyDown={onKeyDown}
       onContextMenu={(e) => e.preventDefault()}

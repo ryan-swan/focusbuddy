@@ -3,7 +3,7 @@ import type { Widget } from '@shared/types'
 import type { DocType, FbDocument } from '@shared/types'
 import WidgetFrame from './WidgetFrame'
 import { useWidgetStore } from '../../stores/widgets'
-import { DocEditor, SheetEditor, SlidesEditor, MapEditor } from '@office'
+import { DocEditor, SheetEditor, SlidesEditor, MapEditor, DesignEditor } from '@office'
 import type { MapBody, SheetBody, SlidesBody } from '@shared/types'
 
 // A document / spreadsheet / slide deck living on the canvas as a native widget.
@@ -21,7 +21,8 @@ const KIND_TO_DOCTYPE: Record<string, DocType> = {
   doc: 'doc',
   sheet: 'sheet',
   slides: 'slides',
-  map: 'map'
+  map: 'map',
+  design: 'design'
 }
 const TYPE_META: Record<DocType, { label: string; accent: string }> = {
   doc: { label: 'Document', accent: 'bg-sky-300/60' },
@@ -95,6 +96,8 @@ export default function OfficeDocWidget({ widget, inline = false }: Props): JSX.
     body = <SheetEditor key={doc.id} body={doc.body as SheetBody} title={doc.title} onChange={saveBody} />
   } else if (docType === 'slides') {
     body = <SlidesEditor key={doc.id} body={doc.body as SlidesBody} title={doc.title} onChange={saveBody} />
+  } else if (docType === 'design') {
+    body = <DesignEditor key={doc.id} content={doc.body} title={doc.title} onChange={saveBody} />
   } else {
     body = <MapEditor key={doc.id} body={doc.body as MapBody} title={doc.title} onChange={saveBody} />
   }

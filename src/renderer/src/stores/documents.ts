@@ -96,7 +96,9 @@ export const useDocumentsStore = create<DocumentsStore>((set, get) => ({
           ? 'Untitled sheet'
           : docType === 'slides'
             ? 'Untitled deck'
-            : 'Untitled map')
+            : docType === 'design'
+              ? 'Untitled design'
+              : 'Untitled map')
     const doc = await window.api.documents.create({ docType, title })
     void pushCloudDoc(doc).catch(() => {})
     await get().refresh()

@@ -121,6 +121,31 @@ export default function MindmapStartingKit({
         </button>
       </div>
 
+      {/* Describe-it entry: the most direct way to set up a desk is to tell the
+          assistant what you want and let it build the whole thing (table, agent,
+          wiring) as cards you confirm. This makes that capability discoverable
+          right where a new desk starts. */}
+      <button
+        onClick={() => window.dispatchEvent(new CustomEvent('fb:open-assistant'))}
+        data-testid="starting-kit-describe"
+        className="w-full text-left px-4 py-2.5 border-b border-[var(--edge-soft)] hover:bg-[var(--surface-sunken)] transition-colors group"
+      >
+        <div className="flex items-center gap-2">
+          <Icon name="auto_awesome" size={14} className="text-[rgb(var(--accent))]" />
+          <span className="text-[12px] font-medium text-[var(--ink-90)]">
+            Or just tell the assistant what you want to set up
+          </span>
+          <Icon
+            name="arrow_forward"
+            size={13}
+            className="ml-auto text-[var(--ink-40)] group-hover:text-[rgb(var(--accent))] transition-colors"
+          />
+        </div>
+        <div className="text-[10.5px] text-[var(--ink-50)] mt-0.5 pl-6">
+          e.g. "track my sales leads and research them" — it builds the table, an agent, and the wiring for you to confirm.
+        </div>
+      </button>
+
       <div className="p-3 max-h-[52vh] overflow-y-auto">
         {stage === 'loading' && (
           <div className="flex items-center gap-2 py-6 justify-center text-[12px] text-[var(--ink-50)]">

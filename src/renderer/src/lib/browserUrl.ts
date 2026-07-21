@@ -48,3 +48,23 @@ export function normalizeUrl(input: string): string | null {
   }
   return searchUrl(raw)
 }
+
+// Sanitize a value before it is loaded as a <webview src> or stored as a webview
+// widget's content. A valid absolute URL (any real scheme, e.g. http, https,
+// fb-file) passes through untouched, so legitimate content is preserved; a
+// relative or scheme-less string is turned into a real URL or a Google search
+// instead. This is a security guard, not a convenience: Electron resolves a
+// non-absolute <webview src> against the host page's own file:// bundle
+// directory, so a bare string (for instance free text an AI create-widget
+// proposal wrote into content) could otherwise load a bundle asset such as
+// assets/index-*.js and render its raw minified source as plain text. Returns
+// '' for empty input.
+export function sanitizeWebviewUrl(input: string): string {
+  const raw = (input ?? '').trim()
+  if (!raw) return ''
+  try {
+    return new URL(raw).toString()
+  } catch {
+    return normalizeUrl(raw) ?? ''
+  }
+}

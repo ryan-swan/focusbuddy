@@ -217,7 +217,15 @@ export function useEdgePan({
     // "don't clear mid-drag" invariant so dragging a widget past a menu toward
     // the edge still pans.
     function isOverFloatingChrome(target: EventTarget | null): boolean {
-      return target instanceof Element && !!target.closest('.fb-floating-chrome')
+      // Suppress while the cursor is over ANY floating menu: the docked menus
+      // (.fb-floating-chrome) and everything tagged data-floating-menu (the
+      // control pill, breadcrumb, toolbar, presence bar, minimap FAB, context
+      // menus, popovers). This is pointer-over only, so panning resumes the
+      // instant the cursor leaves the menu. It never latches edge-pan off.
+      return (
+        target instanceof Element &&
+        !!target.closest('.fb-floating-chrome, [data-floating-menu]')
+      )
     }
 
     function onMove(e: MouseEvent): void {

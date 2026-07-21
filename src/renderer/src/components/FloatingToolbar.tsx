@@ -21,6 +21,12 @@ interface Props {
   paletteDisabled: boolean
   onHistory: () => void
   historyDisabled: boolean
+  // Pixels currently occupied on the right of the viewport by another surface
+  // (the assistant panel). The toolbar is position:fixed, so without this it
+  // would dock at the viewport's right edge and slide under the assistant when
+  // it opens. Adding the inset keeps the docked toolbar beside the assistant,
+  // and a dragged toolbar is clamped so it can never hide behind it either.
+  rightInset?: number
 }
 
 const EASE_ENTER = [0.34, 1.2, 0.64, 1] as const
@@ -33,7 +39,8 @@ export default function FloatingToolbar({
   onBringSynced,
   paletteDisabled,
   onHistory,
-  historyDisabled
+  historyDisabled,
+  rightInset = 0
 }: Props): JSX.Element {
   const [hovered, setHovered] = useState(false)
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null)
@@ -98,9 +105,25 @@ export default function FloatingToolbar({
     return (pos.y < 200 || pos.y > window.innerHeight - 200) ? 'h' : 'v'
   }, [pos])
 
-  const posStyle = pos
-    ? { left: pos.x, top: pos.y }
-    : { right: 12, top: '50%', transform: 'translateY(-50%)' }
+  // Default docks to the right edge, offset by whatever the assistant occupies so
+  // it stays visible (and slides as the assistant opens/closes/resizes). A
+  // dragged toolbar keeps the user's placement but is clamped left of the
+  // assistant so it can never end up hidden behind it.
+  const DOCK_MARGIN = 12
+  const posStyle: React.CSSProperties = pos
+    ? {
+        left: Math.min(
+          pos.x,
+          Math.max(DOCK_MARGIN, window.innerWidth - rightInset - (ref.current?.offsetWidth ?? 220) - DOCK_MARGIN)
+        ),
+        top: pos.y
+      }
+    : {
+        right: DOCK_MARGIN + rightInset,
+        top: '50%',
+        transform: 'translateY(-50%)',
+        transition: 'right 200ms ease'
+      }
 
   const sharedWrapper = {
     ref,
@@ -122,6 +145,7 @@ export default function FloatingToolbar({
     return (
       <div
         {...sharedWrapper}
+        data-floating-menu
         className="fixed z-[45] flex flex-row items-stretch fb-glass-chrome rounded-2xl overflow-hidden cursor-grab active:cursor-grabbing shadow-[0_4px_24px_rgba(0,0,0,0.14)] ring-1 ring-black/[0.07] dark:ring-white/[0.07]"
       >
         {/* Header: drag + icon in a single compact row */}
@@ -192,6 +216,7 @@ export default function FloatingToolbar({
   return (
     <div
       {...sharedWrapper}
+      data-floating-menu
       className="fixed z-[45] flex flex-col items-stretch fb-glass-chrome rounded-2xl overflow-hidden cursor-grab active:cursor-grabbing shadow-[0_4px_24px_rgba(0,0,0,0.14)] ring-1 ring-black/[0.07] dark:ring-white/[0.07]"
     >
       {/* Header: drag handle + construction icon stacked */}

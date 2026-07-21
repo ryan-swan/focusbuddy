@@ -171,6 +171,7 @@ export default function CanvasMinimapFAB(): JSX.Element {
     <div
       className="fb-floating-chrome absolute bottom-3 right-3 z-[46] pointer-events-auto"
       data-minimap-fab
+      data-floating-menu
     >
       {/* mode="popLayout": exiting element leaves layout immediately so entering
           element can grow from the same corner — creates the bloom/unravel effect. */}

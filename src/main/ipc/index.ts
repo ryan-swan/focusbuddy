@@ -85,6 +85,7 @@ import {
   moveNode,
   updateNode
 } from '../db/nodes'
+import { relateNodes, unrelateNodes, listRelatedNodeIds } from '../db/nodeRelations'
 import {
   bringToFront,
   createWidget,
@@ -525,6 +526,16 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('nodes:update', (_e, id: string, patch: NodePatch) => updateNode(id, patch))
   ipcMain.handle('nodes:delete', (_e, id: string) => deleteNode(id))
   ipcMain.handle('nodes:restore', (_e, ids: string[]) => restoreNodes(ids))
+  // User-driven desk relatedness (see db/nodeRelations.ts).
+  ipcMain.handle('nodes:relate', (_e, a: string, b: string) => {
+    relateNodes(a, b)
+    return listRelatedNodeIds(a)
+  })
+  ipcMain.handle('nodes:unrelate', (_e, a: string, b: string) => {
+    unrelateNodes(a, b)
+    return listRelatedNodeIds(a)
+  })
+  ipcMain.handle('nodes:listRelated', (_e, id: string) => listRelatedNodeIds(id))
   ipcMain.handle(
     'nodes:move',
     (_e, id: string, newParentId: string | null, beforeId: string | null) =>
@@ -731,12 +742,52 @@ export function registerIpcHandlers(): void {
       // Where this agent's output is auto-delivered + the FORMAT each target
       // expects, so the agent produces the right shape and doesn't ask the user
       // for "access" to write the linked page/note/table/field.
-      const outputs = links
+      const outputWidgets = links
         .filter((l) => l.sourceWidgetId === agentId)
         .map((l) => getWidget(l.targetWidgetId))
         .filter((w): w is NonNullable<ReturnType<typeof getWidget>> => !!w && !w.archived)
-        .map((w) => ({ kind: w.kind, title: w.title ?? '', format: outputFormatHint(w) }))
-      return runDeskAgent({ instruction, inputs, persona, browserWcId, outputs })
+      const outputs = outputWidgets.map((w) => ({
+        kind: w.kind,
+        title: w.title ?? '',
+        format: outputFormatHint(w)
+      }))
+      // Build the ACTIONABLE WIDGETS block: the real ids (and, for tables, the
+      // schema + a sample of row ids) of every widget wired to this agent, so it
+      // can propose precise changes (set a cell, add a row, update a note, edit a
+      // doc) that come back as review cards. Only these ids are offered.
+      const actionable = [...inputWidgets, ...outputWidgets]
+      const seenIds = new Set<string>()
+      const actionParts: string[] = []
+      for (const w of actionable) {
+        if (seenIds.has(w.id)) continue
+        seenIds.add(w.id)
+        let line = `- widgetId=${w.id} kind=${w.kind}${w.title ? ` "${w.title}"` : ''}`
+        if (w.kind === 'table' && w.content) {
+          const t = getTable(w.content)
+          if (t) {
+            const cols = t.schema.columns.map((c) => `${c.label}(id:${c.id},${c.type})`).join(', ')
+            line += `\n    tableId=${w.content} columns=[${cols}]`
+            const rows = listRows(w.content).slice(0, 12)
+            if (rows.length > 0) {
+              const firstCol = t.schema.columns[0]?.id
+              const sample = rows
+                .map(
+                  (r) =>
+                    `${r.id}="${String((firstCol && (r.cells as Record<string, unknown>)[firstCol]) ?? '').slice(0, 24)}"`
+                )
+                .join(', ')
+              line += `\n    rowIds: ${sample}`
+            }
+          }
+        } else if ((w.kind === 'doc' || w.kind === 'sheet' || w.kind === 'slides') && w.content) {
+          line += `\n    documentId=${w.content}`
+        }
+        actionParts.push(line)
+      }
+      // Only enable action-proposals for non-browser agents (browser agents stay
+      // research-and-report) and only when there is something real to act on.
+      const actionContext = !browserWcId && actionParts.length > 0 ? actionParts.join('\n') : undefined
+      return runDeskAgent({ instruction, inputs, persona, browserWcId, outputs, actionContext })
     }
   )
 

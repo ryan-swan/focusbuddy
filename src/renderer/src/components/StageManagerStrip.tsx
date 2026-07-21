@@ -32,7 +32,6 @@ interface Props {
 export default function StageManagerStrip({ roomId, activeId }: Props): JSX.Element {
   const nodes = useNodeStore((s) => s.nodes)
   const setActive = useNodeStore((s) => s.setActive)
-  const create = useNodeStore((s) => s.create)
   const goTask = useViewStore((s) => s.goTask)
   const goProject = useViewStore((s) => s.goProject)
   const goRoom = useViewStore((s) => s.goProject)
@@ -88,21 +87,21 @@ export default function StageManagerStrip({ roomId, activeId }: Props): JSX.Elem
     else goHome()
   }
 
-  async function handleAddDesk(): Promise<void> {
-    try {
-      const created = await create({ parentId: roomId, kind: 'task', title: 'Untitled' })
-      setActive(created.id)
-      goTask(created.id)
-    } catch {
-      // create() handles user-facing feedback (e.g. desk limit upgrade prompt)
-    }
+  // Open the build wizard (NewNodeDialog) rather than dropping a blank
+  // "Untitled" desk on the canvas. The wizard is where the user names the
+  // desk, describes it, and sets importance, urgency, duration and due date.
+  // We reuse the same global event the sidebar's "New" button fires, passing
+  // the current room as the parent so the new desk lands in the right Room.
+  function handleAddDesk(): void {
+    window.dispatchEvent(
+      new CustomEvent('fb:command-new-task', { detail: { parentId: roomId, kind: 'task' } })
+    )
   }
 
-  async function handleAddRoom(): Promise<void> {
-    try {
-      const created = await create({ parentId: null, kind: 'folder', title: 'New Room' })
-      goRoom(created.id)
-    } catch {}
+  function handleAddRoom(): void {
+    window.dispatchEvent(
+      new CustomEvent('fb:command-new-task', { detail: { parentId: null, kind: 'folder' } })
+    )
   }
 
   return (

@@ -3,23 +3,22 @@
 // app can be built with different backends without touching code.
 //
 // Default behaviour:
-//  - Dev (npm run dev) → useRemote = TRUE pointing at localhost:8787.
-//    Run `cd projects/focusbuddy-signal && npm run dev` in another
-//    terminal to spin up the server. Account login + share + inbox sync
-//    all hit the real server. Body double matching also uses the real
-//    WebSocket. This is what we want by default — local-mock-only mode
-//    was a quick prototyping shortcut and made login impossible.
-//  - Prod (electron-vite build) → useRemote = TRUE pointing at the
-//    public host (set via env at build time).
+//  - EVERY build (dev AND prod) → useRemote = TRUE pointing at the deployed
+//    server. Dev used to default to localhost:8787, which meant anyone who
+//    checked out a branch and ran `npm run dev` WITHOUT also starting the local
+//    signal server got "server unavailable" on login. Defaulting to the real
+//    server means a fresh checkout just works; account login, share and inbox
+//    sync all hit prod out of the box.
 //
-// Override at any time with:
-//    VITE_USE_REMOTE_SIGNAL=true|false
-//    VITE_SIGNAL_HTTP_URL=https://api.focusbuddy.app
-//    VITE_SIGNAL_WS_URL=wss://api.focusbuddy.app/ws
+// Local development against a local signal server is now an EXPLICIT opt-in:
+//    VITE_USE_LOCAL_SIGNAL=true          # -> defaults to localhost:8787/ws
+//    (or point VITE_SIGNAL_HTTP_URL / VITE_SIGNAL_WS_URL at any host directly)
+// Start the local server with `cd projects/focusbuddy-signal && npm run dev`.
 //
-// To get the pure-local-mock behaviour back (no server required,
-// LocalMockMatcher pairs windows via BroadcastChannel, ShareService is
-// null) set VITE_USE_REMOTE_SIGNAL=false.
+// Other overrides:
+//    VITE_USE_REMOTE_SIGNAL=false        # pure local-mock, no server required
+//    VITE_SIGNAL_HTTP_URL=https://host   # explicit host (wins over any default)
+//    VITE_SIGNAL_WS_URL=wss://host/ws
 
 interface SignalConfig {
   useRemote: boolean
@@ -60,10 +59,12 @@ function readEnv(): SignalConfig {
     // whatever VITE_SIGNAL_HTTP_URL points at when the app is built.
     useRemote = true
   }
-  // Pick the default URL based on dev vs prod. An explicit
-  // VITE_SIGNAL_HTTP_URL overrides either default.
-  const defaultHttp = import.meta.env.DEV ? LOCAL_HTTP : PROD_HTTP
-  const defaultWs = import.meta.env.DEV ? LOCAL_WS : PROD_WS
+  // Default to the deployed server in every build. Local development against a
+  // local signal server is opt-in via VITE_USE_LOCAL_SIGNAL=true (or by setting
+  // VITE_SIGNAL_HTTP_URL directly, which overrides this default either way).
+  const wantLocal = import.meta.env.VITE_USE_LOCAL_SIGNAL === 'true'
+  const defaultHttp = wantLocal ? LOCAL_HTTP : PROD_HTTP
+  const defaultWs = wantLocal ? LOCAL_WS : PROD_WS
   const httpUrl = firstUrl(import.meta.env.VITE_SIGNAL_HTTP_URL as string | undefined, defaultHttp)
   const wsUrl = firstUrl(import.meta.env.VITE_SIGNAL_WS_URL as string | undefined, defaultWs)
   return { useRemote, httpUrl, wsUrl }

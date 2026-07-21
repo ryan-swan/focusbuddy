@@ -13,6 +13,9 @@ import {
   type AgentTrigger
 } from '../../lib/deskAgent'
 import { recommendProfileLocal, type ProfileSuggestion } from '../../lib/agentRecommend'
+import { AGENT_JOBS } from '../../lib/agentJobs'
+import ProposalCards from '../ProposalCards'
+import type { AppliedProposal } from '@shared/types'
 import { runAgent, useAgentRunStore } from '../../lib/deskAgentEngine'
 import {
   allProfiles,
@@ -66,6 +69,9 @@ export default function AgentWidget({ widget }: Props): JSX.Element {
   const links = useLinksStore((s) => s.links)
   const widgets = useWidgetStore((s) => s.widgets)
   const running = useAgentRunStore((s) => s.running[widget.id] ?? false)
+  const agentProposals = useAgentRunStore((s) => s.proposals[widget.id])
+  const clearAgentProposals = useAgentRunStore((s) => s.clearProposals)
+  const [appliedProposals, setAppliedProposals] = useState<Record<string, AppliedProposal>>({})
 
   // Live config (output/history/lastError) read fresh each render.
   const cfg = parseAgent(widget.content)
@@ -316,6 +322,37 @@ export default function AgentWidget({ widget }: Props): JSX.Element {
 
       {/* Instruction */}
       <div className="p-2.5 border-b border-[var(--edge-soft)]">
+        {/* One-click jobs: shown while the instruction is empty so a new agent
+            configures itself (instruction + persona + trigger) instead of facing
+            a blank box. It stays disabled until the user turns it on. */}
+        {!edit.instruction.trim() && (
+          <div className="mb-2" data-testid="agent-jobs">
+            <div className="text-[10px] uppercase tracking-[0.1em] text-[var(--ink-50)] mb-1">
+              Quick jobs
+            </div>
+            <div className="flex flex-wrap gap-1">
+              {AGENT_JOBS.map((job) => (
+                <button
+                  key={job.id}
+                  title={job.blurb}
+                  data-testid={`agent-job-${job.id}`}
+                  onClick={() =>
+                    set({
+                      instruction: job.instruction,
+                      profileId: job.profileId,
+                      trigger: job.trigger,
+                      intervalSec: job.intervalSec ?? edit.intervalSec
+                    })
+                  }
+                  className="inline-flex items-center gap-1 h-6 px-2 rounded-full border border-[var(--edge-soft)] bg-[var(--surface-raised)] text-[11px] text-[var(--ink-70)] hover:text-[var(--ink-100)] hover:border-[rgb(var(--accent)/0.4)] transition-colors"
+                >
+                  <Icon name={job.icon} size={12} />
+                  {job.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
         <textarea
           value={edit.instruction}
           onChange={(e) => set({ instruction: e.target.value })}
@@ -506,6 +543,27 @@ export default function AgentWidget({ widget }: Props): JSX.Element {
         ) : (
           <div className="text-[11px] text-[var(--ink-40)]" data-testid="agent-output">
             {running ? 'Thinking…' : 'No output yet. Wire in some inputs, give an instruction, then Run.'}
+          </div>
+        )}
+        {/* Review-before-apply: concrete changes the agent proposed this run
+            (set a cell, add a row, update a note, draft mail). Nothing is applied
+            until the user confirms each card. */}
+        {agentProposals && agentProposals.length > 0 && (
+          <div className="mt-2 pt-2 border-t border-[var(--edge-soft)]" data-testid="agent-proposals">
+            <div className="text-[10px] uppercase tracking-[0.1em] text-[var(--ink-50)] mb-1">
+              Proposed changes
+            </div>
+            <ProposalCards
+              proposals={agentProposals}
+              activeTaskId={widget.taskId}
+              appliedProposals={appliedProposals}
+              onApplied={(id, applied) => setAppliedProposals((m) => ({ ...m, [id]: applied }))}
+              onConsume={(id) => {
+                const remaining = agentProposals.filter((p) => p.id !== id)
+                if (remaining.length === 0) clearAgentProposals(widget.id)
+                else useAgentRunStore.getState().setProposals(widget.id, remaining)
+              }}
+            />
           </div>
         )}
       </div>

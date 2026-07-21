@@ -69,8 +69,19 @@ export async function saveTranscriptDoc(
       title: `${title || 'Meeting'} — transcript`,
       body: transcriptToDocBody(transcript)
     })
-    if (doc && folderId) {
-      await window.api.fileManager.fileDocument(doc.id, folderId).catch(() => null)
+    if (doc) {
+      // Always file the transcript into the Drive so it shows up in the file
+      // tree, not just in the "unfiled documents" picker. Creating a document
+      // alone does NOT add it to the Drive (that needs an fb_files row via
+      // fileDocument). If the meeting folder could not be created (folderId
+      // null) or filing into it fails, fall back to the Drive root so the
+      // transcript is never left invisible.
+      const filed = await window.api.fileManager
+        .fileDocument(doc.id, folderId)
+        .catch(() => null)
+      if (!filed && folderId) {
+        await window.api.fileManager.fileDocument(doc.id, null).catch(() => null)
+      }
     }
     return doc?.id ?? null
   } catch {
