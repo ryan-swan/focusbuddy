@@ -101,6 +101,41 @@ const src = (
   snippet: `snippet ${n}`
 })
 
+// ART-0 stubs NOTHING. It is the lock on the one failure the other tests here
+// cannot see: the streaming transport not actually reaching the running app.
+//
+// The store falls back to the non-streaming `chat:send` when
+// window.api.chat.sendStream is missing — correct behaviour, but it degrades
+// silently, and a silent degrade is indistinguishable from "the trace doesn't
+// work". If the preload surface ever stops shipping, this goes red instead.
+test('ART-0 — the streaming transport is really exposed and really wired, with nothing stubbed', async () => {
+  launched = await launchApp()
+  const { window } = launched
+  await waitForReady(window)
+
+  // 1. The preload exposes it. Without this the store silently falls back and
+  //    no trace can ever appear, however correct the rest of the code is.
+  const surface = await window.evaluate(() => {
+    const api = (window as unknown as { api: { chat: Record<string, unknown> } }).api
+    return { sendStream: typeof api.chat.sendStream, send: typeof api.chat.send }
+  })
+  expect(surface.sendStream).toBe('function')
+  // The non-streaming path must survive alongside it — other callers use it.
+  expect(surface.send).toBe('function')
+
+  // 2. It is wired all the way through. e2e runs with the AI keys stripped, so
+  //    the real handler reaches the real sendChatStream and returns the real
+  //    no-key error — which can only reach the trace via the real channel, the
+  //    real preload bridge and the real store.
+  await openAssistant(window)
+  await ask(window, 'is the streaming path connected?')
+  await expect(window.locator('[data-testid="trace-error"]')).toContainText('No Anthropic API key', {
+    timeout: 15_000
+  })
+  // And it releases the spinner rather than hanging.
+  await expect(window.locator('[data-testid="chat-pending"]')).toHaveCount(0, { timeout: 8000 })
+})
+
 test('ART-1 — nothing retrieved and nothing prepared renders no trace at all', async () => {
   launched = await launchApp()
   const { window, app } = launched

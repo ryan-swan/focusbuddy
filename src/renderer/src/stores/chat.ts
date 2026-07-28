@@ -264,11 +264,24 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       set(updates)
     }
 
-    // Streaming is the normal path. The non-streaming `chat:send` stays wired
-    // and is used whenever the streaming surface isn't there — a renderer talking
-    // to an older preload, or a test that stubs only the plain transport.
+    // Streaming is the normal path. The non-streaming `chat:send` stays wired as
+    // the fallback for a renderer talking to a preload that predates it — in
+    // practice, an Electron process still running the old preload after a code
+    // change, because a released build ships both together.
+    //
+    // The fallback is LOUD on purpose. It degrades the headline behaviour: no
+    // events means no trace, and the panel then looks exactly like a trace that
+    // doesn't work rather than one that was never fed. This warning is the
+    // difference between "restart the app" and an hour of debugging. (ART-0 in
+    // assistantRetrievalTrace.spec.ts locks the surface so CI catches it too.)
     const api = window.api.chat
     if (typeof api.sendStream !== 'function') {
+      console.warn(
+        '[assistant] window.api.chat.sendStream is missing — falling back to the ' +
+          'non-streaming chat:send. The retrieval trace needs the streaming ' +
+          'transport and will not render. This almost always means the Electron ' +
+          'process is running an older preload bundle: restart it (npm run dev).'
+      )
       const resp = await api.send({ taskId, messages: next, attachments })
       settle(resp)
       return
