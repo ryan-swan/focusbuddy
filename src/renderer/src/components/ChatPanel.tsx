@@ -4,6 +4,7 @@ import { useNodeStore } from '../stores/nodes'
 import { useChatStore, appliedKey } from '../stores/chat'
 import { deriveAssistantBlocks } from '../lib/chatBlocks'
 import ChatBlockView from './focus/ChatBlockView'
+import RetrievalTrace from './assistant/RetrievalTrace'
 import { useAssistantContext } from '../lib/assistantContext'
 import { useWidgetStore } from '../stores/widgets'
 import { chimeIn } from '../lib/audioBeep'
@@ -32,6 +33,8 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
   const proposalsByMessage = useChatStore((s) => s.proposalsByMessage)
   const appliedProposals = useChatStore((s) => s.appliedProposals)
   const sourcesByMessage = useChatStore((s) => s.sourcesByMessage)
+  const liveTraceByThread = useChatStore((s) => s.liveTraceByThread)
+  const traceByMessage = useChatStore((s) => s.traceByMessage)
   const markProposalApplied = useChatStore((s) => s.markProposalApplied)
   const consumeProposal = useChatStore((s) => s.consumeProposal)
   const rewindTo = useChatStore((s) => s.rewindTo)
@@ -45,6 +48,10 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
     () => messagesByTask[ctx.key] ?? EMPTY_MESSAGES,
     [messagesByTask, ctx.key]
   )
+  // The trace for the send currently in flight on THIS thread. Scoped by
+  // ctx.key, not by the global `sending` flag, so a request started in another
+  // context can't draw its progress here.
+  const liveTrace = liveTraceByThread[ctx.key]
   const [draft, setDraft] = useState('')
   const [summarizing, setSummarizing] = useState(false)
   // Which turn most recently had its text copied — drives the ✓ confirmation on
@@ -356,6 +363,7 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
             const a = appliedProposals[appliedKey(m.ts, p.id)]
             if (a) appliedForMsg[p.id] = a
           }
+          const finishedTrace = traceByMessage[String(m.ts)]
           return (
             <div key={i} className="group/turn flex flex-col gap-1.5" data-testid="assistant-turn">
               {/* Identity row. With the prose unbubbled, this is what marks the
@@ -369,6 +377,10 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
                   Plexi
                 </span>
               </div>
+              {/* What produced this answer, above it — collapsed to a single
+                  summary line once it has been read, absent entirely when
+                  retrieval found nothing and no action was prepared. */}
+              {finishedTrace && <RetrievalTrace trace={finishedTrace} />}
               {blocks.map((block, bi) => (
                 <ChatBlockView
                   key={bi}
@@ -404,7 +416,12 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
             </div>
           )
         })}
-        {sending && (
+        {/* While a send is in flight the trace IS the pending indicator: it says
+            what is actually happening instead of a generic "Working…". The dots
+            remain for the non-streaming path, which reports nothing until it
+            returns and so has nothing truer to show. */}
+        {sending && liveTrace && <RetrievalTrace trace={liveTrace} />}
+        {sending && !liveTrace && (
           <div className="flex items-center gap-1.5 text-[var(--ink-50)]" data-testid="chat-pending">
             <span className="flex gap-[3px]" aria-hidden="true">
               <span className="w-1 h-1 rounded-full bg-current fb-dot" />

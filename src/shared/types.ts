@@ -421,6 +421,28 @@ export interface ChatSource {
   snippet: string
 }
 
+// One action the assistant prepared, surfaced in the retrieval trace the moment
+// its JSON object completes in the stream — before the whole response lands.
+// Deliberately NOT an ActionProposal: this is read off the raw envelope ahead of
+// sanitisation, so `kind` is whatever the model wrote and the entry is a record
+// of what happened, not a promise that a card will appear.
+export interface ChatToolTrace {
+  // 0-based order of arrival within this response.
+  index: number
+  kind: string
+  // The line the trace draws, e.g. "Email draft → Ryan".
+  label: string
+}
+
+// Fired the moment retrieval returns, carrying what it found and how long it
+// actually took. An empty `sources` array is a real result — it means the
+// workspace had nothing relevant, which the trace shows honestly rather than
+// hiding.
+export interface ChatRetrievalTrace {
+  sources: ChatSource[]
+  elapsedMs: number
+}
+
 export interface ChatResponse {
   ok: boolean
   message?: ChatMessage

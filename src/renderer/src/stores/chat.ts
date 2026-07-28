@@ -1,7 +1,28 @@
 import { create } from 'zustand'
-import type { ActionProposal, AppliedProposal, ChatMessage, ChatSource } from '@shared/types'
+import type {
+  ActionProposal,
+  AppliedProposal,
+  ChatMessage,
+  ChatResponse,
+  ChatSource
+} from '@shared/types'
 import { recordTrail } from '../lib/trail'
 import { gatherCanvasAttachments } from '../lib/canvasContent'
+import type { AssistantTrace } from '../lib/traceView'
+
+function newTrace(): AssistantTrace {
+  return {
+    status: 'running',
+    startedAt: Date.now(),
+    retrievedAt: null,
+    retrievalMs: null,
+    repliedAt: null,
+    completedAt: null,
+    sources: [],
+    tools: [],
+    error: null
+  }
+}
 
 // Applied proposals are keyed by "<messageTs>::<proposalId>" — the same
 // composite key the persisted Focus chat uses — so two different messages can
@@ -28,6 +49,14 @@ interface ChatStore {
   // the reply. Retrieval already ran server-side to build the prompt — this is
   // the same set, surfaced rather than discarded.
   sourcesByMessage: Record<string, ChatSource[]>
+  // The trace for the send currently in flight, keyed by thread. Lives here
+  // rather than under a message id because it starts before there IS a message —
+  // the first thing it shows is retrieval, which happens before a word is
+  // written. On completion it moves to traceByMessage under the answer's ts.
+  liveTraceByThread: Record<string, AssistantTrace>
+  // Finished traces, keyed by the assistant message's timestamp, so a completed
+  // turn can still show its collapsed "3 sources · 2 tools" summary.
+  traceByMessage: Record<string, AssistantTrace>
   sending: boolean
   hasApiKey: boolean | null
   checkApiKey: () => Promise<void>
@@ -67,6 +96,8 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   proposalsByMessage: {},
   appliedProposals: {},
   sourcesByMessage: {},
+  liveTraceByThread: {},
+  traceByMessage: {},
   sending: false,
   hasApiKey: null,
   checkApiKey: async () => {
@@ -111,13 +142,19 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     const nextProposals = { ...get().proposalsByMessage }
     const nextApplied = { ...get().appliedProposals }
     const nextSources = { ...get().sourcesByMessage }
+    const nextTraces = { ...get().traceByMessage }
     for (const m of dropped) {
       for (const p of nextProposals[String(m.ts)] ?? []) {
         delete nextApplied[appliedKey(m.ts, p.id)]
       }
       delete nextProposals[String(m.ts)]
       delete nextSources[String(m.ts)]
+      delete nextTraces[String(m.ts)]
     }
+    // A rewind is the front half of a retry, so any trace still running for this
+    // thread describes work the user just discarded. Drop it too.
+    const nextLive = { ...get().liveTraceByThread }
+    delete nextLive[threadKey]
     set({
       messagesByTask: {
         ...get().messagesByTask,
@@ -125,7 +162,9 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       },
       proposalsByMessage: nextProposals,
       appliedProposals: nextApplied,
-      sourcesByMessage: nextSources
+      sourcesByMessage: nextSources,
+      traceByMessage: nextTraces,
+      liveTraceByThread: nextLive
     })
   },
   send: async (taskId, content, threadKey) => {
@@ -135,6 +174,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     const next = [...current, userMsg]
     set({
       messagesByTask: { ...get().messagesByTask, [key]: next },
+      liveTraceByThread: { ...get().liveTraceByThread, [key]: newTrace() },
       sending: true
     })
     recordTrail('chat_sent', taskId, { preview: content.slice(0, 200) })
@@ -147,42 +187,130 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     } catch {
       attachments = []
     }
-    const resp = await window.api.chat.send({ taskId, messages: next, attachments })
-    let final: ChatMessage[]
-    let proposals: ActionProposal[] | undefined
-    let sources: ChatSource[] | undefined
-    if (resp.ok && resp.message) {
-      final = [...next, resp.message]
-      proposals = resp.proposals
-      sources = resp.sources
-    } else {
-      final = [
-        ...next,
-        {
-          role: 'assistant',
-          content: resp.error ?? 'Something went wrong.',
-          ts: Date.now()
+
+    // Merge a patch into the in-flight trace. A no-op once the trace has been
+    // moved to traceByMessage or cleared, so a late event from a request the
+    // user has already walked away from can't resurrect it.
+    const patchTrace = (patch: Partial<AssistantTrace>): void => {
+      const live = get().liveTraceByThread[key]
+      if (!live) return
+      set({ liveTraceByThread: { ...get().liveTraceByThread, [key]: { ...live, ...patch } } })
+    }
+
+    // The prose lands (and is shown) the moment the reply field closes, which is
+    // before the actions have finished streaming. `answerTs` is the message we
+    // appended then, so `complete` updates that same turn in place instead of
+    // appending a second one.
+    let answerTs: number | null = null
+    const appendAnswer = (text: string): number => {
+      const ts = Date.now()
+      answerTs = ts
+      const thread = get().messagesByTask[key] ?? next
+      set({
+        messagesByTask: {
+          ...get().messagesByTask,
+          [key]: [...thread, { role: 'assistant', content: text, ts }]
         }
-      ]
+      })
+      return ts
     }
-    const updates: Partial<ChatStore> = {
-      messagesByTask: { ...get().messagesByTask, [key]: final },
-      sending: false
-    }
-    const tsKey = String(final[final.length - 1].ts)
-    if (proposals && proposals.length > 0) {
-      updates.proposalsByMessage = {
-        ...get().proposalsByMessage,
-        [tsKey]: proposals
+
+    // Land the finished response and retire the trace onto the answer's turn.
+    const settle = (resp: ChatResponse): void => {
+      let ts = answerTs
+      if (ts === null) {
+        // Nothing has been shown yet: the finished reply (or the error) becomes
+        // the turn.
+        ts = appendAnswer(resp.ok && resp.message ? resp.message.content : (resp.error ?? 'Something went wrong.'))
+      } else if (resp.ok && resp.message && resp.message.content !== '') {
+        // Prose is already on screen. Rewrite it only when the finished response
+        // differs — it gains a notice when the model was truncated mid-actions.
+        // A FAILED response never overwrites prose that really arrived; the
+        // failure is recorded on the trace instead.
+        const thread = get().messagesByTask[key] ?? []
+        const at = thread.findIndex((m) => m.ts === ts)
+        if (at >= 0 && thread[at].content !== resp.message.content) {
+          const copy = thread.slice()
+          copy[at] = { ...copy[at], content: resp.message.content }
+          set({ messagesByTask: { ...get().messagesByTask, [key]: copy } })
+        }
       }
-    }
-    if (sources && sources.length > 0) {
-      updates.sourcesByMessage = {
-        ...get().sourcesByMessage,
-        [tsKey]: sources
+      const tsKey = String(ts)
+      const live = get().liveTraceByThread[key]
+      const updates: Partial<ChatStore> = { sending: false }
+      if (resp.ok && resp.proposals && resp.proposals.length > 0) {
+        updates.proposalsByMessage = { ...get().proposalsByMessage, [tsKey]: resp.proposals }
       }
+      // The full retrieved set. Which of these the answer actually cites is
+      // derived from the [n] markers in the prose at render time — retrieval is
+      // not grounding, and only grounding earns a chip.
+      if (resp.ok && resp.sources && resp.sources.length > 0) {
+        updates.sourcesByMessage = { ...get().sourcesByMessage, [tsKey]: resp.sources }
+      }
+      if (live) {
+        const nextLive = { ...get().liveTraceByThread }
+        delete nextLive[key]
+        updates.liveTraceByThread = nextLive
+        updates.traceByMessage = {
+          ...get().traceByMessage,
+          [tsKey]: {
+            ...live,
+            status: resp.ok ? 'done' : 'error',
+            error: resp.ok ? live.error : (resp.error ?? 'Something went wrong.'),
+            completedAt: Date.now()
+          }
+        }
+      }
+      set(updates)
     }
-    set(updates)
+
+    // Streaming is the normal path. The non-streaming `chat:send` stays wired
+    // and is used whenever the streaming surface isn't there — a renderer talking
+    // to an older preload, or a test that stubs only the plain transport.
+    const api = window.api.chat
+    if (typeof api.sendStream !== 'function') {
+      const resp = await api.send({ taskId, messages: next, attachments })
+      settle(resp)
+      return
+    }
+
+    const requestId = `chat-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
+    await new Promise<void>((resolve) => {
+      let done = false
+      const finish = (): void => {
+        if (done) return
+        done = true
+        cleanup()
+        resolve()
+      }
+      const cleanup = api.sendStream(
+        { taskId, messages: next, attachments, requestId },
+        {
+          onSources: (t) => patchTrace({ retrievedAt: Date.now(), retrievalMs: t.elapsedMs, sources: t.sources }),
+          onReply: (text) => {
+            patchTrace({ repliedAt: Date.now() })
+            if (answerTs === null && text.trim()) appendAnswer(text)
+          },
+          onTool: (tool) => {
+            const live = get().liveTraceByThread[key]
+            if (!live) return
+            patchTrace({ tools: [...live.tools, tool] })
+          },
+          onError: (err) => {
+            // Prose that already landed is real work and stays on screen — the
+            // failure came after it. settle() keeps that message and marks the
+            // trace failed, so the phases end red rather than finishing green on
+            // a request that broke. With no prose yet, the error becomes the turn.
+            settle({ ok: false, error: err.error })
+            finish()
+          },
+          onComplete: (resp) => {
+            settle(resp)
+            finish()
+          }
+        }
+      )
+    })
   },
   sendProactiveWelcome: async (taskId) => {
     if (get().hasApiKey === false) return
@@ -218,18 +346,24 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     const nextProposals = { ...get().proposalsByMessage }
     const nextApplied = { ...get().appliedProposals }
     const nextSources = { ...get().sourcesByMessage }
+    const nextTraces = { ...get().traceByMessage }
     for (const m of cleared) {
       for (const p of nextProposals[String(m.ts)] ?? []) {
         delete nextApplied[appliedKey(m.ts, p.id)]
       }
       delete nextProposals[String(m.ts)]
       delete nextSources[String(m.ts)]
+      delete nextTraces[String(m.ts)]
     }
+    const nextLive = { ...get().liveTraceByThread }
+    delete nextLive[key]
     set({
       messagesByTask: next,
       proposalsByMessage: nextProposals,
       appliedProposals: nextApplied,
-      sourcesByMessage: nextSources
+      sourcesByMessage: nextSources,
+      traceByMessage: nextTraces,
+      liveTraceByThread: nextLive
     })
   }
 }))

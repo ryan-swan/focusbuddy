@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest'
-import { splitCitations, transformCitations } from '../../src/renderer/src/lib/remarkCitations'
+import {
+  splitCitations,
+  transformCitations,
+  citedNumbers
+} from '../../src/renderer/src/lib/remarkCitations'
 
 // The plugin rewrites inline [n] markers in assistant prose into citeRef nodes
 // that render as chips. These tests pin both the happy path and the cases where
@@ -97,5 +101,80 @@ describe('transformCitations', () => {
     const leaf = { type: 'text', value: 'plain [1]' }
     expect(() => transformCitations(leaf)).not.toThrow()
     expect(leaf.value).toBe('plain [1]')
+  })
+})
+
+// citedNumbers answers the question that decides whether a chip appears at all:
+// did the answer actually USE this source? It must agree with what the plugin
+// above turns into a visible marker — a number counted here but skipped there
+// would put a chip under a claim that never cites it.
+describe('citedNumbers', () => {
+  it('is empty for an answer that cites nothing', () => {
+    // The exact bug this work exists to fix: retrieval returned six documents,
+    // the answer used none of them, and six chips appeared anyway.
+    expect(citedNumbers("I don't have Ryan's email address in your canvas or context.").size).toBe(0)
+  })
+
+  it('collects each number the prose cites, once', () => {
+    const out = citedNumbers('The cert is unsigned [2] and the checklist is stale [2][5].')
+    expect([...out].sort((a, b) => a - b)).toEqual([2, 5])
+  })
+
+  it('ignores a bracketed number inside a fenced code block', () => {
+    const md = ['Here is the fix:', '', '```ts', 'const first = rows[1]', '```', '', 'Done.'].join('\n')
+    expect(citedNumbers(md).size).toBe(0)
+  })
+
+  it('ignores an unterminated fence — the model gets cut off mid-block', () => {
+    const md = ['Try this:', '', '```ts', 'const first = rows[1]'].join('\n')
+    expect(citedNumbers(md).size).toBe(0)
+  })
+
+  it('ignores a bracketed number inside an inline code span', () => {
+    expect(citedNumbers('Read `matrix[2]` carefully.').size).toBe(0)
+  })
+
+  it('ignores a bracketed number inside a four-space indented code block', () => {
+    expect(citedNumbers(['Example:', '', '    const x = list[1]', ''].join('\n')).size).toBe(0)
+  })
+
+  it('ignores markdown link and image labels', () => {
+    expect(citedNumbers('See [1](https://example.com) for more.').size).toBe(0)
+    expect(citedNumbers('![1](img.png)').size).toBe(0)
+  })
+
+  it('ignores a link definition line, which the renderer also skips', () => {
+    expect(citedNumbers('[1]: https://example.com').size).toBe(0)
+  })
+
+  it('counts a bare [n] beside a reference label, matching what the renderer chips', () => {
+    // remark only builds a linkReference when a matching definition exists, so
+    // `[label][1]` with none stays plain text and DOES render a chip. Counting
+    // it here is what keeps the chip row and the inline markers in agreement.
+    expect([...citedNumbers('A [label][1] reference.')]).toEqual([1])
+  })
+
+  it('still finds a real citation sitting beside a link', () => {
+    const out = citedNumbers('See [the docs](https://example.com) — the cert is unsigned [3].')
+    expect([...out]).toEqual([3])
+  })
+
+  it('still finds a real citation in a paragraph after a code block', () => {
+    const md = ['```ts', 'rows[1]', '```', '', 'The checklist is stale [4].'].join('\n')
+    expect([...citedNumbers(md)]).toEqual([4])
+  })
+
+  it('applies the same 1-3 digit bound the renderer does', () => {
+    expect(citedNumbers('the year [2026] was fine').size).toBe(0)
+  })
+
+  it('handles empty and whitespace input without throwing', () => {
+    expect(citedNumbers('').size).toBe(0)
+    expect(citedNumbers('   ').size).toBe(0)
+  })
+
+  it('is not corrupted by a previous call (regex lastIndex is reset)', () => {
+    expect([...citedNumbers('first [1]')]).toEqual([1])
+    expect([...citedNumbers('second [1]')]).toEqual([1])
   })
 })

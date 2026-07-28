@@ -2111,3 +2111,55 @@ body {
     opacity: 0.55;
   }
 }
+
+/* Assistant retrieval trace — lines fade in as each phase lands, the whole
+   block fades out once the answer is done, and the in-flight phase carries a
+   blinking square. Kept as plain CSS beside fb-dot rather than as Tailwind
+   keyframes: that's how every other animation in this app is declared. */
+@keyframes fb-trace-in {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes fb-trace-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+@keyframes fb-trace-blink {
+  50% {
+    opacity: 0.15;
+  }
+}
+.fb-trace-in {
+  animation: fb-trace-in 200ms ease-out;
+}
+.fb-trace-out {
+  /* Duration must match FADE_MS in components/assistant/RetrievalTrace.tsx —
+     the collapse timer fires when this finishes. */
+  animation: fb-trace-out 200ms ease-out forwards;
+}
+.fb-trace-blink {
+  animation: fb-trace-blink 1s step-end infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .fb-trace-in,
+  .fb-trace-blink {
+    animation: none;
+  }
+  /* The fade-out still has to end invisible: the collapse timer runs on a clock,
+     not on the animation, so skipping the animation must not leave the expanded
+     trace on screen underneath the collapsed summary. */
+  .fb-trace-out {
+    animation: none;
+    opacity: 0;
+  }
+}

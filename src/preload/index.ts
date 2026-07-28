@@ -8,6 +8,8 @@ import type {
   BrowsingHistoryEntry,
   ChatRequest,
   ChatResponse,
+  ChatRetrievalTrace,
+  ChatToolTrace,
   ConnectedApp,
   ConnectedAppDraft,
   ConnectedAppPatch,
@@ -291,7 +293,78 @@ const api = {
     send: (req: ChatRequest): Promise<ChatResponse> => ipcRenderer.invoke('chat:send', req),
     hasApiKey: (): Promise<boolean> => ipcRenderer.invoke('chat:hasApiKey'),
     proactiveWelcome: (taskId: string): Promise<ChatResponse> =>
-      ipcRenderer.invoke('chat:proactiveWelcome', taskId)
+      ipcRenderer.invoke('chat:proactiveWelcome', taskId),
+    // Streaming variant — the caller mints a requestId and listens on the
+    // per-request channel, so several sends can be in flight without their
+    // events crossing. Returns a cleanup function to unsubscribe.
+    //
+    // `sources` fires the moment retrieval returns, `reply` when the prose
+    // lands whole, `tool` once per action the model finishes writing, then
+    // exactly one of `complete` / `error`. The `complete` payload is the same
+    // ChatResponse `send` returns — the streamed events are the trace, this is
+    // the result.
+    sendStream: (
+      req: ChatRequest & { requestId: string },
+      callbacks: {
+        onSources?: (trace: ChatRetrievalTrace) => void
+        onReply?: (text: string) => void
+        onTool?: (tool: ChatToolTrace) => void
+        onError?: (error: { ok: false; error: string; needsApiKey?: boolean }) => void
+        onComplete?: (response: ChatResponse) => void
+      }
+    ): (() => void) => {
+      const channel = `chat:stream:${req.requestId}`
+      type Event =
+        | { type: 'sources'; payload: ChatRetrievalTrace }
+        | { type: 'reply'; payload: string }
+        | { type: 'tool'; payload: ChatToolTrace }
+        | { type: 'error'; payload: { ok: false; error: string; needsApiKey?: boolean } }
+        | { type: 'complete'; payload: ChatResponse }
+      // Whether a terminal event (complete | error) has already been delivered.
+      // Guards the invoke-rejection backstop below from firing a second one.
+      let settled = false
+      const handler = (_: unknown, ev: Event): void => {
+        switch (ev.type) {
+          case 'sources':
+            callbacks.onSources?.(ev.payload)
+            break
+          case 'reply':
+            callbacks.onReply?.(ev.payload)
+            break
+          case 'tool':
+            callbacks.onTool?.(ev.payload)
+            break
+          case 'error':
+            settled = true
+            callbacks.onError?.(ev.payload)
+            break
+          case 'complete':
+            settled = true
+            callbacks.onComplete?.(ev.payload)
+            break
+        }
+      }
+      ipcRenderer.on(channel, handler)
+      // Same fire-and-forget shape as voiceCommand.runStream: the events carry
+      // the result. The one thing we watch is the invoke itself rejecting — if
+      // the main handler dies before emitting anything, no terminal event is
+      // coming and the caller would wait forever. Synthesise the error so a dead
+      // handler surfaces as a failure, not a stuck spinner.
+      void ipcRenderer.invoke('chat:sendStream', req).catch((e: unknown) => {
+        if (settled) return
+        settled = true
+        callbacks.onError?.({
+          ok: false,
+          error: e instanceof Error ? e.message : 'The assistant request stopped unexpectedly.'
+        })
+      })
+      // Braces so the cleanup arrow returns void — ipcRenderer.removeListener
+      // returns the IpcRenderer instance, which a `(): void =>` concise body
+      // would otherwise try (and fail) to return.
+      return (): void => {
+        ipcRenderer.removeListener(channel, handler)
+      }
+    }
   },
   // Focus-Mode clusters (split "groups") — per-desk saved split layouts.
   clusters: {

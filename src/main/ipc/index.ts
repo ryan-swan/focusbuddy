@@ -417,6 +417,7 @@ import {
   runDeskAgent,
   runTransformWire,
   sendChat,
+  sendChatStream,
   routeCommandBar,
   transformText,
   suggestWidgetSetup,
@@ -865,6 +866,33 @@ export function registerIpcHandlers(): void {
     recordAiCall()
     return sendChat(req)
   })
+  // Streaming variant — retrieval, reply and each prepared action arrive on a
+  // per-request channel `chat:stream:<reqId>` so the assistant can show the work
+  // as it happens. Caller mints the reqId. `chat:send` above is untouched and
+  // stays the fallback for every other caller.
+  ipcMain.handle(
+    'chat:sendStream',
+    async (e, input: ChatRequest & { requestId: string }): Promise<{ ok: boolean }> => {
+      recordAiCall()
+      const channel = `chat:stream:${input.requestId}`
+      const sender = e.sender
+      const send = (type: string, payload?: unknown): void => {
+        if (sender.isDestroyed()) return
+        sender.send(channel, { type, payload })
+      }
+      await sendChatStream(
+        { taskId: input.taskId, messages: input.messages, attachments: input.attachments },
+        {
+          onSources: (t) => send('sources', t),
+          onReply: (text) => send('reply', text),
+          onTool: (tool) => send('tool', tool),
+          onError: (err) => send('error', err),
+          onComplete: (resp) => send('complete', resp)
+        }
+      )
+      return { ok: true }
+    }
+  )
   ipcMain.handle('chat:hasApiKey', () => Boolean(resolveAnthropicKey()))
   ipcMain.handle('ai:dailyBrief', () => generateDailyBrief())
   // Save a meeting to the OS default calendar (Apple Calendar / Outlook) by

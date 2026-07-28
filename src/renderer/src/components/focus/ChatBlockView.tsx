@@ -3,6 +3,7 @@ import remarkGfm from 'remark-gfm'
 import type { AppliedProposal, ChatBlock } from '@shared/types'
 import ProposalCards from '../ProposalCards'
 import remarkCitations from '../../lib/remarkCitations'
+import { connectorMeta } from '../../lib/chatBlocks'
 import Icon from '../Icon'
 
 // The block-renderer registry for the agentic chat's typed-block thread.
@@ -28,17 +29,6 @@ interface Props {
   onConsumeProposal: (proposalId: string) => void
   // Jump to a real workspace item (widget/document) when a block links to one.
   onOpenWidget?: (widgetId: string) => void
-}
-
-// Connector display metadata. Free-string keyed so unknown connectors still get
-// a sane default rather than breaking — open-ended by construction.
-const CONNECTOR_META: Record<string, { icon: string; label: string }> = {
-  gmail: { icon: 'mail', label: 'Email' },
-  calendar: { icon: 'calendar_month', label: 'Calendar' },
-  chat: { icon: 'chat', label: 'Message' }
-}
-function connectorMeta(connector: string): { icon: string; label: string } {
-  return CONNECTOR_META[connector] ?? { icon: 'bolt', label: connector }
 }
 
 export default function ChatBlockView({
