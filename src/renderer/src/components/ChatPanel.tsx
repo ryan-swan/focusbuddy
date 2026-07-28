@@ -1,18 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import ReactMarkdown from 'react-markdown'
-import remarkGfm from 'remark-gfm'
-import type { ActionProposal, ChatMessage } from '@shared/types'
+import type { AppliedProposal, ChatMessage } from '@shared/types'
 import { useNodeStore } from '../stores/nodes'
-import { useChatStore } from '../stores/chat'
+import { useChatStore, appliedKey } from '../stores/chat'
+import { deriveAssistantBlocks } from '../lib/chatBlocks'
+import ChatBlockView from './focus/ChatBlockView'
 import { useAssistantContext } from '../lib/assistantContext'
 import { useWidgetStore } from '../stores/widgets'
-import { useActionHistory } from '../stores/actionHistory'
 import { chimeIn } from '../lib/audioBeep'
 import CanvasContextMenu, { type CtxMenuItem } from './CanvasContextMenu'
 import { FLOATING_MENU_ASIDE, FLOATING_MENU_STYLE } from './chrome/floatingMenu'
 import { useModelMode } from '../lib/modelPrefs'
 import { useBodyDouble } from '../lib/bodyDouble'
-import { applyProposal, describeProposal } from '../lib/actionExecutor'
 import Icon from './Icon'
 
 // Window for the "What was I doing?" lookback — last 30 minutes covers most context switches.
@@ -32,6 +30,8 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
   const checkApiKey = useChatStore((s) => s.checkApiKey)
   const messagesByTask = useChatStore((s) => s.messagesByTask)
   const proposalsByMessage = useChatStore((s) => s.proposalsByMessage)
+  const appliedProposals = useChatStore((s) => s.appliedProposals)
+  const markProposalApplied = useChatStore((s) => s.markProposalApplied)
   const consumeProposal = useChatStore((s) => s.consumeProposal)
   const clear = useChatStore((s) => s.clear)
   // The assistant is one panel that adapts to the current screen (desk / room /
@@ -282,54 +282,45 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
           </div>
         )}
         {messages.map((m, i) => {
-          // Per-message proposals: rendered as cards below the assistant bubble.
-          // Cards are individually clickable to apply or dismiss; an "apply all"
-          // shortcut runs every remaining proposal in one click.
-          const proposalsForMsg =
-            m.role === 'assistant' ? proposalsByMessage[String(m.ts)] : undefined
-          return (
-            <div key={i} className="flex flex-col gap-1.5">
+          // The user's own turn stays a plain bubble.
+          if (m.role === 'user') {
+            return (
               <div
-                className={`max-w-[92%] rounded-xl px-3 py-2 text-sm leading-relaxed ${
-                  m.role === 'user'
-                    ? 'ml-auto bg-stone-900 dark:bg-stone-100 text-stone-50 dark:text-stone-900 whitespace-pre-wrap'
-                    : 'bg-[var(--surface-raised)] text-[var(--ink-100)] border border-[var(--edge-soft)] md-rendered'
-                }`}
+                key={i}
+                className="ml-auto max-w-[92%] rounded-xl px-3 py-2 text-sm leading-relaxed bg-stone-900 dark:bg-stone-100 text-stone-50 dark:text-stone-900 whitespace-pre-wrap"
               >
-                {m.role === 'assistant' ? (
-                  // Rich text rendering: headings, lists, bold, code, links,
-                  // tables (GFM). The `md-rendered` class above provides the
-                  // typography styles (same as MarkdownWidget). Select+copy
-                  // preserves formatting when pasted into Notion/Docs.
-                  <ReactMarkdown
-                    remarkPlugins={[remarkGfm]}
-                    components={{
-                      a: ({ href, children, ...rest }) => (
-                        <a
-                          href={href}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          {...rest}
-                        >
-                          {children}
-                        </a>
-                      )
-                    }}
-                  >
-                    {m.content}
-                  </ReactMarkdown>
-                ) : (
-                  m.content
-                )}
+                {m.content}
               </div>
-              {proposalsForMsg && proposalsForMsg.length > 0 && (
-                <ProposalCards
-                  proposals={proposalsForMsg}
-                  messageTs={m.ts}
+            )
+          }
+          // Each assistant turn renders as an ordered list of typed blocks
+          // rather than one markdown lump: the reply text, then one block per
+          // proposal — connector-branded (Gmail / Calendar / Message) when the
+          // action maps to an integration. Blocks are derived on this side from
+          // the existing {reply, actions} response, so the backend contract is
+          // untouched. Same path the Focus chat already uses.
+          const proposals = proposalsByMessage[String(m.ts)] ?? []
+          const blocks = deriveAssistantBlocks(m, proposals)
+          // Slice the composite-keyed applied-state down to THIS message,
+          // re-keyed by plain proposalId, so ProposalCards stays store-shape
+          // agnostic (the Focus chat passes the same shape).
+          const appliedForMsg: Record<string, AppliedProposal> = {}
+          for (const p of proposals) {
+            const a = appliedProposals[appliedKey(m.ts, p.id)]
+            if (a) appliedForMsg[p.id] = a
+          }
+          return (
+            <div key={i} className="flex flex-col gap-1.5" data-testid="assistant-turn">
+              {blocks.map((block, bi) => (
+                <ChatBlockView
+                  key={bi}
+                  block={block}
                   activeTaskId={activeTaskId}
-                  onConsume={(id) => consumeProposal(m.ts, id)}
+                  appliedProposals={appliedForMsg}
+                  onApplied={(id, applied) => markProposalApplied(m.ts, id, applied)}
+                  onConsumeProposal={(id) => consumeProposal(m.ts, id)}
                 />
-              )}
+              ))}
             </div>
           )
         })}
@@ -371,253 +362,5 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
         />
       )}
     </aside>
-  )
-}
-
-// ── Inline action-proposal cards ────────────────────────────────────────────
-//
-// Each ActionProposal renders as a clickable card with apply / dismiss
-// affordances. On apply, the executor mutates the workspace; on success the
-// card flashes a confirmation chip + the proposal disappears from the list.
-// Multiple cards can be applied in sequence; an "apply all" runs them.
-
-interface ProposalCardsProps {
-  proposals: ActionProposal[]
-  messageTs: number
-  activeTaskId: string | null
-  onConsume: (proposalId: string) => void
-}
-
-// Exported so PlexiChat can render the AI member's proposals as the same
-// confirm-before-apply cards used by the desk AI assistant. Reused as-is: the
-// apply / dependency-resolution / no-fakery-toast logic is shared, not forked.
-export function ProposalCards({
-  proposals,
-  activeTaskId,
-  onConsume
-}: ProposalCardsProps): JSX.Element {
-  const [busy, setBusy] = useState<string | null>(null)
-  const [toast, setToast] = useState<{ id: string; ok: boolean; message: string } | null>(
-    null
-  )
-
-  // resolvedIds threads newly-created entity ids (today: tables) through a
-  // batch so a follow-up proposal (today: add-table-row) can reference what
-  // an earlier one created via "$<proposalId>" symbolic refs. Held in a ref
-  // so a per-card click survives outside of a single applyAll() loop —
-  // without this, clicking Apply on an add-table-row card after manually
-  // applying its parent create-table card would still fail because the
-  // resolution map was local to applyAll's stack frame.
-  const batchResolvedIds = useRef<Map<string, string>>(new Map())
-
-  // Detect "I depend on a proposal that hasn't been applied yet" cases.
-  // When the user clicks Apply on a single dependent card (e.g. an
-  // add-table-row pointing at $tbl-1), we look up the parent in the
-  // current proposals array and run it first, threading the resolved id
-  // into the batch map so the child's apply succeeds. Today only
-  // add-table-row → create-table exists; the helper is structured so
-  // new dependent kinds slot in by adding a case to the switch.
-  async function ensureDependencies(
-    p: ActionProposal,
-    resolvedIds: Map<string, string>
-  ): Promise<{ ok: true } | { ok: false; message: string }> {
-    if (p.kind === 'add-table-row' && p.tableId.startsWith('$')) {
-      const refKey = p.tableId.slice(1)
-      if (resolvedIds.has(refKey)) return { ok: true }
-      const parent = proposals.find(
-        (x) => x.id === refKey && x.kind === 'create-table'
-      )
-      if (!parent) {
-        return {
-          ok: false,
-          message:
-            'Row references a table that was never proposed alongside it — try regenerating the request.'
-        }
-      }
-      const parentResult = await applyProposal(parent, { activeTaskId, resolvedIds })
-      if (!parentResult.ok) {
-        return {
-          ok: false,
-          message: `Couldn't auto-create parent table: ${parentResult.message}`
-        }
-      }
-      // Parent landed — drop it from the visible list too so the user
-      // doesn't see a duplicate "create table" card sitting around.
-      onConsume(parent.id)
-    }
-    // edit-document → create-document in the same batch, same shape.
-    if (p.kind === 'edit-document' && p.documentId.startsWith('$')) {
-      const refKey = p.documentId.slice(1)
-      if (!resolvedIds.has(refKey)) {
-        const parent = proposals.find(
-          (x) => x.id === refKey && (x.kind === 'create-document' || x.kind === 'generate-document')
-        )
-        if (!parent) {
-          return {
-            ok: false,
-            message: 'Edit references a document that was never proposed alongside it — try regenerating.'
-          }
-        }
-        const parentResult = await applyProposal(parent, { activeTaskId, resolvedIds })
-        if (!parentResult.ok) {
-          return { ok: false, message: `Couldn't auto-create the document first: ${parentResult.message}` }
-        }
-        onConsume(parent.id)
-      }
-    }
-    // schedule-event bound to a create-task in the same batch.
-    if (p.kind === 'schedule-event' && p.taskId && p.taskId.startsWith('$')) {
-      const refKey = p.taskId.slice(1)
-      if (!resolvedIds.has(refKey)) {
-        const parent = proposals.find((x) => x.id === refKey && x.kind === 'create-task')
-        if (!parent) {
-          return { ok: false, message: 'Event references a task that was never proposed alongside it.' }
-        }
-        const parentResult = await applyProposal(parent, { activeTaskId, resolvedIds })
-        if (!parentResult.ok) {
-          return { ok: false, message: `Couldn't auto-create the task first: ${parentResult.message}` }
-        }
-        onConsume(parent.id)
-      }
-    }
-    return { ok: true }
-  }
-
-  async function applyOne(
-    p: ActionProposal,
-    resolvedIds?: Map<string, string>
-  ): Promise<void> {
-    if (busy) return
-    const ids = resolvedIds ?? batchResolvedIds.current
-    setBusy(p.id)
-    const dep = await ensureDependencies(p, ids)
-    if (!dep.ok) {
-      setBusy(null)
-      setToast({ id: p.id, ok: false, message: dep.message })
-      setTimeout(() => setToast((t) => (t?.id === p.id ? null : t)), 2800)
-      return
-    }
-    // A canvas handler (or its store IPC) can throw rather than return a
-    // failure envelope. Without this guard the throw skipped setBusy(null), so
-    // every Apply button stayed disabled and the panel looked frozen. Always
-    // clear busy and show an honest failure chip; the card stays for a retry.
-    let result: { ok: boolean; message: string }
-    try {
-      result = await applyProposal(p, { activeTaskId, resolvedIds: ids })
-    } catch (err) {
-      result = { ok: false, message: err instanceof Error ? err.message : 'Could not apply that action.' }
-    }
-    setBusy(null)
-    setToast({ id: p.id, ok: result.ok, message: result.message })
-    // Only remove from the list if it succeeded. Failures stay so the user
-    // can read the message + try again.
-    if (result.ok) onConsume(p.id)
-    // Auto-dismiss the toast — bottom-right chip behaviour, ~2s.
-    setTimeout(() => setToast((t) => (t?.id === p.id ? null : t)), 2200)
-  }
-
-  async function applyAll(): Promise<void> {
-    if (busy) return
-    // Confirm before a batch that destroys anything — undo exists as a backstop,
-    // but a one-click bulk delete deserves a heads-up.
-    const destructive = proposals.filter((p) => p.kind === 'delete-widget')
-    if (destructive.length > 0) {
-      const ok = window.confirm(
-        `This will delete ${destructive.length} item${destructive.length > 1 ? 's' : ''} from your canvas. You can undo it afterwards. Apply all ${proposals.length} change${proposals.length > 1 ? 's' : ''}?`
-      )
-      if (!ok) return
-    }
-    const resolvedIds = batchResolvedIds.current
-    // Coalesce the whole batch into one undo entry, so a single Cmd-Z (or the
-    // toast's Undo) reverses the entire "Apply all".
-    useActionHistory.getState().beginBatch()
-    try {
-      for (const p of proposals) {
-        // Sequential so error messages from one don't get clobbered by the
-        // next, AND so symbolic-id refs resolve in order (create-table must
-        // run before its add-table-row siblings).
-        await applyOne(p, resolvedIds)
-      }
-    } finally {
-      useActionHistory
-        .getState()
-        .endBatch(`Apply ${proposals.length} AI change${proposals.length > 1 ? 's' : ''}`)
-    }
-  }
-
-  return (
-    <div className="ml-0 mr-auto max-w-[92%] flex flex-col gap-1">
-      {proposals.map((p) => {
-        const desc = describeProposal(p)
-        const isBusy = busy === p.id
-        const showToast = toast?.id === p.id
-        return (
-          <button
-            key={p.id}
-            onClick={() => void applyOne(p)}
-            disabled={isBusy}
-            className="text-left rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-raised)] hover:border-accent hover:bg-accent/5 px-2.5 py-1.5 transition-colors group"
-          >
-            <div className="flex items-center gap-2">
-              <span className="h-6 w-6 rounded-md inline-flex items-center justify-center bg-accent/10 text-accent shrink-0">
-                <Icon name={desc.icon} size={13} />
-              </span>
-              <div className="min-w-0 flex-1">
-                <div className="text-[10px] uppercase tracking-wider text-[var(--ink-50)]">
-                  {desc.verb}
-                </div>
-                <div className="text-[12px] font-medium text-[var(--ink-100)] truncate">
-                  {desc.subject}
-                </div>
-                {p.reason && (
-                  <div className="text-[10px] text-[var(--ink-50)] mt-0.5 leading-snug">
-                    {p.reason}
-                  </div>
-                )}
-                {showToast && (
-                  <div
-                    className={`text-[10px] mt-1 ${
-                      toast.ok
-                        ? 'text-emerald-600 dark:text-emerald-400'
-                        : 'text-amber-700 dark:text-amber-400'
-                    }`}
-                  >
-                    {toast.ok ? '✓ ' : '⚠ '}
-                    {toast.message}
-                  </div>
-                )}
-              </div>
-              <div className="flex items-center gap-1 shrink-0">
-                {!isBusy && (
-                  <span
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      onConsume(p.id)
-                    }}
-                    title="Dismiss this suggestion"
-                    role="button"
-                    className="icon-btn !h-5 !w-5"
-                  >
-                    <Icon name="close" size={11} />
-                  </span>
-                )}
-                <span className="text-[10px] text-accent font-medium px-1">
-                  {isBusy ? '…' : 'apply'}
-                </span>
-              </div>
-            </div>
-          </button>
-        )
-      })}
-      {proposals.length > 1 && (
-        <button
-          onClick={() => void applyAll()}
-          disabled={busy !== null}
-          className="text-[11px] text-accent self-start px-1.5 py-0.5 hover:underline disabled:opacity-50"
-        >
-          Apply all {proposals.length}
-        </button>
-      )}
-    </div>
   )
 }

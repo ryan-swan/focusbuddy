@@ -15,22 +15,33 @@ import Icon from './Icon'
 // Store-agnostic: the applied-state + the mark-applied callback are passed in by
 // the host surface, so the SAME component works for the in-memory side-panel
 // assistant (useChatStore) AND the persisted Focus chat (useFocusChatStore).
+//
+// Both are OPTIONAL so a surface can adopt this component before it has anywhere
+// to keep applied-state. Omit them and an applied card is simply consumed on
+// success (the pre-durable-record behaviour) — no store change required. Pass
+// them and the card becomes a durable green record with a "Go to". PlexiChat
+// (MessagesView) is on the fallback today; wiring applied-state into
+// stores/messaging.ts is all it needs to gain the richer behaviour.
 
 interface ProposalCardsProps {
   proposals: ActionProposal[]
   activeTaskId: string | null
   // Applied-card state keyed by proposal id (from the host surface's store).
-  appliedProposals: Record<string, AppliedProposal>
+  // Omitted → no card is ever shown as applied (see onApplied).
+  appliedProposals?: Record<string, AppliedProposal>
   // Record that a proposal was approved (the host persists / stores it).
-  onApplied: (proposalId: string, applied: AppliedProposal) => void
+  // Omitted → the card is consumed on success instead of kept as a record.
+  onApplied?: (proposalId: string, applied: AppliedProposal) => void
   // Remove an un-applied suggestion (dismiss).
   onConsume: (proposalId: string) => void
 }
 
+const NO_APPLIED: Record<string, AppliedProposal> = {}
+
 export default function ProposalCards({
   proposals,
   activeTaskId,
-  appliedProposals,
+  appliedProposals = NO_APPLIED,
   onApplied,
   onConsume
 }: ProposalCardsProps): JSX.Element {
@@ -47,6 +58,27 @@ export default function ProposalCards({
   // applying its parent create-table card would still fail because the
   // resolution map was local to applyAll's stack frame.
   const batchResolvedIds = useRef<Map<string, string>>(new Map())
+
+  // Single place the "what happens to a card once it succeeds" decision lives.
+  // With an applied-state store the card becomes a durable green record with a
+  // "Go to"; without one it is consumed, matching the pre-durable behaviour.
+  // Every success path (direct apply + each auto-applied parent dependency)
+  // routes through here so the two modes can never drift apart.
+  function recordApplied(
+    p: ActionProposal,
+    message: string,
+    resolvedIds: Map<string, string>
+  ): void {
+    if (onApplied) {
+      onApplied(p.id, {
+        message,
+        target: resolveGoToTarget(p, resolvedIds),
+        appliedAt: Date.now()
+      })
+    } else {
+      onConsume(p.id)
+    }
+  }
 
   // Detect "I depend on a proposal that hasn't been applied yet" cases.
   // When the user clicks Apply on a single dependent card (e.g. an
@@ -81,17 +113,19 @@ export default function ProposalCards({
       }
       // Parent landed — mark it applied (green record) rather than removing it,
       // so an auto-created dependency reads the same as a manually-applied one.
-      onApplied(parent.id, {
-        message: parentResult.message,
-        target: resolveGoToTarget(parent, resolvedIds),
-        appliedAt: Date.now()
-      })
+      recordApplied(parent, parentResult.message, resolvedIds)
     }
     // edit-document → create-document in the same batch, same shape.
+    // `generate-document` counts as a parent too: it also produces a document,
+    // so an edit referencing one must resolve against it. Carried over from
+    // da4938b, which added it to the inlined copy this component replaced —
+    // converging the fork must not drop the fix that lived in the fork.
     if (p.kind === 'edit-document' && p.documentId.startsWith('$')) {
       const refKey = p.documentId.slice(1)
       if (!resolvedIds.has(refKey)) {
-        const parent = proposals.find((x) => x.id === refKey && x.kind === 'create-document')
+        const parent = proposals.find(
+          (x) => x.id === refKey && (x.kind === 'create-document' || x.kind === 'generate-document')
+        )
         if (!parent) {
           return {
             ok: false,
@@ -102,11 +136,7 @@ export default function ProposalCards({
         if (!parentResult.ok) {
           return { ok: false, message: `Couldn't auto-create the document first: ${parentResult.message}` }
         }
-        onApplied(parent.id, {
-          message: parentResult.message,
-          target: resolveGoToTarget(parent, resolvedIds),
-          appliedAt: Date.now()
-        })
+        recordApplied(parent, parentResult.message, resolvedIds)
       }
     }
     // schedule-event bound to a create-task in the same batch.
@@ -121,11 +151,7 @@ export default function ProposalCards({
         if (!parentResult.ok) {
           return { ok: false, message: `Couldn't auto-create the task first: ${parentResult.message}` }
         }
-        onApplied(parent.id, {
-          message: parentResult.message,
-          target: resolveGoToTarget(parent, resolvedIds),
-          appliedAt: Date.now()
-        })
+        recordApplied(parent, parentResult.message, resolvedIds)
       }
     }
     return { ok: true }
@@ -162,12 +188,7 @@ export default function ProposalCards({
     // keep the card clickable (so the user can read the message + retry) and are
     // shown as an inline toast.
     if (result.ok) {
-      const target = resolveGoToTarget(p, ids)
-      onApplied(p.id, {
-        message: result.message,
-        target,
-        appliedAt: Date.now()
-      })
+      recordApplied(p, result.message, ids)
     } else {
       setToast({ id: p.id, ok: false, message: result.message })
       setTimeout(() => setToast((t) => (t?.id === p.id ? null : t)), 2200)

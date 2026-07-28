@@ -36,7 +36,7 @@ import { applyProposal } from '../../lib/actionExecutor'
 import { listOrgs, type OrgMembership } from '../../lib/orgsClient'
 import Icon from '../Icon'
 import { ChatComposer } from './chat/ChatComposer'
-import { ProposalCards } from '../ChatPanel'
+import ProposalCards from '../ProposalCards'
 import { useViewStore } from '../../stores/view'
 import { useNodeStore } from '../../stores/nodes'
 import { useWidgetStore } from '../../stores/widgets'
@@ -376,9 +376,12 @@ export function MessageRow({
         )}
         {proposals.length > 0 && (
           <div className="mt-1 w-full max-w-[420px]" data-testid={`chat-proposals-${m.id}`}>
+            {/* No appliedProposals / onApplied: PlexiChat has nowhere to keep
+                applied-state yet, so cards are consumed on success exactly as
+                before. Wiring applied-state into stores/messaging.ts is all this
+                needs to gain durable green records + "Go to". */}
             <ProposalCards
               proposals={proposals}
-              messageTs={m.createdAt}
               activeTaskId={null}
               onConsume={(pid) => consumeProposal(m.conversationId, m.id, pid)}
             />
