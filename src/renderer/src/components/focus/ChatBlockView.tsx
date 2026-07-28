@@ -2,6 +2,7 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import type { AppliedProposal, ChatBlock } from '@shared/types'
 import ProposalCards from '../ProposalCards'
+import remarkCitations from '../../lib/remarkCitations'
 import Icon from '../Icon'
 
 // The block-renderer registry for the agentic chat's typed-block thread.
@@ -51,20 +52,61 @@ export default function ChatBlockView({
   switch (block.kind) {
     // ── Live blocks ──────────────────────────────────────────────────────────
     case 'text':
+      // Assistant prose is deliberately UNBUBBLED — it sits on the panel rather
+      // than inside a bordered box. Boxing both sides is the generic-chat tell,
+      // and it forces long answers, tables and code to fight a 10px radius. The
+      // speaker is carried by the turn's identity row, not by a container.
       return (
-        <div className="max-w-[92%] rounded-lg px-3 py-2 text-sm leading-relaxed bg-[var(--surface-raised)] text-[var(--ink-100)] border border-[var(--edge-soft)] md-rendered">
+        <div className="text-[13px] leading-[1.62] text-[var(--ink-90)] md-rendered">
           <ReactMarkdown
-            remarkPlugins={[remarkGfm]}
+            remarkPlugins={[remarkGfm, remarkCitations]}
             components={{
               a: ({ href, children, ...rest }) => (
                 <a href={href} target="_blank" rel="noopener noreferrer" {...rest}>
                   {children}
                 </a>
-              )
+              ),
+              // Inline [n] citation markers, rewritten by remarkCitations into a
+              // span carrying data-citation. Any other span passes through
+              // untouched, so this override costs nothing when there are no
+              // citations. Rendered as a small accent chip so a claim and its
+              // grounding read as one thing.
+              span: ({ node, children, ...rest }) => {
+                const n = node?.properties?.dataCitation
+                if (n === undefined || n === null || n === '') {
+                  return <span {...rest}>{children}</span>
+                }
+                return (
+                  <span
+                    data-testid="chat-citation"
+                    title={`Source ${String(n)}`}
+                    className="inline-grid place-items-center align-[1.5px] mx-[1px] min-w-[14px] h-[14px] px-[3px] rounded-[4px] bg-accent/15 text-accent text-[9px] font-mono font-semibold"
+                  >
+                    {String(n)}
+                  </span>
+                )
+              }
             }}
           >
             {block.markdown}
           </ReactMarkdown>
+        </div>
+      )
+
+    case 'sources':
+      // What the answer stands on. The numbers match the inline markers above.
+      return (
+        <div className="flex flex-wrap gap-1" data-testid="chat-sources">
+          {block.sources.map((s) => (
+            <span
+              key={`${s.n}-${s.docId}`}
+              title={s.snippet || s.title}
+              className="inline-flex items-center gap-1.5 max-w-full rounded-full border border-[var(--edge-soft)] bg-[var(--surface-sunken)] pl-1.5 pr-2 py-0.5 text-[10px] text-[var(--ink-70)]"
+            >
+              <b className="font-mono text-[8.5px] font-bold text-accent">{s.n}</b>
+              <span className="truncate">{s.title}</span>
+            </span>
+          ))}
         </div>
       )
 

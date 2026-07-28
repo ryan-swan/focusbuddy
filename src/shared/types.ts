@@ -408,6 +408,19 @@ export interface ChatRequest {
   workspace?: WorkspaceSnapshot
 }
 
+// A retrieved workspace document the assistant was grounded on. Slimmed from
+// the main process's WorkspaceSource: the renderer needs enough to label, order
+// and open a citation — not the full extracted body that went to the model.
+export interface ChatSource {
+  // 1-based citation number. Matches the [n] markers the model is told to use
+  // inline in its reply, so a marker and its chip always refer to the same doc.
+  n: number
+  docId: string
+  title: string
+  docType: string
+  snippet: string
+}
+
 export interface ChatResponse {
   ok: boolean
   message?: ChatMessage
@@ -417,6 +430,10 @@ export interface ChatResponse {
   // it WOULD do; the renderer shows each as a confirmable card and only
   // executes those the user accepts. Empty/undefined for plain chat replies.
   proposals?: ActionProposal[]
+  // The workspace material this answer was grounded on. Retrieval already ran on
+  // every message to build the prompt; returning it lets the renderer show what
+  // the answer stands on instead of discarding it.
+  sources?: ChatSource[]
 }
 
 // ── Action proposals (AI → workspace actions, gated by user confirmation) ───
@@ -2124,3 +2141,6 @@ export type ChatBlock =
   | { kind: 'widget-card'; widgetId?: string; documentId?: string; title: string; widgetKind?: WidgetKind }
   | { kind: 'link'; href: string; label: string; external?: boolean }
   | { kind: 'connector-action'; connector: string; label: string; proposal: ActionProposal }
+  // What the answer was grounded on. Rendered as a row of numbered chips under
+  // the reply, matching the [n] markers inside it.
+  | { kind: 'sources'; sources: ChatSource[] }

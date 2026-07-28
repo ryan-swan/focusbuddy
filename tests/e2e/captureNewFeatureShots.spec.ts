@@ -383,7 +383,10 @@ test('capture new-feature marketing screenshots', async () => {
         ]
       })) as unknown as typeof api.chat.send
     })
-    const composer = window.locator('textarea[placeholder*="⌘⏎"]')
+    // Stable testid rather than placeholder text: the composer no longer
+    // advertises a send chord in its placeholder (Enter sends now). The Send
+    // button below is still found by its accessible name, which is unchanged.
+    const composer = window.locator('[data-testid="chat-composer"]')
     await composer.waitFor({ state: 'visible', timeout: 5_000 })
     await composer.fill('Set up a way to track and research my sales leads')
     await window.getByRole('button', { name: /^Send$/ }).click()

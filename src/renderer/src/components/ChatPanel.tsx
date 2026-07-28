@@ -31,8 +31,10 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
   const messagesByTask = useChatStore((s) => s.messagesByTask)
   const proposalsByMessage = useChatStore((s) => s.proposalsByMessage)
   const appliedProposals = useChatStore((s) => s.appliedProposals)
+  const sourcesByMessage = useChatStore((s) => s.sourcesByMessage)
   const markProposalApplied = useChatStore((s) => s.markProposalApplied)
   const consumeProposal = useChatStore((s) => s.consumeProposal)
+  const rewindTo = useChatStore((s) => s.rewindTo)
   const clear = useChatStore((s) => s.clear)
   // The assistant is one panel that adapts to the current screen (desk / room /
   // doc / chat / meet / design / focused widget). ctx.key threads the
@@ -45,7 +47,11 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
   )
   const [draft, setDraft] = useState('')
   const [summarizing, setSummarizing] = useState(false)
+  // Which turn most recently had its text copied — drives the ✓ confirmation on
+  // the copy button, then clears itself.
+  const [copiedTs, setCopiedTs] = useState<number | null>(null)
   const scrollRef = useRef<HTMLDivElement | null>(null)
+  const taRef = useRef<HTMLTextAreaElement | null>(null)
   const createWidget = useWidgetStore((s) => s.create)
   const bumpLayout = useWidgetStore((s) => s.bumpLayoutVersion)
   const pushAssistantMessage = useChatStore((s) => s.pushAssistantMessage)
@@ -151,12 +157,55 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight
   }, [messages.length, sending])
 
+  // Grow the composer with its content instead of pinning it to a fixed 3 rows.
+  // Reset to auto first so it shrinks back when text is deleted; the max-height
+  // in the class caps it and hands over to scrolling.
+  useEffect(() => {
+    const el = taRef.current
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = `${el.scrollHeight}px`
+  }, [draft])
+
   async function handleSend(e: React.FormEvent): Promise<void> {
     e.preventDefault()
     const content = draft.trim()
     if (!content || sending) return
     setDraft('')
     await send(ctx.serverTaskId, content, ctx.key)
+  }
+
+  async function copyTurn(content: string): Promise<void> {
+    try {
+      await navigator.clipboard?.writeText(content)
+      const stamp = Date.now()
+      setCopiedTs(stamp)
+      // Clear the ✓ only if nothing else has been copied since.
+      setTimeout(() => setCopiedTs((c) => (c === stamp ? null : c)), 1600)
+    } catch {
+      /* clipboard can be denied; failing to copy is not worth an error state */
+    }
+  }
+
+  // Regenerate an assistant turn: drop it (and anything after) and re-send the
+  // user message that produced it. Getting a bad answer should not mean
+  // retyping the question.
+  async function retryFrom(assistantIndex: number): Promise<void> {
+    if (sending) return
+    // Walk back to the user turn that produced this answer.
+    let userIndex = -1
+    for (let k = assistantIndex - 1; k >= 0; k--) {
+      if (messages[k].role === 'user') {
+        userIndex = k
+        break
+      }
+    }
+    if (userIndex < 0) return
+    const question = messages[userIndex].content
+    // Rewind to just before that question, then re-send it, so the request is
+    // rebuilt with exactly the history it had the first time.
+    rewindTo(ctx.key, userIndex)
+    await send(ctx.serverTaskId, question, ctx.key)
   }
 
   return (
@@ -171,27 +220,20 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
     >
       <div className="px-3 py-3 border-b border-[var(--edge-soft)] flex items-center justify-between gap-2">
         <div className="min-w-0">
+          {/* Sentence case, not shouted. The uppercase treatment made a 13px
+              label read as a system banner rather than a product surface. */}
           <div className="flex items-center gap-1.5">
-            <Icon name={ctx.icon} size={16} className="text-[var(--ink-70)]" />
-            <h2 className="text-[13px] font-semibold tracking-tight text-[var(--ink-100)] uppercase">
+            <Icon name={ctx.icon} size={15} className="text-[var(--ink-70)]" />
+            <h2 className="text-[13.5px] font-semibold tracking-[-0.01em] text-[var(--ink-100)]">
               Assistant
             </h2>
           </div>
-          <p className="text-[11px] text-[var(--ink-50)] truncate flex items-center gap-1.5">
-            <span className="truncate" title={`Assistant is focused on ${ctx.label}${ctx.title ? ` — ${ctx.title}` : ''}`}>
-              {ctx.label}
-              {ctx.title ? ` · ${ctx.title}` : ''}
-            </span>
-            {/* Only surface the model when it is locked to something specific; in
-                the default auto mode the chip is just noise in a narrow header. */}
-            {modelMode !== 'auto' && (
-              <span
-                className="font-mono text-[9px] px-1.5 py-0.5 rounded-full bg-[var(--surface-sunken)] text-[var(--ink-70)] shrink-0"
-                title={`Locked to ${modelMode}. Change in Settings.`}
-              >
-                {modelMode}
-              </span>
-            )}
+          <p
+            className="text-[10.5px] text-[var(--ink-50)] truncate"
+            title={`Assistant is focused on ${ctx.label}${ctx.title ? ` — ${ctx.title}` : ''}`}
+          >
+            {ctx.title ? `${ctx.title} · ` : ''}
+            {ctx.label}
           </p>
         </div>
         <div className="flex items-center gap-1">
@@ -263,18 +305,18 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
       >
         {messages.length === 0 && (
           <div className="mt-1 px-0.5">
-            <p className="text-[12.5px] text-[var(--ink-50)] leading-relaxed mb-3">
-              {ctx.intro} Try one of these to start:
-            </p>
-            <div className="space-y-1.5">
+            <p className="text-[12.5px] text-[var(--ink-70)] leading-relaxed mb-3">{ctx.intro}</p>
+            {/* Prompt chips wrap instead of stacking as full-width bordered rows;
+                a pill reads as an offer, a full-width row reads as a menu item. */}
+            <div className="flex flex-wrap gap-1.5">
               {ctx.suggestions.map((s) => (
                 <button
                   key={s.text}
                   onClick={() => setDraft(s.text)}
                   data-testid="chat-suggestion"
-                  className="w-full text-left text-[12.5px] px-3 py-2 rounded-lg border border-[var(--edge-soft)] text-[var(--ink-70)] hover:border-accent hover:bg-[var(--surface-sunken)] transition-colors flex items-center gap-2"
+                  className="inline-flex items-center gap-1.5 text-left text-[11.5px] px-2.5 py-1.5 rounded-full border border-[var(--edge-soft)] text-[var(--ink-70)] hover:text-[var(--ink-100)] hover:border-[rgb(var(--accent)/0.45)] hover:bg-[var(--surface-sunken)] transition-colors"
                 >
-                  <Icon name={s.icon} size={14} className="text-accent shrink-0" />
+                  <Icon name={s.icon} size={13} className="text-accent shrink-0" />
                   <span>{s.text}</span>
                 </button>
               ))}
@@ -282,12 +324,16 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
           </div>
         )}
         {messages.map((m, i) => {
-          // The user's own turn stays a plain bubble.
+          // The user's turn is a quiet accent-tinted block, built from tokens so
+          // it follows every theme. It used to be hardcoded stone-900/stone-100
+          // — the one element in the panel that ignored the token system and so
+          // stayed the same slab under futuristic and atelier.
           if (m.role === 'user') {
             return (
               <div
                 key={i}
-                className="ml-auto max-w-[92%] rounded-xl px-3 py-2 text-sm leading-relaxed bg-stone-900 dark:bg-stone-100 text-stone-50 dark:text-stone-900 whitespace-pre-wrap"
+                data-testid="user-turn"
+                className="ml-auto max-w-[88%] rounded-xl rounded-br-[3px] px-3 py-2 text-[13px] leading-relaxed whitespace-pre-wrap bg-[rgb(var(--accent)/0.10)] border border-[rgb(var(--accent)/0.18)] text-[var(--ink-100)]"
               >
                 {m.content}
               </div>
@@ -300,7 +346,8 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
           // the existing {reply, actions} response, so the backend contract is
           // untouched. Same path the Focus chat already uses.
           const proposals = proposalsByMessage[String(m.ts)] ?? []
-          const blocks = deriveAssistantBlocks(m, proposals)
+          const sources = sourcesByMessage[String(m.ts)] ?? []
+          const blocks = deriveAssistantBlocks(m, proposals, sources)
           // Slice the composite-keyed applied-state down to THIS message,
           // re-keyed by plain proposalId, so ProposalCards stays store-shape
           // agnostic (the Focus chat passes the same shape).
@@ -310,7 +357,18 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
             if (a) appliedForMsg[p.id] = a
           }
           return (
-            <div key={i} className="flex flex-col gap-1.5" data-testid="assistant-turn">
+            <div key={i} className="group/turn flex flex-col gap-1.5" data-testid="assistant-turn">
+              {/* Identity row. With the prose unbubbled, this is what marks the
+                  speaker — the research is explicit that sender must not be
+                  carried by colour alone. */}
+              <div className="flex items-center gap-1.5">
+                <span className="w-4 h-4 rounded-[5px] grid place-items-center bg-accent/15 text-accent shrink-0">
+                  <Icon name="auto_awesome" size={10} filled />
+                </span>
+                <span className="text-[10px] font-mono uppercase tracking-[0.09em] text-[var(--ink-50)]">
+                  Plexi
+                </span>
+              </div>
               {blocks.map((block, bi) => (
                 <ChatBlockView
                   key={bi}
@@ -321,36 +379,90 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
                   onConsumeProposal={(id) => consumeProposal(m.ts, id)}
                 />
               ))}
+              {/* Per-turn actions. Revealed on hover to keep the thread calm, but
+                  focus-visible brings them back for keyboard users — hover-only
+                  affordances are otherwise unreachable without a mouse. */}
+              <div className="flex items-center gap-0.5 opacity-0 group-hover/turn:opacity-100 focus-within:opacity-100 transition-opacity">
+                <button
+                  onClick={() => void copyTurn(m.content)}
+                  title="Copy this reply"
+                  className="icon-btn !h-6 !w-6"
+                  data-testid="turn-copy"
+                >
+                  <Icon name={copiedTs === m.ts ? 'check' : 'content_copy'} size={12} />
+                </button>
+                <button
+                  onClick={() => void retryFrom(i)}
+                  disabled={sending}
+                  title="Ask again — regenerate this reply"
+                  className="icon-btn !h-6 !w-6"
+                  data-testid="turn-retry"
+                >
+                  <Icon name="refresh" size={12} />
+                </button>
+              </div>
             </div>
           )
         })}
         {sending && (
-          <div className="bg-[var(--surface-raised)] text-[var(--ink-50)] text-sm italic rounded-xl px-3 py-2 border border-[var(--edge-soft)] w-fit flex items-center gap-1.5">
-            <Icon name="more_horiz" size={16} />
-            <span>thinking</span>
+          <div className="flex items-center gap-1.5 text-[var(--ink-50)]" data-testid="chat-pending">
+            <span className="flex gap-[3px]" aria-hidden="true">
+              <span className="w-1 h-1 rounded-full bg-current fb-dot" />
+              <span className="w-1 h-1 rounded-full bg-current fb-dot" style={{ animationDelay: '150ms' }} />
+              <span className="w-1 h-1 rounded-full bg-current fb-dot" style={{ animationDelay: '300ms' }} />
+            </span>
+            <span className="text-[11.5px]">Working…</span>
           </div>
         )}
       </div>
 
+      {/* The composer is one container that holds the field AND its actions,
+          rather than a bare textarea with a detached Send button underneath.
+          The whole box carries the focus ring, so it reads as a single control. */}
       <form onSubmit={handleSend} className="p-3 border-t border-[var(--edge-soft)]">
-        <textarea
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-              e.preventDefault()
-              void handleSend(e as unknown as React.FormEvent)
-            }
-          }}
-          rows={3}
-          placeholder={`${ctx.placeholder} (⌘⏎ to send)`}
-          className="w-full resize-none bg-[var(--surface-raised)] text-[var(--ink-100)] border border-[var(--edge-firm)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--edge-firm)] focus:ring-2 focus:ring-[var(--edge-firm)]"
-        />
-        <div className="flex justify-end mt-2">
-          <button type="submit" disabled={!draft.trim() || sending} className="btn-primary">
-            <Icon name="send" size={14} />
-            <span>Send</span>
-          </button>
+        <div className="rounded-[13px] border border-[var(--edge-firm)] bg-[var(--surface-raised)] px-2.5 pt-2 pb-1.5 flex flex-col gap-2 transition-shadow focus-within:border-[rgb(var(--accent)/0.55)] focus-within:shadow-[0_0_0_3px_rgb(var(--accent)/0.13)]">
+          <textarea
+            ref={taRef}
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              // Enter sends, Shift+Enter makes a newline — the convention every
+              // comparable panel uses. ⌘/Ctrl+Enter still works for muscle memory.
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault()
+                void handleSend(e as unknown as React.FormEvent)
+              }
+            }}
+            rows={1}
+            placeholder={ctx.placeholder}
+            data-testid="chat-composer"
+            className="w-full resize-none bg-transparent text-[var(--ink-100)] placeholder:text-[var(--ink-50)] text-[13px] leading-[1.45] max-h-[160px] focus:outline-none"
+          />
+          <div className="flex items-center gap-1.5">
+            {modelMode !== 'auto' && (
+              <span
+                className="inline-flex items-center gap-1 rounded-full border border-[var(--edge-soft)] px-2 py-0.5 text-[10px] font-mono text-[var(--ink-60)]"
+                title={`Locked to ${modelMode}. Change in Settings.`}
+              >
+                {modelMode}
+              </span>
+            )}
+            <span className="flex-1" />
+            <button
+              type="submit"
+              disabled={!draft.trim() || sending}
+              title="Send"
+              aria-label="Send"
+              className="w-[26px] h-[26px] rounded-full grid place-items-center shrink-0 transition-colors bg-[rgb(var(--accent))] text-white hover:bg-[rgb(var(--accent-hover))] disabled:bg-[var(--surface-sunken)] disabled:text-[var(--ink-40)] disabled:border disabled:border-[var(--edge-soft)]"
+            >
+              <Icon name="arrow_upward" size={14} />
+            </button>
+          </div>
+        </div>
+        <div className="flex justify-end mt-1.5">
+          <span className="text-[9.5px] font-mono text-[var(--ink-40)]">
+            ↵ send · ⇧↵ newline
+          </span>
         </div>
       </form>
       {ctxMenu && (

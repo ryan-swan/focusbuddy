@@ -2086,3 +2086,28 @@ body {
     animation: none !important;
   }
 }
+
+/* Assistant "working" indicator — three dots that breathe in sequence. Replaces
+   the static italic "thinking" pill, which gave no sense that anything was
+   actually in flight. Each dot's delay is set inline by ChatPanel. */
+@keyframes fb-dot-pulse {
+  0%,
+  80%,
+  100% {
+    opacity: 0.25;
+    transform: translateY(0);
+  }
+  40% {
+    opacity: 1;
+    transform: translateY(-2px);
+  }
+}
+.fb-dot {
+  animation: fb-dot-pulse 1.2s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .fb-dot {
+    animation: none;
+    opacity: 0.55;
+  }
+}

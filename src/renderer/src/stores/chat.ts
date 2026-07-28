@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { ActionProposal, AppliedProposal, ChatMessage } from '@shared/types'
+import type { ActionProposal, AppliedProposal, ChatMessage, ChatSource } from '@shared/types'
 import { recordTrail } from '../lib/trail'
 import { gatherCanvasAttachments } from '../lib/canvasContent'
 
@@ -23,6 +23,11 @@ interface ChatStore {
   // conversation reads as a log of what actually happened rather than a
   // transcript that eats its own actions.
   appliedProposals: Record<string, AppliedProposal>
+  // The workspace material each assistant answer was grounded on, keyed by the
+  // message timestamp. Rendered as numbered chips matching the [n] markers in
+  // the reply. Retrieval already ran server-side to build the prompt — this is
+  // the same set, surfaced rather than discarded.
+  sourcesByMessage: Record<string, ChatSource[]>
   sending: boolean
   hasApiKey: boolean | null
   checkApiKey: () => Promise<void>
@@ -37,6 +42,10 @@ interface ChatStore {
   // Drop one proposal from a message's set (dismissed, or applied on a surface
   // with no applied-state).
   consumeProposal: (messageTs: number, proposalId: string) => void
+  // Truncate a thread to its first `keepCount` messages, discarding the
+  // proposals, applied records and sources that hung off the dropped ones.
+  // Backs "retry": rewind to just before a question, then re-send it.
+  rewindTo: (threadKey: string, keepCount: number) => void
   // threadKey scopes the conversation thread (the context the assistant is in).
   // When omitted it falls back to taskId, preserving existing desk behaviour. The
   // real taskId is still what's sent to the server for task context.
@@ -57,6 +66,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   messagesByTask: {},
   proposalsByMessage: {},
   appliedProposals: {},
+  sourcesByMessage: {},
   sending: false,
   hasApiKey: null,
   checkApiKey: async () => {
@@ -94,6 +104,30 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     delete nextApplied[appliedKey(messageTs, proposalId)]
     set({ proposalsByMessage: next, appliedProposals: nextApplied })
   },
+  rewindTo: (threadKey, keepCount) => {
+    const current = get().messagesByTask[threadKey] ?? []
+    if (keepCount >= current.length) return
+    const dropped = current.slice(Math.max(0, keepCount))
+    const nextProposals = { ...get().proposalsByMessage }
+    const nextApplied = { ...get().appliedProposals }
+    const nextSources = { ...get().sourcesByMessage }
+    for (const m of dropped) {
+      for (const p of nextProposals[String(m.ts)] ?? []) {
+        delete nextApplied[appliedKey(m.ts, p.id)]
+      }
+      delete nextProposals[String(m.ts)]
+      delete nextSources[String(m.ts)]
+    }
+    set({
+      messagesByTask: {
+        ...get().messagesByTask,
+        [threadKey]: current.slice(0, Math.max(0, keepCount))
+      },
+      proposalsByMessage: nextProposals,
+      appliedProposals: nextApplied,
+      sourcesByMessage: nextSources
+    })
+  },
   send: async (taskId, content, threadKey) => {
     const key = threadKey ?? taskId ?? GLOBAL_KEY
     const current = get().messagesByTask[key] ?? []
@@ -116,9 +150,11 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     const resp = await window.api.chat.send({ taskId, messages: next, attachments })
     let final: ChatMessage[]
     let proposals: ActionProposal[] | undefined
+    let sources: ChatSource[] | undefined
     if (resp.ok && resp.message) {
       final = [...next, resp.message]
       proposals = resp.proposals
+      sources = resp.sources
     } else {
       final = [
         ...next,
@@ -133,11 +169,17 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       messagesByTask: { ...get().messagesByTask, [key]: final },
       sending: false
     }
+    const tsKey = String(final[final.length - 1].ts)
     if (proposals && proposals.length > 0) {
-      const tsKey = String(final[final.length - 1].ts)
       updates.proposalsByMessage = {
         ...get().proposalsByMessage,
         [tsKey]: proposals
+      }
+    }
+    if (sources && sources.length > 0) {
+      updates.sourcesByMessage = {
+        ...get().sourcesByMessage,
+        [tsKey]: sources
       }
     }
     set(updates)
@@ -175,16 +217,19 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     // whose conversation no longer exists.
     const nextProposals = { ...get().proposalsByMessage }
     const nextApplied = { ...get().appliedProposals }
+    const nextSources = { ...get().sourcesByMessage }
     for (const m of cleared) {
       for (const p of nextProposals[String(m.ts)] ?? []) {
         delete nextApplied[appliedKey(m.ts, p.id)]
       }
       delete nextProposals[String(m.ts)]
+      delete nextSources[String(m.ts)]
     }
     set({
       messagesByTask: next,
       proposalsByMessage: nextProposals,
-      appliedProposals: nextApplied
+      appliedProposals: nextApplied,
+      sourcesByMessage: nextSources
     })
   }
 }))

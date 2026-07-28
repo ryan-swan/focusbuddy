@@ -14,7 +14,7 @@
 // registry; a later session teaches the model to emit them and fills their
 // renderers. This function is where that emission will be parsed in.
 
-import type { ActionProposal, ChatBlock, ChatMessage } from '@shared/types'
+import type { ActionProposal, ChatBlock, ChatMessage, ChatSource } from '@shared/types'
 
 // Connector-shaped action kinds. When an action is one of these we surface it as
 // a 'connector-action' block (a distinct, connector-branded affordance) rather
@@ -34,7 +34,8 @@ export function connectorForProposal(p: ActionProposal): string | null {
 // backend attached to this message (from the store, keyed by message ts).
 export function deriveAssistantBlocks(
   message: ChatMessage,
-  proposals: ActionProposal[]
+  proposals: ActionProposal[],
+  sources: ChatSource[] = []
 ): ChatBlock[] {
   const blocks: ChatBlock[] = []
 
@@ -42,7 +43,12 @@ export function deriveAssistantBlocks(
   const text = message.content?.trim()
   if (text) blocks.push({ kind: 'text', markdown: text })
 
-  // 2) Each proposal becomes an action block — or a connector-action block when
+  // 2) What the reply was grounded on, directly under it — a numbered chip row
+  //    matching the [n] markers inside the text. Only when the turn actually has
+  //    prose: a bare action turn has no claims to support.
+  if (text && sources.length > 0) blocks.push({ kind: 'sources', sources })
+
+  // 3) Each proposal becomes an action block — or a connector-action block when
   //    it maps to a known connector, so email/calendar/chat read as first-class
   //    connector affordances instead of generic actions.
   for (const p of proposals) {
