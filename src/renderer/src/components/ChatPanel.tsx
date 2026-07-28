@@ -9,6 +9,7 @@ import { useWidgetStore } from '../stores/widgets'
 import { useActionHistory } from '../stores/actionHistory'
 import { chimeIn } from '../lib/audioBeep'
 import CanvasContextMenu, { type CtxMenuItem } from './CanvasContextMenu'
+import { FLOATING_MENU_ASIDE, FLOATING_MENU_STYLE } from './chrome/floatingMenu'
 import { useModelMode } from '../lib/modelPrefs'
 import { useBodyDouble } from '../lib/bodyDouble'
 import { applyProposal, describeProposal } from '../lib/actionExecutor'
@@ -159,7 +160,15 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
   }
 
   return (
-    <aside className="h-full flex flex-col fb-glass-chrome border-l border-[color:var(--glass-chrome-border)]">
+    // The assistant is a floating rounded card, the same chrome the desk
+    // sidebar / segment / PlexiOffice menus use — not a panel welded to the
+    // window edge with a one-sided border. See components/chrome/floatingMenu.
+    // The wrapping column in App.tsx supplies the inset that detaches it.
+    <aside
+      className={FLOATING_MENU_ASIDE}
+      style={FLOATING_MENU_STYLE}
+      data-testid="assistant-panel"
+    >
       <div className="px-3 py-3 border-b border-[var(--edge-soft)] flex items-center justify-between gap-2">
         <div className="min-w-0">
           <div className="flex items-center gap-1.5">
@@ -177,7 +186,7 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
                 the default auto mode the chip is just noise in a narrow header. */}
             {modelMode !== 'auto' && (
               <span
-                className="font-mono text-[9px] px-1 py-0.5 rounded bg-[var(--surface-sunken)] text-[var(--ink-70)] shrink-0"
+                className="font-mono text-[9px] px-1.5 py-0.5 rounded-full bg-[var(--surface-sunken)] text-[var(--ink-70)] shrink-0"
                 title={`Locked to ${modelMode}. Change in Settings.`}
               >
                 {modelMode}
@@ -237,7 +246,7 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
       </div>
 
       {hasApiKey === false && (
-        <div className="m-3 p-3 rounded-md bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/50 text-xs text-[var(--ink-90)] leading-relaxed flex gap-2">
+        <div className="m-3 p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/50 text-xs text-[var(--ink-90)] leading-relaxed flex gap-2">
           <Icon name="key" size={16} className="text-amber-700 dark:text-amber-400 mt-0.5" />
           <div>
             <strong className="text-[var(--ink-100)]">No API key yet.</strong> Open{' '}
@@ -281,7 +290,7 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
           return (
             <div key={i} className="flex flex-col gap-1.5">
               <div
-                className={`max-w-[92%] rounded-lg px-3 py-2 text-sm leading-relaxed ${
+                className={`max-w-[92%] rounded-xl px-3 py-2 text-sm leading-relaxed ${
                   m.role === 'user'
                     ? 'ml-auto bg-stone-900 dark:bg-stone-100 text-stone-50 dark:text-stone-900 whitespace-pre-wrap'
                     : 'bg-[var(--surface-raised)] text-[var(--ink-100)] border border-[var(--edge-soft)] md-rendered'
@@ -325,7 +334,7 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
           )
         })}
         {sending && (
-          <div className="bg-[var(--surface-raised)] text-[var(--ink-50)] text-sm italic rounded-lg px-3 py-2 border border-[var(--edge-soft)] w-fit flex items-center gap-1.5">
+          <div className="bg-[var(--surface-raised)] text-[var(--ink-50)] text-sm italic rounded-xl px-3 py-2 border border-[var(--edge-soft)] w-fit flex items-center gap-1.5">
             <Icon name="more_horiz" size={16} />
             <span>thinking</span>
           </div>
@@ -344,7 +353,7 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
           }}
           rows={3}
           placeholder={`${ctx.placeholder} (⌘⏎ to send)`}
-          className="w-full resize-none bg-[var(--surface-raised)] text-[var(--ink-100)] border border-[var(--edge-firm)] rounded-md px-3 py-2 text-sm focus:outline-none focus:border-[var(--edge-firm)] focus:ring-2 focus:ring-[var(--edge-firm)]"
+          className="w-full resize-none bg-[var(--surface-raised)] text-[var(--ink-100)] border border-[var(--edge-firm)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--edge-firm)] focus:ring-2 focus:ring-[var(--edge-firm)]"
         />
         <div className="flex justify-end mt-2">
           <button type="submit" disabled={!draft.trim() || sending} className="btn-primary">
@@ -547,7 +556,7 @@ export function ProposalCards({
             key={p.id}
             onClick={() => void applyOne(p)}
             disabled={isBusy}
-            className="text-left rounded-md border border-[var(--edge-soft)] bg-[var(--surface-raised)] hover:border-accent hover:bg-accent/5 px-2.5 py-1.5 transition-colors group"
+            className="text-left rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-raised)] hover:border-accent hover:bg-accent/5 px-2.5 py-1.5 transition-colors group"
           >
             <div className="flex items-center gap-2">
               <span className="h-6 w-6 rounded-md inline-flex items-center justify-center bg-accent/10 text-accent shrink-0">

@@ -66,7 +66,10 @@ test('FTI — FloatingToolbar stays left of the assistant panel when it opens, a
       timeout: 4_000
     })
 
-    const assistantPanel = window.locator('aside.fb-glass-chrome.border-l').first()
+    // Stable testid rather than a class selector: the assistant adopted the
+    // shared floating-card chrome (rounded card, hairline all round) and no
+    // longer carries fb-glass-chrome / border-l.
+    const assistantPanel = window.locator('[data-testid="assistant-panel"]').first()
     await expect(assistantPanel).toBeVisible({ timeout: 4_000 })
     const assistantBox = await assistantPanel.boundingBox()
     expect(assistantBox, 'assistant panel must have a bounding box while open').toBeTruthy()

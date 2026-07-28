@@ -9,6 +9,7 @@ import Sidebar from './components/Sidebar'
 import PlexiiLogo from './components/PlexiiLogo'
 import {
   FLOATING_MENU_INSET,
+  FLOATING_MENU_INSET_RIGHT,
   useMinimizable,
   useSidebarWidth
 } from './components/chrome/floatingMenu'
@@ -611,7 +612,7 @@ export default function App(): JSX.Element {
             <Tooltip content="Show the assistant panel" placement="bottom">
               <button
                 onClick={expandChat}
-                className="h-7 px-2 inline-flex items-center gap-1 rounded-md text-[11px] font-medium text-stone-600 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-white/[0.06] border border-stone-200/70 dark:border-white/10 transition-colors"
+                className="h-7 px-2.5 inline-flex items-center gap-1 rounded-lg text-[11px] font-medium text-[var(--ink-80)] hover:text-[var(--ink-100)] border border-[var(--edge-soft)] hover:border-[rgb(var(--accent)/0.4)] transition-colors"
                 aria-label="Show assistant panel"
               >
                 <span>Assistant</span>
@@ -645,7 +646,13 @@ export default function App(): JSX.Element {
               <Panel defaultSize={78} minSize={40}>
                 <MainPane />
               </Panel>
-              <PanelResizeHandle className="w-px bg-stone-200 dark:bg-stone-700 hover:bg-stone-400 dark:hover:bg-stone-500 transition-colors" />
+              {/* Grip, not a divider: the assistant is now a floating card with
+                  its own hairline edge, so a hard 1px rule between the panes
+                  would double up. Mirrors the sidebar's resize affordance — a
+                  wide invisible hit area with a small accent pill inside. */}
+              <PanelResizeHandle className="group w-2.5 flex items-center justify-center outline-none">
+                <span className="h-10 w-[3px] rounded-full bg-transparent transition-colors group-hover:bg-[rgb(var(--accent)/0.5)] group-focus-visible:bg-[rgb(var(--accent))] group-data-[resize-handle-state=drag]:bg-[rgb(var(--accent))]" />
+              </PanelResizeHandle>
               <Panel
                 ref={chatRef}
                 defaultSize={22}
@@ -656,7 +663,11 @@ export default function App(): JSX.Element {
                 onCollapse={() => setChatCollapsed(true)}
                 onExpand={() => setChatCollapsed(false)}
               >
-                <ChatPanel onCollapse={collapseChat} />
+                {/* Inset column: lets the desk surface show around the assistant
+                    card so it reads as floating, exactly like the sidebar dock. */}
+                <div className={`h-full box-border ${FLOATING_MENU_INSET_RIGHT}`}>
+                  <ChatPanel onCollapse={collapseChat} />
+                </div>
               </Panel>
             </PanelGroup>
           </div>
