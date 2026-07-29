@@ -35,6 +35,7 @@
     "test:e2e": "npm run build && playwright test",
     "test": "npm run test:unit && npm run test:e2e",
     "merge-check": "node scripts/merge-check.mjs",
+    "spec:trace": "node scripts/spec-trace.mjs",
     "hooks:install": "sh scripts/install-git-hooks.sh"
   },
   "engines": {

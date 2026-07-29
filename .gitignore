@@ -52,3 +52,4 @@ release-preview/
 # Throwaway self-signed TLS cert for the local org-sync live-proxy test helper
 tests/e2e/support/localhost-key.pem
 tests/e2e/support/localhost-cert.pem
+build/spec-trace.report.json
