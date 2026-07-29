@@ -48,6 +48,8 @@ import MinimapWidget from './widgets/MinimapWidget'
 import CanvasMinimapFAB from './CanvasMinimapFAB'
 import DeskSuggestionChip from './DeskSuggestionChip'
 import DeskGallery from './DeskGallery'
+import ColumnsView from './ColumnsView'
+import { useDeskViewStore } from '../stores/deskView'
 import VoiceRecorderWidget from './widgets/VoiceRecorderWidget'
 import MindMapWidget from './widgets/MindMapWidget'
 import DiagramWidget from './widgets/DiagramWidget'
@@ -238,6 +240,10 @@ const STATUS_META: Record<
 
 export default function Canvas(): JSX.Element {
   const activeTaskId = useNodeStore((s) => s.activeTaskId)
+  // Per-desk view mode: the infinite Canvas (default) or the Columns view.
+  const deskViewModes = useDeskViewStore((s) => s.modes)
+  const deskViewMode = activeTaskId ? deskViewModes[activeTaskId] ?? 'canvas' : 'canvas'
+  const setDeskViewMode = useDeskViewStore((s) => s.set)
   const nodes = useNodeStore((s) => s.nodes)
   const updateNode = useNodeStore((s) => s.update)
   const openObjectChannel = useMessagingStore((s) => s.openObjectChannel)
@@ -2024,7 +2030,7 @@ export default function Canvas(): JSX.Element {
         >
           {/* Breadcrumb — floated top-left of the canvas surface so it
               sits on the desk itself rather than in a header bar above it. */}
-          <div data-floating-menu className="fb-floating-chrome absolute top-4 left-4 z-[45]">
+          <div data-floating-menu className="fb-floating-chrome absolute top-4 left-4 z-[45] flex items-center gap-2">
             <CanvasBreadcrumb
               activeTask={activeTask}
               nodes={nodes}
@@ -2036,6 +2042,16 @@ export default function Canvas(): JSX.Element {
               onAssignToRoom={(deskId, roomId) => void assignToRoom(deskId, roomId)}
               onCreateRoomFromDesk={(deskId) => void createRoomAndAssign(deskId)}
             />
+            {activeTaskId && deskViewMode !== 'columns' && (
+              <button
+                onClick={() => setDeskViewMode(activeTaskId, 'columns')}
+                data-testid="desk-view-columns"
+                title="Columns view — stack your objects into scrollable columns"
+                className="fb-glass-chrome inline-flex items-center gap-1 h-8 px-2.5 rounded-lg text-[12px] text-[var(--ink-70)] hover:text-[rgb(var(--accent))] shadow-[0_2px_10px_rgba(0,0,0,0.1)] ring-1 ring-black/[0.06] dark:ring-white/[0.06]"
+              >
+                <Icon name="view_column" size={14} /> Columns
+              </button>
+            )}
           </div>
           {panPing && (
             <div
@@ -2191,15 +2207,17 @@ export default function Canvas(): JSX.Element {
               transformOrigin: '0 0'
             }}
           >
-            {/* Sections first (render behind non-section widgets). Sections render their own children. */}
-            {widgets.map((w) => {
+            {/* Sections first (render behind non-section widgets). Sections render their own children.
+                Skipped entirely in Columns view so canvas widgets (and their webviews) don't mount
+                under the overlay. */}
+            {deskViewMode !== 'columns' && widgets.map((w) => {
               if (w.archived) return null
               if (w.pinned || w.kind !== 'section') return null
               return (
                 <div key={w.id}>{renderWidget(w)}</div>
               )
             })}
-            {widgets.map((w) => {
+            {deskViewMode !== 'columns' && widgets.map((w) => {
               if (w.archived) return null
               if (w.pinned || w.kind === 'section') return null
               if (w.parentSectionId !== null) return null // owned by a section, rendered inside it
@@ -2213,6 +2231,11 @@ export default function Canvas(): JSX.Element {
               )
             })}
           </div>
+          {deskViewMode === 'columns' && activeTaskId && (
+            <div className="absolute inset-0 z-[60]">
+              <ColumnsView taskId={activeTaskId} widgets={widgets} />
+            </div>
+          )}
           {/* Spatial-link overlay renders in screen-space, OUTSIDE the
               transformed container. It reads each linked widget's actual
               rendered position via getBoundingClientRect on every frame

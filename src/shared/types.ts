@@ -690,6 +690,23 @@ export type ActionProposal =
       reason?: string
     }
   | {
+      // Generate a POPULATED office surface with AI (a spreadsheet, a
+      // presentation, a diagram / map / mind map, or a written document) and
+      // place it on the desk. When `widgetId` names an existing output widget of
+      // that type, its backing document is regenerated in place instead. The real
+      // body is produced by a second AI call at apply time (documents.generate),
+      // so the agent supplies only intent via `prompt` — never a hand-authored
+      // body for schemas it would get wrong. This is how the desk agent creates
+      // decks, sheets, maps and mind maps, not just plain text.
+      id: string
+      kind: 'generate-document'
+      docType: 'doc' | 'sheet' | 'slides' | 'map'
+      title: string
+      prompt: string
+      widgetId?: string
+      reason?: string
+    }
+  | {
       // Edit an EXISTING document's content. documentId is a real id from the
       // documents context block, or "$<proposalId>" referencing a sibling
       // create-document in the same batch. Defaults to append — the least

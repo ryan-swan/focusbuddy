@@ -212,3 +212,59 @@ export function findNonOverlapPosition(
   const maxBottom = Math.max(...existing.map((e) => e.y + e.height), 0)
   return { x: desired.x, y: maxBottom + gap }
 }
+
+// A top-level object the desk drag can push out of the way. Minimal shape so
+// callers can build these from a Widget or a computed section frame.
+export interface Placeable {
+  id: string
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
+// Drag priority: the widget the user is moving stays exactly where they dropped
+// it (the "anchor"), and any top-level widgets it now overlaps flow OUT of its
+// way to the nearest clear spot, cascading so pushed widgets never end up on top
+// of each other or of the anchor. This is the inverse of findNonOverlapPosition,
+// which relocates the DROPPED widget instead — the wrong priority once the user
+// has deliberately placed something. `blockers` (e.g. section frames) are treated
+// as immovable: pushed widgets avoid them, but they never move. Nearest widgets
+// resolve first so the closest thing moves the least. Returns only the widgets
+// that actually moved, mapped to their new position.
+export function resolvePushFromAnchor(
+  anchor: { x: number; y: number; width: number; height: number },
+  movable: Placeable[],
+  blockers: Array<{ x: number; y: number; width: number; height: number }> = [],
+  gap = SECTION_GAP
+): Map<string, { x: number; y: number }> {
+  type Rect = { x: number; y: number; width: number; height: number }
+  const overlaps = (a: Rect, b: Rect): boolean =>
+    !(
+      a.x + a.width + gap <= b.x ||
+      a.x >= b.x + b.width + gap ||
+      a.y + a.height + gap <= b.y ||
+      a.y >= b.y + b.height + gap
+    )
+  const cx = (r: Rect): number => r.x + r.width / 2
+  const cy = (r: Rect): number => r.y + r.height / 2
+  const order = [...movable].sort(
+    (p, q) => Math.hypot(cx(p) - cx(anchor), cy(p) - cy(anchor)) - Math.hypot(cx(q) - cx(anchor), cy(q) - cy(anchor))
+  )
+  const fixed: Rect[] = [anchor, ...blockers]
+  const clearOf = (r: Rect): boolean => fixed.every((f) => !overlaps(r, f))
+  const moved = new Map<string, { x: number; y: number }>()
+  for (const p of order) {
+    const desired: Rect = { x: p.x, y: p.y, width: p.width, height: p.height }
+    if (clearOf(desired)) {
+      fixed.push(desired)
+      continue
+    }
+    // findNonOverlapPosition only reads x/y/width/height off the obstacles, so a
+    // plain rect array stands in for Widget[].
+    const placed = findNonOverlapPosition(desired, fixed as unknown as Widget[], gap)
+    moved.set(p.id, { x: Math.round(placed.x), y: Math.round(placed.y) })
+    fixed.push({ x: placed.x, y: placed.y, width: p.width, height: p.height })
+  }
+  return moved
+}

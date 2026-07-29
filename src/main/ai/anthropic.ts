@@ -333,6 +333,7 @@ function buildSystemPrompt(taskId: string | null): string {
     '  { "kind": "update-task", "taskId": "<the Task id shown above>", "label": "this task", "status": "done", "dueDate": null, "title": "new title", "reason": "user marked it complete" }\n' +
     '  { "kind": "create-knowledge-entry", "title": "Brand voice rule", "body": "We write in first-person plural and never use em dashes.", "tags": ["brand"], "reason": "user stated this as a rule" }\n' +
     '  { "kind": "edit-document", "documentId": "<from the documents list>", "label": "the Q3 brief", "body": "New section text...", "operation": "append", "reason": "..." }\n' +
+    '  { "kind": "generate-document", "docType": "slides"|"sheet"|"map"|"doc", "title": "Q3 launch deck", "prompt": "<what to make, grounded only in the request/context>", "reason": "..." }  (slides=presentation, sheet=spreadsheet, map=diagram/flowchart/mind map/org chart, doc=written document; the real content is generated in a follow-up step, so the prompt must restate only what was asked and invent nothing, and your reply must not claim it already exists)\n' +
     '  { "kind": "set-cell", "tableId": "<from canvas summary>", "rowId": "<from rowIds>", "cells": {"Status":"Live"}, "reason": "..." }\n' +
     '  { "kind": "schedule-event", "title": "Deep work: brief", "startMs": 1780000000000, "durationMinutes": 60, "recurrence": null, "reason": "..." }\n' +
     '  { "kind": "compose-mail", "to": ["ana@example.com"], "subject": "Q3 brief attached", "body": "Hi Ana, ...", "reason": "..." }\n' +
@@ -751,6 +752,27 @@ export function parseChatJson(raw: string): {
           title,
           body,
           operation: op === 'replace' || op === 'prepend' || op === 'append' ? op : undefined,
+          reason
+        })
+        break
+      }
+      case 'generate-document': {
+        // The agent asks for a populated spreadsheet / presentation / map / doc.
+        // We only carry intent (docType + title + prompt); the real body is
+        // generated at apply time by documents.generate.
+        const dt = action.docType
+        const docType = dt === 'sheet' || dt === 'slides' || dt === 'map' || dt === 'doc' ? dt : null
+        const title = typeof action.title === 'string' ? action.title.trim() : ''
+        const gPrompt = typeof action.prompt === 'string' ? action.prompt.trim() : ''
+        if (!docType || !title || !gPrompt) break
+        const widgetId = typeof action.widgetId === 'string' && action.widgetId.trim() ? action.widgetId.trim() : undefined
+        proposals.push({
+          id: makeProposalId('gendoc', i++),
+          kind: 'generate-document',
+          docType,
+          title,
+          prompt: gPrompt,
+          widgetId,
           reason
         })
         break
@@ -3291,9 +3313,11 @@ export async function runDeskAgent(input: {
         '  { "kind":"add-table-row", "tableId":"<id>", "cells":{"Column":"value"} }\n' +
         '  { "kind":"update-widget", "widgetId":"<id>", "label":"...", "content":"...", "operation":"append" }\n' +
         '  { "kind":"edit-document", "documentId":"<id>", "label":"...", "body":"...", "operation":"append" }\n' +
+        '  { "kind":"generate-document", "docType":"slides"|"sheet"|"map"|"doc", "title":"...", "prompt":"<what to make, grounded only in the request and inputs>" }\n' +
         '  { "kind":"create-task", "title":"...", "notes":"..." }\n' +
         '  { "kind":"create-knowledge-entry", "title":"...", "body":"..." }\n' +
         '  { "kind":"compose-mail", "subject":"...", "body":"..." }\n' +
+        'Choosing a surface: a presentation or deck -> generate-document docType "slides"; a spreadsheet, tracker, budget or table of records -> "sheet"; a diagram, flowchart, mind map, org chart or process map -> "map"; a written document, brief or plan -> "doc". edit-document only works on an existing written doc (docType doc); to fill an existing slides/sheet/map OUTPUT widget, use generate-document with its "widgetId" from ACTIONABLE WIDGETS. generate-document produces the real content in a follow-up step, so its "prompt" must restate ONLY what the user asked for and what the inputs contain — never invent facts, numbers, names or data — and your "reply" must NOT claim the content already exists (only the actions do the work).\n' +
         'Rules: only real ids from ACTIONABLE WIDGETS; set-cell needs a rowId from that table\'s rowIds (use add-table-row for new records); never invent ids, columns, or facts; leave out any change the inputs do not support. Put a short human summary in "reply" and every concrete change in "actions". If there is nothing to change, return "actions": [].'
       const actionUser =
         user + '\n\nACTIONABLE WIDGETS (the only ids you may act on):\n' + input.actionContext

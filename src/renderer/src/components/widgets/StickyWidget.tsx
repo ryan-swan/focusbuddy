@@ -73,9 +73,20 @@ export default function StickyWidget({ widget, inline = false }: Props): JSX.Ele
     }
   }, [text, editing, widget.height, widget.id, inline, update])
 
+  // Adopt the store's content on a NEW widget, or on a genuine EXTERNAL change
+  // (sync, AI, sync-group mirror). Never re-adopt the echo of our own debounced
+  // save: doing so resets the textarea to the just-saved value and drops any
+  // characters typed in the gap between the save firing and the store update
+  // landing, which reads as the cursor freezing mid-word. This is the same
+  // self-echo guard MarkdownWidget already uses.
+  const prevIdRef = useRef(widget.id)
   useEffect(() => {
-    setText(widget.content)
-    lastSavedRef.current = widget.content
+    const idChanged = widget.id !== prevIdRef.current
+    prevIdRef.current = widget.id
+    if (idChanged || widget.content !== lastSavedRef.current) {
+      setText(widget.content)
+      lastSavedRef.current = widget.content
+    }
   }, [widget.id, widget.content])
 
   useEffect(() => {

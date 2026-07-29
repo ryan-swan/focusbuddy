@@ -103,6 +103,8 @@ export async function applyProposal(
       return applyCreateKnowledgeEntry(proposal)
     case 'create-document':
       return applyCreateDocument(proposal, ctx)
+    case 'generate-document':
+      return applyGenerateDocument(proposal, ctx)
     case 'edit-document':
       return applyEditDocument(proposal, ctx)
     case 'set-cell':
@@ -448,6 +450,87 @@ async function applyCreateDocument(
   } catch (e) {
     return { ok: false, message: `Could not create the document: ${e instanceof Error ? e.message : String(e)}` }
   }
+}
+
+// Generate a POPULATED office surface (spreadsheet, presentation, diagram/map,
+// or written doc) with AI, then either place it on the desk or fill an existing
+// output widget of that type. The body comes from documents.generate — the same
+// proven per-type generator the "create with AI" flow uses — so the desk agent
+// never has to hand-author a slides/sheet/map body it would get wrong. Honest
+// failures: no API key, generation failed, or the surface is off-plan.
+async function applyGenerateDocument(
+  p: Extract<ActionProposal, { kind: 'generate-document' }>,
+  ctx: { activeTaskId: string | null; resolvedIds?: Map<string, string>; destinationFolderId?: string | null }
+): Promise<ApplyResult> {
+  const cap = capabilityForDocType(p.docType)
+  if (useCapabilityStore.getState().get(cap) !== true) {
+    return { ok: false, message: `${DOC_TYPE_LABEL[p.docType]} is not available on your plan.` }
+  }
+  const label = DOC_TYPE_LABEL[p.docType]
+
+  // Populate an existing output widget in place: regenerate its backing doc body.
+  if (p.widgetId) {
+    const widget = useWidgetStore.getState().widgets.find((w) => w.id === p.widgetId)
+    const docId = widget?.content
+    if (!widget || !docId) {
+      return { ok: false, message: 'Could not find that widget to fill.' }
+    }
+    if (widget.kind !== p.docType) {
+      return { ok: false, message: `That widget is a ${widget.kind}, not a ${label.toLowerCase()}.` }
+    }
+    const gen = await window.api.documents.generate({ docType: p.docType, prompt: p.prompt })
+    if (!gen.ok) {
+      return {
+        ok: false,
+        message: gen.needsApiKey
+          ? 'Add an Anthropic API key in Settings to generate content.'
+          : gen.error ?? `Could not generate the ${label.toLowerCase()}.`
+      }
+    }
+    await window.api.documents.update(
+      docId,
+      { body: gen.body as never, ...(p.title ? { title: p.title } : {}) },
+      'AI generate'
+    )
+    const store = useDocumentsStore.getState()
+    await store.refresh()
+    if (store.active?.id === docId) await store.open(docId)
+    if (ctx.resolvedIds) ctx.resolvedIds.set(p.id, docId)
+    return { ok: true, message: `Filled ${label.toLowerCase()} "${p.title || widget.title}" — recoverable in Version history` }
+  }
+
+  // Create a new populated document and drop it on the desk as a widget.
+  if (!ctx.activeTaskId) {
+    return { ok: false, message: 'Open a desk first — the generated document needs a canvas.' }
+  }
+  const res = await useDocumentsStore.getState().createWithAI({ docType: p.docType, prompt: p.prompt })
+  if (!res.ok || !res.id) {
+    return {
+      ok: false,
+      message: res.needsApiKey
+        ? 'Add an Anthropic API key in Settings to generate documents.'
+        : res.error ?? `Could not generate the ${label.toLowerCase()}.`
+    }
+  }
+  const docId = res.id
+  // Prefer the agent's title over the generator's auto-title.
+  if (p.title) await window.api.documents.update(docId, { title: p.title }).catch(() => null)
+  if (ctx.destinationFolderId) {
+    await window.api.fileManager.fileDocument(docId, ctx.destinationFolderId).catch(() => null)
+  }
+  const entry = catalogFor(p.docType as WidgetKind)
+  await useWidgetStore.getState().create({
+    taskId: ctx.activeTaskId,
+    kind: p.docType as WidgetKind,
+    title: p.title,
+    content: docId,
+    ...spawnPositionFor(entry?.defaultWidth ?? 640, entry?.defaultHeight ?? 480),
+    width: entry?.defaultWidth,
+    height: entry?.defaultHeight,
+    color: null
+  })
+  if (ctx.resolvedIds) ctx.resolvedIds.set(p.id, docId)
+  return { ok: true, message: `Created ${label.toLowerCase()} "${p.title}" on the desk` }
 }
 
 async function applyCreateWidget(
@@ -1243,6 +1326,26 @@ export function describeProposal(
               : p.docType === 'design'
                 ? 'palette'
                 : 'description'
+      return { icon, verb, subject: p.title }
+    }
+    case 'generate-document': {
+      const verb =
+        (p.widgetId ? 'Fill ' : 'Generate ') +
+        (p.docType === 'sheet'
+          ? 'spreadsheet'
+          : p.docType === 'slides'
+            ? 'deck'
+            : p.docType === 'map'
+              ? 'diagram'
+              : 'document')
+      const icon =
+        p.docType === 'sheet'
+          ? 'table_chart'
+          : p.docType === 'slides'
+            ? 'slideshow'
+            : p.docType === 'map'
+              ? 'account_tree'
+              : 'description'
       return { icon, verb, subject: p.title }
     }
     default:

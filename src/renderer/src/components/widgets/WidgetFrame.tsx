@@ -18,8 +18,15 @@ import {
   computeSectionFrame,
   effectiveLayout,
   findNonOverlapPosition,
+  resolvePushFromAnchor,
   SECTION_PADDING
 } from '../../lib/sectionGeometry'
+
+// Registry of imperative Rnd position setters, keyed by widget id. A drop that
+// pushes neighbours out of the way uses this to slide each neighbour's Rnd in
+// place WITHOUT a remount, so their children (webviews especially) stay mounted.
+// Each free-widget frame registers its own setter while mounted.
+const rndPositioners = new Map<string, (x: number, y: number) => void>()
 import { chimeIn, chimeOut } from '../../lib/audioBeep'
 import { useZonePosition } from '../../lib/pinLayout'
 import { LinkDragContext } from '../../lib/linkDragContext'
@@ -217,6 +224,17 @@ export default function WidgetFrame({
       r.updatePosition.call(rnd, { x, y })
     }
   }
+
+  // Register this frame's imperative positioner so a neighbouring widget's drop
+  // can push us aside in place (no remount). Re-registers when our size changes
+  // so the setter always moves us at our current dimensions.
+  useEffect(() => {
+    rndPositioners.set(widget.id, (x, y) => applyRndSizeAndPosition(widget.width, widget.height, x, y))
+    return () => {
+      rndPositioners.delete(widget.id)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [widget.id, widget.width, widget.height])
 
   const layoutCtx = useContext(SectionLayoutContext)
   const sectionLayout = layoutCtx ? layoutCtx.layout : 'free'
@@ -468,32 +486,44 @@ export default function WidgetFrame({
       }
     }
 
-    // Canvas-level drop. Push the widget away from every other top-level
-    // widget on the canvas — sections + free widgets. This is the
-    // reverse-magnetic behaviour: widgets never overlap on the desk.
-    // Optional snap-to-grid rounds the drop to an 8px grid first; overlap
-    // avoidance still runs after, so snapped widgets never land on top of one
-    // another.
+    // Canvas-level drop. Priority goes to the object the user is moving: it
+    // STAYS exactly where dropped, and any top-level widgets it now overlaps
+    // flow out of its way to the nearest clear spot (cascading, so pushed
+    // widgets never land on each other). Previously we relocated the DROPPED
+    // widget instead, which fought the user's deliberate placement — the
+    // opposite of what "I put it there" should mean. Sections are treated as
+    // immovable blockers (pushed widgets avoid them; a section itself doesn't
+    // shuffle when a small widget lands near it). Optional snap-to-grid rounds
+    // the drop to an 8px grid first.
     const grid = getNavPrefs().snapToGridEnabled ? 8 : 1
     const rawX = Math.round(newX / grid) * grid
     const rawY = Math.round(newY / grid) * grid
     const topLevelSiblings = latestWidgets.filter(
-      (w) => w.id !== widget.id && !w.pinned && !w.parentSectionId
+      (w) => w.id !== widget.id && !w.pinned && !w.parentSectionId && !w.archived && w.kind !== 'minimap'
     )
-    const placed = findNonOverlapPosition(
-      { x: rawX, y: rawY, width: widget.width, height: widget.height },
-      effectiveSiblingsForCheck(topLevelSiblings, latestWidgets)
-    )
-    const moved = snappedAway(rawX, rawY, placed.x, placed.y)
-    void update(widget.id, { x: placed.x, y: placed.y })
-    if (moved) {
-      // Rnd is uncontrolled for free widgets — without an update it would
-      // visually stay at the user's drop point and ignore the snap. We
-      // used to bumpLayout() to force a key-change re-mount, but that
-      // tears down any <webview> child (each Electron webview is its own
-      // process and a full URL reload kicks in on remount). Imperative
-      // updatePosition leaves children mounted.
-      applyRndSizeAndPosition(widget.width, widget.height, placed.x, placed.y)
+    const anchor = { x: rawX, y: rawY, width: widget.width, height: widget.height }
+    // Movable = free (non-section) neighbours; blockers = section frames.
+    const movable = topLevelSiblings
+      .filter((w) => w.kind !== 'section')
+      .map((w) => ({ id: w.id, x: w.x, y: w.y, width: w.width, height: w.height }))
+    const blockers = effectiveSiblingsForCheck(
+      topLevelSiblings.filter((w) => w.kind === 'section'),
+      latestWidgets
+    ).map((s) => ({ x: s.x, y: s.y, width: s.width, height: s.height }))
+
+    // The moved widget commits to its drop point. Only nudge Rnd if grid-snap
+    // actually shifted it (avoids a needless imperative update on a clean drop).
+    void update(widget.id, { x: rawX, y: rawY })
+    if (snappedAway(newX, newY, rawX, rawY)) {
+      applyRndSizeAndPosition(widget.width, widget.height, rawX, rawY)
+    }
+
+    // Push the overlapping neighbours away and slide each imperatively so no
+    // webview reloads. Store stays the source of truth via update().
+    const pushes = resolvePushFromAnchor(anchor, movable, blockers)
+    for (const [id, pos] of pushes) {
+      void update(id, { x: pos.x, y: pos.y })
+      rndPositioners.get(id)?.(pos.x, pos.y)
     }
   }
 

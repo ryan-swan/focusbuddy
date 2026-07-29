@@ -61,16 +61,25 @@ export default function NoteWidget({ widget, inline = false }: Props): JSX.Eleme
     setEditing(false)
   }
 
+  const prevIdRef = useRef(widget.id)
   useEffect(() => {
-    setText(widget.content)
-    lastSavedRef.current = widget.content
-    // Reconcile the view with the content that just loaded. If the user has not
-    // deliberately opened the editor, content presence wins: a note with a table
-    // renders it, an empty note stays a typeable textarea. Because this keys off
-    // userEditRef and not focus, the empty-then-hydrated mount race resolves to
-    // the rendered view instead of getting stuck as a raw textarea.
-    if (!userEditRef.current) {
-      setEditing(widget.content.trim() === '')
+    const idChanged = widget.id !== prevIdRef.current
+    prevIdRef.current = widget.id
+    // Adopt the store's content on a NEW widget or a genuine EXTERNAL change, but
+    // never re-adopt the echo of our own debounced save: doing so resets the
+    // textarea to the just-saved value and drops characters typed in the gap,
+    // which reads as the cursor freezing mid-word. (Guard mirrors MarkdownWidget.)
+    if (idChanged || widget.content !== lastSavedRef.current) {
+      setText(widget.content)
+      lastSavedRef.current = widget.content
+      // Reconcile the view with the content that just loaded. If the user has not
+      // deliberately opened the editor, content presence wins: a note with a table
+      // renders it, an empty note stays a typeable textarea. Because this keys off
+      // userEditRef and not focus, the empty-then-hydrated mount race resolves to
+      // the rendered view instead of getting stuck as a raw textarea.
+      if (!userEditRef.current) {
+        setEditing(widget.content.trim() === '')
+      }
     }
   }, [widget.id, widget.content])
 

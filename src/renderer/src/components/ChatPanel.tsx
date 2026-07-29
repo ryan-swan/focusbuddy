@@ -440,7 +440,9 @@ export function ProposalCards({
     if (p.kind === 'edit-document' && p.documentId.startsWith('$')) {
       const refKey = p.documentId.slice(1)
       if (!resolvedIds.has(refKey)) {
-        const parent = proposals.find((x) => x.id === refKey && x.kind === 'create-document')
+        const parent = proposals.find(
+          (x) => x.id === refKey && (x.kind === 'create-document' || x.kind === 'generate-document')
+        )
         if (!parent) {
           return {
             ok: false,

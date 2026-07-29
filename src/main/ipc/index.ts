@@ -779,7 +779,7 @@ export function registerIpcHandlers(): void {
               line += `\n    rowIds: ${sample}`
             }
           }
-        } else if ((w.kind === 'doc' || w.kind === 'sheet' || w.kind === 'slides') && w.content) {
+        } else if ((w.kind === 'doc' || w.kind === 'sheet' || w.kind === 'slides' || w.kind === 'map') && w.content) {
           line += `\n    documentId=${w.content}`
         }
         actionParts.push(line)
