@@ -1,9 +1,10 @@
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import type { AppliedProposal, ChatBlock } from '@shared/types'
+import type { AppliedProposal, ChatBlock, ChatSource } from '@shared/types'
 import ProposalCards from '../ProposalCards'
 import remarkCitations from '../../lib/remarkCitations'
 import { connectorMeta } from '../../lib/chatBlocks'
+import { isOpenable } from '../../lib/sourceTarget'
 import Icon from '../Icon'
 
 // The block-renderer registry for the agentic chat's typed-block thread.
@@ -29,6 +30,13 @@ interface Props {
   onConsumeProposal: (proposalId: string) => void
   // Jump to a real workspace item (widget/document) when a block links to one.
   onOpenWidget?: (widgetId: string) => void
+  // Open a cited source — the document, knowledge entry, desk or widget the
+  // claim rests on. Both the chip row and the inline [n] markers route here, so
+  // a citation is a link wherever it appears. Optional: a host that can't
+  // navigate (the Focus chat) simply renders them as static text.
+  onOpenSource?: (source: ChatSource) => void
+  // The sources this turn cites, so an inline [n] can resolve its own target.
+  citedSources?: ChatSource[]
 }
 
 export default function ChatBlockView({
@@ -37,8 +45,19 @@ export default function ChatBlockView({
   appliedProposals,
   onApplied,
   onConsumeProposal,
-  onOpenWidget
+  onOpenWidget,
+  onOpenSource,
+  citedSources
 }: Props): JSX.Element | null {
+  // A citation is clickable only when we both know where it goes and have a way
+  // to get there. Anything else stays plain text rather than offering a click
+  // that does nothing.
+  const sourceForMarker = (n: string): ChatSource | null => {
+    if (!onOpenSource || !citedSources) return null
+    const found = citedSources.find((s) => String(s.n) === n)
+    return found && isOpenable(found) ? found : null
+  }
+
   switch (block.kind) {
     // ── Live blocks ──────────────────────────────────────────────────────────
     case 'text':
@@ -66,14 +85,29 @@ export default function ChatBlockView({
                 if (n === undefined || n === null || n === '') {
                   return <span {...rest}>{children}</span>
                 }
+                const chipClass =
+                  'inline-grid place-items-center align-[1.5px] mx-[1px] min-w-[14px] h-[14px] px-[3px] rounded-[4px] bg-accent/15 text-accent text-[9px] font-mono font-semibold'
+                const source = sourceForMarker(String(n))
+                if (!source) {
+                  return (
+                    <span data-testid="chat-citation" title={`Source ${String(n)}`} className={chipClass}>
+                      {String(n)}
+                    </span>
+                  )
+                }
+                // The marker sits inside prose, so it opens on click but must not
+                // behave like a block-level control: type="button" keeps it out of
+                // form submission, and the title names what it opens.
                 return (
-                  <span
+                  <button
+                    type="button"
                     data-testid="chat-citation"
-                    title={`Source ${String(n)}`}
-                    className="inline-grid place-items-center align-[1.5px] mx-[1px] min-w-[14px] h-[14px] px-[3px] rounded-[4px] bg-accent/15 text-accent text-[9px] font-mono font-semibold"
+                    title={`Open ${source.title}`}
+                    onClick={() => onOpenSource?.(source)}
+                    className={`${chipClass} cursor-pointer hover:bg-accent/30 transition-colors`}
                   >
                     {String(n)}
-                  </span>
+                  </button>
                 )
               }
             }}
@@ -83,22 +117,51 @@ export default function ChatBlockView({
         </div>
       )
 
-    case 'sources':
-      // What the answer stands on. The numbers match the inline markers above.
+    case 'sources': {
+      // What the answer stands on. The numbers match the inline markers above,
+      // and each chip opens the thing it names — the document, the knowledge
+      // entry, or the desk the cited widget or table lives on. A source we can't
+      // route stays a plain chip; an affordance that goes nowhere is worse than
+      // no affordance. The tooltip carries the retrieved excerpt, which is the
+      // closest thing to "the line this came from" that retrieval hands back.
+      const chipClass =
+        'inline-flex items-center gap-1.5 max-w-full rounded-full border border-[var(--edge-soft)] bg-[var(--surface-sunken)] pl-1.5 pr-2 py-0.5 text-[10px] text-[var(--ink-70)]'
       return (
         <div className="flex flex-wrap gap-1" data-testid="chat-sources">
-          {block.sources.map((s) => (
-            <span
-              key={`${s.n}-${s.docId}`}
-              title={s.snippet || s.title}
-              className="inline-flex items-center gap-1.5 max-w-full rounded-full border border-[var(--edge-soft)] bg-[var(--surface-sunken)] pl-1.5 pr-2 py-0.5 text-[10px] text-[var(--ink-70)]"
-            >
-              <b className="font-mono text-[8.5px] font-bold text-accent">{s.n}</b>
-              <span className="truncate">{s.title}</span>
-            </span>
-          ))}
+          {block.sources.map((s) => {
+            const openable = onOpenSource && isOpenable(s)
+            const body = (
+              <>
+                <b className="font-mono text-[8.5px] font-bold text-accent">{s.n}</b>
+                <span className="truncate">{s.title}</span>
+                {openable && (
+                  <Icon name="north_east" size={10} className="shrink-0 text-[var(--ink-40)]" />
+                )}
+              </>
+            )
+            if (!openable) {
+              return (
+                <span key={`${s.n}-${s.docId}`} title={s.snippet || s.title} className={chipClass}>
+                  {body}
+                </span>
+              )
+            }
+            return (
+              <button
+                key={`${s.n}-${s.docId}`}
+                type="button"
+                data-testid="chat-source-link"
+                title={`Open ${s.title}${s.snippet ? ` — ${s.snippet}` : ''}`}
+                onClick={() => onOpenSource?.(s)}
+                className={`${chipClass} hover:border-[rgb(var(--accent)/0.45)] hover:text-[var(--ink-100)] transition-colors`}
+              >
+                {body}
+              </button>
+            )
+          })}
         </div>
       )
+    }
 
     case 'action':
       // Reuse the shared apply pipeline (dependency resolution, batched undo,

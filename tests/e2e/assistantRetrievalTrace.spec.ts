@@ -229,6 +229,50 @@ test('ART-4 — real sources and prepared tools appear in the trace, then collap
   await collapsed.click()
   await expect(trace).toBeVisible({ timeout: 4000 })
   await expect(trace).toContainText('Prepared 2 tools')
+
+  // …and the disclosure goes BOTH ways. Re-opening used to be a one-way door:
+  // the trace stayed expanded for the rest of the conversation with no way to
+  // put it away, because the auto-collapse timer never fires again once the user
+  // has taken control.
+  const collapseControl = window.locator('[data-testid="trace-collapse"]')
+  await expect(collapseControl).toBeVisible()
+  await expect(collapseControl).toContainText('3 sources · 2 tools')
+  await collapseControl.click()
+  await expect(collapsed).toBeVisible({ timeout: 4000 })
+  await expect(trace).toHaveCount(0)
+
+  // And it opens again after that — the toggle is stable, not one-shot.
+  await collapsed.click()
+  await expect(trace).toBeVisible({ timeout: 4000 })
+  await expect(window.locator('[data-testid="trace-collapse"]')).toBeVisible()
+})
+
+test('ART-7 — a failed trace can be put away too, and folds without looking successful', async () => {
+  launched = await launchApp()
+  const { window, app } = launched
+  await waitForReady(window)
+  await openAssistant(window)
+  await stubStream(app, {
+    sources: [src(1, 'Release checklist')],
+    elapsedMs: 33,
+    error: 'Conversation hit the model context window. Start a fresh session.'
+  })
+  await ask(window, 'summarise everything')
+
+  const trace = window.locator('[data-testid="assistant-trace"]')
+  await expect(window.locator('[data-testid="trace-error"]')).toBeVisible({ timeout: 8000 })
+  // A failure never auto-collapses — it is the only explanation on screen — so
+  // without its own control it would be permanent.
+  const collapseControl = window.locator('[data-testid="trace-collapse"]')
+  await expect(collapseControl).toBeVisible()
+  await collapseControl.click()
+  // The folded summary leads with the failure: "1 source" alone would read like
+  // a request that went fine.
+  await expect(window.locator('[data-testid="trace-collapsed"]')).toContainText(
+    'Failed · 1 source',
+    { timeout: 4000 }
+  )
+  await expect(trace).toHaveCount(0)
 })
 
 test('ART-5 — a failure ends red and never claims work it did not do', async () => {
@@ -257,6 +301,111 @@ test('ART-5 — a failure ends red and never claims work it did not do', async (
   await expect(window.locator('[data-testid="trace-collapsed"]')).toHaveCount(0)
   // The spinner is released — a failed request must not leave the composer stuck.
   await expect(window.locator('[data-testid="chat-pending"]')).toHaveCount(0)
+})
+
+test('ART-8 — a trace stays as you left it when you navigate away and back', async () => {
+  launched = await launchApp()
+  const { window, app } = launched
+  await waitForReady(window)
+  await openAssistant(window)
+  await stubStream(app, {
+    sources: [src(1, 'Release checklist'), src(2, 'updater-notes.md')],
+    elapsedMs: 51,
+    reply: 'Here is the state of the release [1].'
+  })
+  await ask(window, 'where is the release?')
+
+  // Let it auto-collapse, so the remembered state is "closed".
+  const collapsed = window.locator('[data-testid="trace-collapsed"]')
+  const trace = window.locator('[data-testid="assistant-trace"]')
+  const turns = window.locator('[data-testid="assistant-turn"]')
+  await expect(collapsed).toBeVisible({ timeout: 10_000 })
+
+  // Go to another page and come back.
+  //
+  // The panel itself survives navigation — what changes is the THREAD, because
+  // the assistant re-threads per screen. Another page's conversation replaces
+  // this one, so every turn (and its trace) unmounts, and coming back mounts
+  // them fresh. That is the remount that broke this.
+  //
+  // Rooms, specifically: it threads under its own key ('room'), where Calendar
+  // and Home both fall through to '__global__' and so would not switch threads
+  // at all — a navigation that changes nothing would make this test pass while
+  // locking nothing.
+  const leaveAndReturn = async (): Promise<void> => {
+    await window.getByRole('button', { name: /Rooms/ }).first().click()
+    await expect(turns).toHaveCount(0, { timeout: 6000 })
+    await window.getByRole('button', { name: /Home/ }).first().click()
+    await expect(turns).toHaveCount(1, { timeout: 8000 })
+  }
+
+  await leaveAndReturn()
+  // Checked IMMEDIATELY, on a deliberately short timeout. A trace that comes
+  // back expanded and then folds itself away again on its own timer would
+  // satisfy a lenient wait while still replaying the whole thing in front of
+  // you — which is exactly the bug, and exactly what a generous timeout here
+  // would hide.
+  await expect(trace).toHaveCount(0, { timeout: 700 })
+  await expect(collapsed).toHaveCount(1, { timeout: 700 })
+
+  // Now open it deliberately and leave again. The choice has to survive too, in
+  // the other direction.
+  await collapsed.click()
+  await expect(trace).toBeVisible({ timeout: 4000 })
+  await leaveAndReturn()
+  await expect(trace).toHaveCount(1, { timeout: 700 })
+  // …and it comes back fully revealed rather than re-running the stagger. The
+  // reveal shows work happening; re-enacting it for a request that finished
+  // minutes ago is theatre, and it fired on every single navigation.
+  await expect(window.locator('[data-testid="trace-leaf"]')).toHaveCount(2, { timeout: 700 })
+})
+
+test('ART-9 — every retrieved source in the trace is a link, cited or not', async () => {
+  launched = await launchApp()
+  const { window, app } = launched
+  await waitForReady(window)
+
+  // A real desk to land on, so the click has somewhere genuine to go.
+  const taskId = await window.evaluate(async () => {
+    const api = (window as unknown as { api: typeof window.api }).api
+    const node = await api.nodes.create({ parentId: null, kind: 'task', title: 'TraceLinkTarget' })
+    return node.id
+  })
+
+  await openAssistant(window)
+  // Two sources retrieved; the answer cites only [1]. Source 2 is the case that
+  // matters: retrieved, never cited, so it appears in no chip row and the trace
+  // is the only place it exists.
+  await stubStream(app, {
+    sources: [
+      { n: 1, docId: 'doc-cited', title: 'Cited doc', docType: 'doc', snippet: 'a' },
+      { n: 2, docId: taskId, title: 'TraceLinkTarget', docType: 'task', snippet: 'b' }
+    ],
+    elapsedMs: 44,
+    reply: 'Grounded in the first one [1].'
+  })
+  await ask(window, 'what do you know?')
+
+  // Only one chip, because only one source was cited…
+  const chipRow = window.locator('[data-testid="chat-sources"]')
+  await expect(chipRow).toBeVisible({ timeout: 8000 })
+  await expect(chipRow.locator('> span, > button')).toHaveCount(1)
+
+  // …but the trace lists both, and both are links.
+  const collapsed = window.locator('[data-testid="trace-collapsed"]')
+  await expect(collapsed).toBeVisible({ timeout: 10_000 })
+  await collapsed.click()
+  const leafLinks = window.locator('[data-testid="trace-leaf-link"]')
+  await expect(leafLinks).toHaveCount(2, { timeout: 4000 })
+
+  // Following the uncited one navigates, and the conversation comes with it —
+  // the assistant moved you, so it keeps the thread that sent you there.
+  await leafLinks.nth(1).click()
+  await expect(window.locator('[data-testid="assistant-pinned-banner"]')).toBeVisible({
+    timeout: 8000
+  })
+  await expect(window.locator('[data-testid="assistant-turn"]')).toHaveCount(1)
+  await expect(window.getByText(/Grounded in the first one/)).toBeVisible()
 })
 
 test('ART-6 — clearing the thread takes its traces with it', async () => {

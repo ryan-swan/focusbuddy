@@ -42,6 +42,14 @@ export interface TraceLeaf {
   icon: string
   // 1-based citation number, for source leaves. Matches the [n] markers.
   n?: number
+  // The retrieved source this leaf stands for, so it can be opened.
+  //
+  // This matters more than it looks: the trace lists everything retrieval
+  // found, while the chips below the answer list only what the answer cited.
+  // Anything retrieved but uncited exists nowhere else in the UI — the trace is
+  // the only way back to it. Absent on tool leaves, which name an action rather
+  // than a document.
+  source?: ChatSource
 }
 
 export interface TraceLine {
@@ -101,11 +109,18 @@ export function hasTraceContent(trace: AssistantTrace): boolean {
 
 // The one-line summary the trace collapses to. Only ever names things that
 // exist, so "3 sources · 2 tools" never appears over a request that had neither.
+//
+// A failed request says so first. Now that a failure can be folded away, a bare
+// "1 source" over a broken request would read exactly like one that went fine —
+// which is the one thing a collapsed summary must never do.
 export function traceSummary(trace: AssistantTrace): string {
   const parts: string[] = []
   if (trace.sources.length > 0) parts.push(plural(trace.sources.length, 'source'))
   if (trace.tools.length > 0) parts.push(plural(trace.tools.length, 'tool'))
-  if (parts.length === 0) return trace.status === 'error' ? 'Failed' : 'No sources used'
+  if (trace.status === 'error') {
+    return parts.length > 0 ? `Failed · ${parts.join(' · ')}` : 'Failed'
+  }
+  if (parts.length === 0) return 'No sources used'
   return parts.join(' · ')
 }
 
@@ -121,7 +136,8 @@ function sourceLeaves(trace: AssistantTrace, revealedCount: number): TraceLeaf[]
     key: `${s.n}-${s.docId}`,
     label: s.title,
     icon: s.docType === 'knowledge' ? 'menu_book' : 'description',
-    n: s.n
+    n: s.n,
+    source: s
   }))
 }
 

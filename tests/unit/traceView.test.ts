@@ -92,6 +92,21 @@ describe('getTraceView — phases only advance on real events', () => {
     expect(v2.active).toBeNull()
   })
 
+  it('carries the source on each leaf so the trace can open it', () => {
+    // The trace lists everything retrieval found; the chips below the answer
+    // list only what it cited. Anything retrieved-but-uncited is reachable
+    // nowhere else, so these leaves are the only route back to it.
+    const sources = [src(1, 'Release checklist'), src(2, 'updater-notes.md')]
+    const leaves = getTraceView(done({ sources }), 2).completed[0].leaves ?? []
+    expect(leaves.map((l) => l.source)).toEqual(sources)
+  })
+
+  it('does not put a source on a tool leaf — an action is not a document', () => {
+    const t = done({ tools: [tool(0, 'compose-mail', 'Email draft → Ryan')] })
+    const toolLine = getTraceView(t, 0).completed.find((l) => l.key === 'tools')
+    expect((toolLine?.leaves ?? []).every((l) => l.source === undefined)).toBe(true)
+  })
+
   it('numbers source leaves to match the inline [n] markers', () => {
     const v = getTraceView(done({ sources: [src(1, 'A'), src(2, 'B'), src(3, 'C')] }), 3)
     expect((v.completed[0].leaves ?? []).map((l) => l.n)).toEqual([1, 2, 3])
@@ -228,6 +243,22 @@ describe('traceSummary — the collapsed line only names things that exist', () 
   it('never invents a zero count', () => {
     expect(traceSummary(done())).toBe('No sources used')
     expect(traceSummary(done({ status: 'error', error: 'x' }))).toBe('Failed')
+  })
+
+  it('leads with the failure, so a folded-away error cannot read as a success', () => {
+    expect(traceSummary(done({ status: 'error', error: 'x', sources: [src(1, 'A')] }))).toBe(
+      'Failed · 1 source'
+    )
+    expect(
+      traceSummary(
+        done({
+          status: 'error',
+          error: 'x',
+          sources: [src(1, 'A'), src(2, 'B')],
+          tools: [tool(0, 'compose-mail', 'y')]
+        })
+      )
+    ).toBe('Failed · 2 sources · 1 tool')
   })
 })
 

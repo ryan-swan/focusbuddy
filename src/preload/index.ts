@@ -129,6 +129,9 @@ const api = {
     listRelated: (id: string): Promise<string[]> => ipcRenderer.invoke('nodes:listRelated', id)
   },
   widgets: {
+    // Fetch one widget by id. Needed to answer "which desk is this on?" when all
+    // you have is the widget — a cited source names the widget, not its canvas.
+    get: (id: string): Promise<Widget | null> => ipcRenderer.invoke('widgets:get', id),
     listByTask: (taskId: string): Promise<Widget[]> =>
       ipcRenderer.invoke('widgets:listByTask', taskId),
     listByKind: (kind: Widget['kind']): Promise<Widget[]> =>

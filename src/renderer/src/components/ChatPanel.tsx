@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { AppliedProposal, ChatMessage } from '@shared/types'
+import type { AppliedProposal, ChatMessage, ChatSource } from '@shared/types'
 import { useNodeStore } from '../stores/nodes'
+import { useViewStore } from '../stores/view'
+import { targetForSource } from '../lib/sourceTarget'
 import { useChatStore, appliedKey } from '../stores/chat'
 import { deriveAssistantBlocks } from '../lib/chatBlocks'
 import ChatBlockView from './focus/ChatBlockView'
@@ -35,6 +37,8 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
   const sourcesByMessage = useChatStore((s) => s.sourcesByMessage)
   const liveTraceByThread = useChatStore((s) => s.liveTraceByThread)
   const traceByMessage = useChatStore((s) => s.traceByMessage)
+  const traceDisclosureByMessage = useChatStore((s) => s.traceDisclosureByMessage)
+  const setTraceDisclosure = useChatStore((s) => s.setTraceDisclosure)
   const markProposalApplied = useChatStore((s) => s.markProposalApplied)
   const consumeProposal = useChatStore((s) => s.consumeProposal)
   const rewindTo = useChatStore((s) => s.rewindTo)
@@ -44,14 +48,29 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
   // conversation per context; ctx.serverTaskId is the real task handed to the
   // server for task-scoped context (null off a desk).
   const ctx = useAssistantContext()
+  // The conversation on screen. Normally the current screen's, but a thread
+  // pinned by following a citation keeps its place until the user picks this
+  // page instead — otherwise the assistant sends you somewhere and then loses
+  // the conversation that sent you, which makes its own links unusable.
+  const pinnedThread = useChatStore((s) => s.pinnedThread)
+  const unpinThread = useChatStore((s) => s.unpinThread)
+  const pinThread = useChatStore((s) => s.pinThread)
+  const thread = pinnedThread ?? {
+    key: ctx.key,
+    label: ctx.label,
+    title: ctx.title,
+    icon: ctx.icon,
+    serverTaskId: ctx.serverTaskId
+  }
+  const followingElsewhere = pinnedThread !== null && pinnedThread.key !== ctx.key
   const messages = useMemo(
-    () => messagesByTask[ctx.key] ?? EMPTY_MESSAGES,
-    [messagesByTask, ctx.key]
+    () => messagesByTask[thread.key] ?? EMPTY_MESSAGES,
+    [messagesByTask, thread.key]
   )
   // The trace for the send currently in flight on THIS thread. Scoped by
-  // ctx.key, not by the global `sending` flag, so a request started in another
+  // the active thread, not by the global `sending` flag, so a request started in another
   // context can't draw its progress here.
-  const liveTrace = liveTraceByThread[ctx.key]
+  const liveTrace = liveTraceByThread[thread.key]
   const [draft, setDraft] = useState('')
   const [summarizing, setSummarizing] = useState(false)
   // Which turn most recently had its text copied — drives the ✓ confirmation on
@@ -179,7 +198,67 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
     const content = draft.trim()
     if (!content || sending) return
     setDraft('')
-    await send(ctx.serverTaskId, content, ctx.key)
+    await send(thread.serverTaskId, content, thread.key)
+  }
+
+  // Open the thing a citation points at.
+  //
+  // Where it goes is decided by targetForSource (pure, tested); this only
+  // performs it. Two of the five kinds need a lookup first: a source names a
+  // widget or a table, not the desk it sits on, so the canvas has to be resolved
+  // before we can navigate to it. Routing matches PlexiSearchView's openHit, so
+  // a citation and a search result for the same thing land in the same place.
+  async function openSource(source: ChatSource): Promise<void> {
+    const target = targetForSource(source)
+    if (!target) return
+    // Following a citation is the assistant moving you, not you changing screen.
+    // Pin the conversation first so it survives the navigation — otherwise the
+    // panel re-threads to wherever it just sent you and the thread that produced
+    // the link is gone.
+    pinThread(thread)
+    const view = useViewStore.getState()
+    const openDesk = (taskId: string): void => {
+      useNodeStore.getState().setActive(taskId)
+      view.goTask(taskId)
+    }
+    switch (target.kind) {
+      case 'document':
+        view.goDocument(target.documentId)
+        break
+      case 'knowledge':
+        view.goKnowledge(target.entryId)
+        break
+      case 'desk':
+        openDesk(target.taskId)
+        break
+      case 'widget': {
+        // widgets.get is newer than the rest of this bridge, so an Electron
+        // process still running an older preload won't have it. Say so rather
+        // than throwing a TypeError into a click handler — a silent dead link is
+        // exactly the kind of thing that costs an hour to track down.
+        if (typeof window.api.widgets.get !== 'function') {
+          console.warn(
+            '[assistant] window.api.widgets.get is missing, so a cited widget cannot be ' +
+              'resolved to its desk. Restart the Electron process (npm run dev) to pick up ' +
+              'the current preload bundle.'
+          )
+          return
+        }
+        const widget = await window.api.widgets.get(target.widgetId)
+        if (!widget?.taskId) return
+        openDesk(widget.taskId)
+        // Select it so the desk opens with the cited widget picked out rather
+        // than leaving you to find it among everything else on the canvas.
+        useWidgetStore.getState().setSelection([target.widgetId])
+        break
+      }
+      case 'table': {
+        const table = await window.api.tables.get(target.tableId)
+        if (!table?.taskId) return
+        openDesk(table.taskId)
+        break
+      }
+    }
   }
 
   async function copyTurn(content: string): Promise<void> {
@@ -211,8 +290,8 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
     const question = messages[userIndex].content
     // Rewind to just before that question, then re-send it, so the request is
     // rebuilt with exactly the history it had the first time.
-    rewindTo(ctx.key, userIndex)
-    await send(ctx.serverTaskId, question, ctx.key)
+    rewindTo(thread.key, userIndex)
+    await send(thread.serverTaskId, question, thread.key)
   }
 
   return (
@@ -230,17 +309,17 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
           {/* Sentence case, not shouted. The uppercase treatment made a 13px
               label read as a system banner rather than a product surface. */}
           <div className="flex items-center gap-1.5">
-            <Icon name={ctx.icon} size={15} className="text-[var(--ink-70)]" />
+            <Icon name={thread.icon} size={15} className="text-[var(--ink-70)]" />
             <h2 className="text-[13.5px] font-semibold tracking-[-0.01em] text-[var(--ink-100)]">
               Assistant
             </h2>
           </div>
           <p
             className="text-[10.5px] text-[var(--ink-50)] truncate"
-            title={`Assistant is focused on ${ctx.label}${ctx.title ? ` — ${ctx.title}` : ''}`}
+            title={`Assistant is focused on ${thread.label}${thread.title ? ` — ${thread.title}` : ''}`}
           >
-            {ctx.title ? `${ctx.title} · ` : ''}
-            {ctx.label}
+            {thread.title ? `${thread.title} · ` : ''}
+            {thread.label}
           </p>
         </div>
         <div className="flex items-center gap-1">
@@ -282,7 +361,7 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
             />
           </button>
           {messages.length > 0 && (
-            <button onClick={() => clear(ctx.key)} className="icon-btn" title="Clear chat">
+            <button onClick={() => clear(thread.key)} className="icon-btn" title="Clear chat">
               <Icon name="delete_sweep" size={16} />
             </button>
           )}
@@ -293,6 +372,29 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
           )}
         </div>
       </div>
+
+      {/* Why this panel is showing a conversation that isn't this page's, and
+          the way back. Without it a pinned thread is indistinguishable from the
+          assistant simply ignoring where you are. */}
+      {followingElsewhere && (
+        <div
+          data-testid="assistant-pinned-banner"
+          className="mx-3 mt-2 flex items-center gap-1.5 rounded-lg bg-[var(--surface-sunken)] border border-[var(--edge-soft)] px-2 py-1"
+        >
+          <Icon name="push_pin" size={12} className="text-accent shrink-0" filled />
+          <span className="text-[10.5px] text-[var(--ink-70)] truncate flex-1 min-w-0">
+            Still on your {thread.label} conversation
+          </span>
+          <button
+            onClick={unpinThread}
+            data-testid="assistant-unpin"
+            className="text-[10.5px] text-accent hover:underline shrink-0"
+            title={`Switch to the assistant for ${ctx.label}`}
+          >
+            Switch to {ctx.label}
+          </button>
+        </div>
+      )}
 
       {hasApiKey === false && (
         <div className="m-3 p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/50 text-xs text-[var(--ink-90)] leading-relaxed flex gap-2">
@@ -355,6 +457,12 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
           const proposals = proposalsByMessage[String(m.ts)] ?? []
           const sources = sourcesByMessage[String(m.ts)] ?? []
           const blocks = deriveAssistantBlocks(m, proposals, sources)
+          // The sources this turn actually cites, read back off the derived
+          // blocks rather than recomputed — so an inline [n] resolves to exactly
+          // the chip below it, and the two can't disagree about what was cited.
+          const citedSources =
+            blocks.find((b): b is Extract<typeof b, { kind: 'sources' }> => b.kind === 'sources')
+              ?.sources ?? []
           // Slice the composite-keyed applied-state down to THIS message,
           // re-keyed by plain proposalId, so ProposalCards stays store-shape
           // agnostic (the Focus chat passes the same shape).
@@ -380,7 +488,14 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
               {/* What produced this answer, above it — collapsed to a single
                   summary line once it has been read, absent entirely when
                   retrieval found nothing and no action was prepared. */}
-              {finishedTrace && <RetrievalTrace trace={finishedTrace} />}
+              {finishedTrace && (
+                <RetrievalTrace
+                  trace={finishedTrace}
+                  disclosure={traceDisclosureByMessage[String(m.ts)]}
+                  onDisclosureChange={(state) => setTraceDisclosure(m.ts, state)}
+                  onOpenSource={(s) => void openSource(s)}
+                />
+              )}
               {blocks.map((block, bi) => (
                 <ChatBlockView
                   key={bi}
@@ -389,12 +504,16 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
                   appliedProposals={appliedForMsg}
                   onApplied={(id, applied) => markProposalApplied(m.ts, id, applied)}
                   onConsumeProposal={(id) => consumeProposal(m.ts, id)}
+                  onOpenSource={(s) => void openSource(s)}
+                  citedSources={citedSources}
                 />
               ))}
-              {/* Per-turn actions. Revealed on hover to keep the thread calm, but
-                  focus-visible brings them back for keyboard users — hover-only
-                  affordances are otherwise unreachable without a mouse. */}
-              <div className="flex items-center gap-0.5 opacity-0 group-hover/turn:opacity-100 focus-within:opacity-100 transition-opacity">
+              {/* Per-turn actions. Always present — they were hover-only, which
+                  meant you had to already know they were there and land the
+                  pointer on the prose to find them. They sit at low contrast and
+                  come up to full on hover, so the thread stays calm without the
+                  controls being a secret. */}
+              <div className="flex items-center gap-0.5 opacity-55 group-hover/turn:opacity-100 focus-within:opacity-100 transition-opacity">
                 <button
                   onClick={() => void copyTurn(m.content)}
                   title="Copy this reply"
@@ -420,7 +539,9 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
             what is actually happening instead of a generic "Working…". The dots
             remain for the non-streaming path, which reports nothing until it
             returns and so has nothing truer to show. */}
-        {sending && liveTrace && <RetrievalTrace trace={liveTrace} />}
+        {sending && liveTrace && (
+          <RetrievalTrace trace={liveTrace} onOpenSource={(s) => void openSource(s)} />
+        )}
         {sending && !liveTrace && (
           <div className="flex items-center gap-1.5 text-[var(--ink-50)]" data-testid="chat-pending">
             <span className="flex gap-[3px]" aria-hidden="true">

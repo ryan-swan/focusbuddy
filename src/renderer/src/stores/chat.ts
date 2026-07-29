@@ -10,6 +10,17 @@ import { recordTrail } from '../lib/trail'
 import { gatherCanvasAttachments } from '../lib/canvasContent'
 import type { AssistantTrace } from '../lib/traceView'
 
+// Enough of an assistant context to keep showing a conversation after you have
+// navigated away from where it started: which thread it is, what to call it, and
+// the task the server should scope it to.
+export interface PinnedThread {
+  key: string
+  label: string
+  title: string
+  icon: string
+  serverTaskId: string | null
+}
+
 function newTrace(): AssistantTrace {
   return {
     status: 'running',
@@ -57,6 +68,23 @@ interface ChatStore {
   // Finished traces, keyed by the assistant message's timestamp, so a completed
   // turn can still show its collapsed "3 sources · 2 tools" summary.
   traceByMessage: Record<string, AssistantTrace>
+  // Whether each finished trace is open or shut. Lives here rather than in the
+  // component because the panel unmounts whenever you navigate away: local state
+  // would mean a trace you closed comes back open — and replays its reveal —
+  // every single time you return to the page.
+  traceDisclosureByMessage: Record<string, 'open' | 'closed'>
+  setTraceDisclosure: (messageTs: number, state: 'open' | 'closed') => void
+  // A conversation the panel holds onto across navigation.
+  //
+  // The assistant normally re-threads per screen (see lib/assistantContext) — a
+  // desk, a document and a room each get their own conversation. That is right
+  // when YOU changed screen, and wrong when the ASSISTANT did: following a
+  // citation would otherwise swap the conversation you were having for the
+  // destination's, mid-thought. Pinning keeps the thread you were in until you
+  // choose the current page instead.
+  pinnedThread: PinnedThread | null
+  pinThread: (thread: PinnedThread) => void
+  unpinThread: () => void
   sending: boolean
   hasApiKey: boolean | null
   checkApiKey: () => Promise<void>
@@ -98,6 +126,18 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   sourcesByMessage: {},
   liveTraceByThread: {},
   traceByMessage: {},
+  traceDisclosureByMessage: {},
+  pinnedThread: null,
+  setTraceDisclosure: (messageTs, state) => {
+    set({
+      traceDisclosureByMessage: {
+        ...get().traceDisclosureByMessage,
+        [String(messageTs)]: state
+      }
+    })
+  },
+  pinThread: (thread) => set({ pinnedThread: thread }),
+  unpinThread: () => set({ pinnedThread: null }),
   sending: false,
   hasApiKey: null,
   checkApiKey: async () => {
@@ -143,6 +183,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     const nextApplied = { ...get().appliedProposals }
     const nextSources = { ...get().sourcesByMessage }
     const nextTraces = { ...get().traceByMessage }
+    const nextDisclosure = { ...get().traceDisclosureByMessage }
     for (const m of dropped) {
       for (const p of nextProposals[String(m.ts)] ?? []) {
         delete nextApplied[appliedKey(m.ts, p.id)]
@@ -150,6 +191,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       delete nextProposals[String(m.ts)]
       delete nextSources[String(m.ts)]
       delete nextTraces[String(m.ts)]
+      delete nextDisclosure[String(m.ts)]
     }
     // A rewind is the front half of a retry, so any trace still running for this
     // thread describes work the user just discarded. Drop it too.
@@ -164,6 +206,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       appliedProposals: nextApplied,
       sourcesByMessage: nextSources,
       traceByMessage: nextTraces,
+      traceDisclosureByMessage: nextDisclosure,
       liveTraceByThread: nextLive
     })
   },
@@ -360,6 +403,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     const nextApplied = { ...get().appliedProposals }
     const nextSources = { ...get().sourcesByMessage }
     const nextTraces = { ...get().traceByMessage }
+    const nextDisclosure = { ...get().traceDisclosureByMessage }
     for (const m of cleared) {
       for (const p of nextProposals[String(m.ts)] ?? []) {
         delete nextApplied[appliedKey(m.ts, p.id)]
@@ -367,6 +411,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       delete nextProposals[String(m.ts)]
       delete nextSources[String(m.ts)]
       delete nextTraces[String(m.ts)]
+      delete nextDisclosure[String(m.ts)]
     }
     const nextLive = { ...get().liveTraceByThread }
     delete nextLive[key]
@@ -376,7 +421,10 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       appliedProposals: nextApplied,
       sourcesByMessage: nextSources,
       traceByMessage: nextTraces,
-      liveTraceByThread: nextLive
+      traceDisclosureByMessage: nextDisclosure,
+      liveTraceByThread: nextLive,
+      // A cleared thread has nothing left to follow you around.
+      pinnedThread: get().pinnedThread?.key === key ? null : get().pinnedThread
     })
   }
 }))
