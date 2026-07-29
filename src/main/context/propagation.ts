@@ -116,15 +116,35 @@ export function propagateHealth(origin: string, graph: HealthGraph, opts: Propag
   return { origin, affected, deferred, truncations, visitedCount: visited.size, budgetExceeded }
 }
 
+type RelEdgeRow = { id: string; sourceEntityId: string; targetEntityId: string; strength: number }
+
 // Adapt a RelationshipStore into a HealthGraph. Only confirmed edges surface
 // (the store's activeFor already enforces PLX-GPH-002 / PLX-UX-022), so
 // propagation never travels a provisional or rejected link.
-export function graphFromRelationships(store: {
-  activeFor: (entityId: string) => Array<{ id: string; sourceEntityId: string; targetEntityId: string; strength: number }>
-}): HealthGraph {
+export function graphFromRelationships(store: { activeFor: (entityId: string) => RelEdgeRow[] }): HealthGraph {
   return {
     neighbours(objectId: string): HealthEdge[] {
       return store.activeFor(objectId).map((r) => ({
+        objectId: r.sourceEntityId === objectId ? r.targetEntityId : r.sourceEntityId,
+        relationshipId: r.id,
+        strength: r.strength
+      }))
+    }
+  }
+}
+
+// A permission-filtered HealthGraph (PLX-GPH-010, INV-06): propagation only ever
+// reaches nodes the principal can read, and the existence of the rest never leaks
+// into visitedCount, truncation records or path distances, because unreadable
+// neighbours are dropped by activeForPrincipal before the traversal ever sees them.
+export function permissionedGraphFromRelationships<P, C>(
+  store: { activeForPrincipal: (entityId: string, principal: P, canRead: C) => RelEdgeRow[] },
+  principal: P,
+  canRead: C
+): HealthGraph {
+  return {
+    neighbours(objectId: string): HealthEdge[] {
+      return store.activeForPrincipal(objectId, principal, canRead).map((r) => ({
         objectId: r.sourceEntityId === objectId ? r.targetEntityId : r.sourceEntityId,
         relationshipId: r.id,
         strength: r.strength

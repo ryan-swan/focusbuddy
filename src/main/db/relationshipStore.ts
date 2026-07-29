@@ -22,6 +22,7 @@ import {
   type RelationshipTypeId
 } from '../../shared/relationship'
 import type { PermissionSnapshot } from '../../shared/events'
+import { edgeCrossable, type CanRead, type Principal } from '../../shared/permission'
 
 export interface ProposeInput {
   organisationId: string
@@ -46,8 +47,14 @@ export interface RelationshipStore {
   reject: (id: string, actor: string) => Relationship | null
   recomputeConfidence: (id: string, newConfidence: number) => Relationship | null
   activeFor: (entityId: string) => Relationship[]
+  // Permission-filtered confirmed neighbours (PLX-GPH-010/021, INV-06): only edges
+  // whose far endpoint the principal may read and whose scope it satisfies. Unread-
+  // able neighbours are omitted BEFORE the caller derives any count, so their
+  // existence never leaks through counts or distances.
+  activeForPrincipal: (entityId: string, principal: Principal, canRead: CanRead) => Relationship[]
   get: (id: string) => Relationship | null
   all: () => Relationship[]
+  organisationId: string | null
   db: SqlDb
 }
 
@@ -81,8 +88,22 @@ export function ensureRelationshipSchema(db: SqlDb): void {
   `)
 }
 
-export function createRelationshipStore(db: SqlDb): RelationshipStore {
+// In production the Context Engine binds this to getActiveOrgId(), so every read is
+// hardcoded to a single organisation and a cross-org result is impossible by
+// construction (PLX-SEC-011 / GPH-011). An unbound store (organisationId omitted)
+// is for single-organisation unit tests only.
+export function createRelationshipStore(
+  db: SqlDb,
+  organisationId?: string | (() => string | null)
+): RelationshipStore {
   ensureRelationshipSchema(db)
+  // A live resolver, so a store bound in production tracks the active org even
+  // across an org switch, rather than freezing the org it was constructed under.
+  const resolveOrg: () => string | null =
+    typeof organisationId === 'function' ? organisationId : () => organisationId ?? null
+  const bound = organisationId != null
+  const orgClause = bound ? ' AND organisation_id = ?' : ''
+  const orgArg = (): unknown[] => (bound ? [resolveOrg()] : [])
 
   function rowToRel(r: Record<string, unknown>): Relationship {
     return {
@@ -109,7 +130,9 @@ export function createRelationshipStore(db: SqlDb): RelationshipStore {
   }
 
   const get: RelationshipStore['get'] = (id) => {
-    const row = db.prepare('SELECT * FROM relationships WHERE id = ?').get(id) as Record<string, unknown> | undefined
+    const row = db.prepare(`SELECT * FROM relationships WHERE id = ?${orgClause}`).get(id, ...orgArg()) as
+      | Record<string, unknown>
+      | undefined
     return row ? rowToRel(row) : null
   }
 
@@ -202,17 +225,43 @@ export function createRelationshipStore(db: SqlDb): RelationshipStore {
   }
 
   // Only CONFIRMED edges feed retrieval, propagation, resume and permissions
-  // (PLX-GPH-002). Provisional and rejected edges are deliberately excluded.
+  // (PLX-GPH-002). Provisional and rejected edges are deliberately excluded. When
+  // the store is org-bound, cross-org edges are excluded at the query (PLX-GPH-011).
   const activeFor: RelationshipStore['activeFor'] = (entityId) => {
     const rows = db
-      .prepare(`SELECT * FROM relationships WHERE state = 'confirmed' AND (source_entity_id = ? OR target_entity_id = ?) ORDER BY strength DESC`)
-      .all(entityId, entityId) as Record<string, unknown>[]
+      .prepare(
+        `SELECT * FROM relationships WHERE state = 'confirmed' AND (source_entity_id = ? OR target_entity_id = ?)${orgClause} ORDER BY strength DESC`
+      )
+      .all(entityId, entityId, ...orgArg()) as Record<string, unknown>[]
     return rows.map(rowToRel)
   }
 
-  const all: RelationshipStore['all'] = () => (db.prepare('SELECT * FROM relationships ORDER BY created_at ASC').all() as Record<string, unknown>[]).map(rowToRel)
+  // Permission-filtered traversal: keep only edges the principal may cross —
+  // same-org, far endpoint readable, edge scope satisfied (PLX-GPH-010/021,
+  // INV-06). Filtering happens before the caller sees the set, so an unreadable
+  // neighbour never contributes to a count or distance (no existence leak).
+  const activeForPrincipal: RelationshipStore['activeForPrincipal'] = (entityId, principal, canRead) => {
+    return activeFor(entityId).filter((r) => edgeCrossable(principal, entityId, r, canRead))
+  }
 
-  return { propose, confirm, reject, recomputeConfidence, activeFor, get, all, db }
+  const all: RelationshipStore['all'] = () =>
+    (db.prepare(`SELECT * FROM relationships${bound ? ' WHERE organisation_id = ?' : ''} ORDER BY created_at ASC`).all(...orgArg()) as Record<
+      string,
+      unknown
+    >[]).map(rowToRel)
+
+  return {
+    propose,
+    confirm,
+    reject,
+    recomputeConfidence,
+    activeFor,
+    activeForPrincipal,
+    get,
+    all,
+    organisationId: bound ? resolveOrg() : null,
+    db
+  }
 }
 
 /** A RelationshipConfirmed event for the Event Store when an edge is promoted

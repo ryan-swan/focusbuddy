@@ -60,7 +60,10 @@ export function getContextEngine(): Engine {
   const db = asSqlDb(getDb())
   ensureEventSchema(db)
   const events = createEventStore(db)
-  const relationships = createRelationshipStore(db)
+  // Bind the graph store to the active organisation (live resolver, tracks the org
+  // switcher): a cross-org edge is then impossible by construction (PLX-SEC-011 /
+  // GPH-011). ADR-0002.
+  const relationships = createRelationshipStore(db, () => getActiveOrgId())
   const decisions = createDecisionStore(db)
   ensureReviewSchema(db)
   engine = { events, relationships, decisions, db }
