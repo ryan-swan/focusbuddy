@@ -39,6 +39,23 @@ export interface MaterialityWeights {
   history: number
 }
 
+// Band cutoffs (lower bound to ENTER each band above 'none'). Tenant-configurable
+// and versioned, and recorded on every scoring result so a threshold change is
+// distinguishable from a behaviour change when auditing later (PLX-CTX-012).
+export interface MaterialityThresholds {
+  version: string
+  low: number // score >= low -> at least 'low'
+  medium: number // score >= medium -> at least 'medium'
+  high: number // score >= high -> 'high'
+}
+
+export const DEFAULT_THRESHOLDS: MaterialityThresholds = {
+  version: 'thresholds-1.0.0',
+  low: 0.15,
+  medium: 0.4,
+  high: 0.7
+}
+
 // The function's own version. Bump when the SHAPE of the computation changes;
 // weight-only changes bump the weights version instead.
 export const MATERIALITY_FN_VERSION = 'ctx-materiality-1.0.0'
@@ -63,6 +80,8 @@ export interface MaterialityResult {
   action: MaterialityAction
   functionVersion: string
   weightsVersion: string
+  thresholdsVersion: string
+  thresholds: MaterialityThresholds
 }
 
 // ── Deterministic normalisers (each returns 0..1) ─────────────────────────────
@@ -74,11 +93,11 @@ const reachN = (r: OrganisationalReach): number => ({ self: 0.15, desk: 0.4, tea
 const roleN = (r: UserRole): number => ({ viewer: 0.25, member: 0.5, owner: 0.85, admin: 1 })[r]
 const stageN = (s: WorkflowStage): number => ({ draft: 0.2, active: 0.55, review: 0.8, final: 1 })[s]
 
-function bandFor(score: number): MaterialityBand {
-  if (score < 0.15) return 'none'
-  if (score < 0.4) return 'low'
-  if (score < 0.7) return 'medium'
-  return 'high'
+function bandFor(score: number, t: MaterialityThresholds = DEFAULT_THRESHOLDS): MaterialityBand {
+  if (score >= t.high) return 'high'
+  if (score >= t.medium) return 'medium'
+  if (score >= t.low) return 'low'
+  return 'none'
 }
 function actionFor(band: MaterialityBand): MaterialityAction {
   switch (band) {
@@ -100,7 +119,11 @@ function actionFor(band: MaterialityBand): MaterialityAction {
  * them without a deploy (PLX-CTX-022), and the result records both versions so it
  * stays interpretable later (PLX-CTX-021).
  */
-export function scoreMateriality(input: MaterialityInput, weights: MaterialityWeights = DEFAULT_WEIGHTS): MaterialityResult {
+export function scoreMateriality(
+  input: MaterialityInput,
+  weights: MaterialityWeights = DEFAULT_WEIGHTS,
+  thresholds: MaterialityThresholds = DEFAULT_THRESHOLDS
+): MaterialityResult {
   const w = weights
   const weightSum = w.affected + w.decision + w.depth + w.reach + w.role + w.stage + w.history
   const raw =
@@ -112,8 +135,44 @@ export function scoreMateriality(input: MaterialityInput, weights: MaterialityWe
     w.stage * stageN(input.workflowStage) +
     w.history * clamp01(input.historicalSignificance)
   const score = weightSum > 0 ? clamp01(raw / weightSum) : 0
-  const band = bandFor(score)
-  return { score, band, action: actionFor(band), functionVersion: MATERIALITY_FN_VERSION, weightsVersion: w.version }
+  const band = bandFor(score, thresholds)
+  return {
+    score,
+    band,
+    action: actionFor(band),
+    functionVersion: MATERIALITY_FN_VERSION,
+    weightsVersion: w.version,
+    thresholdsVersion: thresholds.version,
+    thresholds
+  }
+}
+
+// A MaterialityScored Event that records the score alongside the exact weights and
+// thresholds used, so a historical score stays interpretable after either is
+// retuned (PLX-CTX-012 / PLX-CTX-021).
+export function materialityScoredEvent(
+  organisationId: string,
+  actor: string,
+  objectId: string,
+  result: MaterialityResult
+): AppendInput {
+  return {
+    eventType: 'MaterialityScored',
+    category: 'system',
+    actor,
+    organisationId,
+    objectId,
+    currentState: {
+      score: result.score,
+      band: result.band,
+      functionVersion: result.functionVersion,
+      weightsVersion: result.weightsVersion,
+      thresholdsVersion: result.thresholdsVersion,
+      thresholds: result.thresholds
+    },
+    changeSummary: `Materiality scored ${result.band} (${result.score.toFixed(2)})`,
+    confidence: 1
+  }
 }
 
 /**
