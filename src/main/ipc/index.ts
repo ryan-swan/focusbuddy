@@ -87,6 +87,16 @@ import {
 } from '../db/nodes'
 import { relateNodes, unrelateNodes, listRelatedNodeIds } from '../db/nodeRelations'
 import {
+  emitObjectEvent,
+  mirrorUserRelation,
+  unmirrorUserRelation,
+  relatedObjectIds as ceRelatedObjectIds,
+  healthFor as ceHealthFor,
+  markReviewed as ceMarkReviewed
+} from '../context/engine'
+import { plexiId } from '@shared/plexiId'
+import type { MaterialityInput } from '../context/materiality'
+import {
   bringToFront,
   createWidget,
   deleteWidget,
@@ -500,6 +510,30 @@ function outputFormatHint(w: { kind: string; content: string | null }): string {
   }
 }
 
+// Derive a deterministic materiality input from a node's real fields (PLX-CTX-011:
+// no model call). Higher importance, org reach and confirmed relations raise the
+// score; a completed desk scores as final-stage work.
+function materialityForNode(node: {
+  id: string
+  importance: number
+  status: string
+  parentId: string | null
+  sharedFromHandle: string | null
+}): MaterialityInput {
+  const related = ceRelatedObjectIds(node.id).length
+  const stage: MaterialityInput['workflowStage'] =
+    node.status === 'done' ? 'final' : node.status === 'open' ? 'active' : 'review'
+  return {
+    affectedObjectCount: related,
+    decisionImpact: node.importance >= 4 ? 'high' : node.importance >= 3 ? 'low' : 'none',
+    relationshipDepth: related > 0 ? 1 : 0,
+    organisationalReach: node.sharedFromHandle ? 'team' : node.parentId ? 'desk' : 'self',
+    userRole: 'owner',
+    workflowStage: stage,
+    historicalSignificance: Math.min(1, node.importance / 5)
+  }
+}
+
 export function registerIpcHandlers(): void {
   // ── Body-double cross-window relay ──────────────────────────────────────
   // BroadcastChannel is per-renderer-process — fine for two browser tabs,
@@ -522,20 +556,76 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle('nodes:list', () => listNodes())
   ipcMain.handle('nodes:get', (_e, id: string) => getNode(id))
-  ipcMain.handle('nodes:create', (_e, draft: NodeDraft) => createNode(draft))
-  ipcMain.handle('nodes:update', (_e, id: string, patch: NodePatch) => updateNode(id, patch))
-  ipcMain.handle('nodes:delete', (_e, id: string) => deleteNode(id))
+  ipcMain.handle('nodes:create', (_e, draft: NodeDraft) => {
+    const node = createNode(draft)
+    // Live projection: a real ObjectCreated Event on a real user action.
+    emitObjectEvent({
+      eventType: node.kind === 'folder' ? 'RoomCreated' : 'DeskCreated',
+      category: 'user',
+      objectId: node.id,
+      deskId: node.parentId ?? null,
+      currentState: { title: node.title, kind: node.kind, importance: node.importance, status: node.status },
+      changeSummary: `Created ${node.kind} "${node.title}"`
+    })
+    return node
+  })
+  ipcMain.handle('nodes:update', (_e, id: string, patch: NodePatch) => {
+    const before = getNode(id)
+    const node = updateNode(id, patch)
+    if (node) {
+      emitObjectEvent({
+        eventType: node.status === 'done' && before?.status !== 'done' ? 'DeskCompleted' : 'DeskUpdated',
+        category: 'user',
+        objectId: node.id,
+        deskId: node.parentId ?? null,
+        previousState: before ? { title: before.title, status: before.status, importance: before.importance } : undefined,
+        currentState: { title: node.title, status: node.status, importance: node.importance },
+        changeSummary: `Updated "${node.title}"`
+      })
+    }
+    return node
+  })
+  ipcMain.handle('nodes:delete', (_e, id: string) => {
+    const before = getNode(id)
+    const removed = deleteNode(id)
+    emitObjectEvent({
+      eventType: 'DeskDeleted',
+      category: 'user',
+      objectId: id,
+      currentState: { title: before?.title ?? null, trashed: true },
+      changeSummary: `Deleted "${before?.title ?? id}"`
+    })
+    return removed
+  })
   ipcMain.handle('nodes:restore', (_e, ids: string[]) => restoreNodes(ids))
-  // User-driven desk relatedness (see db/nodeRelations.ts).
+  // User-driven desk relatedness (see db/nodeRelations.ts). The legacy table stays
+  // the UI's source of truth; each edge is ALSO mirrored into the knowledge graph
+  // as a confirmed Relationship so Context Health can propagate across it.
   ipcMain.handle('nodes:relate', (_e, a: string, b: string) => {
     relateNodes(a, b)
+    mirrorUserRelation(a, b, plexiId())
     return listRelatedNodeIds(a)
   })
   ipcMain.handle('nodes:unrelate', (_e, a: string, b: string) => {
     unrelateNodes(a, b)
+    unmirrorUserRelation(a, b)
     return listRelatedNodeIds(a)
   })
   ipcMain.handle('nodes:listRelated', (_e, id: string) => listRelatedNodeIds(id))
+
+  // ── Context Engine read surface (live) ──────────────────────────────────
+  // Confirmed relationship neighbours of an object — "surfaces with relations".
+  ipcMain.handle('context:related', (_e, id: string) => ceRelatedObjectIds(id))
+  // Per-(user, object) Context Health, honest against the user's last review point.
+  ipcMain.handle('context:health', (_e, id: string) => {
+    const node = getNode(id)
+    if (!node) return { objectId: id, state: 'current', materiality: null, changedEventCount: 0, decisionsAtRisk: [] }
+    return ceHealthFor(id, materialityForNode(node))
+  })
+  ipcMain.handle('context:markReviewed', (_e, id: string) => {
+    ceMarkReviewed(id)
+    return true
+  })
   ipcMain.handle(
     'nodes:move',
     (_e, id: string, newParentId: string | null, beforeId: string | null) =>
