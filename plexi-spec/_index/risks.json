@@ -1,0 +1,150 @@
+{
+ "risks": [
+  {
+   "id": "PLX-RSK-01",
+   "title": "Immutable history vs right to erasure",
+   "severity": "Critical",
+   "required_by": "first production Event",
+   "status": "OPEN",
+   "blocks": [
+    "Event Service",
+    "Identity Service"
+   ]
+  },
+  {
+   "id": "PLX-RSK-02",
+   "title": "Event schema evolution over infinite horizon",
+   "severity": "Critical",
+   "required_by": "first production Event",
+   "status": "OPEN",
+   "blocks": [
+    "Event Service"
+   ]
+  },
+  {
+   "id": "PLX-RSK-03",
+   "title": "Context Health computation cost at scale",
+   "severity": "High",
+   "required_by": "Phase 2 design",
+   "status": "OPEN",
+   "blocks": [
+    "Context Engine"
+   ]
+  },
+  {
+   "id": "PLX-RSK-04",
+   "title": "CRDT selection and metadata growth",
+   "severity": "High",
+   "required_by": "Phase 1 design",
+   "status": "OPEN",
+   "blocks": []
+  },
+  {
+   "id": "PLX-RSK-05",
+   "title": "AI unit economics",
+   "severity": "Critical",
+   "required_by": "Phase 1 exit",
+   "status": "OPEN",
+   "blocks": [
+    "AI Orchestrator"
+   ]
+  },
+  {
+   "id": "PLX-RSK-06",
+   "title": "Confidence score calibration",
+   "severity": "High",
+   "required_by": "confidence display GA",
+   "status": "OPEN",
+   "blocks": [
+    "Resume Engine",
+    "AI Orchestrator"
+   ]
+  },
+  {
+   "id": "PLX-RSK-07",
+   "title": "Tenant isolation model per store",
+   "severity": "Critical",
+   "required_by": "Phase 1 design",
+   "status": "OPEN",
+   "blocks": [
+    "Graph Engine",
+    "Search Service",
+    "Identity Service"
+   ]
+  },
+  {
+   "id": "PLX-RSK-08",
+   "title": "Event partition key and ordering",
+   "severity": "High",
+   "required_by": "first production Event",
+   "status": "OPEN",
+   "blocks": [
+    "Event Service"
+   ]
+  },
+  {
+   "id": "PLX-RSK-09",
+   "title": "Relationship existence as protected fact",
+   "severity": "Critical",
+   "required_by": "Phase 2 entry",
+   "status": "OPEN",
+   "blocks": [
+    "Object Service",
+    "Graph Engine",
+    "Search Service",
+    "Identity Service"
+   ]
+  },
+  {
+   "id": "PLX-RSK-10",
+   "title": "Prompt injection through ingested content",
+   "severity": "Critical",
+   "required_by": "Phase 3 entry",
+   "status": "OPEN",
+   "blocks": [
+    "AI Orchestrator",
+    "Automation Engine",
+    "Connector Service"
+   ]
+  },
+  {
+   "id": "PLX-RSK-11",
+   "title": "Regulatory classification",
+   "severity": "High",
+   "required_by": "Phase 4 entry",
+   "status": "OPEN",
+   "blocks": [
+    "AI Orchestrator"
+   ]
+  },
+  {
+   "id": "PLX-RSK-12",
+   "title": "Presence telemetry as surveillance",
+   "severity": "High",
+   "required_by": "Phase 1 exit",
+   "status": "OPEN",
+   "blocks": [
+    "Context Engine",
+    "Identity Service"
+   ]
+  },
+  {
+   "id": "PLX-RSK-13",
+   "title": "Accessibility of spatial metaphor",
+   "severity": "High",
+   "required_by": "Phase 1 design",
+   "status": "OPEN",
+   "blocks": [
+    "Workspace Service"
+   ]
+  },
+  {
+   "id": "PLX-RSK-14",
+   "title": "Competitive position undefended",
+   "severity": "Medium",
+   "required_by": "Part VIII",
+   "status": "OPEN",
+   "blocks": []
+  }
+ ]
+}

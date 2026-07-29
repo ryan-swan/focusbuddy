@@ -1,0 +1,3135 @@
+{
+ "document": "PLEXI-0001",
+ "version": "2.0",
+ "count": 344,
+ "areas": {
+  "PRIN": "Foundational principles",
+  "PRD": "Product model",
+  "UX": "User experience",
+  "A11Y": "Accessibility",
+  "DOM": "Domain model",
+  "ARC": "Platform & service architecture",
+  "EVT": "Events, event store & contracts",
+  "SYN": "Synchronisation",
+  "CTX": "Context Engine",
+  "RES": "Resume Engine",
+  "GPH": "Knowledge Graph",
+  "SCH": "Search",
+  "AI": "AI orchestration & governance",
+  "AGT": "Agents",
+  "CON": "Connectors",
+  "APP": "Native applications",
+  "EXT": "Marketplace & SDK",
+  "DATA": "Data architecture",
+  "API": "API design",
+  "SEC": "Security & privacy",
+  "OPS": "Deployment & observability",
+  "ENG": "Engineering standards",
+  "PERF": "Performance",
+  "MET": "Metrics"
+ },
+ "verification_codes": {
+  "T": "Test",
+  "A": "Analysis",
+  "I": "Inspection",
+  "D": "Demonstration"
+ },
+ "requirements": [
+  {
+   "id": "PLX-PRIN-001",
+   "area": "PRIN",
+   "section": "§1",
+   "statement": "The platform **MUST NOT** require a user to perform any manual action whose sole purpose is to preserve context for their own future return. Saving, snapshotting, pinning, bookmarking and summarising for continuity purposes **MUST** be automatic.",
+   "verify": "T, D",
+   "src": "§1.4, §13",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-PRIN-002",
+   "area": "PRIN",
+   "section": "§1",
+   "statement": "The platform **MUST** preserve context independently of the applications that produced it. Removal, replacement or deprecation of a Connector **MUST NOT** destroy previously captured context, relationships or history relating to Objects sourced through it.",
+   "verify": "T",
+   "src": "§4, §59",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-PRIN-003",
+   "area": "PRIN",
+   "section": "§1",
+   "statement": "The platform **MUST NOT** position itself as a replacement for specialist applications. Native applications **MUST** be justified against the build-vs-integrate test in §76 and the justification recorded in an Architecture Decision Record.",
+   "verify": "I",
+   "src": "§1.3, §76",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-PRIN-004",
+   "area": "PRIN",
+   "section": "§4",
+   "statement": "Context, relationships, decisions and history **MUST** be exportable in a documented, machine-readable, vendor-neutral format sufficient to reconstruct organisational memory outside Plexi.",
+   "verify": "T",
+   "src": "§4 (implied), new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-PRIN-005",
+   "area": "PRIN",
+   "section": "§4",
+   "statement": "The platform **MUST NOT** make context durability contingent on a specific AI model, vendor or version. Withdrawal of any model provider **MUST NOT** invalidate previously stored context, relationships or decisions.",
+   "verify": "A, I",
+   "src": "§4, §55",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-PRIN-006",
+   "area": "PRIN",
+   "section": "§7",
+   "statement": "Every feature design **MUST** record, at design review, which of the ten design principles it advances and which it places under tension. Designs placing a principle under tension **MUST** record the mitigation.",
+   "verify": "I",
+   "src": "§7",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-PRIN-007",
+   "area": "PRIN",
+   "section": "§7",
+   "statement": "Every user-visible AI recommendation **MUST** be accompanied by machine-retrievable evidence consisting of references to specific Objects, Events, Decisions or Relationships. A recommendation for which no such evidence exists **MUST NOT** be displayed.",
+   "verify": "T, D",
+   "src": "§7.9, §24",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-PRIN-008",
+   "area": "PRIN",
+   "section": "§7",
+   "statement": "Every inferred Relationship, Context Health transition and Resume assertion **MUST** be traceable by the user to the Events that produced it, through no more than three interactions from the point of display.",
+   "verify": "D",
+   "src": "§7.8, §23",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-PRD-001",
+   "area": "PRD",
+   "section": "§10",
+   "statement": "Every Object **MUST** belong to exactly one owning Desk.",
+   "verify": "T",
+   "src": "§10, §44 R1",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-PRD-002",
+   "area": "PRD",
+   "section": "§10",
+   "statement": "A Desk **MUST** persist its complete visual layout, including Object positions, sizes, z-order, scroll positions, selections and zoom level, and **MUST** restore it on reopen.",
+   "verify": "T, D",
+   "src": "§10.2, §21",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-PRD-003",
+   "area": "PRD",
+   "section": "§10",
+   "statement": "Desk archetype **MUST** be a mutable attribute. Changing archetype **MUST NOT** require data migration, **MUST NOT** alter Object ownership, and **MUST** emit a `DeskArchetypeChanged` Event.",
+   "verify": "T",
+   "src": "§10.3, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-PRD-004",
+   "area": "PRD",
+   "section": "§10",
+   "statement": "Desk state transitions **MUST** follow the state machine in §10.4. Invalid transitions **MUST** be rejected with a machine-readable error identifying the attempted and permitted transitions.",
+   "verify": "T",
+   "src": "§10.4",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-PRD-005",
+   "area": "PRD",
+   "section": "§10",
+   "statement": "Archiving or moving a Desk to Historical **MUST NOT** delete Events, Relationships or Decisions, and **MUST NOT** remove the Desk from search for users holding read permission.",
+   "verify": "T",
+   "src": "§10.4, §44 R5",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-PRD-006",
+   "area": "PRD",
+   "section": "§10",
+   "statement": "A Desk **MUST** carry an explicit, user-editable **Current Objective**. Where absent, the platform **MUST** prompt for one and **MAY** propose a draft derived from Desk activity; a proposed objective **MUST** be marked as unconfirmed until a user accepts it.",
+   "verify": "T, D",
+   "src": "§19, §33",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-PRD-010",
+   "area": "PRD",
+   "section": "§11",
+   "statement": "All Object types **MUST** use the universal Object schema (§34). Type-specific data **MUST** be carried in the typed payload, not by extending the base schema.",
+   "verify": "I, T",
+   "src": "§11, §34",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-PRD-011",
+   "area": "PRD",
+   "section": "§11",
+   "statement": "The Object type registry **MUST** be extensible at runtime without redeployment of the Object Service, and extension-registered types **MUST** receive identical permission, event, versioning and Context Health handling to built-in types.",
+   "verify": "T",
+   "src": "§11.3, §83",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-PRD-012",
+   "area": "PRD",
+   "section": "§11",
+   "statement": "Deletion of an Object **MUST** remove it from default visibility and search results while retaining its Events, Relationships and version history.",
+   "verify": "T",
+   "src": "§11.4, §44 R5",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-PRD-013",
+   "area": "PRD",
+   "section": "§11",
+   "statement": "The platform **MUST** present users with an accurate, plain-language statement of what deletion does and does not remove, at the point of deletion.",
+   "verify": "D, I",
+   "src": "§11.4, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-PRD-014",
+   "area": "PRD",
+   "section": "§11",
+   "statement": "Every Object **MUST** carry semantic embeddings maintained within `PLX-PERF-020` of a content-changing Event, or be explicitly excluded from semantic indexing by policy with the exclusion recorded.",
+   "verify": "T, A",
+   "src": "§11.2, §54",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-PRD-020",
+   "area": "PRD",
+   "section": "§12",
+   "statement": "Cognitive Context values **MUST** be labelled with their acquisition method: `declared` (user-stated), `inferred` (model-derived), or `absent`.",
+   "verify": "T",
+   "src": "§12, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-PRD-021",
+   "area": "PRD",
+   "section": "§12",
+   "statement": "Inferred Cognitive Context **MUST** carry a confidence score and **MUST** be visually distinguished from declared Cognitive Context wherever displayed.",
+   "verify": "T, D",
+   "src": "§12, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-PRD-022",
+   "area": "PRD",
+   "section": "§12",
+   "statement": "Inferred Cognitive Context below the platform confidence threshold **MUST NOT** be displayed as an assertion. It **MAY** be offered as a question to the user.",
+   "verify": "T, D",
+   "src": "§12, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-PRD-023",
+   "area": "PRD",
+   "section": "§12",
+   "statement": "The platform **MUST** provide a low-friction affordance for a user to declare their current question and expected next action, and **MUST NOT** require it.",
+   "verify": "D",
+   "src": "§12, §40",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-PRD-030",
+   "area": "PRD",
+   "section": "§13",
+   "statement": "Workspace Memory capture **MUST** be automatic. The platform **MUST NOT** expose any user action whose function is to save context.",
+   "verify": "I, D",
+   "src": "§13.2",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-PRD-031",
+   "area": "PRD",
+   "section": "§13",
+   "statement": "A Session snapshot **MUST** be written on Desk exit, on session timeout, and at intervals not exceeding 60 seconds during active work, so that context survives unexpected client termination.",
+   "verify": "T",
+   "src": "§13.3, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-PRD-032",
+   "area": "PRD",
+   "section": "§13",
+   "statement": "Context compression **MUST NOT** delete, alter or render unreadable any Event in the Event Store. Compression **MUST** produce a derived summary artefact that references the compressed Events by identifier.",
+   "verify": "T",
+   "src": "§13.4, §49",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-PRD-033",
+   "area": "PRD",
+   "section": "§13",
+   "statement": "Every compressed summary **MUST** be expandable to the underlying Event set on user request.",
+   "verify": "T, D",
+   "src": "§13.4, §23",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-PRD-034",
+   "area": "PRD",
+   "section": "§13",
+   "statement": "Memory layers (§66) **MUST** carry independent, tenant-configurable retention policies, and retention policy application **MUST** emit an auditable Event.",
+   "verify": "T, I",
+   "src": "§66",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-PRD-040",
+   "area": "PRD",
+   "section": "§14",
+   "statement": "Resume generation **MUST** be continuous and automatic. The platform **MUST NOT** require a user to request a Resume.",
+   "verify": "T, D",
+   "src": "§14, §52",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-PRD-041",
+   "area": "PRD",
+   "section": "§14",
+   "statement": "Every Resume assertion **MUST** carry references to the Events that support it.",
+   "verify": "T",
+   "src": "§14, §7.9",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-PRD-042",
+   "area": "PRD",
+   "section": "§14",
+   "statement": "Resume Objects **MUST** be versioned and comparable, so that a user can diff the current understanding against any prior Resume for the same Desk.",
+   "verify": "T, D",
+   "src": "§39",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-PRD-043",
+   "area": "PRD",
+   "section": "§14",
+   "statement": "Estimated catch-up time **MUST** be presented with an accuracy qualifier, and its calibration **MUST** be tracked as `PLX-MET-003`.",
+   "verify": "T, A",
+   "src": "§14.2, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-PRD-044",
+   "area": "PRD",
+   "section": "§14",
+   "statement": "Where the Resume Engine has insufficient signal to produce a confident summary, it **MUST** state that plainly rather than emitting a low-confidence narrative.",
+   "verify": "T, D",
+   "src": "§14, §7.10",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-PRD-050",
+   "area": "PRD",
+   "section": "§15",
+   "statement": "Every Relationship **MUST** carry provenance: discovery method, creating actor or system, evidence references, and confidence.",
+   "verify": "T",
+   "src": "§15.3, §36, §44 R3",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-PRD-051",
+   "area": "PRD",
+   "section": "§15",
+   "statement": "AI-discovered Relationships **MUST** be stored as `provisional` and **MUST NOT** influence Context Health, Resume content or permission evaluation until confirmed by a user or until confidence exceeds the configured tenant threshold.",
+   "verify": "T",
+   "src": "§15.2, §36",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-PRD-052",
+   "area": "PRD",
+   "section": "§15",
+   "statement": "Promotion of a provisional Relationship to confirmed by threshold **MUST** emit a `RelationshipConfirmed` Event recording the threshold and the confidence at promotion.",
+   "verify": "T",
+   "src": "§36, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-PRD-053",
+   "area": "PRD",
+   "section": "§15",
+   "statement": "The platform **MUST NOT** require a user to manually construct graph structure in order to receive relationship-derived intelligence.",
+   "verify": "D",
+   "src": "§6.8",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-PRD-060",
+   "area": "PRD",
+   "section": "§16",
+   "statement": "Sharing an Object into an additional Desk **MUST NOT** change its owning Desk.",
+   "verify": "T",
+   "src": "§16.2, §44 R1",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-PRD-061",
+   "area": "PRD",
+   "section": "§16",
+   "statement": "Where an Object appears in multiple Desks with differing permissions, the **most restrictive** applicable permission **MUST** govern for a given user.",
+   "verify": "T",
+   "src": "§16, §44 R6, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-PRD-062",
+   "area": "PRD",
+   "section": "§16",
+   "statement": "The synchronisation mode of a shared Object **MUST** be visible to every user who can see the Object, so that no user edits a Snapshot believing it is a Live Reference.",
+   "verify": "D",
+   "src": "§16.1, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-PRD-063",
+   "area": "PRD",
+   "section": "§16",
+   "statement": "Federated Objects **MUST** record all owners explicitly, and a change of the owner set **MUST** emit an Event and require approval from the existing owner set per tenant policy.",
+   "verify": "T",
+   "src": "§16.1, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-PRD-070",
+   "area": "PRD",
+   "section": "§17",
+   "statement": "Cross-Desk awareness statements **MUST** be permission-filtered per recipient. A statement **MUST NOT** be rendered if doing so would disclose the existence, name, or attributes of an Object, Desk or Decision the recipient is not permitted to know exists.",
+   "verify": "T",
+   "src": "§17.2, §44 R6",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-PRD-071",
+   "area": "PRD",
+   "section": "§17",
+   "statement": "Where a cross-Desk dependency exists but the recipient lacks permission to see its subject, the platform **MUST** either suppress the statement entirely or render a permission-safe form that discloses no protected attribute, according to tenant policy. The chosen behaviour **MUST** be configurable and auditable.",
+   "verify": "T, I",
+   "src": "§17.2, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-PRD-072",
+   "area": "PRD",
+   "section": "§17",
+   "statement": "Departure of a user (deactivation) **MUST NOT** remove Objects, Decisions, Relationships or Events they authored, and **MUST** trigger an ownership reassignment workflow for Objects they owned.",
+   "verify": "T",
+   "src": "§17.3, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-UX-001",
+   "area": "UX",
+   "section": "§18",
+   "statement": "Every feature proposal **MUST** state, at design review, the cognitive load it removes. A proposal that adds capability without removing load **MUST** be explicitly justified against §6 Philosophy 1 and recorded.",
+   "verify": "I",
+   "src": "§18, §6",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-UX-010",
+   "area": "UX",
+   "section": "§19",
+   "statement": "The active Desk identity **MUST** be visible at all times in every view, without user action, including full-screen Object views.",
+   "verify": "D",
+   "src": "§19.1",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-UX-011",
+   "area": "UX",
+   "section": "§19",
+   "statement": "The Desk Current Objective **MUST** be visible or retrievable in a single interaction from any view within the Desk.",
+   "verify": "D",
+   "src": "§19.2",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-UX-012",
+   "area": "UX",
+   "section": "§19",
+   "statement": "Changes since the user's last review **MUST** be available on Desk open without the user performing any investigative action.",
+   "verify": "T, D",
+   "src": "§19.3",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-UX-013",
+   "area": "UX",
+   "section": "§19",
+   "statement": "Ordering of changes presented to the user **MUST** be by materiality score (§80), not chronology. Chronological ordering **MUST** be available as an explicit alternative view.",
+   "verify": "T, D",
+   "src": "§19.4",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-UX-014",
+   "area": "UX",
+   "section": "§19",
+   "statement": "Every Desk **MUST** present a Suggested Next Action derived from evidence, or explicitly state that no action is recommended. It **MUST NOT** present a fabricated or filler suggestion.",
+   "verify": "T, D",
+   "src": "§19.5",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-UX-015",
+   "area": "UX",
+   "section": "§19",
+   "statement": "Every recommendation, Context Health transition and Resume assertion **MUST** expose its evidence within one interaction from the point of display.",
+   "verify": "D",
+   "src": "§19.6, §7",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-UX-020",
+   "area": "UX",
+   "section": "§20",
+   "statement": "Context Health **MUST** be evaluated per (user, Object) pair, relative to that user's last review point.",
+   "verify": "T",
+   "src": "§20.1",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-UX-021",
+   "area": "UX",
+   "section": "§20",
+   "statement": "Context Health transitions **MUST** be driven by materiality score (§80), not by raw change detection. A non-material change **MUST NOT** produce an `Attention Required` transition.",
+   "verify": "T",
+   "src": "§20, §51",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-UX-022",
+   "area": "UX",
+   "section": "§20",
+   "statement": "Context Health **MUST** propagate across confirmed Relationships. Propagation depth **MUST** be bounded by configuration, and the bound **MUST** be recorded in the propagation Event so that truncation is visible rather than silent.",
+   "verify": "T, A",
+   "src": "§20.5, §80",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-UX-023",
+   "area": "UX",
+   "section": "§20",
+   "statement": "Presence (`Live Activity`) **MUST** be modelled orthogonally to Context Health state and **MUST NOT** overwrite an `Attention Required` or `Decision Risk` state.",
+   "verify": "T",
+   "src": "§20.3, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-UX-024",
+   "area": "UX",
+   "section": "§20",
+   "statement": "Every Context Health transition **MUST** record the triggering Event, the materiality score, and the propagation path, and this record **MUST** be retrievable by the user (`PLX-UX-015`).",
+   "verify": "T",
+   "src": "§20, §7",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-UX-025",
+   "area": "UX",
+   "section": "§20",
+   "statement": "Transition to `Decision Risk` **MUST** identify the specific Decision or Decisions at risk and the specific change believed to invalidate them. A `Decision Risk` state without a named Decision **MUST NOT** be raised.",
+   "verify": "T",
+   "src": "§20.3, §37",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-UX-030",
+   "area": "UX",
+   "section": "§21",
+   "statement": "The platform **MUST NOT** reposition, resize or reflow user-placed Objects on a Desk without explicit user action, except where required by a viewport change, and **MUST** restore the user's canonical layout when the original viewport is restored.",
+   "verify": "T, D",
+   "src": "§21.2, §21.3",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-UX-031",
+   "area": "UX",
+   "section": "§21",
+   "statement": "Desk restoration **MUST** restore layout, scroll positions, window states, open conversations, selected Objects, AI discussions and active workflows to the state recorded in the most recent Session snapshot.",
+   "verify": "T, D",
+   "src": "§21.2",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-UX-032",
+   "area": "UX",
+   "section": "§21",
+   "statement": "Layout **MUST** be persisted per (user, Desk, device class), so that a user's desktop arrangement is not overwritten by their mobile or multi-monitor arrangement.",
+   "verify": "T",
+   "src": "§21, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-UX-033",
+   "area": "UX",
+   "section": "§21",
+   "statement": "Where layout cannot be fully restored (for example, an Object has been deleted or permission revoked), the platform **MUST** indicate what could not be restored rather than silently omitting it.",
+   "verify": "D",
+   "src": "§21, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-UX-040",
+   "area": "UX",
+   "section": "§22",
+   "statement": "Search results **MUST** be ranked with the active Desk as a ranking input. The same query issued from two different Desks **MUST** be permitted to produce different orderings.",
+   "verify": "T",
+   "src": "§22.3, §54",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-UX-041",
+   "area": "UX",
+   "section": "§22",
+   "statement": "Search **MUST** apply permission filtering as the first stage of the ranking pipeline, before any relevance computation, and **MUST NOT** disclose the existence of non-permitted results through result counts, pagination totals or ranking artefacts.",
+   "verify": "T",
+   "src": "§54, §44 R6",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-UX-042",
+   "area": "UX",
+   "section": "§26",
+   "statement": "Interruptive notification volume per active user **MUST** be instrumented and reported per release as a regression metric.",
+   "verify": "A",
+   "src": "§6.7, §26, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-UX-043",
+   "area": "UX",
+   "section": "§26",
+   "statement": "Every notification emitted **MUST** record the escalation layer it entered at and the trigger that escalated it. Notifications emitted without a recorded escalation trigger **MUST** be treated as defects.",
+   "verify": "T, I",
+   "src": "§26.2, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-UX-044",
+   "area": "UX",
+   "section": "§26",
+   "statement": "The `Security` category **MUST** be exempt from user-configurable suppression. All other categories **MUST** be user-suppressible.",
+   "verify": "T",
+   "src": "§26.1, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-UX-045",
+   "area": "UX",
+   "section": "§26",
+   "statement": "A user **MUST** be able to view, in one place, every signal the platform chose *not* to escalate to them in a given period, so that suppression remains inspectable rather than opaque.",
+   "verify": "D",
+   "src": "§26, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-UX-050",
+   "area": "UX",
+   "section": "§23",
+   "statement": "Every Desk open **MUST** present a Resume Card. Where no changes have occurred, it **MUST** state so explicitly rather than rendering empty.",
+   "verify": "T, D",
+   "src": "§23",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-UX-051",
+   "area": "UX",
+   "section": "§23",
+   "statement": "The disclosure path Summary → Details → Evidence → History → Raw Events **MUST** be complete and navigable for every Resume assertion.",
+   "verify": "D",
+   "src": "§23.2",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-UX-052",
+   "area": "UX",
+   "section": "§23",
+   "statement": "The Resume Card **MUST** display a confidence score, and the meaning of the score **MUST** be documented in-product in plain language.",
+   "verify": "D, I",
+   "src": "§23.1, §55",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-UX-060",
+   "area": "UX",
+   "section": "§24",
+   "statement": "Every AI recommendation presented to a user **MUST** carry all eight fields of §24.3. A recommendation missing evidence **MUST NOT** be displayed.",
+   "verify": "T",
+   "src": "§24.3, §7.9",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-UX-061",
+   "area": "UX",
+   "section": "§24",
+   "statement": "AI **MUST** obtain explicit user confirmation before any action that mutates an Object, changes a permission, sends an external communication, or incurs cost above the tenant-configured threshold.",
+   "verify": "T, D",
+   "src": "§24.2",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-UX-062",
+   "area": "UX",
+   "section": "§24",
+   "statement": "AI-generated content **MUST** be visually and programmatically distinguishable from human-authored content at every point of display and in every export.",
+   "verify": "T, D",
+   "src": "§24, §70, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-UX-063",
+   "area": "UX",
+   "section": "§24",
+   "statement": "Confidence scores presented to users **MUST** be derived from a documented, calibrated methodology. Uncalibrated model self-report **MUST NOT** be surfaced as a confidence score.",
+   "verify": "A, I",
+   "src": "§24.3, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-UX-070",
+   "area": "UX",
+   "section": "§25",
+   "statement": "Presence information **MUST** be permission-scoped. A user **MUST NOT** be shown the presence of another user on an Object they cannot themselves see.",
+   "verify": "T",
+   "src": "§25.1, §44 R6",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-UX-071",
+   "area": "UX",
+   "section": "§25",
+   "statement": "Change communication **MUST** be expressed in terms of consequence where consequence is derivable, and **MUST** fall back to factual activity description where it is not. It **MUST NOT** fabricate consequence.",
+   "verify": "T, D",
+   "src": "§25.2",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-UX-072",
+   "area": "UX",
+   "section": "§25",
+   "statement": "Presence data **MUST** be treated as personal data with a defined, tenant-configurable retention period, and **MUST NOT** be retained in the Event Store beyond that period in identifiable form.",
+   "verify": "T, I",
+   "src": "§25.1, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-UX-080",
+   "area": "UX",
+   "section": "§28",
+   "statement": "Resume review and Decision approval **MUST** be fully functional on mobile, including evidence disclosure to at least the Evidence level of §23.2.",
+   "verify": "T, D",
+   "src": "§28",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-UX-081",
+   "area": "UX",
+   "section": "§28",
+   "statement": "Mobile **MUST NOT** be required to render or restore the spatial Canvas layout. Mobile layout state **MUST NOT** overwrite desktop layout state (`PLX-UX-032`).",
+   "verify": "T",
+   "src": "§28, §21",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-UX-082",
+   "area": "UX",
+   "section": "§28",
+   "statement": "Objects captured on mobile **MUST** be attributed to a Desk at capture time, with a user-configurable default capture Desk.",
+   "verify": "T, D",
+   "src": "§28, §44 R1",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-UX-085",
+   "area": "UX",
+   "section": "§82",
+   "statement": "Collaborative Resume content **MUST** be permission-filtered per viewing user at render time (`PLX-RES-004`).",
+   "verify": "T",
+   "src": "§82, §25",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-UX-086",
+   "area": "UX",
+   "section": "§82",
+   "statement": "Team awareness data **MUST NOT** be aggregated into individual activity reports without explicit tenant configuration, subject to `PLX-SEC-033`.",
+   "verify": "I, T",
+   "src": "§82, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-UX-090",
+   "area": "UX",
+   "section": "§29",
+   "statement": "No Context, Relationship, Decision or Resume data **MUST** be stored in a presentation-specific form. Presentation state (layout, viewport, device class) **MUST** be stored separately from semantic state.",
+   "verify": "I, T",
+   "src": "§29",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-UX-091",
+   "area": "UX",
+   "section": "§29",
+   "statement": "Every capability exposed through the primary interface **MUST** be reachable through the public API (§63), so that alternative interfaces are first-class rather than privileged.",
+   "verify": "T, I",
+   "src": "§29, §84",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-A11Y-001",
+   "area": "A11Y",
+   "section": "§27",
+   "statement": "The platform **MUST** conform to WCAG 2.2 Level AA. Conformance **MUST** be verified per release against the published success criteria.",
+   "verify": "T, D, I",
+   "src": "§27",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-A11Y-002",
+   "area": "A11Y",
+   "section": "§27",
+   "statement": "Every function **MUST** be operable by keyboard alone, with a visible focus indicator and no keyboard trap.",
+   "verify": "T, D",
+   "src": "§27",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-A11Y-003",
+   "area": "A11Y",
+   "section": "§27",
+   "statement": "The spatial Canvas **MUST** provide an equivalent non-spatial, linear, screen-reader-navigable representation of Desk contents, structure and Object relationships.",
+   "verify": "T, D",
+   "src": "§27, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-A11Y-004",
+   "area": "A11Y",
+   "section": "§27",
+   "statement": "Context Health states **MUST** be distinguishable without reliance on colour, using shape, text, or iconography in addition to colour.",
+   "verify": "T, D",
+   "src": "§27",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-A11Y-005",
+   "area": "A11Y",
+   "section": "§27",
+   "statement": "The platform **MUST** honour `prefers-reduced-motion` and provide an in-product reduced-motion setting that suppresses non-essential animation, including Canvas transitions and presence animation.",
+   "verify": "T, D",
+   "src": "§27",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-A11Y-006",
+   "area": "A11Y",
+   "section": "§27",
+   "statement": "Interface text and layout **MUST** remain functional at 200% zoom and at user-configured text scaling, without loss of content or functionality.",
+   "verify": "T, D",
+   "src": "§27",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-A11Y-007",
+   "area": "A11Y",
+   "section": "§27",
+   "statement": "Voice interaction, dictation and transcription **MUST** be available for Resume review, Decision approval and Object capture.",
+   "verify": "D",
+   "src": "§27, §28",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-A11Y-008",
+   "area": "A11Y",
+   "section": "§27",
+   "statement": "Accessibility review **MUST** be a blocking item in the Definition of Done (§74). A feature **MUST NOT** be marked done with an open Level AA defect.",
+   "verify": "I",
+   "src": "§27, §74",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-DOM-001",
+   "area": "DOM",
+   "section": "§30",
+   "statement": "Every persisted concept **MUST** be expressible through the entities defined in Part IV. Introduction of a new persisted concept **MUST** proceed by amendment to this Part, not by ad-hoc storage.",
+   "verify": "I",
+   "src": "§30",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-DOM-002",
+   "area": "DOM",
+   "section": "§30",
+   "statement": "No service **MUST** persist domain state outside the entity model, including in caches used as systems of record, in blob metadata, or in message payloads treated as durable.",
+   "verify": "I, A",
+   "src": "§30, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-DOM-010",
+   "area": "DOM",
+   "section": "§32",
+   "statement": "Entity identifiers **MUST** be UUIDv7. Identifiers **MUST** be generable client-side without coordination, so that offline creation and later reconciliation are possible without renumbering.",
+   "verify": "T, I",
+   "src": "§32, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-DOM-011",
+   "area": "DOM",
+   "section": "§32",
+   "statement": "Every entity **MUST** carry `organisationId`. Every data-access path **MUST** filter on `organisationId` at the persistence layer, not solely in application code.",
+   "verify": "T, I",
+   "src": "§32, §69",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-DOM-012",
+   "area": "DOM",
+   "section": "§32",
+   "statement": "Every entity **MUST** carry `schemaVersion`. Readers **MUST** tolerate unknown fields and **MUST** be able to upcast prior schema versions.",
+   "verify": "T",
+   "src": "§32, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-DOM-013",
+   "area": "DOM",
+   "section": "§32",
+   "statement": "`relationships` and `eventHistory` on BaseEntity are **materialised references**, not the system of record. The authoritative sources are the Graph Engine and Event Store respectively. Writers **MUST NOT** treat these fields as authoritative.",
+   "verify": "I, T",
+   "src": "§32, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-DOM-014",
+   "area": "DOM",
+   "section": "§32",
+   "statement": "`aiMetadata.provenance` **MUST** be set on every entity at creation and **MUST NOT** be downgraded from `ai_generated` to `human` by any subsequent operation.",
+   "verify": "T",
+   "src": "§32, §70, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-DOM-015",
+   "area": "DOM",
+   "section": "§32",
+   "statement": "`deletedAt` **MUST** affect visibility only. No process **MUST** interpret a non-null `deletedAt` as authority to remove Events, Relationships or version history.",
+   "verify": "T",
+   "src": "§32, §44 R5",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-DOM-020",
+   "area": "DOM",
+   "section": "§33",
+   "statement": "No Object type **MUST** receive privileged treatment in storage, permission evaluation, event generation, versioning or Context Health computation.",
+   "verify": "I, T",
+   "src": "§11, §34",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-DOM-021",
+   "area": "DOM",
+   "section": "§33",
+   "statement": "`DeskAiConfig.enabled = false` **MUST** disable all AI reasoning for the Desk, including background relationship discovery, embedding generation and Resume summarisation, while leaving deterministic Context Health and Resume assembly operational.",
+   "verify": "T",
+   "src": "§33, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-DOM-022",
+   "area": "DOM",
+   "section": "§33",
+   "statement": "An inferred `Objective` **MUST** carry a confidence band and **MUST** be visually marked as unconfirmed until a user accepts it (`PLX-PRD-006`).",
+   "verify": "T, D",
+   "src": "§33, §12",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-DOM-030",
+   "area": "DOM",
+   "section": "§34",
+   "statement": "Context Health **MUST NOT** be stored as a scalar attribute on the Object entity. It **MUST** be computed or materialised per (user, Object) pair (`PLX-UX-020`).",
+   "verify": "T, I",
+   "src": "§20.1, §34",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-DOM-031",
+   "area": "DOM",
+   "section": "§34",
+   "statement": "`DeskPresence.effectivePermissions` **MUST** be computed as the most restrictive intersection of the owning Desk permissions and the presenting Desk permissions (`PLX-PRD-061`).",
+   "verify": "T",
+   "src": "§16, §34",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-DOM-032",
+   "area": "DOM",
+   "section": "§34",
+   "statement": "Large Object content **MUST** be stored out-of-band via `contentRef` and **MUST NOT** be embedded in Event payloads. Events **MUST** reference content by immutable digest.",
+   "verify": "T, A",
+   "src": "§34, §64, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-DOM-040",
+   "area": "DOM",
+   "section": "§37",
+   "statement": "`decisionOwner` and every `Approval.approver` **MUST** be a human principal. An Agent or service principal **MUST NOT** be recorded as a Decision owner or approver.",
+   "verify": "T",
+   "src": "§37.4, §7.7",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-DOM-041",
+   "area": "DOM",
+   "section": "§37",
+   "statement": "`aiCommentary` **MUST** be stored and displayed as advisory. It **MUST NOT** be rendered in a manner that implies it constitutes the Decision, the rationale of record, or an approval.",
+   "verify": "T, D",
+   "src": "§37.4",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-DOM-042",
+   "area": "DOM",
+   "section": "§37",
+   "statement": "Superseding a Decision **MUST** set `supersededById`, **MUST** create a `DecisionSuperseded` Event, and **MUST** trigger Context Health re-evaluation for every Object referencing the superseded Decision.",
+   "verify": "T",
+   "src": "§37, §20",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-DOM-043",
+   "area": "DOM",
+   "section": "§37",
+   "statement": "Rejected `alternatives` **MUST** be retained permanently. The record of what was *not* chosen, and why, **MUST NOT** be pruned by any retention or compression process.",
+   "verify": "T, I",
+   "src": "§37.2, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-DOM-050",
+   "area": "DOM",
+   "section": "§40",
+   "statement": "`FocusRecord` data (which Object, for how long) **MUST** be classified as presence-class data and **MUST** be subject to the retention constraints of `PLX-UX-072`.",
+   "verify": "T, I",
+   "src": "§40, §25",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-DOM-051",
+   "area": "DOM",
+   "section": "§40",
+   "statement": "Sessions **MUST** be closed by explicit exit, by timeout, or by recovery on next connection. An unclosed Session **MUST NOT** block Resume generation.",
+   "verify": "T",
+   "src": "§40, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-ARC-001",
+   "area": "ARC",
+   "section": "§45",
+   "statement": "Each service **MUST** own exactly one business capability and **MUST** own its own datastore. No service **MUST** read or write another service's datastore directly.",
+   "verify": "I, T",
+   "src": "§45, §46",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-ARC-002",
+   "area": "ARC",
+   "section": "§45",
+   "statement": "Inter-service communication **MUST** occur exclusively through published APIs and Events. Shared-database integration between services **MUST NOT** be used.",
+   "verify": "I, A",
+   "src": "§46",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-ARC-010",
+   "area": "ARC",
+   "section": "§45",
+   "statement": "Every service **MUST** be horizontally scalable without coordinated deployment, and **MUST** tolerate concurrent instances of itself processing the same event stream partition set.",
+   "verify": "T, A",
+   "src": "§45",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-ARC-020",
+   "area": "ARC",
+   "section": "§47",
+   "statement": "Every service **MUST** publish an OpenAPI or equivalent machine-readable contract, and an AsyncAPI or equivalent Event contract, versioned and validated in CI.",
+   "verify": "T, I",
+   "src": "§47, §73",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-ARC-021",
+   "area": "ARC",
+   "section": "§47",
+   "statement": "Every service **MUST** document its failure modes and recovery procedures before production deployment (§73).",
+   "verify": "I",
+   "src": "§73",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-ARC-022",
+   "area": "ARC",
+   "section": "§47",
+   "statement": "No service **MUST** require synchronous availability of the AI Orchestrator to serve its core capability. Loss of AI availability **MUST** degrade the platform to deterministic operation, not to unavailability.",
+   "verify": "T, A",
+   "src": "§45, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-EVT-010",
+   "area": "EVT",
+   "section": "§35",
+   "statement": "Events **MUST** be immutable once written. The Event Store **MUST NOT** expose update or delete operations for Event records through any interface, including administrative interfaces.",
+   "verify": "T, I",
+   "src": "§35.4, §49",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-EVT-011",
+   "area": "EVT",
+   "section": "§35",
+   "statement": "Every Event **MUST** carry `correlationId` and, where it was caused by another Event or a command, `causationId`, so that any derived state can be traced to its originating user action.",
+   "verify": "T",
+   "src": "§35.2, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-EVT-012",
+   "area": "EVT",
+   "section": "§35",
+   "statement": "Every Event **MUST** carry a snapshot of the permissions in effect at emission, so that historical replay evaluates access against the permissions of the time, not of today.",
+   "verify": "T",
+   "src": "§35.2, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-EVT-013",
+   "area": "EVT",
+   "section": "§35",
+   "statement": "Events **MUST** distinguish occurrence time (`timestamp`) from ingestion time (`recordedAt`). Consumers **MUST** order by `sequence` within a partition, never by wall-clock timestamp.",
+   "verify": "T",
+   "src": "§35.2, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-EVT-014",
+   "area": "EVT",
+   "section": "§35",
+   "statement": "Event emission and the corresponding state mutation **MUST** be atomic. Implementations **MUST** use a transactional outbox or an equivalent mechanism guaranteeing that no state change is committed without its Event, and no Event is published without its state change.",
+   "verify": "T, I",
+   "src": "§48, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-EVT-015",
+   "area": "EVT",
+   "section": "§35",
+   "statement": "Every Event consumer **MUST** be idempotent. Consumers **MUST** tolerate at-least-once delivery and duplicate delivery without producing duplicate derived state.",
+   "verify": "T",
+   "src": "§48, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-EVT-020",
+   "area": "EVT",
+   "section": "§48",
+   "statement": "Deterministic processing of an Event **MUST** complete before any AI reasoning is invoked on that Event. AI invocation **MUST NOT** be a precondition for any Context Health transition, Relationship confirmation or Resume update.",
+   "verify": "T, A",
+   "src": "§48",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-EVT-021",
+   "area": "EVT",
+   "section": "§48",
+   "statement": "Failure or unavailability of AI reasoning **MUST NOT** prevent Event processing, Context Health computation or Resume generation from completing.",
+   "verify": "T",
+   "src": "§48, §45",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-EVT-022",
+   "area": "EVT",
+   "section": "§48",
+   "statement": "The Event Bus **MUST** preserve ordering within a partition. The partition key **MUST** be `deskId` for Desk-scoped Events and `objectId` for Object-scoped Events, so that causally related Events are never reordered relative to one another.",
+   "verify": "T, A",
+   "src": "§48, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-EVT-023",
+   "area": "EVT",
+   "section": "§48",
+   "statement": "Every Event **MUST** be assigned to exactly one of the categories in §48.2, and the category **MUST** be carried on the wire.",
+   "verify": "T",
+   "src": "§48.2, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-EVT-024",
+   "area": "EVT",
+   "section": "§48",
+   "statement": "Consumers **MUST** handle out-of-order delivery across partitions and **MUST NOT** assume global total ordering.",
+   "verify": "T",
+   "src": "§48, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-EVT-030",
+   "area": "EVT",
+   "section": "§49",
+   "statement": "The Event Store **MUST** be immutable and append-only. No interface, including administrative and database-level access, **MUST** permit update or deletion of a written Event.",
+   "verify": "T, I",
+   "src": "§49",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-EVT-031",
+   "area": "EVT",
+   "section": "§49",
+   "statement": "The Event Store **MUST** support full and selective replay, reconstructing the state of any Desk at any point in its history.",
+   "verify": "T",
+   "src": "§49",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-EVT-032",
+   "area": "EVT",
+   "section": "§49",
+   "statement": "The Event Store **MUST** be time-indexed and tenant-isolated, and **MUST** be encrypted at rest with tenant-scoped key material.",
+   "verify": "T, I",
+   "src": "§49",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-EVT-033",
+   "area": "EVT",
+   "section": "§49",
+   "statement": "Replay **MUST** evaluate access against the permission snapshot carried on each Event (`PLX-EVT-012`), not against current permissions.",
+   "verify": "T",
+   "src": "§49, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-EVT-034",
+   "area": "EVT",
+   "section": "§49",
+   "statement": "Personal data within Event payloads **MUST** be stored under per-subject encryption keys such that destruction of the key renders that data permanently unrecoverable without modifying any Event record.",
+   "verify": "T, I",
+   "src": "§49, §69.7, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-EVT-035",
+   "area": "EVT",
+   "section": "§49",
+   "statement": "Event schema evolution **MUST** be supported by an upcasting layer. Readers **MUST** be able to interpret every schema version ever written. Upcasters **MUST** be versioned, tested against archived fixtures of each historical schema, and retained indefinitely.",
+   "verify": "T, I",
+   "src": "§49, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-EVT-036",
+   "area": "EVT",
+   "section": "§49",
+   "statement": "The platform **MUST** define and enforce a maximum Event payload size, and **MUST** reject oversized Events rather than truncating them. Large content **MUST** be referenced by digest (`PLX-DOM-032`).",
+   "verify": "T",
+   "src": "§49, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-EVT-040",
+   "area": "EVT",
+   "section": "§64",
+   "statement": "Every Event **MUST** conform to CloudEvents v1.0.2 structure and **MUST** carry the Plexi extension attributes of §64.1.",
+   "verify": "T",
+   "src": "§64, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-EVT-041",
+   "area": "EVT",
+   "section": "§64",
+   "statement": "Event type names **MUST** be past tense and **MUST** carry an explicit version suffix. Command-shaped event names **MUST** be rejected in CI by a naming lint.",
+   "verify": "T, I",
+   "src": "§64.2",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-EVT-042",
+   "area": "EVT",
+   "section": "§64",
+   "statement": "Producers **MUST** guarantee that `source` + `id` is unique for each distinct Event.",
+   "verify": "T",
+   "src": "§64, RFC/CE",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-EVT-043",
+   "area": "EVT",
+   "section": "§64",
+   "statement": "Every Event type **MUST** have a published JSON Schema at a stable `dataschema` URI, versioned, and validated in CI against every producer and consumer.",
+   "verify": "T, I",
+   "src": "§64, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-EVT-044",
+   "area": "EVT",
+   "section": "§64",
+   "statement": "A breaking change to an Event schema **MUST** be published as a new type version. Existing type versions **MUST NOT** be redefined.",
+   "verify": "I, T",
+   "src": "§64, §49",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-EVT-045",
+   "area": "EVT",
+   "section": "§64",
+   "statement": "Large state payloads **MUST** be carried as content digests, not inline (`PLX-DOM-032`).",
+   "verify": "T",
+   "src": "§64, §34",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-SYN-001",
+   "area": "SYN",
+   "section": "§50",
+   "statement": "Collaborative text and rich-text Objects **MUST** use a CRDT with proven convergence, selected to support offline editing and reconnection without a coordinating server.",
+   "verify": "I, T",
+   "src": "§50, decision",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-SYN-002",
+   "area": "SYN",
+   "section": "§50",
+   "statement": "The chosen CRDT implementation **MUST** have a defined garbage-collection or compaction strategy for tombstones and history metadata, and its growth characteristics **MUST** be load-tested against a document with 10⁶ cumulative edits before Phase 1 exit.",
+   "verify": "A",
+   "src": "§50, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-SYN-003",
+   "area": "SYN",
+   "section": "§50",
+   "statement": "Conflict resolution **MUST** be deterministic for every data class in §50.2. AI **MUST NOT** participate in conflict resolution for any class marked deterministic.",
+   "verify": "T",
+   "src": "§50.2",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-SYN-010",
+   "area": "SYN",
+   "section": "§50",
+   "statement": "Offline clients **MUST** be able to create Objects and Events with client-generated identifiers and reconcile on reconnection without renumbering, duplication or loss.",
+   "verify": "T",
+   "src": "§45, §32",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-SYN-011",
+   "area": "SYN",
+   "section": "§50",
+   "statement": "On reconnection, an offline client's Events **MUST** be ingested with their original `timestamp` preserved and a distinct `recordedAt`, and downstream consumers **MUST** handle late-arriving Events without corrupting derived state.",
+   "verify": "T",
+   "src": "§35, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-SYN-012",
+   "area": "SYN",
+   "section": "§50",
+   "statement": "Where an offline edit cannot be merged (a Workflow or Decision class conflict), the platform **MUST** surface the conflict to the user with both versions intact and **MUST NOT** silently discard either.",
+   "verify": "T, D",
+   "src": "§50, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-CTX-001",
+   "area": "CTX",
+   "section": "§38",
+   "statement": "Context Objects **MUST** be versioned and retained. Superseded Context Objects **MUST** remain retrievable for audit.",
+   "verify": "T",
+   "src": "§38.2",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-CTX-002",
+   "area": "CTX",
+   "section": "§38",
+   "statement": "Every field in a Context Object derived from inference **MUST** carry source, confidence and evidence (`CognitiveField`).",
+   "verify": "T",
+   "src": "§38, §12",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-CTX-010",
+   "area": "CTX",
+   "section": "§51",
+   "statement": "Materiality scoring **MUST** be deterministic and reproducible. Given identical inputs, it **MUST** produce an identical score.",
+   "verify": "T",
+   "src": "§51, §48",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-CTX-011",
+   "area": "CTX",
+   "section": "§51",
+   "statement": "Materiality scoring **MUST NOT** require an AI model call in its primary path. AI **MAY** be used to enrich explanation after scoring completes.",
+   "verify": "T, A",
+   "src": "§48, §51",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-CTX-012",
+   "area": "CTX",
+   "section": "§51",
+   "statement": "Materiality thresholds **MUST** be tenant-configurable and **MUST** be recorded on each scoring Event, so that a change in threshold is distinguishable from a change in behaviour when auditing historical decisions.",
+   "verify": "T, I",
+   "src": "§51, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-CTX-013",
+   "area": "CTX",
+   "section": "§51",
+   "statement": "The Context Engine **MUST** bound dependency propagation by configured maximum depth and maximum fan-out. Where a propagation is truncated by either bound, the truncation **MUST** be recorded and **MUST** be visible in the resulting attention record.",
+   "verify": "T, A",
+   "src": "§51, §80",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-CTX-014",
+   "area": "CTX",
+   "section": "§51",
+   "statement": "Context Health computation **MUST** meet `PLX-PERF-020` for direct impact and `PLX-PERF-021` for propagated impact. These are separate budgets and **MUST NOT** be conflated.",
+   "verify": "A",
+   "src": "§58, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-CTX-020",
+   "area": "CTX",
+   "section": "§80",
+   "statement": "Materiality scoring **MUST** be a pure function of its declared inputs — deterministic, reproducible and free of model invocation (`PLX-CTX-010`, `PLX-CTX-011`).",
+   "verify": "T",
+   "src": "§80",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-CTX-021",
+   "area": "CTX",
+   "section": "§80",
+   "statement": "The materiality function and its weights **MUST** be versioned, and the version **MUST** be recorded on every scoring Event, so that historical scores remain interpretable after the function changes.",
+   "verify": "T",
+   "src": "§80, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-CTX-022",
+   "area": "CTX",
+   "section": "§80",
+   "statement": "Materiality weights **MUST** be tunable per tenant without code deployment, and every tuning change **MUST** emit an auditable Event.",
+   "verify": "T, I",
+   "src": "§80, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-CTX-023",
+   "area": "CTX",
+   "section": "§80",
+   "statement": "Propagation **MUST** be incremental. A change **MUST NOT** trigger recalculation of unaffected graph regions.",
+   "verify": "A, T",
+   "src": "§80",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-CTX-024",
+   "area": "CTX",
+   "section": "§80",
+   "statement": "Propagation **MUST** be bounded by maximum depth and maximum fan-out, both tenant-configurable, and truncation **MUST** be recorded and visible (`PLX-CTX-013`).",
+   "verify": "T, A",
+   "src": "§80, §51",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-CTX-025",
+   "area": "CTX",
+   "section": "§80",
+   "statement": "Synchronous propagation **MUST** be limited to the budget of `PLX-PERF-021`; propagation beyond that budget **MUST** continue asynchronously and **MUST** update Context Health on completion.",
+   "verify": "A, T",
+   "src": "§80, §58",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-CTX-026",
+   "area": "CTX",
+   "section": "§80",
+   "statement": "Propagation **MUST** be cycle-safe. The Relationship graph is not acyclic and propagation **MUST** terminate on cyclic paths without repeated re-entry.",
+   "verify": "T",
+   "src": "§80, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-CTX-030",
+   "area": "CTX",
+   "section": "§80",
+   "statement": "Context freshness **MUST** be computed per (user, Desk) and **MUST** decay with elapsed meaningful change, not with elapsed time alone.",
+   "verify": "T",
+   "src": "§80",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-CTX-031",
+   "area": "CTX",
+   "section": "§80",
+   "statement": "Freshness scores **MUST NOT** be surfaced as a comparative measure between users, and **MUST NOT** be exportable in a form that supports individual performance ranking.",
+   "verify": "I, T",
+   "src": "§80, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-RES-001",
+   "area": "RES",
+   "section": "§39",
+   "statement": "Resume Objects **MUST** be versioned and diffable against any prior Resume for the same Desk and user.",
+   "verify": "T, D",
+   "src": "§39",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-RES-002",
+   "area": "RES",
+   "section": "§39",
+   "statement": "Every Resume **MUST** record the Event identifiers from which it was derived. A Resume assertion not traceable to Events **MUST NOT** be emitted.",
+   "verify": "T",
+   "src": "§39, §7.9",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-RES-003",
+   "area": "RES",
+   "section": "§39",
+   "statement": "`estimatedCatchup` **MUST** be expressed as a range with a stated basis, not a bare point value.",
+   "verify": "T, D",
+   "src": "§14, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-RES-004",
+   "area": "RES",
+   "section": "§39",
+   "statement": "Where `forUserId` is null, the Resume **MUST** be permission-filtered at render time per viewing user; a collaborative Resume **MUST NOT** be materialised in a form that leaks non-permitted content.",
+   "verify": "T",
+   "src": "§25.3, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-RES-010",
+   "area": "RES",
+   "section": "§52",
+   "statement": "Resume generation **MUST** be incremental. A Resume update **MUST NOT** require reprocessing the full Event history of a Desk.",
+   "verify": "A, T",
+   "src": "§52.2",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-RES-011",
+   "area": "RES",
+   "section": "§52",
+   "statement": "Stages 1–6 of the Resume pipeline **MUST** be independently testable and **MUST** produce a complete structured Resume without invoking a model. Stage 7 (AI Summary) **MUST** be additive prose over that structure.",
+   "verify": "T",
+   "src": "§52, §81",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-RES-012",
+   "area": "RES",
+   "section": "§52",
+   "statement": "Expensive reasoning outputs **MUST** be cached and keyed by the structured input digest, so that identical input never incurs repeated model cost.",
+   "verify": "T, A",
+   "src": "§52.2, §68",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-RES-013",
+   "area": "RES",
+   "section": "§52",
+   "statement": "Where stage 7 is unavailable or disabled, the Resume **MUST** still render from the structured output of stages 1–6.",
+   "verify": "T",
+   "src": "§52, §33",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-RES-020",
+   "area": "RES",
+   "section": "§81",
+   "statement": "Each Resume stage **MUST** be independently testable with recorded fixtures, and stage outputs **MUST** be inspectable in non-production environments.",
+   "verify": "T",
+   "src": "§81",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-RES-021",
+   "area": "RES",
+   "section": "§81",
+   "statement": "Stages 1–5 and 7 **MUST** complete without model invocation. A Resume **MUST** be renderable from these stages alone (`PLX-RES-013`).",
+   "verify": "T",
+   "src": "§81, §52",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-RES-022",
+   "area": "RES",
+   "section": "§81",
+   "statement": "Catch-up estimation (stage 7) **MUST** be calibrated against observed reconstruction time (`PLX-MET-003`) and recalibrated at least quarterly per tenant.",
+   "verify": "A",
+   "src": "§81, §14",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-RES-023",
+   "area": "RES",
+   "section": "§81",
+   "statement": "Noise removal (stage 3) **MUST** be reversible: removed Events **MUST** remain reachable through the disclosure path of `PLX-UX-051`.",
+   "verify": "T",
+   "src": "§81, §23",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-GPH-001",
+   "area": "GPH",
+   "section": "§36",
+   "statement": "Every Relationship **MUST** carry at least one `EvidenceRef`. A Relationship with an empty evidence set **MUST** be rejected at write time.",
+   "verify": "T",
+   "src": "§36, §44 R3",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-GPH-002",
+   "area": "GPH",
+   "section": "§36",
+   "statement": "Provisional Relationships **MUST NOT** contribute to Context Health propagation, Resume content, search ranking or permission evaluation.",
+   "verify": "T",
+   "src": "§36.3, §15.2",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-GPH-003",
+   "area": "GPH",
+   "section": "§36",
+   "statement": "Relationship confidence **MUST** be recalculated when supporting evidence is superseded or invalidated, and a Relationship whose confidence falls below the tenant threshold **MUST** revert to provisional.",
+   "verify": "T",
+   "src": "§36, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-GPH-004",
+   "area": "GPH",
+   "section": "§36",
+   "statement": "Users **MUST NOT** be required to construct graph structure manually to obtain relationship-derived intelligence. Manual curation **MUST** be available as confirmation and correction.",
+   "verify": "D",
+   "src": "§6.8, §15",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-GPH-005",
+   "area": "GPH",
+   "section": "§36",
+   "statement": "A rejected Relationship **MUST** be retained with state `rejected` and **MUST NOT** be re-proposed on identical evidence.",
+   "verify": "T",
+   "src": "§36, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-GPH-010",
+   "area": "GPH",
+   "section": "§53",
+   "statement": "Graph traversal **MUST** be permission-filtered. Traversal **MUST NOT** cross an edge into a node the requesting principal cannot read, and **MUST NOT** disclose the existence of such a node through path counts, distances or aggregate results.",
+   "verify": "T, A",
+   "src": "§53, §44 R6",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-GPH-011",
+   "area": "GPH",
+   "section": "§53",
+   "statement": "Graph storage **MUST** be tenant-namespaced at the engine level. Application-level tenant filtering alone **MUST NOT** be relied upon (`PLX-SEC-011`).",
+   "verify": "I, T",
+   "src": "§53, §42",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-GPH-012",
+   "area": "GPH",
+   "section": "§53",
+   "statement": "Graph writes **MUST** be idempotent with respect to Event replay. Replaying an Event **MUST NOT** duplicate nodes or edges.",
+   "verify": "T",
+   "src": "§53, §49",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-GPH-013",
+   "area": "GPH",
+   "section": "§53",
+   "statement": "Community detection, clustering and duplicate detection **MUST** run asynchronously and **MUST NOT** be on the synchronous path of any user-facing operation with a latency SLO.",
+   "verify": "A",
+   "src": "§53, §58",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-GPH-020",
+   "area": "GPH",
+   "section": "§65",
+   "statement": "The relationship type vocabulary **MUST** be a single closed registry (Appendix E). Services **MUST NOT** introduce edge types outside the registry; extension-defined types **MUST** be registered before use.",
+   "verify": "T, I",
+   "src": "§65, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-GPH-021",
+   "area": "GPH",
+   "section": "§65",
+   "statement": "Every edge **MUST** carry a permission scope, and traversal **MUST** evaluate it (`PLX-GPH-010`).",
+   "verify": "T",
+   "src": "§65",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-GPH-022",
+   "area": "GPH",
+   "section": "§65",
+   "statement": "Node and edge writes **MUST** carry the `correlationId` of the originating Event, so that any graph state is traceable to the user action that produced it.",
+   "verify": "T",
+   "src": "§65, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-SCH-001",
+   "area": "SCH",
+   "section": "§54",
+   "statement": "Permission filtering **MUST** be the first stage of the ranking pipeline and **MUST** be applied at the index or query layer, not as a post-filter over returned results.",
+   "verify": "T, A",
+   "src": "§54",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-SCH-002",
+   "area": "SCH",
+   "section": "§54",
+   "statement": "Result counts, pagination totals and relevance scores **MUST NOT** disclose the existence of non-permitted results.",
+   "verify": "T",
+   "src": "§54, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-SCH-003",
+   "area": "SCH",
+   "section": "§54",
+   "statement": "AI re-ranking **MUST** be the final stage and **MUST** be optional. Disabling it **MUST** degrade result ordering, not result correctness or completeness.",
+   "verify": "T",
+   "src": "§54, §48",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-SCH-004",
+   "area": "SCH",
+   "section": "§54",
+   "statement": "Search **MUST** meet `PLX-PERF-040` with AI re-ranking disabled. AI re-ranking **MUST** operate within a separate, additive budget and **MUST** be abandoned rather than exceed it.",
+   "verify": "A",
+   "src": "§58, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-SCH-005",
+   "area": "SCH",
+   "section": "§54",
+   "statement": "Semantic index freshness **MUST** meet `PLX-PERF-041`; where an Object's embedding is stale, results **MUST** still include the Object via keyword and relationship paths.",
+   "verify": "T, A",
+   "src": "§54, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-AI-001",
+   "area": "AI",
+   "section": "§55",
+   "statement": "All model invocation **MUST** occur through a single internal abstraction. No service other than the AI Orchestrator **MUST** hold a provider SDK dependency or provider credential.",
+   "verify": "I, T",
+   "src": "§55.2",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-AI-002",
+   "area": "AI",
+   "section": "§55",
+   "statement": "The platform **MUST** maintain a declared capability matrix per model covering at minimum: tool calling, structured output, context window, prompt caching, streaming, and data-residency eligibility.",
+   "verify": "I",
+   "src": "§55, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-AI-003",
+   "area": "AI",
+   "section": "§55",
+   "statement": "Task routing **MUST** refuse to dispatch a task to a model that does not declare the capabilities the task requires, and **MUST** emit `ReasoningRejected` rather than degrade silently.",
+   "verify": "T",
+   "src": "§55, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-AI-004",
+   "area": "AI",
+   "section": "§55",
+   "statement": "Provider substitution **MUST** be verifiable by an evaluation suite executed against every supported model, with results recorded per release. A provider **MUST NOT** be declared supported without a passing evaluation run.",
+   "verify": "T, A",
+   "src": "§55.2, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-AI-005",
+   "area": "AI",
+   "section": "§55",
+   "statement": "AI **MUST NOT** write domain state directly. All AI-originated changes **MUST** be proposed as Events subject to the same validation, permission and confirmation rules as human-originated changes.",
+   "verify": "T, I",
+   "src": "§55, §44 R4",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-AI-006",
+   "area": "AI",
+   "section": "§55",
+   "statement": "Prompt assembly **MUST** enforce permission scoping: no content **MUST** enter a prompt that the requesting principal is not permitted to read.",
+   "verify": "T, A",
+   "src": "§67, §69",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-AI-007",
+   "area": "AI",
+   "section": "§55",
+   "statement": "Every model invocation **MUST** be recorded with model identity, version, token counts, cost, latency, cache status and the identity of the requesting principal.",
+   "verify": "T, I",
+   "src": "§55, §68, §72",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-AI-010",
+   "area": "AI",
+   "section": "§67",
+   "statement": "Prompt assembly **MUST** enforce permission scoping at the retrieval layer (`PLX-AI-006`). Instructing a model to withhold content **MUST NOT** be used as an access control.",
+   "verify": "T, A",
+   "src": "§67, §69",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-AI-011",
+   "area": "AI",
+   "section": "§67",
+   "statement": "Every assembled prompt **MUST** record the identifiers of every source from which context was drawn, so that a generated output's inputs are auditable.",
+   "verify": "T",
+   "src": "§67, §70",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-AI-012",
+   "area": "AI",
+   "section": "§67",
+   "statement": "Organisation AI policies **MUST** be applied before user request content and **MUST NOT** be overridable by user or Object content. Content-originated instructions **MUST NOT** alter policy, tool availability or permission scope.",
+   "verify": "T, A",
+   "src": "§67, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-AI-013",
+   "area": "AI",
+   "section": "§67",
+   "statement": "Prompt templates **MUST** be versioned and their versions recorded on each invocation, so that a change in output behaviour is attributable to a change in template, model or data.",
+   "verify": "T, I",
+   "src": "§67, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-AI-020",
+   "area": "AI",
+   "section": "§68",
+   "statement": "Every AI invocation **MUST** record token counts, model identity and version, cost, latency and cache status (`PLX-AI-007`).",
+   "verify": "T",
+   "src": "§68, §72",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-AI-021",
+   "area": "AI",
+   "section": "§68",
+   "statement": "Reasoning outputs **MUST** be cached keyed by the digest of the structured input. Cache hit rate **MUST** be reported per prompt type.",
+   "verify": "T, A",
+   "src": "§68, §72",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-AI-022",
+   "area": "AI",
+   "section": "§68",
+   "statement": "Embeddings **MUST NOT** be regenerated for unchanged content. Embedding generation **MUST** be keyed by content digest and embedding model version.",
+   "verify": "T",
+   "src": "§68",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-AI-030",
+   "area": "AI",
+   "section": "§68",
+   "statement": "Every Organisation and every Desk **MUST** support a configurable AI cost ceiling. Exceeding a ceiling **MUST** suspend AI operations for that scope and emit `CostCeilingExceeded`, and **MUST NOT** silently substitute a cheaper model or truncate context.",
+   "verify": "T",
+   "src": "§68, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-AI-031",
+   "area": "AI",
+   "section": "§68",
+   "statement": "The platform **MUST** report fully loaded AI cost per active user per tenant (`PLX-MET-011`) and **MUST** publish a unit-economics model before general availability.",
+   "verify": "A, I",
+   "src": "§68, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-AI-032",
+   "area": "AI",
+   "section": "§68",
+   "statement": "Model selection **MUST** be recorded per invocation with the routing rationale, so that cost regressions are attributable.",
+   "verify": "T",
+   "src": "§68, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-AI-040",
+   "area": "AI",
+   "section": "§70",
+   "statement": "Every AI recommendation **MUST** be accompanied by retrievable evidence (`PLX-PRIN-007`).",
+   "verify": "T",
+   "src": "§70",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-AI-041",
+   "area": "AI",
+   "section": "§70",
+   "statement": "AI **MUST** express uncertainty explicitly and **MUST NOT** present low-confidence output as assertion (`PLX-PRD-022`, `PLX-PRD-044`).",
+   "verify": "T, D",
+   "src": "§70",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-AI-042",
+   "area": "AI",
+   "section": "§70",
+   "statement": "AI **MUST NOT** create organisational facts. Any assertion about the organisation **MUST** be derivable from structured platform data (`PLX-INV-04`).",
+   "verify": "T, A",
+   "src": "§70, §44 R4",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-AI-043",
+   "area": "AI",
+   "section": "§70",
+   "statement": "Every reasoning request **MUST** be logged with inputs by reference, model identity, output, cost and requesting principal, retained per tenant policy.",
+   "verify": "T, I",
+   "src": "§70, §72",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-AI-044",
+   "area": "AI",
+   "section": "§70",
+   "statement": "The platform **MUST** support model replacement without application change (`PLX-AI-001`–`PLX-AI-004`).",
+   "verify": "T, A",
+   "src": "§70, §55",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-AI-045",
+   "area": "AI",
+   "section": "§70",
+   "statement": "The platform **MUST** maintain, per deployed AI capability, a record sufficient to support regulatory obligations applicable in the tenant's jurisdiction, including intended purpose, data sources, evaluation results, human oversight mechanism and logging of operation.",
+   "verify": "I",
+   "src": "§70, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-AI-046",
+   "area": "AI",
+   "section": "§70",
+   "statement": "Where AI output materially influences a decision affecting an individual's employment, evaluation or access, the platform **MUST** record the human decision-maker, and **MUST NOT** permit the AI output to be the sole basis of record.",
+   "verify": "T, I",
+   "src": "§70, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-AGT-001",
+   "area": "AGT",
+   "section": "§41",
+   "statement": "An Agent's effective permissions **MUST** be a subset of the permissions of the principal on whose behalf it acts. Permission checks **MUST** be enforced at the data-access layer, not only at the orchestration layer.",
+   "verify": "T",
+   "src": "§41.2, §69",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-AGT-002",
+   "area": "AGT",
+   "section": "§41",
+   "statement": "Every Agent action **MUST** emit an Event attributed to the Agent, with `onBehalfOf` populated.",
+   "verify": "T",
+   "src": "§41.2",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-AGT-003",
+   "area": "AGT",
+   "section": "§41",
+   "statement": "Agents **MUST NOT** create Relationships in `confirmed` state. Agent-created Relationships **MUST** be `provisional`.",
+   "verify": "T",
+   "src": "§41.2, §36",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-AGT-004",
+   "area": "AGT",
+   "section": "§41",
+   "statement": "Agents **MUST NOT** assert organisational facts not derivable from structured platform data. Assertions **MUST** carry evidence references (`PLX-INV-04`).",
+   "verify": "T, A",
+   "src": "§41.2, §70",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-AGT-005",
+   "area": "AGT",
+   "section": "§41",
+   "statement": "Every Agent **MUST** have exactly one `actsOnBehalfOf` human principal at any moment. An Agent with no accountable human principal **MUST** be suspended.",
+   "verify": "T",
+   "src": "§41, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-AGT-006",
+   "area": "AGT",
+   "section": "§41",
+   "statement": "Agent cost consumption **MUST** be metered against `costCeiling` and against the owning Desk's `costCeilingPerMonth`; exceeding either **MUST** suspend the Agent and emit an Event, not silently degrade output quality.",
+   "verify": "T, A",
+   "src": "§41, §68, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-AGT-010",
+   "area": "AGT",
+   "section": "§56",
+   "statement": "Inter-agent messages **MUST** conform to the `AgentMessage` schema and **MUST** be validated on both send and receive. Free-text-only inter-agent communication **MUST NOT** be permitted.",
+   "verify": "T",
+   "src": "§56",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-AGT-011",
+   "area": "AGT",
+   "section": "§56",
+   "statement": "Agent replies **MUST** validate against the `expectedOutput` schema. A non-conforming reply **MUST** be rejected and retried or failed, never passed downstream.",
+   "verify": "T",
+   "src": "§56, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-AGT-012",
+   "area": "AGT",
+   "section": "§56",
+   "statement": "`context` **MUST** be passed by reference. Inlining content into inter-agent messages **MUST NOT** be used, so that permission evaluation occurs at dereference time against the acting principal.",
+   "verify": "T, I",
+   "src": "§56, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-AGT-013",
+   "area": "AGT",
+   "section": "§56",
+   "statement": "Every agent message and reply **MUST** be recorded in the agent audit stream with full lineage via `correlationId` and `causationId`.",
+   "verify": "T",
+   "src": "§56",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-AGT-014",
+   "area": "AGT",
+   "section": "§56",
+   "statement": "Agent-to-agent delegation **MUST** propagate `onBehalfOf` unchanged and **MUST NOT** permit permission escalation through delegation depth. Delegation depth **MUST** be bounded and the bound **MUST** be enforced.",
+   "verify": "T",
+   "src": "§56, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-AGT-015",
+   "area": "AGT",
+   "section": "§56",
+   "statement": "No Agent **MUST** hold more than one specialisation. An Agent performing unrelated responsibilities **MUST** be decomposed.",
+   "verify": "I",
+   "src": "§79",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-AGT-020",
+   "area": "AGT",
+   "section": "§78",
+   "statement": "Every Agent class **MUST** declare its permitted tool set, and tool invocation **MUST** be permission-checked at the tool boundary against the acting principal, not trusted from the model's request.",
+   "verify": "T, A",
+   "src": "§78, §67",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-AGT-021",
+   "area": "AGT",
+   "section": "§78",
+   "statement": "The Research Agent **MUST NOT** transmit tenant content to external systems unless the Desk's `externalDataAllowed` is true, and every external transmission **MUST** be logged with its destination and content digest.",
+   "verify": "T, I",
+   "src": "§78, §69",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-AGT-022",
+   "area": "AGT",
+   "section": "§78",
+   "statement": "Every Agent **MUST** have a defined evaluation suite with recorded pass thresholds, executed per release (`PLX-ENG-013`).",
+   "verify": "T",
+   "src": "§78, §73",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-AGT-023",
+   "area": "AGT",
+   "section": "§78",
+   "statement": "Agent memory scope **MUST** be enforced at retrieval. An Agent with `memoryScope: \"desk\"` **MUST NOT** retrieve content from another Desk, even where the acting principal has permission to it.",
+   "verify": "T",
+   "src": "§41, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-CON-001",
+   "area": "CON",
+   "section": "§57",
+   "statement": "Every Connector **MUST** declare which capabilities it implements. Consumers **MUST** query declared capabilities rather than assuming them.",
+   "verify": "T, I",
+   "src": "§57",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-CON-002",
+   "area": "CON",
+   "section": "§57",
+   "statement": "Connectors **MUST** map external permissions into the Plexi permission model, and **MUST NOT** grant a Plexi principal access to external content beyond what the external system grants the linked external principal.",
+   "verify": "T, A",
+   "src": "§57, §69",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-CON-003",
+   "area": "CON",
+   "section": "§57",
+   "statement": "Where a Connector cannot faithfully represent an external system's permission model, it **MUST** default to the most restrictive interpretation and **MUST** record the limitation in its capability declaration.",
+   "verify": "I, T",
+   "src": "§57, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-CON-004",
+   "area": "CON",
+   "section": "§57",
+   "statement": "Connector credentials **MUST** be stored in a dedicated credential vault, encrypted with tenant-scoped keys, and **MUST NOT** be readable by any service other than the Connector Service.",
+   "verify": "T, I",
+   "src": "§57, §69",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-CON-005",
+   "area": "CON",
+   "section": "§57",
+   "statement": "Connector synchronisation **MUST** be resumable from a durable cursor and **MUST** be idempotent. Re-running a sync **MUST NOT** duplicate Objects or Events.",
+   "verify": "T",
+   "src": "§57, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-CON-006",
+   "area": "CON",
+   "section": "§57",
+   "statement": "Removal of a Connector **MUST NOT** delete previously imported Objects, Relationships, Events or derived context (`PLX-PRIN-002`).",
+   "verify": "T",
+   "src": "§57, §4",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-CON-007",
+   "area": "CON",
+   "section": "§57",
+   "statement": "Connectors **MUST** implement backoff and rate-limit handling for the external system, and **MUST** surface persistent sync failure as a user-visible state rather than failing silently.",
+   "verify": "T, D",
+   "src": "§57, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-APP-001",
+   "area": "APP",
+   "section": "§76",
+   "statement": "Every native application build **MUST** record an ADR answering §76.3, reviewed and approved before implementation begins.",
+   "verify": "I",
+   "src": "§76, §1.3",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-APP-002",
+   "area": "APP",
+   "section": "§76",
+   "statement": "Every native application **MUST** understand Desk context, Relationships, Workspace Memory, AI, permissions and Events, and **MUST** use the same platform interfaces available to marketplace extensions (`PLX-EXT-002`).",
+   "verify": "I, T",
+   "src": "§77, §83",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-APP-010",
+   "area": "APP",
+   "section": "§77",
+   "statement": "The Canvas **MUST** persist Object position, size and z-order per (user, Desk, device class) and restore them exactly (`PLX-UX-030`, `PLX-UX-032`).",
+   "verify": "T, D",
+   "src": "§77",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-APP-011",
+   "area": "APP",
+   "section": "§77",
+   "statement": "The Canvas **MUST** provide the equivalent linear, screen-reader-navigable representation required by `PLX-A11Y-003`, developed and released concurrently with the spatial surface.",
+   "verify": "T, D",
+   "src": "§77, §27",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-APP-012",
+   "area": "APP",
+   "section": "§77",
+   "statement": "Canvas rendering **MUST** virtualise off-viewport Objects so that Desk open latency (`PLX-PERF-001`) is independent of total Object count.",
+   "verify": "A, T",
+   "src": "§77, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-APP-020",
+   "area": "APP",
+   "section": "§77",
+   "statement": "The Decision Tracker **MUST** require a recorded alternative-considered entry, or an explicit statement that none was considered, before a Decision may move to `approved`.",
+   "verify": "T, D",
+   "src": "§77, §37",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-APP-030",
+   "area": "APP",
+   "section": "§77",
+   "statement": "Meeting recording and transcription **MUST** obtain and record consent from all participants per the applicable jurisdiction, and **MUST NOT** commence without it.",
+   "verify": "T, D, I",
+   "src": "§77, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-APP-031",
+   "area": "APP",
+   "section": "§77",
+   "statement": "Decisions and actions extracted from a meeting by AI **MUST** be created as provisional and **MUST** require human confirmation before entering `approved` state or generating Relationships.",
+   "verify": "T",
+   "src": "§77, §37",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-APP-040",
+   "area": "APP",
+   "section": "§77",
+   "statement": "The Relationship Explorer **MUST** apply permission-filtered traversal (`PLX-GPH-010`) and **MUST NOT** reveal node existence, path counts or graph distances involving non-permitted nodes.",
+   "verify": "T",
+   "src": "§77, §53",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-APP-041",
+   "area": "APP",
+   "section": "§77",
+   "statement": "The Relationship Explorer **MUST** display, for every edge, its evidence, confidence, discovery method and state (provisional or confirmed).",
+   "verify": "D",
+   "src": "§77, §36",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-EXT-001",
+   "area": "EXT",
+   "section": "§83",
+   "statement": "Extensions **MUST** execute within a sandbox with an explicitly granted capability set. Capability grants **MUST** be reviewed by the installing Organisation and **MUST** be revocable.",
+   "verify": "T, I",
+   "src": "§83",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-EXT-002",
+   "area": "EXT",
+   "section": "§83",
+   "statement": "Extensions **MUST** use the same public platform interfaces as first-party applications (`PLX-APP-002`). No private interface **MUST** exist for first-party use.",
+   "verify": "I, T",
+   "src": "§83, §77",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-EXT-003",
+   "area": "EXT",
+   "section": "§83",
+   "statement": "Extension actions **MUST** emit Events attributed to the extension, with `onBehalfOf` recording the authorising principal.",
+   "verify": "T",
+   "src": "§83",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-EXT-004",
+   "area": "EXT",
+   "section": "§83",
+   "statement": "Extensions **MUST NOT** exceed the permissions of the principal on whose behalf they act, and permission enforcement **MUST** occur at the data-access layer, not in extension code.",
+   "verify": "T, A",
+   "src": "§83, §69",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-EXT-005",
+   "area": "EXT",
+   "section": "§83",
+   "statement": "Extension-registered Object types and Relationship types **MUST** be registered in the platform registries (`PLX-PRD-011`, `PLX-GPH-020`) and **MUST** receive identical platform treatment to built-in types.",
+   "verify": "T",
+   "src": "§83, §11",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-EXT-006",
+   "area": "EXT",
+   "section": "§83",
+   "statement": "Extensions **MUST** declare their data egress. An extension that transmits tenant content externally **MUST** disclose destinations at install time and **MUST** be blockable by Organisation policy.",
+   "verify": "T, I",
+   "src": "§83, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-EXT-007",
+   "area": "EXT",
+   "section": "§83",
+   "statement": "Extension resource and cost consumption **MUST** be metered and attributable, and **MUST** be subject to the Organisation cost ceiling (`PLX-AI-030`).",
+   "verify": "T",
+   "src": "§83, §68, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-EXT-010",
+   "area": "EXT",
+   "section": "§84",
+   "statement": "The SDK **MUST** be versioned with a published support and deprecation policy of not less than 12 months (`PLX-API-005`).",
+   "verify": "I",
+   "src": "§84",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-EXT-011",
+   "area": "EXT",
+   "section": "§84",
+   "statement": "The SDK **MUST** be backward compatible within a major version. Breaking changes **MUST** require a major version increment.",
+   "verify": "T, I",
+   "src": "§84",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-EXT-012",
+   "area": "EXT",
+   "section": "§84",
+   "statement": "Every SDK interface **MUST** be exercised by at least one first-party application, so that the SDK's capability is continuously proven rather than asserted (`PLX-APP-002`).",
+   "verify": "T, I",
+   "src": "§84, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-DATA-001",
+   "area": "DATA",
+   "section": "§62",
+   "statement": "Each store **MUST** have exactly one owning service. No store **MUST** be written by more than one service.",
+   "verify": "I",
+   "src": "§62, §45",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-DATA-002",
+   "area": "DATA",
+   "section": "§62",
+   "statement": "Derived stores — graph, vector, search, Context DB, Resume DB — **MUST** be fully rebuildable from the Event Store. Rebuild **MUST** be tested at least once per release train.",
+   "verify": "T, A",
+   "src": "§62, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-DATA-003",
+   "area": "DATA",
+   "section": "§62",
+   "statement": "Only the Event Store is a system of record for history. Only the Object store is a system of record for current Object content. Every other store **MUST** be treated as a rebuildable projection.",
+   "verify": "I",
+   "src": "§62, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-DATA-004",
+   "area": "DATA",
+   "section": "§62",
+   "statement": "Every store **MUST** enforce tenant isolation at the storage layer (`PLX-SEC-010`), including graph namespaces and vector-index partitions.",
+   "verify": "T, I",
+   "src": "§62, §42",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-DATA-005",
+   "area": "DATA",
+   "section": "§62",
+   "statement": "Every store **MUST** have a documented backup, restore and point-in-time-recovery procedure, and restore **MUST** be exercised at least quarterly against production-scale data.",
+   "verify": "I, D",
+   "src": "§62, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-DATA-006",
+   "area": "DATA",
+   "section": "§62",
+   "statement": "Personal data **MUST** be catalogued per store, with its lawful basis, retention period and erasure mechanism recorded, before that store enters production.",
+   "verify": "I",
+   "src": "§62, §69, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-DATA-010",
+   "area": "DATA",
+   "section": "§66",
+   "statement": "Each memory layer **MUST** carry an independent, tenant-configurable retention policy, and policy application **MUST** emit an auditable Event.",
+   "verify": "T, I",
+   "src": "§66",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-DATA-011",
+   "area": "DATA",
+   "section": "§66",
+   "statement": "AI memory **MUST** be classified as derived and rebuildable. Loss of AI memory **MUST NOT** cause loss of Objects, Events, Relationships or Decisions.",
+   "verify": "T, I",
+   "src": "§66, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-DATA-012",
+   "area": "DATA",
+   "section": "§66",
+   "statement": "Retention policies **MUST NOT** be capable of pruning Decision `alternatives` (`PLX-DOM-043`) or Event records (`PLX-INV-05`).",
+   "verify": "T",
+   "src": "§66, §37",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-API-001",
+   "area": "API",
+   "section": "§63",
+   "statement": "Every platform capability **MUST** be reachable through the public API. No capability **MUST** be exclusive to the first-party interface (`PLX-UX-091`).",
+   "verify": "T, I",
+   "src": "§63, §29",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-API-002",
+   "area": "API",
+   "section": "§63",
+   "statement": "API operations **MUST** be named for business intent. CRUD-shaped generic mutation endpoints **MUST NOT** be exposed publicly.",
+   "verify": "I",
+   "src": "§63.1",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-API-003",
+   "area": "API",
+   "section": "§63",
+   "statement": "Every response **MUST** carry the envelope of §63.3, including `correlationId` matching the Events generated by the operation.",
+   "verify": "T",
+   "src": "§63.3",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-API-004",
+   "area": "API",
+   "section": "§63",
+   "statement": "`permissionContext.filtered` **MUST** be set true whenever any result was withheld by permission, without disclosing what or how much was withheld.",
+   "verify": "T",
+   "src": "§63.3, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-API-005",
+   "area": "API",
+   "section": "§63",
+   "statement": "APIs **MUST** be versioned. A breaking change **MUST** require a new version; prior versions **MUST** be supported for a published deprecation period of not less than 12 months.",
+   "verify": "I, T",
+   "src": "§63, §73",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-API-006",
+   "area": "API",
+   "section": "§63",
+   "statement": "Every mutating operation **MUST** accept an idempotency key and **MUST** return the original result on retry with the same key.",
+   "verify": "T",
+   "src": "§63, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-API-007",
+   "area": "API",
+   "section": "§63",
+   "statement": "Every API **MUST** enforce per-principal and per-tenant rate limits, and **MUST** return machine-readable limit state.",
+   "verify": "T",
+   "src": "§63, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-API-008",
+   "area": "API",
+   "section": "§63",
+   "statement": "GraphQL query depth and complexity **MUST** be bounded, and permission filtering **MUST** be applied at the resolver layer for every field, not only at the query root.",
+   "verify": "T, I",
+   "src": "§63.2, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-SEC-010",
+   "area": "SEC",
+   "section": "§42",
+   "statement": "Every store — relational, document, event, graph, vector and search — **MUST** enforce tenant isolation at the storage layer, including namespace or row-level security in the graph and vector stores.",
+   "verify": "T, I",
+   "src": "§42, §69",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-SEC-011",
+   "area": "SEC",
+   "section": "§42",
+   "statement": "Cross-Organisation traversal, search or reasoning **MUST** be impossible by construction. No API, query path, agent tool or administrative interface **MUST** be capable of returning data from more than one `organisationId` in a single result.",
+   "verify": "T, A",
+   "src": "§42, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-SEC-020",
+   "area": "SEC",
+   "section": "§69",
+   "statement": "Authorisation **MUST** be evaluated at the data-access layer of every service. Gateway-level authorisation alone **MUST NOT** be relied upon.",
+   "verify": "T, I",
+   "src": "§69",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-SEC-021",
+   "area": "SEC",
+   "section": "§69",
+   "statement": "Every authorisation decision **MUST** be auditable, recording principal, resource, decision, policy evaluated and timestamp.",
+   "verify": "T",
+   "src": "§69",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-SEC-022",
+   "area": "SEC",
+   "section": "§69",
+   "statement": "Temporary permissions **MUST** carry an explicit expiry and **MUST** be revoked automatically. Permission grants without expiry **MUST** be an explicit, audited administrative action.",
+   "verify": "T",
+   "src": "§69.3, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-SEC-023",
+   "area": "SEC",
+   "section": "§69",
+   "statement": "Permission changes **MUST** propagate to derived stores — search index, vector index, graph, materialised Context Health — within `PLX-PERF-021`, and stale permission state **MUST** fail closed.",
+   "verify": "T, A",
+   "src": "§69, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-SEC-024",
+   "area": "SEC",
+   "section": "§69",
+   "statement": "All secrets **MUST** be stored in a managed vault with automatic rotation. Secrets **MUST NOT** appear in configuration files, environment variables in images, logs, Event payloads or prompts.",
+   "verify": "T, I",
+   "src": "§69.4",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-SEC-025",
+   "area": "SEC",
+   "section": "§69",
+   "statement": "Data residency **MUST** be enforceable per Organisation, including for AI inference. A tenant with an EU residency requirement **MUST NOT** have content dispatched to a model endpoint outside the permitted region.",
+   "verify": "T, I",
+   "src": "§71, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-SEC-026",
+   "area": "SEC",
+   "section": "§69",
+   "statement": "The platform **MUST** support customer-managed encryption keys for tenants requiring them, with key revocation rendering tenant data inaccessible.",
+   "verify": "T, I",
+   "src": "§69, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-SEC-027",
+   "area": "SEC",
+   "section": "§69",
+   "statement": "AI-generated content **MUST** be marked as such in storage and in every export (`PLX-UX-062`, `PLX-DOM-014`).",
+   "verify": "T",
+   "src": "§70, §24",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-SEC-030",
+   "area": "SEC",
+   "section": "§69",
+   "statement": "The platform **MUST** implement cryptographic erasure for personal data: per-subject key material, destroyed on valid erasure request, rendering that subject's personal data permanently unrecoverable without modifying any Event record (§44.1).",
+   "verify": "T, I",
+   "src": "§49, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-SEC-031",
+   "area": "SEC",
+   "section": "§69",
+   "statement": "The platform **MUST** maintain a data inventory identifying every location personal data is stored, including derived stores, caches, prompt logs, embeddings and backups, and **MUST** ensure erasure reaches all of them.",
+   "verify": "I, A",
+   "src": "§69, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-SEC-032",
+   "area": "SEC",
+   "section": "§69",
+   "statement": "Data subject access requests **MUST** be servicable within the statutory period, including data held in Event history, embeddings and AI memory.",
+   "verify": "D, A",
+   "src": "§69, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-SEC-033",
+   "area": "SEC",
+   "section": "§69",
+   "statement": "Presence, focus and dwell telemetry **MUST** be retained under the presence retention class (`PLX-UX-072`) and **MUST NOT** be repurposed for performance management or monitoring without an explicit, separately-consented tenant configuration.",
+   "verify": "I, T",
+   "src": "§25, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-OPS-001",
+   "area": "OPS",
+   "section": "§71",
+   "statement": "Every service **MUST** be deployable as a container with no host-specific dependencies and **MUST** support rolling deployment without downtime.",
+   "verify": "T, D",
+   "src": "§71",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-OPS-002",
+   "area": "OPS",
+   "section": "§71",
+   "statement": "The tenant isolation model (`silo`, `pool` or `bridge`) **MUST** be an explicit, recorded per-deployment decision, and the chosen model **MUST** be documented per store, not only per platform.",
+   "verify": "I",
+   "src": "§71, §42, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-OPS-003",
+   "area": "OPS",
+   "section": "§71",
+   "statement": "Regional deployment **MUST** enforce data residency for storage, processing, backups and AI inference (`PLX-SEC-025`).",
+   "verify": "T, I",
+   "src": "§71",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-OPS-004",
+   "area": "OPS",
+   "section": "§71",
+   "statement": "Every deployment topology offered commercially **MUST** be continuously exercised in CI. A topology that is not tested **MUST NOT** be offered.",
+   "verify": "T, I",
+   "src": "§71, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-OPS-010",
+   "area": "OPS",
+   "section": "§72",
+   "statement": "Every service **MUST** emit metrics, structured logs and distributed traces using OpenTelemetry semantics, with `correlationId` propagated end to end from user action through every derived effect.",
+   "verify": "T, I",
+   "src": "§72",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-OPS-011",
+   "area": "OPS",
+   "section": "§72",
+   "statement": "Every target in §58 **MUST** have a corresponding production SLI, an alert threshold and an error budget.",
+   "verify": "I, A",
+   "src": "§58, §72",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-OPS-012",
+   "area": "OPS",
+   "section": "§72",
+   "statement": "AI cost and token usage **MUST** be observable per tenant, per Desk, per prompt type and per model.",
+   "verify": "T",
+   "src": "§72, §68",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-OPS-013",
+   "area": "OPS",
+   "section": "§72",
+   "statement": "Logs **MUST NOT** contain Object content, personal data or prompt content. Content **MUST** be referenced by identifier and digest.",
+   "verify": "T, I",
+   "src": "§72, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-OPS-014",
+   "area": "OPS",
+   "section": "§72",
+   "statement": "Event Store lag, derived-store rebuild lag and consumer lag per partition **MUST** be measured and alerted, as these are the platform's primary silent-failure modes.",
+   "verify": "T, I",
+   "src": "§72, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-ENG-001",
+   "area": "ENG",
+   "section": "§59",
+   "statement": "Every invariant in Appendix B **MUST** have at least one automated detection test that fails if the invariant is violated. Invariants asserted only in documentation **MUST NOT** be considered enforced.",
+   "verify": "T, I",
+   "src": "§59, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-ENG-010",
+   "area": "ENG",
+   "section": "§73",
+   "statement": "Every change **MUST** be evaluated against §6 Philosophy 1: a change that increases functionality while reducing the accuracy or freshness of Context **MUST** be rejected.",
+   "verify": "I",
+   "src": "§60, §75",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-ENG-011",
+   "area": "ENG",
+   "section": "§73",
+   "statement": "Contract tests **MUST** exist between every producer and consumer of an Event type and every API client and server, and **MUST** run in CI.",
+   "verify": "T",
+   "src": "§73.2",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-ENG-012",
+   "area": "ENG",
+   "section": "§73",
+   "statement": "Event replay tests **MUST** verify that replaying a recorded Event stream reproduces identical derived state, and **MUST** run against every derived store.",
+   "verify": "T",
+   "src": "§73.2, §62",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-ENG-013",
+   "area": "ENG",
+   "section": "§73",
+   "statement": "AI evaluation tests **MUST** run against every supported model on every release, with recorded pass thresholds per prompt type (`PLX-AI-004`).",
+   "verify": "T",
+   "src": "§73.2, §55",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-ENG-014",
+   "area": "ENG",
+   "section": "§73",
+   "statement": "Every invariant in Appendix B **MUST** have an automated detection test (`PLX-ENG-001`).",
+   "verify": "T",
+   "src": "§59",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-ENG-015",
+   "area": "ENG",
+   "section": "§73",
+   "statement": "Chaos testing **MUST** include AI provider unavailability, Event Bus partition loss, consumer lag and derived-store divergence, verifying `PLX-ARC-022` and `PLX-EVT-021`.",
+   "verify": "T",
+   "src": "§73.2, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-ENG-016",
+   "area": "ENG",
+   "section": "§73",
+   "statement": "Every service **MUST** publish the documentation set of §73.3 before production deployment. Deployment without it **MUST** be blocked.",
+   "verify": "I",
+   "src": "§73.3",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-ENG-020",
+   "area": "ENG",
+   "section": "§74",
+   "statement": "A feature **MUST NOT** be marked done with any §74 gate unmet. Exceptions **MUST** be recorded as accepted risk with a named owner and a remediation date.",
+   "verify": "I",
+   "src": "§74",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-ENG-021",
+   "area": "ENG",
+   "section": "§74",
+   "statement": "Requirement-to-test traceability **MUST** be machine-checkable. CI **MUST** report any `PLX-*` requirement with no linked verifying test.",
+   "verify": "T, I",
+   "src": "§74, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-ENG-030",
+   "area": "ENG",
+   "section": "§85",
+   "statement": "Every item in §85.2 **MUST** be resolved, with the resolution recorded as an ADR, before the stated milestone. A milestone **MUST NOT** be declared complete with an open foreclosing decision.",
+   "verify": "I",
+   "src": "§85, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-PERF-001",
+   "area": "PERF",
+   "section": "§58",
+   "statement": "Desk open — first meaningful paint of Resume Card and layout — p50 600 ms, p95 1.5 s, p99 **2.0 s**. Measured: Gateway ingress → last byte of initial payload.",
+   "verify": "A",
+   "src": "§58",
+   "kind": "target"
+  },
+  {
+   "id": "PLX-PERF-002",
+   "area": "PERF",
+   "section": "§58",
+   "statement": "Desk open — full Object hydration — p50 1.5 s, p95 3.5 s, p99 5.0 s. Measured: Gateway ingress → all in-viewport Objects interactive.",
+   "verify": "A",
+   "src": "§58",
+   "kind": "target"
+  },
+  {
+   "id": "PLX-PERF-010",
+   "area": "PERF",
+   "section": "§58",
+   "statement": "Object open (in-Desk) — p50 150 ms, p95 400 ms, p99 800 ms. Measured: Gateway ingress → content available.",
+   "verify": "A",
+   "src": "§58",
+   "kind": "target"
+  },
+  {
+   "id": "PLX-PERF-011",
+   "area": "PERF",
+   "section": "§58",
+   "statement": "Resume generation — deterministic stages 1–6 — p50 400 ms, p95 1.2 s, p99 2.0 s. Measured: Trigger Event → structured Resume persisted.",
+   "verify": "A",
+   "src": "§58",
+   "kind": "target"
+  },
+  {
+   "id": "PLX-PERF-012",
+   "area": "PERF",
+   "section": "§58",
+   "statement": "Resume generation — including AI summary (stage 7) — p50 1.5 s, p95 3.5 s, p99 **5.0 s**. Measured: Trigger Event → Resume Object complete.",
+   "verify": "A",
+   "src": "§58",
+   "kind": "target"
+  },
+  {
+   "id": "PLX-PERF-020",
+   "area": "PERF",
+   "section": "§58",
+   "statement": "Context Health update — direct impact (depth 0–1) — p50 60 ms, p95 180 ms, p99 **250 ms**. Measured: Event ingestion → health state committed.",
+   "verify": "A",
+   "src": "§58",
+   "kind": "target"
+  },
+  {
+   "id": "PLX-PERF-021",
+   "area": "PERF",
+   "section": "§58",
+   "statement": "Context Health update — propagated impact (depth 2–N, within bound) — p50 120 ms, p95 350 ms, p99 **500 ms**. Measured: Event ingestion → all in-bound propagation committed.",
+   "verify": "A",
+   "src": "§58",
+   "kind": "target"
+  },
+  {
+   "id": "PLX-PERF-022",
+   "area": "PERF",
+   "section": "§58",
+   "statement": "Graph traversal, permission-filtered, depth ≤ 3 — p50 40 ms, p95 120 ms, p99 250 ms. Measured: Query ingress → result set.",
+   "verify": "A",
+   "src": "§58",
+   "kind": "target"
+  },
+  {
+   "id": "PLX-PERF-030",
+   "area": "PERF",
+   "section": "§58",
+   "statement": "Event ingestion to Event Store durability — p50 15 ms, p95 50 ms, p99 120 ms. Measured: Emission → fsync acknowledged.",
+   "verify": "A",
+   "src": "§58",
+   "kind": "target"
+  },
+  {
+   "id": "PLX-PERF-031",
+   "area": "PERF",
+   "section": "§58",
+   "statement": "Event Store → bus delivery to first subscriber — p50 20 ms, p95 80 ms, p99 200 ms. Measured: Store commit → subscriber receipt.",
+   "verify": "A",
+   "src": "§58",
+   "kind": "target"
+  },
+  {
+   "id": "PLX-PERF-040",
+   "area": "PERF",
+   "section": "§58",
+   "statement": "Search, AI re-ranking disabled — p50 80 ms, p95 200 ms, p99 **300 ms**. Measured: Query ingress → ranked results.",
+   "verify": "A",
+   "src": "§58",
+   "kind": "target"
+  },
+  {
+   "id": "PLX-PERF-041",
+   "area": "PERF",
+   "section": "§58",
+   "statement": "Semantic index freshness after content-changing Event — p50 2 s, p95 10 s, p99 30 s. Measured: Event → embedding queryable.",
+   "verify": "A",
+   "src": "§58",
+   "kind": "target"
+  },
+  {
+   "id": "PLX-PERF-042",
+   "area": "PERF",
+   "section": "§58",
+   "statement": "Search, including AI re-ranking — p50 400 ms, p95 900 ms, p99 1.5 s. Measured: Query ingress → re-ranked results.",
+   "verify": "A",
+   "src": "§58",
+   "kind": "target"
+  },
+  {
+   "id": "PLX-PERF-050",
+   "area": "PERF",
+   "section": "§58",
+   "statement": "AI recommendation, end to end — p50 2.5 s, p95 6 s, p99 **10 s**. Measured: Request → recommendation with evidence rendered.",
+   "verify": "A",
+   "src": "§58",
+   "kind": "target"
+  },
+  {
+   "id": "PLX-PERF-060",
+   "area": "PERF",
+   "section": "§58",
+   "statement": "Authorisation decision — p50 3 ms, p95 10 ms, p99 25 ms. Measured: Policy query → decision.",
+   "verify": "A",
+   "src": "§58",
+   "kind": "target"
+  },
+  {
+   "id": "PLX-PERF-070",
+   "area": "PERF",
+   "section": "§58",
+   "statement": "Every target in §58 **MUST** be continuously measured in production and alerted on. A target without production instrumentation **MUST NOT** be claimed as met.",
+   "verify": "I, A",
+   "src": "§58, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-PERF-071",
+   "area": "PERF",
+   "section": "§58",
+   "statement": "Performance targets **MUST** be re-derived and republished whenever reference load assumptions change by more than one order of magnitude in any dimension.",
+   "verify": "I",
+   "src": "§58, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-PERF-072",
+   "area": "PERF",
+   "section": "§58",
+   "statement": "Operations with an AI component **MUST** have a deterministic fallback that meets the corresponding non-AI target, so that AI latency degradation cannot breach a user-facing budget.",
+   "verify": "T, A",
+   "src": "§58, §48, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-MET-001",
+   "area": "MET",
+   "section": "§8",
+   "statement": "Resume accuracy — Proportion of Resume assertions the user marks correct when prompted, sampled Baseline: In-product sampling, ≥200 samples/tenant/quarter. Target: ≥90%.",
+   "verify": "A",
+   "src": "§8",
+   "kind": "target"
+  },
+  {
+   "id": "PLX-MET-002",
+   "area": "MET",
+   "section": "§8",
+   "statement": "Context reconstruction time — Elapsed time from Desk open to first substantive edit or Decision action Baseline: Instrumented, per Desk-visit. Target: ↓ ≥40% vs first-90-day baseline.",
+   "verify": "A",
+   "src": "§8",
+   "kind": "target"
+  },
+  {
+   "id": "PLX-MET-003",
+   "area": "MET",
+   "section": "§8",
+   "statement": "Catch-up estimate calibration — Absolute error between estimated catch-up time and observed reconstruction time Baseline: Paired with PLX-MET-002. Target: ≤±50% at p90.",
+   "verify": "A",
+   "src": "§8",
+   "kind": "target"
+  },
+  {
+   "id": "PLX-MET-004",
+   "area": "MET",
+   "section": "§8",
+   "statement": "Duplicate work detected — Count of duplicate-candidate Relationships surfaced and confirmed by a user Baseline: Graph telemetry. Target: ↑, reported monthly.",
+   "verify": "A",
+   "src": "§8",
+   "kind": "target"
+  },
+  {
+   "id": "PLX-MET-005",
+   "area": "MET",
+   "section": "§8",
+   "statement": "Decision latency — Elapsed time from Decision `Proposed` to terminal state Baseline: Decision entity timestamps. Target: ↓ ≥25% vs baseline.",
+   "verify": "A",
+   "src": "§8",
+   "kind": "target"
+  },
+  {
+   "id": "PLX-MET-006",
+   "area": "MET",
+   "section": "§8",
+   "statement": "Attention precision — Proportion of `Attention Required` and `Decision Risk` transitions the user acts on rather than dismisses Baseline: Context Health telemetry. Target: ≥60%, and monotonically non-decreasing per release.",
+   "verify": "A",
+   "src": "§8",
+   "kind": "target"
+  },
+  {
+   "id": "PLX-MET-007",
+   "area": "MET",
+   "section": "§8",
+   "statement": "Search reduction — Searches per active Desk-hour Baseline: Search telemetry. Target: ↓ over tenant lifetime.",
+   "verify": "A",
+   "src": "§8",
+   "kind": "target"
+  },
+  {
+   "id": "PLX-MET-008",
+   "area": "MET",
+   "section": "§8",
+   "statement": "Knowledge reuse — Proportion of new Objects that reference at least one pre-existing Object or Decision Baseline: Graph telemetry. Target: ↑.",
+   "verify": "A",
+   "src": "§8",
+   "kind": "target"
+  },
+  {
+   "id": "PLX-MET-009",
+   "area": "MET",
+   "section": "§8",
+   "statement": "Onboarding time to first contribution — Days from user creation to first authored Object on a Team or Project Desk Baseline: Identity + Object telemetry. Target: ↓.",
+   "verify": "A",
+   "src": "§8",
+   "kind": "target"
+  },
+  {
+   "id": "PLX-MET-010",
+   "area": "MET",
+   "section": "§8",
+   "statement": "AI recommendation trust — Proportion of AI recommendations accepted, weighted by materiality Baseline: AI Orchestrator telemetry. Target: ↑, with acceptance-vs-outcome correlation tracked.",
+   "verify": "A",
+   "src": "§8",
+   "kind": "target"
+  },
+  {
+   "id": "PLX-MET-011",
+   "area": "MET",
+   "section": "§8",
+   "statement": "Infrastructure cost per active user — Fully loaded cost including AI inference, per monthly active user, per tenant Baseline: Cost telemetry (§68). Target: ↓ per unit of retained context.",
+   "verify": "A",
+   "src": "§8",
+   "kind": "target"
+  },
+  {
+   "id": "PLX-MET-012",
+   "area": "MET",
+   "section": "§8",
+   "statement": "Every metric in §8.1 **MUST** be instrumented and reported before the capability it measures is declared generally available. A capability **MUST NOT** reach GA with its success metric uninstrumented.",
+   "verify": "I, T",
+   "src": "§8, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-MET-013",
+   "area": "MET",
+   "section": "§8",
+   "statement": "`PLX-MET-006` (attention precision) **MUST** be treated as a release gate. A release that reduces attention precision by more than 5 percentage points **MUST NOT** ship without explicit product sign-off recorded against the regression.",
+   "verify": "A, I",
+   "src": "§6.7, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-MET-020",
+   "area": "MET",
+   "section": "§86",
+   "statement": "Primary metrics **MUST** take precedence over secondary metrics in product decision-making. Where a change improves a secondary metric while degrading a primary metric, it **MUST** be rejected or explicitly accepted with recorded rationale.",
+   "verify": "I",
+   "src": "§86, new",
+   "kind": "requirement"
+  },
+  {
+   "id": "PLX-MET-021",
+   "area": "MET",
+   "section": "§86",
+   "statement": "\"Time in product\" and equivalent engagement-maximising metrics **MUST NOT** be adopted as success metrics. The platform's stated purpose is to reduce time spent reconstructing context.",
+   "verify": "I",
+   "src": "§86, new",
+   "kind": "requirement"
+  }
+ ]
+}
