@@ -63,7 +63,10 @@ export function getContextEngine(): Engine {
   // Bind the graph store to the active organisation (live resolver, tracks the org
   // switcher): a cross-org edge is then impossible by construction (PLX-SEC-011 /
   // GPH-011). ADR-0002.
-  const relationships = createRelationshipStore(db, () => getActiveOrgId())
+  // Event-sourced: each relationship mutation emits a full-snapshot lifecycle Event
+  // atomically, so the live graph is a projection rebuildable from the log
+  // (PLX-DATA-002/003). ADR-0001/0002.
+  const relationships = createRelationshipStore(db, () => getActiveOrgId(), events)
   const decisions = createDecisionStore(db)
   ensureReviewSchema(db)
   engine = { events, relationships, decisions, db }
