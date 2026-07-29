@@ -13,9 +13,12 @@ import Icon from './Icon'
 
 interface Props {
   deskId: string
+  // 'header' sits inline under a desk title (transparent). 'chrome' floats on the
+  // canvas and wears a glass pill so it reads over desk content.
+  variant?: 'header' | 'chrome'
 }
 
-export default function ContextHealthStrip({ deskId }: Props): JSX.Element | null {
+export default function ContextHealthStrip({ deskId, variant = 'header' }: Props): JSX.Element | null {
   const lastVisit = useContextHealthStore((s) => s.lastVisit[deskId])
   const relatedIds = useContextHealthStore((s) => s.relatedById[deskId])
   const byId = useContextHealthStore((s) => s.byId)
@@ -41,8 +44,13 @@ export default function ContextHealthStrip({ deskId }: Props): JSX.Element | nul
 
   if (!caughtUp && relatedRows.length === 0) return null
 
+  const className =
+    variant === 'chrome'
+      ? 'fb-glass-chrome rounded-lg px-3 py-1.5 shadow-[0_2px_10px_rgba(0,0,0,0.1)] ring-1 ring-black/[0.06] dark:ring-white/[0.06] flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[12px] max-w-[520px]'
+      : 'mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[12px]'
+
   return (
-    <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[12px]">
+    <div data-testid="context-health-strip" className={className}>
       {caughtUp && (
         <span className="inline-flex items-center gap-1.5 text-[var(--ink-70)]">
           <Icon name="update" size={13} className="text-[var(--ink-50)]" />

@@ -105,18 +105,16 @@ test('CONTEXT-ENGINE — node CRUD + relate/unrelate keep working with the live 
   }
 })
 
-// Secondary check: the new context:* read handlers (context:related,
-// context:health, context:markReviewed) are registered on ipcMain but are not
-// yet exposed on window.api — no renderer surface calls them (per the
-// engine.ts commit message, "rewiring [the renderer] is the next UI
-// increment"). Confirmed below: window.api has no `context` namespace. Since
-// there's no UI or window.api path to drive them, and adding one would mean
-// editing preload/production code (outside this tester's remit), this test
-// instead invokes the registered ipcMain handlers directly from the main
-// process via Electron's internal `ipcMain._invokeHandlers` map — the same
-// function objects that would run if a renderer called ipcRenderer.invoke.
-// That is API-driven-via-reflection, not UI-driven; flagged here explicitly.
-test('CONTEXT-ENGINE — context:* handlers respond without error (reflection-invoked, no window.api surface yet)', async () => {
+// Secondary check: the context:* read handlers (context:related,
+// context:health, context:markReviewed) are registered on ipcMain. As of
+// plexi-4.0 commit f872a30 (src/preload/index.ts), window.api.context now
+// exposes them to the renderer — updated below from the earlier "no
+// window.api surface yet" assertion, which predates that preload bridge and
+// would otherwise fail as a stale expectation, not a real regression. Also
+// invokes the registered ipcMain handlers directly via Electron's internal
+// `ipcMain._invokeHandlers` map for a reflection-driven cross-check against
+// the same handler functions a renderer call would hit.
+test('CONTEXT-ENGINE — context:* handlers respond without error (window.api.context + reflection cross-check)', async () => {
   const { app, window, dispose } = await launchApp()
   try {
     await waitForReady(window)
@@ -125,7 +123,7 @@ test('CONTEXT-ENGINE — context:* handlers respond without error (reflection-in
       const api = (window as unknown as { api: Record<string, unknown> }).api
       return typeof api.context === 'object' && api.context !== null
     })
-    expect(hasContextNamespace).toBe(false)
+    expect(hasContextNamespace).toBe(true)
 
     const { aId, bId } = await window.evaluate(async () => {
       const api = (window as unknown as { api: typeof window.api }).api
@@ -174,6 +172,20 @@ test('CONTEXT-ENGINE — context:* handlers respond without error (reflection-in
     expect(result.markReviewed).toBe(true)
     expect(typeof result.healthAfterReview).toBe('object')
     expect(result.healthAfterReview).toHaveProperty('state')
+
+    // Now the real path: window.api.context, the actual bridge the renderer
+    // store (contextHealth.ts) calls.
+    const viaBridge = await window.evaluate(async (id) => {
+      const api = (window as unknown as { api: typeof window.api }).api
+      const related = await api.context!.related(id)
+      const health = await api.context!.health(id)
+      const marked = await api.context!.markReviewed(id)
+      return { related, health, marked }
+    }, aId)
+    expect(Array.isArray(viaBridge.related)).toBe(true)
+    expect(viaBridge.related).toContain(bId)
+    expect(viaBridge.health).toHaveProperty('state')
+    expect(viaBridge.marked).toBe(true)
   } finally {
     await dispose()
   }

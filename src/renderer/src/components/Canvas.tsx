@@ -103,6 +103,7 @@ import SyncWidgetPicker from './SyncWidgetPicker'
 import HistoryPanel from './HistoryPanel'
 import ResumeModal from './ResumeModal'
 import CanvasBreadcrumb from './CanvasBreadcrumb'
+import ContextHealthStrip from './ContextHealthStrip'
 import FloatingPill from './FloatingPill'
 import { useFreeDesk } from '../hooks/useFreeDesk'
 import type { StandardApp } from '../lib/standardApps'
@@ -2053,6 +2054,14 @@ export default function Canvas(): JSX.Element {
               </button>
             )}
           </div>
+          {/* Context Health (plexi-4.0): floats just under the breadcrumb, showing
+              what changed since last visit and related desks needing attention.
+              Renders nothing when the desk is calm. */}
+          {activeTask && (
+            <div className="absolute top-16 left-4 z-[45]">
+              <ContextHealthStrip deskId={activeTask.id} variant="chrome" />
+            </div>
+          )}
           {panPing && (
             <div
               className="absolute pointer-events-none z-[200]"
