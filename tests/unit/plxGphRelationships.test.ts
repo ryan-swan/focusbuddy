@@ -57,8 +57,17 @@ describe('plx_prd_050 / plx_prd_051 — provenance and provisional-by-default', 
   it('test_plx_prd_051_ai_discovered_is_provisional', () => {
     const rs = createRelationshipStore(memSqlDb())
     expect(rs.propose(baseInput({ discoveryMethod: 'ai' })).state).toBe('provisional')
-    // a user confirmation lands it confirmed
-    expect(rs.propose(baseInput({ discoveryMethod: 'user', confirmedBy: 'user:1' })).state).toBe('confirmed')
+    // A distinct, user-created edge (own evidence) lands confirmed on creation.
+    expect(
+      rs.propose(
+        baseInput({
+          targetEntityId: 'obj-D',
+          evidence: [{ kind: 'event', ref: 'user-link', excerpt: null, weight: 1 }],
+          discoveryMethod: 'user',
+          confirmedBy: 'user:1'
+        })
+      ).state
+    ).toBe('confirmed')
   })
 })
 
@@ -98,6 +107,37 @@ describe('plx_gph_005 — rejected edges retained, not re-proposed', () => {
     expect(again.id).toBe(prov.id)
     expect(again.state).toBe('rejected')
     expect(rs.all()).toHaveLength(1)
+  })
+})
+
+describe('plx_gph_012 — graph writes are idempotent w.r.t. Event replay', () => {
+  it('test_plx_gph_012_replay_does_not_duplicate_edges', () => {
+    const rs = createRelationshipStore(memSqlDb())
+    // Same originating Event replayed: same endpoints, type and evidence.
+    const first = rs.propose(baseInput())
+    const replay = rs.propose(baseInput())
+    expect(replay.id).toBe(first.id) // returned, not duplicated
+    expect(rs.all()).toHaveLength(1)
+    // A confirmed edge stays single on replay too.
+    rs.confirm(first.id, 'user:1')
+    const replayAfterConfirm = rs.propose(baseInput())
+    expect(replayAfterConfirm.id).toBe(first.id)
+    expect(replayAfterConfirm.state).toBe('confirmed')
+    expect(rs.all()).toHaveLength(1)
+  })
+})
+
+describe('plx_gph_004 — relationship intelligence without manual construction', () => {
+  it('test_plx_gph_004_ai_discovered_without_curation_plus_curation_available', () => {
+    const rs = createRelationshipStore(memSqlDb())
+    // Intelligence arrives from automated discovery — the user built no structure.
+    const auto = rs.propose(baseInput({ discoveryMethod: 'automation', confirmedBy: null }))
+    expect(auto.state).toBe('provisional')
+    expect(auto.discoveryMethod).toBe('automation')
+    // Manual curation is AVAILABLE as confirmation and correction, not required.
+    expect(rs.confirm(auto.id, 'user:1')!.state).toBe('confirmed') // confirmation
+    const other = rs.propose(baseInput({ targetEntityId: 'obj-C', evidence: [{ kind: 'event', ref: 'e9', excerpt: null, weight: 1 }], discoveryMethod: 'ai' }))
+    expect(rs.reject(other.id, 'user:1')!.state).toBe('rejected') // correction
   })
 })
 

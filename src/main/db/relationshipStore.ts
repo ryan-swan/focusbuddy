@@ -124,13 +124,17 @@ export function createRelationshipStore(db: SqlDb): RelationshipStore {
       throw new Error('A Relationship write MUST carry the originating correlationId (PLX-GPH-022).')
     }
     const key = evidenceKey(input.evidence)
-    // Suppress re-proposal of an edge already rejected on identical evidence (PLX-GPH-005).
-    const priorRejected = db
+    // Idempotent write: an edge with the same endpoints, type and evidence is
+    // returned rather than duplicated. This makes graph writes idempotent with
+    // respect to Event replay — replaying the originating Event never creates a
+    // second node or edge (PLX-GPH-012) — and it subsumes the rule that a rejected
+    // edge is never re-proposed on identical evidence (PLX-GPH-005).
+    const priorEdge = db
       .prepare(
-        `SELECT * FROM relationships WHERE source_entity_id = ? AND target_entity_id = ? AND relationship_type = ? AND evidence_key = ? AND state = 'rejected' LIMIT 1`
+        `SELECT * FROM relationships WHERE source_entity_id = ? AND target_entity_id = ? AND relationship_type = ? AND evidence_key = ? LIMIT 1`
       )
       .get(input.sourceEntityId, input.targetEntityId, input.relationshipType, key) as Record<string, unknown> | undefined
-    if (priorRejected) return rowToRel(priorRejected)
+    if (priorEdge) return rowToRel(priorEdge)
 
     const now = new Date().toISOString()
     const confirmedBy = input.confirmedBy ?? null
