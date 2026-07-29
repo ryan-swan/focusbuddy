@@ -147,7 +147,10 @@ export function healthFor(objectId: string, materialityInput: MaterialityInput):
     .all()
     .filter((d) => d.state !== 'superseded' && d.state !== 'cancelled' && d.relatedObjectIds.includes(objectId))
     .map((d) => ({ decisionId: d.id, title: d.title, invalidatingChange: 'a linked object changed since your last review' }))
-  return deriveHealthSnapshot(e.db, localUserId(), objectId, materialityInput, decisionsAtRisk)
+  // Confirmed neighbours feed the signal so a change to a related desk raises this
+  // desk's health (PLX-UX-022).
+  const related = relatedObjectIds(objectId)
+  return deriveHealthSnapshot(e.db, localUserId(), objectId, materialityInput, decisionsAtRisk, related)
 }
 
 // Record that the user has reviewed an Object now — resets Context Health to

@@ -126,6 +126,23 @@ const api = {
     unrelate: (a: string, b: string): Promise<string[]> => ipcRenderer.invoke('nodes:unrelate', a, b),
     listRelated: (id: string): Promise<string[]> => ipcRenderer.invoke('nodes:listRelated', id)
   },
+  // Context Engine (plexi-4.0) — live contextual awareness read surface.
+  context: {
+    // Confirmed knowledge-graph neighbours of an object ("surfaces with relations").
+    related: (id: string): Promise<string[]> => ipcRenderer.invoke('context:related', id),
+    // Per-(user, object) Context Health, honest against the user's last review point.
+    health: (
+      id: string
+    ): Promise<{
+      objectId: string
+      state: 'current' | 'changed' | 'attention-required' | 'decision-risk'
+      changedEventCount: number
+      materiality: { score: number; band: string } | null
+      decisionsAtRisk: Array<{ decisionId: string; title: string; invalidatingChange: string }>
+    }> => ipcRenderer.invoke('context:health', id),
+    // Record that the user has reviewed an object now (resets health to current).
+    markReviewed: (id: string): Promise<boolean> => ipcRenderer.invoke('context:markReviewed', id)
+  },
   widgets: {
     listByTask: (taskId: string): Promise<Widget[]> =>
       ipcRenderer.invoke('widgets:listByTask', taskId),

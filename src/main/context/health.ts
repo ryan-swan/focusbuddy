@@ -29,7 +29,11 @@ export interface HealthSnapshot {
   decisionsAtRisk: DecisionAtRisk[]
 }
 
-// The user's last-reviewed sequence for an Object, or -1 if never reviewed.
+// The user's last-review cursor for an Object, or -1 if never reviewed. This is a
+// GLOBAL event-store cursor (rowid), not the per-partition sequence: Context Health
+// must compare changes across partitions (this Object AND its related Objects live
+// in different partitions), and per-partition sequences are not globally
+// comparable.
 export function reviewPointSeq(db: SqlDb, userId: string, objectId: string): number {
   const rp = db
     .prepare('SELECT reviewed_seq FROM context_review_points WHERE user_id = ? AND object_id = ?')
@@ -37,11 +41,17 @@ export function reviewPointSeq(db: SqlDb, userId: string, objectId: string): num
   return rp?.reviewed_seq ?? -1
 }
 
-// Count an Object's Events with sequence beyond the review point.
-export function changedEventCount(db: SqlDb, objectId: string, sinceSeq: number): number {
-  const row = db.prepare('SELECT COUNT(*) AS n FROM events WHERE object_id = ? AND sequence > ?').get(objectId, sinceSeq) as
-    | { n: number }
-    | undefined
+// Count an Object's Events beyond the review cursor. Optionally includes Events on
+// confirmed-related Objects, so a change to a related desk raises this desk's
+// health too — the "pricing changes, the proposal lights up" model (PLX-UX-022).
+// Related counting is depth-1 here (the full bounded BFS lives in propagation.ts).
+// Uses the global rowid cursor so cross-partition comparison is valid.
+export function changedEventCount(db: SqlDb, objectId: string, sinceCursor: number, relatedIds: string[] = []): number {
+  const ids = [objectId, ...relatedIds.filter((r) => r && r !== objectId)]
+  const placeholders = ids.map(() => '?').join(',')
+  const row = db
+    .prepare(`SELECT COUNT(*) AS n FROM events WHERE object_id IN (${placeholders}) AND rowid > ?`)
+    .get(...ids, sinceCursor) as { n: number } | undefined
   return row?.n ?? 0
 }
 
@@ -50,9 +60,10 @@ export function deriveHealthSnapshot(
   userId: string,
   objectId: string,
   materialityInput: MaterialityInput,
-  decisionsAtRisk: DecisionAtRisk[]
+  decisionsAtRisk: DecisionAtRisk[],
+  relatedIds: string[] = []
 ): HealthSnapshot {
-  const changed = changedEventCount(db, objectId, reviewPointSeq(db, userId, objectId))
+  const changed = changedEventCount(db, objectId, reviewPointSeq(db, userId, objectId), relatedIds)
   if (changed === 0) {
     return { objectId, state: 'current', materiality: null, changedEventCount: 0, decisionsAtRisk }
   }
@@ -66,10 +77,11 @@ export function deriveHealthSnapshot(
   return { objectId, state, materiality, changedEventCount: changed, decisionsAtRisk }
 }
 
-// Record that a user reviewed an Object now — resets health to `current`
-// from the Object's current max sequence forward (PLX-UX-020).
+// Record that a user reviewed an Object now — resets health to `current` from the
+// GLOBAL event cursor forward (PLX-UX-020), so any later change to this Object OR a
+// related one counts as "since your last visit".
 export function recordReview(db: SqlDb, userId: string, objectId: string, at: string): void {
-  const row = db.prepare('SELECT MAX(sequence) AS s FROM events WHERE object_id = ?').get(objectId) as { s: number | null }
+  const row = db.prepare('SELECT MAX(rowid) AS s FROM events').get() as { s: number | null }
   const seq = row?.s ?? 0
   db.prepare(
     `INSERT INTO context_review_points (user_id, object_id, reviewed_seq, reviewed_at)

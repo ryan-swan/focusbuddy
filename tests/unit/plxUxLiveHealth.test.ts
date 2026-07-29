@@ -55,6 +55,22 @@ describe('plx_ux_020 — health is relative to the user last review point', () =
   })
 })
 
+describe('plx_ux_022 — a change to a related desk raises this desk (read layer)', () => {
+  it('test_plx_ux_022_related_change_counts_toward_health', () => {
+    const { db, es } = setup()
+    es.append(objEvent('desk-1', 0))
+    recordReview(db, 'sam', 'desk-1', '2026-07-29T00:00:00Z') // caught up on desk-1
+    // No further change to desk-1 itself -> current when ignoring relations.
+    expect(deriveHealthSnapshot(db, 'sam', 'desk-1', material, []).state).toBe('current')
+    // A change lands on the confirmed-related desk-2.
+    es.append(objEvent('desk-2', 1))
+    // With desk-2 passed as a related neighbour, desk-1 now needs attention.
+    const withRelated = deriveHealthSnapshot(db, 'sam', 'desk-1', material, [], ['desk-2'])
+    expect(withRelated.changedEventCount).toBe(1)
+    expect(withRelated.state).toBe('attention-required')
+  })
+})
+
 describe('plx_dom_030 — computed per (user, Object), not stored on the Object', () => {
   it('test_plx_dom_030_two_users_differ_on_the_same_object', () => {
     const { db, es } = setup()

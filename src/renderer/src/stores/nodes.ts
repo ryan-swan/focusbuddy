@@ -8,6 +8,7 @@ import { canCreateMore, limitFor } from '../lib/gating'
 import { useCapabilityStore } from './capabilities'
 import { promptUpgrade } from './upgradePrompt'
 import { useMessagingStore } from './messaging'
+import { useContextHealthStore } from './contextHealth'
 
 // A "desk" (marketing) / "project" (sidebar) is a top-level folder. The
 // multiple_desks capability caps how many a tier may have. Thrown by
@@ -227,6 +228,11 @@ export const useNodeStore = create<NodeStore>((set, get) => ({
       })
     }
     set({ activeTaskId: id })
+    // Opening a desk is the honest "I am now looking at this" signal: capture what
+    // changed since last visit, mark it reviewed, and refresh related-desk health
+    // so the header surfaces relations (plexi-4.0). Fire-and-forget; never blocks
+    // navigation and degrades to a no-op if the endpoints are absent.
+    if (id) void useContextHealthStore.getState().openDesk(id)
   },
   toggleExpand: (id) =>
     set({ expanded: { ...get().expanded, [id]: !get().expanded[id] } }),

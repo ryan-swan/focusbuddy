@@ -5,6 +5,7 @@ import { useNodeStore } from '../stores/nodes'
 import ShareDialog from './ShareDialog'
 import Icon from './Icon'
 import { StatusPill } from './plexi'
+import ContextHealthStrip from './ContextHealthStrip'
 
 interface Props {
   project: FbNode
@@ -104,6 +105,8 @@ export default function WorkspaceHeader({
             </button>
           </div>
         </div>
+        {/* Context Health: what changed since last visit + related-desk health */}
+        <ContextHealthStrip deskId={project.id} />
         {/* Tabs */}
         <div className="mt-3 flex items-center gap-0.5 -mb-1">
           {TABS.map((t) => {
