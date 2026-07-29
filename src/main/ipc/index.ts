@@ -567,6 +567,10 @@ export function registerIpcHandlers(): void {
       currentState: { title: node.title, kind: node.kind, importance: node.importance, status: node.status },
       changeSummary: `Created ${node.kind} "${node.title}"`
     })
+    // You created it, so you have seen it: anchor the review point past the
+    // creation event so a brand-new desk does not report itself as "changed since
+    // your last visit". Later changes still surface honestly.
+    ceMarkReviewed(node.id)
     return node
   })
   ipcMain.handle('nodes:update', (_e, id: string, patch: NodePatch) => {

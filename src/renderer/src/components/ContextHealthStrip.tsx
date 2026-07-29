@@ -26,6 +26,7 @@ export default function ContextHealthStrip({ deskId, variant = 'header' }: Props
   const nodes = useNodeStore((s) => s.nodes)
   const setActive = useNodeStore((s) => s.setActive)
   const goProject = useViewStore((s) => s.goProject)
+  const goTask = useViewStore((s) => s.goTask)
 
   const related = relatedIds ?? []
   useEffect(() => {
@@ -74,7 +75,10 @@ export default function ContextHealthStrip({ deskId, variant = 'header' }: Props
               key={r.id}
               onClick={() => {
                 setActive(r.id)
-                goProject(r.id)
+                // Route by the target's own kind: a room/folder opens as a project,
+                // a desk/task opens as a task.
+                if (r.node!.kind === 'folder') goProject(r.id)
+                else goTask(r.id)
               }}
               className="inline-flex items-center gap-1.5 rounded-full border border-[var(--edge-soft)] px-2 py-0.5 hover:bg-[var(--surface-hover)] transition-colors"
               title={`Open ${r.node!.title}`}
