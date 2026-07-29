@@ -79,8 +79,15 @@ export function ensureDecisionSchema(db: SqlDb): void {
   `)
 }
 
-export function createDecisionStore(db: SqlDb): DecisionStore {
+// In production the Context Engine binds this to getActiveOrgId(), so reads are
+// hardcoded to one organisation and cannot return another's Decisions (PLX-SEC-010
+// / SEC-011). An unbound store is for single-organisation unit tests only.
+export function createDecisionStore(db: SqlDb, organisationId?: string | (() => string | null)): DecisionStore {
   ensureDecisionSchema(db)
+  const resolveOrg: () => string | null = typeof organisationId === 'function' ? organisationId : () => organisationId ?? null
+  const bound = organisationId != null
+  const orgClause = bound ? ' AND organisation_id = ?' : ''
+  const orgArg = (): unknown[] => (bound ? [resolveOrg()] : [])
 
   function rowToDecision(r: Record<string, unknown>): Decision {
     return {
@@ -109,12 +116,17 @@ export function createDecisionStore(db: SqlDb): DecisionStore {
   }
 
   const get: DecisionStore['get'] = (id) => {
-    const row = db.prepare('SELECT * FROM decisions WHERE id = ?').get(id) as Record<string, unknown> | undefined
+    const row = db.prepare(`SELECT * FROM decisions WHERE id = ?${orgClause}`).get(id, ...orgArg()) as Record<string, unknown> | undefined
     return row ? rowToDecision(row) : null
   }
 
   const all: DecisionStore['all'] = () =>
-    (db.prepare('SELECT * FROM decisions ORDER BY created_at ASC').all() as Record<string, unknown>[]).map(rowToDecision)
+    (
+      db.prepare(`SELECT * FROM decisions${bound ? ' WHERE organisation_id = ?' : ''} ORDER BY created_at ASC`).all(...orgArg()) as Record<
+        string,
+        unknown
+      >[]
+    ).map(rowToDecision)
 
   function persist(d: Decision): void {
     db.prepare(

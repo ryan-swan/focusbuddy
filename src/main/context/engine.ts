@@ -59,15 +59,16 @@ export function getContextEngine(): Engine {
   if (engine) return engine
   const db = asSqlDb(getDb())
   ensureEventSchema(db)
-  const events = createEventStore(db)
-  // Bind the graph store to the active organisation (live resolver, tracks the org
-  // switcher): a cross-org edge is then impossible by construction (PLX-SEC-011 /
+  const activeOrg = (): string => getActiveOrgId()
+  // Every store is bound to the active organisation (live resolver, tracks the org
+  // switcher), so no read can return another tenant's data (PLX-SEC-010/011,
   // GPH-011). ADR-0002.
+  const events = createEventStore(db, activeOrg)
   // Event-sourced: each relationship mutation emits a full-snapshot lifecycle Event
   // atomically, so the live graph is a projection rebuildable from the log
   // (PLX-DATA-002/003). ADR-0001/0002.
-  const relationships = createRelationshipStore(db, () => getActiveOrgId(), events)
-  const decisions = createDecisionStore(db)
+  const relationships = createRelationshipStore(db, activeOrg, events)
+  const decisions = createDecisionStore(db, activeOrg)
   ensureReviewSchema(db)
   engine = { events, relationships, decisions, db }
   return engine

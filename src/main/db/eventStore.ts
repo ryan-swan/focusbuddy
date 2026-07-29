@@ -149,7 +149,12 @@ export interface EventStore {
   db: SqlDb
 }
 
-export function createEventStore(db: SqlDb): EventStore {
+// An optional organisation binding scopes replay to a single tenant, so a desk
+// replay can never surface another organisation's Events (PLX-SEC-010 defence in
+// depth; desks are already org-specific, this makes it enforced not incidental).
+export function createEventStore(db: SqlDb, organisationId?: string | (() => string | null)): EventStore {
+  const resolveOrg: () => string | null = typeof organisationId === 'function' ? organisationId : () => organisationId ?? null
+  const orgBound = organisationId != null
   ensureEventSchema(db)
 
   function rowToEvent(r: Record<string, unknown>): PlexiEvent {
@@ -272,9 +277,13 @@ export function createEventStore(db: SqlDb): EventStore {
   }
 
   const replayDesk: EventStore['replayDesk'] = (deskId, opts) => {
+    const orgClause = orgBound ? ' AND organisation_id = ?' : ''
+    const orgArg = orgBound ? [resolveOrg()] : []
     const rows = opts?.untilSequence
-      ? (db.prepare('SELECT * FROM events WHERE desk_id = ? AND sequence <= ? ORDER BY sequence ASC').all(deskId, opts.untilSequence) as Record<string, unknown>[])
-      : (db.prepare('SELECT * FROM events WHERE desk_id = ? ORDER BY sequence ASC').all(deskId) as Record<string, unknown>[])
+      ? (db
+          .prepare(`SELECT * FROM events WHERE desk_id = ? AND sequence <= ?${orgClause} ORDER BY sequence ASC`)
+          .all(deskId, opts.untilSequence, ...orgArg) as Record<string, unknown>[])
+      : (db.prepare(`SELECT * FROM events WHERE desk_id = ?${orgClause} ORDER BY sequence ASC`).all(deskId, ...orgArg) as Record<string, unknown>[])
     return rows.map(rowToEvent)
   }
 

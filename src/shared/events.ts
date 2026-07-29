@@ -23,8 +23,10 @@ export type EventCategory = (typeof EVENT_CATEGORIES)[number]
 // the permissions of the time, not of today (PLX-EVT-012).
 export interface PermissionSnapshot {
   // Principal ids and the capability they held at emission. Kept deliberately
-  // small; large ACLs are referenced, not inlined.
-  grants: Array<{ principal: string; capability: string }>
+  // small; large ACLs are referenced, not inlined. A grant MAY carry an expiry;
+  // a temporary grant past its expiry is treated as absent, failing closed
+  // (PLX-SEC-022).
+  grants: Array<{ principal: string; capability: string; expiresAt?: string | null }>
   ref?: string // optional pointer to a full PermissionSet record
 }
 
