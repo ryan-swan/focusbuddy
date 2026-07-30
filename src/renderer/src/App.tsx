@@ -9,6 +9,8 @@ import Sidebar from './components/Sidebar'
 import PlexiiLogo from './components/PlexiiLogo'
 import {
   FLOATING_MENU_INSET,
+  SIDEBAR_MIN,
+  SIDEBAR_MAX,
   useMinimizable,
   useSidebarWidth
 } from './components/chrome/floatingMenu'
@@ -757,6 +759,10 @@ function SidebarDock({ collapsed, onToggle }: { collapsed: boolean; onToggle: ()
           role="separator"
           aria-orientation="vertical"
           aria-label="Resize the workspace panel"
+          aria-valuenow={width}
+          aria-valuemin={SIDEBAR_MIN}
+          aria-valuemax={SIDEBAR_MAX}
+          aria-valuetext={`${width} pixels wide`}
           title="Drag to resize the workspace panel"
           tabIndex={0}
           data-testid="sidebar-resize"

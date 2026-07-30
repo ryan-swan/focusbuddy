@@ -112,6 +112,7 @@
     "node-mac-haptics": "^1.0.0"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.12.1",
     "@electron-toolkit/tsconfig": "^1.0.1",
     "@electron/rebuild": "^3.7.2",
     "@playwright/test": "^1.60.0",
