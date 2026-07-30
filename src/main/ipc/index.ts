@@ -92,7 +92,8 @@ import {
   unmirrorUserRelation,
   relatedObjectIds as ceRelatedObjectIds,
   healthFor as ceHealthFor,
-  markReviewed as ceMarkReviewed
+  markReviewed as ceMarkReviewed,
+  liveResumeForDesk as ceLiveResumeForDesk
 } from '../context/engine'
 import { plexiId } from '@shared/plexiId'
 import type { MaterialityInput } from '../context/materiality'
@@ -630,6 +631,8 @@ export function registerIpcHandlers(): void {
     ceMarkReviewed(id)
     return true
   })
+  // Live catch-up Resume with an AI summary (degrades to deterministic without a key).
+  ipcMain.handle('context:resumeSummary', (_e, deskId: string) => ceLiveResumeForDesk(deskId))
   ipcMain.handle(
     'nodes:move',
     (_e, id: string, newParentId: string | null, beforeId: string | null) =>

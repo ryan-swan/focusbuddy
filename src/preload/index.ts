@@ -141,7 +141,13 @@ const api = {
       decisionsAtRisk: Array<{ decisionId: string; title: string; invalidatingChange: string }>
     }> => ipcRenderer.invoke('context:health', id),
     // Record that the user has reviewed an object now (resets health to current).
-    markReviewed: (id: string): Promise<boolean> => ipcRenderer.invoke('context:markReviewed', id)
+    markReviewed: (id: string): Promise<boolean> => ipcRenderer.invoke('context:markReviewed', id),
+    // Live catch-up Resume with an AI summary (degrades to the deterministic summary
+    // when no model key is set).
+    resumeSummary: (
+      deskId: string
+    ): Promise<{ summary: string; aiSummary: string | null; degraded: boolean; cacheHit: boolean; changedEventCount: number }> =>
+      ipcRenderer.invoke('context:resumeSummary', deskId)
   },
   widgets: {
     listByTask: (taskId: string): Promise<Widget[]> =>

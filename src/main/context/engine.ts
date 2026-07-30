@@ -16,7 +16,10 @@ import { graphFromRelationships } from './propagation'
 import { buildTransitions } from './contextHealthService'
 import type { DecisionAtRisk } from '../../shared/contextHealth'
 import type { MaterialityInput } from './materiality'
-import { deriveHealthSnapshot, ensureReviewSchema, recordReview, type HealthSnapshot } from './health'
+import { deriveHealthSnapshot, ensureReviewSchema, recordReview, reviewPointSeq, type HealthSnapshot } from './health'
+import { generateResume } from '../resume/resume'
+import { createSummaryCache, type SummaryCache } from '../ai/summaryCache'
+import { generateResumeSummaryLive } from '../ai/liveResume'
 
 // better-sqlite3's Database is structurally a SqlDb (exec / prepare→run/get/all /
 // transaction). This thin adapter pins the types without copying behaviour.
@@ -158,6 +161,30 @@ export function healthFor(objectId: string, materialityInput: MaterialityInput):
   // desk's health (PLX-UX-022).
   const related = relatedObjectIds(objectId)
   return deriveHealthSnapshot(e.db, localUserId(), objectId, materialityInput, decisionsAtRisk, related)
+}
+
+// Live catch-up Resume for a desk: build the deterministic Resume since the user's
+// last review, then add a real AI summary through the seam if a key is present. The
+// deterministic Resume always comes back; the AI summary is additive and degrades to
+// nothing without a key (ARC-022). This is the live surface the UI/tester can call.
+let summaryCache: SummaryCache | null = null
+export async function liveResumeForDesk(
+  deskId: string
+): Promise<{ summary: string; aiSummary: string | null; degraded: boolean; cacheHit: boolean; changedEventCount: number }> {
+  const e = getContextEngine()
+  if (!summaryCache) summaryCache = createSummaryCache(e.db)
+  const userId = localUserId()
+  const since = reviewPointSeq(e.db, userId, deskId)
+  const objectIds = [deskId, ...relatedObjectIds(deskId)]
+  const resume = generateResume(e.db, { deskId, forUserId: userId, objectIds, sinceCursor: since })
+  const r = await generateResumeSummaryLive(resume, { cache: summaryCache, now: new Date().toISOString() })
+  return {
+    summary: r.resume.summary,
+    aiSummary: r.resume.aiSummary,
+    degraded: r.degraded,
+    cacheHit: r.cacheHit,
+    changedEventCount: resume.sourceEventIds.length
+  }
 }
 
 // Record that the user has reviewed an Object now — resets Context Health to
