@@ -8,7 +8,7 @@ The upgrade turns the product from CRUD-on-SQLite into an event-sourced Context 
 
 ## Traceability snapshot
 
-278 of 344 requirements are traceable to a passing test (80.8 percent), up from 2 at the start of the upgrade. 277 spec-cited unit tests plus the Context Engine and accessibility end-to-end specs are green, and both the main and web typechecks are clean. The AI-001 single-model-client refactor is complete with a whole-codebase audit test, and the accessibility harness has verified keyboard operability and reduced-motion against the real app.
+281 of 344 requirements are traceable to a passing test (81.7 percent), up from 2 at the start of the upgrade. 283 spec-cited unit tests plus the Context Engine and accessibility end-to-end specs are green, and both the main and web typechecks are clean. The AI-001 single-model-client refactor is complete with a whole-codebase audit test; the accessibility harness verified keyboard operability and reduced-motion; and live AI is wired and tester-verified end to end — a desk's catch-up Resume now gets a real Claude-written summary through the seam (grounded, cached, degrading to deterministic without a key), and the eval framework gates provider-supported and release on passing runs. AGT is complete (16/16).
 
 The remaining 75 requirements are the wall: each needs something a unit test cannot honestly substitute for. They are grouped in the "What is blocked and what it needs" section below. Complete areas: DOM 20/20, GPH 12/12, SYN 6/6. Near-complete: PRD 35/36, EVT 23/24, AI 21/24, CTX 15/16, RES 11/12, API 7/8, AGT 15/16, CON 6/7, EXT 9/10, ARC 5/6, PRD 35/36.
 
@@ -19,14 +19,14 @@ The remaining 75 requirements are the wall: each needs something a unit test can
 | SYN | 6 / 6 | Complete. |
 | PRD | 35 / 36 | Visual-layout persistence (UI). |
 | EVT | 23 / 24 | Encryption-at-rest (infra). |
-| AGT | 15 / 16 | Live agent eval. |
+| AGT | 16 / 16 | Complete. |
 | CTX | 15 / 16 | Performance budget (instrumentation). |
 | RES | 11 / 12 | Catch-up calibration (observed data). |
 | EXT | 9 / 10 | SDK exercised by first-party (process). |
 | DATA | 8 / 9 | Backup/PITR (infra). |
-| ENG | 8 / 11 | Chaos/eval/docs (infra + process). |
+| ENG | 10 / 11 | Eval + docs gates done. Remaining: chaos-test infra (ENG-015). |
 | API | 7 / 8 | Capability-via-API audit (done; API-001 whole-app). |
-| AI | 21 / 24 | Live eval, unit-economics, single-abstraction refactor. |
+| AI | 23 / 24 | Live wired + eval framework + single seam. Remaining: unit-economics doc (AI-031). |
 | CON | 6 / 7 | Credential vault (infra). |
 | PRIN | 6 / 8 | Positioning + design-review record (process). |
 | ARC | 5 / 6 | Failure-mode docs (process). |
