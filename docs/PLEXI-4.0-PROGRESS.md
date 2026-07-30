@@ -10,7 +10,7 @@ The upgrade turns the product from CRUD-on-SQLite into an event-sourced Context 
 
 290 of 344 requirements are traceable to a passing test (84.3 percent), up from 2 at the start of the upgrade. Unit, Context Engine, accessibility and live-AI end-to-end specs are green, and both the main and web typechecks are clean. The AI-001 single-model-client refactor is complete with a whole-codebase audit test; live AI is wired and tester-verified end to end (real Claude catch-up summary through the seam, grounded/cached/degrading); a seeded perf environment measures the core operations well under budget at large scale; and desk identity plus objective now stay visible in the full-screen widget view (UX-010/011). Complete areas: DOM 20/20, GPH 12/12, SYN 6/6, AGT 16/16, CTX 16/16, SCH 5/5.
 
-The remaining 63 requirements are the wall: each needs something a unit test cannot honestly substitute for (production instrumentation, cloud infra, live subsystems, UI/manual audit, or a product decision). They are grouped in the "What is blocked and what it needs" section below. Complete areas: DOM 20/20, GPH 12/12, SYN 6/6, AGT 16/16. Near-complete: PRD 35/36, EVT 23/24, AI 23/24, CTX 15/16, RES 11/12, API 7/8, CON 6/7, EXT 9/10, ARC 5/6, ENG 10/11, DATA 8/9.
+The remaining 54 requirements are the wall: each needs production instrumentation, cloud infra, live subsystems, a manual UI/screen-reader pass, or a product decision. They are grouped in the "What is blocked and what it needs" section below. Complete: DOM, GPH, SYN, AGT, CTX, SCH. Near-complete: PRD 35/36, EVT 23/24, AI 23/24, RES 11/12, API 7/8, EXT 9/10, DATA 8/9, ENG 10/11, ARC 5/6, UX 35/40.
 
 | Area | Covered | Remaining needs |
 |---|---|---|
@@ -35,7 +35,7 @@ The remaining 63 requirements are the wall: each needs something a unit test can
 | UX | 35 / 40 | Desk identity/objective in full-screen done. Remaining: mobile (080-082), notification telemetry, design-review process. |
 | MET | 10 / 15 | Live telemetry / sampling / cost. |
 | APP | 5 / 10 | Native-app ADRs + canvas implementation. |
-| A11Y | 3 / 8 | Keyboard + reduced-motion verified; A11Y-001 fails on real contrast/target-size violations (below); zoom/screen-reader/voice remain. |
+| A11Y | 3 / 8 | Keyboard + reduced-motion verified; A11Y-001 PARTIAL (contrast tokens + target sizes fixed, residuals + a brand-colour decision remain); zoom/screen-reader/voice remain. |
 | OPS | 0 / 9 | Deployment, monitoring, SLOs, runbooks (ops infra). |
 | PERF | 0 / 18 | Latency/throughput budgets (instrumentation + load). |
 
