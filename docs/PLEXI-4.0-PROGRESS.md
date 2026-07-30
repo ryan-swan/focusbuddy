@@ -8,7 +8,7 @@ The upgrade turns the product from CRUD-on-SQLite into an event-sourced Context 
 
 ## Traceability snapshot
 
-175 of 344 requirements are traceable to a passing test (50.9 percent), up from 2 at the start of the upgrade. 190 spec-cited unit tests plus the Context Engine end-to-end specs are green, and both the main and web typechecks are clean.
+188 of 344 requirements are traceable to a passing test (54.7 percent), up from 2 at the start of the upgrade. 203 spec-cited unit tests plus the Context Engine end-to-end specs are green, and both the main and web typechecks are clean.
 
 | Area | Covered | Notes |
 |---|---|---|
@@ -17,15 +17,16 @@ The upgrade turns the product from CRUD-on-SQLite into an event-sourced Context 
 | EVT (events) | 23 / 24 | Contract, store, processing soundness, schema evolution, schema registry. Remaining is encryption-at-rest (deployment). |
 | AI | 20 / 24 | Orchestrator, routing, prompt scoping, accounting, caches, ceilings, advisory guards. Remaining are live-eval/regulatory (AI-004/031/045). |
 | CTX (context) | 15 / 16 | Materiality, health, propagation, freshness, versioned context objects. Remaining is a performance-budget verification. |
+| RES (resume) | 11 / 12 | Deterministic pipeline, collaborative permission-filtered render. Remaining is AI-summary calibration. |
 | GPH (graph) | 11 / 12 | Relationships, traversal, isolation, replay. Remaining is async community detection. |
-| RES (resume) | 10 / 12 | Deterministic pipeline. Remaining are AI-summary calibration and permission-filtered render. |
-| SEC (security) | 9 / 14 | Isolation, permissions, erasure. Remaining are residency, customer keys, secrets vault. |
+| SEC (security) | 11 / 14 | Isolation, permissions, erasure, propagation fail-closed, presence protection. Remaining are residency, customer keys, secrets vault. |
+| MET | 10 / 15 | Metrics computed from structured data + governance gates. Remaining need live telemetry/sampling/cost. |
 | DATA | 6 / 9 | Projections, inventory, retention, store ownership. Remaining are backup/PITR procedures. |
 | ENG | 5 / 11 | Traceability, invariant detection, contract + replay tests. Remaining need CI/chaos/eval infrastructure. |
 | ARC | 4 / 6 | Store ownership, service boundaries, concurrency, deterministic degradation. Remaining need service-contract publishing. |
 | UX | 16 / 40 | Health states, resume card, disclosure path, evidence, confidence, provenance. Remaining are UI-presence and visual rules. |
 | APP | 1 / 10 | Foundational touches only. |
-| A11Y, AGT, API, CON, EXT, MET, OPS, PERF, PRIN, SCH, SYN | 0 | Need UI, live subsystems, production instrumentation, or a cloud backend. |
+| A11Y, AGT, API, CON, EXT, OPS, PERF, PRIN, SCH, SYN | 0 | Need UI, live subsystems, production instrumentation, or a cloud backend. |
 
 ## Deliverables
 
