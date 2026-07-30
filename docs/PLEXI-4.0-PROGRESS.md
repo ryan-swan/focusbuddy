@@ -8,7 +8,9 @@ The upgrade turns the product from CRUD-on-SQLite into an event-sourced Context 
 
 ## Traceability snapshot
 
-188 of 344 requirements are traceable to a passing test (54.7 percent), up from 2 at the start of the upgrade. 203 spec-cited unit tests plus the Context Engine end-to-end specs are green, and both the main and web typechecks are clean.
+269 of 344 requirements are traceable to a passing test (78.2 percent), up from 2 at the start of the upgrade. 268 spec-cited unit tests plus the Context Engine end-to-end specs are green, and both the main and web typechecks are clean.
+
+The remaining 75 requirements are the wall: each needs something a unit test cannot honestly substitute for. They are grouped in the "What is blocked and what it needs" section below. Complete areas: DOM 20/20, GPH 12/12, SYN 6/6. Near-complete: PRD 35/36, EVT 23/24, AI 21/24, CTX 15/16, RES 11/12, API 7/8, AGT 15/16, CON 6/7, EXT 9/10, ARC 5/6, PRD 35/36.
 
 | Area | Covered | Notes |
 |---|---|---|
@@ -113,6 +115,30 @@ These are foreclosing decisions from the spec risk register. They have been flag
 Three of the five foreclosing decisions are now recorded: tenant isolation (ADR-0002), cryptographic erasure and key management (ADR-0003), and schema evolution (ADR-0004). The two identifier and permission-snapshot decisions of §85.2 were settled in the Event Store foundation.
 
 What remains open is not required for the desktop build: the partition-load model (RSK-08), the cloud multi-tenant topology (siloed versus pooled graph and vector stores), and data residency and customer-managed keys. The last operator call is when and how the branch merges toward the shipping product, since it is a large architectural addition that currently runs beside the existing paths.
+
+## What is blocked and what it needs
+
+The upgrade has reached 269/344 (78 percent) purely through code and tests. The remaining 75 requirements each need a resource or decision that only the operator can supply. They fall into six clusters.
+
+### 1. A running instance under a defined load, with a performance harness (about 25 requirements)
+PERF-001 through PERF-072, CTX-014, RES-022, SCH-004, MET-001/002/007, UX-042. These are latency percentiles, throughput and volume budgets. A unit test cannot honestly assert a p99 of 500 ms. To progress I need a built instance running under the reference load defined in spec §58, plus a benchmark harness that records real percentiles, and the operator's acceptance that staging numbers may stand in for production until GA.
+
+### 2. Live model access and an evaluation framework (3)
+AI-004, AGT-022, ENG-013. Provider-substitution and agent evaluation suites run against every supported model per release with recorded thresholds. I need model API keys wired for the branch and a go-ahead to build and run an eval harness (this also unlocks the live AI wiring that surfaces the resume summary and relationship discovery).
+
+### 3. A UI and accessibility test pass (about 12)
+A11Y-001/002/003/005/006/007/008 and the UI-presence UX rules (UX-001/010/011/080/081/082/085/086, UX-023). WCAG conformance, keyboard, screen-reader, zoom, reduced-motion, and "always visible" behaviours are verified against the rendered app, not a pure function. I can build much of this as Playwright + axe-core e2e against the real desktop app if you want me to run the UI harness (it means build + the plexidesk-tester loop); the rest needs a manual screen-reader and keyboard pass.
+
+### 4. Cloud and security infrastructure (about 15)
+OPS-001 through OPS-014, SEC-024/025/026, CON-004, EVT-032, DATA-005. Secrets vault, data residency, customer-managed keys, connector credential vault, event-store encryption at rest, backup/restore/PITR exercised quarterly, and the operations surface (monitoring, SLOs, incident runbooks). These need the hosting and KMS/vault environment and the cloud-topology decisions still open in the risk register (RSK-08 and the cloud ADRs).
+
+### 5. An application-level refactor (1)
+AI-001 requires that no service other than the AI Orchestrator holds a provider SDK. The orchestrator abstraction exists, but the shipping app calls provider SDKs directly in several places. Satisfying this means routing all model calls through the orchestrator across the app, which is a real refactor to schedule, not a test to write.
+
+### 6. Process and product decisions (about 19)
+ENG-015/016, ARC-021, EXT-012, PRIN-003/006, APP-001/002/010/011/012, AI-031, MET-011/012, PRD-002. Chaos-testing infrastructure, docs-before-production gates, native-app ADRs, the canvas implementation (persistence, virtualisation, perf), a published unit-economics model, and the design-review record. These are process, documentation, or UI-implementation work items rather than contracts.
+
+The fastest single unlock is cluster 2 (a model key), because it both clears three requirements and turns the whole AI/agent governance layer from ready-to-use into live in the product.
 
 ## How this document is maintained
 
