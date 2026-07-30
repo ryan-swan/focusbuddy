@@ -237,6 +237,20 @@ export function generateResume(db: SqlDb, input: GenerateResumeInput): Structure
   }
 }
 
+// Resume generation is continuous and automatic — a user never has to ask for one
+// (PRD-040). This is the declared mode; the caller regenerates on trigger Events.
+export const RESUME_MODE = 'continuous-automatic' as const
+
+// Whether there is enough signal to produce a confident summary. Where there is
+// not, the Resume states that plainly rather than emitting a low-confidence
+// narrative (PRD-044).
+export function hasSufficientSignal(resume: StructuredResume): boolean {
+  return resume.sourceEventIds.length > 0
+}
+export function signalStatement(resume: StructuredResume): string {
+  return hasSufficientSignal(resume) ? resume.summary : 'Not enough has happened here to summarise yet.'
+}
+
 // Stage model (additive only): attach AI prose over the finished structure. It
 // never edits the structured fields, so a Resume without it is still complete
 // (PLX-RES-013).
