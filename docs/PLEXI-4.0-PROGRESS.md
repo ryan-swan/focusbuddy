@@ -59,7 +59,7 @@ Status values are Done, meaning built and covered by passing tests and, where it
 
 | Deliverable | Status | Commit | What it gives us |
 |---|---|---|---|
-| Universal Object model + runtime type registry | Done | d4e1e0d | One object schema with type data in a typed payload (PRD-010); types register at runtime (PRD-011); no type is privileged in storage/permission/event/versioning/health (DOM-020); materialised refs are not the source of record (DOM-013); inferred objectives stay unconfirmed until accepted (DOM-022). |
+| Universal Object model + runtime type registry | Done | 55c04af | One object schema with type data in a typed payload (PRD-010); types register at runtime (PRD-011); no type is privileged in storage/permission/event/versioning/health (DOM-020); materialised refs are not the source of record (DOM-013); inferred objectives stay unconfirmed until accepted (DOM-022). |
 
 ### Security and privacy
 
