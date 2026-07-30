@@ -36,6 +36,14 @@ test('test_plx_a11y_003_linear_canvas_lists_objects', async () => {
     await first.evaluate((el: HTMLElement) => el.click())
     // No throw / the app stays live after activating a linear entry.
     await expect(window.locator('[data-canvas-surface="true"]')).toBeVisible()
+
+    // PLX-APP-011: the Canvas provides the equivalent linear, screen-reader
+    // representation required by A11Y-003, released concurrently with the spatial
+    // surface. Both are present at once on an active desk: the spatial canvas AND
+    // the linear list of the same objects.
+    await expect(window.locator('[data-canvas-surface="true"]')).toBeVisible()
+    await expect(linear).toBeAttached()
+    await expect(linear.locator('[data-linear-object]')).toHaveCount(2)
   } finally {
     await dispose()
   }

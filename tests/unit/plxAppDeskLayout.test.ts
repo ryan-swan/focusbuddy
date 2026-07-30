@@ -46,6 +46,24 @@ describe('plx_app_010 / plx_prd_002 — persist and restore the complete layout'
     expect(store.load('sam', 'desk-1', 'tablet')).toBeNull()
   })
 
+  it('test_plx_ux_081_mobile_layout_never_overwrites_desktop', () => {
+    // UX-081: mobile is not required to render or restore the spatial Canvas, and
+    // mobile layout state MUST NOT overwrite desktop layout state. The overlay is
+    // keyed by device class, so a mobile save can never touch the desktop row and
+    // a mobile read is independently null until mobile itself saves.
+    const store = createDeskLayoutStore(memSqlDb())
+    store.save(layout({ deviceClass: 'desktop', zoom: 1.75, scroll: { x: -300, y: -120 } }), 't1')
+    // Mobile writes its own (deliberately different) state.
+    store.save(layout({ deviceClass: 'mobile', zoom: 1, scroll: { x: 0, y: 0 }, objects: [] }), 't2')
+    const desktop = store.load('sam', 'desk-1', 'desktop')!
+    expect(desktop.zoom).toBe(1.75) // desktop arrangement untouched by the mobile save
+    expect(desktop.scroll).toEqual({ x: -300, y: -120 })
+    // Mobile has its own state, and the desktop can hold a spatial layout mobile
+    // is never required to render (objects present on desktop, empty on mobile).
+    expect(store.load('sam', 'desk-1', 'mobile')!.objects).toEqual([])
+    expect(desktop.objects.length).toBeGreaterThan(0)
+  })
+
   it('test_plx_app_010_phase1_camera_selection_overlay_round_trip', () => {
     // Phase 1 (ADR-0006): the overlay carries camera + selection only; Object
     // geometry stays in the shared base (widgets), so objects is empty. That
