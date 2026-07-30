@@ -8,7 +8,7 @@ The upgrade turns the product from CRUD-on-SQLite into an event-sourced Context 
 
 ## Traceability snapshot
 
-281 of 344 requirements are traceable to a passing test (81.7 percent), up from 2 at the start of the upgrade. 283 spec-cited unit tests plus the Context Engine and accessibility end-to-end specs are green, and both the main and web typechecks are clean. The AI-001 single-model-client refactor is complete with a whole-codebase audit test; the accessibility harness verified keyboard operability and reduced-motion; and live AI is wired and tester-verified end to end — a desk's catch-up Resume now gets a real Claude-written summary through the seam (grounded, cached, degrading to deterministic without a key), and the eval framework gates provider-supported and release on passing runs. AGT is complete (16/16).
+290 of 344 requirements are traceable to a passing test (84.3 percent), up from 2 at the start of the upgrade. Unit, Context Engine, accessibility and live-AI end-to-end specs are green, and both the main and web typechecks are clean. The AI-001 single-model-client refactor is complete with a whole-codebase audit test; live AI is wired and tester-verified end to end (real Claude catch-up summary through the seam, grounded/cached/degrading); a seeded perf environment measures the core operations well under budget at large scale; and desk identity plus objective now stay visible in the full-screen widget view (UX-010/011). Complete areas: DOM 20/20, GPH 12/12, SYN 6/6, AGT 16/16, CTX 16/16, SCH 5/5.
 
 The remaining 63 requirements are the wall: each needs something a unit test cannot honestly substitute for (production instrumentation, cloud infra, live subsystems, UI/manual audit, or a product decision). They are grouped in the "What is blocked and what it needs" section below. Complete areas: DOM 20/20, GPH 12/12, SYN 6/6, AGT 16/16. Near-complete: PRD 35/36, EVT 23/24, AI 23/24, CTX 15/16, RES 11/12, API 7/8, CON 6/7, EXT 9/10, ARC 5/6, ENG 10/11, DATA 8/9.
 
@@ -32,7 +32,7 @@ The remaining 63 requirements are the wall: each needs something a unit test can
 | ARC | 5 / 6 | Failure-mode docs (process). |
 | SCH | 4 / 5 | Search perf budget (instrumentation). |
 | SEC | 11 / 14 | Residency, customer keys, secrets vault (cloud infra). |
-| UX | 30 / 40 | UI-presence, mobile, accessibility (UI verification). |
+| UX | 35 / 40 | Desk identity/objective in full-screen done. Remaining: mobile (080-082), notification telemetry, design-review process. |
 | MET | 10 / 15 | Live telemetry / sampling / cost. |
 | APP | 5 / 10 | Native-app ADRs + canvas implementation. |
 | A11Y | 3 / 8 | Keyboard + reduced-motion verified; A11Y-001 fails on real contrast/target-size violations (below); zoom/screen-reader/voice remain. |
@@ -141,6 +141,8 @@ The harness ran. VERIFIED against the real app: A11Y-002 (keyboard operable, vis
 - UX-010 appears violated: a full-screen focused widget (`z-50`) overlays the desk breadcrumb (`z-45`), so desk identity is obscured. Fix: raise/duplicate the identity into the full-screen overlay.
 - UX-011 appears unmet: there is no dedicated always-visible "Current Objective" surface. Fix: add one to the desk header.
 - A11Y-003/006/007/008 (screen-reader linear canvas, 200% zoom, voice, DoD gate) still need building plus a manual screen-reader/keyboard pass.
+- A11Y-001 is now PARTIAL, not deferred: the contrast tokens (--ink-40/--ink-50) and the WidgetFrame icon-button target sizes (20->24px) are fixed and shipped. It is not yet claimed green because two residuals remain, and one is a brand decision for the operator: the PlexiOffice/PlexiWork/PlexiAI heading colours (#f59e0b, #ef4444, #8b5cf6) fail AA contrast on white, and darkening them changes the brand palette. The rest (kbd-hint opacity, a nested-interactive tile, 12px colour-swatch hit targets) are small fixes I can finish.
+- Incidental bug found by the harness (pre-existing, unrelated to this work): saving a focus-mode split cluster and reopening the desk can silently delete the cluster (prunePlaceholders races the widget-list load in WidgetFocusMode.tsx). Worth a dedicated fix if cluster-persistence matters.
 
 ### 4. Cloud and security infrastructure (about 15)
 OPS-001 through OPS-014, SEC-024/025/026, CON-004, EVT-032, DATA-005. Secrets vault, data residency, customer-managed keys, connector credential vault, event-store encryption at rest, backup/restore/PITR exercised quarterly, and the operations surface (monitoring, SLOs, incident runbooks). These need the hosting and KMS/vault environment and the cloud-topology decisions still open in the risk register (RSK-08 and the cloud ADRs).
