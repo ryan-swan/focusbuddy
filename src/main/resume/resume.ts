@@ -237,6 +237,21 @@ export function generateResume(db: SqlDb, input: GenerateResumeInput): Structure
   }
 }
 
+// Render a collaborative Resume (forUserId === null) for a specific viewer,
+// filtering at render time to the objects that viewer may read; a collaborative
+// Resume is never materialised in a form that leaks non-permitted content
+// (PLX-RES-004). A per-user Resume (forUserId set) is returned unchanged.
+export function renderResumeForViewer(resume: StructuredResume, canRead: (objectId: string) => boolean): StructuredResume {
+  if (resume.forUserId !== null) return resume
+  const groups = resume.groups.filter((g) => canRead(g.objectId))
+  const keptEventIds = new Set(groups.flatMap((g) => g.eventIds))
+  return {
+    ...resume,
+    groups,
+    sourceEventIds: resume.sourceEventIds.filter((id) => keptEventIds.has(id))
+  }
+}
+
 // Resume generation is continuous and automatic — a user never has to ask for one
 // (PRD-040). This is the declared mode; the caller regenerates on trigger Events.
 export const RESUME_MODE = 'continuous-automatic' as const
