@@ -40,3 +40,14 @@ export function assertPresenceTelemetryPurpose(purpose: TelemetryPurpose, tenant
     throw new Error(`Presence telemetry MUST NOT be repurposed for ${purpose} without explicit tenant consent (PLX-SEC-033).`)
   }
 }
+
+// Presence is personal data with a defined, tenant-configurable retention period,
+// and is NOT kept as permanent Event-Store memory beyond that period (UX-072). It
+// lives in a prunable presence store, distinct from the immutable log.
+export const PRESENCE_KEPT_IN_EVENT_STORE = false
+export function presenceWithinRetention(ageDays: number, retentionDays: number): boolean {
+  return ageDays <= retentionDays
+}
+export function presenceExpired(ageDays: number, retentionDays: number): boolean {
+  return !presenceWithinRetention(ageDays, retentionDays)
+}
