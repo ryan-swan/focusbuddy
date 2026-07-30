@@ -17,7 +17,7 @@
 // pipeline. The renderer adds proposal cards using its existing dock
 // pattern; nothing here triggers a mutation directly.
 
-import Anthropic from '@anthropic-ai/sdk'
+import { getModelClient } from './modelClient'
 import { randomUUID } from 'crypto'
 import { resolveAnthropicKey } from '../settingsStore'
 import { resolveModel } from './modelRouting'
@@ -112,7 +112,7 @@ export async function runVoiceCommand(
     `Widgets on canvas (id ── kind ── title ── content-preview):\n${widgetCatalogBlock}\n\n` +
     `Return the JSON now.`
 
-  const client = new Anthropic({ apiKey: key })
+  const client = getModelClient(key)
   let raw = ''
   try {
     const resp = await client.messages.create({
@@ -693,7 +693,7 @@ export async function runVoiceCommandStreaming(
     `Widgets on canvas (id ── kind ── title ── content-preview):\n${widgetCatalogBlock}\n\n` +
     `Return the JSON now.`
 
-  const client = new Anthropic({ apiKey: key })
+  const client = getModelClient(key)
   const known = new Map(input.widgets.map((w) => [w.id, w]))
   const scanner = new StreamingProposalScanner()
   let replyEmitted = false

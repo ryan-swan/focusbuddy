@@ -1,4 +1,5 @@
-import Anthropic from '@anthropic-ai/sdk'
+import type Anthropic from '@anthropic-ai/sdk'
+import { getModelClient, invalidateModelClients } from './modelClient'
 import { BROWSER_TOOLS, runBrowserTool } from './agentBrowser'
 import { getNode } from '../db/nodes'
 import { getWidget, listWidgetsByTask } from '../db/widgets'
@@ -113,7 +114,7 @@ function getClient(): Anthropic | null {
   const key = resolveAnthropicKey()
   if (!key) return null
   if (!client || client.key !== key) {
-    client = { key, instance: new Anthropic({ apiKey: key }) }
+    client = { key, instance: getModelClient(key) }
   }
   return client.instance
 }
@@ -123,6 +124,7 @@ function getClient(): Anthropic | null {
 export function invalidateAnthropicClient(): void {
   client = null
   invalidateCreditClient()
+  invalidateModelClients() // free cached BYOK clients in the seam (PLX-AI-001)
 }
 
 // Model IDs are now resolved per-call via `resolveModel(purpose)` in ./modelRouting.

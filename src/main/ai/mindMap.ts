@@ -32,7 +32,8 @@
 import { randomUUID } from 'crypto'
 import { readFileSync, readdirSync } from 'fs'
 import { join } from 'path'
-import Anthropic from '@anthropic-ai/sdk'
+import type Anthropic from '@anthropic-ai/sdk'
+import { getModelClient } from './modelClient'
 import { resolveAnthropicKey } from '../settingsStore'
 import { findAgentsDirectory } from '../workspaceResolver'
 
@@ -75,7 +76,7 @@ export async function expandMindMapNode(input: {
       reason: 'no_key'
     }
   }
-  const client = new Anthropic({ apiKey: key })
+  const client = getModelClient(key)
 
   const SYSTEM =
     'You expand a node in a personal mind map. Given the path of labels from the root and the current node, explore the idea FULLY and propose the distinct child branches that genuinely advance the thinking — not paraphrases, not synonyms.\n' +
@@ -253,7 +254,7 @@ export async function suggestAgentsForNode(input: {
       reason: 'no_key'
     }
   }
-  const client = new Anthropic({ apiKey: key })
+  const client = getModelClient(key)
 
   // We compose a tight list — slug + first-line description — so the
   // model can pick without burning tokens on the full agent body.

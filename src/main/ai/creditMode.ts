@@ -9,7 +9,8 @@
 // installed on the credit client transparently handles the out-of-credits
 // hand-off, so no call site needs to know which path it took.
 
-import Anthropic from '@anthropic-ai/sdk'
+import type Anthropic from '@anthropic-ai/sdk'
+import { createAnthropic } from './modelClient'
 import { loadAccountState } from '../db/account'
 import { getAiMode, resolveAnthropicKey, hasOwnAnthropicKey } from '../settingsStore'
 
@@ -138,7 +139,7 @@ export function getCreditClient(): Anthropic | null {
   if (!creditClient || creditClient.token !== token) {
     creditClient = {
       token,
-      instance: new Anthropic({
+      instance: createAnthropic({
         // The proxy authenticates via Authorization: Bearer <session token>,
         // not x-api-key, so the apiKey here is an ignored placeholder.
         apiKey: 'pd-proxy',

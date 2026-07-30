@@ -12,7 +12,7 @@
 
 import { existsSync, writeFileSync } from 'fs'
 import { join } from 'path'
-import Anthropic from '@anthropic-ai/sdk'
+import { getModelClient } from './modelClient'
 import { resolveAnthropicKey } from '../settingsStore'
 import { ensureAgentsDirectory } from '../workspaceResolver'
 
@@ -116,7 +116,7 @@ export async function createAgent(
   // Generate the body via Claude. Sonnet is the right tier — agent
   // design is meta-work, but a one-paragraph user spec isn't deep
   // enough to need Opus.
-  const client = new Anthropic({ apiKey: key })
+  const client = getModelClient(key)
 
   const SYSTEM =
     'You write Claude Code sub-agent markdown files. Output ONLY the body content (no preamble, no markdown fence). The body should:\n' +

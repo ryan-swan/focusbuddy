@@ -27,7 +27,8 @@
 //   - Cross-user messaging once identity infra exists
 
 import { readFileSync } from 'fs'
-import Anthropic from '@anthropic-ai/sdk'
+import type Anthropic from '@anthropic-ai/sdk'
+import { getModelClient } from './modelClient'
 import { randomUUID } from 'crypto'
 import type { ActionProposal } from '@shared/types'
 import { resolveAnthropicKey } from '../settingsStore'
@@ -215,7 +216,7 @@ export async function invokeAgent(
     `[agentDispatcher] invoking "${agentName}" on "${ctx.nodeLabel}" — turn ${prevTurns + 1}/${MAX_CONVERSATION_TURNS * 2}`
   )
 
-  const client = new Anthropic({ apiKey: key })
+  const client = getModelClient(key)
   let parsed: { reply: string; proposals: ActionProposal[] }
   try {
     const resp = await client.messages.create({

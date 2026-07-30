@@ -75,7 +75,7 @@ import type { OrgBrandKit } from '@shared/brandKit'
 import type { DocType, DocumentDraft, DocumentPatch, FbDocument, MailSendInput } from '@shared/types'
 import { sendMail } from '../mail/smtp'
 import { suggestReply, resetToneCache } from '../mail/aiReply'
-import Anthropic from '@anthropic-ai/sdk'
+import { getModelClient } from '../ai/modelClient'
 import {
   createNode,
   deleteNode,
@@ -2550,7 +2550,7 @@ export function registerIpcHandlers(): void {
     const key = resolveAnthropicKey()
     if (!key) return { ok: false, error: 'No key set.' }
     try {
-      const client = new Anthropic({ apiKey: key })
+      const client = getModelClient(key)
       const response = await client.messages.create({
         model: 'claude-haiku-4-5-20251001',
         max_tokens: 1,

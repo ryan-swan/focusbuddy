@@ -31,7 +31,8 @@
 //    cost ~10× more for no quality gain on the cleanup case.
 
 import { randomUUID } from 'crypto'
-import Anthropic from '@anthropic-ai/sdk'
+import type Anthropic from '@anthropic-ai/sdk'
+import { getModelClient } from './modelClient'
 import type { ActionProposal } from '@shared/types'
 import { resolveAnthropicKey, resolveOpenAIKey } from '../settingsStore'
 import { transcribeLocal } from './localWhisper'
@@ -247,7 +248,7 @@ export async function processTranscript(
       reason: 'no_key'
     }
   }
-  const client = new Anthropic({ apiKey: key })
+  const client = getModelClient(key)
   try {
     if (mode === 'cleaned') {
       const resp = await client.messages.create({
@@ -340,7 +341,7 @@ export async function extractActionsFromTranscript(
       reason: 'no_key'
     }
   }
-  const client = new Anthropic({ apiKey: key })
+  const client = getModelClient(key)
 
   // We constrain Claude's output via a tight schema description in the
   // system prompt + explicit tool-style JSON. Keeping it text-mode (not
