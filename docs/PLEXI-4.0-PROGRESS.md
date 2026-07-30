@@ -8,11 +8,11 @@ The upgrade turns the product from CRUD-on-SQLite into an event-sourced Context 
 
 ## Traceability snapshot
 
-105 of 344 requirements are traceable to a passing test (30.5 percent), up from 2 at the start of the upgrade. 129 spec-cited unit tests plus the Context Engine end-to-end specs are green, and both the main and web typechecks are clean.
+106 of 344 requirements are traceable to a passing test (30.8 percent), up from 2 at the start of the upgrade. 135 spec-cited unit tests plus the Context Engine end-to-end specs are green, and both the main and web typechecks are clean.
 
 | Area | Covered | Notes |
 |---|---|---|
-| EVT (events) | 22 / 24 | Contract, store, processing soundness, schema evolution. Remaining are the JSON-Schema registry with CI validation and encryption-at-rest. |
+| EVT (events) | 23 / 24 | Contract, store, processing soundness, schema evolution, schema registry. Remaining is encryption-at-rest (deployment). |
 | CTX (context) | 14 / 16 | Materiality, health, propagation, freshness. Remaining two are performance-budget verifications. |
 | GPH (graph) | 11 / 12 | Relationships, traversal, isolation. Remaining is async community detection. |
 | RES (resume) | 10 / 12 | Deterministic pipeline. Remaining are AI-summary calibration and permission-filtered render. |
@@ -72,13 +72,13 @@ Status values are Done, meaning built and covered by passing tests and, where it
 | Cryptographic erasure + data inventory + DSAR | Done | e430e7a | Real right-to-erasure that keeps the audit trail (ADR-0003, §44.1). |
 | Event-processing soundness | Done | 5504a7e | Historical-permission replay, out-of-order and duplicate tolerance, encrypted event payloads. |
 | Schema evolution / upcasting | Done | 6e4103b | Read-time, versioned, chained upcasting; never fabricates absence; wired into the store read path (ADR-0004). |
+| Event JSON-Schema registry + validation | Done | 3d8113b | Every produced Event type has a published, versioned schema at a stable dataschema URI; a dependency-free validator; the test suite is the CI gate that fails on an unschema'd or malformed producer (EVT-043/044). |
 
 ### Planned and deferred
 
 | Deliverable | Status | Blocking decision |
 |---|---|---|
-| JSON-Schema registry + CI validation | Planned, next | None. EVT-043/044 wire; the upcasting mechanism is in place. |
-| Object-model breadth (remaining PRD surface) | Planned | None. Desk archetype events, presence sync modes, embeddings policy. |
+| Object-model breadth (remaining PRD surface) | Planned, next | None. Desk archetype events, presence sync modes, embeddings policy. |
 | AI orchestration + prompt framework | Planned | Needs a live model key; governance foundation is ready. |
 | Resume AI summary (stage 6) surfaced in UI | Planned | Depends on AI orchestration. |
 | Backup / restore / PITR procedures | Planned | DATA-005; partly exists in the shipping app. |
