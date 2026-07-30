@@ -65,7 +65,7 @@ Status values are Done, meaning built and covered by passing tests and, where it
 | Isolation across all stores + permission expiry/audit | Done | db7b4a0 | Event and decision stores org-bound; grants expire and fail closed; auditable authorisation. |
 | Cryptographic erasure + data inventory + DSAR | Done | e430e7a | Real right-to-erasure that keeps the audit trail (ADR-0003, §44.1). |
 | Event-processing soundness | Done | 5504a7e | Historical-permission replay, out-of-order and duplicate tolerance, encrypted event payloads. |
-| Schema evolution / upcasting | Done | (this change) | Read-time, versioned, chained upcasting; never fabricates absence; wired into the store read path (ADR-0004). |
+| Schema evolution / upcasting | Done | 6e4103b | Read-time, versioned, chained upcasting; never fabricates absence; wired into the store read path (ADR-0004). |
 
 ### Planned and deferred
 
