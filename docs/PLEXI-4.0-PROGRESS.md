@@ -12,23 +12,32 @@ The upgrade turns the product from CRUD-on-SQLite into an event-sourced Context 
 
 The remaining 75 requirements are the wall: each needs something a unit test cannot honestly substitute for. They are grouped in the "What is blocked and what it needs" section below. Complete areas: DOM 20/20, GPH 12/12, SYN 6/6. Near-complete: PRD 35/36, EVT 23/24, AI 21/24, CTX 15/16, RES 11/12, API 7/8, AGT 15/16, CON 6/7, EXT 9/10, ARC 5/6, PRD 35/36.
 
-| Area | Covered | Notes |
+| Area | Covered | Remaining needs |
 |---|---|---|
-| DOM (domain) | 20 / 20 | Complete. Identity, deletion, provenance, schema versioning, uniform object handling, canonical entity model, sessions. |
-| PRD (product) | 35 / 36 | Object model, desk lifecycle/sharing, memory, resume, awareness, deactivation. Remaining is visual-layout persistence (shipping app). |
-| EVT (events) | 23 / 24 | Contract, store, processing soundness, schema evolution, schema registry. Remaining is encryption-at-rest (deployment). |
-| AI | 20 / 24 | Orchestrator, routing, prompt scoping, accounting, caches, ceilings, advisory guards. Remaining are live-eval/regulatory (AI-004/031/045). |
-| CTX (context) | 15 / 16 | Materiality, health, propagation, freshness, versioned context objects. Remaining is a performance-budget verification. |
-| RES (resume) | 11 / 12 | Deterministic pipeline, collaborative permission-filtered render. Remaining is AI-summary calibration. |
-| GPH (graph) | 11 / 12 | Relationships, traversal, isolation, replay. Remaining is async community detection. |
-| SEC (security) | 11 / 14 | Isolation, permissions, erasure, propagation fail-closed, presence protection. Remaining are residency, customer keys, secrets vault. |
-| MET | 10 / 15 | Metrics computed from structured data + governance gates. Remaining need live telemetry/sampling/cost. |
-| DATA | 6 / 9 | Projections, inventory, retention, store ownership. Remaining are backup/PITR procedures. |
-| ENG | 5 / 11 | Traceability, invariant detection, contract + replay tests. Remaining need CI/chaos/eval infrastructure. |
-| ARC | 4 / 6 | Store ownership, service boundaries, concurrency, deterministic degradation. Remaining need service-contract publishing. |
-| UX | 16 / 40 | Health states, resume card, disclosure path, evidence, confidence, provenance. Remaining are UI-presence and visual rules. |
-| APP | 1 / 10 | Foundational touches only. |
-| A11Y, AGT, API, CON, EXT, OPS, PERF, PRIN, SCH, SYN | 0 | Need UI, live subsystems, production instrumentation, or a cloud backend. |
+| DOM | 20 / 20 | Complete. |
+| GPH | 12 / 12 | Complete. |
+| SYN | 6 / 6 | Complete. |
+| PRD | 35 / 36 | Visual-layout persistence (UI). |
+| EVT | 23 / 24 | Encryption-at-rest (infra). |
+| AGT | 15 / 16 | Live agent eval. |
+| CTX | 15 / 16 | Performance budget (instrumentation). |
+| RES | 11 / 12 | Catch-up calibration (observed data). |
+| EXT | 9 / 10 | SDK exercised by first-party (process). |
+| DATA | 8 / 9 | Backup/PITR (infra). |
+| ENG | 8 / 11 | Chaos/eval/docs (infra + process). |
+| API | 7 / 8 | Capability-via-API audit (done; API-001 whole-app). |
+| AI | 21 / 24 | Live eval, unit-economics, single-abstraction refactor. |
+| CON | 6 / 7 | Credential vault (infra). |
+| PRIN | 6 / 8 | Positioning + design-review record (process). |
+| ARC | 5 / 6 | Failure-mode docs (process). |
+| SCH | 4 / 5 | Search perf budget (instrumentation). |
+| SEC | 11 / 14 | Residency, customer keys, secrets vault (cloud infra). |
+| UX | 30 / 40 | UI-presence, mobile, accessibility (UI verification). |
+| MET | 10 / 15 | Live telemetry / sampling / cost. |
+| APP | 5 / 10 | Native-app ADRs + canvas implementation. |
+| A11Y | 1 / 8 | WCAG/keyboard/screen-reader (UI audit). |
+| OPS | 0 / 9 | Deployment, monitoring, SLOs, runbooks (ops infra). |
+| PERF | 0 / 18 | Latency/throughput budgets (instrumentation + load). |
 
 ## Deliverables
 
