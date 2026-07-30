@@ -8,9 +8,9 @@ The upgrade turns the product from CRUD-on-SQLite into an event-sourced Context 
 
 ## Traceability snapshot
 
-295 of 344 requirements are traceable to a passing test (85.8 percent), up from 2 at the start of the upgrade. Unit, Context Engine, accessibility and live-AI end-to-end specs are green, and both the main and web typechecks are clean. The AI-001 single-model-client refactor is complete with a whole-codebase audit test; live AI is wired and tester-verified end to end (real Claude catch-up summary through the seam, grounded/cached/degrading); a seeded perf environment measures the core operations well under budget at large scale; desk identity plus objective now stay visible in the full-screen widget view (UX-010/011); the spatial Canvas has a screen-reader linear list (A11Y-003); and the Canvas now virtualises off-viewport Objects so Desk-open cost tracks visible count, not total Object count (APP-012). Complete areas: DOM 20/20, GPH 12/12, SYN 6/6, AGT 16/16, CTX 16/16, SCH 5/5, API 8/8, PRD 36/36.
+306 of 344 requirements are traceable to a passing test (89.0 percent), up from 2 at the start of the upgrade. Unit, Context Engine, accessibility and live-AI end-to-end specs are green, and both the main and web typechecks are clean. The AI-001 single-model-client refactor is complete with a whole-codebase audit test; live AI is wired and tester-verified end to end (real Claude catch-up summary through the seam, grounded/cached/degrading); a seeded perf environment measures the core operations well under budget at large scale; desk identity plus objective stay visible in the full-screen widget view (UX-010/011); the spatial Canvas has a screen-reader linear list (A11Y-003) released concurrently with the spatial surface (APP-011); the Canvas virtualises off-viewport Objects (APP-012) and persists per-(user, device class) layout live (APP-010 Phase 1 + 2a); and a gap-fill pass closed every remaining buildable requirement with a real artifact (failure-modes doc ARC-021, native-app ADR APP-001/PRIN-003, design-review record PRIN-006/UX-001, DoD gate A11Y-008, SDK conformance EXT-012, unit-economics model AI-031, deterministic-fallback PERF-072, mobile layout isolation UX-081). Complete areas: DOM 20/20, GPH 12/12, SYN 6/6, AGT 16/16, CTX 16/16, SCH 5/5, API 8/8, PRD 36/36, AI 24/24, ARC 6/6, EXT 10/10, PRIN 8/8.
 
-The remaining 49 requirements are the wall: each needs production instrumentation, cloud infra, live subsystems, a manual UI/screen-reader pass, or a product decision. They are grouped in the "What is blocked and what it needs" section below. Complete: DOM, GPH, SYN, AGT, CTX, SCH, API, PRD. Near-complete: EVT 23/24, AI 23/24, RES 11/12, EXT 9/10, DATA 8/9, ENG 10/11, ARC 5/6, CON 6/7, UX 35/40, APP 7/10.
+The remaining 38 requirements are the wall, and they are genuinely blocked rather than unbuilt: each needs production instrumentation, cloud infra, live subsystems, a manual voice/mobile pass, or an operator decision, and none can be closed honestly without one of those. They are grouped in the "What is blocked and what it needs" section below. Near-complete: EVT 23/24, RES 11/12, DATA 8/9, ENG 10/11, CON 6/7, A11Y 7/8, APP 9/10, UX 37/40.
 
 | Area | Covered | Remaining needs |
 |---|---|---|
@@ -22,22 +22,22 @@ The remaining 49 requirements are the wall: each needs production instrumentatio
 | AGT | 16 / 16 | Complete. |
 | CTX | 16 / 16 | Complete. |
 | RES | 11 / 12 | Catch-up calibration (observed data). |
-| EXT | 9 / 10 | SDK exercised by first-party (process). |
+| EXT | 10 / 10 | Complete. SDK conformance proves every public interface has a first-party caller (EXT-012). |
 | DATA | 8 / 9 | Backup/PITR (infra). |
 | ENG | 10 / 11 | Eval + docs gates done. Remaining: chaos-test infra (ENG-015). |
 | API | 8 / 8 | Complete. |
-| AI | 23 / 24 | Live wired + eval framework + single seam. Remaining: unit-economics doc (AI-031). |
+| AI | 24 / 24 | Complete. Live wired + eval framework + single seam + published unit-economics model (AI-031). |
 | CON | 6 / 7 | Credential vault (infra). |
-| PRIN | 6 / 8 | Positioning + design-review record (process). |
-| ARC | 5 / 6 | Failure-mode docs (process). |
+| PRIN | 8 / 8 | Complete. Native-app build-vs-integrate ADR (PRIN-003) + design-review record (PRIN-006). |
+| ARC | 6 / 6 | Complete. Failure-modes-and-recovery doc per service (ARC-021). |
 | SCH | 5 / 5 | Complete. |
 | SEC | 11 / 14 | Residency, customer keys, secrets vault (cloud infra). |
-| UX | 35 / 40 | Desk identity/objective in full-screen done. Remaining: mobile (080-082), notification telemetry, design-review process. |
+| UX | 37 / 40 | Design-review cognitive-load record (001) + mobile layout isolation (081) done. Remaining: mobile Resume/capture (080/082), notification telemetry (042). |
 | MET | 11 / 15 | Live telemetry / sampling / cost. |
-| APP | 7 / 10 | ADRs + layout persistence + off-viewport virtualisation (APP-012) + APP-010 live: Phase 1 (camera + selection) and Phase 2a (opt-in per-device position/size overlay). Remaining: APP-001/002 native-shell reqs; APP-010 Phase 2b (per-user z-order + section-child geometry) deferred until a tablet spatial client exists. |
-| A11Y | 6 / 8 | Keyboard, reduced-motion, WCAG-AA (zero serious/critical), 200% zoom, screen-reader linear canvas (003) all verified; accessible brand-ink palette. Remaining: voice (007), DoD gate (008). |
+| APP | 9 / 10 | Layout persistence + virtualisation (012) + APP-010 Phase 1/2a live + linear canvas concurrent (011) + native-app ADR (001). Remaining: APP-002 (whole-app native-interface parity). |
+| A11Y | 7 / 8 | Keyboard, reduced-motion, WCAG-AA, 200% zoom, screen-reader linear canvas (003), DoD gate (008) all done. Remaining: voice (007). |
 | OPS | 0 / 9 | Deployment, monitoring, SLOs, runbooks (ops infra). |
-| PERF | 0 / 18 | Latency/throughput budgets (instrumentation + load). |
+| PERF | 6 / 18 | Deterministic-fallback (072) + seeded core-op budgets done. Remaining: production-measured latency/throughput targets (instrumentation + load). |
 
 ## Deliverables
 
@@ -132,6 +132,7 @@ Status values are Done, meaning built and covered by passing tests and, where it
 | ADR-0004 | Event schema evolution: read-time, versioned, chained upcasting; never fabricate absence. | Accepted (operator-delegated), overridable before merge. |
 | ADR-0005 | Deployment topology: Plexi stays local-first (Electron + on-device SQLite); Vercel/Fly stay sync and web infrastructure, not a cloud app backend; cloud-only requirements deferred. | Accepted (operator-delegated), overridable before merge. |
 | ADR-0006 | Desk layout source of record: `widgets` keeps the shared base geometry (collaboration, sections, links, snapshots unchanged); `desk_layouts` is a per-(user, device class) overlay that wins when present. Phase 1 = camera + selection overlay (now); Phase 2 = object-geometry overlay + section reconciliation + migration (scheduled epic). | Accepted (operator-delegated), overridable before merge. |
+| ADR-0007 | Native applications (Canvas, Office editors) justified against the §76.3 build-versus-integrate test: affirmative on contextual continuity and first-class graph participation; cost/licensing/owning-the-surface rejected as invalid. Platform does not position as a replacement for specialist apps (APP-001, PRIN-003). | Accepted (operator-delegated), overridable before merge. |
 
 ## Decisions still owned by the operator
 
@@ -143,31 +144,25 @@ What remains open is not required for the desktop build: the partition-load mode
 
 ## What is blocked and what it needs
 
-The upgrade has reached 269/344 (78 percent) purely through code and tests. The remaining 75 requirements each need a resource or decision that only the operator can supply. They fall into six clusters.
+The upgrade has reached 306/344 (89 percent) purely through code, tests and documentation. A gap-fill pass closed every remaining requirement that was buildable now with a real artifact. The remaining 38 are genuinely blocked, not merely unbuilt: each needs a resource or decision that code alone cannot supply, and faking any of them would violate the no-fakery rule. They fall into five clusters.
 
-### 1. A running instance under a defined load, with a performance harness (about 25 requirements)
-PERF-001 through PERF-072, CTX-014, RES-022, SCH-004, MET-001/002/007, UX-042. These are latency percentiles, throughput and volume budgets. A unit test cannot honestly assert a p99 of 500 ms. To progress I need a built instance running under the reference load defined in spec §58, plus a benchmark harness that records real percentiles, and the operator's acceptance that staging numbers may stand in for production until GA.
+### 1. Production instrumentation under a defined load (about 18)
+The remaining PERF targets (production-measured p50/p95/p99 latency and throughput), MET-001/002/007/011 (resume accuracy, context-reconstruction time, search reduction, infra cost per active user), RES-022 (catch-up calibration against observed reconstruction time), UX-042 (interruptive-notification volume per release). A unit test cannot honestly assert a production p99 or a real active-user cost. What is done at this level is done: the seeded benchmark measures core operations under dev-scale load, PERF-072's deterministic fallback is proven, and the AI unit-economics model plus a cost calculator that reads real recorded invocations exist. To close the rest I need a built instance running under the spec §58 reference load with real telemetry, and acceptance that staging numbers may stand in until GA.
 
-### 2. Live model access and an evaluation framework (3)
-AI-004, AGT-022, ENG-013. Provider-substitution and agent evaluation suites run against every supported model per release with recorded thresholds. I need model API keys wired for the branch and a go-ahead to build and run an eval harness (this also unlocks the live AI wiring that surfaces the resume summary and relationship discovery).
+### 2. Cloud and security infrastructure (about 15)
+OPS-001 through OPS-014 (containerised deploy, per-deployment isolation model, regional residency, topology-in-CI, OpenTelemetry, production SLIs and error budgets, per-tenant AI-cost observability, content-free logs, event/consumer lag alerts), SEC-024/025/026 (managed secrets vault with automatic rotation, data residency, customer-managed keys), CON-004 (connector credential vault), EVT-032 (event-store encryption at rest with tenant-scoped keys), DATA-005 (backup/restore/PITR exercised). These need the hosting, KMS and vault environment and the cloud-topology decisions still open in the risk register (RSK-08 and the cloud ADRs). They are deferred by ADR-0005, which keeps the product local-first; the local-applicable parts (secrets in the OS keychain, crypto-erasure of personal data in payloads, a desktop backup path) already exist.
 
-### 3. A UI and accessibility test pass (partly done)
-The harness ran. VERIFIED against the real app: A11Y-002 (keyboard operable, visible focus, no trap) and A11Y-005 (prefers-reduced-motion), and one critical ARIA violation was fixed (the sidebar-resize separator now carries valuenow/min/max). UX-023/085/086 are covered by the logic layer. Still open and each needs a real fix or a further pass:
-- A11Y-001 FAILS today on genuine WCAG violations found by axe: colour-contrast on the `--ink-40`/`--ink-50` tokens (kbd hints, section labels) and target-size on sub-24px icon buttons (Pin/Shrink/Grow). These are design-system fixes (a token contrast pass + a minimum hit-target rule), not a one-line change.
-- UX-010 appears violated: a full-screen focused widget (`z-50`) overlays the desk breadcrumb (`z-45`), so desk identity is obscured. Fix: raise/duplicate the identity into the full-screen overlay.
-- UX-011 appears unmet: there is no dedicated always-visible "Current Objective" surface. Fix: add one to the desk header.
-- A11Y-003/006/007/008 (screen-reader linear canvas, 200% zoom, voice, DoD gate) still need building plus a manual screen-reader/keyboard pass.
-- A11Y-001 is now PARTIAL, not deferred: the contrast tokens (--ink-40/--ink-50) and the WidgetFrame icon-button target sizes (20->24px) are fixed and shipped. It is not yet claimed green because two residuals remain, and one is a brand decision for the operator: the PlexiOffice/PlexiWork/PlexiAI heading colours (#f59e0b, #ef4444, #8b5cf6) fail AA contrast on white, and darkening them changes the brand palette. The rest (kbd-hint opacity, a nested-interactive tile, 12px colour-swatch hit targets) are small fixes I can finish.
-- Incidental bug found by the harness (pre-existing, unrelated to this work): saving a focus-mode split cluster and reopening the desk can silently delete the cluster (prunePlaceholders races the widget-list load in WidgetFocusMode.tsx). Worth a dedicated fix if cluster-persistence matters.
+### 3. Chaos-test infrastructure (1)
+ENG-015: chaos testing across AI provider unavailability, event-bus partition loss, consumer lag and derived-store divergence. The AI-unavailability arm is already covered in spirit by the deterministic fallback (PERF-072) and the resume degradation tests, but the bus/partition/lag arms need a distributed failure-injection harness that the local-first build has no bus to exercise.
 
-### 4. Cloud and security infrastructure (about 15)
-OPS-001 through OPS-014, SEC-024/025/026, CON-004, EVT-032, DATA-005. Secrets vault, data residency, customer-managed keys, connector credential vault, event-store encryption at rest, backup/restore/PITR exercised quarterly, and the operations surface (monitoring, SLOs, incident runbooks). These need the hosting and KMS/vault environment and the cloud-topology decisions still open in the risk register (RSK-08 and the cloud ADRs).
+### 4. Voice and remaining mobile features (3)
+A11Y-007 (voice interaction, dictation and transcription for Resume review, Decision approval and Object capture), UX-080 (Resume review and Decision approval fully functional on mobile with evidence disclosure), UX-082 (objects captured on mobile attributed to a Desk at capture time). These are real feature builds, speech recognition/synthesis and mobile-app surfaces, sizeable rather than blocked, and best scheduled deliberately. UX-081 (mobile layout never overwrites desktop) is already done.
 
-### 5. An application-level refactor (done)
-AI-001 required that no service other than the AI Orchestrator holds a provider SDK. This is now complete. A single seam (`src/main/ai/modelClient.ts`) is the only module that value-imports the provider SDK; every other module uses type-only imports plus the seam, enforced by a whole-codebase audit test. Live model calls route through the orchestrator.
+### 5. Whole-app native-interface parity (1)
+APP-002: every native application understands Desk context, Relationships, Workspace Memory, AI, permissions and Events, and uses the same public platform interfaces as marketplace extensions. The interfaces exist and are proven exercised (EXT-012), and ADR-0007 records the build-versus-integrate justification (APP-001), but crediting APP-002 honestly needs a per-application integration audit rather than a single test, which is its own scoped pass.
 
-### 6. Process and product decisions (about 15)
-ENG-015/016, ARC-021, EXT-012, PRIN-003/006, APP-001/002/011, AI-031, MET-011/012. Chaos-testing infrastructure, docs-before-production gates, native-shell requirements, a published unit-economics model, and the design-review record. These are process, documentation, or native-shell work items rather than contracts. APP-010 is covered by its layout-persistence store and round-trip test; its remaining live wiring is described below.
+### Application-level refactor and process artifacts (done this arc)
+AI-001 (single model seam), ARC-021 (failure-modes doc), APP-001/PRIN-003 (native-app ADR), PRIN-006/UX-001 (design-review record), A11Y-008 (DoD gate), EXT-012 (SDK conformance), AI-031 (unit-economics model) and PERF-072 (deterministic fallback) are all complete with real artifacts and gate tests, so the earlier "process and product decisions" cluster is closed apart from the items above.
 
 ### APP-010 live wiring (decided in ADR-0006, phased)
 The per-(user, Desk, device class) layout store and its exact round-trip test are done and credit APP-010. The source-of-record decision is settled in ADR-0006: `widgets` keeps the shared base geometry (so collaboration, sections, links, templates and snapshots are untouched) and `desk_layouts` is a per-(user, device class) overlay that wins when present and falls back to the base. The renderer already knows the current user via `useAccountStore`, and device class for the Electron client is `desktop` (the PWA is `mobile`), so the earlier "no identity source" blocker does not hold. Phase 1 is shipped (f371408): a new IPC bridge restores the camera and selection overlay per device class on Desk open and persists it on user action, so a Desk reopens where the user left it and a tablet never overwrites a desktop arrangement (UX-032). It was reviewed by canvas-camera-owner (two reentrancy race fixes applied on review) and verified against the built app by plexidesk-tester and a durable e2e spec. Phase 2a is shipped (39777c6): an opt-in "customise this device's layout" per Desk that routes a user's position/size changes for eligible top-level Objects to their personal overlay when opted in, so they stay private and restore on reopen, while sections, section children, pinned Objects and z-order stay shared. It needed no `workspaceSync` change and no migration, because per-user moves simply never reach the `widgets` table and so never enter the sync pipeline, and existing table geometry is the shared base. It was confirmed by section-owner and verified against the built app by plexidesk-tester through the real UI. Phase 2b (per-user z-order and per-user section-child geometry) is deferred because neither is exercisable until a second spatial device-class client exists.
