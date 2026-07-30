@@ -10,7 +10,7 @@ The upgrade turns the product from CRUD-on-SQLite into an event-sourced Context 
 
 281 of 344 requirements are traceable to a passing test (81.7 percent), up from 2 at the start of the upgrade. 283 spec-cited unit tests plus the Context Engine and accessibility end-to-end specs are green, and both the main and web typechecks are clean. The AI-001 single-model-client refactor is complete with a whole-codebase audit test; the accessibility harness verified keyboard operability and reduced-motion; and live AI is wired and tester-verified end to end — a desk's catch-up Resume now gets a real Claude-written summary through the seam (grounded, cached, degrading to deterministic without a key), and the eval framework gates provider-supported and release on passing runs. AGT is complete (16/16).
 
-The remaining 75 requirements are the wall: each needs something a unit test cannot honestly substitute for. They are grouped in the "What is blocked and what it needs" section below. Complete areas: DOM 20/20, GPH 12/12, SYN 6/6. Near-complete: PRD 35/36, EVT 23/24, AI 21/24, CTX 15/16, RES 11/12, API 7/8, AGT 15/16, CON 6/7, EXT 9/10, ARC 5/6, PRD 35/36.
+The remaining 63 requirements are the wall: each needs something a unit test cannot honestly substitute for (production instrumentation, cloud infra, live subsystems, UI/manual audit, or a product decision). They are grouped in the "What is blocked and what it needs" section below. Complete areas: DOM 20/20, GPH 12/12, SYN 6/6, AGT 16/16. Near-complete: PRD 35/36, EVT 23/24, AI 23/24, CTX 15/16, RES 11/12, API 7/8, CON 6/7, EXT 9/10, ARC 5/6, ENG 10/11, DATA 8/9.
 
 | Area | Covered | Remaining needs |
 |---|---|---|
