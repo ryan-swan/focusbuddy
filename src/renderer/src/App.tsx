@@ -531,7 +531,11 @@ export default function App(): JSX.Element {
             >
               <Icon name="auto_awesome" size={12} className="text-accent" />
               <span>Build</span>
-              <kbd className="text-[9px] font-mono opacity-60 ml-0.5">⌘⇧K</kbd>
+              {/* PLX-A11Y-001: opacity-60 dimming a dark-ink kbd hint fell below
+                  4.5:1; --ink-70 is the token other kbd hints in the app use
+                  (CommandCenter, ShortcutsOverlay, WidgetFocusMode) so this one
+                  reads at the same weight instead of a one-off opacity trick. */}
+              <kbd className="text-[9px] font-mono text-[var(--ink-70)] ml-0.5">⌘⇧K</kbd>
             </button>
           </Tooltip>
           <Tooltip

@@ -49,6 +49,24 @@
   --ink-30: oklch(78% 0.006 264);      /* hairlines, dim — decorative only, not used for text */
   --ink-10: oklch(94% 0.004 264);      /* surface tone */
 
+  /* ── Brand group ink — PLX-A11Y-001 ───────────────────────────────────────
+     The PlexiSuite home (PlexiSuiteHome.tsx) sets each product-group heading's
+     TEXT color straight to that group's vivid brand accent (PLEXI_GROUPS in
+     shared/plexiSuite.ts) — none of the seven clear 4.5:1 against
+     --surface-base. Rather than dim the brand palette itself (used elsewhere
+     for icon fills, badges and card glows, where it still reads fine), these
+     are same-hue TEXT variants: same hue and chroma, lightness pulled just
+     past the WCAG AA floor with a small safety margin (~4.8:1) against the
+     lightest surface these headings render on. Fills/icons/badges keep using
+     the vivid accent unchanged; only heading TEXT reads these tokens. */
+  --brand-office-ink: #ab5a00;   /* PlexiOffice,  accent #f59e0b */
+  --brand-work-ink: #d6272f;     /* PlexiWork,    accent #ef4444 */
+  --brand-ai-ink: #804fe8;       /* PlexiAI,      accent #8b5cf6 */
+  --brand-data-ink: #0074b5;     /* PlexiData,    accent #0ea5e9 */
+  --brand-build-ink: #00804c;    /* PlexiBuild,   accent #10b981 */
+  --brand-connect-ink: #5c5de8;  /* PlexiConnect, accent #6366f1 */
+  --brand-ops-ink: #007e6e;      /* PlexiOps,     accent #14b8a6 */
+
   /* ── Surface (background) — OKLCH ───────────────────────────────────────── */
   --surface-base: oklch(98.5% 0.003 264);     /* document floor */
   --surface-raised: oklch(100% 0 0);           /* panels — pure white */
@@ -136,6 +154,18 @@
   --ink-30: oklch(38% 0.012 264);
   --ink-10: oklch(22% 0.015 264);
 
+  /* PLX-A11Y-001: dark-surface variants of the brand group ink — the vivid
+     accents already clear 4.5:1 against the dark surface for 5 of 7 groups,
+     but PlexiAI and PlexiConnect need a touch of lightening to reach the same
+     ~4.8:1 margin. The rest keep their original accent verbatim. */
+  --brand-office-ink: #f59e0b;
+  --brand-work-ink: #ef4444;
+  --brand-ai-ink: #8c5ef8;
+  --brand-data-ink: #0ea5e9;
+  --brand-build-ink: #10b981;
+  --brand-connect-ink: #686cf7;
+  --brand-ops-ink: #14b8a6;
+
   --surface-base: oklch(14% 0.012 264);
   --surface-raised: oklch(18% 0.014 264);
   --surface-sunken: oklch(11% 0.010 264);
@@ -204,6 +234,16 @@
   --ink-40: oklch(60.1% 0.019 80);
   --ink-30: oklch(36% 0.020 80);
   --ink-10: oklch(22% 0.024 250);
+
+  /* PLX-A11Y-001: same brand group ink treatment as .dark, re-checked against
+     Atelier's own (slightly lighter, warmer) surface-base. */
+  --brand-office-ink: #f59e0b;
+  --brand-work-ink: #ef4444;
+  --brand-ai-ink: #8e60fa;
+  --brand-data-ink: #0ea5e9;
+  --brand-build-ink: #10b981;
+  --brand-connect-ink: #696ef9;
+  --brand-ops-ink: #14b8a6;
 
   /* Surfaces — deep navy with a warm undertone, not blue-grey */
   --surface-base: oklch(16% 0.030 250);     /* document floor */

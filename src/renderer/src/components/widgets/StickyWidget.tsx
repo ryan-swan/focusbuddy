@@ -159,8 +159,12 @@ export default function StickyWidget({ widget, inline = false }: Props): JSX.Ele
     })
   }
 
+  // PLX-A11Y-001: 20px (h-5 w-5) failed the WCAG 2.5.8 target-size minimum
+  // (24x24) once the swatch buttons beside it stopped absorbing the row's
+  // failures — raised to 24px, the same fix already applied to WidgetFrame's
+  // icon buttons.
   const toolbarBtn =
-    'h-5 w-5 inline-flex items-center justify-center rounded text-stone-700/70 hover:text-stone-900 hover:bg-black/10 transition-colors'
+    'h-6 w-6 shrink-0 inline-flex items-center justify-center rounded text-stone-700/70 hover:text-stone-900 hover:bg-black/10 transition-colors'
 
   const rendered = (
     <div
@@ -277,17 +281,33 @@ export default function StickyWidget({ widget, inline = false }: Props): JSX.Ele
       className="fb-sticky-body min-h-full w-full p-3 flex flex-col gap-2"
       style={{ backgroundColor: bgColor, '--fb-sticky-tint': bgColor } as React.CSSProperties}
     >
-      <div className="flex items-center gap-1">
+      {/* PLX-A11Y-001: flex-wrap matches MarkdownWidget's own toolbar row —
+          growing the swatches + Bold/Bullet/Checklist buttons to a real 24px
+          target size means the row no longer always fits one line on a
+          narrow sticky; wrapping (not shrinking below 24px, not spilling
+          past the note edge) is the same accessible-toolbar pattern already
+          used there. */}
+      <div className="flex items-center gap-0.5 flex-wrap">
         {COLORS.map((c) => (
+          // PLX-A11Y-001: the visible swatch stays 12px (the sticky's compact
+          // toolbar look is unchanged), but the button itself gets a 24x24
+          // invisible hit-slop so it clears the WCAG 2.5.8 target-size
+          // minimum — same technique as WidgetFrame's icon buttons, just with
+          // the visual dot nested inside a bigger tappable box instead of the
+          // icon itself growing.
           <button
             key={c}
             onClick={() => void update(widget.id, { color: c })}
-            className="h-3 w-3 rounded-full border border-black/10 hover:scale-125 transition-transform"
-            style={{ backgroundColor: c }}
+            className="h-6 w-6 shrink-0 rounded-full inline-flex items-center justify-center"
             aria-label={`Color ${c}`}
-          />
+          >
+            <span
+              className="h-3 w-3 rounded-full border border-black/10 hover:scale-125 transition-transform"
+              style={{ backgroundColor: c }}
+            />
+          </button>
         ))}
-        <span className="mx-0.5 h-3.5 w-px bg-black/10" aria-hidden />
+        <span className="mx-0.5 h-3.5 w-px bg-black/10 shrink-0" aria-hidden />
         <button onClick={applyBold} className={toolbarBtn} title="Bold (**text**)" aria-label="Bold" data-testid="sticky-bold">
           <Icon name="format_bold" size={13} />
         </button>

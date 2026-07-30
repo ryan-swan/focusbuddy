@@ -86,63 +86,89 @@ function ProductTile({ product }: { product: PlexiProduct }): JSX.Element {
   const ready = product.status === 'ready'
 
   return (
-    <button
-      onClick={() => goProduct(product.key)}
-      data-testid={`product-tile-${product.key}`}
-      className={`group relative text-left rounded-xl border p-3 transition-all ${
+    // PLX-A11Y-001: this card was a single <button> wrapping the UpvoteButton
+    // for not-ready products — a button nested inside a button, which axe's
+    // nested-interactive check (correctly) flags because nested interactive
+    // controls aren't reliably announced by assistive tech. Same fix as the
+    // PlexiDesk hero below: the outer element is a plain container, the
+    // navigate action is its own <button>, and the upvote control is a
+    // sibling rather than a descendant.
+    <div
+      className={`group relative rounded-xl border p-3 transition-all ${
         ready
           ? `${PLEXI_CARD} fb-lift`
           : 'border-[var(--edge-soft)]/50 bg-[var(--surface-sunken)]/60'
       }`}
     >
-      <div className="flex items-start gap-2.5">
-        <span
-          className={`shrink-0 inline-flex h-9 w-9 items-center justify-center rounded-lg ${ready ? '' : 'opacity-50 grayscale'}`}
-          // Calm, unified icon treatment: a neutral glyph on a quiet accent-tinted
-          // chip, so each product keeps a whisper of its colour without the whole
-          // grid reading as a saturated rainbow.
-          style={{ backgroundColor: `${product.accent}26`, color: 'var(--ink-90)' }}
-        >
-          <Icon name={product.icon} size={18} filled />
-        </span>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1.5">
-            <span
-              className={`text-[13px] font-semibold truncate ${
-                ready ? 'text-[var(--ink-100)]' : 'text-[var(--ink-50)]'
-              }`}
-            >
-              {product.name}
-            </span>
-            {!ready && (
+      <button
+        onClick={() => goProduct(product.key)}
+        data-testid={`product-tile-${product.key}`}
+        className="w-full text-left"
+      >
+        <div className="flex items-start gap-2.5">
+          <span
+            className={`shrink-0 inline-flex h-9 w-9 items-center justify-center rounded-lg ${ready ? '' : 'opacity-50 grayscale'}`}
+            // Calm, unified icon treatment: a neutral glyph on a quiet accent-tinted
+            // chip, so each product keeps a whisper of its colour without the whole
+            // grid reading as a saturated rainbow.
+            style={{ backgroundColor: `${product.accent}26`, color: 'var(--ink-90)' }}
+          >
+            <Icon name={product.icon} size={18} filled />
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-1.5">
               <span
-                className={`shrink-0 text-[9px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-full ${
-                  product.status === 'soon'
-                    ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
-                    : 'bg-[var(--ink-50)]/15 text-[var(--ink-50)]'
+                className={`text-[13px] font-semibold truncate ${
+                  ready ? 'text-[var(--ink-100)]' : 'text-[var(--ink-50)]'
                 }`}
               >
-                {STATUS_LABEL[product.status]}
+                {product.name}
               </span>
-            )}
+              {!ready && (
+                <span
+                  className={`shrink-0 text-[9px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-full ${
+                    product.status === 'soon'
+                      ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
+                      : 'bg-[var(--ink-50)]/15 text-[var(--ink-50)]'
+                  }`}
+                >
+                  {STATUS_LABEL[product.status]}
+                </span>
+              )}
+            </div>
+            <p
+              className={`mt-0.5 text-[11px] leading-snug line-clamp-2 min-h-[2.75em] ${
+                ready ? 'text-[var(--ink-70)]' : 'text-[var(--ink-50)]/70'
+              }`}
+            >
+              {product.tagline}
+            </p>
           </div>
-          <p
-            className={`mt-0.5 text-[11px] leading-snug line-clamp-2 min-h-[2.75em] ${
-              ready ? 'text-[var(--ink-70)]' : 'text-[var(--ink-50)]/70'
-            }`}
-          >
-            {product.tagline}
-          </p>
         </div>
-      </div>
+      </button>
       {!ready && (
         <div className="mt-2.5 flex items-center justify-between">
           <span className="text-[10px] text-[var(--ink-50)]">Upvote to prioritise</span>
           <UpvoteButton featureKey={product.key} />
         </div>
       )}
-    </button>
+    </div>
   )
+}
+
+// PLX-A11Y-001: every group heading below is set in its own brand hue, but
+// the vivid PLEXI_GROUPS accents used for icon fills/badges/glows don't clear
+// WCAG AA 4.5:1 as TEXT against --surface-base. These are same-hue, darkened
+// (light theme) / lightened (dark themes) text-only variants defined once in
+// tokens.css — the accent itself is untouched everywhere else it's used.
+const GROUP_HEADING_INK: Record<string, string> = {
+  office: 'var(--brand-office-ink)',
+  work: 'var(--brand-work-ink)',
+  ai: 'var(--brand-ai-ink)',
+  data: 'var(--brand-data-ink)',
+  build: 'var(--brand-build-ink)',
+  connect: 'var(--brand-connect-ink)',
+  ops: 'var(--brand-ops-ink)'
 }
 
 function GroupSection({ groupKey }: { groupKey: string }): JSX.Element | null {
@@ -154,7 +180,10 @@ function GroupSection({ groupKey }: { groupKey: string }): JSX.Element | null {
   return (
     <section className="space-y-2.5">
       <div className="flex items-baseline gap-2">
-        <h2 className="text-[15px] font-bold tracking-tight" style={{ color: group.accent }}>
+        <h2
+          className="text-[15px] font-bold tracking-tight"
+          style={{ color: GROUP_HEADING_INK[group.key] ?? group.accent }}
+        >
           {group.name}
         </h2>
         <span className="text-[12px] text-[var(--ink-70)]">{group.tagline}</span>
