@@ -974,7 +974,7 @@ export default function WidgetFrame({
                   e.stopPropagation()
                   beginRename()
                 }}
-                className="widget-nodrag h-5 w-5 rounded inline-flex items-center justify-center text-[var(--ink-40)] opacity-50 hover:opacity-100 hover:bg-[var(--surface-sunken)]/60 hover:text-accent transition-opacity"
+                className="widget-nodrag h-6 w-6 rounded inline-flex items-center justify-center text-[var(--ink-40)] opacity-50 hover:opacity-100 hover:bg-[var(--surface-sunken)]/60 hover:text-accent transition-opacity"
                 aria-label="Rename widget"
                 title="Rename"
               >
@@ -993,7 +993,7 @@ export default function WidgetFrame({
                   e.stopPropagation()
                   linkDrag.start(widget.id)
                 }}
-                className="h-5 w-5 rounded inline-flex items-center justify-center text-[var(--ink-50)] hover:bg-[var(--surface-sunken)]/60 hover:text-accent cursor-cell"
+                className="h-6 w-6 rounded inline-flex items-center justify-center text-[var(--ink-50)] hover:bg-[var(--surface-sunken)]/60 hover:text-accent cursor-cell"
                 aria-label="Link to another widget"
                 title="Click, then click another widget to connect them"
               >
@@ -1047,7 +1047,7 @@ export default function WidgetFrame({
                 e.stopPropagation()
                 if (confirm('Remove from the desk?')) void remove(widget.id)
               }}
-              className="h-5 w-5 rounded inline-flex items-center justify-center text-[var(--ink-50)] hover:bg-red-100 hover:text-red-700"
+              className="h-6 w-6 rounded inline-flex items-center justify-center text-[var(--ink-50)] hover:bg-red-100 hover:text-red-700"
               aria-label="Remove widget"
             >
               <Icon name="close" size={13} />
@@ -1147,7 +1147,7 @@ function ResizeStepButton({
         e.stopPropagation()
         onClick()
       }}
-      className="h-5 w-5 rounded inline-flex items-center justify-center text-[var(--ink-50)] hover:bg-[var(--surface-sunken)]/60 hover:text-[var(--ink-100)] transition-colors"
+      className="h-6 w-6 rounded inline-flex items-center justify-center text-[var(--ink-50)] hover:bg-[var(--surface-sunken)]/60 hover:text-[var(--ink-100)] transition-colors"
       aria-label={isGrow ? 'Grow widget' : 'Shrink widget'}
       data-testid={isGrow ? `widget-grow-${widgetId}` : `widget-shrink-${widgetId}`}
       title={
@@ -1257,7 +1257,7 @@ function PinControl({
           e.stopPropagation()
           setOpen(!open)
         }}
-        className={`h-5 w-5 rounded inline-flex items-center justify-center transition-colors ${
+        className={`h-6 w-6 rounded inline-flex items-center justify-center transition-colors ${
           isPinned
             ? 'text-amber-600 hover:bg-amber-100'
             : 'text-[var(--ink-50)] hover:bg-[var(--surface-sunken)]/60 hover:text-[var(--ink-100)]'
@@ -1408,7 +1408,7 @@ function ExpandControl({
           e.stopPropagation()
           setOpen(!open)
         }}
-        className="h-5 w-5 rounded inline-flex items-center justify-center text-[var(--ink-50)] hover:bg-[var(--surface-sunken)]/60 hover:text-[var(--ink-100)]"
+        className="h-6 w-6 rounded inline-flex items-center justify-center text-[var(--ink-50)] hover:bg-[var(--surface-sunken)]/60 hover:text-[var(--ink-100)]"
         aria-label="Expand options"
         title="Expand — bigger on desk or full focus mode"
       >

@@ -39,9 +39,14 @@
   --ink-90: oklch(28% 0.011 264);      /* secondary */
   --ink-70: oklch(46% 0.010 264);      /* tertiary, meta */
   --ink-60: oklch(54% 0.009 264);      /* between meta and placeholder */
-  --ink-50: oklch(62% 0.008 264);      /* placeholder, disabled */
-  --ink-40: oklch(70% 0.007 264);      /* faint meta, section eyebrows */
-  --ink-30: oklch(78% 0.006 264);      /* hairlines, dim */
+  /* PLX-A11Y-001: ink-50/ink-40 raised from 62%/70% L so text set in either
+     token (kbd hints, section labels/eyebrows) clears WCAG AA 4.5:1 against
+     every surface tone (base/raised/sunken), not just the lightest one.
+     Relative order is preserved (ink-50 stays a touch more contrasty than
+     ink-40) with a small safety margin above the 4.5:1 floor. */
+  --ink-50: oklch(52.5% 0.008 264);    /* placeholder, disabled */
+  --ink-40: oklch(53.5% 0.007 264);    /* faint meta, section eyebrows */
+  --ink-30: oklch(78% 0.006 264);      /* hairlines, dim — decorative only, not used for text */
   --ink-10: oklch(94% 0.004 264);      /* surface tone */
 
   /* ── Surface (background) — OKLCH ───────────────────────────────────────── */
@@ -124,8 +129,10 @@
   --ink-90: oklch(86% 0.006 264);
   --ink-70: oklch(72% 0.008 264);
   --ink-60: oklch(64% 0.009 264);
-  --ink-50: oklch(56% 0.010 264);
-  --ink-40: oklch(47% 0.011 264);
+  /* PLX-A11Y-001: see :root — raised from 56%/47% so ink-50/ink-40 text meets
+     WCAG AA 4.5:1 against the lightest surface (surface-raised, 18% L). */
+  --ink-50: oklch(60.2% 0.010 264);
+  --ink-40: oklch(59.1% 0.011 264);
   --ink-30: oklch(38% 0.012 264);
   --ink-10: oklch(22% 0.015 264);
 
@@ -191,8 +198,10 @@
   --ink-90: oklch(85% 0.014 80);
   --ink-70: oklch(70% 0.016 80);
   --ink-60: oklch(62% 0.017 80);
-  --ink-50: oklch(54% 0.018 80);
-  --ink-40: oklch(45% 0.019 80);
+  /* PLX-A11Y-001: see :root — raised from 54%/45% so ink-50/ink-40 text meets
+     WCAG AA 4.5:1 against the lightest surface (surface-raised, 20% L). */
+  --ink-50: oklch(61.2% 0.018 80);
+  --ink-40: oklch(60.1% 0.019 80);
   --ink-30: oklch(36% 0.020 80);
   --ink-10: oklch(22% 0.024 250);
 
