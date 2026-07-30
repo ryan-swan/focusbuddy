@@ -38,7 +38,7 @@ describe('plx_ux_030 / plx_ux_032 — layout persistence per user/desk/device, n
 describe('plx_ux_031 / plx_ux_033 — restore what can be restored, report the rest', () => {
   it('test_plx_ux_031_033', () => {
     const saved: DeskLayout = {
-      userId: 'u', deskId: 'd', deviceClass: 'desktop', scroll: { x: 0, y: 0 }, selectedObjectIds: [],
+      userId: 'u', deskId: 'd', deviceClass: 'desktop', scroll: { x: 0, y: 0 }, selectedObjectIds: [], zoom: 1,
       objects: [{ objectId: 'a', x: 0, y: 0, width: 10, height: 10, zIndex: 1 }, { objectId: 'gone', x: 0, y: 0, width: 10, height: 10, zIndex: 1 }]
     }
     const r = restoreLayout(saved, (id) => id !== 'gone')

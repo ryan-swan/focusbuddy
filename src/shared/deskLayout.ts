@@ -23,6 +23,21 @@ export interface DeskLayout {
   objects: ObjectLayout[]
   scroll: { x: number; y: number }
   selectedObjectIds: string[]
+  zoom: number // viewport zoom level, persisted + restored (PLX-PRD-002)
+}
+
+// A Desk persists its COMPLETE visual layout — object positions/sizes/z-order,
+// scroll, selection and zoom — and restores it on reopen (PRD-002). This predicate
+// confirms a saved layout carries every required dimension.
+export function layoutIsComplete(l: DeskLayout): boolean {
+  return (
+    Array.isArray(l.objects) &&
+    l.objects.every((o) => typeof o.x === 'number' && typeof o.y === 'number' && typeof o.width === 'number' && typeof o.height === 'number' && typeof o.zIndex === 'number') &&
+    typeof l.scroll?.x === 'number' &&
+    typeof l.scroll?.y === 'number' &&
+    Array.isArray(l.selectedObjectIds) &&
+    typeof l.zoom === 'number'
+  )
 }
 
 // The per-(user, Desk, device class) key (UX-032). Two device classes never collide.

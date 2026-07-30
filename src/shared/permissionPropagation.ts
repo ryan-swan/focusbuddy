@@ -51,3 +51,15 @@ export function presenceWithinRetention(ageDays: number, retentionDays: number):
 export function presenceExpired(ageDays: number, retentionDays: number): boolean {
   return !presenceWithinRetention(ageDays, retentionDays)
 }
+
+// Team awareness data MUST NOT be aggregated into individual activity reports
+// without explicit tenant configuration (UX-086, subject to SEC-033).
+export function teamAwarenessAggregationAllowed(intoIndividualReport: boolean, tenantExplicitlyConfigured = false): boolean {
+  if (!intoIndividualReport) return true // team-level aggregation is fine
+  return tenantExplicitlyConfigured // individual activity reports need explicit config
+}
+export function assertTeamAwarenessAggregation(intoIndividualReport: boolean, tenantExplicitlyConfigured = false): void {
+  if (!teamAwarenessAggregationAllowed(intoIndividualReport, tenantExplicitlyConfigured)) {
+    throw new Error('Team awareness MUST NOT be aggregated into individual reports without explicit tenant config (PLX-UX-086).')
+  }
+}

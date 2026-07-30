@@ -66,6 +66,28 @@ export function serviceContractComplete(service: string): boolean {
   return !!c && !!c.apiContract && !!c.eventContract && !!c.version
 }
 
+// ── MET-012 — metrics instrumented before GA ─────────────────────────────────
+// A capability may not reach general availability until every success metric that
+// measures it is instrumented and reported (MET-012).
+export function capabilityGaReady(metrics: Array<{ name: string; instrumented: boolean }>): boolean {
+  return metrics.every((m) => m.instrumented)
+}
+export function metricsBlockingGa(metrics: Array<{ name: string; instrumented: boolean }>): string[] {
+  return metrics.filter((m) => !m.instrumented).map((m) => m.name)
+}
+
+// ── ENG-016 — service docs before production ──────────────────────────────────
+// Deployment is blocked until a service publishes its required documentation set
+// (ENG-016).
+export function deploymentAllowed(requiredDocs: string[], publishedDocs: string[]): boolean {
+  const published = new Set(publishedDocs)
+  return requiredDocs.every((d) => published.has(d))
+}
+export function docsBlockingDeployment(requiredDocs: string[], publishedDocs: string[]): string[] {
+  const published = new Set(publishedDocs)
+  return requiredDocs.filter((d) => !published.has(d))
+}
+
 // ── AI-045 — per-capability regulatory record ────────────────────────────────
 export interface RegulatoryRecord {
   capability: string
