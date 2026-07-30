@@ -157,6 +157,10 @@ function FocusModeInner(): JSX.Element | null {
   // back to a single pane deletes it. `liveClusterId` remembers which row the
   // current split maps to so updates target it instead of piling up new rows.
   const activeTaskId = useNodeStore((s) => s.activeTaskId)
+  // The active desk's identity and objective, so both stay reachable even in a
+  // full-screen widget view (PLX-UX-010 / PLX-UX-011).
+  const activeDeskTitle = useNodeStore((s) => s.nodes.find((n) => n.id === s.activeTaskId)?.title ?? null)
+  const activeDeskObjective = useNodeStore((s) => s.nodes.find((n) => n.id === s.activeTaskId)?.description ?? null)
   const clusters = useFocusClustersStore((s) => s.clusters)
   const saveCluster = useFocusClustersStore((s) => s.save)
   const removeCluster = useFocusClustersStore((s) => s.remove)
@@ -682,6 +686,21 @@ function FocusModeInner(): JSX.Element | null {
       onMouseDown={onOverlayMouseDown}
       onWheel={onWheelNav}
     >
+      {/* Desk identity stays visible even in a full-screen widget view, so the user
+          always knows which desk they are in; its tooltip carries the desk's current
+          objective, retrievable in one interaction (PLX-UX-010 / PLX-UX-011). Shown
+          in the single-widget case; the grid header below carries it in grid mode. */}
+      {!useGrid && activeDeskTitle && (
+        <div
+          className="absolute top-3 left-4 z-30 flex items-center gap-1.5 pointer-events-auto text-[var(--ink-60)]"
+          data-testid="focus-desk-identity"
+          data-focus-no-exit
+          title={activeDeskObjective ? `Objective: ${activeDeskObjective}` : activeDeskTitle}
+        >
+          <Icon name="desk" size={14} />
+          <span className="text-xs font-semibold">{activeDeskTitle}</span>
+        </div>
+      )}
       {/* Generous padding gives an obvious empty margin on every side to click
           for a one-press exit (see onOverlayMouseDown — the whole overlay is an
           exit target except live content / controls). The card keeps its size;
@@ -718,7 +737,14 @@ function FocusModeInner(): JSX.Element | null {
             className="absolute top-3 inset-x-4 flex items-center gap-2 z-20 pointer-events-none"
             data-focus-no-exit
           >
-            <div className="flex items-center gap-2 pointer-events-auto text-[var(--ink-60)]">
+            <div className="flex items-center gap-2 pointer-events-auto text-[var(--ink-60)]" data-testid="focus-desk-identity">
+              {activeDeskTitle && (
+                <span className="flex items-center gap-1.5" title={activeDeskObjective ? `Objective: ${activeDeskObjective}` : activeDeskTitle}>
+                  <Icon name="desk" size={14} />
+                  <span className="text-xs font-semibold">{activeDeskTitle}</span>
+                  <span className="text-[var(--ink-40)]">/</span>
+                </span>
+              )}
               <Icon name="grid_view" size={16} />
               <span className="text-xs font-semibold">{headerTitle}</span>
             </div>
