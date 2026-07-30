@@ -8,7 +8,7 @@ The upgrade turns the product from CRUD-on-SQLite into an event-sourced Context 
 
 ## Traceability snapshot
 
-269 of 344 requirements are traceable to a passing test (78.2 percent), up from 2 at the start of the upgrade. 268 spec-cited unit tests plus the Context Engine end-to-end specs are green, and both the main and web typechecks are clean.
+278 of 344 requirements are traceable to a passing test (80.8 percent), up from 2 at the start of the upgrade. 277 spec-cited unit tests plus the Context Engine and accessibility end-to-end specs are green, and both the main and web typechecks are clean. The AI-001 single-model-client refactor is complete with a whole-codebase audit test, and the accessibility harness has verified keyboard operability and reduced-motion against the real app.
 
 The remaining 75 requirements are the wall: each needs something a unit test cannot honestly substitute for. They are grouped in the "What is blocked and what it needs" section below. Complete areas: DOM 20/20, GPH 12/12, SYN 6/6. Near-complete: PRD 35/36, EVT 23/24, AI 21/24, CTX 15/16, RES 11/12, API 7/8, AGT 15/16, CON 6/7, EXT 9/10, ARC 5/6, PRD 35/36.
 
@@ -35,7 +35,7 @@ The remaining 75 requirements are the wall: each needs something a unit test can
 | UX | 30 / 40 | UI-presence, mobile, accessibility (UI verification). |
 | MET | 10 / 15 | Live telemetry / sampling / cost. |
 | APP | 5 / 10 | Native-app ADRs + canvas implementation. |
-| A11Y | 1 / 8 | WCAG/keyboard/screen-reader (UI audit). |
+| A11Y | 3 / 8 | Keyboard + reduced-motion verified; A11Y-001 fails on real contrast/target-size violations (below); zoom/screen-reader/voice remain. |
 | OPS | 0 / 9 | Deployment, monitoring, SLOs, runbooks (ops infra). |
 | PERF | 0 / 18 | Latency/throughput budgets (instrumentation + load). |
 
@@ -135,8 +135,12 @@ PERF-001 through PERF-072, CTX-014, RES-022, SCH-004, MET-001/002/007, UX-042. T
 ### 2. Live model access and an evaluation framework (3)
 AI-004, AGT-022, ENG-013. Provider-substitution and agent evaluation suites run against every supported model per release with recorded thresholds. I need model API keys wired for the branch and a go-ahead to build and run an eval harness (this also unlocks the live AI wiring that surfaces the resume summary and relationship discovery).
 
-### 3. A UI and accessibility test pass (about 12)
-A11Y-001/002/003/005/006/007/008 and the UI-presence UX rules (UX-001/010/011/080/081/082/085/086, UX-023). WCAG conformance, keyboard, screen-reader, zoom, reduced-motion, and "always visible" behaviours are verified against the rendered app, not a pure function. I can build much of this as Playwright + axe-core e2e against the real desktop app if you want me to run the UI harness (it means build + the plexidesk-tester loop); the rest needs a manual screen-reader and keyboard pass.
+### 3. A UI and accessibility test pass (partly done)
+The harness ran. VERIFIED against the real app: A11Y-002 (keyboard operable, visible focus, no trap) and A11Y-005 (prefers-reduced-motion), and one critical ARIA violation was fixed (the sidebar-resize separator now carries valuenow/min/max). UX-023/085/086 are covered by the logic layer. Still open and each needs a real fix or a further pass:
+- A11Y-001 FAILS today on genuine WCAG violations found by axe: colour-contrast on the `--ink-40`/`--ink-50` tokens (kbd hints, section labels) and target-size on sub-24px icon buttons (Pin/Shrink/Grow). These are design-system fixes (a token contrast pass + a minimum hit-target rule), not a one-line change.
+- UX-010 appears violated: a full-screen focused widget (`z-50`) overlays the desk breadcrumb (`z-45`), so desk identity is obscured. Fix: raise/duplicate the identity into the full-screen overlay.
+- UX-011 appears unmet: there is no dedicated always-visible "Current Objective" surface. Fix: add one to the desk header.
+- A11Y-003/006/007/008 (screen-reader linear canvas, 200% zoom, voice, DoD gate) still need building plus a manual screen-reader/keyboard pass.
 
 ### 4. Cloud and security infrastructure (about 15)
 OPS-001 through OPS-014, SEC-024/025/026, CON-004, EVT-032, DATA-005. Secrets vault, data residency, customer-managed keys, connector credential vault, event-store encryption at rest, backup/restore/PITR exercised quarterly, and the operations surface (monitoring, SLOs, incident runbooks). These need the hosting and KMS/vault environment and the cloud-topology decisions still open in the risk register (RSK-08 and the cloud ADRs).
