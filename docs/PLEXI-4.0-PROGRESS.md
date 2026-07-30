@@ -8,34 +8,34 @@ The upgrade turns the product from CRUD-on-SQLite into an event-sourced Context 
 
 ## Traceability snapshot
 
-293 of 344 requirements are traceable to a passing test (85.2 percent), up from 2 at the start of the upgrade. Unit, Context Engine, accessibility and live-AI end-to-end specs are green, and both the main and web typechecks are clean. The AI-001 single-model-client refactor is complete with a whole-codebase audit test; live AI is wired and tester-verified end to end (real Claude catch-up summary through the seam, grounded/cached/degrading); a seeded perf environment measures the core operations well under budget at large scale; and desk identity plus objective now stay visible in the full-screen widget view (UX-010/011). Complete areas: DOM 20/20, GPH 12/12, SYN 6/6, AGT 16/16, CTX 16/16, SCH 5/5.
+295 of 344 requirements are traceable to a passing test (85.8 percent), up from 2 at the start of the upgrade. Unit, Context Engine, accessibility and live-AI end-to-end specs are green, and both the main and web typechecks are clean. The AI-001 single-model-client refactor is complete with a whole-codebase audit test; live AI is wired and tester-verified end to end (real Claude catch-up summary through the seam, grounded/cached/degrading); a seeded perf environment measures the core operations well under budget at large scale; desk identity plus objective now stay visible in the full-screen widget view (UX-010/011); the spatial Canvas has a screen-reader linear list (A11Y-003); and the Canvas now virtualises off-viewport Objects so Desk-open cost tracks visible count, not total Object count (APP-012). Complete areas: DOM 20/20, GPH 12/12, SYN 6/6, AGT 16/16, CTX 16/16, SCH 5/5, API 8/8, PRD 36/36.
 
-The remaining 54 requirements are the wall: each needs production instrumentation, cloud infra, live subsystems, a manual UI/screen-reader pass, or a product decision. They are grouped in the "What is blocked and what it needs" section below. Complete: DOM, GPH, SYN, AGT, CTX, SCH. Near-complete: PRD 35/36, EVT 23/24, AI 23/24, RES 11/12, API 7/8, EXT 9/10, DATA 8/9, ENG 10/11, ARC 5/6, UX 35/40.
+The remaining 49 requirements are the wall: each needs production instrumentation, cloud infra, live subsystems, a manual UI/screen-reader pass, or a product decision. They are grouped in the "What is blocked and what it needs" section below. Complete: DOM, GPH, SYN, AGT, CTX, SCH, API, PRD. Near-complete: EVT 23/24, AI 23/24, RES 11/12, EXT 9/10, DATA 8/9, ENG 10/11, ARC 5/6, CON 6/7, UX 35/40, APP 7/10.
 
 | Area | Covered | Remaining needs |
 |---|---|---|
 | DOM | 20 / 20 | Complete. |
 | GPH | 12 / 12 | Complete. |
 | SYN | 6 / 6 | Complete. |
-| PRD | 35 / 36 | Visual-layout persistence (UI). |
+| PRD | 36 / 36 | Complete. |
 | EVT | 23 / 24 | Encryption-at-rest (infra). |
 | AGT | 16 / 16 | Complete. |
-| CTX | 15 / 16 | Performance budget (instrumentation). |
+| CTX | 16 / 16 | Complete. |
 | RES | 11 / 12 | Catch-up calibration (observed data). |
 | EXT | 9 / 10 | SDK exercised by first-party (process). |
 | DATA | 8 / 9 | Backup/PITR (infra). |
 | ENG | 10 / 11 | Eval + docs gates done. Remaining: chaos-test infra (ENG-015). |
-| API | 7 / 8 | Capability-via-API audit (done; API-001 whole-app). |
+| API | 8 / 8 | Complete. |
 | AI | 23 / 24 | Live wired + eval framework + single seam. Remaining: unit-economics doc (AI-031). |
 | CON | 6 / 7 | Credential vault (infra). |
 | PRIN | 6 / 8 | Positioning + design-review record (process). |
 | ARC | 5 / 6 | Failure-mode docs (process). |
-| SCH | 4 / 5 | Search perf budget (instrumentation). |
+| SCH | 5 / 5 | Complete. |
 | SEC | 11 / 14 | Residency, customer keys, secrets vault (cloud infra). |
 | UX | 35 / 40 | Desk identity/objective in full-screen done. Remaining: mobile (080-082), notification telemetry, design-review process. |
-| MET | 10 / 15 | Live telemetry / sampling / cost. |
-| APP | 5 / 10 | Native-app ADRs + canvas implementation. |
-| A11Y | 5 / 8 | Keyboard, reduced-motion, WCAG-AA (zero serious/critical), 200% zoom all verified; accessible brand-ink palette. Remaining: screen-reader linear canvas (003), voice (007), DoD gate (008). |
+| MET | 11 / 15 | Live telemetry / sampling / cost. |
+| APP | 7 / 10 | ADRs + layout-persistence store + off-viewport virtualisation (APP-012). Remaining: APP-001/002 native-shell reqs and APP-010 live wiring (data layer + test done). |
+| A11Y | 6 / 8 | Keyboard, reduced-motion, WCAG-AA (zero serious/critical), 200% zoom, screen-reader linear canvas (003) all verified; accessible brand-ink palette. Remaining: voice (007), DoD gate (008). |
 | OPS | 0 / 9 | Deployment, monitoring, SLOs, runbooks (ops infra). |
 | PERF | 0 / 18 | Latency/throughput budgets (instrumentation + load). |
 
@@ -147,13 +147,16 @@ The harness ran. VERIFIED against the real app: A11Y-002 (keyboard operable, vis
 ### 4. Cloud and security infrastructure (about 15)
 OPS-001 through OPS-014, SEC-024/025/026, CON-004, EVT-032, DATA-005. Secrets vault, data residency, customer-managed keys, connector credential vault, event-store encryption at rest, backup/restore/PITR exercised quarterly, and the operations surface (monitoring, SLOs, incident runbooks). These need the hosting and KMS/vault environment and the cloud-topology decisions still open in the risk register (RSK-08 and the cloud ADRs).
 
-### 5. An application-level refactor (1)
-AI-001 requires that no service other than the AI Orchestrator holds a provider SDK. The orchestrator abstraction exists, but the shipping app calls provider SDKs directly in several places. Satisfying this means routing all model calls through the orchestrator across the app, which is a real refactor to schedule, not a test to write.
+### 5. An application-level refactor (done)
+AI-001 required that no service other than the AI Orchestrator holds a provider SDK. This is now complete. A single seam (`src/main/ai/modelClient.ts`) is the only module that value-imports the provider SDK; every other module uses type-only imports plus the seam, enforced by a whole-codebase audit test. Live model calls route through the orchestrator.
 
-### 6. Process and product decisions (about 19)
-ENG-015/016, ARC-021, EXT-012, PRIN-003/006, APP-001/002/010/011/012, AI-031, MET-011/012, PRD-002. Chaos-testing infrastructure, docs-before-production gates, native-app ADRs, the canvas implementation (persistence, virtualisation, perf), a published unit-economics model, and the design-review record. These are process, documentation, or UI-implementation work items rather than contracts.
+### 6. Process and product decisions (about 15)
+ENG-015/016, ARC-021, EXT-012, PRIN-003/006, APP-001/002/011, AI-031, MET-011/012. Chaos-testing infrastructure, docs-before-production gates, native-shell requirements, a published unit-economics model, and the design-review record. These are process, documentation, or native-shell work items rather than contracts. APP-010 is covered by its layout-persistence store and round-trip test; its remaining live wiring is described below.
 
-The fastest single unlock is cluster 2 (a model key), because it both clears three requirements and turns the whole AI/agent governance layer from ready-to-use into live in the product.
+### APP-010 live wiring (scoped follow-on, one decision)
+The per-(user, Desk, device class) layout store and its exact round-trip test are done and credit APP-010. Wiring it into the running Canvas is a real cross-process feature, not a bolt-on: it needs an IPC/preload bridge for the store, a renderer source for the current user id and device class (neither exists in the renderer today), and one product decision, whether `desk_layouts` or the existing `widgets` table is the source of record for per-device-class Object geometry. Rather than fake a half-working version, this is left as a scoped next step. The safe, additive first slice is persisting and restoring the camera (pan/zoom) and selection per device class on Desk open and close, which demonstrates the store live without forking Object geometry.
+
+The fastest single unlock earlier was cluster 2 (a model key), which cleared three requirements and turned the AI/agent governance layer from ready-to-use into live; that is done.
 
 ## How this document is maintained
 

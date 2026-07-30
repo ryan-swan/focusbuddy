@@ -121,6 +121,7 @@ import {
 import LinkOverlay from './LinkOverlay'
 import { useLinksStore } from '../stores/links'
 import { LinkDragContext } from '../lib/linkDragContext'
+import { computeVisibleObjectIds, type VirtualizationBox } from '../lib/canvasVirtualization'
 import type {
   ContextMenuPayload,
   SectionLayout,
@@ -307,12 +308,21 @@ export default function Canvas(): JSX.Element {
   // toolbar (position:fixed) uses this to dock beside the assistant instead of
   // sliding under it when it opens or is resized.
   const [toolbarRightInset, setToolbarRightInset] = useState(0)
+  // Live canvas viewport size in screen px, tracked so off-viewport
+  // virtualisation (PLX-APP-012) can recompute the mounted-Object set when the
+  // window or side panels resize. Zero until first measure = "not measured yet".
+  const [viewportSize, setViewportSize] = useState<{ w: number; h: number }>({ w: 0, h: 0 })
   useEffect(() => {
     const el = dropRef.current
     if (!el) return
     const measure = (): void => {
       const rect = el.getBoundingClientRect()
       setToolbarRightInset(Math.max(0, Math.round(window.innerWidth - rect.right)))
+      setViewportSize((prev) => {
+        const w = Math.round(rect.width)
+        const h = Math.round(rect.height)
+        return prev.w === w && prev.h === h ? prev : { w, h }
+      })
     }
     measure()
     const ro = new ResizeObserver(measure)
@@ -414,13 +424,128 @@ export default function Canvas(): JSX.Element {
   const loadLinksForTask = useLinksStore((s) => s.loadForTask)
   const clearLinks = useLinksStore((s) => s.clear)
   const createLink = useLinksStore((s) => s.create)
+  const links = useLinksStore((s) => s.links)
+  const dragOverride = useWidgetStore((s) => s.dragOverride)
   const [linkSourceId, setLinkSourceId] = useState<string | null>(null)
   const [ghostCursor, setGhostCursor] = useState<{ x: number; y: number } | null>(null)
+
+  // Off-viewport virtualisation (PLX-APP-012). `visibleObjectIds` is the set of
+  // top-level Objects the render loop mounts this frame; null means "cull nothing"
+  // (Columns view or before the viewport is measured). `visibleIdsRef` feeds the
+  // previous-frame set back into the hysteresis + freeze logic, and the key ref
+  // lets us commit a new set only when membership actually changes, mirroring the
+  // marquee hit-test pattern so pans don't force a re-render every frame.
+  const [visibleObjectIds, setVisibleObjectIds] = useState<Set<string> | null>(null)
+  const visibleIdsRef = useRef<Set<string> | null>(null)
+  const visibleKeyRef = useRef<string>('')
 
   useEffect(() => {
     if (activeTaskId) void loadForTask(activeTaskId)
     else clearWidgets()
   }, [activeTaskId, loadForTask, clearWidgets])
+
+  // PLX-APP-012 — world-space bounding boxes for every top-level Object the two
+  // render maps iterate. Camera-independent, so this recomputes only when the
+  // Object set changes, never on a pan frame. Section children are excluded here
+  // and mount through their parent section.
+  const virtualizationBoxes = useMemo<VirtualizationBox[]>(() => {
+    const boxes: VirtualizationBox[] = []
+    for (const w of widgets) {
+      if (w.archived || w.pinned) continue
+      if (w.parentSectionId !== null) continue
+      if (w.kind === 'section') {
+        const children = widgets.filter((c) => c.parentSectionId === w.id)
+        const frame = computeSectionFrame(children, effectiveLayout(w.layout))
+        boxes.push({ id: w.id, x: w.x, y: w.y, width: frame.width, height: frame.height })
+      } else {
+        boxes.push({ id: w.id, x: w.x, y: w.y, width: w.width, height: w.height })
+      }
+    }
+    return boxes
+  }, [widgets])
+
+  // PLX-APP-012 — ids that must never be culled regardless of geometry: the
+  // active, focused and link-armed Object, the whole selection, every stateful
+  // web-kind Object (unmounting a <webview> reloads it), and every link endpoint.
+  // Any exempt Object that lives inside a section also keeps that section mounted,
+  // so the child renders and its DOM node exists for LinkOverlay (linking to
+  // section children is permitted today, so this promotion is load-bearing).
+  // Camera-independent, and deliberately excludes the per-frame drag signal (see
+  // dragExemptIds) so an active drag never rebuilds this Set every frame.
+  const virtualizationExempt = useMemo<Set<string>>(() => {
+    const exempt = new Set<string>()
+    if (activeId) exempt.add(activeId)
+    if (focusedId) exempt.add(focusedId)
+    if (linkSourceId) exempt.add(linkSourceId)
+    for (const id of selectedIds) exempt.add(id)
+    for (const w of widgets) if (isWebKind(w.kind)) exempt.add(w.id)
+    for (const l of links) {
+      exempt.add(l.sourceWidgetId)
+      exempt.add(l.targetWidgetId)
+    }
+    const byId = new Map(widgets.map((w) => [w.id, w]))
+    for (const id of Array.from(exempt)) {
+      const parent = byId.get(id)?.parentSectionId
+      if (parent) exempt.add(parent)
+    }
+    return exempt
+  }, [widgets, links, selectedIds, activeId, focusedId, linkSourceId])
+
+  // PLX-APP-012 — the currently-dragged Object (and its parent section) as a tiny
+  // side channel. `dragOverride` changes x/y every drag frame, but the dragged
+  // *id* is stable for the whole drag, so keying on the id means this recomputes
+  // once per drag rather than per frame, and the heavy exempt Set above is never
+  // rebuilt mid-drag. Passed to computeVisibleObjectIds as extraExemptIds.
+  const draggingId = dragOverride?.widgetId ?? null
+  const dragExemptIds = useMemo<string[] | undefined>(() => {
+    if (!draggingId) return undefined
+    const w = widgets.find((x) => x.id === draggingId)
+    return w?.parentSectionId ? [draggingId, w.parentSectionId] : [draggingId]
+  }, [draggingId, widgets])
+
+  // PLX-APP-012 — recompute the mounted-Object set when the camera or the derived
+  // box/exempt inputs change. Per pan frame only the pure intersection runs, and
+  // the set is committed only when membership actually changes (sorted-key compare,
+  // the marquee hit-test pattern), so a pan that reveals nothing new never forces a
+  // re-render. Hysteresis + the animation freeze come from the pure module.
+  useEffect(() => {
+    if (deskViewMode === 'columns' || viewportSize.w === 0 || viewportSize.h === 0) {
+      // Columns view mounts through its own overlay, and before the first measure
+      // we have no viewport to test against — render everything in both cases.
+      if (visibleIdsRef.current !== null || visibleKeyRef.current !== '') {
+        visibleIdsRef.current = null
+        visibleKeyRef.current = ''
+        setVisibleObjectIds(null)
+      }
+      return
+    }
+    const next = computeVisibleObjectIds(
+      virtualizationBoxes,
+      { panX, panY, zoom, viewportWidth: viewportSize.w, viewportHeight: viewportSize.h },
+      {
+        exemptIds: virtualizationExempt,
+        extraExemptIds: dragExemptIds,
+        previousVisible: visibleIdsRef.current ?? undefined,
+        freezeUnmounts: animatingPan
+      }
+    )
+    const key = Array.from(next).sort().join(',')
+    if (key !== visibleKeyRef.current) {
+      visibleKeyRef.current = key
+      visibleIdsRef.current = next
+      setVisibleObjectIds(next)
+    }
+  }, [
+    virtualizationBoxes,
+    virtualizationExempt,
+    dragExemptIds,
+    panX,
+    panY,
+    zoom,
+    animatingPan,
+    viewportSize,
+    deskViewMode
+  ])
 
   useEffect(() => {
     if (activeTaskId) void loadLinksForTask(activeTaskId)
@@ -2226,6 +2351,9 @@ export default function Canvas(): JSX.Element {
             {deskViewMode !== 'columns' && widgets.map((w) => {
               if (w.archived) return null
               if (w.pinned || w.kind !== 'section') return null
+              // PLX-APP-012: skip sections fully outside the viewport (a section is
+              // exempt when it holds a linked child, so its children's links hold).
+              if (visibleObjectIds && !visibleObjectIds.has(w.id)) return null
               return (
                 <div key={w.id}>{renderWidget(w)}</div>
               )
@@ -2237,6 +2365,10 @@ export default function Canvas(): JSX.Element {
               // For web kinds, fully UNMOUNT the focused widget so its unmount-flush
               // commits the latest URL before focus mode's separate WebViewWidget mounts.
               if (focusedId === w.id && isWebKind(w.kind)) return null
+              // PLX-APP-012: skip Objects fully outside the viewport. Web kinds and
+              // link/active/selected Objects are exempt (kept in visibleObjectIds),
+              // so this only ever culls cheap, off-screen, unconnected Objects.
+              if (visibleObjectIds && !visibleObjectIds.has(w.id)) return null
               return (
                 <div key={w.id}>
                   {renderWidget(w)}
