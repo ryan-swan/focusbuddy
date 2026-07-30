@@ -63,6 +63,9 @@ import { searchAll, setMailSearchCache } from '../db/search'
 // fires once per message per app run (the renderer polls mail:list).
 const announcedMailUids = new Set<number>()
 import { getActiveOrgId, setActiveOrgId } from '../db/activeOrg'
+import { getDb } from '../db/database'
+import { createDeskLayoutStore } from '../db/deskLayoutStore'
+import type { DeskLayout, DeviceClass } from '@shared/deskLayout'
 import { generateDocument, processMeetingEnd, generateDesignContent, generateDesignVariations, setConversationSnapshot } from '../ai/anthropic'
 import { generateImage } from '../imageGen'
 import { exportDesign } from '../designExport'
@@ -535,6 +538,15 @@ function materialityForNode(node: {
   }
 }
 
+// Lazily-constructed desk-layout overlay store, bound to the app DB on first use
+// (getDb() is ready by the time any IPC handler fires). Its constructor creates
+// the desk_layouts table if absent.
+let _deskLayoutStore: ReturnType<typeof createDeskLayoutStore> | null = null
+function deskLayoutStore(): ReturnType<typeof createDeskLayoutStore> {
+  if (!_deskLayoutStore) _deskLayoutStore = createDeskLayoutStore(getDb())
+  return _deskLayoutStore
+}
+
 export function registerIpcHandlers(): void {
   // ── Body-double cross-window relay ──────────────────────────────────────
   // BroadcastChannel is per-renderer-process — fine for two browser tabs,
@@ -648,6 +660,16 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('widgets:delete', (_e, id: string) => deleteWidget(id))
   ipcMain.handle('widgets:restore', (_e, id: string) => restoreWidget(id))
   ipcMain.handle('widgets:bringToFront', (_e, id: string) => bringToFront(id))
+
+  // Desk layout overlay (PLX-APP-010 / UX-032, ADR-0006). Per-(user, Desk,
+  // device class) camera + selection, persisted and restored on Desk open. The
+  // store lazily creates its own table; instantiate once against the app DB.
+  ipcMain.handle('deskLayout:load', (_e, userId: string, deskId: string, deviceClass: DeviceClass) =>
+    deskLayoutStore().load(userId, deskId, deviceClass)
+  )
+  ipcMain.handle('deskLayout:save', (_e, layout: DeskLayout) =>
+    deskLayoutStore().save(layout, new Date().toISOString())
+  )
 
   ipcMain.handle('widgetLinks:listByTask', (_e, taskId: string) => listLinksByTask(taskId))
 

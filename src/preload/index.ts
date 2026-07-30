@@ -73,6 +73,7 @@ import type {
   FbTablePatch
 } from '@shared/fields'
 import type { KnowledgeEntry, KnowledgeDraft, KnowledgePatch } from '@shared/knowledge'
+import type { DeskLayout, DeviceClass } from '@shared/deskLayout'
 
 // Local-document comment row as returned by the docComments IPC.
 interface DocCommentDto {
@@ -309,6 +310,13 @@ const api = {
       ipcRenderer.invoke('account:setSkipped', skipped),
     setCachedEmail: (email: string | null): Promise<void> =>
       ipcRenderer.invoke('account:setCachedEmail', email)
+  },
+  // Desk layout overlay (PLX-APP-010 / UX-032). Per-(user, Desk, device class)
+  // camera + selection, saved on user action and restored on Desk open.
+  deskLayout: {
+    load: (userId: string, deskId: string, deviceClass: DeviceClass): Promise<DeskLayout | null> =>
+      ipcRenderer.invoke('deskLayout:load', userId, deskId, deviceClass),
+    save: (layout: DeskLayout): Promise<void> => ipcRenderer.invoke('deskLayout:save', layout)
   },
   chat: {
     send: (req: ChatRequest): Promise<ChatResponse> => ipcRenderer.invoke('chat:send', req),

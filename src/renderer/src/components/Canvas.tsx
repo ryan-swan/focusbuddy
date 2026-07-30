@@ -120,6 +120,8 @@ import {
 } from '../lib/chromeState'
 import LinkOverlay from './LinkOverlay'
 import { useLinksStore } from '../stores/links'
+import { useAccountStore } from '../stores/account'
+import { currentDeviceClass } from '../lib/deviceClass'
 import { LinkDragContext } from '../lib/linkDragContext'
 import { computeVisibleObjectIds, type VirtualizationBox } from '../lib/canvasVirtualization'
 import type {
@@ -426,6 +428,8 @@ export default function Canvas(): JSX.Element {
   const createLink = useLinksStore((s) => s.create)
   const links = useLinksStore((s) => s.links)
   const dragOverride = useWidgetStore((s) => s.dragOverride)
+  const layoutHydratedFor = useWidgetStore((s) => s.layoutHydratedFor)
+  const accountId = useAccountStore((s) => s.account?.id ?? null)
   const [linkSourceId, setLinkSourceId] = useState<string | null>(null)
   const [ghostCursor, setGhostCursor] = useState<{ x: number; y: number } | null>(null)
 
@@ -443,6 +447,28 @@ export default function Canvas(): JSX.Element {
     if (activeTaskId) void loadForTask(activeTaskId)
     else clearWidgets()
   }, [activeTaskId, loadForTask, clearWidgets])
+
+  // PLX-APP-010 Phase 1 / UX-032 — persist this user's camera + selection for the
+  // active Desk and device class, debounced, on user action. Gated on
+  // layoutHydratedFor so the reset-to-origin and the restore itself never save a
+  // spurious layout before hydration. Object geometry stays in the shared base
+  // (widgets) per ADR-0006, so objects is empty here; Phase 2 fills it. The last
+  // sub-600ms camera nudge before a fast Desk switch may not persist, which
+  // self-heals on the next visit.
+  useEffect(() => {
+    if (!activeTaskId || layoutHydratedFor !== activeTaskId) return
+    const layout = {
+      userId: accountId ?? 'local',
+      deskId: activeTaskId,
+      deviceClass: currentDeviceClass(),
+      objects: [],
+      scroll: { x: panX, y: panY },
+      selectedObjectIds: selectedIds,
+      zoom
+    }
+    const t = window.setTimeout(() => void window.api.deskLayout.save(layout), 600)
+    return () => window.clearTimeout(t)
+  }, [activeTaskId, layoutHydratedFor, accountId, panX, panY, zoom, selectedIds])
 
   // PLX-APP-012 — world-space bounding boxes for every top-level Object the two
   // render maps iterate. Camera-independent, so this recomputes only when the

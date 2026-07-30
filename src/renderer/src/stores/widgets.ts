@@ -7,6 +7,8 @@ import { notifyAgentInputChanged } from '../lib/deskAgentEngine'
 import { recordSnapshotSoon } from '../lib/timeTravel'
 import { recordAction, recordActionWithToast } from './actionHistory'
 import { focusNavOrder, isFocusable } from '../lib/focusNavOrder'
+import { useAccountStore } from './account'
+import { currentDeviceClass } from '../lib/deviceClass'
 
 // Re-export the Focus-Mode nav helpers so consumers (WidgetFocusMode, the split
 // surfaces) can import them from the store alongside useWidgetStore.
@@ -24,6 +26,15 @@ const UNDOABLE_WIDGET_KEYS: Array<keyof WidgetPatch> = ['x', 'y', 'width', 'heig
 interface WidgetStore {
   widgets: Widget[]
   loadingFor: string | null
+  // The Desk whose saved camera + selection overlay has been restored this open
+  // (PLX-APP-010 / UX-032). Gates the debounced save so the reset-to-origin and
+  // the restore itself never persist a spurious layout before hydration.
+  layoutHydratedFor: string | null
+  // Monotonic token bumped on every non-refresh loadForTask. Every awaited write
+  // in that call is gated on it, so a reentrant open for the SAME taskId (e.g.
+  // reloadCanvasStores after an AI-undo, or a live-canvas rebuild) supersedes the
+  // earlier call's late restore, which a taskId-string compare cannot detect.
+  loadToken: number
   focusedWidgetId: string | null
   activeWidgetId: string | null
   hoveredSectionId: string | null
@@ -102,6 +113,8 @@ const clampZoom = (z: number): number => Math.max(Z_MIN, Math.min(Z_MAX, z))
 export const useWidgetStore = create<WidgetStore>((set, get) => ({
   widgets: [],
   loadingFor: null,
+  layoutHydratedFor: null,
+  loadToken: 0,
   focusedWidgetId: null,
   activeWidgetId: null,
   hoveredSectionId: null,
@@ -124,7 +137,12 @@ export const useWidgetStore = create<WidgetStore>((set, get) => ({
       if (get().loadingFor === taskId) set({ widgets, loadingFor: null })
       return
     }
+    // Per-call token: distinguishes a reentrant open for the SAME taskId from
+    // this call itself, which the loadingFor string compare cannot. Every awaited
+    // write below is gated on it, so a newer open always wins.
+    const token = get().loadToken + 1
     set({
+      loadToken: token,
       loadingFor: taskId,
       widgets: [],
       focusedWidgetId: null,
@@ -134,19 +152,53 @@ export const useWidgetStore = create<WidgetStore>((set, get) => ({
       groupStart: null,
       zoom: 1,
       panX: 0,
-      panY: 0
+      panY: 0,
+      layoutHydratedFor: null
     })
     const widgets = await window.api.widgets.listByTask(taskId)
-    if (get().loadingFor === taskId) {
-      set({ widgets, loadingFor: null })
-      // Baseline snapshot for time-travel (dedup keeps it cheap on re-open).
-      recordSnapshotSoon(taskId)
+    if (get().loadToken !== token) return // superseded by a newer open (any taskId)
+    set({ widgets, loadingFor: null })
+    // Baseline snapshot for time-travel (dedup keeps it cheap on re-open).
+    recordSnapshotSoon(taskId)
+    // Restore this user's saved camera + selection overlay for this Desk and
+    // device class (PLX-APP-010 Phase 1 / UX-032, ADR-0006). Absent overlay =
+    // the reset origin above. Stale selected ids (deleted Objects) are dropped
+    // so restoration degrades gracefully (UX-033).
+    const userId = useAccountStore.getState().account?.id ?? 'local'
+    try {
+      const saved = await window.api.deskLayout.load(userId, taskId, currentDeviceClass())
+      // Abandon if a newer open superseded this call while we awaited.
+      if (get().loadToken !== token) return
+      if (saved) {
+        const present = new Set(get().widgets.map((w) => w.id))
+        set({
+          zoom: clampZoom(typeof saved.zoom === 'number' ? saved.zoom : 1),
+          panX: saved.scroll?.x ?? 0,
+          panY: saved.scroll?.y ?? 0,
+          selectedIds: Array.isArray(saved.selectedObjectIds)
+            ? saved.selectedObjectIds.filter((id) => present.has(id))
+            : [],
+          layoutHydratedFor: taskId
+        })
+      } else {
+        set({ layoutHydratedFor: taskId })
+      }
+    } catch {
+      // A missing bridge or a read error must not block the Desk from opening;
+      // mark hydrated so saves can begin from the current (origin) camera, unless
+      // a newer open already superseded this call.
+      if (get().loadToken === token) set({ layoutHydratedFor: taskId })
     }
   },
   clear: () =>
     set({
+      // Bump the token so an in-flight loadForTask cannot repopulate or restore a
+      // Desk the user has already backed out of (the token-scheme equivalent of
+      // the old loadingFor-null guard).
+      loadToken: get().loadToken + 1,
       widgets: [],
       loadingFor: null,
+      layoutHydratedFor: null,
       focusedWidgetId: null,
       activeWidgetId: null,
       selectedIds: [],
