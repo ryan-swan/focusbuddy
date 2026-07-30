@@ -34,7 +34,7 @@ The remaining 49 requirements are the wall: each needs production instrumentatio
 | SEC | 11 / 14 | Residency, customer keys, secrets vault (cloud infra). |
 | UX | 35 / 40 | Desk identity/objective in full-screen done. Remaining: mobile (080-082), notification telemetry, design-review process. |
 | MET | 11 / 15 | Live telemetry / sampling / cost. |
-| APP | 7 / 10 | ADRs + layout-persistence store + off-viewport virtualisation (APP-012). Remaining: APP-001/002 native-shell reqs and APP-010 live wiring (data layer + test done). |
+| APP | 7 / 10 | ADRs + layout persistence + off-viewport virtualisation (APP-012) + APP-010 Phase 1 live (camera + selection overlay). Remaining: APP-001/002 native-shell reqs and APP-010 Phase 2 (object-geometry overlay). |
 | A11Y | 6 / 8 | Keyboard, reduced-motion, WCAG-AA (zero serious/critical), 200% zoom, screen-reader linear canvas (003) all verified; accessible brand-ink palette. Remaining: voice (007), DoD gate (008). |
 | OPS | 0 / 9 | Deployment, monitoring, SLOs, runbooks (ops infra). |
 | PERF | 0 / 18 | Latency/throughput budgets (instrumentation + load). |
@@ -106,6 +106,7 @@ Status values are Done, meaning built and covered by passing tests and, where it
 | Accessible brand-ink palette, WCAG-AA (A11Y-001/006) | Done | 6652ef0 | Home and Desk pass axe with zero serious or critical findings, including at 200% zoom, via same-hue accessible ink tokens. |
 | Screen-reader linear canvas (A11Y-003) | Done | 137711e | The spatial canvas exposes an equivalent ordered, keyboard-navigable list of its objects in a visually-hidden landmark. |
 | Desk layout persistence store (APP-010 data layer) | Done | 6275924 | Per-(user, desk, device class) position, size, z-order, scroll, selection and zoom, with an exact round-trip (PRD-002). |
+| Desk camera + selection overlay, live (APP-010 Phase 1) | Done | f371408 | Per-(user, device class) camera + selection restored on Desk open, saved on user action, via a new IPC bridge (ADR-0006). Reentrancy-safe (loadToken). Camera-owner-approved; tester + e2e verified. Object-geometry overlay is Phase 2. |
 | Off-viewport Canvas virtualisation (APP-012) | Done | 6c98b44 | Mounts only the objects the camera can see, so desk-open cost tracks visible count, not total. Owner-approved (camera + link owners), tester-verified end to end. |
 
 ### Planned and deferred
@@ -113,7 +114,7 @@ Status values are Done, meaning built and covered by passing tests and, where it
 | Deliverable | Status | Blocking decision |
 |---|---|---|
 | Remaining UX presence/visual rules | Planned | Mostly UI-verification; the data-side logic is done. |
-| APP-010 live wiring | Planned, next | Data layer + test done (6275924). Needs an IPC/preload bridge, a renderer user-id + device-class source, and one decision on the geometry source of record (see the APP-010 note above). |
+| APP-010 Phase 2 (object-geometry overlay) | Planned | Phase 1 (camera + selection overlay) is shipped and live (f371408). Phase 2 extends the overlay to Object position/size/z-order, and needs section-engine reconciliation, a workspaceSync change to stop broadcasting per-user geometry, and a first-open migration (ADR-0006). Separately reviewed. |
 | Backup / restore / PITR procedures | Planned | DATA-005; partly exists in the shipping app. |
 | Production performance budgets | Deferred | Seeded env measures under budget (f620987); the remaining PERF requirements need production instrumentation to claim honestly (PERF, CTX-014, RES-022). |
 | Cross-org sync / cloud topology, partition load | Deferred | RSK-08 and cloud ADRs, foreclosing; do not bind the desktop build. |
@@ -168,7 +169,7 @@ AI-001 required that no service other than the AI Orchestrator holds a provider 
 ENG-015/016, ARC-021, EXT-012, PRIN-003/006, APP-001/002/011, AI-031, MET-011/012. Chaos-testing infrastructure, docs-before-production gates, native-shell requirements, a published unit-economics model, and the design-review record. These are process, documentation, or native-shell work items rather than contracts. APP-010 is covered by its layout-persistence store and round-trip test; its remaining live wiring is described below.
 
 ### APP-010 live wiring (decided in ADR-0006, phased)
-The per-(user, Desk, device class) layout store and its exact round-trip test are done and credit APP-010. The source-of-record decision is settled in ADR-0006: `widgets` keeps the shared base geometry (so collaboration, sections, links, templates and snapshots are untouched) and `desk_layouts` is a per-(user, device class) overlay that wins when present and falls back to the base. The renderer already knows the current user via `useAccountStore`, and device class for the Electron client is `desktop` (the PWA is `mobile`), so the earlier "no identity source" blocker does not hold. Phase 1 wires the camera and selection overlay per device class through a new IPC bridge; Phase 2 extends the overlay to Object geometry with section reconciliation, a `workspaceSync` change to stop broadcasting per-user geometry, and a first-open migration, and is a scheduled, separately-reviewed epic.
+The per-(user, Desk, device class) layout store and its exact round-trip test are done and credit APP-010. The source-of-record decision is settled in ADR-0006: `widgets` keeps the shared base geometry (so collaboration, sections, links, templates and snapshots are untouched) and `desk_layouts` is a per-(user, device class) overlay that wins when present and falls back to the base. The renderer already knows the current user via `useAccountStore`, and device class for the Electron client is `desktop` (the PWA is `mobile`), so the earlier "no identity source" blocker does not hold. Phase 1 is shipped (f371408): a new IPC bridge restores the camera and selection overlay per device class on Desk open and persists it on user action, so a Desk reopens where the user left it and a tablet never overwrites a desktop arrangement (UX-032). It was reviewed by canvas-camera-owner (two reentrancy race fixes applied on review) and verified against the built app by plexidesk-tester and a durable e2e spec. Phase 2 extends the overlay to Object geometry with section reconciliation, a `workspaceSync` change to stop broadcasting per-user geometry, and a first-open migration, and remains a scheduled, separately-reviewed epic.
 
 The fastest single unlock earlier was cluster 2 (a model key), which cleared three requirements and turned the AI/agent governance layer from ready-to-use into live; that is done.
 
