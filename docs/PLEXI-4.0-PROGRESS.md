@@ -129,6 +129,7 @@ Status values are Done, meaning built and covered by passing tests and, where it
 | ADR-0003 | Cryptographic erasure with per-subject keys for the desktop build. Cloud KMS left open. | Accepted (operator-delegated), overridable before merge. |
 | ADR-0004 | Event schema evolution: read-time, versioned, chained upcasting; never fabricate absence. | Accepted (operator-delegated), overridable before merge. |
 | ADR-0005 | Deployment topology: Plexi stays local-first (Electron + on-device SQLite); Vercel/Fly stay sync and web infrastructure, not a cloud app backend; cloud-only requirements deferred. | Accepted (operator-delegated), overridable before merge. |
+| ADR-0006 | Desk layout source of record: `widgets` keeps the shared base geometry (collaboration, sections, links, snapshots unchanged); `desk_layouts` is a per-(user, device class) overlay that wins when present. Phase 1 = camera + selection overlay (now); Phase 2 = object-geometry overlay + section reconciliation + migration (scheduled epic). | Accepted (operator-delegated), overridable before merge. |
 
 ## Decisions still owned by the operator
 
@@ -166,8 +167,8 @@ AI-001 required that no service other than the AI Orchestrator holds a provider 
 ### 6. Process and product decisions (about 15)
 ENG-015/016, ARC-021, EXT-012, PRIN-003/006, APP-001/002/011, AI-031, MET-011/012. Chaos-testing infrastructure, docs-before-production gates, native-shell requirements, a published unit-economics model, and the design-review record. These are process, documentation, or native-shell work items rather than contracts. APP-010 is covered by its layout-persistence store and round-trip test; its remaining live wiring is described below.
 
-### APP-010 live wiring (scoped follow-on, one decision)
-The per-(user, Desk, device class) layout store and its exact round-trip test are done and credit APP-010. Wiring it into the running Canvas is a real cross-process feature, not a bolt-on: it needs an IPC/preload bridge for the store, a renderer source for the current user id and device class (neither exists in the renderer today), and one product decision, whether `desk_layouts` or the existing `widgets` table is the source of record for per-device-class Object geometry. Rather than fake a half-working version, this is left as a scoped next step. The safe, additive first slice is persisting and restoring the camera (pan/zoom) and selection per device class on Desk open and close, which demonstrates the store live without forking Object geometry.
+### APP-010 live wiring (decided in ADR-0006, phased)
+The per-(user, Desk, device class) layout store and its exact round-trip test are done and credit APP-010. The source-of-record decision is settled in ADR-0006: `widgets` keeps the shared base geometry (so collaboration, sections, links, templates and snapshots are untouched) and `desk_layouts` is a per-(user, device class) overlay that wins when present and falls back to the base. The renderer already knows the current user via `useAccountStore`, and device class for the Electron client is `desktop` (the PWA is `mobile`), so the earlier "no identity source" blocker does not hold. Phase 1 wires the camera and selection overlay per device class through a new IPC bridge; Phase 2 extends the overlay to Object geometry with section reconciliation, a `workspaceSync` change to stop broadcasting per-user geometry, and a first-open migration, and is a scheduled, separately-reviewed epic.
 
 The fastest single unlock earlier was cluster 2 (a model key), which cleared three requirements and turned the AI/agent governance layer from ready-to-use into live; that is done.
 
