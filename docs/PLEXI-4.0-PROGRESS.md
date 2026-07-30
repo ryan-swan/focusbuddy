@@ -95,15 +95,27 @@ Status values are Done, meaning built and covered by passing tests and, where it
 | Schema evolution / upcasting | Done | 6e4103b | Read-time, versioned, chained upcasting; never fabricates absence; wired into the store read path (ADR-0004). |
 | Event JSON-Schema registry + validation | Done | be62f77 | Every produced Event type has a published, versioned schema at a stable dataschema URI; a dependency-free validator; the test suite is the CI gate that fails on an unschema'd or malformed producer (EVT-043/044). |
 
+### Native applications, accessibility and performance
+
+| Deliverable | Status | Commit | What it gives us |
+|---|---|---|---|
+| Single model-client seam (AI-001) | Done | a6562e9 | One module value-imports the provider SDK; every other module uses the seam, enforced by a whole-codebase audit test. |
+| Live resume summary through the seam | Done | 5e1d7e5 | Real Claude catch-up summary grounded in the structured resume, digest-cached, degrading honestly without a key. Tester-verified end to end. |
+| Seeded perf environment + benchmark | Done | f620987 | Small/medium/large workspace seeds and a percentile harness; core operations measured well under budget at large scale (7 reqs; CTX and SCH complete). |
+| Full-screen desk identity + objective (UX-010/011) | Done | 81e0b78 | Desk title and objective stay visible in the full-screen widget view, in single and grid modes. |
+| Accessible brand-ink palette, WCAG-AA (A11Y-001/006) | Done | 6652ef0 | Home and Desk pass axe with zero serious or critical findings, including at 200% zoom, via same-hue accessible ink tokens. |
+| Screen-reader linear canvas (A11Y-003) | Done | 137711e | The spatial canvas exposes an equivalent ordered, keyboard-navigable list of its objects in a visually-hidden landmark. |
+| Desk layout persistence store (APP-010 data layer) | Done | 6275924 | Per-(user, desk, device class) position, size, z-order, scroll, selection and zoom, with an exact round-trip (PRD-002). |
+| Off-viewport Canvas virtualisation (APP-012) | Done | 6c98b44 | Mounts only the objects the camera can see, so desk-open cost tracks visible count, not total. Owner-approved (camera + link owners), tester-verified end to end. |
+
 ### Planned and deferred
 
 | Deliverable | Status | Blocking decision |
 |---|---|---|
-| Live AI wiring (resume summary + relationship discovery) | Planned, next | Needs a live model key; the whole governance/orchestrator layer is ready. |
-| Resume AI summary (stage 6) surfaced in UI | Planned | Depends on live AI wiring. |
 | Remaining UX presence/visual rules | Planned | Mostly UI-verification; the data-side logic is done. |
+| APP-010 live wiring | Planned, next | Data layer + test done (6275924). Needs an IPC/preload bridge, a renderer user-id + device-class source, and one decision on the geometry source of record (see the APP-010 note above). |
 | Backup / restore / PITR procedures | Planned | DATA-005; partly exists in the shipping app. |
-| Performance budgets | Deferred | Need production instrumentation to claim honestly (PERF, CTX-014, RES-022). |
+| Production performance budgets | Deferred | Seeded env measures under budget (f620987); the remaining PERF requirements need production instrumentation to claim honestly (PERF, CTX-014, RES-022). |
 | Cross-org sync / cloud topology, partition load | Deferred | RSK-08 and cloud ADRs, foreclosing; do not bind the desktop build. |
 | Residency, customer-managed keys, secrets vault | Deferred | Cloud/enterprise scope (SEC-024/025/026). |
 | Merge plexi-4.0 toward the shipping product | Deferred | Operator decision on timing and rollout. |
@@ -116,6 +128,7 @@ Status values are Done, meaning built and covered by passing tests and, where it
 | ADR-0002 | Tenant isolation for the desktop build: organisationId enforced at the store layer by construction. Cloud topology left open. | Accepted (operator-delegated), overridable before merge. |
 | ADR-0003 | Cryptographic erasure with per-subject keys for the desktop build. Cloud KMS left open. | Accepted (operator-delegated), overridable before merge. |
 | ADR-0004 | Event schema evolution: read-time, versioned, chained upcasting; never fabricate absence. | Accepted (operator-delegated), overridable before merge. |
+| ADR-0005 | Deployment topology: Plexi stays local-first (Electron + on-device SQLite); Vercel/Fly stay sync and web infrastructure, not a cloud app backend; cloud-only requirements deferred. | Accepted (operator-delegated), overridable before merge. |
 
 ## Decisions still owned by the operator
 
