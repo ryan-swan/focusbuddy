@@ -25,6 +25,7 @@ import {
   type PlexiEvent,
   type StatePayload
 } from '../../shared/events'
+import { upcastEvent } from './upcasting'
 
 // Minimal SQLite surface the store needs. better-sqlite3's Database satisfies it
 // structurally (production passes getDb() directly); tests pass a node:sqlite
@@ -183,6 +184,13 @@ export function createEventStore(db: SqlDb, organisationId?: string | (() => str
     }
   }
 
+  // Read-time upcasting (ADR-0004, PLX-EVT-035): an Event written under an older
+  // schema is upcast to the current shape as it is read. The stored row is never
+  // rewritten (INV-05). A no-op until an upcaster is registered for the type.
+  function readEvent(r: Record<string, unknown>): PlexiEvent {
+    return upcastEvent(rowToEvent(r))
+  }
+
   // Core append. Runs inside a transaction so the sequence read and the insert
   // are atomic. NEVER exposes update/delete (PLX-EVT-010).
   // Positional binding keeps the store portable across better-sqlite3 (prod) and
@@ -284,7 +292,7 @@ export function createEventStore(db: SqlDb, organisationId?: string | (() => str
           .prepare(`SELECT * FROM events WHERE desk_id = ? AND sequence <= ?${orgClause} ORDER BY sequence ASC`)
           .all(deskId, opts.untilSequence, ...orgArg) as Record<string, unknown>[])
       : (db.prepare(`SELECT * FROM events WHERE desk_id = ?${orgClause} ORDER BY sequence ASC`).all(deskId, ...orgArg) as Record<string, unknown>[])
-    return rows.map(rowToEvent)
+    return rows.map(readEvent)
   }
 
   // Run fn exactly once per (consumer, event); duplicate delivery is a no-op that
@@ -303,7 +311,7 @@ export function createEventStore(db: SqlDb, organisationId?: string | (() => str
     const rows = db
       .prepare('SELECT e.* FROM events e JOIN event_outbox o ON o.event_id = e.id WHERE o.published = 0 ORDER BY e.recorded_at ASC LIMIT ?')
       .all(limit) as Record<string, unknown>[]
-    return rows.map(rowToEvent)
+    return rows.map(readEvent)
   }
 
   const markPublished: EventStore['markPublished'] = (eventIds) => {

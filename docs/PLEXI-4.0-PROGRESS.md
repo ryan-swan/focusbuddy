@@ -8,16 +8,16 @@ The upgrade turns the product from CRUD-on-SQLite into an event-sourced Context 
 
 ## Traceability snapshot
 
-95 of 344 requirements are traceable to a passing test (28 percent), up from 2 at the start of the upgrade. 116 spec-cited unit tests plus the Context Engine end-to-end specs are green, and both the main and web typechecks are clean.
+98 of 344 requirements are traceable to a passing test (28.5 percent), up from 2 at the start of the upgrade. 121 spec-cited unit tests plus the Context Engine end-to-end specs are green, and both the main and web typechecks are clean.
 
 | Area | Covered | Notes |
 |---|---|---|
-| EVT (events) | 20 / 24 | Contract, store, processing soundness. Remaining are schema-evolution and encryption-at-rest. |
+| EVT (events) | 22 / 24 | Contract, store, processing soundness, schema evolution. Remaining are the JSON-Schema registry with CI validation and encryption-at-rest. |
 | CTX (context) | 14 / 16 | Materiality, health, propagation, freshness. Remaining two are performance-budget verifications. |
 | GPH (graph) | 11 / 12 | Relationships, traversal, isolation. Remaining is async community detection. |
 | RES (resume) | 10 / 12 | Deterministic pipeline. Remaining are AI-summary calibration and permission-filtered render. |
 | SEC (security) | 9 / 14 | Isolation, permissions, erasure. Remaining are residency, customer keys, secrets vault. |
-| DOM (domain) | 9 / 20 | Identity, deletion, provenance. Remaining are object-model breadth. |
+| DOM (domain) | 10 / 20 | Identity, deletion, provenance, schema versioning. Remaining are object-model breadth. |
 | PRD (product) | 8 / 36 | Deletion semantics, relationships. Broadest remaining surface. |
 | DATA | 5 / 9 | Projections, inventory, retention. Remaining are backup/PITR procedures. |
 | AI | 1 / 24 | Governance foundations laid; orchestration and prompt framework remain. |
@@ -65,13 +65,14 @@ Status values are Done, meaning built and covered by passing tests and, where it
 | Isolation across all stores + permission expiry/audit | Done | db7b4a0 | Event and decision stores org-bound; grants expire and fail closed; auditable authorisation. |
 | Cryptographic erasure + data inventory + DSAR | Done | e430e7a | Real right-to-erasure that keeps the audit trail (ADR-0003, §44.1). |
 | Event-processing soundness | Done | 5504a7e | Historical-permission replay, out-of-order and duplicate tolerance, encrypted event payloads. |
+| Schema evolution / upcasting | Done | (this change) | Read-time, versioned, chained upcasting; never fabricates absence; wired into the store read path (ADR-0004). |
 
 ### Planned and deferred
 
 | Deliverable | Status | Blocking decision |
 |---|---|---|
-| Schema evolution / upcasting | Planned, next | RSK-02, foreclosing. Gets its own ADR before build. |
-| Object lifecycle + schema versioning breadth | Planned | None. Non-foreclosing DOM/PRD work. |
+| Object lifecycle + object-model breadth | Planned, next | None. Non-foreclosing DOM/PRD work. |
+| JSON-Schema registry + CI validation | Planned | None. EVT-043/044 wire; the upcasting mechanism is in place. |
 | AI orchestration + prompt framework | Planned | Needs a live model key; governance foundation is ready. |
 | Resume AI summary (stage 6) surfaced in UI | Planned | Depends on AI orchestration. |
 | Backup / restore / PITR procedures | Planned | DATA-005; partly exists in the shipping app. |
@@ -87,14 +88,15 @@ Status values are Done, meaning built and covered by passing tests and, where it
 | ADR-0001 | Adopt event sourcing as the 4.0 foundation. | Accepted (operator). |
 | ADR-0002 | Tenant isolation for the desktop build: organisationId enforced at the store layer by construction. Cloud topology left open. | Accepted (operator-delegated), overridable before merge. |
 | ADR-0003 | Cryptographic erasure with per-subject keys for the desktop build. Cloud KMS left open. | Accepted (operator-delegated), overridable before merge. |
+| ADR-0004 | Event schema evolution: read-time, versioned, chained upcasting; never fabricate absence. | Accepted (operator-delegated), overridable before merge. |
 
 ## Decisions still owned by the operator
 
 These are foreclosing decisions from the spec risk register. They have been flagged rather than settled silently, and each is cheapest to decide now, before any production data exists on the new schema.
 
-The next one due is schema evolution over an infinite horizon (RSK-02): how upcasters are applied and versioned, and whether a missing historical field is exposed as absent or given a default. The recommendation is read-time upcasting and never fabricating absence, consistent with the no-fakery rule; an ADR will record it before the mechanism is built.
+Three of the five foreclosing decisions are now recorded: tenant isolation (ADR-0002), cryptographic erasure and key management (ADR-0003), and schema evolution (ADR-0004). The two identifier and permission-snapshot decisions of §85.2 were settled in the Event Store foundation.
 
-Further out and not required for the desktop build are the partition-load model (RSK-08), the cloud multi-tenant topology (siloed versus pooled graph and vector stores), and data residency and customer-managed keys. The last operator call is when and how the branch merges toward the shipping product, since it is a large architectural addition that currently runs beside the existing paths.
+What remains open is not required for the desktop build: the partition-load model (RSK-08), the cloud multi-tenant topology (siloed versus pooled graph and vector stores), and data residency and customer-managed keys. The last operator call is when and how the branch merges toward the shipping product, since it is a large architectural addition that currently runs beside the existing paths.
 
 ## How this document is maintained
 
