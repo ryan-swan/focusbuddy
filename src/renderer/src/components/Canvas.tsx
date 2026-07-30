@@ -104,6 +104,7 @@ import HistoryPanel from './HistoryPanel'
 import ResumeModal from './ResumeModal'
 import CanvasBreadcrumb from './CanvasBreadcrumb'
 import ContextHealthStrip from './ContextHealthStrip'
+import CanvasLinearView from './CanvasLinearView'
 import FloatingPill from './FloatingPill'
 import { useFreeDesk } from '../hooks/useFreeDesk'
 import type { StandardApp } from '../lib/standardApps'
@@ -2062,6 +2063,9 @@ export default function Canvas(): JSX.Element {
               <ContextHealthStrip deskId={activeTask.id} variant="chrome" />
             </div>
           )}
+          {/* Screen-reader linear representation of the spatial canvas (PLX-A11Y-003):
+              visually hidden, fully navigable, opens each object. */}
+          <CanvasLinearView widgets={widgets} onOpen={(id) => focusOn(id)} deskTitle={activeTask?.title ?? null} />
           {panPing && (
             <div
               className="absolute pointer-events-none z-[200]"
