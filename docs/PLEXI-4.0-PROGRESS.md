@@ -8,7 +8,7 @@ The upgrade turns the product from CRUD-on-SQLite into an event-sourced Context 
 
 ## Traceability snapshot
 
-98 of 344 requirements are traceable to a passing test (28.5 percent), up from 2 at the start of the upgrade. 121 spec-cited unit tests plus the Context Engine end-to-end specs are green, and both the main and web typechecks are clean.
+105 of 344 requirements are traceable to a passing test (30.5 percent), up from 2 at the start of the upgrade. 129 spec-cited unit tests plus the Context Engine end-to-end specs are green, and both the main and web typechecks are clean.
 
 | Area | Covered | Notes |
 |---|---|---|
@@ -17,8 +17,8 @@ The upgrade turns the product from CRUD-on-SQLite into an event-sourced Context 
 | GPH (graph) | 11 / 12 | Relationships, traversal, isolation. Remaining is async community detection. |
 | RES (resume) | 10 / 12 | Deterministic pipeline. Remaining are AI-summary calibration and permission-filtered render. |
 | SEC (security) | 9 / 14 | Isolation, permissions, erasure. Remaining are residency, customer keys, secrets vault. |
-| DOM (domain) | 10 / 20 | Identity, deletion, provenance, schema versioning. Remaining are object-model breadth. |
-| PRD (product) | 8 / 36 | Deletion semantics, relationships. Broadest remaining surface. |
+| DOM (domain) | 14 / 20 | Identity, deletion, provenance, schema versioning, uniform object handling. Remaining are objective/AI-config breadth. |
+| PRD (product) | 11 / 36 | Universal object model, type registry, deletion semantics, relationships. Broadest remaining surface. |
 | DATA | 5 / 9 | Projections, inventory, retention. Remaining are backup/PITR procedures. |
 | AI | 1 / 24 | Governance foundations laid; orchestration and prompt framework remain. |
 | ARC / APP | 1 each | Foundational touches only. |
@@ -55,6 +55,12 @@ Status values are Done, meaning built and covered by passing tests and, where it
 | Renderer surfaces (desk health strip) | Done | f872a30, 55991cf, 3f6c19e | The canvas shows what changed since last visit and related desks needing attention. |
 | Event-sourced graph + projection rebuild | Done | 949c23b | The graph is a projection provably rebuildable from the log (validates ADR-0001). |
 
+### Domain model
+
+| Deliverable | Status | Commit | What it gives us |
+|---|---|---|---|
+| Universal Object model + runtime type registry | Done | d4e1e0d | One object schema with type data in a typed payload (PRD-010); types register at runtime (PRD-011); no type is privileged in storage/permission/event/versioning/health (DOM-020); materialised refs are not the source of record (DOM-013); inferred objectives stay unconfirmed until accepted (DOM-022). |
+
 ### Security and privacy
 
 | Deliverable | Status | Commit | What it gives us |
@@ -71,8 +77,8 @@ Status values are Done, meaning built and covered by passing tests and, where it
 
 | Deliverable | Status | Blocking decision |
 |---|---|---|
-| Object lifecycle + object-model breadth | Planned, next | None. Non-foreclosing DOM/PRD work. |
-| JSON-Schema registry + CI validation | Planned | None. EVT-043/044 wire; the upcasting mechanism is in place. |
+| JSON-Schema registry + CI validation | Planned, next | None. EVT-043/044 wire; the upcasting mechanism is in place. |
+| Object-model breadth (remaining PRD surface) | Planned | None. Desk archetype events, presence sync modes, embeddings policy. |
 | AI orchestration + prompt framework | Planned | Needs a live model key; governance foundation is ready. |
 | Resume AI summary (stage 6) surfaced in UI | Planned | Depends on AI orchestration. |
 | Backup / restore / PITR procedures | Planned | DATA-005; partly exists in the shipping app. |

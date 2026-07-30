@@ -86,6 +86,22 @@ export interface Objective {
   setAt: string
   source: AcquisitionMethod
   confidence: ConfidenceBand | null
+  // An inferred Objective is unconfirmed until a user accepts it (PLX-DOM-022 /
+  // PLX-PRD-006). A declared Objective is confirmed by definition.
+  accepted?: boolean
+}
+
+// Build an inferred Objective. It MUST carry a confidence band and starts
+// unconfirmed, so the interface can mark it as a suggestion, not a fact (DOM-022).
+export function inferredObjective(statement: string, conf: ConfidenceBand, setBy = 'ai', setAt = ''): Objective {
+  if (!conf) throw new Error('An inferred Objective MUST carry a confidence (PLX-DOM-022).')
+  return { statement, setBy, setAt, source: 'inferred', confidence: conf, accepted: false }
+}
+
+// Only declared or explicitly-accepted Objectives are confirmed; an inferred one
+// stays unconfirmed until the user accepts it (DOM-022).
+export function isConfirmedObjective(o: Objective): boolean {
+  return o.source === 'declared' || o.accepted === true
 }
 
 export interface AttentionItem {
