@@ -17,8 +17,15 @@ import { detectOfficeBuild, detectPreviewBuild } from './appMode'
 import { runDueFlows } from './db/flows'
 import { runDueReports } from './db/reports'
 
-loadEnv({ path: join(app.getAppPath(), '.env') })
-loadEnv({ path: join(app.getAppPath(), '..', '.env') })
+// Load .env for dev/prod, but NOT under the Playwright harness (FB_TEST_USER_DATA):
+// the e2e suite strips API keys from the launch env to stay hermetic, and loading a
+// developer's local .env from disk here would silently defeat that and make real,
+// billable AI calls. A deliberate live test passes its keys in the launch env, which
+// this guard leaves untouched.
+if (!process.env.FB_TEST_USER_DATA) {
+  loadEnv({ path: join(app.getAppPath(), '.env') })
+  loadEnv({ path: join(app.getAppPath(), '..', '.env') })
+}
 
 // Test-isolation hook: when running under Playwright we want a throwaway
 // userData (separate DB, separate cookies) so tests don't touch the developer's
