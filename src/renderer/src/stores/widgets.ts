@@ -9,6 +9,14 @@ import { recordAction, recordActionWithToast } from './actionHistory'
 import { focusNavOrder, isFocusable } from '../lib/focusNavOrder'
 import { useAccountStore } from './account'
 import { currentDeviceClass } from '../lib/deviceClass'
+import type { DeskLayout } from '@shared/deskLayout'
+import {
+  isOverlayEligible,
+  patchTouchesOverlayGeometry,
+  splitOverlayPatch,
+  applyOverlayGeometry,
+  serializeOverlayObjects
+} from '../lib/deskLayoutOverlay'
 
 // Re-export the Focus-Mode nav helpers so consumers (WidgetFocusMode, the split
 // surfaces) can import them from the store alongside useWidgetStore.
@@ -35,6 +43,15 @@ interface WidgetStore {
   // reloadCanvasStores after an AI-undo, or a live-canvas rebuild) supersedes the
   // earlier call's late restore, which a taskId-string compare cannot detect.
   loadToken: number
+  // Whether the active Desk is opted into per-device object-geometry customisation
+  // (PLX-APP-010 Phase 2, ADR-0006). False for every Desk by default, which keeps
+  // the mutation path unchanged; true only after the user opts this Desk in on
+  // this device. Set from the loaded overlay on Desk open.
+  customLayout: boolean
+  // Toggle per-device layout customisation for the active Desk. Enabling captures
+  // the current arrangement into the personal overlay; disabling clears it and
+  // reloads the shared base.
+  setDeskCustomLayout: (enabled: boolean) => Promise<void>
   focusedWidgetId: string | null
   activeWidgetId: string | null
   hoveredSectionId: string | null
@@ -115,6 +132,7 @@ export const useWidgetStore = create<WidgetStore>((set, get) => ({
   loadingFor: null,
   layoutHydratedFor: null,
   loadToken: 0,
+  customLayout: false,
   focusedWidgetId: null,
   activeWidgetId: null,
   hoveredSectionId: null,
@@ -153,7 +171,8 @@ export const useWidgetStore = create<WidgetStore>((set, get) => ({
       zoom: 1,
       panX: 0,
       panY: 0,
-      layoutHydratedFor: null
+      layoutHydratedFor: null,
+      customLayout: false
     })
     const widgets = await window.api.widgets.listByTask(taskId)
     if (get().loadToken !== token) return // superseded by a newer open (any taskId)
@@ -171,7 +190,17 @@ export const useWidgetStore = create<WidgetStore>((set, get) => ({
       if (get().loadToken !== token) return
       if (saved) {
         const present = new Set(get().widgets.map((w) => w.id))
+        // Phase 2 (ADR-0006): when this Desk is opted into per-device layout,
+        // the personal overlay wins for eligible top-level Objects. Applied over
+        // the base widgets before they settle, so downstream consumers (render,
+        // sections, links) read the effective geometry transparently.
+        const custom = saved.customLayout === true
         set({
+          widgets:
+            custom && Array.isArray(saved.objects) && saved.objects.length
+              ? applyOverlayGeometry(get().widgets, saved.objects)
+              : get().widgets,
+          customLayout: custom,
           zoom: clampZoom(typeof saved.zoom === 'number' ? saved.zoom : 1),
           panX: saved.scroll?.x ?? 0,
           panY: saved.scroll?.y ?? 0,
@@ -370,51 +399,117 @@ export const useWidgetStore = create<WidgetStore>((set, get) => ({
         w.id === id ? { ...w, ...patch, updatedAt: Date.now() } : w
       )
     })
-    const updated = await window.api.widgets.update(id, patch)
-    if (!updated) return
-    // Reconcile with the server's authoritative copy (timestamps + any computed fields)
-    set({ widgets: get().widgets.map((w) => (w.id === id ? updated : w)) })
-    // Linked-duplicate live sync: mirror the synced fields (content / title /
-    // colour) to any OTHER in-store copies that share this widget's syncGroupId,
-    // so same-task copies update instantly. Cross-task copies are mirrored by the
-    // main process (db/widgets.ts) and show when their task is opened.
-    const sgid = updated.syncGroupId
-    if (
-      sgid &&
-      (patch.content !== undefined || patch.title !== undefined || patch.color !== undefined)
-    ) {
-      const mirror: Partial<Widget> = {}
-      if (patch.content !== undefined) mirror.content = patch.content
-      if (patch.title !== undefined) mirror.title = patch.title
-      if (patch.color !== undefined) mirror.color = patch.color
+    // PLX-APP-010 Phase 2 (ADR-0006): when this Desk is opted into per-device
+    // layout, route position/size changes for eligible top-level Objects to the
+    // personal overlay (persisted by the Canvas overlay-save effect) instead of
+    // the shared base, so they stay private and never sync. A patch that changes
+    // section membership, or an ineligible/section/pinned Object, always writes to
+    // the base as before. When customLayout is off (the default for every Desk)
+    // routeGeom is false and the path below is byte-identical to the shipping code.
+    const target = get().widgets.find((w) => w.id === id)
+    const routeGeom =
+      get().customLayout &&
+      !!target &&
+      isOverlayEligible(target) &&
+      !('parentSectionId' in patch) &&
+      patchTouchesOverlayGeometry(patch as Record<string, unknown>)
+    const { geometry: overlayGeom, rest } = routeGeom
+      ? splitOverlayPatch(patch as Record<string, unknown>)
+      : { geometry: {}, rest: patch }
+    const dbPatch = (routeGeom ? rest : patch) as WidgetPatch
+
+    let updated: Widget | null = null
+    if (Object.keys(dbPatch as Record<string, unknown>).length > 0) {
+      updated = await window.api.widgets.update(id, dbPatch)
+      if (!updated) return
+      const server = updated
+      // Reconcile with the server copy, then re-assert any overlay-destined
+      // geometry so the server's (unchanged) base geometry never clobbers the
+      // optimistic move that was deliberately not written to the base.
       set({
         widgets: get().widgets.map((w) =>
-          w.syncGroupId === sgid && w.id !== id ? { ...w, ...mirror } : w
+          w.id === id ? (routeGeom ? { ...server, ...overlayGeom } : server) : w
         )
       })
+      // Linked-duplicate live sync: mirror the synced fields (content / title /
+      // colour) to any OTHER in-store copies that share this widget's syncGroupId,
+      // so same-task copies update instantly. Cross-task copies are mirrored by the
+      // main process (db/widgets.ts) and show when their task is opened.
+      const sgid = server.syncGroupId
+      if (
+        sgid &&
+        (patch.content !== undefined || patch.title !== undefined || patch.color !== undefined)
+      ) {
+        const mirror: Partial<Widget> = {}
+        if (patch.content !== undefined) mirror.content = patch.content
+        if (patch.title !== undefined) mirror.title = patch.title
+        if (patch.color !== undefined) mirror.color = patch.color
+        set({
+          widgets: get().widgets.map((w) =>
+            w.syncGroupId === sgid && w.id !== id ? { ...w, ...mirror } : w
+          )
+        })
+      }
+      // Live wires: a content change may drive reactive (transform / mirror)
+      // wires leaving this widget, and may trigger any onChange desk agents this
+      // widget is wired into. Both engines debounce + guard against loops.
+      if (patch.content !== undefined) {
+        void notifyWireSource(id)
+        notifyAgentInputChanged(id)
+      }
     }
-    // Live wires: a content change may drive reactive (transform / mirror)
-    // wires leaving this widget, and may trigger any onChange desk agents this
-    // widget is wired into. Both engines debounce + guard against loops.
-    if (patch.content !== undefined) {
-      void notifyWireSource(id)
-      notifyAgentInputChanged(id)
-    }
+    // else: a pure overlay-geometry update — nothing to persist to the base; the
+    // optimistic set already applied it and the Canvas overlay-save effect writes
+    // it to desk_layouts.
     if (undoCapture) {
       const { prevPatch, redoPatch, label } = undoCapture
-      recordAction({
-        label,
-        undo: async () => {
-          await window.api.widgets.update(id, prevPatch)
-          set({ widgets: get().widgets.map((w) => (w.id === id ? { ...w, ...prevPatch } : w)) })
-        },
-        redo: async () => {
-          await window.api.widgets.update(id, redoPatch)
-          set({ widgets: get().widgets.map((w) => (w.id === id ? { ...w, ...redoPatch } : w)) })
-        }
-      })
+      // For an overlay-routed move, reverse THROUGH update() so the reversal also
+      // lands in the overlay; otherwise keep the original direct-to-base reversal.
+      const reverse = (p: WidgetPatch): (() => Promise<void>) =>
+        routeGeom
+          ? async () => {
+              suppressWidgetUndo = true
+              try {
+                await get().update(id, p)
+              } finally {
+                suppressWidgetUndo = false
+              }
+            }
+          : async () => {
+              await window.api.widgets.update(id, p)
+              set({ widgets: get().widgets.map((w) => (w.id === id ? { ...w, ...p } : w)) })
+            }
+      recordAction({ label, undo: reverse(prevPatch), redo: reverse(redoPatch) })
     }
-    recordSnapshotSoon(updated.taskId)
+    const snapshotTaskId = updated?.taskId ?? target?.taskId
+    if (snapshotTaskId) recordSnapshotSoon(snapshotTaskId)
+  },
+  setDeskCustomLayout: async (enabled) => {
+    // Toggle per-device layout customisation for the active (hydrated) Desk
+    // (PLX-APP-010 Phase 2, ADR-0006). Enabling snapshots the current arrangement
+    // into the personal overlay so nothing moves, and flips routing on. Disabling
+    // clears the overlay and reloads the shared base so the Desk reverts to the
+    // collaborative arrangement, keeping the camera.
+    const taskId = get().layoutHydratedFor
+    if (!taskId) return
+    const s = get()
+    const layout: DeskLayout = {
+      userId: useAccountStore.getState().account?.id ?? 'local',
+      deskId: taskId,
+      deviceClass: currentDeviceClass(),
+      customLayout: enabled,
+      objects: enabled ? serializeOverlayObjects(s.widgets) : [],
+      scroll: { x: s.panX, y: s.panY },
+      selectedObjectIds: s.selectedIds,
+      zoom: s.zoom
+    }
+    set({ customLayout: enabled })
+    try {
+      await window.api.deskLayout.save(layout)
+    } catch {
+      // A save failure must not leave the UI wedged; the flag reverts on next open.
+    }
+    if (!enabled) await get().loadForTask(taskId, { refresh: true })
   },
   remove: async (id) => {
     const widget = get().widgets.find((w) => w.id === id)
@@ -573,3 +668,10 @@ export const useWidgetStore = create<WidgetStore>((set, get) => ({
     }
   }
 }))
+
+// Expose the widget store on window so debugging sessions and e2e specs can drive
+// it directly (mirrors __fbView in stores/view.ts). A thin handle to the real
+// store, not a mock; it changes nothing about how the app behaves for users.
+if (typeof window !== 'undefined') {
+  ;(window as unknown as { __fbWidgets?: typeof useWidgetStore }).__fbWidgets = useWidgetStore
+}

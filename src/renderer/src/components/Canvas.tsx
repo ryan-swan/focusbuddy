@@ -122,6 +122,7 @@ import LinkOverlay from './LinkOverlay'
 import { useLinksStore } from '../stores/links'
 import { useAccountStore } from '../stores/account'
 import { currentDeviceClass } from '../lib/deviceClass'
+import { serializeOverlayObjects } from '../lib/deskLayoutOverlay'
 import { LinkDragContext } from '../lib/linkDragContext'
 import { computeVisibleObjectIds, type VirtualizationBox } from '../lib/canvasVirtualization'
 import type {
@@ -150,6 +151,9 @@ const CATEGORY_COLOR: Record<WidgetCategory, string> = {
   Layout: '#737373'
 }
 
+// Stable empty overlay-objects reference so the layout-save effect does not
+// re-arm while a Desk is not opted into per-device layout (PLX-APP-010 Phase 2).
+const EMPTY_OVERLAY_OBJECTS: never[] = []
 const WEB_KINDS: WidgetKind[] = ['webview', 'pdf', 'gdoc', 'gsheet', 'gslide', 'email']
 const isWebKind = (k: WidgetKind): boolean => WEB_KINDS.includes(k)
 
@@ -429,6 +433,8 @@ export default function Canvas(): JSX.Element {
   const links = useLinksStore((s) => s.links)
   const dragOverride = useWidgetStore((s) => s.dragOverride)
   const layoutHydratedFor = useWidgetStore((s) => s.layoutHydratedFor)
+  const customLayout = useWidgetStore((s) => s.customLayout)
+  const setDeskCustomLayout = useWidgetStore((s) => s.setDeskCustomLayout)
   const accountId = useAccountStore((s) => s.account?.id ?? null)
   const [linkSourceId, setLinkSourceId] = useState<string | null>(null)
   const [ghostCursor, setGhostCursor] = useState<{ x: number; y: number } | null>(null)
@@ -455,20 +461,29 @@ export default function Canvas(): JSX.Element {
   // (widgets) per ADR-0006, so objects is empty here; Phase 2 fills it. The last
   // sub-600ms camera nudge before a fast Desk switch may not persist, which
   // self-heals on the next visit.
+  // PLX-APP-010 Phase 2 — when the Desk is opted into per-device layout, the
+  // overlay carries eligible Objects' position/size too; otherwise it stays empty
+  // and only camera + selection persist (Phase 1). Recomputed from widgets so a
+  // geometry change re-arms the debounced save; a no-op stable value when off.
+  const overlayObjects = useMemo(
+    () => (customLayout ? serializeOverlayObjects(widgets) : EMPTY_OVERLAY_OBJECTS),
+    [customLayout, widgets]
+  )
   useEffect(() => {
     if (!activeTaskId || layoutHydratedFor !== activeTaskId) return
     const layout = {
       userId: accountId ?? 'local',
       deskId: activeTaskId,
       deviceClass: currentDeviceClass(),
-      objects: [],
+      customLayout,
+      objects: overlayObjects,
       scroll: { x: panX, y: panY },
       selectedObjectIds: selectedIds,
       zoom
     }
     const t = window.setTimeout(() => void window.api.deskLayout.save(layout), 600)
     return () => window.clearTimeout(t)
-  }, [activeTaskId, layoutHydratedFor, accountId, panX, panY, zoom, selectedIds])
+  }, [activeTaskId, layoutHydratedFor, accountId, panX, panY, zoom, selectedIds, customLayout, overlayObjects])
 
   // PLX-APP-012 — world-space bounding boxes for every top-level Object the two
   // render maps iterate. Camera-independent, so this recomputes only when the
@@ -1623,6 +1638,18 @@ export default function Canvas(): JSX.Element {
         icon: 'center_focus_strong',
         shortcut: '⌘0',
         onClick: () => resetView()
+      },
+      { separator: true },
+      {
+        // Per-device layout customisation (PLX-APP-010 Phase 2, ADR-0006). Off by
+        // default: the Desk follows the shared arrangement. On: this device keeps
+        // its own object positions and sizes, private to this user, and they are
+        // restored on reopen. A checkbox icon signals the toggle state.
+        label: customLayout
+          ? "Stop customising this device's layout"
+          : "Customise this device's layout",
+        icon: customLayout ? 'check_box' : 'check_box_outline_blank',
+        onClick: () => void setDeskCustomLayout(!customLayout)
       }
     ]
   }
