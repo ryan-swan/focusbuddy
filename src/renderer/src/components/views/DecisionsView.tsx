@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Decision } from '@shared/decision'
 import { DashboardHeader } from '../plexi'
 import Icon from '../Icon'
@@ -31,22 +31,42 @@ export default function DecisionsView(): JSX.Element {
   const [rows, setRows] = useState<Row[] | null>(null)
   const goTask = useViewStore((s) => s.goTask)
   const setActive = useNodeStore((s) => s.setActive)
+  const mountedRef = useRef(true)
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+    }
+  }, [])
 
   const refresh = useCallback(async () => {
     const api = window.api?.decisions
     if (!api?.withRisk) {
-      setRows([])
+      if (mountedRef.current) setRows([])
       return
     }
     try {
-      setRows(await api.withRisk())
+      const next = await api.withRisk()
+      if (mountedRef.current) setRows(next)
     } catch {
-      setRows([]) // honest empty rather than a fabricated list
+      if (mountedRef.current) setRows([]) // honest empty rather than a fabricated list
     }
   }, [])
 
+  // Live-updating: fetch on mount, re-fetch when the window regains focus, and
+  // poll on a gentle interval while the panel is open, so an at-risk status that
+  // flips because a linked object changed elsewhere surfaces here without the user
+  // having to leave and come back. Cheap (a handful of health computations) and
+  // stops when the panel unmounts.
   useEffect(() => {
     void refresh()
+    const onFocus = (): void => void refresh()
+    window.addEventListener('focus', onFocus)
+    const timer = window.setInterval(() => void refresh(), 8000)
+    return () => {
+      window.removeEventListener('focus', onFocus)
+      window.clearInterval(timer)
+    }
   }, [refresh])
 
   const openDesk = (deskId: string): void => {
