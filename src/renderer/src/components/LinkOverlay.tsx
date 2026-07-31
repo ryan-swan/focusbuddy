@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
-import type { WidgetLink, WireType, WireRun } from '@shared/types'
+import type { WidgetLink, WireType, WireRun, WidgetKind } from '@shared/types'
+import { recipesForSource } from '../lib/wireRecipes'
 import { useLinksStore } from '../stores/links'
 import { useWidgetStore } from '../stores/widgets'
 import { runWireNow, useWireRunStore } from '../lib/wireEngine'
@@ -694,6 +695,7 @@ export default function LinkOverlay({ ghost, pendingPick, onPendingPickDone }: P
         >
           <WireEditor
             link={selectedLink}
+            sourceKind={allWidgets.find((w) => w.id === selectedLink.sourceWidgetId)?.kind}
             error={wireErrors[selectedLink.id]}
             running={!!running[selectedLink.id]}
             onChange={(patch) => void updateWire(selectedLink.id, patch)}
@@ -773,6 +775,7 @@ function LinkIntentPicker({
 // or unlink. Compact so it doesn't dominate the canvas.
 function WireEditor({
   link,
+  sourceKind,
   error,
   running,
   onChange,
@@ -781,6 +784,7 @@ function WireEditor({
   onClose
 }: {
   link: WidgetLink
+  sourceKind?: WidgetKind
   error?: string
   running: boolean
   onChange: (patch: { type?: WireType; verb?: string; enabled?: boolean }) => void
@@ -790,6 +794,7 @@ function WireEditor({
 }): JSX.Element {
   const [verb, setVerb] = useState(link.verb)
   useEffect(() => setVerb(link.verb), [link.verb])
+  const recipes = recipesForSource(sourceKind)
 
   // Recent activity — durable before/after of what this wire has written, so the
   // user can see what the automation did and revert any write in one click.
@@ -854,6 +859,31 @@ function WireEditor({
 
         {link.type === 'transform' && (
           <div>
+            {recipes.length > 0 && (
+              <div className="mb-1.5" data-testid="wire-recipes">
+                <div className="text-[9px] uppercase tracking-[0.1em] text-[var(--ink-40)] mb-1">
+                  {verb.trim() ? 'Recipes' : 'Pick a recipe, or type your own'}
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {recipes.map((r) => (
+                    <button
+                      key={r.id}
+                      data-testid={`wire-recipe-${r.id}`}
+                      title={r.verb}
+                      onClick={() => {
+                        setVerb(r.verb)
+                        onChange({ verb: r.verb })
+                        onRunNow()
+                      }}
+                      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full border border-[var(--edge-soft)] text-[10px] text-[var(--ink-70)] hover:border-accent hover:text-accent transition-colors"
+                    >
+                      <Icon name={r.icon} size={11} />
+                      {r.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
             <input
               type="text"
               value={verb}
