@@ -170,6 +170,7 @@ const api = {
     cancel: (id: string): Promise<boolean> => ipcRenderer.invoke('decisions:cancel', id)
   },
   widgets: {
+    get: (id: string): Promise<Widget | null> => ipcRenderer.invoke('widgets:get', id),
     listByTask: (taskId: string): Promise<Widget[]> =>
       ipcRenderer.invoke('widgets:listByTask', taskId),
     listByKind: (kind: Widget['kind']): Promise<Widget[]> =>

@@ -715,6 +715,7 @@ export function registerIpcHandlers(): void {
       moveNode(id, newParentId, beforeId)
   )
 
+  ipcMain.handle('widgets:get', (_e, id: string) => getWidget(id))
   ipcMain.handle('widgets:listByTask', (_e, taskId: string) => listWidgetsByTask(taskId))
   ipcMain.handle('widgets:listByKind', (_e, kind: Widget['kind']) => listWidgetsByKind(kind))
   ipcMain.handle('widgets:create', (_e, draft: WidgetDraft) => {
