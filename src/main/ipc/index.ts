@@ -565,6 +565,17 @@ function materialityForWidget(widget: {
   }
 }
 
+// Context Health for any object id, resolving whether it is a node (Desk/Room) or
+// a widget and applying the matching materiality. Shared by context:health and the
+// decisions risk report.
+function objectHealth(id: string): ReturnType<typeof ceHealthFor> {
+  const node = getNode(id)
+  if (node) return ceHealthFor(id, materialityForNode(node))
+  const widget = getWidget(id)
+  if (widget) return ceHealthFor(id, materialityForWidget(widget))
+  return { objectId: id, state: 'current', materiality: null, changedEventCount: 0, decisionsAtRisk: [] }
+}
+
 // Lazily-constructed desk-layout overlay store, bound to the app DB on first use
 // (getDb() is ready by the time any IPC handler fires). Its constructor creates
 // the desk_layouts table if absent.
@@ -661,15 +672,9 @@ export function registerIpcHandlers(): void {
   // Confirmed relationship neighbours of an object — "surfaces with relations".
   ipcMain.handle('context:related', (_e, id: string) => ceRelatedObjectIds(id))
   // Per-(user, object) Context Health, honest against the user's last review point.
-  ipcMain.handle('context:health', (_e, id: string) => {
-    const node = getNode(id)
-    if (node) return ceHealthFor(id, materialityForNode(node))
-    // Widgets are first-class Context-Engine objects too (PLX-APP-002): derive
-    // their health so the Canvas can frame a widget that changed while away.
-    const widget = getWidget(id)
-    if (widget) return ceHealthFor(id, materialityForWidget(widget))
-    return { objectId: id, state: 'current', materiality: null, changedEventCount: 0, decisionsAtRisk: [] }
-  })
+  // Per-(user, object) Context Health. Widgets are first-class objects too, so
+  // this frames a widget that changed while away, not just a desk.
+  ipcMain.handle('context:health', (_e, id: string) => objectHealth(id))
   ipcMain.handle('context:markReviewed', (_e, id: string) => {
     ceMarkReviewed(id)
     return true
@@ -685,6 +690,19 @@ export function registerIpcHandlers(): void {
   )
   ipcMain.handle('decisions:list', () => ceListDecisions())
   ipcMain.handle('decisions:forObject', (_e, objectId: string) => ceDecisionsForObject(objectId))
+  // Live risk report for the decisions panel: each live Decision with whether any
+  // Object it references has a material change since review (so it is at risk).
+  ipcMain.handle('decisions:withRisk', () => {
+    return ceListDecisions()
+      .filter((d) => d.state !== 'superseded' && d.state !== 'cancelled')
+      .map((d) => {
+        const riskyObjectIds = d.relatedObjectIds.filter((oid) => {
+          const s = objectHealth(oid).state
+          return s === 'attention-required' || s === 'decision-risk'
+        })
+        return { decision: d, atRisk: riskyObjectIds.length > 0, riskyObjectIds }
+      })
+  })
   ipcMain.handle('decisions:cancel', (_e, id: string) => {
     ceCancelDecision(id)
     return true

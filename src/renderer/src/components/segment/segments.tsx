@@ -10,6 +10,7 @@ import RecentView from '../views/RecentView'
 import KnowledgeView from '../views/KnowledgeView'
 import PlexiSearchView from '../views/PlexiSearchView'
 import BrainMapView from '../views/BrainMapView'
+import DecisionsView from '../views/DecisionsView'
 import PlexiFlowView from '../views/PlexiFlowView'
 import AgentsView from '../views/AgentsView'
 import ConnectedAppsHubView from '../views/ConnectedAppsHubView'
@@ -96,6 +97,7 @@ export function PlexiBrainShell({ initialApp }: { initialApp?: string } = {}): J
           { key: 'ask', label: 'Ask Brain', blurb: 'Your knowledge base, ask anything', icon: 'neurology', tint: 'bg-indigo-500', render: () => <KnowledgeView /> },
           { key: 'search', label: 'Search', blurb: 'Find anything across your workspace', icon: 'search', tint: 'bg-sky-500', render: () => <PlexiSearchView /> },
           { key: 'map', label: 'Brain Map', blurb: 'Your knowledge as a linked graph', icon: 'bubble_chart', tint: 'bg-fuchsia-500', render: () => <BrainMapView /> },
+          { key: 'decisions', label: 'Decisions', blurb: 'What was decided, and what a change puts at risk', icon: 'gavel', tint: 'bg-red-500', render: () => <DecisionsView /> },
           { key: 'flows', label: 'Flows', blurb: 'Automations that run your work', icon: 'bolt', tint: 'bg-violet-500', render: () => <PlexiFlowView /> },
           { key: 'agents', label: 'Agents', blurb: 'Standing AI workers on your desks', icon: 'smart_toy', tint: 'bg-emerald-500', render: () => <AgentsView /> },
           { key: 'connect', label: 'Connect', blurb: 'Your connected apps and integrations', icon: 'hub', tint: 'bg-cyan-500', render: () => <ConnectedAppsHubView /> },

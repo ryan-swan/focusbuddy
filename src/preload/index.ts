@@ -163,6 +163,10 @@ const api = {
     }): Promise<Decision> => ipcRenderer.invoke('decisions:create', input),
     list: (): Promise<Decision[]> => ipcRenderer.invoke('decisions:list'),
     forObject: (objectId: string): Promise<Decision[]> => ipcRenderer.invoke('decisions:forObject', objectId),
+    // Each live Decision with whether an Object it references has a material change
+    // since review (drives the decisions panel's at-risk status).
+    withRisk: (): Promise<Array<{ decision: Decision; atRisk: boolean; riskyObjectIds: string[] }>> =>
+      ipcRenderer.invoke('decisions:withRisk'),
     cancel: (id: string): Promise<boolean> => ipcRenderer.invoke('decisions:cancel', id)
   },
   widgets: {
