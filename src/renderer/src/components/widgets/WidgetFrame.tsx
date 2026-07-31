@@ -1010,11 +1010,15 @@ export default function WidgetFrame({
                 <Icon name="edit" size={12} />
               </button>
             )}
-            {!isChildOfSection && linkDrag && (
+            {linkDrag && (
               <button
-                // A pinned widget is a valid link endpoint too (widget-link-owner
-                // invariant 5) — its rect is read in the same viewport coords as
-                // every other widget, so the line anchors to its screen position.
+                // Any widget with a header is a valid link SOURCE — top-level,
+                // pinned, or a section child (widget-link-owner: sections/children/
+                // pinned are all valid endpoints). No child gate is needed: icons/
+                // list children never mount WidgetFrame (they use CompactChildView,
+                // no header), so the hub only appears where a header exists (free/
+                // grid/stacks). Rects are read in viewport coords like any widget,
+                // so the line anchors to the child's visible edge inside the frame.
                 // mousedown stopPropagation prevents react-rnd from
                 // treating this click as a drag-handle press (the button
                 // lives inside the .widget-handle div). The actual arming
