@@ -247,6 +247,132 @@ CREATE TABLE IF NOT EXISTS fb_embeddings (
   PRIMARY KEY (item_type, item_id)
 );
 
+-- ── PlexiBrain chunk store (plexi-brain P0: the RAG floor) ────────────────────
+-- A source's extracted text split into overlapping chunks so a fact buried deep
+-- in a long document is findable by meaning (today's whole-doc embedding caps at
+-- ~8000 chars, hiding the tail — measured: recall@3 50% whole-doc vs 93% chunked
+-- on the real corpus). One row per chunk; its embedding lives in fb_embeddings
+-- under item_type='chunk' with item_id = this row's id (zero fb_embeddings schema
+-- change). source_type/source_id point back to the owning knowledge entry /
+-- document / task so a chunk hit resolves to its real WorkspaceSource + provenance.
+--
+-- RESERVED GRAPH-READY COLUMNS (plexi-brain invariant I2 — built-and-inert now,
+-- the anchors P1's object-graph spine layers a re-rank/gate over, never a
+-- tear-out): room_id (the aperture / room boundary), chunk_date (recency signal),
+-- source_kind (type-aware ranking), sensitivity (the privacy gate). Nullable and
+-- populated best-effort in P0 as plain indexed columns (NOT edges yet); P1 builds
+-- the spine/edges over them. Brain OFF never reads this table — it is dormant and
+-- harmless (no base-app feature depends on it, per DEC-012).
+CREATE TABLE IF NOT EXISTS fb_chunks (
+  id TEXT PRIMARY KEY,
+  source_type TEXT NOT NULL,      -- 'knowledge' | 'document' | 'task' | 'table' | 'note'
+  source_id TEXT NOT NULL,        -- the owning item's id (resolves back to a WorkspaceSource)
+  chunk_index INTEGER NOT NULL,   -- ordinal position of this chunk within its source
+  title TEXT NOT NULL DEFAULT '', -- the source title, denormalised for cheap keyword scoring
+  text TEXT NOT NULL,             -- the chunk's extracted plain text
+  content_hash TEXT NOT NULL,     -- hash of (source text + chunk params) → skip re-embed when unchanged
+  -- reserved graph-ready columns (I2): plain indexed columns in P0, spine anchors in P1
+  room_id TEXT,                   -- aperture / room boundary (the retrieval + privacy + tenancy line)
+  chunk_date INTEGER,             -- recency signal (source updated_at at index time)
+  source_kind TEXT,               -- finer type for type-aware ranking (e.g. doc_type)
+  sensitivity TEXT,               -- privacy gate (null = default/normal)
+  org_id TEXT NOT NULL DEFAULT 'personal',
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_fb_chunks_source ON fb_chunks(source_type, source_id);
+CREATE INDEX IF NOT EXISTS idx_fb_chunks_org ON fb_chunks(org_id);
+CREATE INDEX IF NOT EXISTS idx_fb_chunks_room ON fb_chunks(room_id);
+CREATE INDEX IF NOT EXISTS idx_fb_chunks_date ON fb_chunks(chunk_date DESC);
+CREATE INDEX IF NOT EXISTS idx_fb_chunks_kind ON fb_chunks(source_kind);
+
+-- ── PlexiBrain OBJECT GRAPH (plexi-brain P1: the GRAPH SPINE keystone) ─────────
+-- The real object-graph substrate that layers OVER P0's RAG floor as a re-rank/gate
+-- LAYER behind retrieveSources() (06-PLAN.md ## P1). Three ADDITIVE, brain-only
+-- tables — the base app never reads them, so brain OFF leaves them dormant and
+-- harmless (DEC-012.1: no base feature may depend on the brain). The existing island
+-- tables (nodes/documents/fb_knowledge/…) are NEVER touched — a projection-adapter
+-- materializes brain_nodes/brain_edges FROM them on index (the migration posture:
+-- additive, never destructive; the base row stays the single source of truth).
+--
+-- ⚠ The nodes table (kind IN folder|task) is the folder/task TREE and is NOT
+-- reused here — the object graph needs its own home so the ~16 ontology types don't
+-- collide with the task tree's CHECK constraint + cascade semantics.
+--
+-- ⚠ DEC-014: the type column carries a universal STRUCTURAL primitive (room/person/
+-- decision…) — never a domain name. There is deliberately NO CHECK constraint
+-- enumerating a fixed taxonomy at the SQL layer: the vocabulary lives in src/shared/brainGraph.ts
+-- (grep-locked to contain no domain/department/pillar names) and is validated in the
+-- storage layer, keeping "the graph builds itself, never a hardcoded taxonomy" true.
+
+-- Typed nodes carrying the 5 SCALAR spine parts (provenance is an edge, change-log
+-- is its own table). Spine columns are nullable / neutral-defaulted so a node is
+-- valid the instant it's projected; importance_derived is DERIVED (never authored).
+CREATE TABLE IF NOT EXISTS brain_nodes (
+  id TEXT PRIMARY KEY,
+  org_id TEXT NOT NULL DEFAULT 'personal',
+  room_id TEXT,                            -- the aperture (orthogonality rule 1)
+  type TEXT NOT NULL,                      -- a universal structural primitive (NO domain names)
+  subtype TEXT,                            -- structural sub-class within a type (widget kind / docType) — NEVER a domain label
+  title TEXT NOT NULL DEFAULT '',
+  body TEXT NOT NULL DEFAULT '',
+  -- SPINE (scalar parts) --
+  confidence TEXT NOT NULL DEFAULT 'inferred',   -- typed | inferred | ambiguous (I4)
+  lifecycle TEXT NOT NULL DEFAULT 'active',       -- fresh | active | stale | superseded
+  occurs_at INTEGER,                              -- time: due/occurs (ms), null if undated
+  recurrence TEXT,                                -- optional cadence, null = one-off
+  sensitivity TEXT NOT NULL DEFAULT 'normal',     -- privacy tier
+  importance_derived REAL NOT NULL DEFAULT 0.5,   -- [0,1] DERIVED (DEC-014), never authored
+  -- projection back-pointer (null for born-from-capture nodes, P2) --
+  source_table TEXT,                              -- which island table this projects from
+  source_id TEXT,                                 -- the owning row id in that table
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_brain_nodes_org ON brain_nodes(org_id);
+CREATE INDEX IF NOT EXISTS idx_brain_nodes_room ON brain_nodes(room_id);
+CREATE INDEX IF NOT EXISTS idx_brain_nodes_type ON brain_nodes(type);
+CREATE INDEX IF NOT EXISTS idx_brain_nodes_lifecycle ON brain_nodes(lifecycle);
+-- The projection idempotency key: re-projecting a source finds its existing node.
+CREATE INDEX IF NOT EXISTS idx_brain_nodes_source ON brain_nodes(source_table, source_id);
+
+-- The general cross-entity edge table — ONE polymorphic table for the whole graph.
+-- A node→node edge sets dst_id; a PROVENANCE LEAF (a raw source-record that is not a
+-- node, orthogonality rule 3) sets dst_source_table + dst_source_id instead. P3's
+-- same-as / contradicts are just new type values here — no new tables, ever.
+CREATE TABLE IF NOT EXISTS brain_edges (
+  id TEXT PRIMARY KEY,
+  org_id TEXT NOT NULL DEFAULT 'personal',
+  src_id TEXT NOT NULL REFERENCES brain_nodes(id) ON DELETE CASCADE,
+  dst_id TEXT REFERENCES brain_nodes(id) ON DELETE CASCADE,  -- node→node target, or null
+  dst_source_table TEXT,                   -- provenance leaf: source table (null for node→node)
+  dst_source_id TEXT,                      -- provenance leaf: source row id
+  type TEXT NOT NULL,                      -- one of the ~13 ontology edge types
+  role TEXT,                               -- role-qualifier for 'involves'
+  confidence TEXT NOT NULL DEFAULT 'inferred',
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_brain_edges_org ON brain_edges(org_id);
+CREATE INDEX IF NOT EXISTS idx_brain_edges_src ON brain_edges(src_id);
+CREATE INDEX IF NOT EXISTS idx_brain_edges_dst ON brain_edges(dst_id);
+CREATE INDEX IF NOT EXISTS idx_brain_edges_type ON brain_edges(type);
+-- Walk from a source-record back to the nodes it produced (provenance-leaf lookup).
+CREATE INDEX IF NOT EXISTS idx_brain_edges_leaf ON brain_edges(dst_source_table, dst_source_id);
+
+-- The change-log (spine part 6, append-only): {node, field, from, to, when, actor}.
+-- Never updated in place — every material change is a new row (time-travel + the
+-- trust-ledger "corrected" signal for free). Cascade-drops with its node.
+CREATE TABLE IF NOT EXISTS brain_change_log (
+  id TEXT PRIMARY KEY,
+  node_id TEXT NOT NULL REFERENCES brain_nodes(id) ON DELETE CASCADE,
+  field TEXT NOT NULL,
+  from_val TEXT,
+  to_val TEXT,
+  changed_at INTEGER NOT NULL,
+  actor TEXT NOT NULL DEFAULT 'brain'      -- user | brain | projection | an agent id
+);
+CREATE INDEX IF NOT EXISTS idx_brain_change_log_node ON brain_change_log(node_id, changed_at DESC);
+
 -- ── PlexiProjects task dependencies ──────────────────────────────────────────
 -- Finish-to-start links between task nodes that drive the Gantt schedule and the
 -- critical path. pred_id must finish before succ_id can start. Both reference
@@ -560,6 +686,10 @@ export function getDb(): Database.Database {
   ensureColumn(db, 'widgets', 'living_query', 'TEXT')
   ensureColumn(db, 'widgets', 'living_generated_at', 'INTEGER')
   ensureColumn(db, 'widgets', 'living_paused', 'INTEGER NOT NULL DEFAULT 0')
+  // P4.5 island tree: structural sub-classification within a node type (an artifact's
+  // widget kind, a document's docType) so the graph view draws the canvas's exact
+  // icon per leaf. Brain-owned, additive (DEC-012) — never a domain label (DEC-014).
+  ensureColumn(db, 'brain_nodes', 'subtype', 'TEXT')
   // Linked duplicates: widgets sharing a sync_group_id mirror content/title/colour.
   ensureColumn(db, 'widgets', 'sync_group_id', 'TEXT')
   // Multi-device sync. sync_rev is the server rev this row was last reconciled at
@@ -943,7 +1073,78 @@ export function getDb(): Database.Database {
     CREATE INDEX IF NOT EXISTS idx_node_relations_org ON fb_node_relations(org_id);
   `)
   migratePlanFlag(db)
+  migrateChunkFts(db)
   return db
+}
+
+// The lexical retrieval leg (plexi-brain I1 / DEC-020). An FTS5 full-text index over the
+// chunk TITLE + text so exact tokens — IDs, error strings, proper nouns like "Kessel Run" —
+// are found and ranked by BM25 term rarity (IDF), the signal the 384-dim semantic leg blurs
+// (defects D2/D3/D4). Title is a SEPARATE indexed column, weighted above the body at query
+// time (chunksFts.ts), because for documents and widgets the title is never folded into the
+// chunk text, so a term living only in a source's title would otherwise be unreachable in the
+// lexical leg (and, with no embedder, unreachable entirely). A STANDALONE (own-content) fts5
+// table kept in lockstep with fb_chunks by triggers, so every write/delete on the chunk store
+// — including the I0b delete path and the reconcile pass — propagates to the index
+// automatically; no code path can forget to, and a deleted chunk can never be surfaced
+// lexically (the delete path reaches the FTS index for free). Default unicode61 tokenizer:
+// measured on the real corpus to rank the rare-token fixture answers #1–2 via their rare
+// sub-tokens, and to degrade gracefully on partial identifiers (a '_'-preserving tokenizer
+// needs the query to reproduce exact identifier boundaries). Brain-only + dormant when OFF:
+// fb_chunks is written only on the brain path, so with the brain OFF nothing fires these
+// triggers and the base app never reads either table (DEC-012 — mirrors how fb_chunks /
+// brain_nodes are always created but inert when off).
+function migrateChunkFts(d: Database.Database): void {
+  // Reshape guard. The FIRST cut of this index was `(chunk_id, org_id, text)` — title-less,
+  // which dropped title-only terms out of the lexical leg entirely. This build adds an INDEXED
+  // `title` column, and `CREATE VIRTUAL TABLE IF NOT EXISTS` will NOT reshape an already-created
+  // table — worse, the new triggers reference `new.title`, which a 3-column table lacks, so
+  // writes would fail. So if the live table exists without a `title` column, drop it + its
+  // triggers here and let the create below rebuild at the new shape; the backfill is then FORCED
+  // (the count-compare heal below is count-only and would not notice a shape change while the row
+  // counts still match).
+  const existing = d
+    .prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='fb_chunks_fts'")
+    .get() as { sql?: string } | undefined
+  const reshaped = !!existing && !/\btitle\b/i.test(existing.sql ?? '')
+  if (reshaped) {
+    d.exec(`
+      DROP TRIGGER IF EXISTS fb_chunks_fts_ai;
+      DROP TRIGGER IF EXISTS fb_chunks_fts_ad;
+      DROP TRIGGER IF EXISTS fb_chunks_fts_au;
+      DROP TABLE IF EXISTS fb_chunks_fts;
+    `)
+  }
+  d.exec(`
+    CREATE VIRTUAL TABLE IF NOT EXISTS fb_chunks_fts USING fts5(
+      chunk_id UNINDEXED, org_id UNINDEXED, title, text
+    );
+    CREATE TRIGGER IF NOT EXISTS fb_chunks_fts_ai AFTER INSERT ON fb_chunks BEGIN
+      INSERT INTO fb_chunks_fts(chunk_id, org_id, title, text)
+        VALUES (new.id, new.org_id, new.title, new.text);
+    END;
+    CREATE TRIGGER IF NOT EXISTS fb_chunks_fts_ad AFTER DELETE ON fb_chunks BEGIN
+      DELETE FROM fb_chunks_fts WHERE chunk_id = old.id;
+    END;
+    CREATE TRIGGER IF NOT EXISTS fb_chunks_fts_au AFTER UPDATE ON fb_chunks BEGIN
+      DELETE FROM fb_chunks_fts WHERE chunk_id = old.id;
+      INSERT INTO fb_chunks_fts(chunk_id, org_id, title, text)
+        VALUES (new.id, new.org_id, new.title, new.text);
+    END;
+  `)
+  // Backfill / self-heal: the triggers only fire on FUTURE writes, so an existing corpus (the
+  // first run after this migration) or any drift is reconciled here. Forced after a reshape
+  // (counts match but the shape/content changed), else a cheap count compare — idempotent, a
+  // no-op once the two tables agree. This is what makes the lexical leg available on the
+  // current index WITHOUT forcing a full reindex first.
+  const base = (d.prepare('SELECT COUNT(*) AS n FROM fb_chunks').get() as { n: number }).n
+  const fts = (d.prepare('SELECT COUNT(*) AS n FROM fb_chunks_fts').get() as { n: number }).n
+  if (reshaped || base !== fts) {
+    d.exec(`
+      DELETE FROM fb_chunks_fts;
+      INSERT INTO fb_chunks_fts(chunk_id, org_id, title, text) SELECT id, org_id, title, text FROM fb_chunks;
+    `)
+  }
 }
 
 // One-time grandfather for the Rooms/Desks/Plans split. Before this change, the

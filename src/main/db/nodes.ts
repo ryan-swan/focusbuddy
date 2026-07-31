@@ -303,3 +303,17 @@ export function moveNode(
 
   return getNode(id)
 }
+
+// ONE node, under EXACTLY the liveness filter listNodes() applies (trashed + org).
+// plexi-brain I2b: the live-ingest fast path resolves a single source by id, and it must
+// agree with the whole-corpus scan or the two paths would index different corpora. getNode()
+// cannot serve this — FbNode carries neither trashed_at nor org_id, so a caller holding one
+// cannot tell a live node from a trashed or foreign-org one. Deliberately does NOT run the
+// session trash purge listNodes() does: a read on the ingest path must not mutate.
+export function getLiveNode(id: string): FbNode | null {
+  const db = getDb()
+  const row = db
+    .prepare('SELECT * FROM nodes WHERE id = ? AND trashed_at IS NULL AND org_id = ?')
+    .get(id, getActiveOrgId()) as NodeRow | undefined
+  return row ? rowToNode(row) : null
+}

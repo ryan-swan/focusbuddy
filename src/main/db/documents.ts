@@ -261,3 +261,16 @@ export function deleteDocument(id: string): boolean {
   }
   return info.changes > 0
 }
+
+// ONE document's metadata, under EXACTLY the filter listDocuments() applies (archived +
+// trashed + org). plexi-brain I2b — see getLiveNode() in db/nodes.ts for the rationale.
+export function getLiveDocumentMeta(id: string): DocumentMeta | null {
+  const db = getDb()
+  const row = db
+    .prepare(
+      `SELECT id, doc_type, title, archived, created_at, updated_at
+       FROM documents WHERE id = ? AND archived = 0 AND trashed_at IS NULL AND org_id = ?`
+    )
+    .get(id, getActiveOrgId()) as Omit<DocumentRow, 'body'> | undefined
+  return row ? rowToMeta(row) : null
+}

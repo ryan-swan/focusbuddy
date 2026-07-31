@@ -269,3 +269,14 @@ export function bringToFront(id: string): Widget | null {
   if (!row) return null
   return updateWidget(id, { zIndex: nextZ(row.task_id) })
 }
+
+// ONE widget, under EXACTLY the liveness filter listWidgetsByKind() applies (trashed).
+// plexi-brain I2b — see getLiveNode() in db/nodes.ts for the full rationale. Container
+// liveness + org are the caller's job (a widget is org-scoped only through its node).
+export function getLiveWidget(id: string): Widget | null {
+  const db = getDb()
+  const row = db.prepare('SELECT * FROM widgets WHERE id = ? AND trashed_at IS NULL').get(id) as
+    | WidgetRow
+    | undefined
+  return row ? rowToWidget(row) : null
+}

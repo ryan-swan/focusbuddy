@@ -207,6 +207,46 @@ import {
 } from '../db/files'
 import { extractDocText, retrieveSources, relatedDocuments } from '../workspaceSearch'
 import {
+  isBrainEnabled,
+  getBrainStage,
+  getBrainEmbedBackend,
+  setBrainEnabled,
+  setBrainStage,
+  setBrainEmbedBackend,
+  type RolloutStage,
+  type EmbedBackendPref
+} from '../brainPref'
+import { buildIndex } from '../brain/indexer'
+// DEFERRED at the demo port: the inline capture hooks that call onSourcesChanged /
+// onNodeChanged / requestFullSweep from the nodes:*, widgets:*, documents:* and
+// snapshots:* handlers, and onSourcesRemoved / onNodesRemoved from the delete routes.
+// They make ingest INSTANT. Without them the corpus still converges via liveIngest's
+// periodic floor sweep — new content simply appears on the sweep rather than the
+// keystroke, and a delete stops being retrievable at the next sweep rather than at once.
+// Porting them means editing ~11 existing handlers that have drifted since v3.8.0, which
+// is the risky half of this port; the brain is demonstrable without it. See
+// instrumentation-plan for the outstanding item.
+import {
+  setLiveIngestEnabled,
+  liveIngestStats,
+  __flushNowForTest,
+  onCaptureApplied
+} from '../brain/liveIngest'
+import { sourceTableForKind } from '@shared/capture'
+import { INTERNAL_CONNECTORS } from '../brain/connectors/registry'
+import type { SourceDoc as SourceDocForTest } from '../brain/connectors/types'
+import { listIndexedSourceRefs, chunkRoomsForSource } from '../db/chunks'
+import { countChunks } from '../db/chunks'
+import { preloadLocalEmbedder, isLocalEmbedderReady } from '../brain/embedder'
+// plexi-brain P2 — capture-as-decomposition. The registry remembers proposalId→utterance
+// between fan-out and apply-confirm; commitCapture births the node when the apply lands.
+import { rememberCapture, takeCapture } from '../brain/captureRegistry'
+import { commitCapture } from '../brain/capture'
+import { listBrainNodes } from '../db/brainNodes'
+import { countBrainEdges, listEdgesByType, provenanceOf } from '../db/brainEdges'
+// plexi-brain P4 — the graph-view read (one pure LOD projection per view-open; I1).
+import { graphViewPayload } from '../brain/graphView'
+import {
   openExternalUrl,
   openLocalFile,
   pickAndIngestFile,
@@ -2596,6 +2636,254 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('workspace:pendingOrg', (_e, orgId: string) => collectPendingOrg(String(orgId || '')))
   ipcMain.handle('workspace:applyRemoteOrg', (_e, items: RemoteItem[], orgId: string) =>
     applyRemoteOrg(Array.isArray(items) ? items : [], String(orgId || ''))
+  )
+  // ── plexi-brain (P0 — the RAG floor) ───────────────────────────────────────
+  // The brain is a toggleable layer (DEC-012): OFF ⇒ retrieveSources runs the
+  // exact v3.8.0 path, nothing here is consulted. These handlers let the renderer
+  // toggle it per-org, pick the embed backend (DEC-015), build the chunk index,
+  // and read status — the minimum surface to test P0 in-app.
+  ipcMain.handle('brain:status', () => ({
+    enabled: isBrainEnabled(),
+    stage: getBrainStage(),
+    embedBackend: getBrainEmbedBackend(),
+    chunkCount: countChunks(),
+    localEmbedderReady: isLocalEmbedderReady()
+  }))
+  ipcMain.handle('brain:setEnabled', async (_e, enabled: boolean) => {
+    setBrainEnabled(enabled === true)
+    // Pre-warm the local embedder on enable so the first query isn't a cold load.
+    if (enabled === true && getBrainEmbedBackend() === 'local') void preloadLocalEmbedder()
+    // I2b (DEC-012): OFF disarms every timer and DISCARDS the queue, so work armed while
+    // the brain was on can never fire after it is off. ON schedules one catch-up sweep,
+    // because an index that sat idle while the brain was off is arbitrarily stale.
+    setLiveIngestEnabled(enabled === true)
+    return { enabled: isBrainEnabled() }
+  })
+  ipcMain.handle('brain:setStage', (_e, stage: number) => {
+    const s = ([0, 1, 2, 3].includes(stage) ? stage : 0) as RolloutStage
+    setBrainStage(s)
+    return { stage: getBrainStage() }
+  })
+  ipcMain.handle('brain:setEmbedBackend', (_e, backend: string) => {
+    const b: EmbedBackendPref = backend === 'openai' ? 'openai' : 'local'
+    setBrainEmbedBackend(b)
+    return { embedBackend: getBrainEmbedBackend() }
+  })
+  // Build (or refresh) the chunk index for the active org. Returns the index
+  // result (sources/chunks/embedded/model) so the UI can show honest progress.
+  ipcMain.handle('brain:buildIndex', async (_e, force?: boolean) => {
+    // DEC-012 defense-in-depth (I0b): buildIndex now runs a DESTRUCTIVE reconcile pass,
+    // so an ungated call with the brain OFF would delete chunk/graph rows — violating
+    // "brain OFF never touches the chunk layer". The renderer only exposes the button
+    // when the brain is on, but that is a UI invariant, not an enforced one; gate it here
+    // so no future caller (a menu item, a scheduler, a console call) can bypass it. The
+    // no-op result mirrors an unbuilt index so callers need no special case.
+    if (!isBrainEnabled()) {
+      return {
+        sourcesIndexed: 0, chunksWritten: 0, chunksEmbedded: 0, embedModel: null,
+        embedFailed: false, totalChunks: countChunks(), projection: null, importance: null,
+        entities: null, sameAs: null, contradicts: null, reconcile: null
+      }
+    }
+    return buildIndex({ force: force === true })
+  })
+  // plexi-brain P4 (Slice 1) — the graph-view read. ONE load per view-open: the pure
+  // LOD projection over the P1-P3 graph (bands, same-as fold, conflict lift, cap).
+  // Zooming filters CLIENT-side (I1: the zoom path never crosses IPC, never touches
+  // AI). Brain OFF ⇒ empty payload; the renderer's OFF path never calls this anyway
+  // (DEC-012 — the Brain Map tile renders the untouched v3.8.0 tag-graph).
+  ipcMain.handle('brain:graphView', () => {
+    if (!isBrainEnabled()) return { enabled: false, nodes: [], edges: [], totalNodes: 0 }
+    return { enabled: true, ...graphViewPayload() }
+  })
+  // Diagnostic: run the REAL retrieveSources() for a query and return the source
+  // titles + scores it surfaced, plus whether the brain path is active. This is the
+  // exact retrieval the Search view's "Ask" uses — a zero-ambiguity way to prove P0
+  // from the DevTools console: window.api.brain.testRetrieve('your question').
+  ipcMain.handle('brain:testRetrieve', async (_e, query: string) => {
+    const enabled = isBrainEnabled()
+    const sources = await retrieveSources(String(query || ''), 6)
+    return {
+      brainEnabled: enabled,
+      chunkCount: countChunks(),
+      results: sources.map((s, i) => ({
+        rank: i + 1,
+        // I0 (eval fixture): the source identity the scorer matches ground truth on.
+        // Already carried by WorkspaceSource — it was simply never surfaced here.
+        docId: s.docId,
+        title: s.title,
+        docType: s.docType,
+        snippet: s.snippet,
+        score: s.score,
+        // P3 (Layer 3): "sources disagree" flag from `contradicts` edges — proves the
+        // disagree chip end-to-end from the DevTools console / e2e.
+        disagrees: s.disagrees === true
+      }))
+    }
+  })
+  // plexi-brain P2 — capture-as-decomposition, the apply-confirm signal. The renderer
+  // fires this AFTER applyProposal succeeds, passing the proposal id + the real base-app
+  // row id the apply produced (from resolvedIds). We drain the remembered utterance and
+  // commit the born node to the P1 graph (typed + provenance + change-log + presence +
+  // entity-resolution). Brain OFF ⇒ commitCapture no-ops; an unknown/undelivered id ⇒
+  // skip the birth (the utterance is already on the store-anyway floor, so nothing lost,
+  // and the projector converges the base row later). No node is ever born without a real
+  // source row id (convergence).
+  // TEST-ONLY seam (guarded on NODE_ENV==='test'): let an e2e populate the capture
+  // registry directly, so it can drive the REAL captureApplied→commitCapture path
+  // without a live (paid, key-gated, non-deterministic) AI fan-out. Never registered
+  // outside tests — a no-op guard, not a security-sensitive path. Mirrors what
+  // voiceCommand:run does after a real fan-out.
+  if (process.env.NODE_ENV === 'test') {
+    // I2b: let a lock assert the OUTCOME of the live loop without also asserting its
+    // clock. Counters only — the production path is identical with or without these.
+    ipcMain.handle('brain:__liveIngestStatsForTest', () => liveIngestStats())
+    // I2b LOCK 8 — the equivalence the whole fast path rests on. Walks the REAL corpus:
+    // every source `collect()` emits must be reproduced byte-for-byte by `collectOne(id)`,
+    // and every id `collect()` did NOT emit (including ids sitting in the chunk table
+    // because they used to be indexable) must come back null. A silent divergence here
+    // would mean an edit and a rebuild index two different corpora.
+    // I2b LOCK 9 — read a source's stamped room lineage straight from the chunk table,
+    // so a room re-stamp can be asserted on the DATA rather than inferred from retrieval.
+    ipcMain.handle('brain:__chunkRoomsForTest', (_e, sourceType: string, sourceId: string) =>
+      chunkRoomsForSource(String(sourceType), String(sourceId))
+    )
+    ipcMain.handle('brain:__collectParityForTest', () => {
+      const mismatches: Array<{ sourceType: string; sourceId: string; reason: string; a?: string; b?: string }> = []
+      let compared = 0
+      let nullChecked = 0
+      for (const connector of INTERNAL_CONNECTORS) {
+        const emitted: SourceDocForTest[] = []
+        connector.collect((d) => emitted.push(d))
+        const seen = new Set<string>()
+        for (const doc of emitted) {
+          seen.add(doc.sourceId)
+          compared++
+          const one = connector.collectOne(doc.sourceId)
+          if (!one) {
+            mismatches.push({ sourceType: doc.sourceType, sourceId: doc.sourceId, reason: 'collectOne returned null for an emitted source' })
+            continue
+          }
+          const a = JSON.stringify(doc)
+          const b = JSON.stringify(one)
+          if (a !== b) mismatches.push({ sourceType: doc.sourceType, sourceId: doc.sourceId, reason: 'SourceDoc differs', a, b })
+        }
+        // The other half of the contract: ids the scan did NOT emit must be null. Drawn
+        // from the chunk table, so these are real ids that WERE indexable at some point —
+        // the exact population where a too-permissive collectOne would resurrect content.
+        for (const ref of listIndexedSourceRefs()) {
+          if (ref.sourceType !== connector.sourceType || seen.has(ref.sourceId)) continue
+          nullChecked++
+          const one = connector.collectOne(ref.sourceId)
+          if (one) {
+            mismatches.push({
+              sourceType: ref.sourceType,
+              sourceId: ref.sourceId,
+              reason: 'collectOne resurrected a source collect() does not emit',
+              b: JSON.stringify(one)
+            })
+          }
+        }
+      }
+      return { compared, nullChecked, mismatches }
+    })
+    ipcMain.handle('brain:__liveIngestFlushForTest', async () => {
+      await __flushNowForTest()
+      return liveIngestStats()
+    })
+    ipcMain.handle(
+      'brain:__rememberForTest',
+      (_e, payload: { utterance: string; proposals: Array<{ id: string; kind: string; title?: string }>; roomId?: string | null }) => {
+        return rememberCapture({
+          utterance: payload.utterance,
+          proposals: payload.proposals,
+          roomId: payload.roomId ?? null
+        })
+      }
+    )
+    // Read graph stats so the e2e can assert the born node + provenance + person landed.
+    ipcMain.handle('brain:__graphStatsForTest', () => {
+      const nodes = listBrainNodes()
+      return {
+        nodes: nodes.length,
+        edges: countBrainEdges(),
+        persons: nodes.filter((n) => n.type === 'person').length,
+        organizations: nodes.filter((n) => n.type === 'organization').length,
+        provenanceEdges: listEdgesByType('produced').length
+      }
+    })
+    // Read the extracted entities (person/organization) with their provenance source
+    // count — so the P2.7 e2e can assert "one Sarah, referenced by N sources" (Layer 2:
+    // write a name in two places → ONE entity linked to both). Optional name filter.
+    ipcMain.handle('brain:__entitiesForTest', (_e, nameFilter?: string) => {
+      const wanted = (nameFilter ?? '').trim().toLowerCase()
+      return listBrainNodes()
+        .filter((n) => n.type === 'person' || n.type === 'organization')
+        .filter((n) => !wanted || n.title.toLowerCase() === wanted)
+        .map((n) => ({
+          id: n.id,
+          type: n.type,
+          title: n.title,
+          confidence: n.confidence,
+          roomId: n.roomId,
+          // distinct source rows this entity has provenance back to (the "referenced
+          // together" signal — >1 means it was named in multiple sources).
+          provenanceSources: provenanceOf(n.id).length
+        }))
+    })
+    // Read the cross-room `same-as` edges with each endpoint's entity title + room — so the
+    // P3 e2e can assert "one Caleb across ≥2 DIFFERENT rooms is unified" (Layer 3). Optional
+    // name filter (case-insensitive exact match on either endpoint's title).
+    ipcMain.handle('brain:__sameAsForTest', (_e, nameFilter?: string) => {
+      const wanted = (nameFilter ?? '').trim().toLowerCase()
+      const nodes = new Map(listBrainNodes().map((n) => [n.id, n]))
+      return listEdgesByType('same-as')
+        .map((edge) => {
+          const a = edge.srcId ? nodes.get(edge.srcId) : undefined
+          const b = edge.dstId ? nodes.get(edge.dstId) : undefined
+          return {
+            aTitle: a?.title ?? null,
+            aRoomId: a?.roomId ?? null,
+            bTitle: b?.title ?? null,
+            bRoomId: b?.roomId ?? null,
+            type: a?.type ?? null,
+            crossRoom: !!a && !!b && a.roomId !== b.roomId
+          }
+        })
+        .filter(
+          (e) =>
+            !wanted ||
+            (e.aTitle ?? '').toLowerCase() === wanted ||
+            (e.bTitle ?? '').toLowerCase() === wanted
+        )
+    })
+  }
+  ipcMain.handle(
+    'brain:captureApplied',
+    (_e, payload: { proposalId: string; sourceRowId?: string | null; roomId?: string | null }) => {
+      if (!isBrainEnabled()) return { committed: false, reason: 'brain-off' }
+      const entry = takeCapture(payload.proposalId)
+      if (!entry) return { committed: false, reason: 'unknown-proposal' }
+      // Convergence requires the real base row id. When the apply didn't surface one
+      // (kinds that don't populate resolvedIds), skip node-birth — the utterance is
+      // already filed (I3), and projection will pick up the base row later.
+      if (!payload.sourceRowId) return { committed: false, reason: 'no-source-row' }
+      const result = commitCapture({
+        proposal: entry.proposal,
+        utteranceText: entry.utterance,
+        sourceRowId: payload.sourceRowId,
+        utteranceActivityId: entry.utteranceActivityId,
+        roomId: payload.roomId ?? entry.roomId,
+        llmProposedConfidence: entry.llmProposedConfidence
+      })
+      // I2b / F-16: capture births the graph node; the CHUNK index is what makes the
+      // captured text retrievable. The base row was written by applyProposal through a
+      // hooked handler, so this is belt-and-braces — but F-16 said "graph-visible, not
+      // retrievable", and an explicit re-queue is what keeps that closed by construction.
+      const table = sourceTableForKind(entry.proposal.kind)
+      if (table) onCaptureApplied(table, payload.sourceRowId)
+      return result
+    }
   )
   ipcMain.handle('workspace:getCursorOrg', (_e, orgId: string) => getSyncCursorOrg(String(orgId || '')))
   ipcMain.handle('workspace:setCursorOrg', (_e, orgId: string, n: number) =>

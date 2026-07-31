@@ -46,7 +46,8 @@ const ACTIVITY_ICON: Record<ActivityKind, string> = {
   session_started: 'bolt',
   session_ended: 'check_circle',
   ai_setup_run: 'auto_awesome',
-  resume_generated: 'description'
+  resume_generated: 'description',
+  captured: 'psychology'
 }
 
 function relTime(ms: number): string {

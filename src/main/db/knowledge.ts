@@ -108,3 +108,14 @@ export function deleteKnowledge(id: string): boolean {
 export function searchKnowledge(query: string, limit = 20): KnowledgeEntry[] {
   return rankKnowledge(listKnowledge(), query, limit)
 }
+
+// ONE entry, under EXACTLY the filter listKnowledge() applies (org). plexi-brain I2b —
+// getKnowledge() below is deliberately un-scoped (it is used on write read-backs), so the
+// ingest path cannot reuse it without silently indexing another org's entry.
+export function getLiveKnowledge(id: string): KnowledgeEntry | null {
+  const db = getDb()
+  const row = db
+    .prepare('SELECT * FROM fb_knowledge WHERE id = ? AND org_id = ?')
+    .get(id, getActiveOrgId()) as KnowledgeRow | undefined
+  return row ? rowToEntry(row) : null
+}

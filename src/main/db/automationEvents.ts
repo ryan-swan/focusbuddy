@@ -12,6 +12,13 @@
 export type AutomationEvent =
   | { name: 'task-completed'; nodeId: string }
   | { name: 'row-added'; tableId: string }
+  // plexi-brain P6 co-working seam (reserved P0, EMITTED P2 — DEC-013). 'human-focus'
+  // announces that the human's attention/presence is on a brain node (e.g. one they
+  // just captured). NOTHING consumes it until P6's presence-aware reflex loop — but it
+  // is emitted from the capture path NOW so the seam is exercised (not a comment-only
+  // reservation, which DEC-013 warns becomes a retrofit/rewrite). Adding a presence
+  // variant = adding a union member; zero schema change. brainNodeId is a brain_nodes.id.
+  | { name: 'human-focus'; brainNodeId: string }
 
 export type AutomationEventName = AutomationEvent['name']
 

@@ -919,6 +919,189 @@ const api = {
     ): Promise<Array<{ docId: string; title: string; docType: string; snippet: string }>> =>
       ipcRenderer.invoke('workspace:related', docId)
   },
+  // plexi-brain (P0): the toggleable retrieval layer. OFF (default) ⇒ the app
+  // searches exactly as v3.8.0. These let a UI enable it per-org, pick the embed
+  // backend (DEC-015 local/openai), build the chunk index, and read status.
+  brain: {
+    status: (): Promise<{
+      enabled: boolean
+      stage: number
+      embedBackend: 'local' | 'openai'
+      chunkCount: number
+      localEmbedderReady: boolean
+    }> => ipcRenderer.invoke('brain:status'),
+    setEnabled: (enabled: boolean): Promise<{ enabled: boolean }> =>
+      ipcRenderer.invoke('brain:setEnabled', enabled),
+    setStage: (stage: number): Promise<{ stage: number }> =>
+      ipcRenderer.invoke('brain:setStage', stage),
+    setEmbedBackend: (backend: 'local' | 'openai'): Promise<{ embedBackend: 'local' | 'openai' }> =>
+      ipcRenderer.invoke('brain:setEmbedBackend', backend),
+    buildIndex: (
+      force?: boolean
+    ): Promise<{
+      sourcesIndexed: number
+      chunksWritten: number
+      chunksEmbedded: number
+      embedModel: string | null
+      embedFailed: boolean
+      totalChunks: number
+      // P1: the object graph materialized from the same corpus on this index pass.
+      projection: {
+        nodesProjected: number
+        edgesDrawn: number
+        nodesPruned: number // I0b: projected nodes deleted because their source is gone
+        totalNodes: number
+        totalEdges: number
+      } | null
+      // P1 (DEC-014): the derived-importance pass over the projected graph.
+      importance: {
+        nodesScored: number
+        maxDegree: number
+        topByImportance: Array<{ id: string; type: string; title: string; importance: number }>
+      } | null
+      // I0b (the delete path): what this pass REMOVED — sources that were indexed but
+      // the scan no longer yields (trashed, purged, or on a container the user deleted).
+      // `removed` is the tombstone stream of the Connector contract.
+      reconcile: {
+        sourcesRemoved: number
+        chunksRemoved: number
+        edgeLeavesRemoved: number
+        nodesRemoved: number
+        entitiesRemoved: number
+        removed: Array<{ sourceType: string; sourceId: string; reason: 'deleted' | 'reconciled' }>
+      } | null
+    }> => ipcRenderer.invoke('brain:buildIndex', force),
+    // plexi-brain P4 (Slice 1) — the graph-view read: the pure LOD projection over
+    // the P1-P3 graph (bands, same-as fold, conflict lift, cap). Loaded ONCE per
+    // view-open; zoom filters client-side (I1 — no IPC, no AI on the zoom path).
+    graphView: (): Promise<{
+      enabled: boolean
+      nodes: Array<{
+        id: string
+        type: string
+        subtype: string | null
+        title: string
+        roomId: string | null
+        importance: number
+        band: 'pillar' | 'identity' | 'work' | 'orgwide'
+        conflict: boolean
+        baseId: string | null
+        memberRooms: string[]
+        collapsedIds: string[]
+      }>
+      edges: Array<{ srcId: string; dstId: string; type: string }>
+      totalNodes: number
+    }> => ipcRenderer.invoke('brain:graphView'),
+    // Diagnostic: run the real retrieveSources() for a query (the exact retrieval
+    // the Search "Ask" uses) and return the surfaced sources — proves P0 wiring.
+    testRetrieve: (
+      query: string
+    ): Promise<{
+      brainEnabled: boolean
+      chunkCount: number
+      results: Array<{
+        rank: number
+        // I0 (eval fixture): source identity, so a scorer can match ground truth.
+        docId: string
+        title: string
+        docType: string
+        snippet: string
+        score: number
+        // P3 (Layer 3): another source disagrees with this one on a numeric claim.
+        disagrees: boolean
+      }>
+    }> => ipcRenderer.invoke('brain:testRetrieve', query),
+    // plexi-brain P2 — capture-as-decomposition apply-confirm. Fired by the renderer
+    // after a proposal is applied; births the captured node into the graph (no-op when
+    // brain is off / the proposal wasn't a remembered capture / no source row surfaced).
+    captureApplied: (payload: {
+      proposalId: string
+      sourceRowId?: string | null
+      roomId?: string | null
+    }): Promise<{
+      committed: boolean
+      nodeId?: string
+      nodeType?: string
+      confidence?: string
+      reason?: string
+      person?: { nodeId: string; action: 'link' | 'mint'; name: string }
+    }> => ipcRenderer.invoke('brain:captureApplied', payload),
+    // TEST-ONLY (guarded main-side on NODE_ENV==='test'): populate the capture registry
+    // + read graph stats so an e2e can drive the REAL captureApplied path without a live
+    // AI fan-out. Absent outside tests (the main handler is only registered under NODE_ENV=test).
+    __rememberForTest: (payload: {
+      utterance: string
+      proposals: Array<{ id: string; kind: string; title?: string }>
+      roomId?: string | null
+    }): Promise<{ utteranceActivityId: string }> => ipcRenderer.invoke('brain:__rememberForTest', payload),
+    // I2b (TEST-ONLY, like the siblings below): the live-ingest counters + a synchronous
+    // drain, so a lock can assert the loop's OUTCOME without also asserting its clock.
+    // The main-side handlers are registered only under NODE_ENV==='test'.
+    __liveIngestStatsForTest: (): Promise<{
+      marked: number
+      flushes: number
+      sourcesReindexed: number
+      sourcesRemoved: number
+      chunksRestamped: number
+      graphPasses: number
+      discarded: number
+      lastFlushMs: number
+      lastError: string | null
+    }> => ipcRenderer.invoke('brain:__liveIngestStatsForTest'),
+    __chunkRoomsForTest: (sourceType: string, sourceId: string): Promise<Array<string | null>> =>
+      ipcRenderer.invoke('brain:__chunkRoomsForTest', sourceType, sourceId),
+    __collectParityForTest: (): Promise<{
+      compared: number
+      nullChecked: number
+      mismatches: Array<{ sourceType: string; sourceId: string; reason: string; a?: string; b?: string }>
+    }> => ipcRenderer.invoke('brain:__collectParityForTest'),
+    __liveIngestFlushForTest: (): Promise<{
+      marked: number
+      flushes: number
+      sourcesReindexed: number
+      sourcesRemoved: number
+      chunksRestamped: number
+      graphPasses: number
+      discarded: number
+      lastFlushMs: number
+      lastError: string | null
+    }> => ipcRenderer.invoke('brain:__liveIngestFlushForTest'),
+    __graphStatsForTest: (): Promise<{
+      nodes: number
+      edges: number
+      persons: number
+      organizations: number
+      provenanceEdges: number
+    }> => ipcRenderer.invoke('brain:__graphStatsForTest'),
+    // P2.7 (Layer 2): the extracted person/org entities + how many distinct sources
+    // each is referenced by (>1 = "named in multiple places, picked up together").
+    __entitiesForTest: (
+      nameFilter?: string
+    ): Promise<
+      Array<{
+        id: string
+        type: 'person' | 'organization'
+        title: string
+        confidence: string
+        roomId: string | null
+        provenanceSources: number
+      }>
+    > => ipcRenderer.invoke('brain:__entitiesForTest', nameFilter),
+    // P3 (Layer 3): the cross-room `same-as` edges with each endpoint's entity title +
+    // room — so the e2e can assert "one Caleb across ≥2 DIFFERENT rooms is unified".
+    __sameAsForTest: (
+      nameFilter?: string
+    ): Promise<
+      Array<{
+        aTitle: string | null
+        aRoomId: string | null
+        bTitle: string | null
+        bRoomId: string | null
+        type: 'person' | 'organization' | null
+        crossRoom: boolean
+      }>
+    > => ipcRenderer.invoke('brain:__sameAsForTest', nameFilter)
+  },
   // The file/folder manager: a foldered library over fb_files (folders,
   // imported files, and references to internal documents).
   fileManager: {

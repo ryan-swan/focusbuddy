@@ -32,16 +32,62 @@ export function tableToText(table: FbTable, rows: FbRow[]): string {
   return `${table.title}\n${header}\n${body}`.trim()
 }
 
-// A canvas note's text. A 'page' widget stores Tiptap JSON; the rest are plain.
-export function noteWidgetText(kind: string, content: string): string {
-  if (kind === 'page') {
+// ── The widget content-extraction dispatcher (plexi-brain P2.5 — Layer 1) ────────
+// One function turns ANY widget's stored `content` into plain, ingestible text, so BOTH
+// the keyword extras pool (collectExtraSources) and the semantic indexer ('widget'
+// sourceType) call the same extractor — no duplication, no drift.
+//
+// The discipline: return '' for a kind we don't extract (media / UI-state / container /
+// pointer) so the caller SKIPS it — never index noise. Text-bearing kinds return their
+// real prose; JSON-config kinds are parsed main-side (widget configs round-trip as opaque
+// strings through the store, so this is a pure JSON.parse — no renderer import).
+//
+// Kinds carrying NO extractable text, OR whose text is already indexed elsewhere — skip
+// them so recall isn't diluted and nothing is double-counted:
+const NON_TEXT_WIDGET_KINDS: ReadonlySet<string> = new Set([
+  // genuine NONE — media / UI-state / containers / freehand
+  'minimap', 'calculator', 'timer', 'color', 'scratchpad', 'section', 'image', 'video',
+  'shape', 'task-list',
+  // pointers whose target is already indexed (emit edges later, never re-extract text)
+  'task-link', 'portal', 'doc', 'sheet', 'slides', 'map', 'drive', 'file',
+  // external/live surfaces — deferred to a later increment (url+title / capture seam)
+  'webview', 'pdf', 'gdoc', 'gsheet', 'gslide', 'email', 'chat-thread',
+  // structured/thin kinds deferred to later increments (need id→label resolution)
+  'field', 'custom-block', 'diagram', 'chart', 'streamdeck', 'local-app-launcher'
+])
+
+export function widgetText(kind: string, content: string): string {
+  const c = content || ''
+  if (NON_TEXT_WIDGET_KINDS.has(kind)) return ''
+
+  // Tiptap-JSON kinds: parse the ProseMirror tree to text (fall back to the raw string
+  // for legacy bare-string content). 'page' and 'living-doc' share this exact shape.
+  if (kind === 'page' || kind === 'living-doc') {
     try {
-      return extractDocText('doc', JSON.parse(content))
+      return extractDocText('doc', JSON.parse(c))
     } catch {
-      return content
+      return c
     }
   }
-  return content
+
+  // 'card' stores JSON {title, body, ...}; join title + body. Parse-fail ⇒ treat the
+  // whole string as body (a legacy or plain card).
+  if (kind === 'card') {
+    try {
+      const d = JSON.parse(c) as { title?: string; body?: string }
+      return [d.title, d.body].filter(Boolean).join('\n').trim()
+    } catch {
+      return c
+    }
+  }
+
+  // sticky / note / markdown (and any other plain-text kind) store the text verbatim.
+  return c
+}
+
+// Back-compat alias — the original name kept so existing callers are untouched.
+export function noteWidgetText(kind: string, content: string): string {
+  return widgetText(kind, content)
 }
 
 // Gather and keyword-rank workspace content that is NOT a document: tasks,

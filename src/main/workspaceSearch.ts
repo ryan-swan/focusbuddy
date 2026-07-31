@@ -10,11 +10,43 @@ import { extractDocText, rankSources, type WorkspaceSource } from './workspaceRa
 import { semanticSearchKnowledge } from './semanticRetrieval'
 import { semanticSearchDocuments } from './documentRetrieval'
 import { collectExtraSources } from './workspaceExtras'
+import { isBrainEnabled } from './brainPref'
+import { retrieveViaBrain } from './brain/retriever'
 
 export type { WorkspaceSource } from './workspaceRank'
 export { extractDocText } from './workspaceRank'
 
+// The retrieval seam (plexi-brain P0, DEC-008/011/012). Its SIGNATURE is fixed; only the
+// body changed. Brain ENABLED -> the chunked brain retriever (RRF fusion over a BM25 leg
+// and a vector leg). Brain DISABLED (the default) -> the EXACT prior path, byte-for-byte.
+// Nothing in the base app depends on the brain (DEC-012.1).
+//
+// scopeNodeIds is deliberately NOT routed through the brain. It encodes user-driven
+// scoping (focus mode, pinned widgets) and retrieveViaBrain has no scoping parameter, so
+// sending a scoped query to the brain would silently return unscoped results — the user
+// would be shown content they had explicitly narrowed away from. A scoped query therefore
+// stays on the legacy path until the brain grows a scope-aware retrieve.
 export async function retrieveSources(
+  query: string,
+  limit = 6,
+  scopeNodeIds?: string[]
+): Promise<WorkspaceSource[]> {
+  // Brain ON, and the query is unscoped: chunk-level recall + RRF fusion. If the index is
+  // not built yet (returns []), fall through so retrieval always answers.
+  if (isBrainEnabled() && (!scopeNodeIds || scopeNodeIds.length === 0)) {
+    try {
+      const brain = await retrieveViaBrain(query, limit)
+      if (brain.length > 0) return brain
+    } catch {
+      // Any brain-path failure degrades to the legacy path — never breaks retrieval.
+    }
+  }
+  return retrieveSourcesLegacy(query, limit, scopeNodeIds)
+}
+
+// The unchanged prior retrieval — three pools (knowledge, documents, extras) interleaved
+// round-robin. This is exactly what "brain OFF" returns.
+async function retrieveSourcesLegacy(
   query: string,
   limit = 6,
   scopeNodeIds?: string[]

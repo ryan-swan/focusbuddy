@@ -34,6 +34,7 @@ import OrganisationSection from './settings/OrganisationSection'
 import TemplatesSection from './settings/TemplatesSection'
 import DocumentsSyncSection from './settings/DocumentsSyncSection'
 import ApiKeysSection from './settings/ApiKeysSection'
+import BrainSection from './settings/BrainSection'
 import BackupSection from './settings/BackupSection'
 import NavigationSection from './settings/NavigationSection'
 import PrivacyHelpSection from './settings/PrivacyHelpSection'
@@ -343,7 +344,12 @@ export default function SettingsPanel({
           />
         )}
 
-        {tab === 'ai' && <ApiKeysSection />}
+        {tab === 'ai' && (
+          <>
+            <ApiKeysSection />
+            <BrainSection />
+          </>
+        )}
 
         {tab === 'templates' && <TemplatesSection />}
 

@@ -4,6 +4,7 @@ import { existsSync } from 'fs'
 import { pathToFileURL } from 'url'
 import { config as loadEnv } from 'dotenv'
 import { closeDb, getDb } from './db/database'
+import { startLiveIngest, stopLiveIngest } from './brain/liveIngest'
 import { autoBackupOnLaunch } from './db/backup'
 import { registerIpcHandlers } from './ipc'
 import { decidePopup } from './popupRouter'
@@ -455,6 +456,10 @@ app.whenReady().then(() => {
   // Enable getDisplayMedia so PlexiMeet can share a screen or window.
   applyDisplayMediaHandler(session.defaultSession)
   registerIpcHandlers()
+  // plexi-brain I2b — arm the live ingest loop's floor sweep. A no-op while the brain
+  // is off (it re-checks isBrainEnabled() at every fire), and its timers are unref'd so
+  // they never hold the app open (DEC-012).
+  startLiveIngest()
   // Stream Deck focus handoff — caches the previously-frontmost app so
   // ⌘C / ⌘V / ⌘⇧4 / type-text land in the user's actual workspace
   // rather than in FocusBuddy itself.
@@ -597,5 +602,6 @@ app.on('window-all-closed', () => {
 })
 
 app.on('before-quit', () => {
+  stopLiveIngest() // plexi-brain I2b — no ingest tick may outlive the DB handle
   closeDb()
 })

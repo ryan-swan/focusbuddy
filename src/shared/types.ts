@@ -1158,6 +1158,10 @@ export type ActivityKind =
   | 'session_ended'
   | 'ai_setup_run'
   | 'resume_generated'
+  // plexi-brain P2 — capture-as-decomposition. 'captured' files the RAW utterance
+  // (the store-anyway floor, invariant I3): every incoming input is logged and
+  // keyword-findable even if it produced no node, so nothing said is ever lost.
+  | 'captured'
 
 export interface ActivityEvent {
   id: string

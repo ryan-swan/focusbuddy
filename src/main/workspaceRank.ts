@@ -10,6 +10,10 @@ export interface WorkspaceSource {
   // Truncated extracted text, fed to the model as the grounding for this source.
   text: string
   score: number
+  // P3 (Layer 3): another source disagrees with this one on a numeric claim ("sources
+  // disagree"). Set by the brain retrieve path from `contradicts` edges; the UI surfaces
+  // a disagree chip. Optional/absent on the legacy (non-brain) path.
+  disagrees?: boolean
 }
 
 // Best-effort plain text from a document body, by type. Shared with the
