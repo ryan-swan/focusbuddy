@@ -348,7 +348,7 @@ export default function PageWidget({ widget, inline = false }: Props): JSX.Eleme
           @tailwindcss/typography plugin installed, so `prose` classes would
           render as bare text (which is why this used to be blank). */}
       <div
-        className={`md-rendered tiptap-editor px-5 py-4 text-[var(--ink-100)] min-h-[140px] flex-1 text-[14px] leading-relaxed ${isLiving ? 'select-text' : ''}`}
+        className={`md-rendered tiptap-editor px-5 py-4 text-[var(--ink-100)] min-h-[140px] flex-1 leading-relaxed ${isLiving ? 'select-text' : ''}`}
         onContextMenu={(e) => {
           if (e.shiftKey) return
           e.preventDefault()

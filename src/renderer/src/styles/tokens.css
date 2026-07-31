@@ -139,6 +139,12 @@
   --radius-lg: 14px;
   --radius-xl: 20px;
   --radius-2xl: 28px;
+
+  /* Canonical widget BODY text size. One dial so tool bodies read at a consistent
+     size and a widget grows with its content rather than shrinking its text.
+     Chrome labels, headings, table headers and the office editors keep their own
+     scale — this is body copy only. */
+  --fb-body-size: 13px;
 }
 
 /* ── Dark theme overrides ─────────────────────────────────────────────────── */
@@ -400,6 +406,13 @@
   font-family: var(--font-mono);
   font-feature-settings: 'ss01', 'cv01';
   font-size: 0.92em;
+}
+
+/* Canonical widget body copy — one size across tools so text doesn't shrink per
+   widget. Stack .fb-tabular on top for numeric bodies. Independent of theme. */
+.fb-body {
+  font-size: var(--fb-body-size);
+  line-height: 1.5;
 }
 
 /* Subtle ambient breath — apply to status surfaces that should feel "alive"
