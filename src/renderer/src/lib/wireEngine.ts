@@ -5,7 +5,7 @@ import { useWidgetStore } from '../stores/widgets'
 import { parseAgent } from './deskAgent'
 import { extractWebviewText } from './webviewRegistry'
 import { buildTableFromText } from './tableAiBuild'
-import { coerceToWidgetContent } from './widgetContentFormat'
+import { coerceToWidgetContent, textToTiptap } from './widgetContentFormat'
 
 // The content that flows OUT of a widget along a wire. For a desk agent that is
 // its latest output (not its raw JSON config), so an agent can feed a note via a
@@ -174,6 +174,19 @@ async function runWire(wireId: string, gen: number): Promise<void> {
 
   const runStore = useWireRunStore.getState()
 
+  // Honest guard: PlexiDesk can't read binary media text yet (no PDF/image/video
+  // extractor anywhere in the app — confirmed by files:suggestTags treating binary
+  // files as name-only). So a wire from one has nothing real to send; say so on the
+  // wire instead of feeding the AI a URL and producing a hollow result.
+  if (source.kind === 'pdf' || source.kind === 'image' || source.kind === 'video') {
+    const label = source.kind === 'pdf' ? "a PDF's" : `a ${source.kind}'s`
+    runStore.setError(
+      wire.id,
+      `PlexiDesk can't read ${label} text yet, so there's nothing to send. Use a Browser, Note, Page, Document or Table as the source.`
+    )
+    return
+  }
+
   // Outbound webhook target: POST the source content to the widget's URL instead
   // of writing into it (Lever 3, Phase 0). The wire's run status reports the send.
   if (target.kind === 'webhook') {
@@ -221,22 +234,14 @@ async function runWire(wireId: string, gen: number): Promise<void> {
       return
     }
 
-    // Other targets: shape the text into the form that kind stores. null means
-    // this kind can't take a text delivery (a structured config widget) — skip
-    // rather than clobber it.
-    const next = coerceToWidgetContent(target, src)
-    // Nothing to deliver or already identical — still a completed run, so mark it
-    // (keeps freshness honest instead of "stale forever").
-    if (next === null || next === target.content) {
-      runStore.markRan(wire.id, Date.now())
+    // Other targets: office docs write to the doc body; everything else is shaped
+    // by coerceToWidgetContent. A kind that can't hold text surfaces an honest
+    // error rather than silently doing nothing.
+    if (!src.trim()) {
+      runStore.markRan(wire.id, Date.now()) // nothing to deliver yet
       return
     }
-    runStore.pulseWire(wire.id) // electric spark for the (instant) delivery
-    writeCooldown.set(target.id, Date.now())
-    const prevDirect = target.content
-    await widgets.update(target.id, { content: next })
-    recordWireWrite(wire, source, target, prevDirect, next)
-    runStore.markRan(wire.id, Date.now())
+    await deliverTextToTarget(wire, source, target, src)
     return
   }
 
@@ -263,23 +268,15 @@ async function runWire(wireId: string, gen: number): Promise<void> {
       runStore.markRan(wire.id, Date.now())
       return
     }
-    // The transform output is shaped for the target kind too: a transform into a
-    // table builds the table; into a card/page it lands as title/body or a doc.
+    // The transform output is shaped for the target kind: a transform into a
+    // table builds the table; into a Page/Note/Card it lands as prose; into a
+    // Document it writes the doc body; an unsupported target says so honestly.
     if (target.kind === 'table') {
       await buildTableFromText(target.content, res.result, wire.verb)
       runStore.markRan(wire.id, Date.now())
       return
     }
-    const shaped = coerceToWidgetContent(target, res.result)
-    if (shaped === null) {
-      runStore.markRan(wire.id, Date.now())
-      return
-    }
-    writeCooldown.set(target.id, Date.now())
-    const prevTransform = target.content
-    await widgets.update(target.id, { content: shaped })
-    recordWireWrite(wire, source, target, prevTransform, shaped)
-    runStore.markRan(wire.id, Date.now())
+    await deliverTextToTarget(wire, source, target, res.result)
   } catch (e) {
     runStore.setError(wire.id, e instanceof Error ? e.message : String(e))
   } finally {
@@ -342,6 +339,103 @@ async function sendWebhook(wire: WidgetLink, source: Widget, target: Widget): Pr
   } finally {
     runStore.setRunning(wire.id, false)
   }
+}
+
+const FRIENDLY_KIND: Partial<Record<Widget['kind'], string>> = {
+  agent: 'desk agent',
+  timer: 'timer',
+  color: 'colour picker',
+  calculator: 'calculator',
+  webview: 'browser',
+  section: 'section',
+  portal: 'portal',
+  streamdeck: 'SpeedDeck',
+  minimap: 'minimap',
+  chart: 'chart',
+  diagram: 'diagram',
+  scratchpad: 'scratchpad',
+  'task-link': 'task link',
+  'local-app-launcher': 'app launcher'
+}
+
+// Write an office Document (Word/Sheet/Slides) target. Its widget.content is a
+// document id, so we write into the document BODY, not the widget. Only Word docs
+// take free text today (their body is Tiptap, same as a Page); sheets/decks say so
+// honestly rather than silently doing nothing.
+async function writeToOfficeDoc(
+  wire: WidgetLink,
+  target: Widget,
+  text: string
+): Promise<void> {
+  const runStore = useWireRunStore.getState()
+  if (target.kind !== 'doc') {
+    runStore.setError(
+      wire.id,
+      `A ${target.kind === 'sheet' ? 'spreadsheet' : 'slide deck'} can't receive wired text yet — point this at a Page, Note, Table or Document.`
+    )
+    return
+  }
+  const docId = (target.content ?? '').trim()
+  if (!docId) {
+    runStore.setError(wire.id, "This Document isn't saved yet, so there's nowhere to write.")
+    return
+  }
+  try {
+    const doc = await window.api.documents.get(docId)
+    if (!doc) {
+      runStore.setError(wire.id, 'The linked Document no longer exists.')
+      return
+    }
+    const tiptap = JSON.parse(textToTiptap(text)) as Record<string, unknown>
+    const prevBody = doc.body as Record<string, unknown> | null
+    // Preserve brand heading styles if the body carries them; otherwise the body
+    // IS the Tiptap doc.
+    const body =
+      prevBody && typeof prevBody === 'object' && 'headingStyles' in prevBody
+        ? ({ ...prevBody, doc: tiptap } as never)
+        : (tiptap as never)
+    runStore.pulseWire(wire.id)
+    await window.api.documents.update(docId, { body }, 'Updated by a wire')
+    runStore.markRan(wire.id, Date.now())
+  } catch (e) {
+    runStore.setError(wire.id, e instanceof Error ? e.message : 'Could not write to the Document.')
+  }
+}
+
+// Deliver text into a NON-table target: office docs write to the doc body; every
+// other kind is shaped by coerceToWidgetContent. A kind that can't hold text now
+// surfaces an honest, visible reason on the wire instead of silently doing nothing
+// (the old behaviour that made wires feel dead).
+async function deliverTextToTarget(
+  wire: WidgetLink,
+  source: Widget,
+  target: Widget,
+  text: string
+): Promise<void> {
+  const runStore = useWireRunStore.getState()
+  const widgets = useWidgetStore.getState()
+  if (target.kind === 'doc' || target.kind === 'sheet' || target.kind === 'slides') {
+    await writeToOfficeDoc(wire, target, text)
+    return
+  }
+  const next = coerceToWidgetContent(target, text)
+  if (next === null) {
+    runStore.setError(
+      wire.id,
+      `A ${FRIENDLY_KIND[target.kind] ?? target.kind} can't receive text from a wire. Point it at a Page, Note, Card, Sticky, Table or Document.`
+    )
+    return
+  }
+  if (next === target.content) {
+    runStore.markRan(wire.id, Date.now()) // ran, nothing new to write
+    return
+  }
+  runStore.pulseWire(wire.id)
+  writeCooldown.set(target.id, Date.now())
+  const prev = target.content
+  await widgets.update(target.id, { content: next })
+  recordWireWrite(wire, source, target, prev, next)
+  runStore.markRan(wire.id, Date.now())
 }
 
 // Manual "Run now" from the wire editor — bypasses the debounce but keeps the

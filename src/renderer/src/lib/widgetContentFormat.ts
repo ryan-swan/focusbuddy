@@ -41,7 +41,9 @@ interface TiptapNode {
 }
 
 // Minimal, robust text/markdown → Tiptap document. Always returns a valid doc.
-function textToTiptap(text: string): string {
+// Exported so a wire writing into an office Document (whose body is Tiptap) can
+// reuse the exact same conversion the Page target uses.
+export function textToTiptap(text: string): string {
   const out: TiptapNode[] = []
   let list: TiptapNode[] | null = null
   const flush = (): void => {
