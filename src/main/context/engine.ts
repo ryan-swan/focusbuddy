@@ -16,6 +16,8 @@ import { graphFromRelationships } from './propagation'
 import { buildTransitions } from './contextHealthService'
 import type { DecisionAtRisk } from '../../shared/contextHealth'
 import type { MaterialityInput, DecisionImpact } from './materiality'
+import type { Decision, ActorRef } from '../../shared/decision'
+import { plexiId } from '../../shared/plexiId'
 import { deriveHealthSnapshot, ensureReviewSchema, recordReview, reviewPointSeq, type HealthSnapshot } from './health'
 import { generateResume } from '../resume/resume'
 import { createSummaryCache, type SummaryCache } from '../ai/summaryCache'
@@ -144,6 +146,57 @@ export function relatedObjectIds(objectId: string): string[] {
   } catch {
     return []
   }
+}
+
+export interface FlagDecisionInput {
+  title: string
+  decisionStatement?: string
+  relatedObjectIds?: string[]
+  affectedDeskIds?: string[]
+}
+
+// Create a human-owned Decision (PLX-DOM-040) that references the given Objects and
+// Desks, so a later material change to a linked Object raises Decision Risk against
+// it (the red widget frame / desk decisions-at-risk). The owner is always the local
+// human principal; an agent can never own a Decision.
+export function createDecision(input: FlagDecisionInput): Decision {
+  const e = getContextEngine()
+  const email = loadAccountState().cachedEmail
+  const owner: ActorRef = { kind: 'user', id: localUserId(), displayName: email ?? undefined }
+  return e.decisions.create({
+    organisationId: getActiveOrgId() || 'local',
+    title: input.title,
+    decisionStatement: input.decisionStatement?.trim() || input.title,
+    decisionOwner: owner,
+    relatedObjectIds: input.relatedObjectIds ?? [],
+    affectedDeskIds: input.affectedDeskIds ?? [],
+    correlationId: plexiId()
+  })
+}
+
+// Cancel a Decision (supersede with no successor), so it no longer puts any Object
+// at risk. Used to undo a "flag as a decision". Human actor, emits DecisionSuperseded.
+export function cancelDecision(id: string): void {
+  const e = getContextEngine()
+  const email = loadAccountState().cachedEmail
+  const owner: ActorRef = { kind: 'user', id: localUserId(), displayName: email ?? undefined }
+  e.decisions.supersede(id, null, owner, e.events, new Date().toISOString())
+}
+
+// All Decisions for the active org (live + superseded), newest-first as stored.
+export function listDecisions(): Decision[] {
+  try {
+    return getContextEngine().decisions.all()
+  } catch {
+    return []
+  }
+}
+
+// Live Decisions that reference an Object — what puts that Object at decision risk.
+export function decisionsForObject(objectId: string): Decision[] {
+  return listDecisions().filter(
+    (d) => d.state !== 'superseded' && d.state !== 'cancelled' && d.relatedObjectIds.includes(objectId)
+  )
 }
 
 // Whether any live Decision references this Object, expressed as a materiality

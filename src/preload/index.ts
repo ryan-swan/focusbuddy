@@ -74,6 +74,7 @@ import type {
 } from '@shared/fields'
 import type { KnowledgeEntry, KnowledgeDraft, KnowledgePatch } from '@shared/knowledge'
 import type { DeskLayout, DeviceClass } from '@shared/deskLayout'
+import type { Decision } from '@shared/decision'
 
 // Local-document comment row as returned by the docComments IPC.
 interface DocCommentDto {
@@ -149,6 +150,20 @@ const api = {
       deskId: string
     ): Promise<{ summary: string; aiSummary: string | null; degraded: boolean; cacheHit: boolean; changedEventCount: number }> =>
       ipcRenderer.invoke('context:resumeSummary', deskId)
+  },
+  // Decisions (spec §37). Human-owned records that reference Objects/Desks; a
+  // change to a referenced Object raises Decision Risk against it. Creating one is
+  // what activates the decision-risk surface (red widget frame + desk alerts).
+  decisions: {
+    create: (input: {
+      title: string
+      decisionStatement?: string
+      relatedObjectIds?: string[]
+      affectedDeskIds?: string[]
+    }): Promise<Decision> => ipcRenderer.invoke('decisions:create', input),
+    list: (): Promise<Decision[]> => ipcRenderer.invoke('decisions:list'),
+    forObject: (objectId: string): Promise<Decision[]> => ipcRenderer.invoke('decisions:forObject', objectId),
+    cancel: (id: string): Promise<boolean> => ipcRenderer.invoke('decisions:cancel', id)
   },
   widgets: {
     listByTask: (taskId: string): Promise<Widget[]> =>

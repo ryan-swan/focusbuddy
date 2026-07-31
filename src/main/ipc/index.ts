@@ -97,6 +97,10 @@ import {
   healthFor as ceHealthFor,
   markReviewed as ceMarkReviewed,
   decisionImpactForObject as ceDecisionImpactForObject,
+  createDecision as ceCreateDecision,
+  cancelDecision as ceCancelDecision,
+  listDecisions as ceListDecisions,
+  decisionsForObject as ceDecisionsForObject,
   liveResumeForDesk as ceLiveResumeForDesk
 } from '../context/engine'
 import { plexiId } from '@shared/plexiId'
@@ -668,6 +672,21 @@ export function registerIpcHandlers(): void {
   })
   ipcMain.handle('context:markReviewed', (_e, id: string) => {
     ceMarkReviewed(id)
+    return true
+  })
+  // Decisions (spec §37). A human-owned Decision references Objects/Desks so a
+  // later material change raises Decision Risk against them (the red widget frame
+  // + desk decisions-at-risk). Creating one is the entry point that activates the
+  // whole decision-risk surface.
+  ipcMain.handle(
+    'decisions:create',
+    (_e, input: { title: string; decisionStatement?: string; relatedObjectIds?: string[]; affectedDeskIds?: string[] }) =>
+      ceCreateDecision(input)
+  )
+  ipcMain.handle('decisions:list', () => ceListDecisions())
+  ipcMain.handle('decisions:forObject', (_e, objectId: string) => ceDecisionsForObject(objectId))
+  ipcMain.handle('decisions:cancel', (_e, id: string) => {
+    ceCancelDecision(id)
     return true
   })
   // Live catch-up Resume with an AI summary (degrades to deterministic without a key).

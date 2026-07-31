@@ -16,6 +16,7 @@ import {
   duplicateWidget,
   archiveWidget,
   deleteWidget,
+  flagAsDecision,
   sourceWidget,
   workingText,
   pinWidgetToZone,
@@ -107,6 +108,16 @@ export function buildOrganise(ctx: MenuContext): MenuContribution[] {
       label: 'Bring to front',
       icon: 'flip_to_front',
       onSelect: (c) => bringToFront(c)
+    },
+    {
+      // Flag as a Decision: the entry point that activates the decision-risk
+      // surface. A later material change to this widget then lights its red frame.
+      id: 'core/organise/flag-decision',
+      section: MenuSection.Organise,
+      priority: 6,
+      label: 'Flag as a decision',
+      icon: 'gavel',
+      onSelect: (c) => void flagAsDecision(c)
     }
   ]
   if (w.parentSectionId) {

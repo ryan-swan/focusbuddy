@@ -11,10 +11,12 @@ import { launchApp, waitForReady, type LaunchedApp } from './_helpers'
 // (src/renderer/src/components/widgets/WidgetFrame.tsx ~888-905).
 //
 // Desk navigation follows the same __fbView pattern as contextHealthStrip.spec.ts.
-// Decision-risk is NOT covered here: there is no renderer/IPC surface to create a
-// Decision (no `decisions:*` ipcMain handler, no `decisions` preload namespace —
-// confirmed by inspection of src/main/ipc/index.ts and src/preload/index.ts), so
-// that state is not reachable from the renderer and is out of scope for this spec.
+// Decision-risk is NOT covered here on purpose (kept isolated so this file stays a
+// pure "changed"/"attention-required" regression check) — see decisionRisk.spec.ts
+// for the flag-as-a-decision -> decision-risk red path, now wired end to end via
+// window.api.decisions.* (decisions:* ipcMain handlers, src/main/ipc/index.ts) and
+// the "Flag as a decision" context-menu action (core/organise/flag-decision,
+// src/renderer/src/lib/contextMenu/universal.ts).
 
 let launched: LaunchedApp | null = null
 
