@@ -1,22 +1,16 @@
 import { useEffect, useRef, useState } from 'react'
-import {
-  ImperativePanelHandle,
-  Panel,
-  PanelGroup,
-  PanelResizeHandle
-} from 'react-resizable-panels'
 import Sidebar from './components/Sidebar'
 import PlexiiLogo from './components/PlexiiLogo'
 import {
   FLOATING_MENU_INSET,
-  FLOATING_MENU_INSET_RIGHT,
   useMinimizable,
   useSidebarWidth
 } from './components/chrome/floatingMenu'
 import MainPane from './components/MainPane'
 import PlexiOfficeShell from './components/office/PlexiOfficeShell'
 import { PlexiDeskShell, PlexiPeopleShell, PlexiBrainShell } from './components/segment/segments'
-import ChatPanel from './components/ChatPanel'
+import AssistantOverlay from './components/assistant/AssistantOverlay'
+import { useAssistantChrome } from './stores/assistantChrome'
 import TelemetryReporter from './components/TelemetryReporter'
 import ReleaseModal from './components/ReleaseModal'
 import Tooltip from './components/Tooltip'
@@ -93,7 +87,6 @@ export default function App(): JSX.Element {
   const refresh = useNodeStore((s) => s.refresh)
   const setActive = useNodeStore((s) => s.setActive)
   const refreshTemplates = useTemplateStore((s) => s.refresh)
-  const chatRef = useRef<ImperativePanelHandle>(null)
   // The global Desk sidebar is now a floating, resizable, minimisable card
   // rather than a docked resize panel. Its minimise state and width persist
   // across reloads; on a small window it starts minimised so it doesn't cover
@@ -110,7 +103,14 @@ export default function App(): JSX.Element {
     currentView.kind === 'plexidesk' ||
     currentView.kind === 'plexipeople' ||
     currentView.kind === 'plexibrain'
-  const [chatCollapsed, setChatCollapsed] = useState(false)
+  // The assistant is a global overlay (AssistantOverlay) rather than a desk
+  // panel, so it exists on every screen — segment takeovers included. In
+  // sidebar mode it docks right and <main> reserves its width below, the same
+  // way a docked meeting reserves its edge.
+  const assistantOpen = useAssistantChrome((s) => s.open)
+  const assistantMode = useAssistantChrome((s) => s.mode)
+  const assistantWidth = useAssistantChrome((s) => s.width)
+  const assistantPad = assistantOpen && assistantMode === 'sidebar' ? assistantWidth : 0
   // When a meeting is docked (collaborate mode), reserve space on that edge so the
   // docked panel does not cover the workspace content. The panel itself is a
   // fixed-position surface (MeetingOverlay); this just keeps the content clear.
@@ -124,6 +124,15 @@ export default function App(): JSX.Element {
         paddingBottom: meetDockSide === 'bottom' ? 210 : undefined
       }
     : {}
+  // Reserved edges compose: a right-docked meeting and a sidebar-mode
+  // assistant each claim their own strip, so the paddings add.
+  const mainPad: React.CSSProperties =
+    assistantPad > 0
+      ? {
+          ...meetPad,
+          paddingRight: (meetDocked && meetDockSide === 'right' ? 300 : 0) + assistantPad
+        }
+      : meetPad
   // On macOS the window uses hiddenInset, so the traffic lights sit at the top
   // left of the header. Reserve room so the header's left controls (the show-
   // workspace toggle, the trust chip) never sit under them.
@@ -422,23 +431,8 @@ export default function App(): JSX.Element {
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
-  function collapseChat(): void {
-    chatRef.current?.collapse()
-  }
-  function expandChat(): void {
-    chatRef.current?.expand()
-  }
-
-  // Open the assistant on request (e.g. the empty-desk "tell the assistant what
-  // you want" entry). Kept as a window event so any surface can invoke it
-  // without threading a prop down.
-  useEffect(() => {
-    function onOpen(): void {
-      chatRef.current?.expand()
-    }
-    window.addEventListener('fb:open-assistant', onOpen)
-    return () => window.removeEventListener('fb:open-assistant', onOpen)
-  }, [])
+  // fb:open-assistant is handled by AssistantOverlay itself — any surface can
+  // still summon the assistant with the same window event as before.
 
   function toggleSettings(): void {
     if (settingsOpen) {
@@ -520,7 +514,7 @@ export default function App(): JSX.Element {
               first affordance the eye lands on. Cmd+Shift+K opens it
               from anywhere. */}
           <Tooltip
-            content="Build with AI — describe what you want and it builds the tools and widgets on your desk. For help thinking through a task, use the Assistant panel on the right. (⌘⇧K)"
+            content="Build with AI — describe what you want and it builds the tools and widgets on your desk. For help thinking through a task, open the Assistant from the pill at the bottom right. (⌘⇧K)"
             placement="bottom"
           >
             <button
@@ -608,21 +602,9 @@ export default function App(): JSX.Element {
               <Icon name="settings" size={16} />
             </button>
           </Tooltip>
-          {chatCollapsed && (
-            <Tooltip content="Show the assistant panel" placement="bottom">
-              <button
-                onClick={expandChat}
-                className="h-7 px-2.5 inline-flex items-center gap-1 rounded-lg text-[11px] font-medium text-[var(--ink-80)] hover:text-[var(--ink-100)] border border-[var(--edge-soft)] hover:border-[rgb(var(--accent)/0.4)] transition-colors"
-                aria-label="Show assistant panel"
-              >
-                <span>Assistant</span>
-                <Icon name="keyboard_double_arrow_left" size={14} />
-              </button>
-            </Tooltip>
-          )}
         </div>
       </header>
-      <main className="flex-1 min-h-0 relative flex bg-[var(--surface-base)]" style={meetPad}>
+      <main className="flex-1 min-h-0 relative flex bg-[var(--surface-base)]" style={mainPad}>
         {segmentTakeover ? (
           currentView.kind === 'office' ? (
             <PlexiOfficeShell initialApp={currentView.app} />
@@ -641,35 +623,11 @@ export default function App(): JSX.Element {
               the card so it reads as floating above the surface. Minimising it
               collapses the column entirely, giving the content the full width. */}
           <SidebarDock collapsed={sidebarMinimized} onToggle={toggleSidebar} />
+          {/* The assistant no longer lives in a desk-only split here — it is a
+              global overlay (AssistantOverlay, mounted below) so it exists on
+              every screen. Sidebar mode reserves its width via mainPad above. */}
           <div className="flex-1 min-w-0 h-full">
-            <PanelGroup direction="horizontal" autoSaveId="focusbuddy-main-v3">
-              <Panel defaultSize={78} minSize={40}>
-                <MainPane />
-              </Panel>
-              {/* Grip, not a divider: the assistant is now a floating card with
-                  its own hairline edge, so a hard 1px rule between the panes
-                  would double up. Mirrors the sidebar's resize affordance — a
-                  wide invisible hit area with a small accent pill inside. */}
-              <PanelResizeHandle className="group w-2.5 flex items-center justify-center outline-none">
-                <span className="h-10 w-[3px] rounded-full bg-transparent transition-colors group-hover:bg-[rgb(var(--accent)/0.5)] group-focus-visible:bg-[rgb(var(--accent))] group-data-[resize-handle-state=drag]:bg-[rgb(var(--accent))]" />
-              </PanelResizeHandle>
-              <Panel
-                ref={chatRef}
-                defaultSize={22}
-                minSize={16}
-                maxSize={45}
-                collapsible
-                collapsedSize={0}
-                onCollapse={() => setChatCollapsed(true)}
-                onExpand={() => setChatCollapsed(false)}
-              >
-                {/* Inset column: lets the desk surface show around the assistant
-                    card so it reads as floating, exactly like the sidebar dock. */}
-                <div className={`h-full box-border ${FLOATING_MENU_INSET_RIGHT}`}>
-                  <ChatPanel onCollapse={collapseChat} />
-                </div>
-              </Panel>
-            </PanelGroup>
+            <MainPane />
           </div>
         </>
         )}
@@ -702,6 +660,9 @@ export default function App(): JSX.Element {
       <LaunchSignInModal />
       <UpgradePromptModal />
       <MetricsOverlay />
+      {/* The assistant: a pill on every screen, opening into sidebar /
+          floating / fullscreen over one conversation. */}
+      <AssistantOverlay />
       <AICommandBar open={aiBarOpen} onClose={() => setAiBarOpen(false)} />
       {/* Hover mic bar — collapses to accent strip, expands to voice FAB */}
       <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-[150] pointer-events-auto">

@@ -16,7 +16,17 @@ import CanvasContextMenu, { type CtxMenuItem } from './CanvasContextMenu'
 import { FLOATING_MENU_ASIDE, FLOATING_MENU_STYLE } from './chrome/floatingMenu'
 import { useModelMode } from '../lib/modelPrefs'
 import { useBodyDouble } from '../lib/bodyDouble'
+import { useAssistantChrome, type AssistantMode } from '../stores/assistantChrome'
 import Icon from './Icon'
+
+// The three display modes, in Notion's order and with Notion's labels. The
+// header's mode button shows the current mode's icon; the dropdown lists all
+// three with a check on the active one.
+const MODE_OPTIONS: Array<{ mode: AssistantMode; label: string; icon: string }> = [
+  { mode: 'sidebar', label: 'Sidebar', icon: 'vertical_split' },
+  { mode: 'floating', label: 'Floating', icon: 'picture_in_picture_alt' },
+  { mode: 'fullscreen', label: 'Full screen', icon: 'fullscreen' }
+]
 
 // Window for the "What was I doing?" lookback — last 30 minutes covers most context switches.
 const TRAIL_LOOKBACK_MS = 30 * 60 * 1000
@@ -91,6 +101,23 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
   const pushAssistantMessage = useChatStore((s) => s.pushAssistantMessage)
   const [modelMode] = useModelMode()
   const bodyDouble = useBodyDouble()
+  // Display mode (sidebar / floating / fullscreen) — chrome state, not
+  // conversation state. Switching re-dresses this same panel over the same
+  // thread; the AssistantOverlay wrapper does the actual re-containering.
+  const chromeMode = useAssistantChrome((s) => s.mode)
+  const setChromeMode = useAssistantChrome((s) => s.setMode)
+  const [modeMenuOpen, setModeMenuOpen] = useState(false)
+  const modeMenuRef = useRef<HTMLDivElement | null>(null)
+  useEffect(() => {
+    if (!modeMenuOpen) return
+    function onPointerDown(e: PointerEvent): void {
+      if (!modeMenuRef.current?.contains(e.target as Node)) setModeMenuOpen(false)
+    }
+    window.addEventListener('pointerdown', onPointerDown)
+    return () => window.removeEventListener('pointerdown', onPointerDown)
+  }, [modeMenuOpen])
+  const activeModeMeta =
+    MODE_OPTIONS.find((o) => o.mode === chromeMode) ?? MODE_OPTIONS[1]
 
   async function handleWhatWasIDoing(): Promise<void> {
     if (summarizing) return
@@ -373,9 +400,55 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
               <Icon name="delete_sweep" size={16} />
             </button>
           )}
+          {/* Display mode — Notion's ⌄ menu: Sidebar / Floating / Full screen,
+              check on the active one. Chrome only; the conversation persists
+              across switches. */}
+          <div className="relative" ref={modeMenuRef}>
+            <button
+              onClick={() => setModeMenuOpen((v) => !v)}
+              className="icon-btn"
+              title={`Display mode — ${activeModeMeta.label}`}
+              aria-label="Display mode"
+              aria-expanded={modeMenuOpen}
+              data-testid="assistant-mode-toggle"
+            >
+              <Icon name={activeModeMeta.icon} size={16} />
+            </button>
+            {modeMenuOpen && (
+              <div
+                data-testid="assistant-mode-menu"
+                className="absolute right-0 top-full mt-1.5 z-30 min-w-[172px] rounded-[12px] border border-[var(--edge-soft)] bg-[var(--surface-raised)] p-1"
+                style={{ boxShadow: 'var(--shadow-cast)' }}
+              >
+                {MODE_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.mode}
+                    onClick={() => {
+                      setChromeMode(opt.mode)
+                      setModeMenuOpen(false)
+                    }}
+                    data-testid={`assistant-mode-${opt.mode}`}
+                    className="w-full flex items-center gap-2 rounded-lg px-2 py-1.5 text-[12px] text-[var(--ink-90)] hover:bg-[var(--surface-sunken)] transition-colors"
+                  >
+                    <Icon name={opt.icon} size={15} className="text-[var(--ink-60)]" />
+                    <span className="flex-1 text-left">{opt.label}</span>
+                    {opt.mode === chromeMode && (
+                      <Icon name="check" size={14} className="text-accent" />
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
           {onCollapse && (
-            <button onClick={onCollapse} className="icon-btn" title="Hide assistant panel">
-              <Icon name="keyboard_double_arrow_right" size={16} />
+            <button
+              onClick={onCollapse}
+              className="icon-btn"
+              title="Minimize to pill"
+              aria-label="Minimize to pill"
+              data-testid="assistant-minimize"
+            >
+              <Icon name="remove" size={16} />
             </button>
           )}
         </div>
