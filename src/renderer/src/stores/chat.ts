@@ -3,6 +3,7 @@ import type {
   ActionProposal,
   AppliedProposal,
   ChatMessage,
+  ChatQuestion,
   ChatResponse,
   ChatSource
 } from '@shared/types'
@@ -74,6 +75,17 @@ interface ChatStore {
   // every single time you return to the page.
   traceDisclosureByMessage: Record<string, 'open' | 'closed'>
   setTraceDisclosure: (messageTs: number, state: 'open' | 'closed') => void
+  // Follow-up questions the model asked, keyed by the asking message's
+  // timestamp. Store-held for the same reason as trace disclosure: the panel
+  // unmounts on navigation, and a question must neither vanish nor resurrect
+  // because you changed screens. The card renders only while its message is
+  // the LAST in the thread — answering appends a user turn, which un-lasts the
+  // question without deleting the record; a rewind that makes it last again
+  // honestly re-opens it, because in that history it is still unanswered.
+  questionByMessage: Record<string, ChatQuestion>
+  // Dismiss (the card's ×): the user declined to answer. Deletes the record so
+  // the question never comes back, even if its message becomes last again.
+  dismissQuestion: (messageTs: number) => void
   // A conversation the panel holds onto across navigation.
   //
   // The assistant normally re-threads per screen (see lib/assistantContext) — a
@@ -127,6 +139,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   liveTraceByThread: {},
   traceByMessage: {},
   traceDisclosureByMessage: {},
+  questionByMessage: {},
   pinnedThread: null,
   setTraceDisclosure: (messageTs, state) => {
     set({
@@ -135,6 +148,11 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         [String(messageTs)]: state
       }
     })
+  },
+  dismissQuestion: (messageTs) => {
+    const next = { ...get().questionByMessage }
+    delete next[String(messageTs)]
+    set({ questionByMessage: next })
   },
   pinThread: (thread) => set({ pinnedThread: thread }),
   unpinThread: () => set({ pinnedThread: null }),
@@ -184,6 +202,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     const nextSources = { ...get().sourcesByMessage }
     const nextTraces = { ...get().traceByMessage }
     const nextDisclosure = { ...get().traceDisclosureByMessage }
+    const nextQuestions = { ...get().questionByMessage }
     for (const m of dropped) {
       for (const p of nextProposals[String(m.ts)] ?? []) {
         delete nextApplied[appliedKey(m.ts, p.id)]
@@ -192,6 +211,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       delete nextSources[String(m.ts)]
       delete nextTraces[String(m.ts)]
       delete nextDisclosure[String(m.ts)]
+      delete nextQuestions[String(m.ts)]
     }
     // A rewind is the front half of a retry, so any trace still running for this
     // thread describes work the user just discarded. Drop it too.
@@ -207,6 +227,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       sourcesByMessage: nextSources,
       traceByMessage: nextTraces,
       traceDisclosureByMessage: nextDisclosure,
+      questionByMessage: nextQuestions,
       liveTraceByThread: nextLive
     })
   },
@@ -290,6 +311,11 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       if (resp.ok && resp.sources && resp.sources.length > 0) {
         updates.sourcesByMessage = { ...get().sourcesByMessage, [tsKey]: resp.sources }
       }
+      // The durable response is the sole source of truth for a question — the
+      // renderer must never show one the completed envelope does not carry.
+      if (resp.ok && resp.question) {
+        updates.questionByMessage = { ...get().questionByMessage, [tsKey]: resp.question }
+      }
       if (live) {
         const nextLive = { ...get().liveTraceByThread }
         delete nextLive[key]
@@ -325,7 +351,9 @@ export const useChatStore = create<ChatStore>((set, get) => ({
           'transport and will not render. This almost always means the Electron ' +
           'process is running an older preload bundle: restart it (npm run dev).'
       )
-      const resp = await api.send({ taskId, messages: next, attachments })
+      // supportsQuestions: this panel renders the question card, so the model
+      // is allowed to ask here — the one surface that opts in.
+      const resp = await api.send({ taskId, messages: next, attachments, supportsQuestions: true })
       settle(resp)
       return
     }
@@ -340,7 +368,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         resolve()
       }
       const cleanup = api.sendStream(
-        { taskId, messages: next, attachments, requestId },
+        { taskId, messages: next, attachments, requestId, supportsQuestions: true },
         {
           onSources: (t) => patchTrace({ retrievedAt: Date.now(), retrievalMs: t.elapsedMs, sources: t.sources }),
           onReply: (text) => {
@@ -404,6 +432,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     const nextSources = { ...get().sourcesByMessage }
     const nextTraces = { ...get().traceByMessage }
     const nextDisclosure = { ...get().traceDisclosureByMessage }
+    const nextQuestions = { ...get().questionByMessage }
     for (const m of cleared) {
       for (const p of nextProposals[String(m.ts)] ?? []) {
         delete nextApplied[appliedKey(m.ts, p.id)]
@@ -412,6 +441,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       delete nextSources[String(m.ts)]
       delete nextTraces[String(m.ts)]
       delete nextDisclosure[String(m.ts)]
+      delete nextQuestions[String(m.ts)]
     }
     const nextLive = { ...get().liveTraceByThread }
     delete nextLive[key]
@@ -422,6 +452,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       sourcesByMessage: nextSources,
       traceByMessage: nextTraces,
       traceDisclosureByMessage: nextDisclosure,
+      questionByMessage: nextQuestions,
       liveTraceByThread: nextLive,
       // A cleared thread has nothing left to follow you around.
       pinnedThread: get().pinnedThread?.key === key ? null : get().pinnedThread

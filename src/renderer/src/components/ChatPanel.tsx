@@ -7,6 +7,8 @@ import { useChatStore, appliedKey } from '../stores/chat'
 import { deriveAssistantBlocks } from '../lib/chatBlocks'
 import ChatBlockView from './focus/ChatBlockView'
 import RetrievalTrace from './assistant/RetrievalTrace'
+import QuestionCard from './assistant/QuestionCard'
+import { activeQuestionFor } from '../lib/assistantQuestion'
 import { useAssistantContext } from '../lib/assistantContext'
 import { useWidgetStore } from '../stores/widgets'
 import { chimeIn } from '../lib/audioBeep'
@@ -39,6 +41,8 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
   const traceByMessage = useChatStore((s) => s.traceByMessage)
   const traceDisclosureByMessage = useChatStore((s) => s.traceDisclosureByMessage)
   const setTraceDisclosure = useChatStore((s) => s.setTraceDisclosure)
+  const questionByMessage = useChatStore((s) => s.questionByMessage)
+  const dismissQuestion = useChatStore((s) => s.dismissQuestion)
   const markProposalApplied = useChatStore((s) => s.markProposalApplied)
   const consumeProposal = useChatStore((s) => s.consumeProposal)
   const rewindTo = useChatStore((s) => s.rewindTo)
@@ -71,6 +75,10 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
   // the active thread, not by the global `sending` flag, so a request started in another
   // context can't draw its progress here.
   const liveTrace = liveTraceByThread[thread.key]
+  // The follow-up question that is live for the displayed thread, if any —
+  // attached to the last message and neither answered nor dismissed. Derived
+  // by a pure, tested rule (lib/assistantQuestion).
+  const activeQuestion = activeQuestionFor(messages, questionByMessage)
   const [draft, setDraft] = useState('')
   const [summarizing, setSummarizing] = useState(false)
   // Which turn most recently had its text copied — drives the ✓ confirmation on
@@ -558,6 +566,20 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
           rather than a bare textarea with a detached Send button underneath.
           The whole box carries the focus ring, so it reads as a single control. */}
       <form onSubmit={handleSend} className="p-3 border-t border-[var(--edge-soft)]">
+        {/* The assistant's follow-up question, when it asked one, sits directly
+            above the composer — pick an option and Send, or just type below
+            (any send on this thread is the answer). */}
+        {activeQuestion && (
+          <QuestionCard
+            question={activeQuestion.question}
+            disabled={sending}
+            onDismiss={() => dismissQuestion(activeQuestion.messageTs)}
+            onAnswer={(option) => {
+              if (sending) return
+              void send(thread.serverTaskId, option, thread.key)
+            }}
+          />
+        )}
         <div className="rounded-[13px] border border-[var(--edge-firm)] bg-[var(--surface-raised)] px-2.5 pt-2 pb-1.5 flex flex-col gap-2 transition-shadow focus-within:border-[rgb(var(--accent)/0.55)] focus-within:shadow-[0_0_0_3px_rgb(var(--accent)/0.13)]">
           <textarea
             ref={taRef}
