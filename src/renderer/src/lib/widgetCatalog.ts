@@ -116,8 +116,10 @@ export const WIDGET_CATALOG: WidgetCatalogEntry[] = [
     label: 'Table',
     icon: 'table_chart',
     hint: 'Airtable-style database — rows + columns of typed fields',
-    defaultWidth: 560,
-    defaultHeight: 360,
+    // Open wide enough that several typed columns + the add-row control are all
+    // usable without a resize (N3: size scales with the real estate a kind needs).
+    defaultWidth: 680,
+    defaultHeight: 440,
     defaultContent: '',
     isWebBased: false
   },
@@ -127,8 +129,8 @@ export const WIDGET_CATALOG: WidgetCatalogEntry[] = [
     label: 'Chart',
     icon: 'bar_chart',
     hint: 'PlexiDash — bar, line, area, pie or KPI charts from a table. Several on a desk make a dashboard.',
-    defaultWidth: 440,
-    defaultHeight: 320,
+    defaultWidth: 520,
+    defaultHeight: 380,
     defaultContent: '',
     isWebBased: false
   },
@@ -138,8 +140,10 @@ export const WIDGET_CATALOG: WidgetCatalogEntry[] = [
     label: 'Document',
     icon: 'article',
     hint: 'A Word-class document. Create new, open a .docx, or place an existing one.',
-    defaultWidth: 640,
-    defaultHeight: 520,
+    // Word-class: needs the toolbar + a full page width (~816px page) usable on
+    // open. Sized so the page and ribbon are readable without a resize.
+    defaultWidth: 860,
+    defaultHeight: 760,
     defaultContent: '',
     isWebBased: false
   },
@@ -149,8 +153,10 @@ export const WIDGET_CATALOG: WidgetCatalogEntry[] = [
     label: 'Spreadsheet',
     icon: 'grid_on',
     hint: 'An Excel-class spreadsheet with formulas. Create new, import .xlsx/.csv, or place an existing one.',
-    defaultWidth: 640,
-    defaultHeight: 460,
+    // Excel-class: formula bar + toolbar + enough columns/rows to be usable at a
+    // glance without a resize.
+    defaultWidth: 880,
+    defaultHeight: 580,
     defaultContent: '',
     isWebBased: false
   },
@@ -160,8 +166,10 @@ export const WIDGET_CATALOG: WidgetCatalogEntry[] = [
     label: 'Slides',
     icon: 'slideshow',
     hint: 'A PowerPoint-class deck. Create new, import .pptx, or place an existing one.',
-    defaultWidth: 720,
-    defaultHeight: 480,
+    // PowerPoint-class: a 16:9 slide + the thumbnail rail + toolbar all usable on
+    // open.
+    defaultWidth: 900,
+    defaultHeight: 600,
     defaultContent: '',
     isWebBased: false
   },

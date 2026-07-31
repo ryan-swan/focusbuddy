@@ -119,6 +119,7 @@ import {
   useAIRailCollapsed
 } from '../lib/chromeState'
 import LinkOverlay, { type PendingLinkPick } from './LinkOverlay'
+import { tidyPositions, type TidyOptions } from '../lib/autoArrange'
 import { useLinksStore } from '../stores/links'
 import { useAccountStore } from '../stores/account'
 import { currentDeviceClass } from '../lib/deviceClass'
@@ -1644,9 +1645,32 @@ export default function Canvas(): JSX.Element {
           onClick: () => void groupByType(true)
         },
         {
-          label: 'Clean up (Tidy)',
+          // Tidy modes — every mode keeps linked widgets clustered together.
+          label: 'Tidy',
           icon: 'grid_view',
-          onClick: () => void handleAutoArrange()
+          children: [
+            { label: 'Square grid', icon: 'grid_view', onClick: () => void handleAutoArrange({ mode: 'square' }) },
+            { label: 'Single column (vertical)', icon: 'view_agenda', onClick: () => void handleAutoArrange({ mode: 'vertical' }) },
+            { label: 'Single row (horizontal)', icon: 'view_column', onClick: () => void handleAutoArrange({ mode: 'horizontal' }) },
+            { label: 'Mosaic', icon: 'dashboard', onClick: () => void handleAutoArrange({ mode: 'mosaic' }) },
+            { label: 'Rows of the canvas (flow)', icon: 'reorder', onClick: () => void handleAutoArrange({ mode: 'flow' }) },
+            {
+              label: 'Columns…',
+              icon: 'view_week',
+              children: [2, 3, 4, 5, 6].map((c) => ({
+                label: `${c} columns`,
+                onClick: () => void handleAutoArrange({ mode: 'custom', cols: c })
+              }))
+            },
+            {
+              label: 'Rows…',
+              icon: 'table_rows',
+              children: [2, 3, 4, 5, 6].map((r) => ({
+                label: `${r} rows`,
+                onClick: () => void handleAutoArrange({ mode: 'custom', rows: r })
+              }))
+            }
+          ]
         }
       ]
     }
@@ -2034,7 +2058,7 @@ export default function Canvas(): JSX.Element {
     setTimeout(() => centerOnHome(), 100)
   }
 
-  async function handleAutoArrange(): Promise<void> {
+  async function handleAutoArrange(opts: TidyOptions = { mode: 'flow' }): Promise<void> {
     if (widgets.length === 0 || !dropRef.current) return
     const rect = dropRef.current.getBoundingClientRect()
     const visibleW = rect.width / zoom
@@ -2123,22 +2147,18 @@ export default function Canvas(): JSX.Element {
       return composite(a) - composite(b) // same cluster → baseline order within
     })
 
-    let cursorX = PADDING
-    let cursorY = PADDING
-    let rowMaxH = 0
-    const positions = new Map<string, { x: number; y: number }>()
-    for (const item of items) {
-      if (cursorX !== PADDING && cursorX + item.w > PADDING + visibleW) {
-        cursorX = PADDING
-        cursorY += rowMaxH + GAP
-        rowMaxH = 0
-      }
-      positions.set(item.id, { x: Math.round(cursorX), y: Math.round(cursorY) })
-      cursorX += item.w + GAP
-      rowMaxH = Math.max(rowMaxH, item.h)
-    }
-    for (const [id, pos] of positions) {
-      await updateWidget(id, { x: pos.x, y: pos.y })
+    // `items` is already ordered (category baseline + linked-cluster contiguity);
+    // the chosen mode only decides the geometry. Linked widgets therefore stay
+    // adjacent in every mode, so wires stay short.
+    const placed = tidyPositions(
+      items.map((it) => ({ id: it.id, w: it.w, h: it.h })),
+      opts,
+      visibleW,
+      GAP,
+      PADDING
+    )
+    for (const p of placed) {
+      await updateWidget(p.id, { x: p.x, y: p.y })
     }
     bumpLayoutVersion()
   }
