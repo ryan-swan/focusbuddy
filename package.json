@@ -36,7 +36,8 @@
     "test": "npm run test:unit && npm run test:e2e",
     "merge-check": "node scripts/merge-check.mjs",
     "spec:trace": "node scripts/spec-trace.mjs",
-    "hooks:install": "sh scripts/install-git-hooks.sh"
+    "hooks:install": "sh scripts/install-git-hooks.sh",
+    "brain:eval": "npm run build && playwright test --config playwright.eval.config.ts"
   },
   "engines": {
     "node": ">=20.0.0 <23.0.0"
