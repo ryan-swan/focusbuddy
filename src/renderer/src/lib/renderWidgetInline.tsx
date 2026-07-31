@@ -32,6 +32,7 @@ import DiagramWidget from '../components/widgets/DiagramWidget'
 import StreamDeckWidget from '../components/widgets/StreamDeckWidget'
 import AgentWidget from '../components/widgets/AgentWidget'
 import WebhookWidget from '../components/widgets/WebhookWidget'
+import InboundHookWidget from '../components/widgets/InboundHookWidget'
 import PortalWidget from '../components/widgets/PortalWidget'
 import ScratchpadWidget from '../components/widgets/ScratchpadWidget'
 import ChatThreadWidget from '../components/widgets/ChatThreadWidget'
@@ -99,6 +100,8 @@ export function renderWidgetInline(w: Widget): JSX.Element | null {
       return <AgentWidget widget={w} inline />
     case 'webhook':
       return <WebhookWidget widget={w} inline />
+    case 'inbound-hook':
+      return <InboundHookWidget widget={w} inline />
     case 'portal':
       return <PortalWidget widget={w} inline />
     case 'chat-thread':

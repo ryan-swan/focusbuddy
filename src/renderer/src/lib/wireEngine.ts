@@ -11,7 +11,17 @@ import { coerceToWidgetContent } from './widgetContentFormat'
 // its latest output (not its raw JSON config), so an agent can feed a note via a
 // mirror wire or be the source of a transform. Everything else flows its content.
 function effectiveContent(w: Widget): string {
-  return w.kind === 'agent' ? parseAgent(w.content).lastOutput ?? '' : w.content ?? ''
+  if (w.kind === 'agent') return parseAgent(w.content).lastOutput ?? ''
+  // An inbound-hook stores { hookId, url, lastPayload } — what flows out of it on a
+  // wire is the last received payload, not its config blob.
+  if (w.kind === 'inbound-hook') {
+    try {
+      return (JSON.parse(w.content || '{}').lastPayload as string) ?? ''
+    } catch {
+      return ''
+    }
+  }
+  return w.content ?? ''
 }
 
 // ── Live wires: the reactive engine ──────────────────────────────────────────

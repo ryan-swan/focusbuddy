@@ -497,6 +497,17 @@ export const WIDGET_CATALOG: WidgetCatalogEntry[] = [
     isWebBased: false
   },
   {
+    kind: 'inbound-hook',
+    category: 'Tools',
+    label: 'Receive from a URL',
+    icon: 'call_received',
+    hint: 'An inbound webhook. Gives you a unique URL — when an external system (Stripe, a form, curl) POSTs to it, the payload lands here and fires any wire drawn OUT of this tool',
+    defaultWidth: 340,
+    defaultHeight: 200,
+    defaultContent: '',
+    isWebBased: false
+  },
+  {
     kind: 'portal',
     category: 'Layout',
     label: 'Portal',

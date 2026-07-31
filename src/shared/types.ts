@@ -136,6 +136,12 @@ export type WidgetKind =
   // run status (freshness / error) reports the last send. This is the outbound
   // half of external webhooks (Lever 3); the inbound trigger is a separate kind.
   | 'webhook'
+  // Inbound webhook (trigger) — the receiving half. It self-registers a hook with
+  // the signal server and shows a unique URL; when an external system POSTs there,
+  // the server relays the payload here and it lands in this widget's content,
+  // firing any wire drawn OUT of it. content holds { hookId, url } as JSON. You
+  // wire OUT of this (it's a source) — the mirror of the outbound 'webhook'.
+  | 'inbound-hook'
 
 export type ContextMenuAction =
   | 'createStickyFromSelection'

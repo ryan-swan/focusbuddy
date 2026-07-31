@@ -60,6 +60,7 @@ import CardWidget from './widgets/CardWidget'
 import CustomBlockWidget from './widgets/CustomBlockWidget'
 import AgentWidget from './widgets/AgentWidget'
 import WebhookWidget from './widgets/WebhookWidget'
+import InboundHookWidget from './widgets/InboundHookWidget'
 import PortalWidget from './widgets/PortalWidget'
 import ZoomControls from './ZoomControls'
 import CanvasEdgeIndicators from './CanvasEdgeIndicators'
@@ -223,6 +224,8 @@ function renderWidget(w: Widget): JSX.Element | null {
       return <AgentWidget widget={w} />
     case 'webhook':
       return <WebhookWidget widget={w} />
+    case 'inbound-hook':
+      return <InboundHookWidget widget={w} />
     case 'portal':
       return <PortalWidget widget={w} />
     case 'living-doc':
