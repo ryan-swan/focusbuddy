@@ -486,6 +486,17 @@ export const WIDGET_CATALOG: WidgetCatalogEntry[] = [
     isWebBased: false
   },
   {
+    kind: 'webhook',
+    category: 'Tools',
+    label: 'Send to a URL',
+    icon: 'webhook',
+    hint: 'An outbound webhook. Wire a tool into it and its content is POSTed to your URL whenever it changes — send desk data out to Slack, Zapier or any HTTP endpoint',
+    defaultWidth: 320,
+    defaultHeight: 180,
+    defaultContent: '',
+    isWebBased: false
+  },
+  {
     kind: 'portal',
     category: 'Layout',
     label: 'Portal',

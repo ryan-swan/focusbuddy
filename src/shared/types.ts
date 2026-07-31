@@ -130,6 +130,12 @@ export type WidgetKind =
   // when source widgets change (see livingPageScheduler). content is serialized
   // Tiptap JSON, system-owned (never hand-edited). Reuses the living* fields.
   | 'living-doc'
+  // Webhook (outbound) — an endpoint tool. Wire a widget INTO it and, on every
+  // source change, the source's content is POSTed to the configured URL (main
+  // process, so no CORS). content holds { url, method } as JSON. The wire's own
+  // run status (freshness / error) reports the last send. This is the outbound
+  // half of external webhooks (Lever 3); the inbound trigger is a separate kind.
+  | 'webhook'
 
 export type ContextMenuAction =
   | 'createStickyFromSelection'

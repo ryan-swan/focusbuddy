@@ -188,6 +188,7 @@ export const CREATE_AND_CONNECT_MENU: CreateMenuEntry[] = [
   // into action — the whole point of the wire overhaul. It spawns an agent
   // tool wired to read this widget; the user then types what it should do.
   { label: 'Automate with an agent', icon: 'smart_toy', kind: 'agent' },
+  { label: 'Send to a URL',  icon: 'webhook',       kind: 'webhook' },
   { label: 'Sticky',         icon: 'sticky_note_2', kind: 'sticky' },
   { label: 'Note',           icon: 'description',   kind: 'note' },
   { label: 'Markdown',       icon: 'subject',       kind: 'markdown' },

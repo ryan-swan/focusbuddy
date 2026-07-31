@@ -26,9 +26,12 @@ function wireFreshness(
   link: WidgetLink,
   sourceUpdatedAt: number | undefined,
   running: boolean,
-  hasError: boolean
+  hasError: boolean,
+  // A wire into an outbound webhook is reactive even though its type is 'context'
+  // (it POSTs on source change), so it gets freshness like transform/mirror.
+  targetIsWebhook = false
 ): WireFreshness | null {
-  if (link.type !== 'transform' && link.type !== 'mirror') return null
+  if (link.type !== 'transform' && link.type !== 'mirror' && !targetIsWebhook) return null
   if (hasError) return 'error'
   if (running) return 'running'
   if (!link.enabled) return 'disabled'
@@ -612,10 +615,13 @@ export default function LinkOverlay({ ghost, pendingPick, onPendingPickDone }: P
         // Error is durable: a transient run error OR a persisted last_error (so a
         // failure still shows after a reload until the next successful run).
         const hasError = !!wireErrors[seg.link.id] || !!seg.link.lastError
-        const reactiveOff =
-          (seg.link.type === 'transform' || seg.link.type === 'mirror') && !seg.link.enabled
         const source = allWidgets.find((w) => w.id === seg.link.sourceWidgetId)
-        const fresh = wireFreshness(seg.link, source?.updatedAt, isRunning, hasError)
+        const targetIsWebhook =
+          allWidgets.find((w) => w.id === seg.link.targetWidgetId)?.kind === 'webhook'
+        const reactiveOff =
+          (seg.link.type === 'transform' || seg.link.type === 'mirror' || targetIsWebhook) &&
+          !seg.link.enabled
+        const fresh = wireFreshness(seg.link, source?.updatedAt, isRunning, hasError, targetIsWebhook)
         const errText = wireErrors[seg.link.id] ?? seg.link.lastError ?? ''
         const ranText = seg.link.lastRunAt ? ` (ran ${relAgo(seg.link.lastRunAt)})` : ''
         const title =

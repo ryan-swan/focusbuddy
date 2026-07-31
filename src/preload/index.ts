@@ -217,6 +217,16 @@ const api = {
     listByTask: (taskId: string, limit?: number): Promise<WireRun[]> =>
       ipcRenderer.invoke('wireRuns:listByTask', taskId, limit)
   },
+  webhooks: {
+    // Outbound POST from the main process (no CORS). Returns an honest result.
+    send: (input: {
+      url: string
+      method?: string
+      body?: string
+      contentType?: string
+    }): Promise<{ ok: boolean; status?: number; error?: string }> =>
+      ipcRenderer.invoke('webhooks:send', input)
+  },
   snapshots: {
     create: (taskId: string, label?: string): Promise<SnapshotMeta> =>
       ipcRenderer.invoke('snapshots:create', taskId, label),

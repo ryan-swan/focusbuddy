@@ -956,6 +956,36 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('wireRuns:listByTask', (_e, taskId: string, limit?: number) =>
     listWireRunsByTask(taskId, limit)
   )
+  // Outbound webhook POST (Lever 3, Phase 0). Runs in main so there's no CORS and
+  // the desk's data goes straight out to the user's URL. https/http only; bounded
+  // by a timeout so a dead endpoint can't hang a wire. Returns an honest result —
+  // never a fabricated success — so the wire's run status reflects reality.
+  ipcMain.handle(
+    'webhooks:send',
+    async (
+      _e,
+      input: { url: string; method?: string; body?: string; contentType?: string }
+    ): Promise<{ ok: boolean; status?: number; error?: string }> => {
+      const url = (input.url ?? '').trim()
+      if (!/^https?:\/\//i.test(url)) return { ok: false, error: 'Enter a valid http(s) URL.' }
+      const controller = new AbortController()
+      const timer = setTimeout(() => controller.abort(), 15000)
+      try {
+        const res = await fetch(url, {
+          method: input.method?.toUpperCase() === 'PUT' ? 'PUT' : 'POST',
+          headers: { 'content-type': input.contentType || 'application/json' },
+          body: input.body ?? '',
+          signal: controller.signal
+        })
+        return { ok: res.ok, status: res.status, error: res.ok ? undefined : `HTTP ${res.status}` }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return { ok: false, error: controller.signal.aborted ? 'Request timed out.' : msg }
+      } finally {
+        clearTimeout(timer)
+      }
+    }
+  )
   // One-time-ish: mirror widget links that existed before links fed the graph, so
   // historical connections also surface as related. Idempotent, non-fatal.
   ceBackfillWidgetLinkRelations()

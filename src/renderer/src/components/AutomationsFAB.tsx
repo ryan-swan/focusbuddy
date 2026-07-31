@@ -26,7 +26,7 @@ interface Status {
   tone: Tone
 }
 interface Row {
-  kind: 'agent' | 'transform' | 'mirror'
+  kind: 'agent' | 'transform' | 'mirror' | 'webhook'
   id: string
   title: string
   sub: string
@@ -119,29 +119,34 @@ export default function AutomationsFAB(): JSX.Element {
       })
     }
 
-    // Reactive wires — a plain context wire is passive, so it isn't an automation.
+    // Reactive wires — a plain context wire is passive, EXCEPT one whose target is
+    // an outbound webhook, which fires a real POST on every source change and so is
+    // very much an automation the user should see and be able to switch off.
     for (const l of links) {
-      if (l.type !== 'transform' && l.type !== 'mirror') continue
-      const src = byId.get(l.sourceWidgetId)
       const tgt = byId.get(l.targetWidgetId)
+      const isWebhook = tgt?.kind === 'webhook'
+      if (l.type !== 'transform' && l.type !== 'mirror' && !isWebhook) continue
+      const src = byId.get(l.sourceWidgetId)
       if (!src || !tgt) continue // endpoint not on this desk right now
       const label = (w: typeof src): string => w.title?.trim() || w.kind
+      const rowKind: Row['kind'] = isWebhook ? 'webhook' : (l.type as 'transform' | 'mirror')
       const stale = !!l.enabled && l.lastRunAt != null && src.updatedAt > l.lastRunAt
       const status: Status = l.lastError
-        ? { label: 'Last run failed', tone: 'error' }
+        ? { label: isWebhook ? 'Last send failed' : 'Last run failed', tone: 'error' }
         : !l.enabled
           ? { label: 'Off', tone: 'off' }
           : l.lastRunAt == null
-            ? { label: "Hasn't run yet", tone: 'idle' }
+            ? { label: isWebhook ? "Hasn't sent yet" : "Hasn't run yet", tone: 'idle' }
             : stale
               ? { label: 'Stale — source changed', tone: 'stale' }
-              : { label: `Ran ${relAgo(l.lastRunAt)}`, tone: 'ok' }
+              : { label: `${isWebhook ? 'Sent' : 'Ran'} ${relAgo(l.lastRunAt)}`, tone: 'ok' }
       out.push({
-        kind: l.type,
+        kind: rowKind,
         id: l.id,
         title: `${label(src)} → ${label(tgt)}`,
-        sub:
-          l.type === 'transform'
+        sub: isWebhook
+          ? 'Webhook · POSTs to a URL on change'
+          : l.type === 'transform'
             ? `Transform${l.verb.trim() ? ` · ${l.verb.trim()}` : ' · no instruction yet'}`
             : 'Mirror · keeps target in sync',
         status,
@@ -216,7 +221,15 @@ export default function AutomationsFAB(): JSX.Element {
                     >
                       <div className="flex items-center gap-2">
                         <Icon
-                          name={r.kind === 'agent' ? 'smart_toy' : r.kind === 'transform' ? 'auto_awesome' : 'sync'}
+                          name={
+                            r.kind === 'agent'
+                              ? 'smart_toy'
+                              : r.kind === 'transform'
+                                ? 'auto_awesome'
+                                : r.kind === 'webhook'
+                                  ? 'webhook'
+                                  : 'sync'
+                          }
                           size={14}
                           className="text-accent shrink-0"
                         />
