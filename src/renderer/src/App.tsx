@@ -110,7 +110,16 @@ export default function App(): JSX.Element {
   const assistantOpen = useAssistantChrome((s) => s.open)
   const assistantMode = useAssistantChrome((s) => s.mode)
   const assistantWidth = useAssistantChrome((s) => s.width)
-  const assistantPad = assistantOpen && assistantMode === 'sidebar' ? assistantWidth : 0
+  // Focus mode suppresses the assistant entirely (3a.2, P4) — release the
+  // sidebar-mode pad too, or the focus overlay's translucent backdrop shows a
+  // phantom empty strip where the hidden dock would be. Same predicate the
+  // overlay uses: focus mode genuinely showing, not a stale focusedWidgetId.
+  const focusedWidgetId = useWidgetStore((s) => s.focusedWidgetId)
+  const focusModeShowing =
+    (currentView.kind === 'task' || currentView.kind === 'project-dashboard') &&
+    focusedWidgetId !== null
+  const assistantPad =
+    assistantOpen && assistantMode === 'sidebar' && !focusModeShowing ? assistantWidth : 0
   // When a meeting is docked (collaborate mode), reserve space on that edge so the
   // docked panel does not cover the workspace content. The panel itself is a
   // fixed-position surface (MeetingOverlay); this just keeps the content clear.

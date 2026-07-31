@@ -4,6 +4,8 @@ import Icon from '../Icon'
 import { FLOATING_MENU_INSET_RIGHT, FLOATING_MENU_STYLE } from '../chrome/floatingMenu'
 import { useAssistantChrome } from '../../stores/assistantChrome'
 import { useChatStore } from '../../stores/chat'
+import { useViewStore } from '../../stores/view'
+import { useWidgetStore } from '../../stores/widgets'
 import { useAssistantWidgetPin } from '../../lib/useAssistantWidgetPin'
 
 // The assistant's global chrome, mirroring Notion's: a persistent pill at the
@@ -52,6 +54,17 @@ export default function AssistantOverlay(): JSX.Element {
   // the pin's clearing conditions. Lives here because this component never
   // unmounts, so the rules keep running even while the panel is closed.
   useAssistantWidgetPin()
+  // Focus-mode suppression (3a.2, P4): while focus mode is genuinely showing,
+  // its AI Chat tab IS the assistant — pill and panel both disappear. Keyed on
+  // focus mode actually rendering (desk-type view + focusedWidgetId — the
+  // predicate assistantContext uses), NOT on the raw store field: a stale
+  // focusedWidgetId left behind by navigating away must not hide the pill on
+  // other screens. Chrome state (open/mode/width) is deliberately untouched,
+  // so exiting focus mode restores the assistant exactly as it was.
+  const view = useViewStore((s) => s.view)
+  const focusedWidgetId = useWidgetStore((s) => s.focusedWidgetId)
+  const focusModeShowing =
+    (view.kind === 'task' || view.kind === 'project-dashboard') && focusedWidgetId !== null
 
   // Any surface can summon the assistant without prop-threading — the same
   // window event the empty-desk hint and the mindmap starting kit already
@@ -101,6 +114,8 @@ export default function AssistantOverlay(): JSX.Element {
       window.removeEventListener('pointerup', onUp)
     }
   }, [resizing, setWidth, persistWidth])
+
+  if (focusModeShowing) return <></>
 
   if (!open) {
     return (

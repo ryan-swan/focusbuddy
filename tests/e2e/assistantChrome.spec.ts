@@ -11,6 +11,9 @@
  *       mode and open state survive a reload (localStorage).
  * AC-4  The fb:open-assistant window event still opens the assistant — the
  *       entry point every other surface and spec already uses.
+ * AC-5  Focus mode suppresses the assistant entirely — no pill, no panel —
+ *       because the AI Chat tab IS the assistant there; exiting restores the
+ *       chrome exactly as it was (Phase 3a.2, P4).
  */
 
 import { test, expect, type ElectronApplication, type Page } from '@playwright/test'
@@ -189,4 +192,56 @@ test('AC-4 — fb:open-assistant still summons the assistant, into the Notion-sh
   const composerValue = await window.locator('[data-testid="chat-composer"]').inputValue()
   expect(composerValue.length).toBeGreaterThan(0)
   expect(rowText).toContain(composerValue)
+})
+
+test('AC-5 — focus mode suppresses the assistant entirely; exit restores it as it was', async () => {
+  launched = await launchApp()
+  const { window } = launched
+  await waitForReady(window)
+
+  const { aId } = await window.evaluate(async () => {
+    const api = (window as unknown as { api: typeof window.api }).api
+    const task = await api.nodes.create({
+      parentId: null,
+      kind: 'task',
+      title: 'Focus suppress desk'
+    })
+    const a = await api.widgets.create({
+      taskId: task.id,
+      kind: 'sticky',
+      title: 'Widget A',
+      content: 'ALPHA',
+      x: 160,
+      y: 160,
+      width: 220,
+      height: 180
+    })
+    return { aId: a.id }
+  })
+  await window.reload()
+  await waitForReady(window)
+  await window.getByRole('button', { name: 'Focus suppress desk' }).first().click()
+  await window.waitForSelector('[data-canvas-surface="true"]', { timeout: 8000 })
+
+  // Open the panel first, so suppression has real chrome state to preserve.
+  await window.evaluate(() => window.dispatchEvent(new CustomEvent('fb:open-assistant')))
+  await expect(panel(window)).toBeVisible({ timeout: 8000 })
+
+  // Enter focus mode through the widget's real entry point.
+  const widgetEl = window.locator(`[data-widget-id="${aId}"]`).first()
+  await widgetEl.hover()
+  await widgetEl.locator('button[aria-label="Expand options"]').click({ force: true })
+  await window.getByText('Focus mode', { exact: true }).click({ force: true })
+  await expect(window.locator('[data-testid="widget-focus-mode"]')).toBeVisible({ timeout: 5000 })
+
+  // The assistant is GONE — no open panel and no pill either. The AI Chat tab
+  // is the assistant in focus mode.
+  await expect(overlay(window)).toHaveCount(0)
+  await expect(pill(window)).toHaveCount(0)
+
+  // Exit focus mode → the assistant returns exactly as it was: open, same mode.
+  await window.keyboard.press('Escape')
+  await expect(window.locator('[data-testid="widget-focus-mode"]')).toHaveCount(0, { timeout: 5000 })
+  await expect(overlay(window)).toBeVisible({ timeout: 5000 })
+  await expect(panel(window)).toBeVisible()
 })
