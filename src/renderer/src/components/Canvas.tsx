@@ -46,6 +46,7 @@ import '../lib/contextMenu'
 import FloatingToolbar, { type ToolbarAction } from './FloatingToolbar'
 import MinimapWidget from './widgets/MinimapWidget'
 import CanvasMinimapFAB from './CanvasMinimapFAB'
+import AutomationsFAB from './AutomationsFAB'
 import DeskSuggestionChip from './DeskSuggestionChip'
 import DeskGallery from './DeskGallery'
 import ColumnsView from './ColumnsView'
@@ -2618,6 +2619,9 @@ export default function Canvas(): JSX.Element {
           />
           {/* Minimap FAB — always-present in the canvas bottom-right. */}
           {activeTaskId && <CanvasMinimapFAB />}
+          {/* Automations FAB — stacked above the minimap: the desk's "what runs
+              on its own" list (reactive wires + agents) with on/off + jump-to. */}
+          {activeTaskId && <AutomationsFAB />}
           {activeTaskId && <DeskSuggestionChip />}
           {/* Zoom + pan controls — bottom-left. Mirrors the 2.0 mockup. */}
           <ZoomControls />

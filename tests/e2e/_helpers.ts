@@ -157,6 +157,16 @@ export async function waitForReady(
   if (await skip.isVisible().catch(() => false)) {
     await skip.click().catch(() => {})
   }
+
+  // "New feature" corner spotlight (onboarding/FeatureSpotlightPopup) — offers
+  // a tour of a feature module the user hasn't seen. It can render moments
+  // after the core onboarding flow above, on a fixed-position card that
+  // intercepts clicks on whatever's behind it. Best-effort dismiss so a spec
+  // driving a mostly-empty desk doesn't race this popup's appearance.
+  const spotlightDismiss = window.locator('[data-testid="feature-spotlight-dismiss"]')
+  if (await spotlightDismiss.isVisible().catch(() => false)) {
+    await spotlightDismiss.click().catch(() => {})
+  }
 }
 
 // Where each former top-level product now lives under the three-segment IA.
