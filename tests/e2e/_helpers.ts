@@ -1,4 +1,10 @@
-import { _electron as electron, expect, type ElectronApplication, type Page } from '@playwright/test'
+import {
+  _electron as electron,
+  expect,
+  type ElectronApplication,
+  type Locator,
+  type Page
+} from '@playwright/test'
 import { mkdtempSync, rmSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
@@ -248,4 +254,36 @@ export async function gotoView(
     w.__fbView?.getState()[f]?.()
   }, fn)
   await window.waitForTimeout(300)
+}
+
+// ── The assistant composer ─────────────────────────────────────────────────
+// Phase 4.3 replaced the composer's <textarea> with a small TipTap editor so
+// mention chips can sit inside the sentence (plan D9). A contenteditable has no
+// value, and Playwright's fill() writes straight into the DOM — bypassing
+// ProseMirror's transactions, which leaves the editor's own document stale and
+// the message empty. Every suite goes through these two helpers instead, so the
+// one fact "the composer is an editor now" lives in one place.
+
+export function composer(window: Page): Locator {
+  return window.locator('[data-testid="chat-composer"]')
+}
+
+// Replace the composer's contents by typing, exactly as a user would, so the
+// editor's document is genuinely updated.
+export async function typeInComposer(window: Page, text: string): Promise<void> {
+  const box = composer(window)
+  await box.waitFor({ state: 'visible', timeout: 8000 })
+  await box.click()
+  await window.keyboard.press('ControlOrMeta+a')
+  await window.keyboard.press('Backspace')
+  await window.keyboard.type(text)
+  // Let the onUpdate → setDraft round trip land before the caller clicks Send;
+  // the button is disabled while the draft is empty.
+  await window.waitForTimeout(120)
+}
+
+// What the composer currently holds, as plain text. Mention chips serialise to
+// "@Title", matching what gets sent.
+export async function composerText(window: Page): Promise<string> {
+  return (await composer(window).innerText()).trim()
 }

@@ -1470,6 +1470,30 @@ body {
 .tiptap-editor .ProseMirror ::selection {
   background: rgb(var(--accent) / 0.25);
 }
+
+/* The assistant composer (Phase 4.3). A TipTap editor standing in for what was
+   a <textarea>, so mention chips can sit inside the sentence. It is NOT a
+   .tiptap-editor — that class carries document typography this box must not
+   inherit — so it restates only the two things it genuinely needs: no focus
+   outline (the composer's own container draws the focus ring) and a
+   placeholder, matching the textarea's placeholder colour token rather than the
+   document editor's italic grey. */
+.assistant-composer-input.ProseMirror {
+  outline: none;
+}
+.assistant-composer-input.ProseMirror p {
+  margin: 0;
+}
+.assistant-composer-input.ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: var(--ink-50);
+  pointer-events: none;
+  height: 0;
+}
+.assistant-composer-input.ProseMirror ::selection {
+  background: rgb(var(--accent) / 0.25);
+}
 /* Task list checkbox alignment when authored by Tiptap (different DOM than markdown task list) */
 .tiptap-editor .ProseMirror ul[data-type='taskList'] {
   list-style: none;

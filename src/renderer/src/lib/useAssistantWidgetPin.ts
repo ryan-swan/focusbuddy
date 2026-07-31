@@ -5,15 +5,30 @@ import { useNodeStore } from '../stores/nodes'
 import { useChatStore } from '../stores/chat'
 import { useAssistantChrome } from '../stores/assistantChrome'
 import { useAssistantContext } from './assistantContext'
-import { isPinnableWidget, pinFromWidget, shouldAutoPin, shouldClearPin } from './assistantPin'
+import { shouldAutoPin, shouldClearPin } from './assistantPin'
+import {
+  activeMentions,
+  isMentionableWidget,
+  mentionFromWidget,
+  mentionKey
+} from './assistantMentions'
 
-// The performing half of click-to-pin (Phase 3a.1): subscribes to the widget
-// activation signal WidgetFrame already emits (setActive on click) and turns
-// qualifying changes into a pin on the chat store; clears the pin when its
-// thread is left or its widget disappears. All decisions live in
-// lib/assistantPin (pure, unit-tested) — this hook only wires them to the
-// stores. Mounted once, in AssistantOverlay, which never unmounts, so the
+// The performing half of click-to-mention: subscribes to the widget activation
+// signal WidgetFrame already emits (setActive on click) and turns qualifying
+// changes into a reference on the chat store; drops references whose widget
+// disappears. Mounted once, in AssistantOverlay, which never unmounts, so the
 // lifecycle rules keep running even while the panel is closed.
+//
+// Phase 4.3 converged this with @-mentions (plan D7/D8): a click and a typed
+// "@" now produce the SAME kind of chip in the SAME layer. Only the destination
+// changed — the decision rules in lib/assistantPin (pure, unit-tested) are
+// untouched and still the only thing deciding when a click counts, because they
+// were right about that already.
+//
+// What DID change, deliberately: a click no longer REPLACES the previous
+// reference. The layer holds several — the operator's ask was "you can @ mention
+// multiple documents and they are referenced immediately together" — so a
+// second click adds a second chip, up to the cap.
 export function useAssistantWidgetPin(): void {
   const open = useAssistantChrome((s) => s.open)
   const view = useViewStore((s) => s.view)
@@ -24,9 +39,9 @@ export function useAssistantWidgetPin(): void {
   const activeTaskId = useNodeStore((s) => s.activeTaskId)
   const ctx = useAssistantContext()
   const pinnedThread = useChatStore((s) => s.pinnedThread)
-  const pinnedWidget = useChatStore((s) => s.pinnedWidget)
-  const pinWidget = useChatStore((s) => s.pinWidget)
-  const unpinWidget = useChatStore((s) => s.unpinWidget)
+  const mentions = useChatStore((s) => s.mentions)
+  const addMentionRef = useChatStore((s) => s.addMentionRef)
+  const removeMentionRef = useChatStore((s) => s.removeMentionRef)
 
   const threadKey = pinnedThread?.key ?? ctx.key
   const followingElsewhere = pinnedThread !== null && pinnedThread.key !== ctx.key
@@ -35,8 +50,9 @@ export function useAssistantWidgetPin(): void {
   // on a desk screen — a stale focusedWidgetId elsewhere is not focus mode.
   const focusModeShowing = onDeskView && focusedWidgetId !== null
 
-  // Pin on a qualifying activation CHANGE. The ref seeds with the mount-time
-  // value so whatever was already active never pins retroactively.
+  // Reference on a qualifying activation CHANGE. The ref seeds with the
+  // mount-time value so whatever was already active never references
+  // retroactively.
   const prevActiveRef = useRef<string | null>(activeWidgetId)
   useEffect(() => {
     const prev = prevActiveRef.current
@@ -52,23 +68,41 @@ export function useAssistantWidgetPin(): void {
       return
     }
     const w = widgets.find((x) => x.id === activeWidgetId)
-    if (!w || !isPinnableWidget(w.kind)) return
-    pinWidget(pinFromWidget(w, threadKey))
-  }, [activeWidgetId, open, onDeskView, focusModeShowing, followingElsewhere, widgets, threadKey, pinWidget])
+    if (!w || !isMentionableWidget(w.kind)) return
+    const ref = mentionFromWidget(w, threadKey)
+    if (ref) addMentionRef(ref)
+  }, [
+    activeWidgetId,
+    open,
+    onDeskView,
+    focusModeShowing,
+    followingElsewhere,
+    widgets,
+    threadKey,
+    addMentionRef
+  ])
 
-  // Lifecycle: clear on thread switch or when the widget disappears from its
-  // own desk. Runs regardless of panel open state.
+  // Lifecycle: drop a widget reference when its widget disappears from its own
+  // desk. The conversation-switch half of shouldClearPin is handled by scoping
+  // instead (a reference is only ever shown and sent on its own conversation),
+  // so this effect exists for deletion — a chip must not keep claiming a widget
+  // that is no longer there.
   useEffect(() => {
-    if (!pinnedWidget) return
-    if (
-      shouldClearPin(pinnedWidget, {
-        threadKey,
-        activeTaskId,
-        widgetIds: widgets.map((w) => w.id),
-        widgetsLoading
-      })
-    ) {
-      unpinWidget()
+    const widgetIds = widgets.map((w) => w.id)
+    for (const m of activeMentions(mentions, threadKey)) {
+      if (m.kind !== 'widget') continue
+      const gone = shouldClearPin(
+        {
+          widgetId: m.id,
+          taskId: m.taskId ?? '',
+          title: m.title,
+          kind: 'note',
+          icon: m.icon,
+          threadKey
+        },
+        { threadKey, activeTaskId, widgetIds, widgetsLoading }
+      )
+      if (gone) removeMentionRef(threadKey, mentionKey(m))
     }
-  }, [pinnedWidget, threadKey, activeTaskId, widgets, widgetsLoading, unpinWidget])
+  }, [mentions, threadKey, activeTaskId, widgets, widgetsLoading, removeMentionRef])
 }

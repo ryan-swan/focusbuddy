@@ -22,7 +22,7 @@
  */
 
 import { test, expect, type ElectronApplication, type Page } from '@playwright/test'
-import { launchApp, type LaunchedApp, waitForReady } from './_helpers'
+import { launchApp, type LaunchedApp, typeInComposer, waitForReady } from './_helpers'
 
 let launched: LaunchedApp | null = null
 
@@ -97,9 +97,7 @@ async function openAssistant(window: Page): Promise<void> {
 }
 
 async function ask(window: Page, text: string): Promise<void> {
-  const composer = window.locator('[data-testid="chat-composer"]')
-  await composer.waitFor({ state: 'visible', timeout: 8000 })
-  await composer.fill(text)
+  await typeInComposer(window, text)
   await window.locator('button[aria-label="Send"]').click()
 }
 

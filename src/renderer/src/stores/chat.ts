@@ -10,7 +10,16 @@ import type {
 import { recordTrail } from '../lib/trail'
 import { gatherCanvasAttachments } from '../lib/canvasContent'
 import type { AssistantTrace } from '../lib/traceView'
-import type { PinnedWidgetRef } from '../lib/assistantPin'
+import {
+  activeMentions,
+  addMention,
+  clearConversationMentions,
+  mergeMentionResolution,
+  removeMention,
+  toWireMentions,
+  type MentionRef,
+  type MentionResolution
+} from '../lib/assistantMentions'
 
 // Enough of an assistant context to keep showing a conversation after you have
 // navigated away from where it started: which thread it is, what to call it, and
@@ -98,15 +107,26 @@ interface ChatStore {
   pinnedThread: PinnedThread | null
   pinThread: (thread: PinnedThread) => void
   unpinThread: () => void
-  // The widget the user clicked-to-pin as the conversation's primary reference
-  // (Phase 3a.1) — Notion's @-mention chip, one at a time (P1). Sticky across
-  // sends (P2); cleared by the × in the composer chip, by a thread switch, or
-  // when the widget disappears (lifecycle in lib/useAssistantWidgetPin).
+  // The workspace objects this conversation references (Phase 4.3). One layer
+  // for BOTH gestures: typing "@" and clicking a widget produce the same kind
+  // of chip (plan D7), all chips are equal, and all are sticky to the
+  // CONVERSATION until dismissed (plan D8) — 3a.1's single pinnedWidget
+  // generalised to N typed references.
+  //
   // Distinct from pinnedThread above, which pins a CONVERSATION across
   // navigation — this pins reference MATERIAL to a conversation.
-  pinnedWidget: PinnedWidgetRef | null
-  pinWidget: (pin: PinnedWidgetRef) => void
-  unpinWidget: () => void
+  mentions: MentionRef[]
+  addMentionRef: (ref: MentionRef) => { added: boolean; rejectedForCap: boolean }
+  removeMentionRef: (conversationKey: string, key: string) => void
+  // What the main process reported each reference actually produced. The sole
+  // basis for rendering a chip as broken — the renderer never assumes a
+  // reference resolved just because it was sent.
+  mentionResolution: MentionResolution
+  // The references a given user turn was sent with, keyed by its timestamp, so
+  // a past message can re-draw its chips inline exactly where they were typed
+  // (plan P1's first rendering). Kept per message rather than derived, because
+  // the conversation's live set changes and the transcript must not.
+  mentionsByMessage: Record<string, MentionRef[]>
   sending: boolean
   hasApiKey: boolean | null
   checkApiKey: () => Promise<void>
@@ -166,9 +186,17 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   },
   pinThread: (thread) => set({ pinnedThread: thread }),
   unpinThread: () => set({ pinnedThread: null }),
-  pinnedWidget: null,
-  pinWidget: (pin) => set({ pinnedWidget: pin }),
-  unpinWidget: () => set({ pinnedWidget: null }),
+  mentions: [],
+  mentionResolution: {},
+  mentionsByMessage: {},
+  addMentionRef: (ref) => {
+    const r = addMention(get().mentions, ref)
+    if (r.added) set({ mentions: r.mentions })
+    return { added: r.added, rejectedForCap: r.rejectedForCap }
+  },
+  removeMentionRef: (conversationKey, key) => {
+    set({ mentions: removeMention(get().mentions, conversationKey, key) })
+  },
   sending: false,
   hasApiKey: null,
   checkApiKey: async () => {
@@ -216,6 +244,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     const nextTraces = { ...get().traceByMessage }
     const nextDisclosure = { ...get().traceDisclosureByMessage }
     const nextQuestions = { ...get().questionByMessage }
+    const nextMentionsByMessage = { ...get().mentionsByMessage }
     for (const m of dropped) {
       for (const p of nextProposals[String(m.ts)] ?? []) {
         delete nextApplied[appliedKey(m.ts, p.id)]
@@ -225,6 +254,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       delete nextTraces[String(m.ts)]
       delete nextDisclosure[String(m.ts)]
       delete nextQuestions[String(m.ts)]
+      delete nextMentionsByMessage[String(m.ts)]
     }
     // A rewind is the front half of a retry, so any trace still running for this
     // thread describes work the user just discarded. Drop it too.
@@ -241,6 +271,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       traceByMessage: nextTraces,
       traceDisclosureByMessage: nextDisclosure,
       questionByMessage: nextQuestions,
+      mentionsByMessage: nextMentionsByMessage,
       liveTraceByThread: nextLive
     })
   },
@@ -255,11 +286,21 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       sending: true
     })
     recordTrail('chat_sent', taskId, { preview: content.slice(0, 200) })
-    // The user's pinned primary reference rides only the thread it was pinned
-    // on, and a send does NOT clear it (P2) — "primarily referenced in the
-    // conversation", not in one message.
-    const pin = get().pinnedWidget
-    const pinnedWidgetId = pin && pin.threadKey === key ? pin.widgetId : undefined
+    // The conversation's references ride every message on it, and a send does
+    // NOT clear them (plan D8) — "referenced in the conversation", not in one
+    // message. Recorded against this turn as well, so the transcript can draw
+    // the chips back inline where they were typed.
+    const refs = activeMentions(get().mentions, key)
+    const wireMentions = refs.length > 0 ? toWireMentions(refs) : undefined
+    if (refs.length > 0) {
+      set({ mentionsByMessage: { ...get().mentionsByMessage, [String(userMsg.ts)]: refs } })
+    }
+    // A referenced widget that happens to live on the desk in front of us is
+    // also force-included through the canvas path, exactly as the 3a.1 pin was,
+    // so its LIVE text (a rendered browser page the main process cannot read)
+    // still rides. Off-desk references are resolved in main instead.
+    const localWidget = refs.find((m) => m.kind === 'widget' && (!taskId || m.taskId === taskId))
+    const pinnedWidgetId = localWidget?.id
     // Gather any browser/doc/pdf content the user has open so the assistant can
     // act on it (e.g. create calendar events from a booking page). Best-effort:
     // a failure here must never block the message.
@@ -334,6 +375,11 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       if (resp.ok && resp.question) {
         updates.questionByMessage = { ...get().questionByMessage, [tsKey]: resp.question }
       }
+      // What each reference genuinely produced, straight from the response. A
+      // chip is marked broken on this basis and no other.
+      if (resp.mentions && resp.mentions.length > 0) {
+        updates.mentionResolution = mergeMentionResolution(get().mentionResolution, resp.mentions)
+      }
       if (live) {
         const nextLive = { ...get().liveTraceByThread }
         delete nextLive[key]
@@ -376,7 +422,8 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         messages: next,
         attachments,
         supportsQuestions: true,
-        pinnedWidgetId
+        pinnedWidgetId,
+        mentions: wireMentions
       })
       settle(resp)
       return
@@ -392,7 +439,15 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         resolve()
       }
       const cleanup = api.sendStream(
-        { taskId, messages: next, attachments, requestId, supportsQuestions: true, pinnedWidgetId },
+        {
+          taskId,
+          messages: next,
+          attachments,
+          requestId,
+          supportsQuestions: true,
+          pinnedWidgetId,
+          mentions: wireMentions
+        },
         {
           onSources: (t) => patchTrace({ retrievedAt: Date.now(), retrievalMs: t.elapsedMs, sources: t.sources }),
           onReply: (text) => {
@@ -457,6 +512,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     const nextTraces = { ...get().traceByMessage }
     const nextDisclosure = { ...get().traceDisclosureByMessage }
     const nextQuestions = { ...get().questionByMessage }
+    const nextMentionsByMessage = { ...get().mentionsByMessage }
     for (const m of cleared) {
       for (const p of nextProposals[String(m.ts)] ?? []) {
         delete nextApplied[appliedKey(m.ts, p.id)]
@@ -466,6 +522,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       delete nextTraces[String(m.ts)]
       delete nextDisclosure[String(m.ts)]
       delete nextQuestions[String(m.ts)]
+      delete nextMentionsByMessage[String(m.ts)]
     }
     const nextLive = { ...get().liveTraceByThread }
     delete nextLive[key]
@@ -477,11 +534,12 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       traceByMessage: nextTraces,
       traceDisclosureByMessage: nextDisclosure,
       questionByMessage: nextQuestions,
+      mentionsByMessage: nextMentionsByMessage,
       liveTraceByThread: nextLive,
       // A cleared thread has nothing left to follow you around — and nothing
-      // left pinned to it.
+      // left referencing it.
       pinnedThread: get().pinnedThread?.key === key ? null : get().pinnedThread,
-      pinnedWidget: get().pinnedWidget?.threadKey === key ? null : get().pinnedWidget
+      mentions: clearConversationMentions(get().mentions, key)
     })
   }
 }))

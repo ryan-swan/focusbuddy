@@ -16,7 +16,7 @@
  */
 
 import { test, expect, type ElectronApplication, type Page } from '@playwright/test'
-import { launchApp, type LaunchedApp, waitForReady } from './_helpers'
+import { launchApp, type LaunchedApp, typeInComposer, waitForReady } from './_helpers'
 
 let launched: LaunchedApp | null = null
 
@@ -126,8 +126,7 @@ test('FC-1 — the desk thread imports into a persisted focus conversation, hone
   await window.evaluate(() => window.dispatchEvent(new CustomEvent('fb:open-assistant')))
   await expect(window.locator('[data-testid="assistant-panel"]')).toBeVisible({ timeout: 8000 })
   await stubStream(app, 'The desk answer.')
-  const composer = window.locator('[data-testid="chat-composer"]')
-  await composer.fill('the desk question')
+  await typeInComposer(window, 'the desk question')
   await window.locator('button[aria-label="Send"]').click()
   await expect(window.getByText('The desk answer.')).toBeVisible({ timeout: 8000 })
 

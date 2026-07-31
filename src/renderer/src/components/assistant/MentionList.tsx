@@ -1,0 +1,118 @@
+// The "@" typeahead popover (Phase 4.3). Controlled by the TipTap suggestion
+// plugin exactly the way SlashMenuList is: the plugin feeds it items and
+// forwards keystrokes through an imperative handle, so ↑/↓/Enter/Tab work while
+// the editor keeps focus and the caret keeps blinking.
+
+import { forwardRef, useEffect, useImperativeHandle, useState } from 'react'
+import Icon from '../Icon'
+import { mentionKindLabel, type MentionRef } from '../../lib/assistantMentions'
+
+export interface MentionListHandle {
+  onKeyDown: (e: KeyboardEvent) => boolean
+}
+
+interface Props {
+  items: MentionRef[]
+  loading: boolean
+  // Set when the reference set is already full — the picker says so rather than
+  // silently doing nothing when a choice is made.
+  atCap: boolean
+  command: (item: MentionRef) => void
+}
+
+const MentionList = forwardRef<MentionListHandle, Props>(function MentionList(
+  { items, loading, atCap, command },
+  ref
+): JSX.Element {
+  const [selected, setSelected] = useState(0)
+  useEffect(() => setSelected(0), [items])
+
+  useImperativeHandle(ref, () => ({
+    onKeyDown: (e: KeyboardEvent): boolean => {
+      if (items.length === 0) return false
+      if (e.key === 'ArrowDown') {
+        setSelected((s) => (s + 1) % items.length)
+        return true
+      }
+      if (e.key === 'ArrowUp') {
+        setSelected((s) => (s - 1 + items.length) % items.length)
+        return true
+      }
+      if (e.key === 'Enter' || e.key === 'Tab') {
+        const item = items[Math.min(selected, items.length - 1)]
+        if (item) command(item)
+        return true
+      }
+      return false
+    }
+  }))
+
+  if (atCap) {
+    return (
+      <div
+        data-testid="mention-picker"
+        data-mention-state="at-cap"
+        className="w-72 rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-xl p-2.5 text-[11.5px] text-[var(--ink-60)]"
+      >
+        This conversation already references the maximum number of items. Remove one to add another.
+      </div>
+    )
+  }
+
+  if (loading && items.length === 0) {
+    return (
+      <div
+        data-testid="mention-picker"
+        data-mention-state="loading"
+        className="w-72 rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-xl p-2.5 text-[11.5px] text-[var(--ink-40)]"
+      >
+        Searching…
+      </div>
+    )
+  }
+
+  if (items.length === 0) {
+    return (
+      <div
+        data-testid="mention-picker"
+        data-mention-state="empty"
+        className="w-72 rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-xl p-2.5 text-[11.5px] text-[var(--ink-40)]"
+      >
+        Nothing found. Mention a desk, document, widget, file or PlexiBrain entry.
+      </div>
+    )
+  }
+
+  return (
+    <div
+      data-testid="mention-picker"
+      data-mention-state="results"
+      className="w-72 max-h-72 overflow-auto rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-xl py-1"
+    >
+      {items.map((item, i) => (
+        <button
+          key={`${item.kind}:${item.id}`}
+          type="button"
+          data-testid="mention-option"
+          data-mention-id={item.id}
+          aria-selected={i === selected}
+          onMouseEnter={() => setSelected(i)}
+          onClick={() => command(item)}
+          className={`w-full flex items-center gap-2.5 px-2.5 py-1.5 text-left ${
+            i === selected ? 'bg-accent/10' : 'hover:bg-[var(--surface-sunken)]'
+          }`}
+        >
+          <Icon name={item.icon} size={15} className="shrink-0 text-[var(--ink-70)]" />
+          <span className="min-w-0 flex-1">
+            <span className="block text-[12.5px] text-[var(--ink-90)] truncate">{item.title}</span>
+            <span className="block text-[10.5px] text-[var(--ink-40)]">
+              {mentionKindLabel(item.kind)}
+            </span>
+          </span>
+        </button>
+      ))}
+    </div>
+  )
+})
+
+export default MentionList

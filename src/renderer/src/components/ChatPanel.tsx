@@ -1,9 +1,13 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { AppliedProposal, ChatMessage, ChatSource } from '@shared/types'
 import { useNodeStore } from '../stores/nodes'
 import { useViewStore } from '../stores/view'
 import { targetForSource } from '../lib/sourceTarget'
 import { useChatStore, appliedKey } from '../stores/chat'
+import MentionComposer from './assistant/MentionComposer'
+import MentionRefRow from './assistant/MentionRefRow'
+import { activeMentions, type MentionRef } from '../lib/assistantMentions'
+import { docToInput, splitMentionText } from '../lib/mentionDoc'
 import { deriveAssistantBlocks } from '../lib/chatBlocks'
 import ChatBlockView from './focus/ChatBlockView'
 import RetrievalTrace from './assistant/RetrievalTrace'
@@ -70,12 +74,15 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
   const pinnedThread = useChatStore((s) => s.pinnedThread)
   const unpinThread = useChatStore((s) => s.unpinThread)
   const pinThread = useChatStore((s) => s.pinThread)
-  // The clicked-to-pin primary reference (Phase 3a.1). Shown only on the
-  // thread it was pinned to; lifecycle (auto-pin on widget click, clear on
-  // thread switch / widget deletion) runs in useAssistantWidgetPin, mounted by
-  // AssistantOverlay. This panel just renders the chip and its ×.
-  const pinnedWidget = useChatStore((s) => s.pinnedWidget)
-  const unpinWidget = useChatStore((s) => s.unpinWidget)
+  // The conversation's referenced objects (Phase 4.3) — one layer holding both
+  // typed "@" mentions and clicked widgets. Shown only on the conversation they
+  // belong to; the click half of the lifecycle runs in useAssistantWidgetPin,
+  // mounted by AssistantOverlay. This panel renders the row and its ×.
+  const mentions = useChatStore((s) => s.mentions)
+  const removeMentionRef = useChatStore((s) => s.removeMentionRef)
+  const addMentionRef = useChatStore((s) => s.addMentionRef)
+  const mentionResolution = useChatStore((s) => s.mentionResolution)
+  const mentionsByMessage = useChatStore((s) => s.mentionsByMessage)
   const thread = pinnedThread ?? {
     key: ctx.key,
     label: ctx.label,
@@ -84,7 +91,7 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
     serverTaskId: ctx.serverTaskId
   }
   const followingElsewhere = pinnedThread !== null && pinnedThread.key !== ctx.key
-  const activePin = pinnedWidget && pinnedWidget.threadKey === thread.key ? pinnedWidget : null
+  const activeRefs = useMemo(() => activeMentions(mentions, thread.key), [mentions, thread.key])
   const messages = useMemo(
     () => messagesByTask[thread.key] ?? EMPTY_MESSAGES,
     [messagesByTask, thread.key]
@@ -97,13 +104,25 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
   // attached to the last message and neither answered nor dismissed. Derived
   // by a pure, tested rule (lib/assistantQuestion).
   const activeQuestion = activeQuestionFor(messages, questionByMessage)
+  // The composer is a TipTap editor now (Phase 4.3), so the draft lives in its
+  // document. `draft` mirrors the plain-text rendering purely so Send can be
+  // disabled on an empty box — the document remains the source of truth.
   const [draft, setDraft] = useState('')
+  const editorRef = useRef<import('@tiptap/core').Editor | null>(null)
+  // Fill the composer without sending — what the suggestion rows and home cards
+  // have always done. Goes through the editor because there is no textarea to
+  // set a value on any more.
+  const fillComposer = useCallback((text: string): void => {
+    const ed = editorRef.current
+    if (!ed) return
+    ed.chain().focus().clearContent().insertContent(text).run()
+    setDraft(text)
+  }, [])
   const [summarizing, setSummarizing] = useState(false)
   // Which turn most recently had its text copied — drives the ✓ confirmation on
   // the copy button, then clears itself.
   const [copiedTs, setCopiedTs] = useState<number | null>(null)
   const scrollRef = useRef<HTMLDivElement | null>(null)
-  const taRef = useRef<HTMLTextAreaElement | null>(null)
   const createWidget = useWidgetStore((s) => s.create)
   const bumpLayout = useWidgetStore((s) => s.bumpLayoutVersion)
   const pushAssistantMessage = useChatStore((s) => s.pushAssistantMessage)
@@ -231,23 +250,36 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight
   }, [messages.length, sending])
 
-  // Grow the composer with its content instead of pinning it to a fixed 3 rows.
-  // Reset to auto first so it shrinks back when text is deleted; the max-height
-  // in the class caps it and hands over to scrolling.
-  useEffect(() => {
-    const el = taRef.current
-    if (!el) return
-    el.style.height = 'auto'
-    el.style.height = `${el.scrollHeight}px`
-  }, [draft])
+  const submitComposer = useCallback(async (): Promise<void> => {
+    const ed = editorRef.current
+    // The document is the source of truth: its chips serialise to "@Title" in
+    // the text, and the references themselves ride from the store (they are
+    // sticky to the conversation, not to this message).
+    const content = ed ? docToInput(ed.getJSON()).text.trim() : draft.trim()
+    if (!content || useChatStore.getState().sending) return
+    ed?.commands.clearContent()
+    setDraft('')
+    await send(thread.serverTaskId, content, thread.key)
+  }, [draft, send, thread.serverTaskId, thread.key])
 
   async function handleSend(e: React.FormEvent): Promise<void> {
     e.preventDefault()
-    const content = draft.trim()
-    if (!content || sending) return
-    setDraft('')
-    await send(thread.serverTaskId, content, thread.key)
+    await submitComposer()
   }
+
+  // Handed to the "@" suggestion plugin. Reading through getState keeps the
+  // hooks object stable while still seeing live values, so re-configuring the
+  // extension never throws the draft away.
+  const mentionHooks = useMemo(
+    () => ({
+      conversationKey: (): string => thread.key,
+      current: (): readonly MentionRef[] => useChatStore.getState().mentions,
+      onPick: (ref: MentionRef): void => {
+        addMentionRef(ref)
+      }
+    }),
+    [thread.key, addMentionRef]
+  )
 
   // Open the thing a citation points at.
   //
@@ -551,7 +583,7 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
               {ctx.suggestions.map((s) => (
                 <button
                   key={s.text}
-                  onClick={() => setDraft(s.text)}
+                  onClick={() => fillComposer(s.text)}
                   data-testid="chat-suggestion"
                   className="flex items-center gap-2.5 text-left text-[12.5px] px-2 py-2 rounded-lg text-[var(--ink-80)] hover:text-[var(--ink-100)] hover:bg-[var(--surface-sunken)] transition-colors"
                 >
@@ -568,13 +600,37 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
           // — the one element in the panel that ignored the token system and so
           // stayed the same slab under futuristic and atelier.
           if (m.role === 'user') {
+            // Any references this turn was sent with re-render as chips exactly
+            // where they were typed (plan P1's first rendering). splitMentionText
+            // only chips a reference whose own token is genuinely in the text —
+            // so a turn shows what was actually sent, never a chip invented to
+            // match a reference the words no longer contain.
+            const turnRefs = mentionsByMessage[String(m.ts)] ?? []
+            const segments = splitMentionText(m.content, turnRefs)
             return (
               <div
                 key={i}
                 data-testid="user-turn"
                 className="ml-auto max-w-[88%] rounded-xl rounded-br-[3px] px-3 py-2 text-[13px] leading-relaxed whitespace-pre-wrap bg-[rgb(var(--accent)/0.10)] border border-[rgb(var(--accent)/0.18)] text-[var(--ink-100)]"
               >
-                {m.content}
+                {segments.length <= 1
+                  ? m.content
+                  : segments.map((seg, si) =>
+                      seg.kind === 'text' ? (
+                        <span key={si}>{seg.text}</span>
+                      ) : (
+                        <span
+                          key={si}
+                          data-testid="turn-mention-chip"
+                          data-mention-id={seg.ref.id}
+                          title={`${seg.ref.title} — referenced in this message`}
+                          className="inline-flex items-center gap-1 rounded-md border border-[rgb(var(--accent)/0.35)] bg-[rgb(var(--accent)/0.14)] px-1.5 py-[1px] mx-[1px] align-baseline"
+                        >
+                          <Icon name={seg.ref.icon} size={11} className="shrink-0 text-accent" />
+                          <span className="truncate max-w-[160px]">{seg.ref.title}</span>
+                        </span>
+                      )
+                    )}
               </div>
             )
           }
@@ -715,34 +771,24 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
           />
         )}
         <div className="rounded-[13px] border border-[var(--edge-firm)] bg-[var(--surface-raised)] px-2.5 pt-2 pb-1.5 flex flex-col gap-2 transition-shadow focus-within:border-[rgb(var(--accent)/0.55)] focus-within:shadow-[0_0_0_3px_rgb(var(--accent)/0.13)]">
-          {/* Context chip — names the surface this conversation is scoped to,
-              restated at the point of typing (Notion's 📄-chip pattern). Same
-              fact as the header subtitle; in floating and fullscreen modes the
-              header is far from the composer. While a widget is pinned as the
-              primary reference (click-to-pin, 3a.1), the pin chip replaces it —
-              the pin is the sharper statement of what this conversation is
-              about, and it renders exactly what will ride the next request. */}
+          {/* What this conversation is working from, restated at the point of
+              typing. Either the objects it references (typed with "@" or
+              clicked on the canvas — one layer, plan D7/D8) or, when it
+              references nothing, the surface it is scoped to (Notion's 📄-chip
+              pattern; same fact as the header subtitle, which in floating and
+              fullscreen modes is far from the composer).
+
+              The row is the live set: exactly what will ride the NEXT message.
+              The chips INSIDE the box are per-message, and stay in the
+              transcript as a record of what each message said. Two renderings,
+              one set (plan P1). */}
           <div>
-            {activePin ? (
-              <span
-                data-testid="composer-pin-chip"
-                className="inline-flex max-w-full items-center gap-1 rounded-full border border-[rgb(var(--accent)/0.35)] bg-[rgb(var(--accent)/0.10)] px-2 py-0.5 text-[10px] text-[var(--ink-80)]"
-                title={`Pinned as the primary reference: ${activePin.title}. The assistant reads it first on every message in this conversation.`}
-              >
-                <Icon name="push_pin" size={11} filled className="shrink-0 text-accent" />
-                <Icon name={activePin.icon} size={11} className="shrink-0" />
-                <span className="truncate">{activePin.title}</span>
-                <button
-                  type="button"
-                  onClick={unpinWidget}
-                  aria-label={`Unpin ${activePin.title}`}
-                  title="Unpin — back to the whole surface"
-                  data-testid="composer-pin-clear"
-                  className="shrink-0 grid place-items-center rounded-full hover:text-[var(--ink-100)] transition-colors"
-                >
-                  <Icon name="close" size={11} />
-                </button>
-              </span>
+            {activeRefs.length > 0 ? (
+              <MentionRefRow
+                refs={activeRefs}
+                resolution={mentionResolution}
+                onRemove={(key) => removeMentionRef(thread.key, key)}
+              />
             ) : (
               <span
                 data-testid="composer-context-chip"
@@ -754,22 +800,15 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
               </span>
             )}
           </div>
-          <textarea
-            ref={taRef}
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            onKeyDown={(e) => {
-              // Enter sends, Shift+Enter makes a newline — the convention every
-              // comparable panel uses. ⌘/Ctrl+Enter still works for muscle memory.
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault()
-                void handleSend(e as unknown as React.FormEvent)
-              }
-            }}
-            rows={1}
+          <MentionComposer
             placeholder={ctx.placeholder}
-            data-testid="chat-composer"
-            className="w-full resize-none bg-transparent text-[var(--ink-100)] placeholder:text-[var(--ink-50)] text-[13px] leading-[1.45] max-h-[160px] focus:outline-none"
+            disabled={sending}
+            hooks={mentionHooks}
+            onTextChange={setDraft}
+            onSubmit={() => void submitComposer()}
+            onReady={(ed) => {
+              editorRef.current = ed
+            }}
           />
           <div className="flex items-center gap-1.5">
             {/* Real model picker (P7) — shared with the focus AI Chat. */}
@@ -826,7 +865,7 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
                   key={s.text}
                   type="button"
                   data-testid="home-suggestion-card"
-                  onClick={() => setDraft(s.text)}
+                  onClick={() => fillComposer(s.text)}
                   className="text-left px-3 py-2.5 rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-raised)] hover:border-[rgb(var(--accent)/0.45)] hover:bg-[var(--surface-sunken)] transition-colors flex items-center gap-2.5"
                 >
                   <Icon name={s.icon} size={15} className="text-accent shrink-0" />

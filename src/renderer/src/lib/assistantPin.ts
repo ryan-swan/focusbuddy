@@ -1,18 +1,19 @@
-// Click-to-pin decision rules (Phase 3a.1), pure and store-free — the same
-// pattern as lib/assistantQuestion. Clicking a widget while the assistant is
-// open pins it as the conversation's primary reference (Notion's @-mention
-// chip); these rules decide WHEN a click becomes a pin and when an existing pin
-// must clear. The hook (useAssistantWidgetPin) only performs what they decide.
+// The canvas-click decision rules (Phase 3a.1), pure and store-free — the same
+// pattern as lib/assistantQuestion. They decide WHEN a widget click counts as
+// the user referencing that widget, and when an existing reference must drop.
+// The hook (useAssistantWidgetPin) only performs what they decide.
 //
-// Distinct from the two existing pin concepts, deliberately:
+// Phase 4.3 converged click-to-pin with @-mentions: a click and a typed "@" now
+// produce the same chip in the same layer (lib/assistantMentions), so what a
+// reference IS moved there. These two rules stayed, unchanged, because they were
+// always about the GESTURE rather than the reference — and they were right.
+//
+// Distinct from the two other pin concepts in the tree, deliberately:
 //   • stores/chat `pinnedThread` — a CONVERSATION kept across navigation after
 //     following a citation.
 //   • widgets `pinned`/`pinnedZone` — a widget docked to a canvas corner.
-// This one is a widget pinned TO the assistant as reference material.
 
-import type { Widget, WidgetKind } from '@shared/types'
-import { ATTACHABLE_WIDGET_KINDS } from '@shared/widgetText'
-import { catalogFor } from './widgetCatalog'
+import type { WidgetKind } from '@shared/types'
 
 export interface PinnedWidgetRef {
   widgetId: string
@@ -23,25 +24,6 @@ export interface PinnedWidgetRef {
   // The conversation this pin belongs to. A pin never follows you to another
   // thread — switching threads clears it (see shouldClearPin).
   threadKey: string
-}
-
-// Only kinds whose content the shared extractor can genuinely read may be
-// pinned. The pin chip promises "this is what the assistant is looking at" —
-// pinning a timer or a section would promise content that cannot be sent.
-export function isPinnableWidget(kind: WidgetKind): boolean {
-  return ATTACHABLE_WIDGET_KINDS.has(kind)
-}
-
-export function pinFromWidget(w: Widget, threadKey: string): PinnedWidgetRef {
-  const cat = catalogFor(w.kind)
-  return {
-    widgetId: w.id,
-    taskId: w.taskId,
-    title: w.title || cat?.label || w.kind,
-    kind: w.kind,
-    icon: cat?.icon ?? 'widgets',
-    threadKey
-  }
 }
 
 // Does this activation change count as "the user clicked a widget to pin it"?

@@ -23,7 +23,7 @@
  */
 
 import { test, expect, type Page } from '@playwright/test'
-import { launchApp, type LaunchedApp, waitForReady } from './_helpers'
+import { composerText, launchApp, type LaunchedApp, waitForReady } from './_helpers'
 
 let launched: LaunchedApp | null = null
 
@@ -94,8 +94,7 @@ test('AF-2 — the fullscreen empty state is the Notion home; a card fills the c
   await expect(card).toBeVisible()
   const cardText = (await card.textContent()) ?? ''
   await card.click()
-  const composer = window.locator('[data-testid="chat-composer"]')
-  const value = await composer.inputValue()
+  const value = await composerText(window)
   expect(value.length).toBeGreaterThan(0)
   expect(cardText).toContain(value)
 

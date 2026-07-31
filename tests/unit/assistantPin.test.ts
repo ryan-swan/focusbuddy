@@ -1,38 +1,13 @@
 import { describe, it, expect } from 'vitest'
 import {
-  isPinnableWidget,
-  pinFromWidget,
   shouldAutoPin,
   shouldClearPin,
   type PinnedWidgetRef
 } from '../../src/renderer/src/lib/assistantPin'
-import type { Widget } from '../../src/shared/types'
 
-// The click-to-pin decision rules (Phase 3a.1), pure and store-free — the same
-// pattern as lib/assistantQuestion. The hook only performs what these decide.
-
-function widget(partial: Partial<Widget>): Widget {
-  return {
-    id: 'w1',
-    taskId: 't1',
-    kind: 'sticky',
-    title: 'Widget one',
-    content: 'hello',
-    x: 0,
-    y: 0,
-    width: 200,
-    height: 160,
-    zIndex: 1,
-    color: null,
-    pinned: false,
-    pinnedScreenX: null,
-    pinnedScreenY: null,
-    pinnedZone: null,
-    parentSectionId: null,
-    layout: null,
-    ...partial
-  } as Widget
-}
+// The canvas-click decision rules (Phase 3a.1), pure and store-free. Phase 4.3
+// moved what a reference IS into lib/assistantMentions (and its own suite);
+// these two rules stayed, unchanged, because they are about the GESTURE.
 
 const OPTS = {
   panelOpen: true,
@@ -67,36 +42,6 @@ describe('shouldAutoPin — a widget click becomes a pin only in the right circu
     expect(shouldAutoPin('w1', 'w1', OPTS)).toBe(false)
     expect(shouldAutoPin('w1', null, OPTS)).toBe(false)
     expect(shouldAutoPin(null, null, OPTS)).toBe(false)
-  })
-})
-
-describe('isPinnableWidget — only kinds whose content can genuinely ride the request', () => {
-  it('accepts content-bearing kinds', () => {
-    expect(isPinnableWidget('sticky')).toBe(true)
-    expect(isPinnableWidget('note')).toBe(true)
-    expect(isPinnableWidget('table')).toBe(true)
-    expect(isPinnableWidget('webview')).toBe(true)
-  })
-
-  it('rejects chrome-only kinds — a pin chip must never claim content that cannot be sent', () => {
-    expect(isPinnableWidget('section')).toBe(false)
-  })
-})
-
-describe('pinFromWidget — the chip renders exactly what was clicked', () => {
-  it('maps id, task, title, kind and thread', () => {
-    const pin = pinFromWidget(widget({ id: 'w9', taskId: 't3', title: 'Q3 plan' }), 't3')
-    expect(pin.widgetId).toBe('w9')
-    expect(pin.taskId).toBe('t3')
-    expect(pin.title).toBe('Q3 plan')
-    expect(pin.kind).toBe('sticky')
-    expect(pin.threadKey).toBe('t3')
-    expect(pin.icon.length).toBeGreaterThan(0)
-  })
-
-  it('falls back to the catalog label when the widget is untitled', () => {
-    const pin = pinFromWidget(widget({ title: '' }), 't1')
-    expect(pin.title.length).toBeGreaterThan(0)
   })
 })
 

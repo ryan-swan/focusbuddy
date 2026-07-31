@@ -17,7 +17,7 @@
  */
 
 import { test, expect, type ElectronApplication, type Page } from '@playwright/test'
-import { launchApp, type LaunchedApp, waitForReady } from './_helpers'
+import { composerText, launchApp, type LaunchedApp, typeInComposer, waitForReady } from './_helpers'
 
 let launched: LaunchedApp | null = null
 
@@ -109,13 +109,15 @@ test('AC-2 — modes switch over one conversation; draft and thread survive', as
 
   // Put a real turn in the thread through the real path.
   await stubStream(app, 'The answer you asked for.')
-  const composer = window.locator('[data-testid="chat-composer"]')
-  await composer.fill('a question')
+  await typeInComposer(window, 'a question')
   await window.locator('button[aria-label="Send"]').click()
   await expect(window.getByText('The answer you asked for.')).toBeVisible({ timeout: 8000 })
 
-  // Leave a half-typed draft in the composer, then re-dress the panel.
-  await composer.fill('half-typed thought')
+  // Leave a half-typed draft in the composer, then re-dress the panel. Phase
+  // 4.3 made the composer a TipTap editor, so the draft lives in a document
+  // rather than a value — the survival claim is unchanged, and is now read
+  // through the editor's own text.
+  await typeInComposer(window, 'half-typed thought')
 
   await switchMode(window, 'sidebar')
   // Sidebar mode reserves real content width on <main>.
@@ -125,14 +127,14 @@ test('AC-2 — modes switch over one conversation; draft and thread survive', as
   expect(padRight).toBe('400px')
   // Same conversation, same draft — nothing remounted.
   await expect(window.getByText('The answer you asked for.')).toBeVisible()
-  await expect(composer).toHaveValue('half-typed thought')
+  expect(await composerText(window)).toBe('half-typed thought')
 
   await switchMode(window, 'fullscreen')
   await expect(window.getByText('The answer you asked for.')).toBeVisible()
-  await expect(composer).toHaveValue('half-typed thought')
+  expect(await composerText(window)).toBe('half-typed thought')
 
   await switchMode(window, 'floating')
-  await expect(composer).toHaveValue('half-typed thought')
+  expect(await composerText(window)).toBe('half-typed thought')
   // Floating reserves nothing.
   const padAfter = await window.evaluate(
     () => getComputedStyle(document.querySelector('main')!).paddingRight
@@ -189,7 +191,7 @@ test('AC-4 — fb:open-assistant still summons the assistant, into the Notion-sh
   const row = window.locator('[data-testid="chat-suggestion"]').first()
   const rowText = (await row.textContent()) ?? ''
   await row.click()
-  const composerValue = await window.locator('[data-testid="chat-composer"]').inputValue()
+  const composerValue = await composerText(window)
   expect(composerValue.length).toBeGreaterThan(0)
   expect(rowText).toContain(composerValue)
 })
