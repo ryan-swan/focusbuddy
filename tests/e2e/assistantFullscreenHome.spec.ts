@@ -22,8 +22,46 @@
  *       the flow begins as a genuine conversation turn.
  */
 
-import { test, expect, type Page } from '@playwright/test'
-import { composerText, launchApp, type LaunchedApp, waitForReady } from './_helpers'
+import { test, expect, type ElectronApplication, type Page } from '@playwright/test'
+import {
+  composerText,
+  launchApp,
+  type LaunchedApp,
+  typeInComposer,
+  waitForReady
+} from './_helpers'
+
+// Far-end stub, same philosophy as the sibling suites: only chat:sendStream is
+// swapped, so the store, the persistence and the rail are all shipping code.
+async function stubStream(app: ElectronApplication, reply: string): Promise<void> {
+  await app.evaluate(({ ipcMain }, replyText: string) => {
+    try {
+      ipcMain.removeHandler('chat:sendStream')
+    } catch {
+      /* first install */
+    }
+    ipcMain.handle(
+      'chat:sendStream',
+      async (e: Electron.IpcMainInvokeEvent, input: { requestId: string }) => {
+        const channel = `chat:stream:${input.requestId}`
+        const send = (type: string, payload: unknown): void => {
+          if (!e.sender.isDestroyed()) e.sender.send(channel, { type, payload })
+        }
+        const wait = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms))
+        await wait(20)
+        send('sources', { sources: [], elapsedMs: 5 })
+        await wait(20)
+        send('reply', replyText)
+        await wait(20)
+        send('complete', {
+          ok: true,
+          message: { role: 'assistant', content: replyText, ts: Date.now() }
+        })
+        return { ok: true }
+      }
+    )
+  }, reply)
+}
 
 let launched: LaunchedApp | null = null
 
@@ -48,7 +86,7 @@ async function switchToFullscreen(window: Page): Promise<void> {
   await expect(overlay(window)).toHaveAttribute('data-mode', 'fullscreen')
 }
 
-test('AF-1 — fullscreen keeps the sidebar and header alive; nav clicks re-thread the panel', async () => {
+test('AF-1 — fullscreen keeps the sidebar and header alive; a fresh chat follows the screen', async () => {
   launched = await launchApp()
   const { window } = launched
   await waitForReady(window)
@@ -66,14 +104,53 @@ test('AF-1 — fullscreen keeps the sidebar and header alive; nav clicks re-thre
   expect(overlayBox.y).toBeGreaterThanOrEqual(38)
   await expect(window.locator('[data-testid="topbar-search"]')).toBeVisible()
 
-  // Navigation genuinely works from fullscreen: clicking Rooms re-threads the
-  // panel to the rooms scope, exactly as everywhere else.
+  // Navigation genuinely works from fullscreen. Phase 4.5 changed what it means
+  // for the conversation, and this locks the half that survived: a chat nobody
+  // has spoken in yet has committed to nothing, so it still takes its framing
+  // from wherever you are. (AF-7 locks the other half — that a conversation
+  // WITH turns keeps its own context and is never replaced by the screen.)
   await window.getByRole('button', { name: /Rooms/ }).first().click()
   await expect(window.locator('[data-testid="composer-context-chip"]')).toContainText(
     'your rooms',
     { timeout: 6000 }
   )
   await expect(overlay(window)).toHaveAttribute('data-mode', 'fullscreen')
+})
+
+test('AF-7 — a conversation keeps its own context and its turns as you walk around', async () => {
+  launched = await launchApp()
+  const { window, app } = launched
+  await waitForReady(window)
+  await openAssistant(window)
+  await switchToFullscreen(window)
+
+  // Fullscreen carries the conversation rail (plan D10).
+  const rail = window.locator('[data-testid="conversation-rail"]')
+  await expect(rail).toBeVisible()
+
+  // Speak, so the conversation becomes real and records where it began.
+  await stubStream(app, 'A home answer.')
+  await typeInComposer(window, 'a question from home')
+  await window.locator('button[aria-label="Send"]').click()
+  await expect(window.getByText('A home answer.')).toBeVisible({ timeout: 8000 })
+  await expect(rail.locator('[data-testid="conversation-row"]')).toHaveCount(1, { timeout: 8000 })
+
+  // Now walk to another screen. This is the D4 reversal: the conversation is
+  // NOT replaced by the destination's, and its context label does not drift to
+  // wherever you happen to be standing.
+  await window.getByRole('button', { name: /Rooms/ }).first().click()
+  await expect(window.locator('[data-testid="assistant-turn"]')).toHaveCount(1, { timeout: 6000 })
+  await expect(window.getByText('A home answer.')).toBeVisible()
+
+  // ⌘O starts a fresh one — and the one you were in is still in the rail.
+  await window.keyboard.press('ControlOrMeta+o')
+  await expect(window.locator('[data-testid="assistant-turn"]')).toHaveCount(0, { timeout: 6000 })
+  await expect(rail.locator('[data-testid="conversation-row"]')).toHaveCount(1)
+
+  // Reopening it from the rail brings the turns back — they are on disk, not in
+  // a variable that a New chat threw away.
+  await rail.locator('[data-testid="conversation-row"]').first().click()
+  await expect(window.getByText('A home answer.')).toBeVisible({ timeout: 8000 })
 })
 
 test('AF-2 — the fullscreen empty state is the Notion home; a card fills the composer; sending swaps to conversation', async () => {

@@ -6,6 +6,7 @@ import { targetForSource } from '../lib/sourceTarget'
 import { useChatStore, appliedKey, NEW_CHAT_KEY } from '../stores/chat'
 import MentionComposer from './assistant/MentionComposer'
 import MentionRefRow from './assistant/MentionRefRow'
+import ConversationList from './assistant/ConversationList'
 import { activeMentions, type MentionRef } from '../lib/assistantMentions'
 import { docToInput, splitMentionText } from '../lib/mentionDoc'
 import { deriveAssistantBlocks } from '../lib/chatBlocks'
@@ -80,6 +81,13 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
   const conversations = useChatStore((s) => s.conversations)
   const setPendingContext = useChatStore((s) => s.setPendingContext)
   const refreshConversations = useChatStore((s) => s.refreshConversations)
+  const newConversation = useChatStore((s) => s.newConversation)
+  const openConversation = useChatStore((s) => s.openConversation)
+  const deleteConversation = useChatStore((s) => s.deleteConversation)
+  // History is a permanent rail in fullscreen and an overlay elsewhere (plan
+  // D10) — the narrow modes have no room to give a rail without taking it from
+  // the conversation, which is the thing you came for.
+  const [historyOpen, setHistoryOpen] = useState(false)
   // The conversation's referenced objects (Phase 4.3) — one layer holding both
   // typed "@" mentions and clicked widgets. Shown only on the conversation they
   // belong to; the click half of the lifecycle runs in useAssistantWidgetPin,
@@ -130,6 +138,19 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
   useEffect(() => {
     void refreshConversations()
   }, [refreshConversations])
+  // ⌘O / Ctrl+O starts a new conversation from anywhere, in every mode. Checked
+  // free of conflicts: App.tsx's global handlers use ⌘⇧K, ⌘/ and ⌘Z only.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent): void {
+      if (!(e.metaKey || e.ctrlKey) || e.shiftKey || e.altKey) return
+      if (e.key.toLowerCase() !== 'o') return
+      e.preventDefault()
+      newConversation()
+      setHistoryOpen(false)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [newConversation])
   // The composer is a TipTap editor now (Phase 4.3), so the draft lives in its
   // document. `draft` mirrors the plain-text rendering purely so Send can be
   // disabled on an empty box — the document remains the source of truth.
@@ -414,6 +435,39 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
       style={isFullscreen ? undefined : FLOATING_MENU_STYLE}
       data-testid="assistant-panel"
     >
+      {/* Fullscreen is the AI home, so it carries a permanent conversation rail
+          beside the chat (plan D10). The narrow modes cannot give a rail the
+          width without taking it from the conversation, so they get the same
+          list as an overlay, toggled from the header. One component either
+          way — two containers, not two implementations. */}
+      <div className={isFullscreen ? 'flex-1 min-h-0 flex' : 'contents'}>
+      {isFullscreen && (
+        <ConversationList
+          variant="rail"
+          conversations={conversations}
+          activeId={activeConversationId}
+          onOpen={(id) => void openConversation(id)}
+          onNew={newConversation}
+          onDelete={(id) => void deleteConversation(id)}
+        />
+      )}
+      <div className={isFullscreen ? 'flex-1 min-w-0 flex flex-col relative' : 'contents'}>
+      {!isFullscreen && historyOpen && (
+        <ConversationList
+          variant="overlay"
+          conversations={conversations}
+          activeId={activeConversationId}
+          onOpen={(id) => {
+            void openConversation(id)
+            setHistoryOpen(false)
+          }}
+          onNew={() => {
+            newConversation()
+            setHistoryOpen(false)
+          }}
+          onDelete={(id) => void deleteConversation(id)}
+        />
+      )}
       <div className="px-3 py-3 border-b border-[var(--edge-soft)] flex items-center justify-between gap-2">
         <div className="min-w-0">
           {/* Sentence case, not shouted. The uppercase treatment made a 13px
@@ -433,6 +487,29 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
           </p>
         </div>
         <div className="flex items-center gap-1">
+          <button
+            onClick={() => {
+              newConversation()
+              setHistoryOpen(false)
+            }}
+            className="icon-btn"
+            data-testid="assistant-new-chat"
+            title="New chat (⌘O)"
+          >
+            <Icon name="add" size={16} />
+          </button>
+          {/* Fullscreen keeps the rail open beside the conversation, so it has
+              no need of a toggle. */}
+          {!isFullscreen && (
+            <button
+              onClick={() => setHistoryOpen((v) => !v)}
+              className={`icon-btn ${historyOpen ? '!text-accent' : ''}`}
+              data-testid="assistant-history-toggle"
+              title="Your conversations"
+            >
+              <Icon name="history" size={16} />
+            </button>
+          )}
           <button
             onClick={bodyDouble.toggle}
             className={`icon-btn relative ${bodyDouble.enabled ? '!text-accent' : ''}`}
@@ -883,6 +960,8 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
         </div>
         </div>
       </form>
+      </div>
+      </div>
       {ctxMenu && (
         <CanvasContextMenu
           x={ctxMenu.x}
