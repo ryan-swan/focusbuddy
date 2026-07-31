@@ -157,6 +157,18 @@ export async function waitForReady(
   if (await skip.isVisible().catch(() => false)) {
     await skip.click().catch(() => {})
   }
+
+  // Feature-tour spotlight — the corner card offered on the first boot AFTER
+  // core onboarding is done, which for a spec means the boot after a seeded
+  // reload. It docks bottom-right at z-[230], exactly over the assistant pill
+  // and panel, and intercepts their clicks. Best-effort dismiss; it can also
+  // appear a beat later (its init awaits two IPC calls), so specs that drive
+  // the bottom-right corner should additionally seed fb.onboarding.v2 with the
+  // tours skipped before reloading (see assistantPin.spec.ts).
+  const spotlight = window.locator('[data-testid="feature-spotlight-dismiss"]')
+  if (await spotlight.isVisible().catch(() => false)) {
+    await spotlight.click().catch(() => {})
+  }
 }
 
 // Where each former top-level product now lives under the three-segment IA.

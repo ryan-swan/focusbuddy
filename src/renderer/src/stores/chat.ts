@@ -10,6 +10,7 @@ import type {
 import { recordTrail } from '../lib/trail'
 import { gatherCanvasAttachments } from '../lib/canvasContent'
 import type { AssistantTrace } from '../lib/traceView'
+import type { PinnedWidgetRef } from '../lib/assistantPin'
 
 // Enough of an assistant context to keep showing a conversation after you have
 // navigated away from where it started: which thread it is, what to call it, and
@@ -97,6 +98,15 @@ interface ChatStore {
   pinnedThread: PinnedThread | null
   pinThread: (thread: PinnedThread) => void
   unpinThread: () => void
+  // The widget the user clicked-to-pin as the conversation's primary reference
+  // (Phase 3a.1) — Notion's @-mention chip, one at a time (P1). Sticky across
+  // sends (P2); cleared by the × in the composer chip, by a thread switch, or
+  // when the widget disappears (lifecycle in lib/useAssistantWidgetPin).
+  // Distinct from pinnedThread above, which pins a CONVERSATION across
+  // navigation — this pins reference MATERIAL to a conversation.
+  pinnedWidget: PinnedWidgetRef | null
+  pinWidget: (pin: PinnedWidgetRef) => void
+  unpinWidget: () => void
   sending: boolean
   hasApiKey: boolean | null
   checkApiKey: () => Promise<void>
@@ -156,6 +166,9 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   },
   pinThread: (thread) => set({ pinnedThread: thread }),
   unpinThread: () => set({ pinnedThread: null }),
+  pinnedWidget: null,
+  pinWidget: (pin) => set({ pinnedWidget: pin }),
+  unpinWidget: () => set({ pinnedWidget: null }),
   sending: false,
   hasApiKey: null,
   checkApiKey: async () => {
@@ -242,12 +255,17 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       sending: true
     })
     recordTrail('chat_sent', taskId, { preview: content.slice(0, 200) })
+    // The user's pinned primary reference rides only the thread it was pinned
+    // on, and a send does NOT clear it (P2) — "primarily referenced in the
+    // conversation", not in one message.
+    const pin = get().pinnedWidget
+    const pinnedWidgetId = pin && pin.threadKey === key ? pin.widgetId : undefined
     // Gather any browser/doc/pdf content the user has open so the assistant can
     // act on it (e.g. create calendar events from a booking page). Best-effort:
     // a failure here must never block the message.
     let attachments: Awaited<ReturnType<typeof gatherCanvasAttachments>> = []
     try {
-      attachments = await gatherCanvasAttachments(taskId)
+      attachments = await gatherCanvasAttachments(taskId, pinnedWidgetId)
     } catch {
       attachments = []
     }
@@ -353,7 +371,13 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       )
       // supportsQuestions: this panel renders the question card, so the model
       // is allowed to ask here — the one surface that opts in.
-      const resp = await api.send({ taskId, messages: next, attachments, supportsQuestions: true })
+      const resp = await api.send({
+        taskId,
+        messages: next,
+        attachments,
+        supportsQuestions: true,
+        pinnedWidgetId
+      })
       settle(resp)
       return
     }
@@ -368,7 +392,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         resolve()
       }
       const cleanup = api.sendStream(
-        { taskId, messages: next, attachments, requestId, supportsQuestions: true },
+        { taskId, messages: next, attachments, requestId, supportsQuestions: true, pinnedWidgetId },
         {
           onSources: (t) => patchTrace({ retrievedAt: Date.now(), retrievalMs: t.elapsedMs, sources: t.sources }),
           onReply: (text) => {
@@ -454,8 +478,10 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       traceDisclosureByMessage: nextDisclosure,
       questionByMessage: nextQuestions,
       liveTraceByThread: nextLive,
-      // A cleared thread has nothing left to follow you around.
-      pinnedThread: get().pinnedThread?.key === key ? null : get().pinnedThread
+      // A cleared thread has nothing left to follow you around — and nothing
+      // left pinned to it.
+      pinnedThread: get().pinnedThread?.key === key ? null : get().pinnedThread,
+      pinnedWidget: get().pinnedWidget?.threadKey === key ? null : get().pinnedWidget
     })
   }
 }))

@@ -934,7 +934,7 @@ async function prepareChatCall(req: ChatRequest): Promise<PreparedChatCall> {
     system:
       buildSystemPrompt(req.taskId, req.supportsQuestions) +
       retrieval +
-      renderAttachments(req.attachments),
+      renderAttachments(req.attachments, req.pinnedWidgetId),
     msgs: req.messages
       .filter((m) => m.role === 'user' || m.role === 'assistant')
       .map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content })),

@@ -69,6 +69,12 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
   const pinnedThread = useChatStore((s) => s.pinnedThread)
   const unpinThread = useChatStore((s) => s.unpinThread)
   const pinThread = useChatStore((s) => s.pinThread)
+  // The clicked-to-pin primary reference (Phase 3a.1). Shown only on the
+  // thread it was pinned to; lifecycle (auto-pin on widget click, clear on
+  // thread switch / widget deletion) runs in useAssistantWidgetPin, mounted by
+  // AssistantOverlay. This panel just renders the chip and its ×.
+  const pinnedWidget = useChatStore((s) => s.pinnedWidget)
+  const unpinWidget = useChatStore((s) => s.unpinWidget)
   const thread = pinnedThread ?? {
     key: ctx.key,
     label: ctx.label,
@@ -77,6 +83,7 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
     serverTaskId: ctx.serverTaskId
   }
   const followingElsewhere = pinnedThread !== null && pinnedThread.key !== ctx.key
+  const activePin = pinnedWidget && pinnedWidget.threadKey === thread.key ? pinnedWidget : null
   const messages = useMemo(
     () => messagesByTask[thread.key] ?? EMPTY_MESSAGES,
     [messagesByTask, thread.key]
@@ -663,16 +670,41 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
           {/* Context chip — names the surface this conversation is scoped to,
               restated at the point of typing (Notion's 📄-chip pattern). Same
               fact as the header subtitle; in floating and fullscreen modes the
-              header is far from the composer. */}
+              header is far from the composer. While a widget is pinned as the
+              primary reference (click-to-pin, 3a.1), the pin chip replaces it —
+              the pin is the sharper statement of what this conversation is
+              about, and it renders exactly what will ride the next request. */}
           <div>
-            <span
-              data-testid="composer-context-chip"
-              className="inline-flex max-w-full items-center gap-1 rounded-full border border-[var(--edge-soft)] bg-[var(--surface-sunken)] px-2 py-0.5 text-[10px] text-[var(--ink-60)]"
-              title={`This conversation is scoped to ${thread.title || thread.label}`}
-            >
-              <Icon name={thread.icon} size={11} className="shrink-0" />
-              <span className="truncate">{thread.title || thread.label}</span>
-            </span>
+            {activePin ? (
+              <span
+                data-testid="composer-pin-chip"
+                className="inline-flex max-w-full items-center gap-1 rounded-full border border-[rgb(var(--accent)/0.35)] bg-[rgb(var(--accent)/0.10)] px-2 py-0.5 text-[10px] text-[var(--ink-80)]"
+                title={`Pinned as the primary reference: ${activePin.title}. The assistant reads it first on every message in this conversation.`}
+              >
+                <Icon name="push_pin" size={11} filled className="shrink-0 text-accent" />
+                <Icon name={activePin.icon} size={11} className="shrink-0" />
+                <span className="truncate">{activePin.title}</span>
+                <button
+                  type="button"
+                  onClick={unpinWidget}
+                  aria-label={`Unpin ${activePin.title}`}
+                  title="Unpin — back to the whole surface"
+                  data-testid="composer-pin-clear"
+                  className="shrink-0 grid place-items-center rounded-full hover:text-[var(--ink-100)] transition-colors"
+                >
+                  <Icon name="close" size={11} />
+                </button>
+              </span>
+            ) : (
+              <span
+                data-testid="composer-context-chip"
+                className="inline-flex max-w-full items-center gap-1 rounded-full border border-[var(--edge-soft)] bg-[var(--surface-sunken)] px-2 py-0.5 text-[10px] text-[var(--ink-60)]"
+                title={`This conversation is scoped to ${thread.title || thread.label}`}
+              >
+                <Icon name={thread.icon} size={11} className="shrink-0" />
+                <span className="truncate">{thread.title || thread.label}</span>
+              </span>
+            )}
           </div>
           <textarea
             ref={taRef}

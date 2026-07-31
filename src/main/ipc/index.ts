@@ -886,7 +886,8 @@ export function registerIpcHandlers(): void {
           taskId: input.taskId,
           messages: input.messages,
           attachments: input.attachments,
-          supportsQuestions: input.supportsQuestions
+          supportsQuestions: input.supportsQuestions,
+          pinnedWidgetId: input.pinnedWidgetId
         },
         {
           onSources: (t) => send('sources', t),

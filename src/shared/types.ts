@@ -411,6 +411,11 @@ export interface ChatRequest {
   // by surfaces (focus chat, dashboard cards, field editor) that have no card
   // to render, and a model taught to ask there produces turns that dead-end.
   supportsQuestions?: boolean
+  // The widget the user clicked-to-pin as this conversation's primary
+  // reference (Phase 3a.1). Additive and optional: surfaces with no pin
+  // affordance never set it. The prompt claims a pin only when the id resolves
+  // to an attachment that genuinely rendered (see chatAttachments).
+  pinnedWidgetId?: string
 }
 
 // A retrieved workspace document the assistant was grounded on. Slimmed from

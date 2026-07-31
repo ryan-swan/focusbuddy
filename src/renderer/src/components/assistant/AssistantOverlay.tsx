@@ -4,6 +4,7 @@ import Icon from '../Icon'
 import { FLOATING_MENU_INSET_RIGHT, FLOATING_MENU_STYLE } from '../chrome/floatingMenu'
 import { useAssistantChrome } from '../../stores/assistantChrome'
 import { useChatStore } from '../../stores/chat'
+import { useAssistantWidgetPin } from '../../lib/useAssistantWidgetPin'
 
 // The assistant's global chrome, mirroring Notion's: a persistent pill at the
 // bottom-right of EVERY screen, opening into Sidebar / Floating / Fullscreen —
@@ -47,6 +48,10 @@ export default function AssistantOverlay(): JSX.Element {
   // The pill pulses while a request is genuinely in flight — the one honest
   // "something is happening" signal we have. No invented unread badges.
   const sending = useChatStore((s) => s.sending)
+  // Click-to-pin lifecycle (3a.1): watches the widget-activation signal and
+  // the pin's clearing conditions. Lives here because this component never
+  // unmounts, so the rules keep running even while the panel is closed.
+  useAssistantWidgetPin()
 
   // Any surface can summon the assistant without prop-threading — the same
   // window event the empty-desk hint and the mindmap starting kit already
