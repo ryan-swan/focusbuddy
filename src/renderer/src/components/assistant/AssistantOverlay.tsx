@@ -7,6 +7,7 @@ import { useChatStore } from '../../stores/chat'
 import { useViewStore } from '../../stores/view'
 import { useWidgetStore } from '../../stores/widgets'
 import { useAssistantWidgetPin } from '../../lib/useAssistantWidgetPin'
+import { useSidebarDockInset } from '../../lib/useSidebarDockInset'
 
 // The assistant's global chrome, mirroring Notion's: a persistent pill at the
 // bottom-right of EVERY screen, opening into Sidebar / Floating / Fullscreen —
@@ -32,12 +33,21 @@ import { useAssistantWidgetPin } from '../../lib/useAssistantWidgetPin'
 // chrome (FloatingToolbar z-45) and below the mic bar (z-150) and dialogs;
 // fullscreen at z-[190] takes over everything below CommandCenter (220) and
 // prompts (300).
+//
+// Fullscreen is Notion's AI page, not a modal takeover (3a.4, P6 + approved
+// amendment): on normal screens it insets below the header (top-10) and to
+// the right of the live-measured desk sidebar dock, so the app's nav stays
+// visible AND clickable — navigating re-threads the conversation exactly as
+// everywhere else. On segment takeovers there is no dock and the segment owns
+// its own nav, so fullscreen stays full-bleed.
 const WRAPPER_BY_MODE = {
   sidebar: 'fixed top-10 bottom-7 right-0 z-[120]',
   floating:
-    'fixed right-[14px] bottom-[42px] z-[120] w-[min(420px,calc(100vw-28px))] h-[min(680px,calc(100vh-96px))]',
-  fullscreen: 'fixed inset-0 z-[190] bg-[var(--surface-base)]'
+    'fixed right-[14px] bottom-[42px] z-[120] w-[min(420px,calc(100vw-28px))] h-[min(680px,calc(100vh-96px))]'
 } as const
+const FULLSCREEN_TAKEOVER = 'fixed inset-0 z-[190] bg-[var(--surface-base)]'
+const FULLSCREEN_PAGE =
+  'fixed top-10 bottom-0 right-0 z-[190] bg-[var(--surface-base)] border-l border-[var(--edge-soft)]'
 
 export default function AssistantOverlay(): JSX.Element {
   const open = useAssistantChrome((s) => s.open)
@@ -65,6 +75,15 @@ export default function AssistantOverlay(): JSX.Element {
   const focusedWidgetId = useWidgetStore((s) => s.focusedWidgetId)
   const focusModeShowing =
     (view.kind === 'task' || view.kind === 'project-dashboard') && focusedWidgetId !== null
+  // Fullscreen-as-a-page geometry (3a.4): the same four takeover kinds App
+  // uses. The dock inset is measured live so sidebar resizes and the minimised
+  // 58px strip track truthfully.
+  const segmentTakeover =
+    view.kind === 'office' ||
+    view.kind === 'plexidesk' ||
+    view.kind === 'plexipeople' ||
+    view.kind === 'plexibrain'
+  const dockInset = useSidebarDockInset(open && mode === 'fullscreen' && !segmentTakeover)
 
   // Any surface can summon the assistant without prop-threading — the same
   // window event the empty-desk hint and the mindmap starting kit already
@@ -141,8 +160,20 @@ export default function AssistantOverlay(): JSX.Element {
 
   return (
     <div
-      className={WRAPPER_BY_MODE[mode]}
-      style={mode === 'sidebar' ? { width } : undefined}
+      className={
+        mode === 'fullscreen'
+          ? segmentTakeover
+            ? FULLSCREEN_TAKEOVER
+            : FULLSCREEN_PAGE
+          : WRAPPER_BY_MODE[mode]
+      }
+      style={
+        mode === 'sidebar'
+          ? { width }
+          : mode === 'fullscreen' && !segmentTakeover
+            ? { left: dockInset }
+            : undefined
+      }
       data-testid="assistant-overlay"
       data-mode={mode}
     >

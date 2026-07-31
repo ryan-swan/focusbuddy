@@ -14,7 +14,8 @@ import { useWidgetStore } from '../stores/widgets'
 import { chimeIn } from '../lib/audioBeep'
 import CanvasContextMenu, { type CtxMenuItem } from './CanvasContextMenu'
 import { FLOATING_MENU_ASIDE, FLOATING_MENU_STYLE } from './chrome/floatingMenu'
-import { useModelMode } from '../lib/modelPrefs'
+import { MODEL_OPTIONS, useModelMode } from '../lib/modelPrefs'
+import { ASSISTANT_CAPABILITIES } from '../lib/assistantCapabilities'
 import { useBodyDouble } from '../lib/bodyDouble'
 import { useAssistantChrome, type AssistantMode } from '../stores/assistantChrome'
 import Icon from './Icon'
@@ -106,7 +107,7 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
   const createWidget = useWidgetStore((s) => s.create)
   const bumpLayout = useWidgetStore((s) => s.bumpLayoutVersion)
   const pushAssistantMessage = useChatStore((s) => s.pushAssistantMessage)
-  const [modelMode] = useModelMode()
+  const [modelMode, setModelMode] = useModelMode()
   const bodyDouble = useBodyDouble()
   // Display mode (sidebar / floating / fullscreen) — chrome state, not
   // conversation state. Switching re-dresses this same panel over the same
@@ -125,6 +126,27 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
   }, [modeMenuOpen])
   const activeModeMeta =
     MODE_OPTIONS.find((o) => o.mode === chromeMode) ?? MODE_OPTIONS[1]
+  // The real model picker in the composer footer (3a.4, P7 — the operator's
+  // ask un-deferred the old plan-D5). Same data and same write-through as the
+  // Settings picker (one shared preference; the two stay in live sync via
+  // modelPrefs' subscriber), so this is a second door to the same switch —
+  // never a second switch.
+  const [modelMenuOpen, setModelMenuOpen] = useState(false)
+  const modelMenuRef = useRef<HTMLDivElement | null>(null)
+  useEffect(() => {
+    if (!modelMenuOpen) return
+    function onPointerDown(e: PointerEvent): void {
+      if (!modelMenuRef.current?.contains(e.target as Node)) setModelMenuOpen(false)
+    }
+    window.addEventListener('pointerdown', onPointerDown)
+    return () => window.removeEventListener('pointerdown', onPointerDown)
+  }, [modelMenuOpen])
+  const activeModelMeta = MODEL_OPTIONS.find((o) => o.value === modelMode) ?? MODEL_OPTIONS[0]
+  // Fullscreen with an empty thread renders as Notion's AI home (3a.4):
+  // greeting and composer centered as a group, capability row and suggestion
+  // cards under the input. Same panel, same nodes — only layout classes
+  // change, so the draft and every store subscription survive the swap.
+  const fullscreenHome = chromeMode === 'fullscreen' && messages.length === 0
 
   async function handleWhatWasIDoing(): Promise<void> {
     if (summarizing) return
@@ -498,9 +520,24 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
       <div
         ref={scrollRef}
         onContextMenu={handleMessagesContextMenu}
-        className="flex-1 overflow-auto px-3 py-3 space-y-3"
+        className={
+          fullscreenHome
+            ? 'shrink-0 mt-auto w-full max-w-[640px] mx-auto px-6 pb-5'
+            : 'flex-1 overflow-auto px-3 py-3 space-y-3'
+        }
       >
-        {messages.length === 0 && (
+        {fullscreenHome && (
+          // The Notion-home greeting: centered over the composer. The
+          // suggestion cards and capability row render under the composer,
+          // inside the form below.
+          <div data-testid="assistant-home" className="text-center">
+            <h3 className="text-[26px] font-semibold tracking-[-0.02em] text-[var(--ink-100)] mb-2">
+              How can I help you today?
+            </h3>
+            <p className="text-[13px] text-[var(--ink-60)] leading-relaxed">{ctx.intro}</p>
+          </div>
+        )}
+        {messages.length === 0 && !fullscreenHome && (
           // Notion-mirror empty state: avatar, "How can I help you today?",
           // the per-screen intro, then iconed suggestion ROWS — the reference
           // layout. (The earlier wrap-chips predate the mirror direction.)
@@ -650,8 +687,18 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
 
       {/* The composer is one container that holds the field AND its actions,
           rather than a bare textarea with a detached Send button underneath.
-          The whole box carries the focus ring, so it reads as a single control. */}
-      <form onSubmit={handleSend} className="p-3 border-t border-[var(--edge-soft)]">
+          The whole box carries the focus ring, so it reads as a single control.
+          In the fullscreen home it joins the greeting as one centered column
+          (mt-auto above + mb-auto here center the pair), with the capability
+          row and suggestion cards underneath. */}
+      <form
+        onSubmit={handleSend}
+        className={
+          fullscreenHome
+            ? 'p-3 pt-0 mb-auto w-full max-w-[640px] mx-auto'
+            : 'p-3 border-t border-[var(--edge-soft)]'
+        }
+      >
         {/* The assistant's follow-up question, when it asked one, sits directly
             above the composer — pick an option and Send, or just type below
             (any send on this thread is the answer). */}
@@ -724,14 +771,56 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
             className="w-full resize-none bg-transparent text-[var(--ink-100)] placeholder:text-[var(--ink-50)] text-[13px] leading-[1.45] max-h-[160px] focus:outline-none"
           />
           <div className="flex items-center gap-1.5">
-            {modelMode !== 'auto' && (
-              <span
-                className="inline-flex items-center gap-1 rounded-full border border-[var(--edge-soft)] px-2 py-0.5 text-[10px] font-mono text-[var(--ink-60)]"
-                title={`Locked to ${modelMode}. Change in Settings.`}
+            {/* Real model picker (P7) — replaces the old read-only "locked"
+                chip. Opens upward (the composer sits at the bottom). */}
+            <div className="relative" ref={modelMenuRef}>
+              <button
+                type="button"
+                onClick={() => setModelMenuOpen((v) => !v)}
+                data-testid="composer-model-toggle"
+                aria-label="Choose model"
+                aria-expanded={modelMenuOpen}
+                title={`Model — ${activeModelMeta.label}. ${activeModelMeta.blurb}`}
+                className="inline-flex items-center gap-1 rounded-full border border-[var(--edge-soft)] px-2 py-0.5 text-[10px] font-mono text-[var(--ink-60)] hover:border-[rgb(var(--accent)/0.5)] hover:text-[var(--ink-90)] transition-colors"
               >
-                {modelMode}
-              </span>
-            )}
+                <Icon name="psychology" size={11} className="shrink-0" />
+                <span className="truncate max-w-[110px]">{activeModelMeta.label}</span>
+                <Icon name="unfold_more" size={10} className="shrink-0" />
+              </button>
+              {modelMenuOpen && (
+                <div
+                  data-testid="composer-model-menu"
+                  className="absolute left-0 bottom-full mb-1.5 z-30 w-[300px] rounded-[12px] border border-[var(--edge-soft)] bg-[var(--surface-raised)] p-1"
+                  style={{ boxShadow: 'var(--shadow-cast)' }}
+                >
+                  {MODEL_OPTIONS.map((opt) => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      data-testid={`composer-model-${opt.value}`}
+                      onClick={() => {
+                        setModelMode(opt.value)
+                        setModelMenuOpen(false)
+                      }}
+                      className="w-full flex items-start gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-[var(--surface-sunken)] transition-colors"
+                    >
+                      <span className="w-8 shrink-0 pt-0.5 text-[10px] font-mono text-[var(--ink-40)]">
+                        {opt.costTier}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-[12px] text-[var(--ink-90)]">{opt.label}</span>
+                        <span className="block text-[10.5px] text-[var(--ink-50)] leading-snug">
+                          {opt.blurb}
+                        </span>
+                      </span>
+                      {opt.value === modelMode && (
+                        <Icon name="check" size={14} className="text-accent shrink-0 mt-0.5" />
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
             <span className="flex-1" />
             <button
               type="submit"
@@ -744,6 +833,46 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
             </button>
           </div>
         </div>
+        {fullscreenHome && (
+          <>
+            {/* What the assistant can genuinely act on today (P8) — every
+                entry is backed by real proposal kinds (lib/
+                assistantCapabilities, type-locked). Informational, not
+                connector toggles. */}
+            <div
+              data-testid="assistant-capability-row"
+              aria-label="What the assistant can act on"
+              className="mt-3 flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5"
+            >
+              {ASSISTANT_CAPABILITIES.map((c) => (
+                <span
+                  key={c.label}
+                  className="inline-flex items-center gap-1 text-[10.5px] text-[var(--ink-50)]"
+                >
+                  <Icon name={c.icon} size={12} className="text-[var(--ink-40)] shrink-0" />
+                  {c.label}
+                </span>
+              ))}
+            </div>
+            {/* The per-screen suggestions as home cards under the input —
+                Notion's preset options. Same ctx data as the panel rows; an
+                offer that fills the composer, never a command. */}
+            <div className="mt-5 grid grid-cols-2 gap-2">
+              {ctx.suggestions.map((s) => (
+                <button
+                  key={s.text}
+                  type="button"
+                  data-testid="home-suggestion-card"
+                  onClick={() => setDraft(s.text)}
+                  className="text-left px-3 py-2.5 rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-raised)] hover:border-[rgb(var(--accent)/0.45)] hover:bg-[var(--surface-sunken)] transition-colors flex items-center gap-2.5"
+                >
+                  <Icon name={s.icon} size={15} className="text-accent shrink-0" />
+                  <span className="text-[12.5px] text-[var(--ink-80)] truncate">{s.text}</span>
+                </button>
+              ))}
+            </div>
+          </>
+        )}
         <div className="flex justify-end mt-1.5">
           <span className="text-[9.5px] font-mono text-[var(--ink-40)]">
             ↵ send · ⇧↵ newline
