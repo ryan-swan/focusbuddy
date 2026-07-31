@@ -15,6 +15,8 @@ import { extractJson, salvageEnvelope } from './chatJson'
 import { questionProtocolSection, validateChatQuestion } from './chatQuestion'
 import { createChatStreamConsumer } from './chatStreamConsumer'
 import { renderAttachments } from './chatAttachments'
+import { renderMentions } from './chatMentions'
+import { mentionedDeskIds, reportResolutions, resolveMentions } from './mentionResolver'
 import { resolveModel } from './modelRouting'
 import { recordAiUsage } from '../db/telemetry'
 import { parseSheetRows, parseSheetColumns } from './sheetParse'
@@ -31,6 +33,7 @@ import type {
   AiBuildResponse,
   AiBuildSuggestion,
   BodyDoubleResponse,
+  ChatMentionResolved,
   ChatQuestion,
   ChatRequest,
   ChatResponse,
@@ -875,9 +878,29 @@ interface PreparedChatCall {
   msgs: Array<{ role: 'user' | 'assistant'; content: string }>
   sources: ChatSource[]
   retrievalMs: number
+  // What each @-mention actually produced (Phase 4.2). Empty when the request
+  // carried none. Derived from the same pass that built the prompt block, so
+  // the renderer is told exactly what the model was given.
+  mentions: ChatMentionResolved[]
 }
 
 async function prepareChatCall(req: ChatRequest): Promise<PreparedChatCall> {
+  // @-mentions (Phase 4.2) resolve BEFORE retrieval, because what they resolve
+  // to decides two things about it: which desks the narrowable pool is limited
+  // to, and which retrieved sources would merely repeat material the user has
+  // already put in front of the model.
+  const resolvedMentions = resolveMentions(req.mentions)
+  const renderedMentions = renderMentions(resolvedMentions)
+  const mentionReport = reportResolutions(resolvedMentions, renderedMentions.admitted)
+  // Only references that GENUINELY rendered may influence retrieval. A deleted
+  // desk must not silently narrow the search to nothing.
+  const admittedRefs = (req.mentions ?? []).filter((m) =>
+    renderedMentions.admitted.has(`${m.kind}:${m.id}`)
+  )
+  const mentionDeskIds = mentionedDeskIds(admittedRefs)
+  // Ids already force-included above. A retrieved source repeating one of them
+  // would spend a numbered slot restating material the model already has.
+  const admittedIds = new Set(admittedRefs.map((m) => m.id))
   // Unified-brain retrieval. Before answering, pull the most relevant material
   // from the workspace and ground the assistant in it, so the desk assistant
   // researches (not just reacts) and can advise/create/improve across desks.
@@ -894,13 +917,22 @@ async function prepareChatCall(req: ChatRequest): Promise<PreparedChatCall> {
   try {
     const lastUser = [...req.messages].reverse().find((m) => m.role === 'user')?.content ?? ''
     if (lastUser.trim()) {
-      const scope = relatedScopeIds(req.taskId)
-      const sources = await retrieveSources(lastUser, 6, scope.length ? scope : undefined)
+      // Referencing desks narrows the pool that CAN be narrowed — tasks, tables
+      // and canvas notes, which belong to a desk. Documents and PlexiBrain
+      // entries carry no desk affiliation in the data model, so they are not
+      // scoped and the wording below never claims they were.
+      const related = relatedScopeIds(req.taskId)
+      const scope = mentionDeskIds.length > 0 ? mentionDeskIds : related
+      const rawSources = await retrieveSources(lastUser, 6, scope.length ? scope : undefined)
+      // Drop anything the user already put in front of the model by name.
+      const sources = rawSources.filter((s) => !admittedIds.has(s.docId))
       if (sources.length > 0) {
         const scopeNote =
-          scope.length > 0
-            ? 'this desk and the desks you have related to it'
-            : 'your workspace'
+          mentionDeskIds.length > 0
+            ? 'the desks you referenced (documents and PlexiBrain entries are searched across your whole workspace)'
+            : related.length > 0
+              ? 'this desk and the desks you have related to it'
+              : 'your workspace'
         citedSources = sources.map((s, i) => ({
           n: i + 1,
           docId: s.docId,
@@ -933,11 +965,14 @@ async function prepareChatCall(req: ChatRequest): Promise<PreparedChatCall> {
   return {
     system:
       buildSystemPrompt(req.taskId, req.supportsQuestions) +
+      // What the user named by hand leads what the system went looking for.
+      renderedMentions.block +
       retrieval +
       renderAttachments(req.attachments, req.pinnedWidgetId),
     msgs: req.messages
       .filter((m) => m.role === 'user' || m.role === 'assistant')
       .map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content })),
+    mentions: mentionReport,
     sources: citedSources,
     retrievalMs: Date.now() - t0
   }
@@ -947,7 +982,14 @@ async function prepareChatCall(req: ChatRequest): Promise<PreparedChatCall> {
 // gets. Shared by both paths so a streamed answer and a non-streamed one are
 // assembled identically — including the truncation notice, which is the one
 // place a partial response has to explain itself.
-function buildChatResponse(rawText: string, sources: ChatSource[]): ChatResponse | null {
+function buildChatResponse(
+  rawText: string,
+  sources: ChatSource[],
+  // What each @-mention produced (Phase 4.2). Threaded as a parameter rather
+  // than attached at the call sites so a new caller cannot forget it and
+  // silently drop the honest record of what the model was actually given.
+  mentions: ChatMentionResolved[] = []
+): ChatResponse | null {
   const parsed = parseChatJson(rawText)
   if (!parsed) return null
   let content = parsed.reply || (parsed.proposals.length > 0 ? "Here's what I can set up:" : '')
@@ -964,7 +1006,8 @@ function buildChatResponse(rawText: string, sources: ChatSource[]): ChatResponse
     message: { role: 'assistant', content, ts: Date.now() },
     proposals: parsed.proposals.length > 0 ? parsed.proposals : undefined,
     sources: sources.length > 0 ? sources : undefined,
-    question: parsed.question
+    question: parsed.question,
+    mentions: mentions.length > 0 ? mentions : undefined
   }
 }
 
@@ -979,7 +1022,7 @@ export async function sendChat(req: ChatRequest): Promise<ChatResponse> {
     }
   }
   try {
-    const { system, msgs, sources: citedSources } = await prepareChatCall(req)
+    const { system, msgs, sources: citedSources, mentions: mentionReport } = await prepareChatCall(req)
     // DELIBERATELY no `tools:` passed. We tried Anthropic native tool-use and
     // the model defaults to prose too often even when the prompt commands
     // tools. AI Builder uses a strict JSON-required prompt (same pattern as
@@ -1007,9 +1050,9 @@ export async function sendChat(req: ChatRequest): Promise<ChatResponse> {
       .join('\n')
       .trim()
 
-    const built = buildChatResponse(text, citedSources)
+    const built = buildChatResponse(text, citedSources, mentionReport)
     if (built) return built
-    return unparseableChatResponse(text, resp.stop_reason as string, citedSources)
+    return unparseableChatResponse(text, resp.stop_reason as string, citedSources, mentionReport)
   } catch (e) {
     return { ok: false, error: (e as Error).message }
   }
@@ -1022,7 +1065,8 @@ export async function sendChat(req: ChatRequest): Promise<ChatResponse> {
 function unparseableChatResponse(
   text: string,
   stopReason: string,
-  sources: ChatSource[]
+  sources: ChatSource[],
+  mentions: ChatMentionResolved[] = []
 ): ChatResponse {
   if (stopReason === 'max_tokens') {
     return {
@@ -1041,7 +1085,8 @@ function unparseableChatResponse(
   return {
     ok: true,
     message: { role: 'assistant', content: text, ts: Date.now() },
-    sources: sources.length > 0 ? sources : undefined
+    sources: sources.length > 0 ? sources : undefined,
+    mentions: mentions.length > 0 ? mentions : undefined
   }
 }
 
@@ -1161,12 +1206,12 @@ export async function sendChatStream(
   // forever waiting for an event that is never coming.
   try {
     const text = consumer.text().trim()
-    const built = buildChatResponse(text, prepared.sources)
+    const built = buildChatResponse(text, prepared.sources, prepared.mentions)
     if (built) {
       cb.onComplete(built)
       return
     }
-    const fallback = unparseableChatResponse(text, stopReason, prepared.sources)
+    const fallback = unparseableChatResponse(text, stopReason, prepared.sources, prepared.mentions)
     if (fallback.ok) cb.onComplete(fallback)
     else cb.onError({ ok: false, error: fallback.error ?? 'Something went wrong.' })
   } catch (e) {

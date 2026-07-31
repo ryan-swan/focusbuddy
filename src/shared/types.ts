@@ -397,11 +397,62 @@ export interface ChatAttachment {
   text: string
 }
 
+// ── @-mentions (Phase 4) ────────────────────────────────────────────────────
+// A typed, id-bearing reference to a real workspace object that the user named
+// with "@" (or by clicking it). Deliberately NOT lib/mentions.ts's @handle text
+// tokens, which live in PlexiChat, mean "notify this person", and carry no id —
+// a text token can make no honest claim about what rode the request.
+//
+// This is the WIRE shape: what the main process needs to resolve the reference.
+// The renderer's MentionRef adds an icon and the conversation it belongs to,
+// both of which are presentation/state and stop at the IPC boundary.
+export type ChatMentionKind =
+  | 'document'
+  | 'desk'
+  | 'room'
+  | 'widget'
+  | 'file'
+  | 'knowledge'
+  | 'person'
+
+export interface ChatMentionRef {
+  kind: ChatMentionKind
+  id: string
+  title: string
+  // The desk that owns a widget reference — what lets the resolver read a
+  // widget on a desk the user is not currently looking at. (The renderer's own
+  // attachment gathering stops at the current desk; this is what mentions add.)
+  taskId?: string | null
+}
+
+// What a reference ACTUALLY produced, reported back so the renderer can be
+// honest about it. A reference that resolved to nothing must never render as
+// though the assistant read it.
+export interface ChatMentionResolved {
+  kind: ChatMentionKind
+  id: string
+  title: string
+  // True only when real text was extracted AND genuinely reached the prompt.
+  resolved: boolean
+  // How many characters actually rode, after every cap.
+  chars: number
+  // The prompt budget cut this reference short. Stated, never silent.
+  truncated: boolean
+  // Why it did not resolve, when it did not. Null when it did.
+  reason: string | null
+}
+
 export interface ChatRequest {
   taskId: string | null
   messages: ChatMessage[]
   // Live content the user has open on the canvas, gathered by the renderer.
   attachments?: ChatAttachment[]
+  // Workspace objects the user explicitly referenced for this conversation
+  // (Phase 4). Additive and optional, exactly like pinnedWidgetId before it, so
+  // every surface that does not offer mentions is untouched. Their content is
+  // force-included ahead of retrieved material, and the prompt claims a
+  // reference ONLY when its text genuinely rendered (see chatMentions.ts).
+  mentions?: ChatMentionRef[]
   // Layer-1 structural index of the whole workspace (ids + titles, no bodies),
   // gathered by the renderer so the assistant knows what exists and can act on
   // real items. Optional: absent for callers that don't provide it.
@@ -484,6 +535,11 @@ export interface ChatResponse {
   // only when the model actually emitted one — the renderer must never invent
   // or show a question the model did not ask.
   question?: ChatQuestion
+  // What each @-mention on the request actually produced (Phase 4). Present
+  // only when the request carried mentions. This is the sole source of truth
+  // for the trace's "Mentioned" lane and for marking a chip broken — the
+  // renderer may not assume a reference resolved just because it was sent.
+  mentions?: ChatMentionResolved[]
 }
 
 // ── Action proposals (AI → workspace actions, gated by user confirmation) ───

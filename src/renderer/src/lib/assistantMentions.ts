@@ -16,7 +16,14 @@
 // A MentionRef is none of those: it is a typed, id-bearing reference to a real
 // workspace object, resolved to real content before it may claim anything.
 
-import type { FbNode, SearchHit, Widget, WidgetKind } from '@shared/types'
+import type {
+  ChatMentionKind,
+  ChatMentionRef,
+  FbNode,
+  SearchHit,
+  Widget,
+  WidgetKind
+} from '@shared/types'
 import { ATTACHABLE_WIDGET_KINDS } from '@shared/widgetText'
 import { catalogFor } from './widgetCatalog'
 
@@ -28,28 +35,25 @@ import { catalogFor } from './widgetCatalog'
 //
 // Vocabulary follows the app's own (types.ts: "Task nodes (Desks)"):
 // a task node IS a Desk; a folder node is a Room.
-export type MentionKind =
-  | 'document'
-  | 'desk'
-  | 'room'
-  | 'widget'
-  | 'file'
-  | 'knowledge'
-  | 'person'
+//
+// The kind and the wire shape are the SHARED ones — one definition, so the
+// renderer and the resolver cannot drift about what a reference is.
+export type MentionKind = ChatMentionKind
 
-export interface MentionRef {
-  kind: MentionKind
-  id: string
-  title: string
+export interface MentionRef extends ChatMentionRef {
   icon: string
-  // The desk that owns a widget, when the reference is to one. The resolver
-  // needs it to read across desks — which is the whole reason mentions beat
-  // the pin, whose reach stops at the desk you are looking at.
-  taskId?: string | null
   // The conversation this reference belongs to. Opaque on purpose (plan P6):
   // it is the per-screen thread key before unification and the persisted
   // conversation id after, so re-homing costs a value rather than a rewrite.
   conversationKey: string
+}
+
+// Strip the renderer-only fields for the request. The main process resolves by
+// (kind, id, taskId); `icon` is presentation and `conversationKey` is renderer
+// state, and sending either would imply the server cares which conversation a
+// reference came from. It does not.
+export function toWireMentions(refs: readonly MentionRef[]): ChatMentionRef[] {
+  return refs.map((m) => ({ kind: m.kind, id: m.id, title: m.title, taskId: m.taskId ?? null }))
 }
 
 // How many references one conversation may carry. The force-included content
