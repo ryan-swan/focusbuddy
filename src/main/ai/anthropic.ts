@@ -12,6 +12,7 @@ import { mainWidgetResolvers } from './widgetSummary'
 import { retrieveSources } from '../workspaceSearch'
 import { relatedScopeIds } from '../db/nodeRelations'
 import { extractJson, salvageEnvelope } from './chatJson'
+import { questionProtocolSection, validateChatQuestion } from './chatQuestion'
 import { createChatStreamConsumer } from './chatStreamConsumer'
 import { renderAttachments } from './chatAttachments'
 import { resolveModel } from './modelRouting'
@@ -30,6 +31,7 @@ import type {
   AiBuildResponse,
   AiBuildSuggestion,
   BodyDoubleResponse,
+  ChatQuestion,
   ChatRequest,
   ChatResponse,
   ChatRetrievalTrace,
@@ -306,7 +308,7 @@ function taskBlock(taskId: string): string {
   return lines.join('\n')
 }
 
-function buildSystemPrompt(taskId: string | null): string {
+function buildSystemPrompt(taskId: string | null, supportsQuestions?: boolean): string {
   const base =
     'You are PlexiDesk, the in-app pair-worker for an ADHD-friendly task-execution desktop app. ' +
     'You help the user think, plan, research, and complete the task they are currently focused on. ' +
@@ -379,7 +381,10 @@ function buildSystemPrompt(taskId: string | null): string {
     '}\n\n' +
     'CORRECT for "what time is it in Tokyo":\n' +
     '{ "reply": "Tokyo is JST (UTC+9). Right now it\'s roughly 17 hours ahead of Pacific Time.", "actions": [] }\n\n' +
-    'INCORRECT (NEVER do this): A reply that says "Here are the widgets I\'ve added: 📝 **Launch checklist** with these items..." while actions is empty. The widgets do not exist if they are not in the actions array.'
+    'INCORRECT (NEVER do this): A reply that says "Here are the widgets I\'ve added: 📝 **Launch checklist** with these items..." while actions is empty. The widgets do not exist if they are not in the actions array.' +
+    // Taught ONLY to surfaces that render the question card (the assistant
+    // panel). Everything else keeps the exact two-field envelope above.
+    questionProtocolSection(supportsQuestions)
   const extras = [clockBlock(), documentsBlock(), conversationsBlock()].filter(Boolean).join('\n')
   const withExtras = `${base}\n\n${extras}`
   if (!taskId) return withExtras
@@ -445,13 +450,17 @@ export function parseChatJson(raw: string): {
   reply: string
   proposals: ActionProposal[]
   truncated: boolean
+  // A validated follow-up question, when the model asked one. Undefined both
+  // when absent and when what the model wrote fails validation — a question
+  // that can't be rendered honestly is treated as never asked.
+  question?: ChatQuestion
 } | null {
-  let parsed: { reply?: unknown; actions?: unknown } | null = null
+  let parsed: { reply?: unknown; question?: unknown; actions?: unknown } | null = null
   let truncated = false
   const jsonStr = extractJson(raw)
   if (jsonStr) {
     try {
-      parsed = JSON.parse(jsonStr) as { reply?: unknown; actions?: unknown }
+      parsed = JSON.parse(jsonStr) as { reply?: unknown; question?: unknown; actions?: unknown }
     } catch {
       parsed = null
     }
@@ -468,6 +477,7 @@ export function parseChatJson(raw: string): {
     truncated = true
   }
   const reply = typeof parsed.reply === 'string' ? parsed.reply : ''
+  const question = validateChatQuestion(parsed.question) ?? undefined
   const actionsRaw = Array.isArray(parsed.actions) ? parsed.actions : []
   const proposals: ActionProposal[] = []
   let i = 0
@@ -848,7 +858,7 @@ export function parseChatJson(raw: string): {
       }
     }
   }
-  return { reply, proposals, truncated }
+  return { reply, proposals, truncated, question }
 }
 
 // Everything a chat call needs before it can be made: the assembled system
@@ -921,7 +931,10 @@ async function prepareChatCall(req: ChatRequest): Promise<PreparedChatCall> {
     citedSources = []
   }
   return {
-    system: buildSystemPrompt(req.taskId) + retrieval + renderAttachments(req.attachments),
+    system:
+      buildSystemPrompt(req.taskId, req.supportsQuestions) +
+      retrieval +
+      renderAttachments(req.attachments),
     msgs: req.messages
       .filter((m) => m.role === 'user' || m.role === 'assistant')
       .map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content })),
@@ -950,7 +963,8 @@ function buildChatResponse(rawText: string, sources: ChatSource[]): ChatResponse
     ok: true,
     message: { role: 'assistant', content, ts: Date.now() },
     proposals: parsed.proposals.length > 0 ? parsed.proposals : undefined,
-    sources: sources.length > 0 ? sources : undefined
+    sources: sources.length > 0 ? sources : undefined,
+    question: parsed.question
   }
 }
 
@@ -1062,6 +1076,11 @@ export interface ChatStreamCallbacks {
   onSources: (trace: ChatRetrievalTrace) => void
   onReply: (replyText: string) => void
   onTool: (tool: ChatToolTrace) => void
+  // Fired the moment the envelope's optional question object closes — between
+  // reply and tools per the mandated key order. The durable copy still rides
+  // the `complete` response, so a listener that misses this event loses only
+  // earliness, never the question itself.
+  onQuestion: (question: ChatQuestion) => void
   onError: (error: { ok: false; error: string; needsApiKey?: boolean }) => void
   onComplete: (response: ChatResponse) => void
 }
@@ -1098,7 +1117,11 @@ export async function sendChatStream(
 
   // The delta → event loop lives in its own module so it can be tested without
   // this file's database imports. See chatStreamConsumer.ts.
-  const consumer = createChatStreamConsumer({ onReply: cb.onReply, onTool: cb.onTool })
+  const consumer = createChatStreamConsumer({
+    onReply: cb.onReply,
+    onTool: cb.onTool,
+    onQuestion: cb.onQuestion
+  })
   let stopReason = ''
 
   try {

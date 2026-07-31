@@ -882,11 +882,17 @@ export function registerIpcHandlers(): void {
         sender.send(channel, { type, payload })
       }
       await sendChatStream(
-        { taskId: input.taskId, messages: input.messages, attachments: input.attachments },
+        {
+          taskId: input.taskId,
+          messages: input.messages,
+          attachments: input.attachments,
+          supportsQuestions: input.supportsQuestions
+        },
         {
           onSources: (t) => send('sources', t),
           onReply: (text) => send('reply', text),
           onTool: (tool) => send('tool', tool),
+          onQuestion: (q) => send('question', q),
           onError: (err) => send('error', err),
           onComplete: (resp) => send('complete', resp)
         }

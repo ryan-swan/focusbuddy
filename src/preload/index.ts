@@ -6,6 +6,7 @@ import type {
   AiBuildResponse,
   BodyDoubleResponse,
   BrowsingHistoryEntry,
+  ChatQuestion,
   ChatRequest,
   ChatResponse,
   ChatRetrievalTrace,
@@ -302,16 +303,18 @@ const api = {
     // events crossing. Returns a cleanup function to unsubscribe.
     //
     // `sources` fires the moment retrieval returns, `reply` when the prose
-    // lands whole, `tool` once per action the model finishes writing, then
-    // exactly one of `complete` / `error`. The `complete` payload is the same
-    // ChatResponse `send` returns — the streamed events are the trace, this is
-    // the result.
+    // lands whole, `question` if (and only if) the model asked one, `tool`
+    // once per action the model finishes writing, then exactly one of
+    // `complete` / `error`. The `complete` payload is the same ChatResponse
+    // `send` returns — the streamed events are the trace, this is the result
+    // (it carries the question too, so missing the event loses only earliness).
     sendStream: (
       req: ChatRequest & { requestId: string },
       callbacks: {
         onSources?: (trace: ChatRetrievalTrace) => void
         onReply?: (text: string) => void
         onTool?: (tool: ChatToolTrace) => void
+        onQuestion?: (question: ChatQuestion) => void
         onError?: (error: { ok: false; error: string; needsApiKey?: boolean }) => void
         onComplete?: (response: ChatResponse) => void
       }
@@ -321,6 +324,7 @@ const api = {
         | { type: 'sources'; payload: ChatRetrievalTrace }
         | { type: 'reply'; payload: string }
         | { type: 'tool'; payload: ChatToolTrace }
+        | { type: 'question'; payload: ChatQuestion }
         | { type: 'error'; payload: { ok: false; error: string; needsApiKey?: boolean } }
         | { type: 'complete'; payload: ChatResponse }
       // Whether a terminal event (complete | error) has already been delivered.
@@ -336,6 +340,9 @@ const api = {
             break
           case 'tool':
             callbacks.onTool?.(ev.payload)
+            break
+          case 'question':
+            callbacks.onQuestion?.(ev.payload)
             break
           case 'error':
             settled = true

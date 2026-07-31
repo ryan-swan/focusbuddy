@@ -235,6 +235,108 @@ describe('StreamingEnvelopeScanner — chunk boundaries', () => {
   })
 })
 
+describe('StreamingEnvelopeScanner — extractObjectField', () => {
+  // The question envelope used throughout: reply, then question, then actions —
+  // the key order the chat prompt mandates.
+  const Q = '{ "prompt": "Which desk?", "options": ["Marketing", "A new desk"], "allowFreeText": true }'
+  const ENVELOPE = `{"reply":"One thing first.","question":${Q},"actions":[]}`
+
+  it('returns null until the object closes, then the parsed object, exactly once', () => {
+    const s = new StreamingEnvelopeScanner('actions')
+    s.push('{"reply":"One thing first.","question":{ "prompt": "Which desk?", "options": ["Marketing", "A new')
+    s.extractReply()
+    expect(s.extractObjectField('question')).toBeNull()
+    s.push(' desk"], "allowFreeText": true }')
+    expect(s.extractObjectField('question')).toEqual(JSON.parse(Q))
+    // One-shot: the field has been handed over.
+    expect(s.extractObjectField('question')).toBeNull()
+  })
+
+  it('survives a boundary at every single character', () => {
+    const s = new StreamingEnvelopeScanner('actions')
+    let reply: string | null = null
+    let question: unknown | null = null
+    for (const ch of ENVELOPE) {
+      s.push(ch)
+      if (reply === null) reply = s.extractReply()
+      if (question === null) question = s.extractObjectField('question')
+    }
+    expect(reply).toBe('One thing first.')
+    expect(question).toEqual(JSON.parse(Q))
+  })
+
+  it('does not scan before the reply has closed', () => {
+    // Honesty constraint: the reply is prose and may spell the key. Nothing may
+    // be extracted while the only place the key could live is inside it.
+    const s = new StreamingEnvelopeScanner('actions')
+    s.push('{"question":{"prompt":"early?","options":["a","b"]},"reply":"still open')
+    expect(s.extractObjectField('question')).toBeNull()
+  })
+
+  it('is not fooled by the key spelled inside the reply prose', () => {
+    // The reply QUOTES a question-shaped fragment. Emitting it would render a
+    // question the model never asked — the exact class of invention the trace
+    // work removed. Only the real post-reply field may come out.
+    const s = new StreamingEnvelopeScanner('actions')
+    s.push(
+      '{"reply":"Write \\"question\\": {\\"prompt\\": \\"fake\\"} in your config.","question":' +
+        Q +
+        ',"actions":[]}'
+    )
+    expect(s.extractReply()).toBe('Write "question": {"prompt": "fake"} in your config.')
+    expect(s.extractObjectField('question')).toEqual(JSON.parse(Q))
+  })
+
+  it('ignores a question spelled raw in a protocol-violating preamble', () => {
+    // Models sometimes preface the envelope with prose despite the JSON-only
+    // instruction. Outside a JSON string nothing is escaped, so the spelling
+    // in the preamble matches the key pattern exactly — the post-reply guard
+    // is what keeps it from being emitted as a question the model never asked.
+    const s = new StreamingEnvelopeScanner('actions')
+    s.push(
+      'Sure — put "question": {"prompt": "fake", "options": ["a", "b"]} in your envelope, like this:\n' +
+        `{"reply":"ok","question":${Q},"actions":[]}`
+    )
+    expect(s.extractReply()).toBe('ok')
+    expect(s.extractObjectField('question')).toEqual(JSON.parse(Q))
+    expect(s.extractObjectField('question')).toBeNull()
+  })
+
+  it('returns null forever when the field never arrives', () => {
+    const s = new StreamingEnvelopeScanner('actions')
+    s.push('{"reply":"no question here","actions":[{"n":1}]}')
+    s.extractReply()
+    expect(s.extractObjectField('question')).toBeNull()
+    s.push('\n')
+    expect(s.extractObjectField('question')).toBeNull()
+  })
+
+  it('keeps nested structures and brace-bearing strings balanced', () => {
+    const nested =
+      '{"prompt":"Pick { a } shape?","options":["curly } brace","square ] bracket"],"meta":{"deep":[1,2]}}'
+    const s = new StreamingEnvelopeScanner('actions')
+    s.push(`{"reply":"x","question":${nested},"actions":[]}`)
+    s.extractReply()
+    expect(s.extractObjectField('question')).toEqual(JSON.parse(nested))
+  })
+
+  it('a truncated object stays invisible', () => {
+    const s = new StreamingEnvelopeScanner('actions')
+    s.push('{"reply":"x","question":{"prompt":"cut off","options":["a"')
+    s.extractReply()
+    expect(s.extractObjectField('question')).toBeNull()
+  })
+
+  it('tracks different keys independently', () => {
+    const s = new StreamingEnvelopeScanner('actions')
+    s.push('{"reply":"x","question":{"a":1},"context":{"b":2},"actions":[]}')
+    s.extractReply()
+    expect(s.extractObjectField('question')).toEqual({ a: 1 })
+    expect(s.extractObjectField('context')).toEqual({ b: 2 })
+    expect(s.extractObjectField('question')).toBeNull()
+  })
+})
+
 describe('StreamingEnvelopeScanner — fullText', () => {
   it('accumulates every chunk so the caller can run the whole-envelope parser', () => {
     // The streaming path still runs the proven whole-response parse at the end;

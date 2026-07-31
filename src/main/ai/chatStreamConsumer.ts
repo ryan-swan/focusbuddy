@@ -14,7 +14,8 @@
 
 import { StreamingEnvelopeScanner } from './streamingEnvelope'
 import { describeAction } from './actionLabel'
-import type { ChatToolTrace } from '@shared/types'
+import { validateChatQuestion } from './chatQuestion'
+import type { ChatQuestion, ChatToolTrace } from '@shared/types'
 
 export interface ChatStreamConsumerCallbacks {
   // Fires exactly once, when the envelope's reply field closes. The prose lands
@@ -23,6 +24,12 @@ export interface ChatStreamConsumerCallbacks {
   onReply: (replyText: string) => void
   // Fires once per action object as it completes, in arrival order.
   onTool: (tool: ChatToolTrace) => void
+  // Fires at most once, when the envelope's optional question object closes —
+  // after the reply, before any tools that would follow it (per the envelope's
+  // key order, a turn that asks should carry no actions at all). Only a
+  // question that survives validation is reported: emitting junk would be a
+  // claim the model asked something it didn't.
+  onQuestion?: (question: ChatQuestion) => void
 }
 
 export interface ChatStreamConsumer {
@@ -40,6 +47,7 @@ export function createChatStreamConsumer(
 ): ChatStreamConsumer {
   const scanner = new StreamingEnvelopeScanner('actions')
   let replySeen = false
+  let questionArrived = false
   let toolIndex = 0
 
   return {
@@ -50,6 +58,16 @@ export function createChatStreamConsumer(
         if (r !== null) {
           replySeen = true
           cb.onReply(r)
+        }
+      }
+      // The optional question object. The scanner is one-shot per key; the
+      // local flag just skips the regex work once the field has arrived.
+      if (!questionArrived && cb.onQuestion) {
+        const rawQuestion = scanner.extractObjectField('question')
+        if (rawQuestion !== null) {
+          questionArrived = true
+          const q = validateChatQuestion(rawQuestion)
+          if (q) cb.onQuestion(q)
         }
       }
       // Drain every action object that has finished arriving. Objects the

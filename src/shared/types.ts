@@ -406,6 +406,11 @@ export interface ChatRequest {
   // gathered by the renderer so the assistant knows what exists and can act on
   // real items. Optional: absent for callers that don't provide it.
   workspace?: WorkspaceSnapshot
+  // The calling surface can render a structured follow-up question card. Only
+  // then does the system prompt teach the ask-protocol — chat:send is shared
+  // by surfaces (focus chat, dashboard cards, field editor) that have no card
+  // to render, and a model taught to ask there produces turns that dead-end.
+  supportsQuestions?: boolean
 }
 
 // A retrieved workspace document the assistant was grounded on. Slimmed from
@@ -443,6 +448,20 @@ export interface ChatRetrievalTrace {
   elapsedMs: number
 }
 
+// A structured follow-up the assistant asks instead of guessing — rendered as
+// a choice card above the composer. Emitted by the model inside the
+// {reply, question, actions} envelope, and only ever taught to surfaces that
+// declared supportsQuestions on the request. Single-select; answering sends
+// the chosen option (or the user's own words) as a normal user turn.
+export interface ChatQuestion {
+  prompt: string
+  // 2–5 short, mutually exclusive choices.
+  options: string[]
+  // Whether typing in the composer is a valid answer ("Or, describe it…").
+  // False means only the listed options make sense.
+  allowFreeText: boolean
+}
+
 export interface ChatResponse {
   ok: boolean
   message?: ChatMessage
@@ -456,6 +475,10 @@ export interface ChatResponse {
   // every message to build the prompt; returning it lets the renderer show what
   // the answer stands on instead of discarding it.
   sources?: ChatSource[]
+  // A follow-up question the model asked instead of acting on a guess. Present
+  // only when the model actually emitted one — the renderer must never invent
+  // or show a question the model did not ask.
+  question?: ChatQuestion
 }
 
 // ── Action proposals (AI → workspace actions, gated by user confirmation) ───

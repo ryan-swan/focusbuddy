@@ -127,3 +127,74 @@ describe('createChatStreamConsumer', () => {
     expect(consumer.toolCount()).toBe(2)
   })
 })
+
+describe('createChatStreamConsumer — question', () => {
+  const QUESTION_ENVELOPE =
+    '{"reply":"One thing first.","question":' +
+    '{"prompt":"Which desk should this go on?","options":["Marketing desk","A new desk"],"allowFreeText":true},' +
+    '"actions":[]}'
+
+  function runWithQuestion(chunks: string[]): {
+    events: Array<{ type: 'reply' | 'question' | 'tool'; value: unknown }>
+  } {
+    const events: Array<{ type: 'reply' | 'question' | 'tool'; value: unknown }> = []
+    const consumer = createChatStreamConsumer({
+      onReply: (r) => events.push({ type: 'reply', value: r }),
+      onTool: (t) => events.push({ type: 'tool', value: t }),
+      onQuestion: (q) => events.push({ type: 'question', value: q })
+    })
+    for (const c of chunks) consumer.push(c)
+    return { events }
+  }
+
+  it('reports a validated question once, after the reply, whatever the chunk size', () => {
+    for (const size of [1, 3, 7, 64, QUESTION_ENVELOPE.length]) {
+      const { events } = runWithQuestion(chunked(QUESTION_ENVELOPE, size))
+      expect(events.map((e) => e.type)).toEqual(['reply', 'question'])
+      expect(events[1].value).toEqual({
+        prompt: 'Which desk should this go on?',
+        options: ['Marketing desk', 'A new desk'],
+        allowFreeText: true
+      })
+    }
+  })
+
+  it('normalises the question through the shared validator, not raw off the wire', () => {
+    // Duplicate + empty options are cleaned, allowFreeText defaults true — the
+    // event must carry exactly what the durable parse would.
+    const { events } = runWithQuestion([
+      '{"reply":"x","question":{"prompt":" Which one? ","options":["A","A","","B"]},"actions":[]}'
+    ])
+    expect(events.filter((e) => e.type === 'question').map((e) => e.value)).toEqual([
+      { prompt: 'Which one?', options: ['A', 'B'], allowFreeText: true }
+    ])
+  })
+
+  it('emits no question event for junk the card could not render', () => {
+    // One option is not a choice. The field arrived, the event must not.
+    const { events } = runWithQuestion([
+      '{"reply":"x","question":{"prompt":"Pick","options":["only one"]},"actions":[]}'
+    ])
+    expect(events.map((e) => e.type)).toEqual(['reply'])
+  })
+
+  it('emits nothing when the envelope has no question', () => {
+    const { events } = runWithQuestion(chunked('{"reply":"Just an answer.","actions":[]}', 5))
+    expect(events.map((e) => e.type)).toEqual(['reply'])
+  })
+
+  it('a consumer without the callback still handles a question envelope', () => {
+    // The voice-command shape of the callbacks object — no onQuestion — must
+    // keep working against a stream that carries one.
+    const { replies, tools } = run(chunked(QUESTION_ENVELOPE, 6))
+    expect(replies).toEqual(['One thing first.'])
+    expect(tools).toEqual([])
+  })
+
+  it('a truncated question never becomes an event', () => {
+    const { events } = runWithQuestion([
+      '{"reply":"x","question":{"prompt":"cut","options":["a","b'
+    ])
+    expect(events.map((e) => e.type)).toEqual(['reply'])
+  })
+})

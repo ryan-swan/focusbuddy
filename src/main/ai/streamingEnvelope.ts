@@ -28,6 +28,10 @@ export class StreamingEnvelopeScanner {
   // Position the next-extract scan starts at (cursor advances as we emit each
   // completed object).
   private scanFrom = 0
+  // One-shot extraction state per named top-level object field ("question").
+  // searchFrom advances past false matches so a key spelled inside a later
+  // string can't permanently jam the real field's discovery.
+  private objectFields = new Map<string, { searchFrom: number; emitted: boolean }>()
   private readonly arrayPattern: RegExp
 
   // `arrayKey` is the envelope's array field — "proposals" for voice commands,
@@ -74,6 +78,68 @@ export class StreamingEnvelopeScanner {
       }
       i += 1
     }
+    return null
+  }
+
+  // Carve out a complete `"<key>": { … }` top-level object field the moment its
+  // closing brace lands. One-shot per key: after the object has been returned
+  // once, further calls return null.
+  //
+  // Scanning deliberately starts only AFTER the reply string has closed. The
+  // reply is prose and can quote the key's spelling (…say `"question": {…}` in
+  // your config…) — a match inside that string would emit a question the model
+  // never asked, which is exactly the class of invention this surface exists to
+  // avoid. The envelope's mandated key order (reply, question, actions) makes
+  // post-reply the earliest honest place to look.
+  extractObjectField(key: string): unknown | null {
+    if (this.replyEnd === null) return null
+    let st = this.objectFields.get(key)
+    if (!st) {
+      st = { searchFrom: this.replyEnd, emitted: false }
+      this.objectFields.set(key, st)
+    }
+    if (st.emitted) return null
+    const m = new RegExp(`"${escapeRegExp(key)}"\\s*:\\s*\\{`).exec(this.buf.slice(st.searchFrom))
+    if (!m) return null
+    // Walk from the opening brace maintaining depth + string state, same
+    // discipline as nextItem().
+    const braceAt = st.searchFrom + m.index + m[0].length - 1
+    let depth = 0
+    let inString = false
+    let escape = false
+    for (let j = braceAt; j < this.buf.length; j++) {
+      const c = this.buf[j]
+      if (escape) {
+        escape = false
+        continue
+      }
+      if (inString) {
+        if (c === '\\') escape = true
+        else if (c === '"') inString = false
+        continue
+      }
+      if (c === '"') {
+        inString = true
+      } else if (c === '{' || c === '[') {
+        depth += 1
+      } else if (c === '}' || c === ']') {
+        depth -= 1
+        if (depth === 0) {
+          try {
+            const parsed: unknown = JSON.parse(this.buf.slice(braceAt, j + 1))
+            st.emitted = true
+            return parsed
+          } catch {
+            // Balanced but unparseable — a false match (the key's spelling
+            // inside some later string). Skip past it and keep looking.
+            st.searchFrom = braceAt + 1
+            return null
+          }
+        }
+      }
+    }
+    // Object not complete yet — leave searchFrom alone so the next push
+    // finds the same opening brace with more of the object behind it.
     return null
   }
 
