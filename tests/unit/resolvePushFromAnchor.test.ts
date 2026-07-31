@@ -51,6 +51,16 @@ describe('resolvePushFromAnchor', () => {
     }
   })
 
+  it('slides an overlapping neighbour horizontally, keeping its row (N4 move-boss)', () => {
+    const anchor = { x: 100, y: 100, width: 200, height: 200 }
+    const n: Placeable = { id: 'n', x: 140, y: 120, width: 200, height: 200 }
+    const moved = resolvePushFromAnchor(anchor, [n]) // default axis: 'horizontal'
+    const nr = finalRect(n, moved)
+    expect(nr.y).toBe(120) // same row — moved sideways, not up/down
+    expect(overlaps(nr, anchor)).toBe(false)
+    expect(nr.x).toBeGreaterThanOrEqual(anchor.x + anchor.width) // pushed to the right
+  })
+
   it('treats blockers as immovable and routes pushed widgets around them', () => {
     const anchor = { x: 0, y: 0, width: 200, height: 200 }
     const blocker = { x: 260, y: 0, width: 200, height: 600 } // wall to the right
