@@ -69,6 +69,7 @@ import { exportDesign } from '../designExport'
 import { exportMap } from '../mapExport'
 import { importVsdx } from '../mapImport'
 import { searchStockPhotos, fetchImageDataUrl, removeBackground } from '../stockMedia'
+import { setPeopleDirectory, type DirectoryPerson } from '../peopleDirectory'
 import type { DesignBody } from '@shared/design'
 import { getBrandKit, saveBrandKit, hasBrandKit } from '../db/brandKit'
 import type { OrgBrandKit } from '@shared/brandKit'
@@ -2232,6 +2233,13 @@ export function registerIpcHandlers(): void {
     renameAiChatConversation(id, title)
   )
   ipcMain.handle('aiChat:deleteConversation', (_e, id: string) => deleteAiChatConversation(id))
+
+  // People the renderer has genuinely fetched from the signal server, handed to
+  // the main process so @-mentions can resolve one (Phase 4.7). Same shape as
+  // the mail search cache: main knows only what the app actually loaded.
+  ipcMain.handle('people:setDirectory', (_e, people: DirectoryPerson[]) =>
+    setPeopleDirectory(Array.isArray(people) ? people : [])
+  )
 
   // PlexiProjects: project plans, the Gantt schedule, dependencies and reschedule.
   ipcMain.handle('projects:list', () => listProjectSummaries())

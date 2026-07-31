@@ -1615,8 +1615,22 @@ const api = {
       ipcRenderer.invoke('documents:reindex'),
     semanticActive: (): Promise<boolean> => ipcRenderer.invoke('documents:semanticActive')
   },
+  // People the app has fetched, published to the main process so an @-mention
+  // can resolve one. Coverage is honestly partial: whatever the renderer has
+  // actually loaded, never a promise of the whole directory.
+  people: {
+    setDirectory: (
+      people: Array<{
+        accountId: string
+        handle: string
+        firstName: string | null
+        lastName: string | null
+        role: string
+      }>
+    ): Promise<void> => ipcRenderer.invoke('people:setDirectory', people)
+  },
   // Persisted AI-assistant chat history (local, free-standing conversations) —
-  // backs the Focus-Mode chat surface.
+  // backs the assistant's one conversation system.
   aiChat: {
     listConversations: (): Promise<import('@shared/types').AiChatConversationMeta[]> =>
       ipcRenderer.invoke('aiChat:listConversations'),

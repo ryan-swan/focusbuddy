@@ -55,6 +55,10 @@ vi.mock('node:fs', async (importOriginal) => {
 })
 
 const { renderMentions } = await import('../../src/main/ai/chatMentions')
+const { setPeopleDirectory } = await import('../../src/main/peopleDirectory')
+const { personMentionCandidates } = await import(
+  '../../src/renderer/src/lib/peopleDirectory'
+)
 const { resolveMentions, mentionedDeskIds, reportResolutions } = await import(
   '../../src/main/ai/mentionResolver'
 )
@@ -125,6 +129,7 @@ beforeEach(() => {
   files.clear()
   knowledge.clear()
   fileBytes.clear()
+  setPeopleDirectory([])
   docs.set('d1', {
     id: 'd1',
     docType: 'doc',
@@ -237,10 +242,14 @@ describe('resolveMentions — real content or an honest reason, never invention'
     expect(r.source).toBe('1 widget read')
   })
 
-  it('a person reference REFUSES — the capability is not built, so it has no path to text', () => {
+  it('a person reference refuses while the directory is empty — see the people section below', () => {
+    // Phase 4.2 stubbed this branch as a throwing port because the capability
+    // was not built; Phase 4.7 built it. The refusal survives, but now for the
+    // honest reason rather than the placeholder one: with nothing fetched there
+    // is no person to describe.
     const [r] = resolveMentions([ref({ kind: 'person', id: 'p1', title: 'Ryan' })])
     expect(r.text).toBeNull()
-    expect(r.reason).toContain('not available yet')
+    expect(r.reason).toContain('not in the workspace directory')
   })
 
   it('a resolver that throws loses only its own reference, never the chat', () => {
@@ -412,5 +421,80 @@ describe('mentionedDeskIds — narrows the pool that CAN be narrowed', () => {
 
   it('is empty for a request with no references', () => {
     expect(mentionedDeskIds(undefined)).toEqual([])
+  })
+})
+
+// ── People (Phase 4.7) ─────────────────────────────────────────────────────
+// People are the one mentionable kind main cannot look up: they live on the
+// signal server behind a session token, so the renderer publishes what it has
+// genuinely fetched (the pattern db/search.ts uses for mail). The rule under
+// test: an empty directory refuses, it never improvises a name.
+
+describe('person references — context only, and only from what was really fetched', () => {
+  it('refuses when the directory is empty (signed out, or never loaded)', () => {
+    setPeopleDirectory([])
+    const [r] = resolveMentions([ref({ kind: 'person', id: 'acc-1', title: 'Ryan' })])
+    expect(r.text).toBeNull()
+    expect(r.reason).toContain('not in the workspace directory')
+  })
+
+  it('describes a person the app really loaded', () => {
+    setPeopleDirectory([
+      { accountId: 'acc-1', handle: 'ryan', firstName: 'Ryan', lastName: 'Chen', role: 'admin' }
+    ])
+    const [r] = resolveMentions([ref({ kind: 'person', id: 'acc-1', title: 'Ryan Chen' })])
+    expect(r.text).toContain('Ryan Chen')
+    expect(r.text).toContain('@ryan')
+    expect(r.text).toContain('admin')
+    expect(r.reason).toBeNull()
+  })
+
+  it('tells the model plainly that it cannot contact them — context, never a notification', () => {
+    setPeopleDirectory([
+      { accountId: 'acc-1', handle: 'ryan', firstName: 'Ryan', lastName: null, role: 'member' }
+    ])
+    const [r] = resolveMentions([ref({ kind: 'person', id: 'acc-1', title: 'Ryan' })])
+    expect(r.text).toContain('do not claim you have contacted them')
+  })
+
+  it('still refuses a person who is not in the loaded directory, even when others are', () => {
+    setPeopleDirectory([
+      { accountId: 'acc-1', handle: 'ryan', firstName: 'Ryan', lastName: null, role: 'member' }
+    ])
+    const [r] = resolveMentions([ref({ kind: 'person', id: 'acc-999', title: 'Someone Else' })])
+    expect(r.text).toBeNull()
+    // And critically: the title the RENDERER supplied is not echoed back as if
+    // it were a fact the directory confirmed.
+    expect(r.reason).not.toContain('Someone Else')
+  })
+
+  it('falls back to the handle when the directory has no name', () => {
+    setPeopleDirectory([
+      { accountId: 'acc-2', handle: 'quietone', firstName: null, lastName: null, role: 'guest' }
+    ])
+    const [r] = resolveMentions([ref({ kind: 'person', id: 'acc-2', title: 'quietone' })])
+    expect(r.text).toContain('quietone')
+  })
+
+  it('a refused person contributes nothing to the prompt at all', () => {
+    setPeopleDirectory([])
+    const { block } = renderMentions(
+      resolveMentions([ref({ kind: 'person', id: 'acc-1', title: 'Ghost Person' })])
+    )
+    expect(block).toBe('')
+  })
+
+  it('the picker offers nobody from an empty directory', () => {
+    expect(personMentionCandidates([], 'ry', 'c1')).toEqual([])
+  })
+
+  it('the picker matches on name OR handle, because people are known both ways', () => {
+    const dir = [
+      { accountId: 'a', handle: 'rchen', firstName: 'Ryan', lastName: 'Chen', role: 'admin' }
+    ]
+    expect(personMentionCandidates(dir, 'ryan', 'c1')).toHaveLength(1)
+    expect(personMentionCandidates(dir, 'rchen', 'c1')).toHaveLength(1)
+    expect(personMentionCandidates(dir, 'zzz', 'c1')).toHaveLength(0)
+    expect(personMentionCandidates(dir, 'ryan', 'c1')[0].kind).toBe('person')
   })
 })

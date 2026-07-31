@@ -9,9 +9,11 @@
 //   • useNodeStore — desks and rooms, offered before the user has typed enough
 //     for search to run (searchAll needs 2 characters). Real data, not a
 //     placeholder list.
-// People are deliberately absent: they are not in the search index at all, and
-// person references are not resolvable yet (plan P4.7). Offering them here
-// would put a chip on screen that the resolver would have to refuse.
+//   • usePeopleStore — the org's members, fetched from the signal server and
+//     published to main so the resolver can read one (Phase 4.7). They are not
+//     in the search index at all, so they need their own source. Signed out, or
+//     in a personal workspace, the directory is EMPTY and nobody is offered —
+//     the picker never shows a person the resolver would have to refuse.
 
 import { Extension } from '@tiptap/core'
 import Suggestion from '@tiptap/suggestion'
@@ -19,6 +21,7 @@ import { ReactRenderer } from '@tiptap/react'
 import MentionList from './MentionList'
 import type { MentionListHandle } from './MentionList'
 import { useNodeStore } from '../../stores/nodes'
+import { personMentionCandidates, usePeopleStore } from '../../lib/peopleDirectory'
 import {
   MENTION_CAP,
   activeMentions,
@@ -57,6 +60,12 @@ async function candidatesFor(query: string, conversationKey: string): Promise<Me
     if (q && !n.title.toLowerCase().includes(lowered)) continue
     push(mentionFromNode(n, conversationKey))
     if (out.length >= MAX_OPTIONS) break
+  }
+
+  // People, from whatever the app has genuinely loaded. Offered from the first
+  // keystroke like desks, because the directory is already in memory.
+  for (const person of personMentionCandidates(usePeopleStore.getState().people, q, conversationKey)) {
+    push(person)
   }
 
   // Deep search covers everything else, but only once it has enough to go on —

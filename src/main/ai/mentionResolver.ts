@@ -22,6 +22,7 @@ import { getKnowledge } from '../db/knowledge'
 import { getTable, listRows } from '../db/tables'
 import { DOC_TEXT_CAP, extractDocText } from '../workspaceRank'
 import { widgetToText, type WidgetTextResolvers, type ResolvedTable } from '@shared/widgetText'
+import { getDirectoryPerson, personDisplayName } from '../peopleDirectory'
 import { readFileSync } from 'node:fs'
 
 // Per-reference cap. Matches chatAttachments' PER so one reference cannot eat
@@ -243,15 +244,29 @@ function resolveOne(ref: ChatMentionRef): ResolvedMention {
         if (!text) return wrap({ text: null, source: null, reason: 'this PlexiBrain entry is empty' })
         return wrap({ text, source: k.pinned ? 'pinned entry' : null, reason: null })
       }
-      case 'person':
-        // Not built yet (plan P4.7). It refuses rather than improvising: an
-        // unbuilt capability that can emit real-looking output eventually
-        // passes as real, so this branch has no path to a `text` value.
-        return wrap({
-          text: null,
-          source: null,
-          reason: 'person references are not available yet'
-        })
+      case 'person': {
+        // Context only, never a notification (plan D1). There is no path from
+        // the assistant to a person's inbox, and this branch does not pretend
+        // otherwise — it describes who they are and says so plainly.
+        const person = getDirectoryPerson(ref.id)
+        if (!person) {
+          // Signed out, or this org's members were never loaded. Refusing is the
+          // honest answer: the alternative is a name the app never fetched.
+          return wrap({
+            text: null,
+            source: null,
+            reason: 'this person is not in the workspace directory you have loaded'
+          })
+        }
+        const name = personDisplayName(person)
+        const lines = [
+          `${name} (@${person.handle})`,
+          `Role in this workspace: ${person.role}.`,
+          'This is who they are, for context. You have no way to message or ' +
+            'notify them from here — do not claim you have contacted them.'
+        ]
+        return wrap({ text: lines.join('\n'), source: `@${person.handle}`, reason: null })
+      }
     }
   } catch {
     // A resolver throwing must never take the chat down with it — the reference

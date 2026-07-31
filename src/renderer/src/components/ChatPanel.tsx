@@ -9,6 +9,7 @@ import MentionRefRow from './assistant/MentionRefRow'
 import ConversationList from './assistant/ConversationList'
 import { activeMentions, type MentionRef } from '../lib/assistantMentions'
 import { docToInput, splitMentionText } from '../lib/mentionDoc'
+import { usePeopleStore } from '../lib/peopleDirectory'
 import { deriveAssistantBlocks } from '../lib/chatBlocks'
 import ChatBlockView from './focus/ChatBlockView'
 import RetrievalTrace from './assistant/RetrievalTrace'
@@ -138,6 +139,12 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
   useEffect(() => {
     void refreshConversations()
   }, [refreshConversations])
+  // Load the people directory once the panel is live, so @-mentioning a
+  // colleague works without opening the org admin screen first. Fails quiet:
+  // signed out or personal-workspace leaves it empty and offers nobody.
+  useEffect(() => {
+    void usePeopleStore.getState().load()
+  }, [])
   // ⌘O / Ctrl+O starts a new conversation from anywhere, in every mode. Checked
   // free of conflicts: App.tsx's global handlers use ⌘⇧K, ⌘/ and ⌘Z only.
   useEffect(() => {
