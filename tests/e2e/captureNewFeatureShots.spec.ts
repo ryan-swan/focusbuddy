@@ -332,58 +332,96 @@ test('capture new-feature marketing screenshots', async () => {
 
     // ────────────────────────────────────────────────────────────────────
     // 6 — brain-assistant.png: assistant panel with a seeded reply +
-    // proposal cards. The composer + store run for real; only the IPC
-    // transport (window.api.chat.send) is stubbed since no Anthropic key is
-    // present in this hermetic test run.
+    // proposal cards. The composer, store, trace and cards all run for real;
+    // only the model is stubbed, since no Anthropic key is present in this
+    // hermetic run.
+    //
+    // The stub replaces the `chat:sendStream` MAIN-PROCESS handler, not
+    // window.api. contextBridge deep-freezes the exposed api object, so
+    // assigning over api.chat.* from the page silently does nothing and the
+    // real handler runs anyway (which is what the previous version of this
+    // stub did — it produced a no-API-key error, not the seeded reply).
+    // Driving the real channel also means the shot shows the genuine retrieval
+    // trace: sources, reply, one event per prepared action, then complete.
     // ────────────────────────────────────────────────────────────────────
     await window.evaluate(() => window.dispatchEvent(new CustomEvent('fb:open-assistant')))
     await window.waitForTimeout(400)
-    await window.evaluate(() => {
-      const api = (window as unknown as { api: typeof window.api }).api
-      api.chat.send = (async () => ({
-        ok: true,
-        message: {
-          role: 'assistant',
-          content:
-            "Set this up for you: a Prospects table to track who you're reaching out to, a research agent wired into it that will fill in notes and status as you add rows, and the two linked so it runs automatically. Review the cards below and apply what you want.",
-          ts: Date.now()
+    await app.evaluate(({ ipcMain }) => {
+      const reply =
+        "Set this up for you: a Prospects table to track who you're reaching out to, a research agent wired into it that will fill in notes and status as you add rows, and the two linked so it runs automatically. Review the cards below and apply what you want."
+      const proposals = [
+        {
+          id: 'ai-p1',
+          kind: 'create-table',
+          title: 'Prospects',
+          columns: [
+            { label: 'Company', type: 'text-short' },
+            { label: 'Notes', type: 'text-long' },
+            { label: 'Status', type: 'single-select', options: ['New', 'Researched', 'Contacted'] }
+          ],
+          reason: 'A place to track each prospect and what you know about them.'
         },
-        proposals: [
-          {
-            id: 'ai-p1',
-            kind: 'create-table',
-            title: 'Prospects',
-            columns: [
-              { label: 'Company', type: 'text-short' },
-              { label: 'Notes', type: 'text-long' },
-              { label: 'Status', type: 'single-select', options: ['New', 'Researched', 'Contacted'] }
-            ],
-            reason: 'A place to track each prospect and what you know about them.'
-          },
-          {
-            id: 'ai-p2',
-            kind: 'create-agent',
-            title: 'Research agent',
-            instruction:
-              'Research each company wired into me and fill in the Notes column with a concise summary, then set Status to Researched.',
-            profileId: 'bi-researcher',
-            trigger: 'manual',
-            reason: 'Automates the research step once the table has rows.'
-          },
-          {
-            id: 'ai-p3',
-            kind: 'link-widgets',
-            sourceWidgetId: '$ai-p1',
-            targetWidgetId: '$ai-p2',
-            sourceLabel: 'Prospects',
-            targetLabel: 'Research agent',
-            wireType: 'context',
-            reason: 'Wires the table into the agent so it has rows to work on.'
+        {
+          id: 'ai-p2',
+          kind: 'create-agent',
+          title: 'Research agent',
+          instruction:
+            'Research each company wired into me and fill in the Notes column with a concise summary, then set Status to Researched.',
+          profileId: 'bi-researcher',
+          trigger: 'manual',
+          reason: 'Automates the research step once the table has rows.'
+        },
+        {
+          id: 'ai-p3',
+          kind: 'link-widgets',
+          sourceWidgetId: '$ai-p1',
+          targetWidgetId: '$ai-p2',
+          sourceLabel: 'Prospects',
+          targetLabel: 'Research agent',
+          wireType: 'context',
+          reason: 'Wires the table into the agent so it has rows to work on.'
+        }
+      ]
+      const tools = [
+        { index: 0, kind: 'create-table', label: 'Table — Prospects' },
+        { index: 1, kind: 'create-agent', label: 'Agent — Research agent' },
+        { index: 2, kind: 'link-widgets', label: 'Wire — Prospects → Research agent' }
+      ]
+      try {
+        ipcMain.removeHandler('chat:sendStream')
+      } catch {
+        /* nothing installed yet */
+      }
+      ipcMain.handle(
+        'chat:sendStream',
+        async (e: Electron.IpcMainInvokeEvent, input: { requestId: string }) => {
+          const channel = `chat:stream:${input.requestId}`
+          const send = (type: string, payload: unknown): void => {
+            if (!e.sender.isDestroyed()) e.sender.send(channel, { type, payload })
           }
-        ]
-      })) as unknown as typeof api.chat.send
+          const wait = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms))
+          await wait(40)
+          send('sources', { sources: [], elapsedMs: 180 })
+          await wait(60)
+          send('reply', reply)
+          for (const t of tools) {
+            await wait(50)
+            send('tool', t)
+          }
+          await wait(50)
+          send('complete', {
+            ok: true,
+            message: { role: 'assistant', content: reply, ts: Date.now() },
+            proposals
+          })
+          return { ok: true }
+        }
+      )
     })
-    const composer = window.locator('textarea[placeholder*="⌘⏎"]')
+    // Stable testid rather than placeholder text: the composer no longer
+    // advertises a send chord in its placeholder (Enter sends now). The Send
+    // button below is still found by its accessible name, which is unchanged.
+    const composer = window.locator('[data-testid="chat-composer"]')
     await composer.waitFor({ state: 'visible', timeout: 5_000 })
     await composer.fill('Set up a way to track and research my sales leads')
     await window.getByRole('button', { name: /^Send$/ }).click()

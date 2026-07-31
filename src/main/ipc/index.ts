@@ -69,6 +69,7 @@ import { exportDesign } from '../designExport'
 import { exportMap } from '../mapExport'
 import { importVsdx } from '../mapImport'
 import { searchStockPhotos, fetchImageDataUrl, removeBackground } from '../stockMedia'
+import { setPeopleDirectory, type DirectoryPerson } from '../peopleDirectory'
 import type { DesignBody } from '@shared/design'
 import { getBrandKit, saveBrandKit, hasBrandKit } from '../db/brandKit'
 import type { OrgBrandKit } from '@shared/brandKit'
@@ -428,6 +429,7 @@ import {
   runDeskAgent,
   runTransformWire,
   sendChat,
+  sendChatStream,
   routeCommandBar,
   transformText,
   suggestWidgetSetup,
@@ -474,6 +476,11 @@ import type {
   WireType,
   ActionProposal,
   AppliedProposal,
+  AiChatConversationContext,
+  ChatMentionRef,
+  ChatQuestion,
+  ChatSource,
+  StoredTrace,
   FocusClusterDraft
 } from '@shared/types'
 
@@ -639,6 +646,7 @@ export function registerIpcHandlers(): void {
       moveNode(id, newParentId, beforeId)
   )
 
+  ipcMain.handle('widgets:get', (_e, id: string) => getWidget(id))
   ipcMain.handle('widgets:listByTask', (_e, taskId: string) => listWidgetsByTask(taskId))
   ipcMain.handle('widgets:listByKind', (_e, kind: Widget['kind']) => listWidgetsByKind(kind))
   ipcMain.handle('widgets:create', (_e, draft: WidgetDraft) => createWidget(draft))
@@ -962,6 +970,41 @@ export function registerIpcHandlers(): void {
     recordAiCall()
     return sendChat(req)
   })
+  // Streaming variant — retrieval, reply and each prepared action arrive on a
+  // per-request channel `chat:stream:<reqId>` so the assistant can show the work
+  // as it happens. Caller mints the reqId. `chat:send` above is untouched and
+  // stays the fallback for every other caller.
+  ipcMain.handle(
+    'chat:sendStream',
+    async (e, input: ChatRequest & { requestId: string }): Promise<{ ok: boolean }> => {
+      recordAiCall()
+      const channel = `chat:stream:${input.requestId}`
+      const sender = e.sender
+      const send = (type: string, payload?: unknown): void => {
+        if (sender.isDestroyed()) return
+        sender.send(channel, { type, payload })
+      }
+      await sendChatStream(
+        {
+          taskId: input.taskId,
+          messages: input.messages,
+          attachments: input.attachments,
+          supportsQuestions: input.supportsQuestions,
+          pinnedWidgetId: input.pinnedWidgetId
+        },
+        {
+          onMentions: (m) => send('mentions', m),
+          onSources: (t) => send('sources', t),
+          onReply: (text) => send('reply', text),
+          onTool: (tool) => send('tool', tool),
+          onQuestion: (q) => send('question', q),
+          onError: (err) => send('error', err),
+          onComplete: (resp) => send('complete', resp)
+        }
+      )
+      return { ok: true }
+    }
+  )
   ipcMain.handle('chat:hasApiKey', () => Boolean(resolveAnthropicKey()))
   ipcMain.handle('ai:dailyBrief', () => generateDailyBrief())
   // Save a meeting to the OS default calendar (Apple Calendar / Outlook) by
@@ -2255,7 +2298,10 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('aiChat:getConversation', (_e, id: string) => getAiChatConversation(id))
   ipcMain.handle(
     'aiChat:createConversation',
-    (_e, input: { taskId: string | null; title?: string }) => createAiChatConversation(input)
+    (
+      _e,
+      input: { taskId: string | null; title?: string; context?: AiChatConversationContext | null }
+    ) => createAiChatConversation(input)
   )
   ipcMain.handle(
     'aiChat:appendMessage',
@@ -2268,6 +2314,10 @@ export function registerIpcHandlers(): void {
         ts: number
         proposals?: ActionProposal[]
         applied?: Record<string, AppliedProposal>
+        sources?: ChatSource[]
+        question?: ChatQuestion | null
+        trace?: StoredTrace | null
+        mentions?: ChatMentionRef[]
       }
     ) => appendAiChatMessage(conversationId, message)
   )
@@ -2280,6 +2330,13 @@ export function registerIpcHandlers(): void {
     renameAiChatConversation(id, title)
   )
   ipcMain.handle('aiChat:deleteConversation', (_e, id: string) => deleteAiChatConversation(id))
+
+  // People the renderer has genuinely fetched from the signal server, handed to
+  // the main process so @-mentions can resolve one (Phase 4.7). Same shape as
+  // the mail search cache: main knows only what the app actually loaded.
+  ipcMain.handle('people:setDirectory', (_e, people: DirectoryPerson[]) =>
+    setPeopleDirectory(Array.isArray(people) ? people : [])
+  )
 
   // PlexiProjects: project plans, the Gantt schedule, dependencies and reschedule.
   ipcMain.handle('projects:list', () => listProjectSummaries())

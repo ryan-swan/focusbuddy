@@ -40,6 +40,12 @@ export const FLOATING_MENU_STYLE: React.CSSProperties = {
 // dock column so the desk surface shows through the gap around the card.
 export const FLOATING_MENU_INSET = 'fb-floating-inset pl-[10px] py-[10px] pr-[8px]'
 
+// The same inset mirrored for a card docked on the RIGHT of the content, so the
+// larger gap (10px) always faces the window edge and the smaller one (8px) faces
+// the content. Used by the assistant panel; any future right-hand floating
+// surface should use this rather than re-deriving the numbers.
+export const FLOATING_MENU_INSET_RIGHT = 'fb-floating-inset pr-[10px] py-[10px] pl-[8px]'
+
 // Resizable main sidebar width bounds, in px, measured on the dock column
 // (card + inset). The MIN is deliberately generous so a narrowed menu still has
 // room for a two-line label and can never be dragged down to where text clips

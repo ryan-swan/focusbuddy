@@ -50,3 +50,48 @@ describe('renderAttachments', () => {
     expect(out).toContain('meeting 3pm')
   })
 })
+
+// The pinned primary reference (Phase 3a.1). The honesty invariant matters more
+// than the feature: the prompt may claim a pin ONLY for an attachment that is
+// genuinely rendered into it. An id that matches nothing (widget deleted or on
+// another desk, extraction yielded nothing) must produce zero pin language.
+describe('renderAttachments — pinned primary reference', () => {
+  it('marks the pinned attachment block and announces it as the primary reference', () => {
+    const out = renderAttachments(
+      [
+        att({ widgetId: 'w-pin', kind: 'document', title: 'Launch spec', text: 'The launch plan says…' }),
+        att({ widgetId: 'w-other', kind: 'PDF', title: 'Invoice', text: 'Due 2026-09-01' })
+      ],
+      'w-pin'
+    )
+    expect(out).toContain('--- [PINNED · primary reference] document: "Launch spec" ---')
+    expect(out).toContain('The user pinned "Launch spec" as the primary reference')
+    // The marker sits on the pinned block only.
+    expect(out).toContain('--- PDF: "Invoice" ---')
+    expect(out).not.toContain('[PINNED · primary reference] PDF')
+  })
+
+  it('never fabricates: a pinned id matching no attachment produces no pin language', () => {
+    const out = renderAttachments([att({ widgetId: 'w1', title: 'Notes', text: 'abc' })], 'w-gone')
+    expect(out).not.toContain('PINNED')
+    expect(out).not.toContain('primary reference')
+  })
+
+  it('never fabricates: a pinned widget whose text is empty produces no pin language', () => {
+    const out = renderAttachments(
+      [
+        att({ widgetId: 'w-pin', title: 'Empty pin', text: '   ' }),
+        att({ widgetId: 'w2', title: 'Real', text: 'content here' })
+      ],
+      'w-pin'
+    )
+    expect(out).not.toContain('PINNED')
+    expect(out).not.toContain('primary reference')
+  })
+
+  it('without a pinnedWidgetId the output is byte-identical to the one-arg call', () => {
+    const as = [att({ widgetId: 'w1', text: 'abc' })]
+    expect(renderAttachments(as, undefined)).toBe(renderAttachments(as))
+    expect(renderAttachments(as)).not.toContain('PINNED')
+  })
+})

@@ -14,6 +14,19 @@
 
 import type { Widget, WidgetKind } from './types'
 
+// The widget kinds whose content is worth carrying as a FULL-text attachment —
+// the deep channel every AI surface shares. Chrome-only kinds (sections,
+// minimaps, timers, colour chips) are excluded: they render UI, not content.
+// Lives here beside the extractor so "what can ride a request" and "what can be
+// read" stay one list — the renderer's attachment gathering and the assistant's
+// click-to-pin rule both consume it.
+export const ATTACHABLE_WIDGET_KINDS: ReadonlySet<WidgetKind> = new Set<WidgetKind>([
+  'note', 'sticky', 'markdown', 'page', 'living-doc', 'card', 'custom-block',
+  'webview', 'pdf', 'gdoc', 'gsheet', 'gslide', 'email',
+  'doc', 'sheet', 'slides', 'map', 'design',
+  'table', 'chart', 'diagram', 'mindmap', 'agent', 'field'
+])
+
 // A table reduced to the shape the summariser needs. The caller adapts its own
 // table source (main getTable/listRows, renderer store) into this.
 export interface ResolvedTable {

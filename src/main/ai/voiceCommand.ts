@@ -21,6 +21,7 @@ import { getModelClient } from './modelClient'
 import { randomUUID } from 'crypto'
 import { resolveAnthropicKey } from '../settingsStore'
 import { resolveModel } from './modelRouting'
+import { StreamingEnvelopeScanner } from './streamingEnvelope'
 import type { ActionProposal, WidgetKind, NavigateTarget } from '@shared/types'
 
 // What the renderer hands us about the current canvas. Kept deliberately
@@ -695,7 +696,7 @@ export async function runVoiceCommandStreaming(
 
   const client = getModelClient(key)
   const known = new Map(input.widgets.map((w) => [w.id, w]))
-  const scanner = new StreamingProposalScanner()
+  const scanner = new StreamingEnvelopeScanner('proposals')
   let replyEmitted = false
   let replyText = ''
   let proposalIndex = 0
@@ -727,7 +728,7 @@ export async function runVoiceCommandStreaming(
 
       // Drain all complete proposal objects we can see right now.
       while (true) {
-        const next = scanner.nextProposal()
+        const next = scanner.nextItem()
         if (next === null) break
         const sanitised = sanitiseProposal(next, known, input.activeTaskId, proposalIndex++)
         if (sanitised) {
@@ -767,130 +768,4 @@ export async function runVoiceCommandStreaming(
   }
 
   cb.onComplete({ totalProposals: acceptedCount, replyText })
-}
-
-// Incremental JSON-array scanner. Stores the running text buffer and
-// tracks the brace + bracket depth so we can carve out completed
-// objects inside the "proposals" array as soon as they land. String-
-// literal aware (escapes + quotes don't confuse the counter).
-//
-// The scanner doesn't validate — it returns raw parsed objects, which
-// the caller pipes through sanitiseProposal() before emitting.
-class StreamingProposalScanner {
-  private buf = ''
-  private replyEnd: number | null = null // index where the reply field's closing " sits
-  private proposalsArrayStart: number | null = null
-  // Position the next-extract scan starts at (cursor advances as we
-  // emit each completed object).
-  private scanFrom = 0
-
-  push(chunk: string): void {
-    this.buf += chunk
-  }
-
-  fullText(): string {
-    return this.buf
-  }
-
-  extractReply(): string | null {
-    if (this.replyEnd !== null) {
-      // Already emitted — caller shouldn't call us again, but guard.
-      return null
-    }
-    // Look for `"reply"\s*:\s*"` then walk forward respecting escapes
-    // until the closing quote.
-    const m = this.buf.match(/"reply"\s*:\s*"/)
-    if (!m || m.index === undefined) return null
-    const start = m.index + m[0].length
-    let i = start
-    while (i < this.buf.length) {
-      const c = this.buf[i]
-      if (c === '\\') {
-        i += 2
-        continue
-      }
-      if (c === '"') {
-        this.replyEnd = i
-        // Decode the JSON string fragment by reparsing it within a tiny envelope.
-        try {
-          const json = `"${this.buf.slice(start, i)}"`
-          return JSON.parse(json) as string
-        } catch {
-          return this.buf.slice(start, i)
-        }
-      }
-      i += 1
-    }
-    return null
-  }
-
-  nextProposal(): unknown | null {
-    // Locate the proposals array if we haven't already.
-    if (this.proposalsArrayStart === null) {
-      const m = this.buf.match(/"proposals"\s*:\s*\[/)
-      if (!m || m.index === undefined) return null
-      this.proposalsArrayStart = m.index + m[0].length
-      this.scanFrom = this.proposalsArrayStart
-    }
-    // Scan from scanFrom looking for a complete top-level object.
-    // Skip whitespace / commas between objects.
-    let i = this.scanFrom
-    while (i < this.buf.length && /[\s,]/.test(this.buf[i])) i += 1
-    if (i >= this.buf.length) {
-      this.scanFrom = i
-      return null
-    }
-    if (this.buf[i] === ']') {
-      // End of proposals array — nothing more to find.
-      this.scanFrom = i
-      return null
-    }
-    if (this.buf[i] !== '{') {
-      // Junk before the next object — skip a char and try again next push.
-      this.scanFrom = i + 1
-      return null
-    }
-    // We're at the start of an object. Walk forward maintaining brace +
-    // bracket depth + string-literal state until depth returns to 0.
-    let depth = 0
-    let inString = false
-    let escape = false
-    let j = i
-    while (j < this.buf.length) {
-      const c = this.buf[j]
-      if (escape) {
-        escape = false
-        j += 1
-        continue
-      }
-      if (inString) {
-        if (c === '\\') escape = true
-        else if (c === '"') inString = false
-        j += 1
-        continue
-      }
-      if (c === '"') {
-        inString = true
-      } else if (c === '{' || c === '[') {
-        depth += 1
-      } else if (c === '}' || c === ']') {
-        depth -= 1
-        if (depth === 0) {
-          // Completed object spans i..j inclusive.
-          const slice = this.buf.slice(i, j + 1)
-          this.scanFrom = j + 1
-          try {
-            return JSON.parse(slice)
-          } catch {
-            return null
-          }
-        }
-      }
-      j += 1
-    }
-    // Object not yet complete — don't advance scanFrom past i so the
-    // next push() finds it again.
-    this.scanFrom = i
-    return null
-  }
 }
