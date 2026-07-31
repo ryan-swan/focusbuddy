@@ -853,6 +853,34 @@ export interface WidgetLink {
   verb: string
   // Kill switch — a disabled reactive wire stays drawn but never fires.
   enabled: boolean
+  // Durable run state (reactive wires only). lastRunAt is when the engine last
+  // fired this wire (including a checked-but-nothing-to-write no-op), so the
+  // badge can show live / stale / just-ran and it survives a reload. lastError
+  // is the last failure message, cleared on the next successful run.
+  lastRunAt?: number | null
+  lastError?: string | null
+}
+
+// A durable record of one reactive-wire WRITE into a target — captured whenever a
+// transform or mirror wire overwrites a text target's content. It stores the
+// before and after so the user can see exactly what an automation did and revert
+// it in one click (the trust core). Table-target writes are structurally
+// different (row-level) and are not recorded here. Pruned per-wire.
+export interface WireRun {
+  id: string
+  wireId: string
+  taskId: string
+  sourceWidgetId: string
+  targetWidgetId: string
+  // Human label for the source (its title or kind) so the activity list reads in
+  // plain language without a second lookup.
+  sourceLabel: string
+  wireType: WireType
+  // The transform instruction, if any (empty for a mirror copy).
+  verb: string
+  at: number
+  prevContent: string
+  nextContent: string
 }
 
 // Result of a living-page regeneration. ok=true → returns freshly-generated

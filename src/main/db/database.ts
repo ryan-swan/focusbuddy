@@ -375,6 +375,26 @@ CREATE TABLE IF NOT EXISTS canvas_snapshots (
 );
 CREATE INDEX IF NOT EXISTS idx_canvas_snapshots_task ON canvas_snapshots(task_id, at DESC);
 
+-- ── Wire run history ─────────────────────────────────────────────────────────
+-- One row per reactive-wire write into a text target (transform / mirror). Stores
+-- the target's content before and after so the user can see what an automation
+-- did and revert it in one click. Pruned to the most recent per wire.
+CREATE TABLE IF NOT EXISTS wire_runs (
+  id TEXT PRIMARY KEY,
+  wire_id TEXT NOT NULL REFERENCES widget_links(id) ON DELETE CASCADE,
+  task_id TEXT NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
+  source_widget_id TEXT NOT NULL REFERENCES widgets(id) ON DELETE CASCADE,
+  target_widget_id TEXT NOT NULL REFERENCES widgets(id) ON DELETE CASCADE,
+  source_label TEXT NOT NULL DEFAULT '',
+  wire_type TEXT NOT NULL,
+  verb TEXT NOT NULL DEFAULT '',
+  at INTEGER NOT NULL,
+  prev_content TEXT NOT NULL,
+  next_content TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_wire_runs_wire ON wire_runs(wire_id, at DESC);
+CREATE INDEX IF NOT EXISTS idx_wire_runs_task ON wire_runs(task_id, at DESC);
+
 -- ── Outgoing share links ────────────────────────────────────────────────────
 -- Each row is a link the local user minted to share one of their folders /
 -- tasks / widgets. Tokens are opaque and URL-safe. revoked=1 soft-deletes
@@ -545,6 +565,11 @@ export function getDb(): Database.Database {
   ensureColumn(db, 'widget_links', 'type', "TEXT NOT NULL DEFAULT 'context'")
   ensureColumn(db, 'widget_links', 'verb', "TEXT NOT NULL DEFAULT ''")
   ensureColumn(db, 'widget_links', 'enabled', 'INTEGER NOT NULL DEFAULT 1')
+  // Durable run state for a reactive wire, so freshness (live / stale / errored)
+  // and last-ran survive a reload and feed both the wire badge and the desk
+  // Automations panel from one source of truth. Null until the wire first runs.
+  ensureColumn(db, 'widget_links', 'last_run_at', 'INTEGER')
+  ensureColumn(db, 'widget_links', 'last_error', 'TEXT')
   // Render mode for local-app-launcher widgets: 'launcher' (icon + click-to-open)
   // vs 'mirror' (punch-through live view of the real native app window). Null for
   // any other widget kind.

@@ -60,7 +60,8 @@ import type {
   SearchHit,
   WidgetLink,
   WidgetPatch,
-  WireType
+  WireType,
+  WireRun
 } from '@shared/types'
 import type {
   FbFile,
@@ -197,10 +198,24 @@ const api = {
       ipcRenderer.invoke('widgetLinks:create', sourceWidgetId, targetWidgetId, taskId, type),
     update: (
       id: string,
-      patch: { type?: WireType; verb?: string; enabled?: boolean }
+      patch: {
+        type?: WireType
+        verb?: string
+        enabled?: boolean
+        lastRunAt?: number | null
+        lastError?: string | null
+      }
     ): Promise<WidgetLink | null> => ipcRenderer.invoke('widgetLinks:update', id, patch),
     delete: (id: string): Promise<boolean> =>
       ipcRenderer.invoke('widgetLinks:delete', id)
+  },
+  wireRuns: {
+    record: (input: Omit<WireRun, 'id'>): Promise<WireRun> =>
+      ipcRenderer.invoke('wireRuns:record', input),
+    listByWire: (wireId: string, limit?: number): Promise<WireRun[]> =>
+      ipcRenderer.invoke('wireRuns:listByWire', wireId, limit),
+    listByTask: (taskId: string, limit?: number): Promise<WireRun[]> =>
+      ipcRenderer.invoke('wireRuns:listByTask', taskId, limit)
   },
   snapshots: {
     create: (taskId: string, label?: string): Promise<SnapshotMeta> =>

@@ -1029,7 +1029,7 @@ export default function WidgetFrame({
                 aria-label="Link to another widget"
                 title="Click, then click another widget to connect them"
               >
-                <Icon name="hub" size={13} />
+                <Icon name="add_link" size={14} />
               </button>
             )}
             {!isChildOfSection && (

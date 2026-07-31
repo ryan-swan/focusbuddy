@@ -22,10 +22,17 @@ interface LinksStore {
     taskId: string,
     type?: WireType
   ) => Promise<WidgetLink | null>
-  // Update a wire's live-wire fields (type / verb / enabled). Optimistic.
+  // Update a wire's mutable fields (type / verb / enabled, plus durable run
+  // state written by the wire engine). Optimistic.
   update: (
     id: string,
-    patch: { type?: WidgetLink['type']; verb?: string; enabled?: boolean }
+    patch: {
+      type?: WidgetLink['type']
+      verb?: string
+      enabled?: boolean
+      lastRunAt?: number | null
+      lastError?: string | null
+    }
   ) => Promise<void>
   remove: (id: string) => Promise<void>
   // Drop every link that references a widget id — called when a widget is

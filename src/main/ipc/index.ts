@@ -126,6 +126,12 @@ import {
   type WireUpdate
 } from '../db/widgetLinks'
 import {
+  recordWireRun,
+  listWireRunsByWire,
+  listWireRunsByTask,
+  type WireRunInput
+} from '../db/wireRuns'
+import {
   branchSnapshot,
   createSnapshot,
   getSnapshot,
@@ -941,6 +947,15 @@ export function registerIpcHandlers(): void {
     }
     return ok
   })
+  // Wire run history — durable before/after of every reactive-wire write, so the
+  // user can see what an automation did and revert it (the trust layer).
+  ipcMain.handle('wireRuns:record', (_e, input: WireRunInput) => recordWireRun(input))
+  ipcMain.handle('wireRuns:listByWire', (_e, wireId: string, limit?: number) =>
+    listWireRunsByWire(wireId, limit)
+  )
+  ipcMain.handle('wireRuns:listByTask', (_e, taskId: string, limit?: number) =>
+    listWireRunsByTask(taskId, limit)
+  )
   // One-time-ish: mirror widget links that existed before links fed the graph, so
   // historical connections also surface as related. Idempotent, non-fatal.
   ceBackfillWidgetLinkRelations()
