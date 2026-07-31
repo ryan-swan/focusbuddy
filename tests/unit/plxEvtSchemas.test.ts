@@ -40,8 +40,9 @@ describe('plx_evt_043 — every produced Event type has a published, versioned s
   })
 
   it('test_plx_evt_043_widget_object_events_validate', () => {
-    // Widgets are first-class Context-Engine producers (PLX-APP-002); their
-    // lifecycle Events must validate against published schemas.
+    // Widgets are first-class Context-Engine event producers; their lifecycle
+    // Events must validate against published schemas. (This does not by itself
+    // verify APP-002, which is a whole-app native-interface audit and stays open.)
     const es = createEventStore(memSqlDb())
     const created = es.append({
       eventType: 'WidgetCreated', category: 'user', actor: 'u', organisationId: 'org', deskId: 'd1', objectId: 'w1',
