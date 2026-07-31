@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, it, expect } from 'vitest'
 import { memSqlDb } from './_memdb'
 import { createDecisionStore, type CreateDecisionInput } from '../../src/main/db/decisionStore'
