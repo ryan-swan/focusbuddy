@@ -113,6 +113,7 @@ Status values are Done, meaning built and covered by passing tests and, where it
 | Decision creation + live decision-risk frame | Done | 8b9d7ca | Right-click "Flag as a decision" creates a human-owned Decision (undoable) referencing the widget + desk; a later content change turns the frame red and names the decision. Activates the previously-dormant decision-risk surface. decisions:* IPC + preload. Tester-verified. |
 | Decisions panel (PlexiBrain) | Done | dc6a8c6 | Lists every live Decision with a live at-risk status (rose/emerald pill), owner/state/linked-object count, Open-desk and Retire actions, and an honest empty state. Backed by decisions:withRisk over a shared objectHealth helper. Live-updating (ff48fc6). Tester-verified. |
 | Assemble a desk (PlexiBrain) | Done | a4a691a | Search the brain, tick widgets + the graph-related ones each pick surfaces, and create a new desk holding them, as live-synced copies (shared syncGroupId, default) or disconnected copies. Reuses the SyncWidgetPicker sync mechanism; widgets:get + bringWidgetToDesk helper. Tester-verified. |
+| Widget links feed the relationship graph | Done | b650b7d | A drawn widget link now creates a confirmed RelatedTo edge, so connections surface as related in Assemble and propagate context-health / decision-risk (verified: change a linked widget, the connected decision lights up). Create/delete mirror + boot backfill. Link-owner-approved; e2e verified. Follow-up: links (and their mirrored relations) still orphan on widget archive / desk delete. |
 
 ### Planned and deferred
 
