@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useFocusChatStore } from '../../stores/focusChat'
+import { useChatStore } from '../../stores/chat'
 import { deriveAssistantBlocks } from '../../lib/chatBlocks'
 import ChatBlockView from './ChatBlockView'
 import { useNodeStore } from '../../stores/nodes'
@@ -32,9 +33,17 @@ export default function FocusChatSurface({ onOpenWidget }: Props): JSX.Element {
   const newConversation = useFocusChatStore((s) => s.newConversation)
   const openConversation = useFocusChatStore((s) => s.openConversation)
   const deleteConversation = useFocusChatStore((s) => s.deleteConversation)
+  const importDeskConversation = useFocusChatStore((s) => s.importDeskConversation)
+  // The desk panel's thread for this task — when it has turns, the empty state
+  // offers to continue that conversation here (Phase 3a.3). Count only; the
+  // import itself re-reads the store at tap time.
+  const deskTurnCount = useChatStore((s) =>
+    activeTaskId ? (s.messagesByTask[activeTaskId] ?? []).length : 0
+  )
 
   const [draft, setDraft] = useState('')
   const [historyOpen, setHistoryOpen] = useState(false)
+  const [importing, setImporting] = useState(false)
   const scrollRef = useRef<HTMLDivElement | null>(null)
 
   // On mount: check the key + load history. Start a fresh chat ONLY when nothing
@@ -173,6 +182,37 @@ export default function FocusChatSurface({ onOpenWidget }: Props): JSX.Element {
           <div className="mx-auto max-w-2xl flex flex-col gap-3">
             {messages.length === 0 && (
               <div className="mt-2">
+                {/* One tap imports the desk panel's thread for this task into a
+                    new persisted conversation — announced as imported, turns
+                    verbatim, proposals summarised honestly (P5 slice a). Only
+                    offered when that thread actually has turns. */}
+                {deskTurnCount > 0 && (
+                  <button
+                    onClick={() => {
+                      if (importing) return
+                      setImporting(true)
+                      void importDeskConversation().finally(() => setImporting(false))
+                    }}
+                    disabled={importing}
+                    data-testid="focus-chat-continue-desk"
+                    className="w-full text-left mb-4 px-3 py-2.5 rounded-lg border border-[rgb(var(--accent)/0.35)] bg-[rgb(var(--accent)/0.07)] hover:bg-[rgb(var(--accent)/0.12)] transition-colors flex items-center gap-2.5"
+                  >
+                    <Icon
+                      name={importing ? 'hourglass_top' : 'forum'}
+                      size={16}
+                      className={`text-accent shrink-0 ${importing ? 'animate-spin' : ''}`}
+                    />
+                    <span className="min-w-0">
+                      <span className="block text-[12.5px] font-medium text-[var(--ink-100)]">
+                        Continue your desk conversation
+                      </span>
+                      <span className="block text-[11px] text-[var(--ink-50)]">
+                        Bring the {deskTurnCount}-turn thread from this desk&apos;s assistant into
+                        a saved chat here.
+                      </span>
+                    </span>
+                  </button>
+                )}
                 <p className="text-[12px] text-[var(--ink-50)] mb-3">
                   I can see your whole workspace and act on it — create, edit, schedule, and more.
                 </p>

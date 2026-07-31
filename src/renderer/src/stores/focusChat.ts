@@ -7,8 +7,10 @@ import type {
 } from '@shared/types'
 import { gatherCanvasAttachments } from '../lib/canvasContent'
 import { gatherWorkspaceSnapshot } from '../lib/workspaceSnapshot'
+import { buildImportedConversation } from '../lib/deskConversationImport'
 import { useNodeStore } from './nodes'
 import { useDocumentsStore } from './documents'
+import { useChatStore } from './chat'
 
 // Persisted, free-standing chat store for the Focus Mode "AI Chat" tab.
 //
@@ -49,6 +51,12 @@ interface FocusChatStore {
   // Load a persisted conversation by id into the active view.
   openConversation: (id: string) => Promise<void>
   deleteConversation: (id: string) => Promise<void>
+  // "Continue your desk conversation" (Phase 3a.3, P5 slice a): copy the desk
+  // panel's thread for the active task into a NEW persisted conversation —
+  // plain-text turns with proposals summarised honestly (lib/
+  // deskConversationImport), announced as imported. Returns false when there
+  // is nothing to import or persistence failed.
+  importDeskConversation: () => Promise<boolean>
   send: (content: string) => Promise<void>
   // Record an approved card (persisted so the green card survives restart).
   markProposalApplied: (
@@ -127,6 +135,44 @@ export const useFocusChatStore = create<FocusChatStore>((set, get) => ({
     // If we deleted the open one, drop to a fresh chat.
     if (get().activeConversationId === id) get().newConversation()
     await get().refreshConversations()
+  },
+
+  importDeskConversation: async () => {
+    if (get().sending || get().creatingConversation) return false
+    const taskId = useNodeStore.getState().activeTaskId
+    if (!taskId) return false
+    const chat = useChatStore.getState()
+    const deskMessages = chat.messagesByTask[taskId] ?? []
+    const taskTitle =
+      useNodeStore.getState().nodes.find((n) => n.id === taskId)?.title ?? 'this desk'
+    const built = buildImportedConversation(deskMessages, chat.proposalsByMessage, taskTitle)
+    if (!built) return false
+    // Reuse the lazy-create guard so a rapid double-tap cannot mint two copies.
+    set({ creatingConversation: true })
+    let convId: string | null = null
+    try {
+      const meta = await window.api.aiChat.createConversation({ taskId, title: built.title })
+      convId = meta.id
+      for (const m of built.messages) {
+        await window.api.aiChat.appendMessage(meta.id, {
+          role: m.role,
+          content: m.content,
+          ts: m.ts
+        })
+      }
+      await get().openConversation(meta.id)
+      await get().refreshConversations().catch(() => {})
+      return true
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.error('[focusChat] desk-conversation import failed', e)
+      // A half-written import would sit in history looking like the real
+      // thing with turns missing — remove it rather than leave a partial copy.
+      if (convId) await window.api.aiChat.deleteConversation(convId).catch(() => {})
+      return false
+    } finally {
+      set({ creatingConversation: false })
+    }
   },
 
   send: async (content) => {
