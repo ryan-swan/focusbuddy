@@ -464,6 +464,11 @@ import type {
   WireType,
   ActionProposal,
   AppliedProposal,
+  AiChatConversationContext,
+  ChatMentionRef,
+  ChatQuestion,
+  ChatSource,
+  StoredTrace,
   FocusClusterDraft
 } from '@shared/types'
 
@@ -2195,7 +2200,10 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('aiChat:getConversation', (_e, id: string) => getAiChatConversation(id))
   ipcMain.handle(
     'aiChat:createConversation',
-    (_e, input: { taskId: string | null; title?: string }) => createAiChatConversation(input)
+    (
+      _e,
+      input: { taskId: string | null; title?: string; context?: AiChatConversationContext | null }
+    ) => createAiChatConversation(input)
   )
   ipcMain.handle(
     'aiChat:appendMessage',
@@ -2208,6 +2216,10 @@ export function registerIpcHandlers(): void {
         ts: number
         proposals?: ActionProposal[]
         applied?: Record<string, AppliedProposal>
+        sources?: ChatSource[]
+        question?: ChatQuestion | null
+        trace?: StoredTrace | null
+        mentions?: ChatMentionRef[]
       }
     ) => appendAiChatMessage(conversationId, message)
   )

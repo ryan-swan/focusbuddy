@@ -1,11 +1,12 @@
-import { useEffect, useRef, useState } from 'react'
-import { useFocusChatStore } from '../../stores/focusChat'
-import { useChatStore } from '../../stores/chat'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useChatStore, NEW_CHAT_KEY } from '../../stores/chat'
 import { deriveAssistantBlocks } from '../../lib/chatBlocks'
 import ChatBlockView from './ChatBlockView'
 import ModelPickerChip from '../assistant/ModelPickerChip'
 import { useNodeStore } from '../../stores/nodes'
 import Icon from '../Icon'
+
+const EMPTY_TURNS: import('@shared/types').ChatMessage[] = []
 
 interface Props {
   // Jump to a real workspace item when a block links to one (widget cards).
@@ -18,38 +19,38 @@ interface Props {
 // created"): the home greeting, the composer card with context chip + model
 // picker + Enter-to-send, suggestion cards, and the panel's turn styling.
 //
-// Deliberately still its OWN persisted store (useFocusChatStore → SQLite via
-// window.api.aiChat) and the non-streaming chat:send transport, with NO
-// supportsQuestions opt-in — engine unification is the dedicated session's
-// work; this is one product language over two engines until then.
+// Phase 4.5 UNIFIED it with the panel: one persisted conversation system
+// (useChatStore → SQLite via window.api.aiChat) behind both surfaces. This is
+// no longer a second engine wearing the same clothes — open a conversation
+// here and it is the same conversation, with the same turns, citations,
+// questions and trace. The one-way "Continue your desk conversation" import
+// that bridged the two engines is deleted along with them: there is nothing
+// left to import across.
 export default function FocusChatSurface({ onOpenWidget }: Props): JSX.Element {
   const activeTaskId = useNodeStore((s) => s.activeTaskId)
-  const send = useFocusChatStore((s) => s.send)
-  const sending = useFocusChatStore((s) => s.sending)
-  const hasApiKey = useFocusChatStore((s) => s.hasApiKey)
-  const checkApiKey = useFocusChatStore((s) => s.checkApiKey)
-  const messages = useFocusChatStore((s) => s.messages)
-  const proposalsByMessage = useFocusChatStore((s) => s.proposalsByMessage)
-  const appliedProposals = useFocusChatStore((s) => s.appliedProposals)
-  const markProposalApplied = useFocusChatStore((s) => s.markProposalApplied)
-  const consumeProposal = useFocusChatStore((s) => s.consumeProposal)
-  const conversations = useFocusChatStore((s) => s.conversations)
-  const activeConversationId = useFocusChatStore((s) => s.activeConversationId)
-  const refreshConversations = useFocusChatStore((s) => s.refreshConversations)
-  const newConversation = useFocusChatStore((s) => s.newConversation)
-  const openConversation = useFocusChatStore((s) => s.openConversation)
-  const deleteConversation = useFocusChatStore((s) => s.deleteConversation)
-  const importDeskConversation = useFocusChatStore((s) => s.importDeskConversation)
-  // The desk panel's thread for this task — when it has turns, the empty state
-  // offers to continue that conversation here (Phase 3a.3). Count only; the
-  // import itself re-reads the store at tap time.
-  const deskTurnCount = useChatStore((s) =>
-    activeTaskId ? (s.messagesByTask[activeTaskId] ?? []).length : 0
+  const send = useChatStore((s) => s.send)
+  const sending = useChatStore((s) => s.sending)
+  const hasApiKey = useChatStore((s) => s.hasApiKey)
+  const checkApiKey = useChatStore((s) => s.checkApiKey)
+  const messagesByTask = useChatStore((s) => s.messagesByTask)
+  const proposalsByMessage = useChatStore((s) => s.proposalsByMessage)
+  const appliedProposals = useChatStore((s) => s.appliedProposals)
+  const markProposalApplied = useChatStore((s) => s.markProposalApplied)
+  const consumeProposal = useChatStore((s) => s.consumeProposal)
+  const conversations = useChatStore((s) => s.conversations)
+  const activeConversationId = useChatStore((s) => s.activeConversationId)
+  const refreshConversations = useChatStore((s) => s.refreshConversations)
+  const newConversation = useChatStore((s) => s.newConversation)
+  const openConversation = useChatStore((s) => s.openConversation)
+  const deleteConversation = useChatStore((s) => s.deleteConversation)
+  const convKey = activeConversationId ?? NEW_CHAT_KEY
+  const messages = useMemo(
+    () => messagesByTask[convKey] ?? EMPTY_TURNS,
+    [messagesByTask, convKey]
   )
 
   const [draft, setDraft] = useState('')
   const [historyOpen, setHistoryOpen] = useState(false)
-  const [importing, setImporting] = useState(false)
   const scrollRef = useRef<HTMLDivElement | null>(null)
   const taRef = useRef<HTMLTextAreaElement | null>(null)
   // Empty thread renders as the assistant home: greeting and composer centered
@@ -65,8 +66,10 @@ export default function FocusChatSurface({ onOpenWidget }: Props): JSX.Element {
   useEffect(() => {
     void checkApiKey()
     void refreshConversations()
-    const s = useFocusChatStore.getState()
-    if (!s.activeConversationId && s.messages.length === 0) newConversation()
+    const s = useChatStore.getState()
+    if (!s.activeConversationId && (s.messagesByTask[NEW_CHAT_KEY] ?? []).length === 0) {
+      newConversation()
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -88,7 +91,9 @@ export default function FocusChatSurface({ onOpenWidget }: Props): JSX.Element {
     const content = draft.trim()
     if (!content || sending) return
     setDraft('')
-    await send(content)
+    // The unified send takes the desk to scope server context to, the text, and
+    // the conversation to append to — the same call the panel makes.
+    await send(activeTaskId, content, useChatStore.getState().conversationKey())
   }
 
   async function handleOpenConversation(id: string): Promise<void> {
@@ -364,38 +369,6 @@ export default function FocusChatSurface({ onOpenWidget }: Props): JSX.Element {
 
               {isHome && (
                 <>
-                  {/* One tap imports the desk panel's thread for this task into
-                      a new persisted conversation — announced as imported,
-                      turns verbatim, proposals summarised honestly (P5 slice
-                      a). Only offered when that thread actually has turns. */}
-                  {deskTurnCount > 0 && (
-                    <button
-                      onClick={() => {
-                        if (importing) return
-                        setImporting(true)
-                        void importDeskConversation().finally(() => setImporting(false))
-                      }}
-                      disabled={importing}
-                      type="button"
-                      data-testid="focus-chat-continue-desk"
-                      className="w-full text-left mt-3 px-3 py-2.5 rounded-xl border border-[rgb(var(--accent)/0.35)] bg-[rgb(var(--accent)/0.07)] hover:bg-[rgb(var(--accent)/0.12)] transition-colors flex items-center gap-2.5"
-                    >
-                      <Icon
-                        name={importing ? 'hourglass_top' : 'forum'}
-                        size={16}
-                        className={`text-accent shrink-0 ${importing ? 'animate-spin' : ''}`}
-                      />
-                      <span className="min-w-0">
-                        <span className="block text-[12.5px] font-medium text-[var(--ink-100)]">
-                          Continue your desk conversation
-                        </span>
-                        <span className="block text-[11px] text-[var(--ink-50)]">
-                          Bring the {deskTurnCount}-turn thread from this desk&apos;s assistant
-                          into a saved chat here.
-                        </span>
-                      </span>
-                    </button>
-                  )}
                   {/* The workspace suggestions as home cards under the input —
                       the same card language as the fullscreen home. */}
                   <div className="mt-5 grid sm:grid-cols-2 gap-2">

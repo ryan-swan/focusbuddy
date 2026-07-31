@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react'
 import { useWidgetStore } from '../stores/widgets'
 import { useViewStore } from '../stores/view'
 import { useNodeStore } from '../stores/nodes'
-import { useChatStore } from '../stores/chat'
+import { useChatStore, NEW_CHAT_KEY } from '../stores/chat'
 import { useAssistantChrome } from '../stores/assistantChrome'
 import { useAssistantContext } from './assistantContext'
 import { shouldAutoPin, shouldClearPin } from './assistantPin'
@@ -37,14 +37,18 @@ export function useAssistantWidgetPin(): void {
   const widgets = useWidgetStore((s) => s.widgets)
   const widgetsLoading = useWidgetStore((s) => s.loadingFor) !== null
   const activeTaskId = useNodeStore((s) => s.activeTaskId)
-  const ctx = useAssistantContext()
-  const pinnedThread = useChatStore((s) => s.pinnedThread)
+  useAssistantContext()
+  const activeConversationId = useChatStore((s) => s.activeConversationId)
   const mentions = useChatStore((s) => s.mentions)
   const addMentionRef = useChatStore((s) => s.addMentionRef)
   const removeMentionRef = useChatStore((s) => s.removeMentionRef)
 
-  const threadKey = pinnedThread?.key ?? ctx.key
-  const followingElsewhere = pinnedThread !== null && pinnedThread.key !== ctx.key
+  // Phase 4.5: references belong to the CONVERSATION, not the screen.
+  const threadKey = activeConversationId ?? NEW_CHAT_KEY
+  // There is no "following a conversation from elsewhere" state any more — a
+  // conversation is never replaced by navigation, so a canvas click can never
+  // hijack one that belongs to another screen.
+  const followingElsewhere = false
   const onDeskView = view.kind === 'task' || view.kind === 'project-dashboard'
   // Same predicate 3a.2 suppresses the overlay on: focus mode only truly shows
   // on a desk screen — a stale focusedWidgetId elsewhere is not focus mode.

@@ -29,14 +29,33 @@ test.afterEach(async () => {
 async function stubSend(app: ElectronApplication, reply: string): Promise<void> {
   await app.evaluate(({ ipcMain }, replyText: string) => {
     try {
-      ipcMain.removeHandler('chat:send')
+      ipcMain.removeHandler('chat:sendStream')
     } catch {
       /* first install */
     }
-    ipcMain.handle('chat:send', async () => ({
-      ok: true,
-      message: { role: 'assistant', content: replyText, ts: Date.now() }
-    }))
+    // Phase 4.5 unified the engines: the focus chat now sends through the SAME
+    // streaming transport as the panel, so this is the handler to stub. That it
+    // is the same one is itself part of the unification claim.
+    ipcMain.handle(
+      'chat:sendStream',
+      async (e: Electron.IpcMainInvokeEvent, input: { requestId: string }) => {
+        const channel = `chat:stream:${input.requestId}`
+        const send = (type: string, payload: unknown): void => {
+          if (!e.sender.isDestroyed()) e.sender.send(channel, { type, payload })
+        }
+        const wait = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms))
+        await wait(20)
+        send('sources', { sources: [], elapsedMs: 5 })
+        await wait(20)
+        send('reply', replyText)
+        await wait(20)
+        send('complete', {
+          ok: true,
+          message: { role: 'assistant', content: replyText, ts: Date.now() }
+        })
+        return { ok: true }
+      }
+    )
   }, reply)
 }
 

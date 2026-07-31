@@ -1625,6 +1625,7 @@ const api = {
     createConversation: (input: {
       taskId: string | null
       title?: string
+      context?: import('@shared/types').AiChatConversationContext | null
     }): Promise<import('@shared/types').AiChatConversationMeta> =>
       ipcRenderer.invoke('aiChat:createConversation', input),
     appendMessage: (
@@ -1635,6 +1636,10 @@ const api = {
         ts: number
         proposals?: import('@shared/types').ActionProposal[]
         applied?: Record<string, import('@shared/types').AppliedProposal>
+        sources?: import('@shared/types').ChatSource[]
+        question?: import('@shared/types').ChatQuestion | null
+        trace?: import('@shared/types').StoredTrace | null
+        mentions?: import('@shared/types').ChatMentionRef[]
       }
     ): Promise<import('@shared/types').AiChatStoredMessage> =>
       ipcRenderer.invoke('aiChat:appendMessage', conversationId, message),

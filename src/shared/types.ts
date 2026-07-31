@@ -2131,12 +2131,37 @@ export interface FocusClusterDraft {
 // ── Persisted AI-chat history (local, free-standing conversations) ──────────
 // Ported from Caleb's Focus-Mode branch. Backs the aiChat DB module + the
 // Focus-Mode chat surface. ActionProposal / ChatRole already exist on this line.
+// Where a conversation was started (Phase 4.5). Before unification the
+// assistant re-threaded per screen, so "which screen" WAS the conversation;
+// after it, a conversation remembers its origin and keeps it while you walk
+// away (plan D4). Null on conversations written before unification — they
+// genuinely do not know, and the UI says nothing rather than guessing.
+export interface AiChatConversationContext {
+  kind: string
+  label: string
+  title: string
+  icon: string
+}
+
+// The retrieval trace as persisted. Deliberately NOT the live AssistantTrace:
+// the renderer clock stamps that drive the progressive reveal describe one
+// session's animation, not a durable fact. What survives is what the assistant
+// actually did.
+export interface StoredTrace {
+  sources: ChatSource[]
+  tools: ChatToolTrace[]
+  mentions: ChatMentionResolved[]
+  retrievalMs: number | null
+  error: string | null
+}
+
 export interface AiChatConversationMeta {
   id: string
   taskId: string | null
   title: string
   createdAt: number
   updatedAt: number
+  context?: AiChatConversationContext | null
   // Number of messages — for the history list preview. Populated by the list
   // query; not stored on the row.
   messageCount?: number
@@ -2154,6 +2179,16 @@ export interface AiChatStoredMessage {
   proposals: ActionProposal[]
   // Approved-card state keyed by proposal id.
   applied: Record<string, AppliedProposal>
+  // Phase 4.5 — what the panel always showed and persistence used to drop.
+  // Citations this answer stands on.
+  sources: ChatSource[]
+  // The follow-up the model asked on this turn, if it asked one.
+  question: ChatQuestion | null
+  // What the assistant actually did to produce this turn.
+  trace: StoredTrace | null
+  // The references the USER's turn was sent with, so the transcript can redraw
+  // its chips exactly where they were typed.
+  mentions: ChatMentionRef[]
 }
 export interface AiChatConversation {
   meta: AiChatConversationMeta

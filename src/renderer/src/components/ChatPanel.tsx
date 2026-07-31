@@ -3,7 +3,7 @@ import type { AppliedProposal, ChatMessage, ChatSource } from '@shared/types'
 import { useNodeStore } from '../stores/nodes'
 import { useViewStore } from '../stores/view'
 import { targetForSource } from '../lib/sourceTarget'
-import { useChatStore, appliedKey } from '../stores/chat'
+import { useChatStore, appliedKey, NEW_CHAT_KEY } from '../stores/chat'
 import MentionComposer from './assistant/MentionComposer'
 import MentionRefRow from './assistant/MentionRefRow'
 import { activeMentions, type MentionRef } from '../lib/assistantMentions'
@@ -71,9 +71,15 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
   // pinned by following a citation keeps its place until the user picks this
   // page instead — otherwise the assistant sends you somewhere and then loses
   // the conversation that sent you, which makes its own links unusable.
-  const pinnedThread = useChatStore((s) => s.pinnedThread)
-  const unpinThread = useChatStore((s) => s.unpinThread)
-  const pinThread = useChatStore((s) => s.pinThread)
+  // The conversation on screen (Phase 4.5/4.6). It is keyed by the conversation
+  // itself, not by the screen: walking to another page no longer replaces it.
+  // That also retires pinnedThread — it existed only to stop navigation from
+  // swapping a conversation mid-thought after following a citation, which is
+  // now simply what happens by default.
+  const activeConversationId = useChatStore((s) => s.activeConversationId)
+  const conversations = useChatStore((s) => s.conversations)
+  const setPendingContext = useChatStore((s) => s.setPendingContext)
+  const refreshConversations = useChatStore((s) => s.refreshConversations)
   // The conversation's referenced objects (Phase 4.3) — one layer holding both
   // typed "@" mentions and clicked widgets. Shown only on the conversation they
   // belong to; the click half of the lifecycle runs in useAssistantWidgetPin,
@@ -83,14 +89,23 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
   const addMentionRef = useChatStore((s) => s.addMentionRef)
   const mentionResolution = useChatStore((s) => s.mentionResolution)
   const mentionsByMessage = useChatStore((s) => s.mentionsByMessage)
-  const thread = pinnedThread ?? {
-    key: ctx.key,
-    label: ctx.label,
-    title: ctx.title,
-    icon: ctx.icon,
+  const conversationKey = activeConversationId ?? NEW_CHAT_KEY
+  // A conversation carries the context it STARTED in; only a brand-new one
+  // takes its framing from the screen you are on right now. So an old chat
+  // still says what it was about, and never relabels itself as you walk around.
+  const startedIn = useMemo(
+    () => conversations.find((c) => c.id === activeConversationId)?.context ?? null,
+    [conversations, activeConversationId]
+  )
+  const thread = {
+    key: conversationKey,
+    label: startedIn?.label ?? ctx.label,
+    title: startedIn?.title ?? ctx.title,
+    icon: startedIn?.icon ?? ctx.icon,
+    // The desk handed to the server for task-scoped context is always the one
+    // you are on NOW — that is live context, not a property of the conversation.
     serverTaskId: ctx.serverTaskId
   }
-  const followingElsewhere = pinnedThread !== null && pinnedThread.key !== ctx.key
   const activeRefs = useMemo(() => activeMentions(mentions, thread.key), [mentions, thread.key])
   const messages = useMemo(
     () => messagesByTask[thread.key] ?? EMPTY_MESSAGES,
@@ -104,6 +119,17 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
   // attached to the last message and neither answered nor dismissed. Derived
   // by a pure, tested rule (lib/assistantQuestion).
   const activeQuestion = activeQuestionFor(messages, questionByMessage)
+  // Keep the pending context in step with the screen while the chat is still
+  // unsaved, so the conversation it becomes remembers where it began.
+  useEffect(() => {
+    if (activeConversationId === null) {
+      setPendingContext({ kind: ctx.kind, label: ctx.label, title: ctx.title, icon: ctx.icon })
+    }
+  }, [activeConversationId, ctx.kind, ctx.label, ctx.title, ctx.icon, setPendingContext])
+  // The history list backs both the rail and the context of the open chat.
+  useEffect(() => {
+    void refreshConversations()
+  }, [refreshConversations])
   // The composer is a TipTap editor now (Phase 4.3), so the draft lives in its
   // document. `draft` mirrors the plain-text rendering purely so Send can be
   // disabled on an empty box — the document remains the source of truth.
@@ -291,11 +317,9 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
   async function openSource(source: ChatSource): Promise<void> {
     const target = targetForSource(source)
     if (!target) return
-    // Following a citation is the assistant moving you, not you changing screen.
-    // Pin the conversation first so it survives the navigation — otherwise the
-    // panel re-threads to wherever it just sent you and the thread that produced
-    // the link is gone.
-    pinThread(thread)
+    // Nothing to pin any more: a conversation is no longer replaced by the
+    // screen, so following a citation cannot lose the conversation that
+    // produced the link. That was the entire job of pinnedThread.
     const view = useViewStore.getState()
     const openDesk = (taskId: string): void => {
       useNodeStore.getState().setActive(taskId)
@@ -504,29 +528,6 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
           )}
         </div>
       </div>
-
-      {/* Why this panel is showing a conversation that isn't this page's, and
-          the way back. Without it a pinned thread is indistinguishable from the
-          assistant simply ignoring where you are. */}
-      {followingElsewhere && (
-        <div
-          data-testid="assistant-pinned-banner"
-          className="mx-3 mt-2 flex items-center gap-1.5 rounded-lg bg-[var(--surface-sunken)] border border-[var(--edge-soft)] px-2 py-1"
-        >
-          <Icon name="push_pin" size={12} className="text-accent shrink-0" filled />
-          <span className="text-[10.5px] text-[var(--ink-70)] truncate flex-1 min-w-0">
-            Still on your {thread.label} conversation
-          </span>
-          <button
-            onClick={unpinThread}
-            data-testid="assistant-unpin"
-            className="text-[10.5px] text-accent hover:underline shrink-0"
-            title={`Switch to the assistant for ${ctx.label}`}
-          >
-            Switch to {ctx.label}
-          </button>
-        </div>
-      )}
 
       {hasApiKey === false && (
         <div className="m-3 p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/50 text-xs text-[var(--ink-90)] leading-relaxed flex gap-2">

@@ -321,18 +321,22 @@ test('ART-8 — a trace stays as you left it when you navigate away and back', a
 
   // Go to another page and come back.
   //
-  // The panel itself survives navigation — what changes is the THREAD, because
-  // the assistant re-threads per screen. Another page's conversation replaces
-  // this one, so every turn (and its trace) unmounts, and coming back mounts
-  // them fresh. That is the remount that broke this.
+  // Phase 4.5 changed what this probe means, and made the claim stronger.
   //
-  // Rooms, specifically: it threads under its own key ('room'), where Calendar
-  // and Home both fall through to '__global__' and so would not switch threads
-  // at all — a navigation that changes nothing would make this test pass while
-  // locking nothing.
+  // It used to lock a remount: the assistant re-threaded per screen, another
+  // page's conversation replaced this one, every turn (and its trace) unmounted,
+  // and coming back mounted them fresh — which is what broke the disclosure
+  // state this test guards. Rooms was chosen specifically because it threaded
+  // under its own key, where Calendar and Home both fell through to
+  // '__global__' and would have switched nothing.
+  //
+  // Now a conversation is never replaced by the screen (plan D4), so the turn
+  // stays mounted the whole way round. The disclosure claim is unchanged and
+  // still asserted immediately below; what is added here is the D4 invariant
+  // itself — the turn never disappears in the first place.
   const leaveAndReturn = async (): Promise<void> => {
     await window.getByRole('button', { name: /Rooms/ }).first().click()
-    await expect(turns).toHaveCount(0, { timeout: 6000 })
+    await expect(turns).toHaveCount(1, { timeout: 6000 })
     await window.getByRole('button', { name: /Home/ }).first().click()
     await expect(turns).toHaveCount(1, { timeout: 8000 })
   }
@@ -396,14 +400,15 @@ test('ART-9 — every retrieved source in the trace is a link, cited or not', as
   const leafLinks = window.locator('[data-testid="trace-leaf-link"]')
   await expect(leafLinks).toHaveCount(2, { timeout: 4000 })
 
-  // Following the uncited one navigates, and the conversation comes with it —
-  // the assistant moved you, so it keeps the thread that sent you there.
+  // Following the uncited one navigates, and the conversation comes with it.
+  // Phase 4.5 removed the pinned banner that used to announce this: a
+  // conversation is no longer replaced by the screen, so there is no longer a
+  // special case to explain. The claim the banner stood for is asserted
+  // directly instead — the turn that produced the link is still on screen.
   await leafLinks.nth(1).click()
-  await expect(window.locator('[data-testid="assistant-pinned-banner"]')).toBeVisible({
-    timeout: 8000
-  })
-  await expect(window.locator('[data-testid="assistant-turn"]')).toHaveCount(1)
+  await expect(window.locator('[data-testid="assistant-turn"]')).toHaveCount(1, { timeout: 8000 })
   await expect(window.getByText(/Grounded in the first one/)).toBeVisible()
+  await expect(window.locator('[data-testid="assistant-pinned-banner"]')).toHaveCount(0)
 })
 
 test('ART-6 — clearing the thread takes its traces with it', async () => {

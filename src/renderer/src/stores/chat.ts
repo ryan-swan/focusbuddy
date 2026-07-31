@@ -1,11 +1,14 @@
 import { create } from 'zustand'
 import type {
   ActionProposal,
+  AiChatConversationContext,
+  AiChatConversationMeta,
   AppliedProposal,
   ChatMessage,
   ChatQuestion,
   ChatResponse,
-  ChatSource
+  ChatSource,
+  StoredTrace
 } from '@shared/types'
 import { recordTrail } from '../lib/trail'
 import { gatherCanvasAttachments } from '../lib/canvasContent'
@@ -20,17 +23,6 @@ import {
   type MentionRef,
   type MentionResolution
 } from '../lib/assistantMentions'
-
-// Enough of an assistant context to keep showing a conversation after you have
-// navigated away from where it started: which thread it is, what to call it, and
-// the task the server should scope it to.
-export interface PinnedThread {
-  key: string
-  label: string
-  title: string
-  icon: string
-  serverTaskId: string | null
-}
 
 function newTrace(): AssistantTrace {
   return {
@@ -97,25 +89,13 @@ interface ChatStore {
   // Dismiss (the card's ×): the user declined to answer. Deletes the record so
   // the question never comes back, even if its message becomes last again.
   dismissQuestion: (messageTs: number) => void
-  // A conversation the panel holds onto across navigation.
-  //
-  // The assistant normally re-threads per screen (see lib/assistantContext) — a
-  // desk, a document and a room each get their own conversation. That is right
-  // when YOU changed screen, and wrong when the ASSISTANT did: following a
-  // citation would otherwise swap the conversation you were having for the
-  // destination's, mid-thought. Pinning keeps the thread you were in until you
-  // choose the current page instead.
-  pinnedThread: PinnedThread | null
-  pinThread: (thread: PinnedThread) => void
-  unpinThread: () => void
   // The workspace objects this conversation references (Phase 4.3). One layer
   // for BOTH gestures: typing "@" and clicking a widget produce the same kind
   // of chip (plan D7), all chips are equal, and all are sticky to the
   // CONVERSATION until dismissed (plan D8) — 3a.1's single pinnedWidget
   // generalised to N typed references.
   //
-  // Distinct from pinnedThread above, which pins a CONVERSATION across
-  // navigation — this pins reference MATERIAL to a conversation.
+  // Distinct from the conversation itself — this pins reference MATERIAL to one.
   mentions: MentionRef[]
   addMentionRef: (ref: MentionRef) => { added: boolean; rejectedForCap: boolean }
   removeMentionRef: (conversationKey: string, key: string) => void
@@ -128,6 +108,35 @@ interface ChatStore {
   // (plan P1's first rendering). Kept per message rather than derived, because
   // the conversation's live set changes and the transcript must not.
   mentionsByMessage: Record<string, MentionRef[]>
+  // ── One persisted conversation system (Phase 4.5) ────────────────────────
+  // The panel and the focus chat used to be two engines: in-memory per-screen
+  // threads here, SQLite conversations there, bridged one-way by the 3a.3
+  // import. This store is now the single one, and the bridge is gone.
+  //
+  // The active conversation's id, or null for a fresh chat nobody has spoken in
+  // yet. Created lazily on the first message so history never fills with empty
+  // conversations (the rule the focus chat already had, kept).
+  activeConversationId: string | null
+  // The history list — metadata only, refreshed on demand.
+  conversations: AiChatConversationMeta[]
+  // Guards the lazy first-message create so two fast sends cannot each mint a
+  // conversation and split the turns across duplicates.
+  creatingConversation: boolean
+  // The persisted row id for each message ts, so an applied-state write targets
+  // a unique id rather than a Date.now() that can collide.
+  messageIdByTs: Record<string, string>
+  // The key the per-conversation maps use right now: the real conversation id,
+  // or NEW_CHAT_KEY while the chat is still unsaved.
+  conversationKey: () => string
+  refreshConversations: () => Promise<void>
+  newConversation: () => void
+  openConversation: (id: string) => Promise<void>
+  deleteConversation: (id: string) => Promise<void>
+  // Where a NEW conversation says it was started. Set by the panel from the
+  // current screen just before the first send; a conversation created without
+  // one records nothing rather than a placeholder.
+  pendingContext: AiChatConversationContext | null
+  setPendingContext: (ctx: AiChatConversationContext | null) => void
   sending: boolean
   hasApiKey: boolean | null
   checkApiKey: () => Promise<void>
@@ -160,6 +169,50 @@ interface ChatStore {
 const GLOBAL_KEY = '__global__'
 const EMPTY_MESSAGES: ChatMessage[] = []
 
+// The key the per-conversation maps use before the first message has created a
+// real conversation row. A fresh chat is genuinely unsaved until you say
+// something — an empty conversation in history would be clutter nobody asked
+// for — so it lives under this sentinel and is re-keyed to its real id the
+// moment it becomes real.
+export const NEW_CHAT_KEY = '__new__'
+
+// The live trace reduced to what is worth keeping. The renderer clock stamps
+// that drive the progressive reveal describe one session's animation, not a
+// durable fact, so they are dropped rather than persisted and replayed.
+function toStoredTrace(t: AssistantTrace | undefined): StoredTrace | null {
+  if (!t) return null
+  if (t.sources.length === 0 && t.tools.length === 0 && t.mentions.length === 0 && !t.error) {
+    return null
+  }
+  return {
+    sources: t.sources,
+    tools: t.tools,
+    mentions: t.mentions,
+    retrievalMs: t.retrievalMs,
+    error: t.error
+  }
+}
+
+// A persisted trace restored for display. status is 'done' because a stored
+// trace is by definition finished, and the timestamps are set to a constant so
+// the reveal shows it complete rather than replaying an animation for work that
+// happened days ago.
+function fromStoredTrace(t: StoredTrace | null): AssistantTrace | null {
+  if (!t) return null
+  return {
+    status: t.error ? 'error' : 'done',
+    startedAt: 0,
+    retrievedAt: 0,
+    retrievalMs: t.retrievalMs,
+    repliedAt: 0,
+    completedAt: 0,
+    mentions: t.mentions ?? [],
+    sources: t.sources ?? [],
+    tools: t.tools ?? [],
+    error: t.error
+  }
+}
+
 const EMPTY_PROPOSALS: ActionProposal[] = []
 
 export const useChatStore = create<ChatStore>((set, get) => ({
@@ -171,7 +224,6 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   traceByMessage: {},
   traceDisclosureByMessage: {},
   questionByMessage: {},
-  pinnedThread: null,
   setTraceDisclosure: (messageTs, state) => {
     set({
       traceDisclosureByMessage: {
@@ -185,8 +237,6 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     delete next[String(messageTs)]
     set({ questionByMessage: next })
   },
-  pinThread: (thread) => set({ pinnedThread: thread }),
-  unpinThread: () => set({ pinnedThread: null }),
   mentions: [],
   mentionResolution: {},
   mentionsByMessage: {},
@@ -197,6 +247,89 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   },
   removeMentionRef: (conversationKey, key) => {
     set({ mentions: removeMention(get().mentions, conversationKey, key) })
+  },
+  activeConversationId: null,
+  conversations: [],
+  creatingConversation: false,
+  messageIdByTs: {},
+  pendingContext: null,
+  setPendingContext: (ctx) => set({ pendingContext: ctx }),
+  conversationKey: () => get().activeConversationId ?? NEW_CHAT_KEY,
+  refreshConversations: async () => {
+    const list = await window.api.aiChat.listConversations().catch(() => null)
+    if (list) set({ conversations: list })
+  },
+  newConversation: () => {
+    // Drop whatever an unsaved chat had accumulated so a second New chat does
+    // not inherit the first one's half-written draft state. A conversation that
+    // was already persisted is untouched — it lives on disk.
+    const key = NEW_CHAT_KEY
+    const nextMessages = { ...get().messagesByTask }
+    delete nextMessages[key]
+    const nextLive = { ...get().liveTraceByThread }
+    delete nextLive[key]
+    set({
+      activeConversationId: null,
+      messagesByTask: nextMessages,
+      liveTraceByThread: nextLive,
+      messageIdByTs: {},
+      mentions: clearConversationMentions(get().mentions, key),
+      pendingContext: null
+    })
+  },
+  openConversation: async (id) => {
+    const conv = await window.api.aiChat.getConversation(id).catch(() => null)
+    if (!conv) return
+    const messages: ChatMessage[] = conv.messages.map((m) => ({
+      role: m.role,
+      content: m.content,
+      ts: m.ts
+    }))
+    const proposalsByMessage: Record<string, ActionProposal[]> = {}
+    const appliedProposals: Record<string, AppliedProposal> = { ...get().appliedProposals }
+    const sourcesByMessage: Record<string, ChatSource[]> = { ...get().sourcesByMessage }
+    const questionByMessage: Record<string, ChatQuestion> = { ...get().questionByMessage }
+    const traceByMessage: Record<string, AssistantTrace> = { ...get().traceByMessage }
+    const mentionsByMessage: Record<string, MentionRef[]> = { ...get().mentionsByMessage }
+    const messageIdByTs: Record<string, string> = {}
+    for (const m of conv.messages) {
+      const k = String(m.ts)
+      messageIdByTs[k] = m.id
+      if (m.proposals.length) proposalsByMessage[k] = m.proposals
+      for (const [proposalId, applied] of Object.entries(m.applied)) {
+        appliedProposals[appliedKey(m.ts, proposalId)] = applied
+      }
+      if (m.sources.length) sourcesByMessage[k] = m.sources
+      if (m.question) questionByMessage[k] = m.question
+      const restored = fromStoredTrace(m.trace)
+      if (restored) traceByMessage[k] = restored
+      // The references a user turn was sent with, rehydrated onto this
+      // conversation so its inline chips redraw where they were typed.
+      if (m.mentions.length) {
+        mentionsByMessage[k] = m.mentions.map((r) => ({
+          ...r,
+          icon: 'attachment',
+          conversationKey: id
+        }))
+      }
+    }
+    set({
+      activeConversationId: id,
+      messagesByTask: { ...get().messagesByTask, [id]: messages },
+      proposalsByMessage: { ...get().proposalsByMessage, ...proposalsByMessage },
+      appliedProposals,
+      sourcesByMessage,
+      questionByMessage,
+      traceByMessage,
+      mentionsByMessage,
+      messageIdByTs,
+      pendingContext: null
+    })
+  },
+  deleteConversation: async (id) => {
+    await window.api.aiChat.deleteConversation(id).catch(() => {})
+    if (get().activeConversationId === id) get().newConversation()
+    await get().refreshConversations()
   },
   sending: false,
   hasApiKey: null,
@@ -212,12 +345,22 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     return get().proposalsByMessage[String(messageTs)] ?? EMPTY_PROPOSALS
   },
   markProposalApplied: (messageTs, proposalId, applied) => {
-    set({
-      appliedProposals: {
-        ...get().appliedProposals,
-        [appliedKey(messageTs, proposalId)]: applied
-      }
-    })
+    const next = { ...get().appliedProposals, [appliedKey(messageTs, proposalId)]: applied }
+    set({ appliedProposals: next })
+    // Persist so an approved card is still green after a restart (Phase 4.5 —
+    // the behaviour the focus chat already had, now that both surfaces share
+    // one store). Addressed by the message's own row id: a ts can collide, an
+    // id cannot. Without one we keep the in-memory green state and skip the
+    // write rather than guessing at a row.
+    const convId = get().activeConversationId
+    const messageId = get().messageIdByTs[String(messageTs)]
+    if (!convId || !messageId) return
+    const forMsg: Record<string, AppliedProposal> = {}
+    for (const p of get().proposalsByMessage[String(messageTs)] ?? []) {
+      const a = next[appliedKey(messageTs, p.id)]
+      if (a) forMsg[p.id] = a
+    }
+    void window.api.aiChat.setMessageApplied(convId, messageId, forMsg).catch(() => {})
   },
   consumeProposal: (messageTs, proposalId) => {
     const key = String(messageTs)
@@ -277,7 +420,42 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     })
   },
   send: async (taskId, content, threadKey) => {
-    const key = threadKey ?? taskId ?? GLOBAL_KEY
+    let key = threadKey ?? taskId ?? GLOBAL_KEY
+    // First message in a fresh chat: mint the conversation now, and move
+    // everything the unsaved chat accumulated onto its real id. Persistence is
+    // best-effort throughout — a DB that will not write must never cost the
+    // user their message, so a failure here logs and continues unsaved.
+    let convId = get().activeConversationId
+    if (!convId && key === NEW_CHAT_KEY && !get().creatingConversation) {
+      set({ creatingConversation: true })
+      try {
+        const meta = await window.api.aiChat.createConversation({
+          taskId,
+          title: content.slice(0, 60),
+          context: get().pendingContext
+        })
+        convId = meta.id
+        const carried = get().messagesByTask[NEW_CHAT_KEY] ?? []
+        const nextMessages = { ...get().messagesByTask }
+        delete nextMessages[NEW_CHAT_KEY]
+        nextMessages[meta.id] = carried
+        set({
+          activeConversationId: meta.id,
+          messagesByTask: nextMessages,
+          // References picked before the first send belong to this conversation.
+          mentions: get().mentions.map((m) =>
+            m.conversationKey === NEW_CHAT_KEY ? { ...m, conversationKey: meta.id } : m
+          ),
+          pendingContext: null
+        })
+        key = meta.id
+      } catch (e) {
+        // eslint-disable-next-line no-console
+        console.error('[assistant] could not create conversation (continuing unsaved)', e)
+      } finally {
+        set({ creatingConversation: false })
+      }
+    }
     const current = get().messagesByTask[key] ?? []
     const userMsg: ChatMessage = { role: 'user', content, ts: Date.now() }
     const next = [...current, userMsg]
@@ -287,6 +465,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       sending: true
     })
     recordTrail('chat_sent', taskId, { preview: content.slice(0, 200) })
+    const persist = convId
     // The conversation's references ride every message on it, and a send does
     // NOT clear them (plan D8) — "referenced in the conversation", not in one
     // message. Recorded against this turn as well, so the transcript can draw
@@ -295,6 +474,19 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     const wireMentions = refs.length > 0 ? toWireMentions(refs) : undefined
     if (refs.length > 0) {
       set({ mentionsByMessage: { ...get().mentionsByMessage, [String(userMsg.ts)]: refs } })
+    }
+    if (persist) {
+      const savedUser = await window.api.aiChat
+        .appendMessage(persist, {
+          role: 'user',
+          content,
+          ts: userMsg.ts,
+          mentions: wireMentions
+        })
+        .catch(() => null)
+      if (savedUser) {
+        set({ messageIdByTs: { ...get().messageIdByTs, [String(userMsg.ts)]: savedUser.id } })
+      }
     }
     // A referenced widget that happens to live on the desk in front of us is
     // also force-included through the canvas path, exactly as the 3a.1 pin was,
@@ -396,6 +588,32 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         }
       }
       set(updates)
+
+      // Persist the finished assistant turn with everything the panel shows for
+      // it: the prose, its proposals, its citations, any question it asked, and
+      // the trace of what it actually did. Persisting only the prose would make
+      // reopening a conversation a quieter, less honest version of what the user
+      // saw the first time.
+      if (persist && ts !== null) {
+        const storedTrace = toStoredTrace(get().traceByMessage[tsKey])
+        void window.api.aiChat
+          .appendMessage(persist, {
+            role: 'assistant',
+            content: get().messagesByTask[key]?.find((m) => m.ts === ts)?.content ?? '',
+            ts,
+            proposals: resp.ok ? resp.proposals : undefined,
+            sources: resp.ok ? resp.sources : undefined,
+            question: resp.ok ? (resp.question ?? null) : null,
+            trace: storedTrace
+          })
+          .then((saved) => {
+            if (saved) {
+              set({ messageIdByTs: { ...get().messageIdByTs, [String(ts)]: saved.id } })
+            }
+            return get().refreshConversations()
+          })
+          .catch(() => {})
+      }
     }
 
     // Streaming is the normal path. The non-streaming `chat:send` stays wired as
@@ -543,10 +761,16 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       questionByMessage: nextQuestions,
       mentionsByMessage: nextMentionsByMessage,
       liveTraceByThread: nextLive,
-      // A cleared thread has nothing left to follow you around — and nothing
-      // left referencing it.
-      pinnedThread: get().pinnedThread?.key === key ? null : get().pinnedThread,
+      // A cleared conversation has nothing left referencing it.
       mentions: clearConversationMentions(get().mentions, key)
     })
   }
 }))
+
+// Expose the unified conversation store on window so e2e specs can drive it
+// without a live model call (the harness strips the API key). A thin handle to
+// the real store — it replaces __fbFocusChat, which pointed at the second engine
+// this store absorbed.
+if (typeof window !== 'undefined') {
+  ;(window as unknown as { __fbChat?: typeof useChatStore }).__fbChat = useChatStore
+}

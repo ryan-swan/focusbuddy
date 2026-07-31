@@ -1,18 +1,20 @@
 /**
- * Focus-chat continuity (Phase 3a.3, P5 slice a): the focus AI Chat's empty
- * state offers one tap to continue the desk assistant's conversation — the
- * thread is copied into a NEW persisted conversation, announced as imported,
- * turns verbatim.
+ * ONE conversation system (Phase 4.5).
  *
- * Only `chat:sendStream` is stubbed (to put real turns in the desk thread);
- * the focus dock, the import builder, the persisted aiChat storage and the
- * offer UI are all shipping code.
+ * Phase 3a.3 shipped a one-way bridge: the focus AI Chat could COPY the desk
+ * panel's thread into a new persisted conversation, because the two surfaces
+ * ran on two different engines and copying was the only honest thing available.
+ * Unification removed both the second engine and the bridge — so this suite,
+ * which locked the copy, now locks the thing that made the copy unnecessary.
  *
- * FC-1  Before any desk conversation exists, the AI Chat tab shows no offer.
- *       After a desk exchange, it does — and one tap imports the thread:
- *       header announcing the import + both turns, persisted to history.
- *       "New chat" then shows the offer again (a fresh import target), with
- *       the imported copy still in history.
+ * Only `chat:sendStream` is stubbed; the panel, the focus dock, the unified
+ * store and the persisted aiChat storage are all shipping code.
+ *
+ * FC-1  A conversation started in the panel IS the conversation the focus chat
+ *       shows — same turns, no import, nothing copied. It persists as ONE
+ *       conversation, not two.
+ * FC-2  It survives a reload with the turns intact — the panel's conversations
+ *       are durable now, which they never were before unification.
  */
 
 import { test, expect, type ElectronApplication, type Page } from '@playwright/test'
@@ -83,7 +85,7 @@ async function openFocusChatTab(window: Page): Promise<void> {
   await expect(window.locator('[data-testid="focus-chat-surface"]')).toBeVisible({ timeout: 5000 })
 }
 
-test('FC-1 — the desk thread imports into a persisted focus conversation, honestly announced', async () => {
+test('FC-1 — the panel and the focus chat are the SAME conversation, not a copy', async () => {
   launched = await launchApp()
   const { window, app } = launched
   await waitForReady(window)
@@ -113,15 +115,6 @@ test('FC-1 — the desk thread imports into a persisted focus conversation, hone
   await window.getByRole('button', { name: 'Continuity desk' }).first().click()
   await window.waitForSelector('[data-canvas-surface="true"]', { timeout: 8000 })
 
-  // No desk conversation yet → the AI Chat tab offers nothing to continue.
-  await enterFocusMode(window, aId)
-  await openFocusChatTab(window)
-  await expect(window.locator('[data-testid="focus-chat-continue-desk"]')).toHaveCount(0)
-  await window.keyboard.press('Escape')
-  await expect(window.locator('[data-testid="widget-focus-mode"]')).toHaveCount(0, {
-    timeout: 5000
-  })
-
   // Have a real exchange in the desk panel (far end stubbed, renderer real).
   await window.evaluate(() => window.dispatchEvent(new CustomEvent('fb:open-assistant')))
   await expect(window.locator('[data-testid="assistant-panel"]')).toBeVisible({ timeout: 8000 })
@@ -130,37 +123,53 @@ test('FC-1 — the desk thread imports into a persisted focus conversation, hone
   await window.locator('button[aria-label="Send"]').click()
   await expect(window.getByText('The desk answer.')).toBeVisible({ timeout: 8000 })
 
-  // Back into focus mode → the offer is there, naming the turn count.
+  // Into focus mode: the SAME conversation is already there. No offer to
+  // import, because there is nothing to import across — the bridge and the
+  // second engine are both gone.
   await enterFocusMode(window, aId)
   await openFocusChatTab(window)
-  const offer = window.locator('[data-testid="focus-chat-continue-desk"]')
-  await expect(offer).toBeVisible({ timeout: 5000 })
-  await expect(offer).toContainText('2-turn')
-
-  // One tap imports: the announced header plus both turns, verbatim.
-  await offer.click()
   const thread = window.locator('[data-testid="focus-chat-thread"]')
-  await expect(thread).toContainText('Imported from your desk conversation', { timeout: 8000 })
-  await expect(thread).toContainText('Continuity desk')
-  await expect(thread).toContainText('the desk question')
+  await expect(thread).toContainText('the desk question', { timeout: 8000 })
   await expect(thread).toContainText('The desk answer.')
+  await expect(window.locator('[data-testid="focus-chat-continue-desk"]')).toHaveCount(0)
+  // And nothing was announced as imported, because nothing was.
+  await expect(thread).not.toContainText('Imported from your desk conversation')
 
-  // It persisted as a real conversation, announced as imported in its title.
+  // ONE persisted conversation, not the two a copy would have left behind.
   const persisted = await window.evaluate(async () => {
     const api = (window as unknown as { api: typeof window.api }).api
     const list = await api.aiChat.listConversations()
     return { count: list.length, title: list[0]?.title ?? '' }
   })
   expect(persisted.count).toBe(1)
-  expect(persisted.title).toContain('Imported')
-  expect(persisted.title).toContain('Continuity desk')
+  expect(persisted.title).toContain('the desk question')
+  expect(persisted.title).not.toContain('Imported')
+})
 
-  // A fresh "New chat" empties the surface — the offer returns (the desk
-  // thread still exists), and the imported copy stays in history.
-  await window.locator('[data-testid="focus-chat-new"]').click()
-  await expect(offer).toBeVisible({ timeout: 5000 })
-  await window.locator('[data-testid="focus-chat-history-toggle"]').click()
-  await expect(
-    window.locator('[data-testid="focus-chat-history"]')
-  ).toContainText('Imported — Continuity desk', { timeout: 5000 })
+test('FC-2 — a panel conversation survives a reload, which it never did before', async () => {
+  launched = await launchApp()
+  const { window, app } = launched
+  await waitForReady(window)
+  await suppressFeatureSpotlights(window)
+
+  await window.evaluate(() => window.dispatchEvent(new CustomEvent('fb:open-assistant')))
+  await expect(window.locator('[data-testid="assistant-panel"]')).toBeVisible({ timeout: 8000 })
+  await stubStream(app, 'A durable answer.')
+  await typeInComposer(window, 'a durable question')
+  await window.locator('button[aria-label="Send"]').click()
+  await expect(window.getByText('A durable answer.')).toBeVisible({ timeout: 8000 })
+
+  // Before unification the panel's threads were in-memory and died here.
+  await window.reload()
+  await waitForReady(window)
+  const restored = await window.evaluate(async () => {
+    const api = (window as unknown as { api: typeof window.api }).api
+    const list = await api.aiChat.listConversations()
+    if (!list[0]) return null
+    const conv = await api.aiChat.getConversation(list[0].id)
+    return conv?.messages.map((m) => `${m.role}:${m.content}`) ?? null
+  })
+  expect(restored).not.toBeNull()
+  expect(restored).toContain('user:a durable question')
+  expect(restored).toContain('assistant:A durable answer.')
 })

@@ -195,15 +195,19 @@ test('QC-3 — dismissing the card produces no turn and it stays dismissed', asy
   // No synthetic turn was produced by dismissing.
   await expect(window.locator('[data-testid="user-turn"]')).toHaveCount(turnsBefore)
 
-  // Navigate away and back — a dismissed question must not resurrect.
+  // Navigate away and back — a dismissed question must not resurrect. Phase 4.5
+  // made this a sharper probe than it was: navigation no longer swaps the
+  // conversation for the destination's, so the turn stays on screen the whole
+  // way round and the card has every opportunity to come back. It must not.
   await window.getByRole('button', { name: /Rooms/ }).first().click()
-  await expect(window.locator('[data-testid="assistant-turn"]')).toHaveCount(0, { timeout: 6000 })
+  await expect(window.locator('[data-testid="assistant-turn"]')).toHaveCount(1, { timeout: 6000 })
+  await expect(card).toHaveCount(0)
   await window.getByRole('button', { name: /Home/ }).first().click()
   await expect(window.locator('[data-testid="assistant-turn"]')).toHaveCount(1, { timeout: 8000 })
   await expect(card).toHaveCount(0, { timeout: 700 })
 })
 
-test('QC-4 — navigation neither loses nor duplicates a live question', async () => {
+test('QC-4 — navigation keeps the conversation, and its live question, exactly', async () => {
   launched = await launchApp()
   const { window, app } = launched
   await waitForReady(window)
@@ -214,15 +218,18 @@ test('QC-4 — navigation neither loses nor duplicates a live question', async (
   const card = window.locator('[data-testid="assistant-question-card"]')
   await expect(card).toBeVisible({ timeout: 8000 })
 
-  // Rooms threads under its own key — a genuine thread switch. The rooms
-  // thread has no conversation and no question. (Calendar and Home both fall
-  // through to __global__ and would switch nothing — see ART-8.)
+  // This locks the OPPOSITE of what it used to (plan D4). Before unification
+  // the assistant re-threaded per screen, so walking to Rooms replaced your
+  // conversation with that screen's empty one, and the claim worth making was
+  // that the question came back intact when you returned. Now a conversation
+  // is never replaced by the screen — so the question never leaves at all, and
+  // is still answerable without going back.
   await window.getByRole('button', { name: /Rooms/ }).first().click()
-  await expect(window.locator('[data-testid="assistant-turn"]')).toHaveCount(0, { timeout: 6000 })
-  await expect(card).toHaveCount(0)
+  await expect(window.locator('[data-testid="assistant-turn"]')).toHaveCount(1, { timeout: 6000 })
+  await expect(card).toHaveCount(1)
+  await expect(card).toContainText('Which desk should this tracker go on?')
 
-  // Back home: the conversation remounts and the card is exactly there again —
-  // one card, same prompt, still answerable.
+  // And back again: still exactly one card, never duplicated by the round trip.
   await window.getByRole('button', { name: /Home/ }).first().click()
   await expect(window.locator('[data-testid="assistant-turn"]')).toHaveCount(1, { timeout: 8000 })
   await expect(card).toHaveCount(1, { timeout: 700 })
