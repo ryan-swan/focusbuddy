@@ -32,4 +32,10 @@ describe('ASSISTANT_CAPABILITIES — honest, backed, non-duplicated', () => {
     const labels = ASSISTANT_CAPABILITIES.map((c) => c.label)
     expect(new Set(labels).size).toBe(labels.length)
   })
+
+  it('every capability carries a real, unique starter request (a click must start something)', () => {
+    const starters = ASSISTANT_CAPABILITIES.map((c) => c.starter)
+    for (const s of starters) expect(s.trim().length).toBeGreaterThan(0)
+    expect(new Set(starters).size).toBe(starters.length)
+  })
 })

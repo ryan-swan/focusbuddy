@@ -15,6 +15,11 @@
  *       one writes through to the shared preference (fb.model.mode).
  * AF-4  On a segment takeover, fullscreen stays full-bleed (its nav lives
  *       inside the takeover shell).
+ * AF-5  Fullscreen is flat — the panel drops its floating-card chrome (no
+ *       radius, no inset) and IS the screen; floating mode keeps the card.
+ * AF-6  Capability chips are functional: a click sends a REAL starter request
+ *       (captured at the far end, byte-equal to what the chip declares) and
+ *       the flow begins as a genuine conversation turn.
  */
 
 import { test, expect, type Page } from '@playwright/test'
@@ -146,6 +151,83 @@ test('AF-3 — the model picker is real: MODEL_OPTIONS listed, choice written th
   const stored = await window.evaluate(() => localStorage.getItem('fb.model.mode'))
   expect(stored).toBe('haiku')
   await expect(window.locator('[data-testid="composer-model-toggle"]')).toContainText('Haiku')
+})
+
+test('AF-5 — fullscreen is flat and full-bleed; floating keeps the card chrome', async () => {
+  launched = await launchApp()
+  const { window } = launched
+  await waitForReady(window)
+  await openAssistant(window)
+
+  // Floating: the panel is a card — rounded, detached from the wrapper edge.
+  const radiusFloating = await panel(window).evaluate((el) => getComputedStyle(el).borderRadius)
+  expect(radiusFloating).not.toBe('0px')
+
+  await switchToFullscreen(window)
+  // Fullscreen: no card. Flat surface, no radius, and the panel spans the
+  // whole overlay — no 880px column, no inset gutter.
+  const radiusFull = await panel(window).evaluate((el) => getComputedStyle(el).borderRadius)
+  expect(radiusFull).toBe('0px')
+  const overlayBox = (await overlay(window).boundingBox())!
+  const panelBox = (await panel(window).boundingBox())!
+  expect(Math.abs(panelBox.width - overlayBox.width)).toBeLessThanOrEqual(2)
+  expect(Math.abs(panelBox.height - overlayBox.height)).toBeLessThanOrEqual(2)
+})
+
+test('AF-6 — a capability chip click sends the real starter request it declares', async () => {
+  launched = await launchApp()
+  const { window, app } = launched
+  await waitForReady(window)
+  await openAssistant(window)
+  await switchToFullscreen(window)
+
+  await app.evaluate(({ ipcMain }) => {
+    try {
+      ipcMain.removeHandler('chat:sendStream')
+    } catch {
+      /* first install */
+    }
+    ipcMain.handle(
+      'chat:sendStream',
+      async (
+        e: Electron.IpcMainInvokeEvent,
+        input: { requestId: string; messages: Array<{ role: string; content: string }> }
+      ) => {
+        ;(globalThis as Record<string, unknown>).__afLastUserMessage =
+          [...input.messages].reverse().find((m) => m.role === 'user')?.content ?? null
+        const channel = `chat:stream:${input.requestId}`
+        const send = (type: string, payload: unknown): void => {
+          if (!e.sender.isDestroyed()) e.sender.send(channel, { type, payload })
+        }
+        await new Promise((r) => setTimeout(r, 20))
+        send('sources', { sources: [], elapsedMs: 5 })
+        send('reply', 'Starting that for you.')
+        send('complete', {
+          ok: true,
+          message: { role: 'assistant', content: 'Starting that for you.', ts: Date.now() }
+        })
+        return { ok: true }
+      }
+    )
+  })
+
+  const chip = window.locator('[data-testid="capability-chip"]').first()
+  await expect(chip).toBeVisible()
+  const declaredStarter = await chip.getAttribute('data-starter')
+  expect(declaredStarter && declaredStarter.length).toBeTruthy()
+
+  await chip.click()
+  // The starter became a real user turn…
+  await expect(window.locator('[data-testid="user-turn"]').last()).toContainText(
+    declaredStarter!,
+    { timeout: 8000 }
+  )
+  await expect(window.getByText('Starting that for you.')).toBeVisible({ timeout: 8000 })
+  // …and the far end received EXACTLY what the chip declared.
+  const sent = await app.evaluate(
+    () => (globalThis as Record<string, unknown>).__afLastUserMessage
+  )
+  expect(sent).toBe(declaredStarter)
 })
 
 test('AF-4 — on a segment takeover, fullscreen stays full-bleed', async () => {

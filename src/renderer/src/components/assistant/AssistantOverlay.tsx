@@ -215,15 +215,14 @@ export default function AssistantOverlay(): JSX.Element {
           ChatPanel on every switch and eat the half-typed draft. In sidebar
           mode the inset column detaches the card from the window edge exactly
           as the old desk column did; in floating mode the wrapper IS the
-          card's footprint; in fullscreen a centered column holds it like a
-          page. (ChatPanel carries its own card chrome + shadow.) */}
+          card's footprint; in fullscreen the panel IS the page — full-bleed,
+          no inset box (ChatPanel drops its card chrome there and centers its
+          own content columns). */}
       <div
         className={
           mode === 'sidebar'
             ? `h-full box-border ${FLOATING_MENU_INSET_RIGHT}`
-            : mode === 'floating'
-              ? 'h-full w-full'
-              : 'h-full w-full max-w-[880px] mx-auto px-4 py-4 box-border'
+            : 'h-full w-full'
         }
       >
         <ChatPanel onCollapse={close} />

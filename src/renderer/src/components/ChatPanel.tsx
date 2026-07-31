@@ -14,7 +14,7 @@ import { useWidgetStore } from '../stores/widgets'
 import { chimeIn } from '../lib/audioBeep'
 import CanvasContextMenu, { type CtxMenuItem } from './CanvasContextMenu'
 import { FLOATING_MENU_ASIDE, FLOATING_MENU_STYLE } from './chrome/floatingMenu'
-import { MODEL_OPTIONS, useModelMode } from '../lib/modelPrefs'
+import ModelPickerChip from './assistant/ModelPickerChip'
 import { ASSISTANT_CAPABILITIES } from '../lib/assistantCapabilities'
 import { useBodyDouble } from '../lib/bodyDouble'
 import { useAssistantChrome, type AssistantMode } from '../stores/assistantChrome'
@@ -107,7 +107,6 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
   const createWidget = useWidgetStore((s) => s.create)
   const bumpLayout = useWidgetStore((s) => s.bumpLayoutVersion)
   const pushAssistantMessage = useChatStore((s) => s.pushAssistantMessage)
-  const [modelMode, setModelMode] = useModelMode()
   const bodyDouble = useBodyDouble()
   // Display mode (sidebar / floating / fullscreen) — chrome state, not
   // conversation state. Switching re-dresses this same panel over the same
@@ -126,27 +125,12 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
   }, [modeMenuOpen])
   const activeModeMeta =
     MODE_OPTIONS.find((o) => o.mode === chromeMode) ?? MODE_OPTIONS[1]
-  // The real model picker in the composer footer (3a.4, P7 — the operator's
-  // ask un-deferred the old plan-D5). Same data and same write-through as the
-  // Settings picker (one shared preference; the two stay in live sync via
-  // modelPrefs' subscriber), so this is a second door to the same switch —
-  // never a second switch.
-  const [modelMenuOpen, setModelMenuOpen] = useState(false)
-  const modelMenuRef = useRef<HTMLDivElement | null>(null)
-  useEffect(() => {
-    if (!modelMenuOpen) return
-    function onPointerDown(e: PointerEvent): void {
-      if (!modelMenuRef.current?.contains(e.target as Node)) setModelMenuOpen(false)
-    }
-    window.addEventListener('pointerdown', onPointerDown)
-    return () => window.removeEventListener('pointerdown', onPointerDown)
-  }, [modelMenuOpen])
-  const activeModelMeta = MODEL_OPTIONS.find((o) => o.value === modelMode) ?? MODEL_OPTIONS[0]
   // Fullscreen with an empty thread renders as Notion's AI home (3a.4):
   // greeting and composer centered as a group, capability row and suggestion
   // cards under the input. Same panel, same nodes — only layout classes
   // change, so the draft and every store subscription survive the swap.
-  const fullscreenHome = chromeMode === 'fullscreen' && messages.length === 0
+  const isFullscreen = chromeMode === 'fullscreen'
+  const fullscreenHome = isFullscreen && messages.length === 0
 
   async function handleWhatWasIDoing(): Promise<void> {
     if (summarizing) return
@@ -359,13 +343,19 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
   }
 
   return (
-    // The assistant is a floating rounded card, the same chrome the desk
-    // sidebar / segment / PlexiOffice menus use — not a panel welded to the
-    // window edge with a one-sided border. See components/chrome/floatingMenu.
-    // The wrapping column in App.tsx supplies the inset that detaches it.
+    // In sidebar and floating modes the assistant is a floating rounded card,
+    // the same chrome the desk sidebar / segment / PlexiOffice menus use. In
+    // fullscreen it is deliberately NOT a card (operator's live-drive call:
+    // "no borders and edges, it should just be the screen you are in") — the
+    // panel goes flat and full-bleed and IS the page; readable width comes
+    // from internal centered columns instead of an inset box.
     <aside
-      className={FLOATING_MENU_ASIDE}
-      style={FLOATING_MENU_STYLE}
+      className={
+        isFullscreen
+          ? 'h-full w-full flex flex-col overflow-hidden bg-[var(--surface-base)] text-[var(--ink-100)]'
+          : FLOATING_MENU_ASIDE
+      }
+      style={isFullscreen ? undefined : FLOATING_MENU_STYLE}
       data-testid="assistant-panel"
     >
       <div className="px-3 py-3 border-b border-[var(--edge-soft)] flex items-center justify-between gap-2">
@@ -523,9 +513,18 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
         className={
           fullscreenHome
             ? 'shrink-0 mt-auto w-full max-w-[640px] mx-auto px-6 pb-5'
-            : 'flex-1 overflow-auto px-3 py-3 space-y-3'
+            : 'flex-1 overflow-auto px-3 py-3'
         }
       >
+        {/* In fullscreen the flat page needs a readable column; elsewhere the
+            card provides the width. Always the same wrapper node — classes
+            only — so switching modes mid-conversation re-lays-out without
+            remounting the panel. */}
+        <div
+          className={
+            isFullscreen && !fullscreenHome ? 'max-w-[820px] mx-auto w-full space-y-3' : 'space-y-3'
+          }
+        >
         {fullscreenHome && (
           // The Notion-home greeting: centered over the composer. The
           // suggestion cards and capability row render under the composer,
@@ -683,6 +682,7 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
             <span className="text-[11.5px]">Working…</span>
           </div>
         )}
+        </div>
       </div>
 
       {/* The composer is one container that holds the field AND its actions,
@@ -699,6 +699,7 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
             : 'p-3 border-t border-[var(--edge-soft)]'
         }
       >
+        <div className={isFullscreen && !fullscreenHome ? 'max-w-[720px] mx-auto w-full' : ''}>
         {/* The assistant's follow-up question, when it asked one, sits directly
             above the composer — pick an option and Send, or just type below
             (any send on this thread is the answer). */}
@@ -771,56 +772,8 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
             className="w-full resize-none bg-transparent text-[var(--ink-100)] placeholder:text-[var(--ink-50)] text-[13px] leading-[1.45] max-h-[160px] focus:outline-none"
           />
           <div className="flex items-center gap-1.5">
-            {/* Real model picker (P7) — replaces the old read-only "locked"
-                chip. Opens upward (the composer sits at the bottom). */}
-            <div className="relative" ref={modelMenuRef}>
-              <button
-                type="button"
-                onClick={() => setModelMenuOpen((v) => !v)}
-                data-testid="composer-model-toggle"
-                aria-label="Choose model"
-                aria-expanded={modelMenuOpen}
-                title={`Model — ${activeModelMeta.label}. ${activeModelMeta.blurb}`}
-                className="inline-flex items-center gap-1 rounded-full border border-[var(--edge-soft)] px-2 py-0.5 text-[10px] font-mono text-[var(--ink-60)] hover:border-[rgb(var(--accent)/0.5)] hover:text-[var(--ink-90)] transition-colors"
-              >
-                <Icon name="psychology" size={11} className="shrink-0" />
-                <span className="truncate max-w-[110px]">{activeModelMeta.label}</span>
-                <Icon name="unfold_more" size={10} className="shrink-0" />
-              </button>
-              {modelMenuOpen && (
-                <div
-                  data-testid="composer-model-menu"
-                  className="absolute left-0 bottom-full mb-1.5 z-30 w-[300px] rounded-[12px] border border-[var(--edge-soft)] bg-[var(--surface-raised)] p-1"
-                  style={{ boxShadow: 'var(--shadow-cast)' }}
-                >
-                  {MODEL_OPTIONS.map((opt) => (
-                    <button
-                      key={opt.value}
-                      type="button"
-                      data-testid={`composer-model-${opt.value}`}
-                      onClick={() => {
-                        setModelMode(opt.value)
-                        setModelMenuOpen(false)
-                      }}
-                      className="w-full flex items-start gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-[var(--surface-sunken)] transition-colors"
-                    >
-                      <span className="w-8 shrink-0 pt-0.5 text-[10px] font-mono text-[var(--ink-40)]">
-                        {opt.costTier}
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block text-[12px] text-[var(--ink-90)]">{opt.label}</span>
-                        <span className="block text-[10.5px] text-[var(--ink-50)] leading-snug">
-                          {opt.blurb}
-                        </span>
-                      </span>
-                      {opt.value === modelMode && (
-                        <Icon name="check" size={14} className="text-accent shrink-0 mt-0.5" />
-                      )}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+            {/* Real model picker (P7) — shared with the focus AI Chat. */}
+            <ModelPickerChip />
             <span className="flex-1" />
             <button
               type="submit"
@@ -835,23 +788,33 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
         </div>
         {fullscreenHome && (
           <>
-            {/* What the assistant can genuinely act on today (P8) — every
-                entry is backed by real proposal kinds (lib/
-                assistantCapabilities, type-locked). Informational, not
-                connector toggles. */}
+            {/* What the assistant can genuinely act on today (P8), and a real
+                entry point for each (3b — operator's call): clicking a chip
+                sends its declared starter as a genuine user request; the
+                question protocol gathers the specifics. Backed by real
+                proposal kinds (lib/assistantCapabilities, type-locked). */}
             <div
               data-testid="assistant-capability-row"
               aria-label="What the assistant can act on"
               className="mt-3 flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5"
             >
               {ASSISTANT_CAPABILITIES.map((c) => (
-                <span
+                <button
                   key={c.label}
-                  className="inline-flex items-center gap-1 text-[10.5px] text-[var(--ink-50)]"
+                  type="button"
+                  data-testid="capability-chip"
+                  data-starter={c.starter}
+                  disabled={sending}
+                  onClick={() => {
+                    if (sending) return
+                    void send(thread.serverTaskId, c.starter, thread.key)
+                  }}
+                  title={`Start now — sends “${c.starter}”; I'll ask for any details I need`}
+                  className="inline-flex items-center gap-1 text-[10.5px] text-[var(--ink-60)] hover:text-accent underline decoration-transparent hover:decoration-current underline-offset-2 transition-colors disabled:opacity-50"
                 >
-                  <Icon name={c.icon} size={12} className="text-[var(--ink-40)] shrink-0" />
+                  <Icon name={c.icon} size={12} className="shrink-0" />
                   {c.label}
-                </span>
+                </button>
               ))}
             </div>
             {/* The per-screen suggestions as home cards under the input —
@@ -877,6 +840,7 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
           <span className="text-[9.5px] font-mono text-[var(--ink-40)]">
             ↵ send · ⇧↵ newline
           </span>
+        </div>
         </div>
       </form>
       {ctxMenu && (
