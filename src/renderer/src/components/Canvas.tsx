@@ -118,7 +118,7 @@ import {
   AI_RAIL_WIDTH,
   useAIRailCollapsed
 } from '../lib/chromeState'
-import LinkOverlay from './LinkOverlay'
+import LinkOverlay, { type PendingLinkPick } from './LinkOverlay'
 import { useLinksStore } from '../stores/links'
 import { useAccountStore } from '../stores/account'
 import { currentDeviceClass } from '../lib/deviceClass'
@@ -439,6 +439,10 @@ export default function Canvas(): JSX.Element {
   const accountId = useAccountStore((s) => s.account?.id ?? null)
   const [linkSourceId, setLinkSourceId] = useState<string | null>(null)
   const [ghostCursor, setGhostCursor] = useState<{ x: number; y: number } | null>(null)
+  // A freshly-drawn link awaiting the user's "how should this connect?" choice,
+  // anchored at the drop point (raw viewport coords). See LinkOverlay's picker.
+  const [pendingLinkPick, setPendingLinkPick] = useState<PendingLinkPick | null>(null)
+  const clearPendingLinkPick = useCallback(() => setPendingLinkPick(null), [])
 
   // Off-viewport virtualisation (PLX-APP-012). `visibleObjectIds` is the set of
   // top-level Objects the render loop mounts this frame; null means "cull nothing"
@@ -672,10 +676,9 @@ export default function Canvas(): JSX.Element {
         endArm()
         return
       }
-      if (from.pinned || to.pinned) {
-        endArm()
-        return
-      }
+      // Pinned widgets are valid endpoints too (widget-link-owner invariant 5):
+      // their rect is read in the same viewport coords as every other widget, so
+      // a line to/from a screen-anchored pinned tool renders correctly.
       // Linking widgets inside sections — and to sections themselves — is
       // now permitted. The visual link is drawn between the actual
       // rendered widget rects (LinkOverlay reads getBoundingClientRect on
@@ -684,8 +687,17 @@ export default function Canvas(): JSX.Element {
       // section produces a line that anchors to the section's outer
       // frame. The persisted row in widget_links stores source + target
       // widget ids regardless of section membership.
-      void createLink(sourceId, toId, activeTaskId)
+      //
+      // The link is created immediately as a passive `context` wire (so the
+      // gesture never silently produces nothing), then we offer the intent
+      // picker at the drop point to upgrade its type. Capture the drop coords
+      // BEFORE endArm resets gesture state (widget-link-owner design).
+      const dropX = e.clientX
+      const dropY = e.clientY
       endArm()
+      void createLink(sourceId, toId, activeTaskId).then((link) => {
+        if (link) setPendingLinkPick({ linkId: link.id, x: dropX, y: dropY })
+      })
     }
     function onKey(e: KeyboardEvent): void {
       if (e.key === 'Escape') endArm()
@@ -2454,8 +2466,9 @@ export default function Canvas(): JSX.Element {
               transformed container. It reads each linked widget's actual
               rendered position via getBoundingClientRect on every frame
               during a drag, so lines can never visually detach from the
-              widget they're attached to. Pinned widgets and section
-              children are excluded from linking in v1. */}
+              widget they're attached to. Widgets in sections, sections
+              themselves, and pinned widgets are all valid link endpoints;
+              arming from a section child is the one remaining exception. */}
           <LinkOverlay
             ghost={
               linkSourceId && ghostCursor
@@ -2466,13 +2479,22 @@ export default function Canvas(): JSX.Element {
                   }
                 : null
             }
+            pendingPick={pendingLinkPick}
+            onPendingPickDone={clearPendingLinkPick}
           />
           </LinkDragContext.Provider>
           {/* Pinned-widget layer: screen-space, in front of the transformed canvas.
               Zone-pinned widgets have their position computed here and provided
               via PinLayoutContext so any nested WidgetFrame can look up its
-              docked rect without prop-drilling through every widget kind. */}
-          <PinnedLayer widgets={widgets} focusedId={focusedId} renderWidget={renderWidget} />
+              docked rect without prop-drilling through every widget kind.
+              It renders OUTSIDE the canvas's LinkDragContext.Provider (it's a
+              screen-space sibling), so it needs its own provider wired to the
+              same controller — otherwise pinned WidgetFrames read a null
+              linkDrag and their "connect" hub button never appears, and a pinned
+              widget can't be a link source (dropping onto one already works). */}
+          <LinkDragContext.Provider value={linkDragController}>
+            <PinnedLayer widgets={widgets} focusedId={focusedId} renderWidget={renderWidget} />
+          </LinkDragContext.Provider>
           <FloatingToolbar
             onAddWidget={handleClickAdd}
             onImport={() => setSyncPickerOpen(true)}

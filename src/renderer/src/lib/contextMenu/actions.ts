@@ -10,7 +10,7 @@ import { useWidgetStore } from '../../stores/widgets'
 import { recordActionWithToast } from '../../stores/actionHistory'
 import { useAiAssistPreview } from '../../stores/aiAssistPreview'
 import { catalogFor } from '../widgetCatalog'
-import { createConnectedTool } from '../createConnectedTool'
+import { createConnectedTool, createAgentFromSources } from '../createConnectedTool'
 import type { MenuContext } from './types'
 
 // The text a context can offer for seeding or AI work: the selection if there
@@ -127,6 +127,18 @@ export async function flagAsDecision(ctx: MenuContext): Promise<void> {
       id = await create()
     }
   })
+}
+
+// Bulk "Automate with an agent" for a multi-selection: spawn one agent and wire
+// every selected widget into it, so the agent runs its instruction over all of
+// them at once. Undo is provided by the underlying create + link actions (each
+// records its own history entry), matching the single-widget create-and-connect
+// flow — no separate composite wrapper.
+export async function automateWithAgent(ctx: MenuContext): Promise<void> {
+  if (ctx.object.type !== 'multi') return
+  const ids = ctx.object.widgets.map((w) => w.id)
+  if (ids.length === 0) return
+  await createAgentFromSources(ids)
 }
 
 // ── Share ────────────────────────────────────────────────────────────────────

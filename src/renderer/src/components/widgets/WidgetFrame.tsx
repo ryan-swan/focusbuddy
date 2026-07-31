@@ -1010,8 +1010,11 @@ export default function WidgetFrame({
                 <Icon name="edit" size={12} />
               </button>
             )}
-            {!isChildOfSection && !isPinned && linkDrag && (
+            {!isChildOfSection && linkDrag && (
               <button
+                // A pinned widget is a valid link endpoint too (widget-link-owner
+                // invariant 5) — its rect is read in the same viewport coords as
+                // every other widget, so the line anchors to its screen position.
                 // mousedown stopPropagation prevents react-rnd from
                 // treating this click as a drag-handle press (the button
                 // lives inside the .widget-handle div). The actual arming

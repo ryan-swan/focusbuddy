@@ -43,8 +43,22 @@ export interface LinkDragGhost {
   cursorScreenY: number
 }
 
+// A link that was just drawn and is awaiting the user's intent choice. The link
+// already exists as a passive `context` wire (created synchronously on drop); the
+// picker only upgrades its type. Anchored in RAW viewport coords (the drop point).
+export interface PendingLinkPick {
+  linkId: string
+  x: number
+  y: number
+}
+
 interface Props {
   ghost: LinkDragGhost | null
+  // Set right after a link is drawn, to offer "how should this connect?" at the
+  // drop point. Null when no pick is pending.
+  pendingPick: PendingLinkPick | null
+  // Clear the pending pick (dismiss or after a choice is made). Should be stable.
+  onPendingPickDone: () => void
 }
 
 interface Bounds {
@@ -156,7 +170,7 @@ interface Segment {
   my: number
 }
 
-export default function LinkOverlay({ ghost }: Props): JSX.Element | null {
+export default function LinkOverlay({ ghost, pendingPick, onPendingPickDone }: Props): JSX.Element | null {
   const links = useLinksStore((s) => s.links)
   const remove = useLinksStore((s) => s.remove)
   const updateWire = useLinksStore((s) => s.update)
@@ -279,6 +293,42 @@ export default function LinkOverlay({ ghost }: Props): JSX.Element | null {
     return () => document.removeEventListener('mousedown', onDown)
   }, [selectedLinkId])
 
+  // Intent picker: dismiss on Escape or an outside-of-popover click. Dismissing
+  // is non-destructive — the link stays a passive `context` wire (widget-link-owner:
+  // never cancel-to-nothing, the gesture already produced a real connection).
+  useEffect(() => {
+    if (!pendingPick) return
+    function onDown(e: MouseEvent): void {
+      const target = e.target as HTMLElement
+      if (target.closest('[data-link-popover]')) return
+      onPendingPickDone()
+    }
+    function onKey(e: KeyboardEvent): void {
+      if (e.key === 'Escape') onPendingPickDone()
+    }
+    document.addEventListener('mousedown', onDown)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onDown)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [pendingPick, onPendingPickDone])
+
+  // Self-heal a stale pick whose link has since vanished (task switch, concurrent
+  // delete). Keeps Canvas's pendingPick state from getting stuck.
+  useEffect(() => {
+    if (pendingPick && !links.some((l) => l.id === pendingPick.linkId)) onPendingPickDone()
+  }, [pendingPick, links, onPendingPickDone])
+
+  // A newly-armed pick dismisses any open wire editor — the reciprocal of
+  // handleClickLine's clear, so the two popovers can never both be on screen.
+  useEffect(() => {
+    if (pendingPick) {
+      setSelectedLinkId(null)
+      setPopoverPos(null)
+    }
+  }, [pendingPick])
+
   // Build the segment list from live DOM positions. Any link whose
   // endpoint isn't currently in the DOM (e.g. archived widget) gets
   // silently skipped — its row stays in SQLite but doesn't render.
@@ -304,10 +354,30 @@ export default function LinkOverlay({ ghost }: Props): JSX.Element | null {
   }
 
   const selectedLink = selectedLinkId ? links.find((l) => l.id === selectedLinkId) ?? null : null
+  const pickLink = pendingPick ? links.find((l) => l.id === pendingPick.linkId) ?? null : null
 
   function handleClickLine(link: WidgetLink, mid: { x: number; y: number }): void {
+    // Opening the wire editor dismisses any pending intent picker — only one
+    // wire popover is ever on screen at a time (widget-link-owner invariant).
+    if (pendingPick) onPendingPickDone()
     setSelectedLinkId(link.id)
     setPopoverPos(mid)
+  }
+
+  // Resolve the intent picker: set the chosen wire type and close. For Transform,
+  // hand off to the full wire editor (anchored where the picker was) so the user
+  // can type the instruction. updateWire is safe on a since-deleted link (returns
+  // null, never throws) — widget-link-owner invariant.
+  function handlePickIntent(type: WireType): void {
+    if (!pendingPick) return
+    const linkId = pendingPick.linkId
+    const pos = { x: pendingPick.x, y: pendingPick.y }
+    void updateWire(linkId, { type })
+    onPendingPickDone()
+    if (type === 'transform') {
+      setSelectedLinkId(linkId)
+      setPopoverPos(pos)
+    }
   }
 
   function handleDelete(): void {
@@ -539,6 +609,13 @@ export default function LinkOverlay({ ghost }: Props): JSX.Element | null {
           </button>
         )
       })}
+      {pendingPick && pickLink && (
+        <LinkIntentPicker
+          pos={{ x: pendingPick.x, y: pendingPick.y }}
+          onPick={handlePickIntent}
+          onDismiss={onPendingPickDone}
+        />
+      )}
       {popoverPos && selectedLink && (
         <div
           data-link-popover
@@ -564,6 +641,64 @@ export default function LinkOverlay({ ghost }: Props): JSX.Element | null {
           />
         </div>
       )}
+    </div>
+  )
+}
+
+// The intent picker shown at the drop point the moment a connection is drawn.
+// It puts the "what should this connection DO?" decision at the moment of intent
+// instead of hiding it behind a tiny badge the user has to discover later. The
+// link already exists as a passive context wire; choosing here just upgrades it.
+function LinkIntentPicker({
+  pos,
+  onPick,
+  onDismiss
+}: {
+  pos: { x: number; y: number }
+  onPick: (type: WireType) => void
+  onDismiss: () => void
+}): JSX.Element {
+  const CHOICES: Array<{ value: WireType; label: string; icon: string; hint: string }> = [
+    { value: 'context', label: 'Feed in as context', icon: 'link', hint: 'Use it as background for the target’s AI.' },
+    { value: 'transform', label: 'Transform it', icon: 'auto_awesome', hint: 'Run an instruction on it and write the result into the target.' },
+    { value: 'mirror', label: 'Keep in sync', icon: 'sync', hint: 'Copy it into the target whenever it changes.' }
+  ]
+  return (
+    <div
+      data-link-popover
+      data-testid="link-intent-picker"
+      onMouseDown={(e) => e.stopPropagation()}
+      style={{
+        position: 'absolute',
+        left: pos.x,
+        top: pos.y + 12,
+        transform: 'translate(-50%, 0)',
+        pointerEvents: 'auto'
+      }}
+      className="w-60 rounded-lg bg-[var(--surface-raised)] border border-[var(--edge-soft)] shadow-xl text-[11px] overflow-hidden"
+    >
+      <div className="flex items-center justify-between px-2.5 py-1.5 border-b border-[var(--edge-soft)]">
+        <span className="font-semibold text-[var(--ink-70)]">How should this connect?</span>
+        <button onClick={onDismiss} className="text-[var(--ink-40)] hover:text-[var(--ink-70)]" aria-label="Dismiss">
+          <Icon name="close" size={12} />
+        </button>
+      </div>
+      <div className="p-1.5">
+        {CHOICES.map((c) => (
+          <button
+            key={c.value}
+            onClick={() => onPick(c.value)}
+            data-testid={`link-intent-${c.value}`}
+            className="w-full flex items-start gap-2 px-2 py-1.5 rounded text-left hover:bg-[var(--surface-sunken)] transition-colors"
+          >
+            <Icon name={c.icon} size={15} className="text-accent mt-0.5 shrink-0" />
+            <span className="flex flex-col">
+              <span className="text-[11px] font-medium text-[var(--ink-100)]">{c.label}</span>
+              <span className="text-[10px] text-[var(--ink-50)] leading-snug">{c.hint}</span>
+            </span>
+          </button>
+        ))}
+      </div>
     </div>
   )
 }
