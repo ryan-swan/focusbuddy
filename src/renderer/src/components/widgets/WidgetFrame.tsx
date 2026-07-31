@@ -6,6 +6,8 @@ import UnifiedWidgetMenu from '../contextMenu/UnifiedWidgetMenu'
 import WidgetSetupAffordance from './WidgetSetupAffordance'
 import { useAutoGrowHeight, autoGrowsHeight } from '../../lib/useAutoGrowHeight'
 import { getNavPrefs } from '../../lib/navPrefs'
+import { useContextHealthStore } from '../../stores/contextHealth'
+import { healthFrameStyle } from '../../lib/healthFrame'
 import { buildContextForWidget, buildContextForMulti } from '../../lib/contextMenu/buildContext'
 import type { FrameCallbacks } from '../../lib/contextMenu/types'
 import { FrameCallbacksProvider } from '../../lib/contextMenu/frameContext'
@@ -140,6 +142,12 @@ export default function WidgetFrame({
   const [shareOpen, setShareOpen] = useState(false)
   const isActive = useWidgetStore((s) => s.activeWidgetId === widget.id)
   const zoom = useWidgetStore((s) => s.zoom)
+  // Per-widget Context Health frame (plexi-4.0, UX-022). Reads the pre-review
+  // "since your last visit" snapshot captured on desk open; `current` -> no frame.
+  const health = useContextHealthStore((s) => s.lastVisit[widget.id])
+  const healthStyle = health
+    ? healthFrameStyle(health.state, (health.decisionsAtRisk ?? []).map((d) => d.title))
+    : null
   const zoomToWidget = useWidgetStore((s) => s.zoomToWidget)
   const allWidgets = useWidgetStore((s) => s.widgets)
   const bumpLayout = useWidgetStore((s) => s.bumpLayoutVersion)
@@ -852,7 +860,7 @@ export default function WidgetFrame({
           if (isPinned) setActive(widget.id)
           else setFocused(widget.id)
         }}
-        className={`h-full w-full flex flex-col rounded-[12px] overflow-hidden border bg-[var(--surface-raised)] fb-spring-snap ${
+        className={`relative h-full w-full flex flex-col rounded-[12px] overflow-hidden border bg-[var(--surface-raised)] fb-spring-snap ${
           selected
             ? 'border-[rgb(var(--accent))] ring-2 ring-[rgb(var(--accent)/0.7)] ring-offset-2 ring-offset-transparent'
             : isActive
@@ -874,6 +882,27 @@ export default function WidgetFrame({
           transitionProperty: 'box-shadow, transform, border-color'
         }}
       >
+        {/* Context Health frame (plexi-4.0, UX-022): a coloured inner ring plus a
+            labelled corner dot, so the state reads without relying on colour
+            (A11Y-004). Rendered above content but click-through. */}
+        {healthStyle && (
+          <div
+            className={`pointer-events-none absolute inset-0 z-[6] rounded-[12px] border-2 ${healthStyle.border}`}
+            aria-hidden="true"
+          />
+        )}
+        {healthStyle && (
+          <span
+            className="pointer-events-none absolute right-1.5 top-1.5 z-[7] inline-flex h-2.5 w-2.5 items-center justify-center"
+            role="img"
+            aria-label={healthStyle.label}
+            title={healthStyle.label}
+            data-testid="widget-health-dot"
+            data-health-state={health!.state}
+          >
+            <span className={`h-2.5 w-2.5 rounded-full ring-2 ring-[var(--surface-raised)] ${healthStyle.dot}`} />
+          </span>
+        )}
         <div
           className={`${draggableHandleClass} ${headerAccent} flex items-center justify-between px-2 py-1 cursor-move select-none border-b border-[color:var(--edge-soft)] backdrop-blur-sm`}
           onContextMenu={(e) => {

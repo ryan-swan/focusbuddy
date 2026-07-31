@@ -33,6 +33,11 @@ interface ContextHealthStore {
   refresh: (id: string) => Promise<void>
   refreshMany: (ids: string[]) => Promise<void>
   openDesk: (id: string) => Promise<void>
+  // Baseline a desk's widgets on open: capture each one's pre-review health into
+  // lastVisit (what changed since the user was last here, which drives the
+  // per-widget frame), then mark the changed ones reviewed so the same change is
+  // not shown again next visit. Unchanged widgets are left untouched.
+  reviewWidgets: (ids: string[]) => Promise<void>
 }
 
 export const useContextHealthStore = create<ContextHealthStore>((set, get) => ({
@@ -78,6 +83,34 @@ export const useContextHealthStore = create<ContextHealthStore>((set, get) => ({
       await api.markReviewed(id)
       await get().refresh(id)
       await get().refreshMany(related)
+    } catch {
+      /* honest no-op */
+    }
+  },
+
+  reviewWidgets: async (ids) => {
+    const api = ctx()
+    const fresh = ids.filter(Boolean)
+    if (!api || fresh.length === 0) return
+    try {
+      // Capture each widget's pre-review health (vs its last review point) into
+      // lastVisit; this stable snapshot is what the widget frame renders during
+      // the visit, so a frame does not vanish the instant the desk opens.
+      const results = await Promise.allSettled(fresh.map((id) => api.health(id)))
+      const changed: string[] = []
+      set((s) => {
+        const lv = { ...s.lastVisit }
+        for (const r of results) {
+          if (r.status !== 'fulfilled') continue
+          const snap = r.value as HealthSnapshot
+          lv[snap.objectId] = snap
+          if (snap.state !== 'current') changed.push(snap.objectId)
+        }
+        return { lastVisit: lv }
+      })
+      // Re-baseline only the widgets that actually changed, so the same change is
+      // not re-surfaced next visit; unchanged widgets keep their existing point.
+      if (changed.length) await Promise.allSettled(changed.map((id) => api.markReviewed(id)))
     } catch {
       /* honest no-op */
     }

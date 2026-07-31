@@ -123,6 +123,7 @@ import { useLinksStore } from '../stores/links'
 import { useAccountStore } from '../stores/account'
 import { currentDeviceClass } from '../lib/deviceClass'
 import { serializeOverlayObjects } from '../lib/deskLayoutOverlay'
+import { useContextHealthStore } from '../stores/contextHealth'
 import { LinkDragContext } from '../lib/linkDragContext'
 import { computeVisibleObjectIds, type VirtualizationBox } from '../lib/canvasVirtualization'
 import type {
@@ -453,6 +454,21 @@ export default function Canvas(): JSX.Element {
     if (activeTaskId) void loadForTask(activeTaskId)
     else clearWidgets()
   }, [activeTaskId, loadForTask, clearWidgets])
+
+  // Per-widget Context Health frames (plexi-4.0, UX-022 at the Object level). Once
+  // a desk's widgets have loaded, baseline each one's "changed since your last
+  // visit" health so the frames reflect what moved while the user was away. Runs
+  // once per desk open; the ref guards against re-running on later widget edits.
+  const reviewedWidgetsForRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (!activeTaskId || layoutHydratedFor !== activeTaskId) return
+    if (reviewedWidgetsForRef.current === activeTaskId) return
+    reviewedWidgetsForRef.current = activeTaskId
+    const ids = widgets
+      .filter((w) => !w.archived && w.parentSectionId === null && w.kind !== 'section')
+      .map((w) => w.id)
+    void useContextHealthStore.getState().reviewWidgets(ids)
+  }, [activeTaskId, layoutHydratedFor, widgets])
 
   // PLX-APP-010 Phase 1 / UX-032 — persist this user's camera + selection for the
   // active Desk and device class, debounced, on user action. Gated on

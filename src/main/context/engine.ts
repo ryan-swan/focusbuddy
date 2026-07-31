@@ -15,7 +15,7 @@ import { createDecisionStore, type DecisionStore } from '../db/decisionStore'
 import { graphFromRelationships } from './propagation'
 import { buildTransitions } from './contextHealthService'
 import type { DecisionAtRisk } from '../../shared/contextHealth'
-import type { MaterialityInput } from './materiality'
+import type { MaterialityInput, DecisionImpact } from './materiality'
 import { deriveHealthSnapshot, ensureReviewSchema, recordReview, reviewPointSeq, type HealthSnapshot } from './health'
 import { generateResume } from '../resume/resume'
 import { createSummaryCache, type SummaryCache } from '../ai/summaryCache'
@@ -143,6 +143,21 @@ export function relatedObjectIds(objectId: string): string[] {
     return e.relationships.activeFor(objectId).map((r) => (r.sourceEntityId === objectId ? r.targetEntityId : r.sourceEntityId))
   } catch {
     return []
+  }
+}
+
+// Whether any live Decision references this Object, expressed as a materiality
+// DecisionImpact. Used so a change to an Object a Decision depends on scores as
+// material and can escalate to decision-risk (Context Health state machine).
+export function decisionImpactForObject(objectId: string): DecisionImpact {
+  try {
+    const e = getContextEngine()
+    const referenced = e.decisions
+      .all()
+      .some((d) => d.state !== 'superseded' && d.state !== 'cancelled' && d.relatedObjectIds.includes(objectId))
+    return referenced ? 'high' : 'none'
+  } catch {
+    return 'none'
   }
 }
 

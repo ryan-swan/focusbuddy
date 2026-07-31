@@ -96,6 +96,7 @@ import {
   relatedObjectIds as ceRelatedObjectIds,
   healthFor as ceHealthFor,
   markReviewed as ceMarkReviewed,
+  decisionImpactForObject as ceDecisionImpactForObject,
   liveResumeForDesk as ceLiveResumeForDesk
 } from '../context/engine'
 import { plexiId } from '@shared/plexiId'
@@ -538,6 +539,28 @@ function materialityForNode(node: {
   }
 }
 
+// Materiality inputs for a Widget (Object). A change scores as material when the
+// widget is referenced by a live Decision or has confirmed relations, so a
+// content change to a decision-linked or well-connected widget can escalate its
+// Context Health, while an isolated note stays a quiet "changed".
+function materialityForWidget(widget: {
+  id: string
+  kind: string
+  parentSectionId: string | null
+}): MaterialityInput {
+  const related = ceRelatedObjectIds(widget.id).length
+  const decisionImpact = ceDecisionImpactForObject(widget.id)
+  return {
+    affectedObjectCount: related,
+    decisionImpact,
+    relationshipDepth: related > 0 ? 1 : 0,
+    organisationalReach: 'desk',
+    userRole: 'owner',
+    workflowStage: 'active',
+    historicalSignificance: decisionImpact === 'high' ? 0.6 : 0.2
+  }
+}
+
 // Lazily-constructed desk-layout overlay store, bound to the app DB on first use
 // (getDb() is ready by the time any IPC handler fires). Its constructor creates
 // the desk_layouts table if absent.
@@ -636,8 +659,12 @@ export function registerIpcHandlers(): void {
   // Per-(user, object) Context Health, honest against the user's last review point.
   ipcMain.handle('context:health', (_e, id: string) => {
     const node = getNode(id)
-    if (!node) return { objectId: id, state: 'current', materiality: null, changedEventCount: 0, decisionsAtRisk: [] }
-    return ceHealthFor(id, materialityForNode(node))
+    if (node) return ceHealthFor(id, materialityForNode(node))
+    // Widgets are first-class Context-Engine objects too (PLX-APP-002): derive
+    // their health so the Canvas can frame a widget that changed while away.
+    const widget = getWidget(id)
+    if (widget) return ceHealthFor(id, materialityForWidget(widget))
+    return { objectId: id, state: 'current', materiality: null, changedEventCount: 0, decisionsAtRisk: [] }
   })
   ipcMain.handle('context:markReviewed', (_e, id: string) => {
     ceMarkReviewed(id)
@@ -653,11 +680,58 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle('widgets:listByTask', (_e, taskId: string) => listWidgetsByTask(taskId))
   ipcMain.handle('widgets:listByKind', (_e, kind: Widget['kind']) => listWidgetsByKind(kind))
-  ipcMain.handle('widgets:create', (_e, draft: WidgetDraft) => createWidget(draft))
+  ipcMain.handle('widgets:create', (_e, draft: WidgetDraft) => {
+    const widget = createWidget(draft)
+    // Widgets are first-class Context-Engine objects (PLX-APP-002): a real create
+    // emits an Event on the widget's object id so its Context Health can be derived.
+    emitObjectEvent({
+      eventType: 'WidgetCreated',
+      category: 'user',
+      objectId: widget.id,
+      deskId: widget.taskId ?? null,
+      currentState: { kind: widget.kind, title: widget.title ?? null },
+      changeSummary: `Added ${widget.kind}${widget.title ? ` "${widget.title}"` : ''}`
+    })
+    // You created it, so you have seen it: baseline past the creation so a brand-new
+    // widget does not report itself as "changed since your last visit".
+    ceMarkReviewed(widget.id)
+    return widget
+  })
   // Tolerant variant for auto-spawned chrome (minimap): no-op if the task is gone.
+  // Chrome is not user content, so it emits no Object Event.
   ipcMain.handle('widgets:createOptional', (_e, draft: WidgetDraft) => createWidgetIfTaskExists(draft))
-  ipcMain.handle('widgets:update', (_e, id: string, patch: WidgetPatch) => updateWidget(id, patch))
-  ipcMain.handle('widgets:delete', (_e, id: string) => deleteWidget(id))
+  ipcMain.handle('widgets:update', (_e, id: string, patch: WidgetPatch) => {
+    const widget = updateWidget(id, patch)
+    // Emit only for content-meaningful changes. Pure geometry/layout moves are not
+    // "changed since your last visit" content and must never flood the log or
+    // flicker a health frame on every drag.
+    if (widget && ('content' in patch || 'title' in patch)) {
+      emitObjectEvent({
+        eventType: 'WidgetUpdated',
+        category: 'user',
+        objectId: widget.id,
+        deskId: widget.taskId ?? null,
+        currentState: { kind: widget.kind, title: widget.title ?? null },
+        changeSummary: `Updated ${widget.kind}${widget.title ? ` "${widget.title}"` : ''}`
+      })
+    }
+    return widget
+  })
+  ipcMain.handle('widgets:delete', (_e, id: string) => {
+    const before = getWidget(id)
+    const removed = deleteWidget(id)
+    if (before) {
+      emitObjectEvent({
+        eventType: 'WidgetDeleted',
+        category: 'user',
+        objectId: id,
+        deskId: before.taskId ?? null,
+        currentState: { kind: before.kind, trashed: true },
+        changeSummary: `Removed ${before.kind}${before.title ? ` "${before.title}"` : ''}`
+      })
+    }
+    return removed
+  })
   ipcMain.handle('widgets:restore', (_e, id: string) => restoreWidget(id))
   ipcMain.handle('widgets:bringToFront', (_e, id: string) => bringToFront(id))
 

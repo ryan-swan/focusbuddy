@@ -39,6 +39,25 @@ describe('plx_evt_043 — every produced Event type has a published, versioned s
     expect(r.errors.some((e) => e.includes('status'))).toBe(true)
   })
 
+  it('test_plx_evt_043_widget_object_events_validate', () => {
+    // Widgets are first-class Context-Engine producers (PLX-APP-002); their
+    // lifecycle Events must validate against published schemas.
+    const es = createEventStore(memSqlDb())
+    const created = es.append({
+      eventType: 'WidgetCreated', category: 'user', actor: 'u', organisationId: 'org', deskId: 'd1', objectId: 'w1',
+      currentState: { kind: 'sticky', title: 'Note' }, changeSummary: 'Added sticky'
+    })
+    expect(validateEvent(created)).toEqual({ valid: true, errors: [] })
+    const deleted = es.append({
+      eventType: 'WidgetDeleted', category: 'user', actor: 'u', organisationId: 'org', deskId: 'd1', objectId: 'w1',
+      currentState: { kind: 'sticky', trashed: true }, changeSummary: 'Removed sticky'
+    })
+    expect(validateEvent(deleted)).toEqual({ valid: true, errors: [] })
+    // A WidgetCreated missing its required `kind` fails.
+    const bad = { ...created, currentState: { title: 'Note' } }
+    expect(validateEvent(bad).valid).toBe(false)
+  })
+
   it('test_plx_evt_043_unregistered_type_is_a_failure', () => {
     const r = validateEvent({ id: 'e', eventType: 'TotallyNewThing', category: 'user', actor: 'u', organisationId: 'o', timestamp: 't', recordedAt: 't', sequence: 1, correlationId: 'c', currentState: {} })
     expect(r.valid).toBe(false)
