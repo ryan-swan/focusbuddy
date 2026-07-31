@@ -499,10 +499,7 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
           // layout. (The earlier wrap-chips predate the mirror direction.)
           // Content still comes from ctx per screen — no curated static list,
           // no invented "New" badges (plan D4).
-          <div className="mt-5 px-1 flex flex-col" data-testid="assistant-empty-state">
-            <span className="w-10 h-10 rounded-full grid place-items-center bg-accent/15 border border-[rgb(var(--accent)/0.25)] text-accent mb-3">
-              <Icon name="auto_awesome" size={20} filled />
-            </span>
+          <div className="mt-2 px-1 flex flex-col" data-testid="assistant-empty-state">
             <h3 className="text-[15px] font-semibold tracking-[-0.01em] text-[var(--ink-100)] mb-1">
               How can I help you today?
             </h3>
