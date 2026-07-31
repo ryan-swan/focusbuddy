@@ -101,6 +101,7 @@ import {
   cancelDecision as ceCancelDecision,
   listDecisions as ceListDecisions,
   decisionsForObject as ceDecisionsForObject,
+  backfillWidgetLinkRelations as ceBackfillWidgetLinkRelations,
   liveResumeForDesk as ceLiveResumeForDesk
 } from '../context/engine'
 import { plexiId } from '@shared/plexiId'
@@ -119,6 +120,7 @@ import { getLaunchInfo } from '../launchVersion'
 import {
   createLink,
   deleteLink,
+  getLink,
   listLinksByTask,
   updateLink,
   type WireUpdate
@@ -658,7 +660,7 @@ export function registerIpcHandlers(): void {
   // as a confirmed Relationship so Context Health can propagate across it.
   ipcMain.handle('nodes:relate', (_e, a: string, b: string) => {
     relateNodes(a, b)
-    mirrorUserRelation(a, b, plexiId())
+    mirrorUserRelation(a, b, plexiId(), 'user linked these desks')
     return listRelatedNodeIds(a)
   })
   ipcMain.handle('nodes:unrelate', (_e, a: string, b: string) => {
@@ -905,13 +907,43 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle(
     'widgetLinks:create',
-    (_e, sourceWidgetId: string, targetWidgetId: string, taskId: string, type?: WireType) =>
-      createLink(sourceWidgetId, targetWidgetId, taskId, type ?? 'context')
+    (_e, sourceWidgetId: string, targetWidgetId: string, taskId: string, type?: WireType) => {
+      const link = createLink(sourceWidgetId, targetWidgetId, taskId, type ?? 'context')
+      // A link the user drew IS a relationship: mirror it into the graph as a
+      // confirmed RelatedTo, so the connection feeds context.related, decision-risk
+      // propagation and Assemble's related-surfacing (widget-link-owner approved,
+      // all wire types). Idempotent; self-loops already blocked by createLink.
+      if (link) {
+        mirrorUserRelation(link.sourceWidgetId, link.targetWidgetId, link.id, 'user linked these widgets')
+      }
+      return link
+    }
   )
+  // updateLink only changes wire behaviour (enable/disable/retype); the
+  // relationship exists as long as the link does, so the mirror is untouched here.
   ipcMain.handle('widgetLinks:update', (_e, id: string, patch: WireUpdate) =>
     updateLink(id, patch)
   )
-  ipcMain.handle('widgetLinks:delete', (_e, id: string) => deleteLink(id))
+  ipcMain.handle('widgetLinks:delete', (_e, id: string) => {
+    const link = getLink(id)
+    const ok = deleteLink(id)
+    // Remove the mirrored relationship only when no other link still connects the
+    // pair in EITHER direction (widget_links allows independent A->B and B->A).
+    if (link) {
+      const a = link.sourceWidgetId
+      const b = link.targetWidgetId
+      const stillLinked = listLinksByTask(link.taskId).some(
+        (l) =>
+          (l.sourceWidgetId === a && l.targetWidgetId === b) ||
+          (l.sourceWidgetId === b && l.targetWidgetId === a)
+      )
+      if (!stillLinked) unmirrorUserRelation(a, b)
+    }
+    return ok
+  })
+  // One-time-ish: mirror widget links that existed before links fed the graph, so
+  // historical connections also surface as related. Idempotent, non-fatal.
+  ceBackfillWidgetLinkRelations()
 
   // Desk time-travel snapshots.
   ipcMain.handle('snapshots:create', (_e, taskId: string, label?: string) =>

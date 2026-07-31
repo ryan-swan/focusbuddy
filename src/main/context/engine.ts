@@ -18,6 +18,7 @@ import type { DecisionAtRisk } from '../../shared/contextHealth'
 import type { MaterialityInput, DecisionImpact } from './materiality'
 import type { Decision, ActorRef } from '../../shared/decision'
 import { plexiId } from '../../shared/plexiId'
+import { listAllLinks } from '../db/widgetLinks'
 import { deriveHealthSnapshot, ensureReviewSchema, recordReview, reviewPointSeq, type HealthSnapshot } from './health'
 import { generateResume } from '../resume/resume'
 import { createSummaryCache, type SummaryCache } from '../ai/summaryCache'
@@ -97,7 +98,12 @@ export function emitObjectEvent(input: Omit<AppendInput, 'organisationId' | 'act
 // Mirror a user-created desk relation into the knowledge graph as a CONFIRMED
 // RelatedTo edge (the user linked them, so it is confirmed, not provisional —
 // PLX-PRD-051). Idempotent against an existing active edge. Non-fatal on failure.
-export function mirrorUserRelation(a: string, b: string, correlationId: string): void {
+export function mirrorUserRelation(
+  a: string,
+  b: string,
+  correlationId: string,
+  excerpt = 'user linked these'
+): void {
   if (!a || !b || a === b) return
   try {
     const e = getContextEngine()
@@ -113,7 +119,7 @@ export function mirrorUserRelation(a: string, b: string, correlationId: string):
       directed: false,
       strength: 0.8,
       confidence: 1,
-      evidence: [{ kind: 'event', ref: correlationId, excerpt: 'user linked these desks', weight: 1 }],
+      evidence: [{ kind: 'event', ref: correlationId, excerpt, weight: 1 }],
       discoveryMethod: 'user',
       correlationId,
       confirmedBy: actor
@@ -135,6 +141,19 @@ export function unmirrorUserRelation(a: string, b: string): void {
     }
   } catch (err) {
     console.warn('[context-engine] relation unmirror failed (non-fatal):', (err as Error).message)
+  }
+}
+
+// One-time-ish backfill: mirror every existing widget link into the relationship
+// graph, so connections drawn before links began mirroring still surface as
+// related. Idempotent (mirrorUserRelation no-ops on an existing edge) and non-fatal.
+export function backfillWidgetLinkRelations(): void {
+  try {
+    for (const l of listAllLinks()) {
+      mirrorUserRelation(l.sourceWidgetId, l.targetWidgetId, l.id, 'user linked these widgets')
+    }
+  } catch (err) {
+    console.warn('[context-engine] widget-link relation backfill failed (non-fatal):', (err as Error).message)
   }
 }
 

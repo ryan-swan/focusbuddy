@@ -36,6 +36,22 @@ export function listLinksByTask(taskId: string): WidgetLink[] {
   return rows.map(rowToLink)
 }
 
+// A single link by id. Needed on delete so the caller can read the endpoints
+// before the row is gone (e.g. to remove the mirrored graph relationship).
+export function getLink(id: string): WidgetLink | null {
+  const db = getDb()
+  const row = db.prepare('SELECT * FROM widget_links WHERE id = ?').get(id) as WidgetLinkRow | undefined
+  return row ? rowToLink(row) : null
+}
+
+// Every link across all tasks. Used to backfill the relationship graph from links
+// that already existed before links began mirroring into it.
+export function listAllLinks(): WidgetLink[] {
+  const db = getDb()
+  const rows = db.prepare('SELECT * FROM widget_links').all() as WidgetLinkRow[]
+  return rows.map(rowToLink)
+}
+
 // Create a directed link. Returns the new link, or the existing one if a
 // link in the same direction already exists (UNIQUE constraint catches the
 // dup). We deliberately do NOT prevent the reverse direction — users can
