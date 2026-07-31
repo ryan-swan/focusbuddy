@@ -890,6 +890,7 @@ export function registerIpcHandlers(): void {
           pinnedWidgetId: input.pinnedWidgetId
         },
         {
+          onMentions: (m) => send('mentions', m),
           onSources: (t) => send('sources', t),
           onReply: (text) => send('reply', text),
           onTool: (tool) => send('tool', tool),

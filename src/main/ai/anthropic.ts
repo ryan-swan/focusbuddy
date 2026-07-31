@@ -1118,6 +1118,10 @@ function unparseableChatResponse(
 // assigned per response), and the point of the trace is to show the work in
 // flight, not to pre-empt the result.
 export interface ChatStreamCallbacks {
+  // What each @-mention produced. Fires before onSources because the resolver
+  // genuinely runs before retrieval — the references decide what retrieval is
+  // narrowed to. Absent entirely when the request carried no mentions.
+  onMentions: (mentions: ChatMentionResolved[]) => void
   onSources: (trace: ChatRetrievalTrace) => void
   onReply: (replyText: string) => void
   onTool: (tool: ChatToolTrace) => void
@@ -1158,6 +1162,7 @@ export async function sendChatStream(
     return
   }
   // Retrieval is done — report it before a single token of the answer exists.
+  if (prepared.mentions.length > 0) cb.onMentions(prepared.mentions)
   cb.onSources({ sources: prepared.sources, elapsedMs: prepared.retrievalMs })
 
   // The delta → event loop lives in its own module so it can be tested without

@@ -9,6 +9,7 @@ import type {
   ChatQuestion,
   ChatRequest,
   ChatResponse,
+  ChatMentionResolved,
   ChatRetrievalTrace,
   ChatToolTrace,
   ConnectedApp,
@@ -311,6 +312,7 @@ const api = {
     sendStream: (
       req: ChatRequest & { requestId: string },
       callbacks: {
+        onMentions?: (mentions: ChatMentionResolved[]) => void
         onSources?: (trace: ChatRetrievalTrace) => void
         onReply?: (text: string) => void
         onTool?: (tool: ChatToolTrace) => void
@@ -321,6 +323,7 @@ const api = {
     ): (() => void) => {
       const channel = `chat:stream:${req.requestId}`
       type Event =
+        | { type: 'mentions'; payload: ChatMentionResolved[] }
         | { type: 'sources'; payload: ChatRetrievalTrace }
         | { type: 'reply'; payload: string }
         | { type: 'tool'; payload: ChatToolTrace }
@@ -332,6 +335,9 @@ const api = {
       let settled = false
       const handler = (_: unknown, ev: Event): void => {
         switch (ev.type) {
+          case 'mentions':
+            callbacks.onMentions?.(ev.payload)
+            break
           case 'sources':
             callbacks.onSources?.(ev.payload)
             break

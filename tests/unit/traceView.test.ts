@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import type { ChatSource, ChatToolTrace } from '../../src/shared/types'
+import type { ChatMentionResolved, ChatSource, ChatToolTrace } from '../../src/shared/types'
 import {
   getTraceView,
   hasTraceContent,
@@ -22,6 +22,22 @@ const src = (n: number, title: string, docType = 'document'): ChatSource => ({
 
 const tool = (index: number, kind: string, label: string): ChatToolTrace => ({ index, kind, label })
 
+// A resolved (or refused) @-mention, as the main process reports it.
+const mention = (
+  title: string,
+  resolved: boolean,
+  extra: Partial<ChatMentionResolved> = {}
+): ChatMentionResolved => ({
+  kind: 'document',
+  id: title.toLowerCase().replace(/\s+/g, '-'),
+  title,
+  resolved,
+  chars: resolved ? 120 : 0,
+  truncated: false,
+  reason: resolved ? null : 'this document no longer exists',
+  ...extra
+})
+
 // A trace with nothing yet reported — the state right after a send starts.
 function running(patch: Partial<AssistantTrace> = {}): AssistantTrace {
   return {
@@ -31,6 +47,7 @@ function running(patch: Partial<AssistantTrace> = {}): AssistantTrace {
     retrievalMs: null,
     repliedAt: null,
     completedAt: null,
+    mentions: [],
     sources: [],
     tools: [],
     error: null,
@@ -278,5 +295,115 @@ describe('toolIcon — an action looks the same in the trace as on its card', ()
 
   it('falls back rather than rendering a broken glyph for an unknown kind', () => {
     expect(toolIcon('summon-dragon')).toBe('bolt')
+  })
+})
+
+// ── The "Mentioned" lane (Phase 4.4, plan D3) ──────────────────────────────
+// A separate lane from Retrieved on purpose: "you told me to read this" and
+// "I went and found this" are different claims. The critical invariant is that
+// merging them never happens — [n] means retrieval, and only retrieval.
+
+describe('the mentioned lane — what the user named, and what it really produced', () => {
+  it('leads the trace, because references resolve before retrieval runs', () => {
+    const v = getTraceView(
+      running({
+        mentions: [mention('Q3 brief', true)],
+        retrievedAt: 1100,
+        retrievalMs: 40,
+        sources: [src(1, 'A doc')],
+        repliedAt: 1200,
+        status: 'done',
+        completedAt: 1300
+      }),
+      1
+    )
+    expect(v.completed[0].key).toBe('mentions')
+    expect(v.completed[1].key).toBe('retrieve')
+  })
+
+  it('does not exist at all when the request carried no references', () => {
+    const v = getTraceView(running({ retrievedAt: 1100, sources: [], repliedAt: 1200, status: 'done' }), 0)
+    expect(v.completed.find((l) => l.key === 'mentions')).toBeUndefined()
+  })
+
+  it('never draws an unresolved reference as read', () => {
+    const v = getTraceView(
+      running({
+        mentions: [mention('Gone doc', false)],
+        retrievedAt: 1100,
+        repliedAt: 1200,
+        status: 'done'
+      }),
+      0
+    )
+    const line = v.completed.find((l) => l.key === 'mentions')!
+    expect(line.label).toContain('Could not read')
+    expect(line.label).not.toMatch(/^Read \d/)
+    expect(line.leaves![0].label).toContain('no longer exists')
+    expect(line.leaves![0].icon).toBe('link_off')
+  })
+
+  it('counts honestly when some resolved and some did not', () => {
+    const v = getTraceView(
+      running({
+        mentions: [mention('Good', true), mention('Bad', false)],
+        retrievedAt: 1100,
+        repliedAt: 1200,
+        status: 'done'
+      }),
+      0
+    )
+    expect(v.completed.find((l) => l.key === 'mentions')!.label).toBe('Read 1 of 2 items you referenced')
+  })
+
+  it('says a reference was shortened rather than passing a fragment off as the whole', () => {
+    const v = getTraceView(
+      running({
+        mentions: [mention('Huge doc', true, { truncated: true })],
+        retrievedAt: 1100,
+        repliedAt: 1200,
+        status: 'done'
+      }),
+      0
+    )
+    expect(v.completed.find((l) => l.key === 'mentions')!.leaves![0].label).toContain('shortened')
+  })
+
+  it('keeps [n] meaning retrieval, and only retrieval', () => {
+    // The whole reason for a separate lane (plan D3). A mention must never take
+    // a citation number, or an inline [1] in the prose would point at something
+    // the model was never told to number.
+    const t = running({
+      mentions: [mention('Referenced', true), mention('Also referenced', true)],
+      retrievedAt: 1100,
+      sources: [src(1, 'First retrieved'), src(2, 'Second retrieved')],
+      repliedAt: 1200,
+      status: 'done'
+    })
+    const v = getTraceView(t, 2)
+    const mentionLeaves = v.completed.find((l) => l.key === 'mentions')!.leaves!
+    const sourceLeaves = v.completed.find((l) => l.key === 'retrieve')!.leaves!
+    // No mention leaf carries a citation number.
+    expect(mentionLeaves.every((l) => l.n === undefined)).toBe(true)
+    // Retrieval's numbering starts at 1 regardless of how many were mentioned.
+    expect(sourceLeaves.map((l) => l.n)).toEqual([1, 2])
+  })
+
+  it('summarises only references that were genuinely read', () => {
+    expect(
+      traceSummary(
+        running({ mentions: [mention('A', true), mention('B', false)], sources: [src(1, 'x')], status: 'done' })
+      )
+    ).toBe('1 mentioned · 1 source')
+    // All failed: the collapsed line must not advertise a count of zero read.
+    expect(
+      traceSummary(running({ mentions: [mention('A', false)], sources: [], tools: [], status: 'done' }))
+    ).toBe('No sources used')
+  })
+
+  it('is content worth drawing even when retrieval found nothing', () => {
+    expect(
+      hasTraceContent(running({ mentions: [mention('A', true)], sources: [], tools: [], status: 'done' }))
+    ).toBe(true)
   })
 })

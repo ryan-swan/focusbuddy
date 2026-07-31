@@ -2249,4 +2249,5 @@ export type ChatBlock =
   | { kind: 'connector-action'; connector: string; label: string; proposal: ActionProposal }
   // What the answer was grounded on. Rendered as a row of numbered chips under
   // the reply, matching the [n] markers inside it.
+  | { kind: 'mentions'; mentions: ChatMentionResolved[] }
   | { kind: 'sources'; sources: ChatSource[] }

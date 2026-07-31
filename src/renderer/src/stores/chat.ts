@@ -40,6 +40,7 @@ function newTrace(): AssistantTrace {
     retrievalMs: null,
     repliedAt: null,
     completedAt: null,
+    mentions: [],
     sources: [],
     tools: [],
     error: null
@@ -449,6 +450,12 @@ export const useChatStore = create<ChatStore>((set, get) => ({
           mentions: wireMentions
         },
         {
+          onMentions: (m) => {
+            patchTrace({ mentions: m })
+            // Same verdicts the completed response carries, applied as soon as
+            // they are known so a broken chip does not wait for the answer.
+            set({ mentionResolution: mergeMentionResolution(get().mentionResolution, m) })
+          },
           onSources: (t) => patchTrace({ retrievedAt: Date.now(), retrievalMs: t.elapsedMs, sources: t.sources }),
           onReply: (text) => {
             patchTrace({ repliedAt: Date.now() })

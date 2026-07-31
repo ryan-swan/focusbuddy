@@ -51,10 +51,19 @@ async function stubStream(
   reply: string,
   // When set, the completed response reports these mention ids as unresolvable,
   // which is the only thing that may make a chip render broken.
-  unresolved: string[] = []
+  unresolved: string[] = [],
+  // Emit retrieved sources too, so the two lanes can be told apart.
+  withSources = false
 ): Promise<void> {
   await app.evaluate(
-    ({ ipcMain }, { replyText, unresolvedIds }: { replyText: string; unresolvedIds: string[] }) => {
+    (
+      { ipcMain },
+      {
+        replyText,
+        unresolvedIds,
+        withSources
+      }: { replyText: string; unresolvedIds: string[]; withSources: boolean }
+    ) => {
       try {
         ipcMain.removeHandler('chat:sendStream')
       } catch {
@@ -83,29 +92,42 @@ async function stubStream(
             if (!e.sender.isDestroyed()) e.sender.send(channel, { type, payload })
           }
           const wait = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms))
+          const resolutions = mentions.map((m) => ({
+            kind: m.kind,
+            id: m.id,
+            title: m.title,
+            resolved: !unresolvedIds.includes(m.id),
+            chars: unresolvedIds.includes(m.id) ? 0 : 42,
+            truncated: false,
+            reason: unresolvedIds.includes(m.id) ? 'this widget no longer exists' : null
+          }))
           await wait(20)
-          send('sources', { sources: [], elapsedMs: 10 })
+          // Resolution really does precede retrieval in the main process, and
+          // the stream reports it in that order.
+          if (resolutions.length > 0) send('mentions', resolutions)
+          await wait(20)
+          send('sources', {
+            sources: withSources
+              ? [
+                  { n: 1, docId: 'doc-1', title: 'A retrieved doc', docType: 'document', snippet: 's1' },
+                  { n: 2, docId: 'doc-2', title: 'Another retrieved doc', docType: 'document', snippet: 's2' }
+                ]
+              : [],
+            elapsedMs: 10
+          })
           await wait(20)
           send('reply', replyText)
           await wait(20)
           send('complete', {
             ok: true,
             message: { role: 'assistant', content: replyText, ts: Date.now() },
-            mentions: mentions.map((m) => ({
-              kind: m.kind,
-              id: m.id,
-              title: m.title,
-              resolved: !unresolvedIds.includes(m.id),
-              chars: unresolvedIds.includes(m.id) ? 0 : 42,
-              truncated: false,
-              reason: unresolvedIds.includes(m.id) ? 'this widget no longer exists' : null
-            }))
+            mentions: resolutions
           })
           return { ok: true }
         }
       )
     },
-    { replyText: reply, unresolvedIds: unresolved }
+    { replyText: reply, unresolvedIds: unresolved, withSources }
   )
 }
 
@@ -340,4 +362,37 @@ test('AM-7 — a reference the assistant could not read renders broken, not live
   await expect(refChips(window).first()).toHaveAttribute('data-mention-resolved', 'false', {
     timeout: 4000
   })
+})
+
+test('AM-8 — the trace shows a Mentioned lane above Retrieved, and [n] still means retrieval', async () => {
+  const { window, app, aId } = await boot()
+  await openAssistant(window)
+
+  await window.locator(`[data-widget-id="${aId}"]`).click()
+  await expect(refChips(window)).toHaveCount(1, { timeout: 4000 })
+
+  await stubStream(app, 'Grounded in both.', [], true)
+  await ask(window, 'what does it say?')
+  await expect(window.getByText('Grounded in both.')).toBeVisible({ timeout: 8000 })
+
+  const mentionLane = window.locator('[data-trace-line="mentions"]')
+  const retrieveLane = window.locator('[data-trace-line="retrieve"]')
+  await expect(mentionLane).toBeVisible({ timeout: 8000 })
+  await expect(retrieveLane).toBeVisible()
+  await expect(mentionLane).toContainText('you referenced')
+  await expect(mentionLane).toContainText('Widget A')
+
+  // The lane leads — resolution genuinely happens before retrieval.
+  const laneOrder = await window.evaluate(() =>
+    Array.from(document.querySelectorAll('[data-trace-line]')).map((el) =>
+      el.getAttribute('data-trace-line')
+    )
+  )
+  expect(laneOrder.indexOf('mentions')).toBeLessThan(laneOrder.indexOf('retrieve'))
+
+  // Plan D3's whole point: the mention takes no citation number, so retrieval's
+  // numbering still starts at 1 and an inline [1] means the first RETRIEVED doc.
+  await expect(retrieveLane).toContainText('A retrieved doc')
+  const mentionLaneText = await mentionLane.innerText()
+  expect(mentionLaneText).not.toMatch(/\b1\b\s*Widget A/)
 })

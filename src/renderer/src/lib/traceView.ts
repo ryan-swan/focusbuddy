@@ -11,7 +11,7 @@
 // Pure and DOM-free so it unit-tests directly — the derivation is where the
 // honesty lives, so it is the part that gets pinned by tests.
 
-import type { ChatSource, ChatToolTrace } from '@shared/types'
+import type { ChatMentionResolved, ChatSource, ChatToolTrace } from '@shared/types'
 import { connectorForKind, connectorMeta } from './chatBlocks'
 
 // What the assistant actually did while answering one message.
@@ -29,6 +29,12 @@ export interface AssistantTrace {
   // Null until the reply prose lands whole.
   repliedAt: number | null
   completedAt: number | null
+  // What each object the user named with "@" actually produced (Phase 4.4).
+  // A separate lane from `sources` on purpose (plan D3): "you told me to read
+  // this" and "I went and found this" are different claims, and merging them
+  // would also renumber the [n] markers, which mean retrieval and only
+  // retrieval. Empty when the request carried no mentions.
+  mentions: ChatMentionResolved[]
   // Everything retrieval returned — NOT the same as what the answer cites.
   // Citation chips are derived separately, from the [n] markers in the prose.
   sources: ChatSource[]
@@ -104,7 +110,7 @@ export function toolIcon(kind: string): string {
 export function hasTraceContent(trace: AssistantTrace): boolean {
   if (trace.status === 'running') return true
   if (trace.status === 'error') return true
-  return trace.sources.length > 0 || trace.tools.length > 0
+  return trace.mentions.length > 0 || trace.sources.length > 0 || trace.tools.length > 0
 }
 
 // The one-line summary the trace collapses to. Only ever names things that
@@ -115,6 +121,11 @@ export function hasTraceContent(trace: AssistantTrace): boolean {
 // which is the one thing a collapsed summary must never do.
 export function traceSummary(trace: AssistantTrace): string {
   const parts: string[] = []
+  // Only references that genuinely produced content are counted as read — a
+  // summary saying "2 mentioned" over one that failed would be the collapsed
+  // line telling a story the expanded one contradicts.
+  const readCount = trace.mentions.filter((m) => m.resolved).length
+  if (readCount > 0) parts.push(`${readCount} mentioned`)
   if (trace.sources.length > 0) parts.push(plural(trace.sources.length, 'source'))
   if (trace.tools.length > 0) parts.push(plural(trace.tools.length, 'tool'))
   if (trace.status === 'error') {
@@ -122,6 +133,35 @@ export function traceSummary(trace: AssistantTrace): string {
   }
   if (parts.length === 0) return 'No sources used'
   return parts.join(' · ')
+}
+
+// The lane for the objects the user named. Resolved references are drawn as
+// read; one that produced nothing is drawn as NOT read, with the reason the
+// resolver gave. Both belong on screen — the user named it, so they are owed
+// the outcome — but only one of them may claim the assistant read it.
+function mentionLine(trace: AssistantTrace): TraceLine | null {
+  if (trace.mentions.length === 0) return null
+  const read = trace.mentions.filter((m) => m.resolved)
+  const label =
+    read.length === trace.mentions.length
+      ? `Read ${plural(read.length, 'item')} you referenced`
+      : read.length === 0
+        ? `Could not read the ${plural(trace.mentions.length, 'item')} you referenced`
+        : `Read ${read.length} of ${trace.mentions.length} items you referenced`
+  return {
+    key: 'mentions',
+    label,
+    icon: 'alternate_email',
+    leaves: trace.mentions.map((m) => ({
+      key: `mention-${m.kind}-${m.id}`,
+      label: m.resolved
+        ? m.truncated
+          ? `${m.title} (shortened to fit)`
+          : m.title
+        : `${m.title} — ${m.reason ?? 'could not be read'}`,
+      icon: m.resolved ? 'alternate_email' : 'link_off'
+    }))
+  }
 }
 
 function retrieveLabel(trace: AssistantTrace): string {
@@ -171,6 +211,11 @@ export function getTraceView(trace: AssistantTrace, revealedCount: number): Trac
           }
         }
       : { completed, active, error: null }
+
+  // 0 — what the user named. Resolution genuinely happens before retrieval (it
+  // is what retrieval gets narrowed by), so this lane leads.
+  const mentioned = mentionLine(trace)
+  if (mentioned) completed.push(mentioned)
 
   // 1 — retrieval. Nothing else can be true until this returns.
   if (trace.retrievedAt === null) {

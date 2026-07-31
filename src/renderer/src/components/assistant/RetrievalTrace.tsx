@@ -145,7 +145,7 @@ export default function RetrievalTrace({
         </button>
       )}
       {completed.map((line) => (
-        <div key={line.key} className="flex flex-col gap-0.5">
+        <div key={line.key} data-trace-line={line.key} className="flex flex-col gap-0.5">
           <div className="fb-trace-in flex items-center gap-1.5 text-[var(--ink-40)]">
             <Icon name="check_circle" size={12} className="text-emerald-500/80 shrink-0" filled />
             <Icon name={line.icon} size={11} className="shrink-0 opacity-70" />
