@@ -494,20 +494,29 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
         className="flex-1 overflow-auto px-3 py-3 space-y-3"
       >
         {messages.length === 0 && (
-          <div className="mt-1 px-0.5">
-            <p className="text-[12.5px] text-[var(--ink-70)] leading-relaxed mb-3">{ctx.intro}</p>
-            {/* Prompt chips wrap instead of stacking as full-width bordered rows;
-                a pill reads as an offer, a full-width row reads as a menu item. */}
-            <div className="flex flex-wrap gap-1.5">
+          // Notion-mirror empty state: avatar, "How can I help you today?",
+          // the per-screen intro, then iconed suggestion ROWS — the reference
+          // layout. (The earlier wrap-chips predate the mirror direction.)
+          // Content still comes from ctx per screen — no curated static list,
+          // no invented "New" badges (plan D4).
+          <div className="mt-5 px-1 flex flex-col" data-testid="assistant-empty-state">
+            <span className="w-10 h-10 rounded-full grid place-items-center bg-accent/15 border border-[rgb(var(--accent)/0.25)] text-accent mb-3">
+              <Icon name="auto_awesome" size={20} filled />
+            </span>
+            <h3 className="text-[15px] font-semibold tracking-[-0.01em] text-[var(--ink-100)] mb-1">
+              How can I help you today?
+            </h3>
+            <p className="text-[11.5px] text-[var(--ink-60)] leading-relaxed mb-4">{ctx.intro}</p>
+            <div className="flex flex-col -mx-1">
               {ctx.suggestions.map((s) => (
                 <button
                   key={s.text}
                   onClick={() => setDraft(s.text)}
                   data-testid="chat-suggestion"
-                  className="inline-flex items-center gap-1.5 text-left text-[11.5px] px-2.5 py-1.5 rounded-full border border-[var(--edge-soft)] text-[var(--ink-70)] hover:text-[var(--ink-100)] hover:border-[rgb(var(--accent)/0.45)] hover:bg-[var(--surface-sunken)] transition-colors"
+                  className="flex items-center gap-2.5 text-left text-[12.5px] px-2 py-2 rounded-lg text-[var(--ink-80)] hover:text-[var(--ink-100)] hover:bg-[var(--surface-sunken)] transition-colors"
                 >
-                  <Icon name={s.icon} size={13} className="text-accent shrink-0" />
-                  <span>{s.text}</span>
+                  <Icon name={s.icon} size={15} className="text-accent shrink-0" />
+                  <span className="truncate">{s.text}</span>
                 </button>
               ))}
             </div>
@@ -654,6 +663,20 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
           />
         )}
         <div className="rounded-[13px] border border-[var(--edge-firm)] bg-[var(--surface-raised)] px-2.5 pt-2 pb-1.5 flex flex-col gap-2 transition-shadow focus-within:border-[rgb(var(--accent)/0.55)] focus-within:shadow-[0_0_0_3px_rgb(var(--accent)/0.13)]">
+          {/* Context chip — names the surface this conversation is scoped to,
+              restated at the point of typing (Notion's 📄-chip pattern). Same
+              fact as the header subtitle; in floating and fullscreen modes the
+              header is far from the composer. */}
+          <div>
+            <span
+              data-testid="composer-context-chip"
+              className="inline-flex max-w-full items-center gap-1 rounded-full border border-[var(--edge-soft)] bg-[var(--surface-sunken)] px-2 py-0.5 text-[10px] text-[var(--ink-60)]"
+              title={`This conversation is scoped to ${thread.title || thread.label}`}
+            >
+              <Icon name={thread.icon} size={11} className="shrink-0" />
+              <span className="truncate">{thread.title || thread.label}</span>
+            </span>
+          </div>
           <textarea
             ref={taRef}
             value={draft}

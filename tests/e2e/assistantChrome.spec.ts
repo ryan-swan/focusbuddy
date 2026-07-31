@@ -161,7 +161,7 @@ test('AC-3 — minimize returns the pill; reopen and reload both restore the las
   await expect(panel(window)).toBeVisible()
 })
 
-test('AC-4 — fb:open-assistant still summons the assistant', async () => {
+test('AC-4 — fb:open-assistant still summons the assistant, into the Notion-shaped empty state', async () => {
   launched = await launchApp()
   const { window } = launched
   await waitForReady(window)
@@ -169,4 +169,24 @@ test('AC-4 — fb:open-assistant still summons the assistant', async () => {
   await expect(panel(window)).toHaveCount(0)
   await window.evaluate(() => window.dispatchEvent(new CustomEvent('fb:open-assistant')))
   await expect(panel(window)).toBeVisible({ timeout: 8000 })
+
+  // Fresh thread → the mirror empty state: avatar block with the greeting,
+  // per-screen suggestion rows, and the composer's context chip naming the
+  // surface the conversation is scoped to.
+  const empty = window.locator('[data-testid="assistant-empty-state"]')
+  await expect(empty).toBeVisible()
+  await expect(empty).toContainText('How can I help you today?')
+  await expect(window.locator('[data-testid="chat-suggestion"]').first()).toBeVisible()
+  await expect(window.locator('[data-testid="composer-context-chip"]')).toBeVisible()
+
+  // A suggestion row fills the composer rather than sending — an offer, not a
+  // command. The row's textContent also carries the icon's Material Symbols
+  // ligature name, so assert containment of the real value instead of
+  // equality against the raw row text.
+  const row = window.locator('[data-testid="chat-suggestion"]').first()
+  const rowText = (await row.textContent()) ?? ''
+  await row.click()
+  const composerValue = await window.locator('[data-testid="chat-composer"]').inputValue()
+  expect(composerValue.length).toBeGreaterThan(0)
+  expect(rowText).toContain(composerValue)
 })
