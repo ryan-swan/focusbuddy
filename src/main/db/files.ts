@@ -161,6 +161,46 @@ export function readFileBytes(id: string): { mimeType: string; bytes: Buffer } |
   }
 }
 
+// ── Cross-member sync byte helpers ───────────────────────────────────────────
+// A file's metadata syncs over the org workspace loop like any other row; these
+// move the actual bytes. readForSync ships a local file's bytes up to the org
+// blob channel; hasBytes tells the pull side whether it still needs to fetch;
+// writeSyncedBytes lands a pulled blob on disk under the same id+ext naming the
+// rest of this module uses, so getFile/readFileBytes/extractFileText find it.
+
+export function hasFileBytes(id: string): boolean {
+  const file = getFile(id)
+  if (!file) return false
+  return existsSync(file.storedPath)
+}
+
+export function readFileBytesForSync(
+  id: string
+): { ext: string; mimeType: string; bytes: Uint8Array } | null {
+  const file = getFile(id)
+  if (!file || !existsSync(file.storedPath)) return null
+  try {
+    return { ext: file.ext, mimeType: file.mimeType, bytes: readFileSync(file.storedPath) }
+  } catch {
+    return null
+  }
+}
+
+export function writeSyncedFileBytes(id: string, bytes: Uint8Array): boolean {
+  const file = getFile(id)
+  // The fb_files row is applied before its bytes are fetched, so it exists here
+  // and gives us the canonical stored path (id + sanitised ext). If it somehow
+  // doesn't, refuse rather than guess a path.
+  if (!file) return false
+  try {
+    mkdirSync(filesDir(), { recursive: true })
+    writeFileSync(file.storedPath, bytes)
+    return true
+  } catch {
+    return false
+  }
+}
+
 // ── File/folder manager ──────────────────────────────────────────────────────
 // fb_files doubles as the manager's tree: folders (kind 'folder'), imported
 // external files (kind 'file'), and references to internal documents filed into

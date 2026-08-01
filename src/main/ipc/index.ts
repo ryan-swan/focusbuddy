@@ -218,7 +218,10 @@ import {
   smartFolderEntries as fileSmartFolderEntries,
   fileDocument,
   unfiledDocuments,
-  locateDocument
+  locateDocument,
+  hasFileBytes,
+  readFileBytesForSync,
+  writeSyncedFileBytes
 } from '../db/files'
 import { extractFileText } from '../fileText'
 import { ingestWorkspaceIntoBrain } from '../brainIngest'
@@ -2743,7 +2746,7 @@ export function registerIpcHandlers(): void {
   // signal URL + token); these expose the local-DB half: what to push, what to
   // mark pushed, applying pulled rows, and the pull cursor.
   ipcMain.handle('workspace:pending', () => collectPending())
-  ipcMain.handle('workspace:markPushed', (_e, itemType: 'node' | 'widget' | 'timeblock' | 'document' | 'table' | 'row', id: string, rev: number) =>
+  ipcMain.handle('workspace:markPushed', (_e, itemType: 'node' | 'widget' | 'timeblock' | 'document' | 'table' | 'row' | 'file', id: string, rev: number) =>
     markPushed(itemType, id, rev)
   )
   ipcMain.handle('workspace:applyRemote', (_e, items: RemoteItem[]) =>
@@ -2763,6 +2766,16 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('workspace:getCursorOrg', (_e, orgId: string) => getSyncCursorOrg(String(orgId || '')))
   ipcMain.handle('workspace:setCursorOrg', (_e, orgId: string, n: number) =>
     setSyncCursorOrg(String(orgId || ''), typeof n === 'number' ? n : 0)
+  )
+
+  // Cross-member Drive file bytes. A file's metadata syncs over the org loop
+  // above; these move the actual bytes. The renderer reads a local file's bytes to
+  // upload, checks whether a pulled file's bytes are already on disk, and lands
+  // downloaded bytes under the canonical id+ext path.
+  ipcMain.handle('workspace:fileBytesForPush', (_e, id: string) => readFileBytesForSync(String(id || '')))
+  ipcMain.handle('workspace:hasLocalFileBytes', (_e, id: string) => hasFileBytes(String(id || '')))
+  ipcMain.handle('workspace:writeSyncedFileBytes', (_e, id: string, bytes: Uint8Array) =>
+    writeSyncedFileBytes(String(id || ''), bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes))
   )
 
   // Validate the stored key by sending a 1-token "ping" prompt. Costs

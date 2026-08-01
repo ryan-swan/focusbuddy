@@ -1478,31 +1478,42 @@ const api = {
   // local DB. These expose the local half (collect changes, apply pulls, cursor).
   workspaceSync: {
     pending: (): Promise<{
-      upserts: Array<{ id: string; itemType: 'node' | 'widget' | 'timeblock' | 'document' | 'table' | 'row'; body: Record<string, unknown>; baseRev: number }>
-      deletes: Array<{ id: string; itemType: 'node' | 'widget' | 'timeblock' | 'document' | 'table' | 'row'; baseRev: number }>
+      upserts: Array<{ id: string; itemType: 'node' | 'widget' | 'timeblock' | 'document' | 'table' | 'row' | 'file'; body: Record<string, unknown>; baseRev: number }>
+      deletes: Array<{ id: string; itemType: 'node' | 'widget' | 'timeblock' | 'document' | 'table' | 'row' | 'file'; baseRev: number }>
     }> => ipcRenderer.invoke('workspace:pending'),
-    markPushed: (itemType: 'node' | 'widget' | 'timeblock' | 'document' | 'table' | 'row', id: string, rev: number): Promise<void> =>
+    markPushed: (itemType: 'node' | 'widget' | 'timeblock' | 'document' | 'table' | 'row' | 'file', id: string, rev: number): Promise<void> =>
       ipcRenderer.invoke('workspace:markPushed', itemType, id, rev),
     applyRemote: (
-      items: Array<{ id: string; itemType: 'node' | 'widget' | 'timeblock' | 'document' | 'table' | 'row'; body: Record<string, unknown> | null; rev: number; deleted: boolean }>
+      items: Array<{ id: string; itemType: 'node' | 'widget' | 'timeblock' | 'document' | 'table' | 'row' | 'file'; body: Record<string, unknown> | null; rev: number; deleted: boolean }>
     ): Promise<{ applied: number }> => ipcRenderer.invoke('workspace:applyRemote', items),
     getCursor: (): Promise<number> => ipcRenderer.invoke('workspace:getCursor'),
     setCursor: (n: number): Promise<void> => ipcRenderer.invoke('workspace:setCursor', n),
-    // Org-shared variants (cross-member time blocks). The active org id selects
-    // the scope and its own cursor; markPushed is shared (it keys by id only).
+    // Org-shared variants (cross-member sync). The active org id selects the scope
+    // and its own cursor; markPushed is shared (it keys by id only).
     pendingOrg: (
       orgId: string
     ): Promise<{
-      upserts: Array<{ id: string; itemType: 'node' | 'widget' | 'timeblock' | 'document' | 'table' | 'row'; body: Record<string, unknown>; baseRev: number }>
-      deletes: Array<{ id: string; itemType: 'node' | 'widget' | 'timeblock' | 'document' | 'table' | 'row'; baseRev: number }>
+      upserts: Array<{ id: string; itemType: 'node' | 'widget' | 'timeblock' | 'document' | 'table' | 'row' | 'file'; body: Record<string, unknown>; baseRev: number }>
+      deletes: Array<{ id: string; itemType: 'node' | 'widget' | 'timeblock' | 'document' | 'table' | 'row' | 'file'; baseRev: number }>
     }> => ipcRenderer.invoke('workspace:pendingOrg', orgId),
     applyRemoteOrg: (
-      items: Array<{ id: string; itemType: 'node' | 'widget' | 'timeblock' | 'document' | 'table' | 'row'; body: Record<string, unknown> | null; rev: number; deleted: boolean }>,
+      items: Array<{ id: string; itemType: 'node' | 'widget' | 'timeblock' | 'document' | 'table' | 'row' | 'file'; body: Record<string, unknown> | null; rev: number; deleted: boolean }>,
       orgId: string
     ): Promise<{ applied: number }> => ipcRenderer.invoke('workspace:applyRemoteOrg', items, orgId),
     getCursorOrg: (orgId: string): Promise<number> => ipcRenderer.invoke('workspace:getCursorOrg', orgId),
     setCursorOrg: (orgId: string, n: number): Promise<void> =>
-      ipcRenderer.invoke('workspace:setCursorOrg', orgId, n)
+      ipcRenderer.invoke('workspace:setCursorOrg', orgId, n),
+    // Cross-member Drive file bytes. Metadata rides the loops above; these move the
+    // bytes: read a local file to upload, check whether a pulled file's bytes are
+    // already here, and write downloaded bytes to disk.
+    fileBytesForPush: (
+      id: string
+    ): Promise<{ ext: string; mimeType: string; bytes: Uint8Array } | null> =>
+      ipcRenderer.invoke('workspace:fileBytesForPush', id),
+    hasLocalFileBytes: (id: string): Promise<boolean> =>
+      ipcRenderer.invoke('workspace:hasLocalFileBytes', id),
+    writeSyncedFileBytes: (id: string, bytes: Uint8Array): Promise<boolean> =>
+      ipcRenderer.invoke('workspace:writeSyncedFileBytes', id, bytes)
   },
   // Mail (IMAP) — the user's own mailbox, connected straight from the desktop.
   // The password never crosses this boundary on read; the renderer only ever

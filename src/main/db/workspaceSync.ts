@@ -8,16 +8,23 @@ import { PERSONAL_ORG_ID } from './activeOrg'
 // dirty state in needs_sync (set by the DB triggers in database.ts on any content
 // write, cleared here after a push or an applied pull).
 
-type SyncTable = 'nodes' | 'widgets' | 'time_blocks' | 'documents' | 'fb_tables' | 'fb_rows'
-type ItemType = 'node' | 'widget' | 'timeblock' | 'document' | 'table' | 'row'
+type SyncTable = 'nodes' | 'widgets' | 'time_blocks' | 'documents' | 'fb_tables' | 'fb_rows' | 'fb_files'
+type ItemType = 'node' | 'widget' | 'timeblock' | 'document' | 'table' | 'row' | 'file'
 const TABLE: Record<ItemType, SyncTable> = {
   node: 'nodes',
   widget: 'widgets',
   timeblock: 'time_blocks',
   document: 'documents',
   table: 'fb_tables',
-  row: 'fb_rows'
+  row: 'fb_rows',
+  file: 'fb_files'
 }
+
+// fb_files rows that are pointers to internal documents (kind 'doc') are NOT
+// synced here — the document itself already travels as a 'document' item, and
+// syncing the pointer would race the document and churn the Drive tree. Only real
+// files and folders cross members over the org loop.
+const SYNCED_FILE_KINDS = "('file','folder')"
 
 export interface PendingUpsert {
   id: string
@@ -220,6 +227,14 @@ export function collectPendingOrg(orgId: string): {
     .all(orgId) as Array<Record<string, unknown>>
   for (const row of rows) pushRow(row, 'row')
 
+  // Drive files + folders (fb_files carries org_id directly). Doc-pointer rows are
+  // excluded (their document syncs as a 'document'); a file's bytes are uploaded
+  // separately by the renderer after its metadata pushes.
+  const fileRows = db
+    .prepare(`SELECT * FROM fb_files WHERE needs_sync = 1 AND org_id = ? AND kind IN ${SYNCED_FILE_KINDS}`)
+    .all(orgId) as Array<Record<string, unknown>>
+  for (const row of fileRows) pushRow(row, 'file')
+
   return { upserts, deletes }
 }
 
@@ -327,45 +342,57 @@ export function applyRemote(items: RemoteItem[]): { applied: number } {
 export function orderOrgItemsForApply(items: RemoteItem[]): RemoteItem[] {
   const rank = (t: ItemType): number => (t === 'node' ? 0 : t === 'widget' ? 1 : t === 'row' ? 2 : 0)
   const ordered = [...items].sort((a, b) => rank(a.itemType) - rank(b.itemType))
-  const nodeIdx: number[] = []
+  // Self-referential types carry a parent_id into the SAME table, so within their
+  // rank slots each parent must be emitted before its children in a single pass:
+  // nodes (parent_id -> nodes.id, a Room before a Desk nested in it) and Drive
+  // files/folders (fb_files.parent_id -> fb_files.id, a folder before its files).
+  // A file's parent is never a node, so the two groups sort independently.
+  topoSortSelfReferential(ordered, 'node')
+  topoSortSelfReferential(ordered, 'file')
+  return ordered
+}
+
+// Reorder just the items of `itemType` so a parent (by body.parent_id, referencing
+// the same table) always precedes its children, leaving every other item exactly
+// where rank placed it. Pure over the batch; a node/file whose parent is not in the
+// batch keeps its slot (the parent is already in the DB, or a genuine orphan the
+// per-row retry handles).
+function topoSortSelfReferential(ordered: RemoteItem[], itemType: ItemType): void {
+  const slots: number[] = []
   const idToPos = new Map<string, number>()
   ordered.forEach((it, i) => {
-    if (it.itemType !== 'node') return
-    nodeIdx.push(i)
+    if (it.itemType !== itemType) return
+    slots.push(i)
     if (typeof it.id === 'string') idToPos.set(it.id, i)
   })
-  if (nodeIdx.length > 1) {
-    const parentOf = (i: number): string | null => {
-      const b = ordered[i].body as Record<string, unknown> | null | undefined
-      const p = b && typeof b === 'object' ? b['parent_id'] : null
-      return typeof p === 'string' ? p : null
-    }
-    const emitted = new Set<number>()
-    const out: number[] = []
-    const visit = (i: number, stack: Set<number>): void => {
-      if (emitted.has(i) || stack.has(i)) return
-      stack.add(i)
-      const p = parentOf(i)
-      if (p != null) {
-        const pi = idToPos.get(p)
-        if (pi != null && pi !== i) visit(pi, stack)
-      }
-      stack.delete(i)
-      if (!emitted.has(i)) {
-        emitted.add(i)
-        out.push(i)
-      }
-    }
-    for (const i of nodeIdx) visit(i, new Set())
-    // Splice the topologically ordered node items back into the node slots, leaving
-    // every non-node item exactly where rank placed it. Snapshot the reordered
-    // items before writing so an overwritten slot is never read back.
-    const reordered = out.map((i) => ordered[i])
-    nodeIdx.forEach((slot, k) => {
-      ordered[slot] = reordered[k]
-    })
+  if (slots.length <= 1) return
+  const parentOf = (i: number): string | null => {
+    const b = ordered[i].body as Record<string, unknown> | null | undefined
+    const p = b && typeof b === 'object' ? b['parent_id'] : null
+    return typeof p === 'string' ? p : null
   }
-  return ordered
+  const emitted = new Set<number>()
+  const out: number[] = []
+  const visit = (i: number, stack: Set<number>): void => {
+    if (emitted.has(i) || stack.has(i)) return
+    stack.add(i)
+    const p = parentOf(i)
+    if (p != null) {
+      const pi = idToPos.get(p)
+      if (pi != null && pi !== i) visit(pi, stack)
+    }
+    stack.delete(i)
+    if (!emitted.has(i)) {
+      emitted.add(i)
+      out.push(i)
+    }
+  }
+  for (const i of slots) visit(i, new Set())
+  // Snapshot the reordered items before writing so an overwritten slot is never read back.
+  const reordered = out.map((i) => ordered[i])
+  slots.forEach((slot, k) => {
+    ordered[slot] = reordered[k]
+  })
 }
 
 export function applyRemoteOrg(items: RemoteItem[], orgId: string): { applied: number } {

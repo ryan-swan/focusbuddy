@@ -74,4 +74,39 @@ describe('orderOrgItemsForApply', () => {
     orderOrgItemsForApply(input)
     expect(input.map((i) => i.id)).toEqual(snapshot)
   })
+
+  // Drive files/folders are self-referential too (fb_files.parent_id -> fb_files.id),
+  // so a folder must be emitted before the files nested in it, independently of the
+  // node group.
+  const file = (id: string, parentId: string | null): RemoteItem =>
+    item({ id, itemType: 'file', body: { id, parent_id: parentId, kind: parentId === null ? 'folder' : 'file' } })
+
+  it('emits a parent folder before its file even when the file arrives first', () => {
+    const out = orderOrgItemsForApply([file('doc.pdf', 'folder1'), file('folder1', null)])
+    const pos = (id: string): number => out.findIndex((i) => i.id === id)
+    expect(pos('folder1')).toBeLessThan(pos('doc.pdf'))
+  })
+
+  it('orders nested folders (grandparent folder -> subfolder -> file)', () => {
+    const out = orderOrgItemsForApply([
+      file('report.pdf', 'sub'),
+      file('root', null),
+      file('sub', 'root')
+    ])
+    const pos = (id: string): number => out.findIndex((i) => i.id === id)
+    expect(pos('root')).toBeLessThan(pos('sub'))
+    expect(pos('sub')).toBeLessThan(pos('report.pdf'))
+  })
+
+  it('orders nodes and files independently in the same batch', () => {
+    const out = orderOrgItemsForApply([
+      file('f.pdf', 'fold'),
+      node('desk', 'room'),
+      file('fold', null),
+      node('room', null)
+    ])
+    const pos = (id: string): number => out.findIndex((i) => i.id === id)
+    expect(pos('room')).toBeLessThan(pos('desk'))
+    expect(pos('fold')).toBeLessThan(pos('f.pdf'))
+  })
 })

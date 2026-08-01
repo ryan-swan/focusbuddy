@@ -3,7 +3,7 @@ import { contentToPlainText } from '@shared/widgetText'
 import { listNodes } from './db/nodes'
 import { listDocuments, getDocument } from './db/documents'
 import { listWidgetsByTask } from './db/widgets'
-import { listEntries } from './db/files'
+import { listEntries, hasFileBytes } from './db/files'
 import { upsertKnowledgeBySource, hasKnowledgeSource, pruneKnowledgeSources } from './db/knowledge'
 import { extractDocText } from './workspaceRank'
 import { extractFileText } from './fileText'
@@ -133,6 +133,13 @@ export async function ingestWorkspaceIntoBrain(): Promise<BrainIngestStats> {
           live.add(`file:${e.id}`) // already indexed; immutable, so keep as-is
           continue
         }
+        // A file synced from another member arrives as metadata first; its bytes
+        // land a moment later over the blob channel. Don't index it until the bytes
+        // are here, otherwise the file-skip optimisation above would lock in an
+        // empty (name-only) entry that a later sync never refreshes. Skipping
+        // (without marking it live) leaves it to be indexed on the next sync once
+        // the bytes arrive.
+        if (!hasFileBytes(e.id)) continue
         let body = ''
         try {
           body = (await extractFileText(e.id)) ?? ''

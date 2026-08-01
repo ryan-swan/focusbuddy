@@ -917,6 +917,19 @@ export function getDb(): Database.Database {
   `)
   db.exec('CREATE INDEX IF NOT EXISTS idx_fb_rows_needs_sync ON fb_rows(needs_sync)')
 
+  // Drive files + folders join cross-member org sync (metadata over the org loop;
+  // a file's BYTES ride the separate org-file-blob channel). Same guarded dirty
+  // trigger as the other synced tables; new rows default needs_sync = 1 so a file
+  // uploaded today is picked up on the next org cycle.
+  ensureColumn(db, 'fb_files', 'sync_rev', 'INTEGER NOT NULL DEFAULT 0')
+  ensureColumn(db, 'fb_files', 'needs_sync', 'INTEGER NOT NULL DEFAULT 1')
+  db.exec(`
+    CREATE TRIGGER IF NOT EXISTS fb_files_mark_dirty AFTER UPDATE ON fb_files
+    WHEN NEW.needs_sync = OLD.needs_sync AND NEW.sync_rev = OLD.sync_rev AND OLD.needs_sync = 0
+    BEGIN UPDATE fb_files SET needs_sync = 1 WHERE id = NEW.id; END;
+  `)
+  db.exec('CREATE INDEX IF NOT EXISTS idx_fb_files_needs_sync ON fb_files(needs_sync)')
+
   // Remaining top-level user-content surfaces get the same per-org scoping so
   // switching organisation shows only that org's automations, reports, apps,
   // forms, meetings, signature requests and saved file views. Existing rows
