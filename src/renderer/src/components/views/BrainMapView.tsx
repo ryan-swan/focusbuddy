@@ -57,6 +57,11 @@ function buildGraph(entries: KnowledgeEntry[]): { nodes: GraphNode[]; edges: Gra
   return { nodes, edges }
 }
 
+// Module-level so reopening the Brain Map within the window doesn't re-sync on
+// every mount — one workspace→brain sync per this gap is plenty.
+const BRAIN_SYNC_MIN_GAP_MS = 30_000
+let lastBrainSyncAt = 0
+
 export default function BrainMapView(): JSX.Element {
   const entries = useKnowledgeStore((s) => s.entries)
   const loaded = useKnowledgeStore((s) => s.loaded)
@@ -67,6 +72,22 @@ export default function BrainMapView(): JSX.Element {
   useEffect(() => {
     if (!loaded) void load()
   }, [loaded, load])
+
+  // Keep the brain current automatically: syncing the workspace in whenever the
+  // map is opened means the graph always reflects every desk/document/note/file
+  // without a manual command. Debounced across remounts (module-level guard) so
+  // reopening the map repeatedly doesn't re-sync; non-fatal (the map still shows
+  // whatever's already indexed if a sync fails). Files are skipped when unchanged,
+  // so this is cheap after the first run.
+  useEffect(() => {
+    const now = Date.now()
+    if (now - lastBrainSyncAt < BRAIN_SYNC_MIN_GAP_MS) return
+    lastBrainSyncAt = now
+    void window.api.brain
+      .ingestWorkspace()
+      .then(() => load())
+      .catch(() => {})
+  }, [load])
 
   const { nodes, edges } = useMemo(() => buildGraph(entries), [entries])
   const posById = useMemo(() => new Map(nodes.map((nd) => [nd.entry.id, nd])), [nodes])

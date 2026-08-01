@@ -4,23 +4,26 @@ import { listNodes } from './db/nodes'
 import { listDocuments, getDocument } from './db/documents'
 import { listWidgetsByTask } from './db/widgets'
 import { listEntries } from './db/files'
-import { upsertKnowledgeBySource } from './db/knowledge'
+import { upsertKnowledgeBySource, hasKnowledgeSource, pruneKnowledgeSources } from './db/knowledge'
 import { extractDocText } from './workspaceRank'
 import { extractFileText } from './fileText'
 
 // Sync the whole workspace into the PlexiBrain knowledge base, so the Brain reads
 // everything — every desk, document, note/page, and Drive file — not just the few
-// entries someone typed by hand. Deterministic + idempotent (each object owns one
-// entry, keyed by source; re-running refreshes rather than duplicates), and
-// honest (no invented content — a file whose text can't be read gets its name and
-// an empty body, never a fabricated summary).
+// entries someone typed by hand. A true SYNC: adds new objects, refreshes changed
+// ones, and prunes entries whose object was deleted; manual (source-less) entries
+// are never touched. Deterministic + honest (no invented content — a file whose
+// text can't be read gets its name and an empty body, never a fabricated summary).
+//
+// Cheap to re-run: files are immutable once ingested, so a file already in the
+// brain is skipped rather than re-parsed — which is what makes running this on
+// boot and whenever the Brain is opened affordable.
 //
 // Entries are tagged so the Brain Map's shared-tag edges form real clusters: by
 // object type (desk / document / note / file), by subtype (docType / extension),
 // and by the desk they live on (so a desk's notes group together).
 
 const BODY_CAP = 8000
-// Widget kinds that carry real prose worth putting in the brain.
 const TEXT_WIDGET = new Set<Widget['kind']>(['note', 'page', 'markdown', 'card', 'living-doc', 'sticky'])
 
 function slug(s: string): string {
@@ -38,13 +41,17 @@ export interface BrainIngestStats {
   files: number
   created: number
   updated: number
+  removed: number
 }
 
 export async function ingestWorkspaceIntoBrain(): Promise<BrainIngestStats> {
-  const stats: BrainIngestStats = { desks: 0, documents: 0, widgets: 0, files: 0, created: 0, updated: 0 }
-  const bump = (r: { created: boolean }): void => {
+  const stats: BrainIngestStats = { desks: 0, documents: 0, widgets: 0, files: 0, created: 0, updated: 0, removed: 0 }
+  const live = new Set<string>()
+  const record = (kind: string, id: string, draft: Parameters<typeof upsertKnowledgeBySource>[2]): void => {
+    const r = upsertKnowledgeBySource(kind, id, draft)
     if (r.created) stats.created++
     else stats.updated++
+    live.add(`${kind}:${id}`)
   }
 
   const nodes = listNodes()
@@ -53,13 +60,11 @@ export async function ingestWorkspaceIntoBrain(): Promise<BrainIngestStats> {
   for (const n of nodes) {
     const tags = ['workspace', n.kind]
     if (n.status) tags.push(n.status)
-    bump(
-      upsertKnowledgeBySource('node', n.id, {
-        title: n.title?.trim() || `(untitled ${n.kind})`,
-        body: (n.description ?? '').slice(0, BODY_CAP),
-        tags
-      })
-    )
+    record('node', n.id, {
+      title: n.title?.trim() || `(untitled ${n.kind})`,
+      body: (n.description ?? '').slice(0, BODY_CAP),
+      tags
+    })
     stats.desks++
   }
 
@@ -73,13 +78,11 @@ export async function ingestWorkspaceIntoBrain(): Promise<BrainIngestStats> {
     } catch {
       body = ''
     }
-    bump(
-      upsertKnowledgeBySource('document', meta.id, {
-        title: meta.title?.trim() || 'Untitled document',
-        body,
-        tags: ['document', meta.docType]
-      })
-    )
+    record('document', meta.id, {
+      title: meta.title?.trim() || 'Untitled document',
+      body,
+      tags: ['document', meta.docType]
+    })
     stats.documents++
   }
 
@@ -97,21 +100,19 @@ export async function ingestWorkspaceIntoBrain(): Promise<BrainIngestStats> {
       if (!TEXT_WIDGET.has(w.kind) || w.archived) continue
       const text = contentToPlainText(w.content).trim()
       if (!text) continue
-      const tags = [w.kind, ...(deskTag ? [deskTag] : [])]
-      bump(
-        upsertKnowledgeBySource('widget', w.id, {
-          title: w.title?.trim() || `${w.kind} on ${n.title ?? 'a desk'}`,
-          body: text.slice(0, BODY_CAP),
-          tags
-        })
-      )
+      record('widget', w.id, {
+        title: w.title?.trim() || `${w.kind} on ${n.title ?? 'a desk'}`,
+        body: text.slice(0, BODY_CAP),
+        tags: [w.kind, ...(deskTag ? [deskTag] : [])]
+      })
       stats.widgets++
     }
   }
 
-  // Drive files — recurse the folder tree; extract text where possible (PDF/Word/
-  // spreadsheet/text), else store name + type only (honest, no fabrication). 'doc'
-  // entries are covered by the documents pass above, so skip them here.
+  // Drive files — recurse the folder tree. A file is immutable once ingested, so
+  // one already in the brain is kept as-is (skip the expensive re-parse); a new
+  // one is extracted (PDF/Word/spreadsheet/text) or stored name-only if binary.
+  // 'doc' entries are covered by the documents pass above.
   const seen = new Set<string>()
   const walk = async (parentId: string | null, depth: number): Promise<void> => {
     if (depth > 12) return
@@ -127,6 +128,11 @@ export async function ingestWorkspaceIntoBrain(): Promise<BrainIngestStats> {
         seen.add(e.id)
         await walk(e.id, depth + 1)
       } else if (e.kind === 'file') {
+        stats.files++
+        if (hasKnowledgeSource('file', e.id)) {
+          live.add(`file:${e.id}`) // already indexed; immutable, so keep as-is
+          continue
+        }
         let body = ''
         try {
           body = (await extractFileText(e.id)) ?? ''
@@ -134,18 +140,18 @@ export async function ingestWorkspaceIntoBrain(): Promise<BrainIngestStats> {
           body = ''
         }
         const ext = (e.ext ?? '').replace(/^\./, '')
-        bump(
-          upsertKnowledgeBySource('file', e.id, {
-            title: e.name?.trim() || 'File',
-            body: body.slice(0, BODY_CAP),
-            tags: ['file', ...(ext ? [ext] : [])]
-          })
-        )
-        stats.files++
+        record('file', e.id, {
+          title: e.name?.trim() || 'File',
+          body: body.slice(0, BODY_CAP),
+          tags: ['file', ...(ext ? [ext] : [])]
+        })
       }
     }
   }
   await walk(null, 0)
+
+  // Remove brain entries whose workspace object was deleted (true sync).
+  stats.removed = pruneKnowledgeSources(live)
 
   return stats
 }

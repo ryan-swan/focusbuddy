@@ -116,6 +116,36 @@ export function upsertKnowledgeBySource(
   return { created: true }
 }
 
+// Whether a brain entry already exists for a workspace source (used to skip
+// re-extracting immutable files on every re-sync).
+export function hasKnowledgeSource(sourceKind: string, sourceId: string): boolean {
+  const db = getDb()
+  const row = db
+    .prepare('SELECT 1 FROM fb_knowledge WHERE org_id = ? AND source_kind = ? AND source_id = ? LIMIT 1')
+    .get(getActiveOrgId(), sourceKind, sourceId)
+  return !!row
+}
+
+// Remove source-tagged brain entries whose object no longer exists in the
+// workspace, so a re-sync is a true sync (add + update + REMOVE). `liveKeys` holds
+// "kind:id" for every object still present. Manually-authored entries (no source)
+// are never touched. Returns how many were pruned.
+export function pruneKnowledgeSources(liveKeys: Set<string>): number {
+  const db = getDb()
+  const rows = db
+    .prepare(
+      'SELECT id, source_kind, source_id FROM fb_knowledge WHERE org_id = ? AND source_kind IS NOT NULL'
+    )
+    .all(getActiveOrgId()) as Array<{ id: string; source_kind: string; source_id: string }>
+  let removed = 0
+  for (const r of rows) {
+    if (!liveKeys.has(`${r.source_kind}:${r.source_id}`)) {
+      if (deleteKnowledge(r.id)) removed++
+    }
+  }
+  return removed
+}
+
 export function updateKnowledge(id: string, patch: KnowledgePatch): KnowledgeEntry | null {
   const db = getDb()
   const existing = getKnowledge(id)
