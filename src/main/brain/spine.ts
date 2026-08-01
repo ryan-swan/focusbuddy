@@ -28,10 +28,18 @@ import { DISAGREES_SURFACING_ENABLED, type CandidateSpine } from '@shared/spineR
 // The correspondence between a chunk's source_type (indexer.ts SourceDoc.sourceType) and
 // the projection's source_table. Single source of truth — keep in lockstep with both. A
 // source_type not listed has no graph node (null spine).
+//
+// EVERY registered connector's sourceType MUST appear here, or its content is retrievable
+// but graph-blind — a null spine means no importance, no room, no lifecycle, no cross-room
+// unification, nothing. `widget` was missing from P4.5 Inc 1 until 2026-08-01, so all 38
+// indexed widgets fell to the store-anyway floor while their 69 projected brain nodes sat
+// unused. Locked as a CLASS invariant by tests/unit/spineBridgeCoverage.test.ts so the next
+// connector added (the I5 external connectors) cannot repeat it.
 export const SOURCE_TYPE_TO_TABLE: Record<string, string> = {
   knowledge: 'fb_knowledge',
   document: 'documents',
-  task: 'nodes'
+  task: 'nodes',
+  widget: 'widgets'
 }
 
 // Does this node have any `contradicts` edge (either direction)? A contradicted source is
