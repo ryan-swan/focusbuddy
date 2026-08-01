@@ -42,6 +42,19 @@ files:
 asarUnpack:
   - node_modules/better-sqlite3/**/*
   - node_modules/node-mac-haptics/**/*
+  # PDF text extraction (pdf-parse) + offline OCR for scanned PDFs (tesseract.js
+  # worker/WASM, pdf-to-png-converter, and the @napi-rs/canvas native addon) all
+  # break inside an asar, so keep them unpacked here too.
+  - node_modules/pdf-parse/**/*
+  - node_modules/tesseract.js/**/*
+  - node_modules/tesseract.js-core/**/*
+  - node_modules/pdf-to-png-converter/**/*
+  - node_modules/@napi-rs/**/*
+
+# Bundle the offline OCR training data (no CDN fetch).
+extraResources:
+  - from: resources/tessdata
+    to: tessdata
 
 protocols:
   - name: PlexiOffice Protocol

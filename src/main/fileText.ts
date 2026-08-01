@@ -6,9 +6,10 @@ import { getFile, readFileBytes } from './db/files'
 // wire never crashes on a weird file. Heavy parsers are imported lazily so they
 // only load when a matching file is actually read.
 //
-// Supported: PDF (pdf-parse), Word .docx (mammoth), spreadsheets .xlsx/.xls/.csv
-// (xlsx), and plain-text families (txt/md/json/csv/log/tsv/html/xml/yaml). Other
-// binaries (images, video, audio, zips) have no text and return null.
+// Supported: PDF (pdf-parse for the text layer, falling back to offline OCR via
+// ./ocr for scanned / image-only PDFs), Word .docx (mammoth), spreadsheets
+// .xlsx/.xls/.csv (xlsx), and plain-text families (txt/md/json/csv/log/tsv/html/
+// xml/yaml). Other binaries (images, video, audio, zips) have no text and return null.
 
 const MAX_CHARS = 12000
 
@@ -24,12 +25,31 @@ export async function extractTextFromBuffer(
     if (e === 'pdf' || m.includes('pdf')) {
       const { PDFParse } = await import('pdf-parse')
       const parser = new PDFParse({ data: new Uint8Array(buf) })
+      let text = ''
+      let pageCount = 0
       try {
         const res = await parser.getText()
-        return (res.text || '').trim().slice(0, MAX_CHARS)
+        text = (res.text || '').trim()
+        pageCount = res.total ?? 0
       } finally {
         await parser.destroy?.()
       }
+      // A scanned / image-only PDF has no embedded text layer, so pdf-parse
+      // returns little or nothing. When the text is thin relative to the page
+      // count, OCR the rendered pages instead (offline, on-device). Only replace
+      // the extracted text if OCR actually found more — never fabricate, and
+      // never crash a wire/brain sync if OCR is unavailable.
+      const thin = text.length < 16 || (pageCount > 0 && text.length / pageCount < 8)
+      if (thin) {
+        try {
+          const { ocrPdfBuffer } = await import('./ocr')
+          const ocr = await ocrPdfBuffer(buf)
+          if (ocr.length > text.length) return ocr.slice(0, MAX_CHARS)
+        } catch {
+          // OCR unavailable or failed — fall back to whatever text layer exists.
+        }
+      }
+      return text.slice(0, MAX_CHARS)
     }
     if (e === 'docx' || m.includes('wordprocessingml')) {
       const mammoth = (await import('mammoth')).default
