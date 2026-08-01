@@ -42,6 +42,30 @@ export interface CandidateSpine {
   disagrees?: boolean
 }
 
+// ── S-007 surfacing gate ──────────────────────────────────────────────────────
+// The "sources disagree" chip does NOT reach a user while this is false.
+//
+// Why: measured on the operator's real corpus, the resolver produced 198 false
+// contradictions. The value-position fix (commit 0fc1ed4) cut that to 96 — a real
+// improvement, still far too many. DEC-016's safe-asymmetry keel rates a FALSE "sources
+// disagree" as worse than a missed one, so at 96 the honest state is silence.
+//
+// The detector stays wired and `contradicts` edges keep being minted: they are the
+// measurement that will eventually justify turning this back on.
+//
+// TO UN-GATE, evidence is required — not judgement:
+//   1. A LABELLED ground-truth sample of the real corpus (each detected contradiction
+//      read and classified true/false by a human). None exists yet; without it a lower
+//      count cannot be distinguished from having killed the true positives too.
+//   2. A measured false-positive rate on that sample that the operator accepts.
+//   3. tests/unit/disagreesGate.test.ts updated in the same commit, so the gate can
+//      never drift open silently.
+//
+// Tracked as S-007. The structural retirement of this whole class is U3 in
+// instrumentation-plan/UNIFIED-BRAIN-ARCHITECTURE.md: a thin-evidence edge lands
+// `provisional`, and provisional edges cannot reach ranking at all.
+export const DISAGREES_SURFACING_ENABLED = false
+
 // One P0 candidate + its (optional) spine + the recall score P0 assigned.
 export interface SpineCandidate<T> {
   item: T

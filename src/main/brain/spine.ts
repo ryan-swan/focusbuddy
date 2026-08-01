@@ -23,7 +23,7 @@
 
 import { getBrainNodeBySource, getBrainNode } from '../db/brainNodes'
 import { edgesFrom, edgesTo } from '../db/brainEdges'
-import type { CandidateSpine } from '@shared/spineRerank'
+import { DISAGREES_SURFACING_ENABLED, type CandidateSpine } from '@shared/spineRerank'
 
 // The correspondence between a chunk's source_type (indexer.ts SourceDoc.sourceType) and
 // the projection's source_table. Single source of truth — keep in lockstep with both. A
@@ -86,6 +86,9 @@ export function resolveSpine(
       !!activeRoomId && node.roomId !== activeRoomId
         ? isCrossRoomLinkedInto(node.id, activeRoomId)
         : false,
-    disagrees: nodeDisagrees(node.id)
+    // S-007: the detector still runs (its edges are the measurement that will justify
+    // re-opening this), but the flag does not surface while the gate is closed. See
+    // DISAGREES_SURFACING_ENABLED for the evidence required, and disagreesGate.test.ts.
+    disagrees: DISAGREES_SURFACING_ENABLED && nodeDisagrees(node.id)
   }
 }
