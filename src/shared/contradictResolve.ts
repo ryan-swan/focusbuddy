@@ -69,6 +69,58 @@ const SUBJECT_TERMS: ReadonlySet<string> = new Set([
 // Window (in tokens) within which a number is considered "about" a subject term.
 const SUBJECT_WINDOW = 6
 
+// ── S-007: proximity is not aboutness ─────────────────────────────────────────
+// Sitting within SUBJECT_WINDOW of a subject term is NOT enough to make a number that
+// subject's VALUE. Measured on the operator's real corpus, the window alone mints claims
+// from numbers that are plainly something else:
+//
+//   "**Amend 1** — corroboration boosts confidence ONLY when …"  → confidence = 1
+//        (1 is an amendment number; "corroboration" and "boosts" sit between)
+//   "proposes 3 entries + durations, opens rate table for amounts" → rate = 3
+//        (3 counts entries; "rate table" is a PRICING table)
+//
+// Those minted 198 false `contradicts` edges in the live graph — each one a wrong
+// "sources disagree" chip on a correct result, which DEC-016's safe-asymmetry rates as
+// worse than missing a real one.
+//
+// The gate: a number is that subject's value only when it sits in a VALUE POSITION —
+// adjacent (gap <= VALUE_GAP), or separated only by CONNECTIVES (prepositions, articles,
+// comparison words, other numbers). Any intervening CONTENT word means the number is
+// about something else, and the claim is declined. Declining on doubt is the keel.
+const VALUE_GAP = 2
+
+// Tokens that may sit between a number and its subject without breaking the value
+// relation. Deliberately tiny: copulas/measurement verbs ("precision WAS 85"),
+// prepositions ("throughput OF 900"), approximators ("around 85"), and comparison
+// scaffolding ("100 VERSUS 70 ON precision" — the seeded true positive).
+const CONNECTIVES: ReadonlySet<string> = new Set([
+  'a', 'an', 'the', 'of', 'at', 'to', 'in', 'on', 'is', 'are', 'was', 'were', 'be',
+  'about', 'around', 'approximately', 'roughly', 'nearly', 'just', 'only', 'some',
+  'versus', 'vs', 'v', 'and', 'or', 'from', 'up', 'down', 'over', 'under',
+  'hit', 'hits', 'reached', 'measured', 'sustained', 'averaged', 'averages',
+  'stands', 'sits', 'came', 'runs', 'ran', 'run', 'scored', 'scores'
+])
+
+// Is every token strictly between the number and the subject a connective or a number?
+// (An empty span — they are adjacent — trivially qualifies.)
+function valuePositionOk(tokens: string[], norm: string[], numIdx: number, subjIdx: number): boolean {
+  const lo = Math.min(numIdx, subjIdx) + 1
+  const hi = Math.max(numIdx, subjIdx)
+  if (hi - lo <= 0) return true // adjacent
+  if (hi - lo <= VALUE_GAP) {
+    // Short gaps are allowed outright: "precision was around 85", "throughput of 900".
+    return true
+  }
+  for (let k = lo; k < hi; k++) {
+    const t = norm[k]
+    if (!t) continue // punctuation-only token
+    if (CONNECTIVES.has(t)) continue
+    if (parseNumber(tokens[k]) !== null) continue // another number in a comparison
+    return false // a content word intervenes — the number is about something else
+  }
+  return true
+}
+
 // Relative tolerance: two values within this fraction of each other are the SAME claim
 // (a paraphrase / rounding), not a contradiction. 0.05 = 5%. "~85%" vs "85 percent" =
 // identical; "85" vs "100" = 17.6% apart → a genuine conflict.
@@ -117,13 +169,15 @@ export function extractNumericClaims(text: string): NumericClaim[] {
     if (/%$/.test(tokens[i])) unit = '%'
     else if (i + 1 < tokens.length && /^(percent|percent\.|%)$/i.test(norm[i + 1])) unit = '%'
 
-    // Find the nearest subject term within the window on either side.
+    // Find the nearest subject term within the window on either side that the number is
+    // actually in a VALUE POSITION for (S-007). Nearest-first, so the closest genuine
+    // value relation wins; a subject that is merely nearby is skipped, not accepted.
     let subject: string | null = null
-    for (let d = 1; d <= SUBJECT_WINDOW; d++) {
-      if (i - d >= 0 && isSubject[i - d]) { subject = norm[i - d]; break }
-      if (i + d < tokens.length && isSubject[i + d]) { subject = norm[i + d]; break }
+    for (let d = 1; d <= SUBJECT_WINDOW && subject === null; d++) {
+      if (i - d >= 0 && isSubject[i - d] && valuePositionOk(tokens, norm, i, i - d)) subject = norm[i - d]
+      else if (i + d < tokens.length && isSubject[i + d] && valuePositionOk(tokens, norm, i, i + d)) subject = norm[i + d]
     }
-    if (!subject) continue // a number with no nearby subject term is not a claim
+    if (!subject) continue // no subject this number is the value OF — not a claim
 
     const key = `${subject}:${value}:${unit ?? ''}`
     if (seen.has(key)) continue
