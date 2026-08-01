@@ -268,6 +268,18 @@ export default function CommandCenter({
         void createShowcaseDesk()
       }
     })
+    items.push({
+      id: 'sync-brain',
+      label: 'Sync workspace to Brain',
+      hint: 'Index every desk, document & file',
+      icon: 'hub',
+      kind: 'action',
+      score: matchScore('sync workspace brain knowledge index ingest everything drive documents files graph', q),
+      run: () => {
+        closePalette()
+        void window.api.brain.ingestWorkspace().then(() => goPlexiBrain())
+      }
+    })
     // Relate this desk to others so the brain reads them together. Only when a
     // desk is open (relatedness is per-desk).
     if (activeTaskId) {

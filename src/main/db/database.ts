@@ -570,6 +570,12 @@ export function getDb(): Database.Database {
   // Automations panel from one source of truth. Null until the wire first runs.
   ensureColumn(db, 'widget_links', 'last_run_at', 'INTEGER')
   ensureColumn(db, 'widget_links', 'last_error', 'TEXT')
+  // Provenance for brain entries auto-ingested from the workspace (a desk,
+  // document, widget or file). Null = a manually-authored entry. The pair is the
+  // idempotency key so re-syncing updates in place instead of duplicating, and
+  // lets a future "clear synced entries" leave hand-written ones untouched.
+  ensureColumn(db, 'fb_knowledge', 'source_kind', 'TEXT')
+  ensureColumn(db, 'fb_knowledge', 'source_id', 'TEXT')
   // Render mode for local-app-launcher widgets: 'launcher' (icon + click-to-open)
   // vs 'mirror' (punch-through live view of the real native app window). Null for
   // any other widget kind.

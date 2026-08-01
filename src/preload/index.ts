@@ -227,6 +227,18 @@ const api = {
     }): Promise<{ ok: boolean; status?: number; error?: string }> =>
       ipcRenderer.invoke('webhooks:send', input)
   },
+  brain: {
+    // Sync the whole workspace (desks, documents, notes/pages, Drive files) into
+    // the PlexiBrain knowledge base. Idempotent; returns counts.
+    ingestWorkspace: (): Promise<{
+      desks: number
+      documents: number
+      widgets: number
+      files: number
+      created: number
+      updated: number
+    }> => ipcRenderer.invoke('brain:ingestWorkspace')
+  },
   snapshots: {
     create: (taskId: string, label?: string): Promise<SnapshotMeta> =>
       ipcRenderer.invoke('snapshots:create', taskId, label),

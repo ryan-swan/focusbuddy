@@ -221,6 +221,7 @@ import {
   locateDocument
 } from '../db/files'
 import { extractFileText } from '../fileText'
+import { ingestWorkspaceIntoBrain } from '../brainIngest'
 import { extractDocText, retrieveSources, relatedDocuments } from '../workspaceSearch'
 import {
   openExternalUrl,
@@ -1635,6 +1636,9 @@ export function registerIpcHandlers(): void {
   // wires + desk agents + the brain to read file CONTENTS; also lets the UI show
   // "what's in this file". Returns null for a binary with no text.
   ipcMain.handle('files:extractText', (_e, id: string) => extractFileText(id))
+  // Sync the whole workspace (desks, documents, notes/pages, Drive files) into the
+  // PlexiBrain knowledge base. Idempotent; returns honest counts.
+  ipcMain.handle('brain:ingestWorkspace', () => ingestWorkspaceIntoBrain())
   ipcMain.handle('files:read', (_e, id: string) => {
     const r = readFileBytes(id)
     if (!r) return null

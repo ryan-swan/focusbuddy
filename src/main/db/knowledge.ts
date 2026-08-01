@@ -73,6 +73,49 @@ export function createKnowledge(draft: KnowledgeDraft): KnowledgeEntry {
   return getKnowledge(id) as KnowledgeEntry
 }
 
+// Insert-or-update a brain entry keyed by its workspace source (kind + id), so
+// syncing the workspace into the brain is idempotent: re-running refreshes the
+// existing entry for that desk/document/widget/file instead of duplicating it.
+// Returns whether a new entry was created (vs an existing one updated).
+export function upsertKnowledgeBySource(
+  sourceKind: string,
+  sourceId: string,
+  draft: KnowledgeDraft
+): { created: boolean } {
+  const db = getDb()
+  const org = getActiveOrgId()
+  const now = Date.now()
+  const existing = db
+    .prepare('SELECT id FROM fb_knowledge WHERE org_id = ? AND source_kind = ? AND source_id = ?')
+    .get(org, sourceKind, sourceId) as { id: string } | undefined
+  if (existing) {
+    db.prepare(
+      `UPDATE fb_knowledge SET title = @title, body = @body, tags_json = @tags, updated_at = @now WHERE id = @id`
+    ).run({
+      id: existing.id,
+      title: draft.title ?? 'Untitled entry',
+      body: draft.body ?? '',
+      tags: JSON.stringify(draft.tags ?? []),
+      now
+    })
+    return { created: false }
+  }
+  db.prepare(
+    `INSERT INTO fb_knowledge (id, title, body, tags_json, pinned, created_at, updated_at, org_id, source_kind, source_id)
+     VALUES (@id, @title, @body, @tags, 0, @now, @now, @org, @sk, @si)`
+  ).run({
+    id: randomUUID(),
+    title: draft.title ?? 'Untitled entry',
+    body: draft.body ?? '',
+    tags: JSON.stringify(draft.tags ?? []),
+    now,
+    org,
+    sk: sourceKind,
+    si: sourceId
+  })
+  return { created: true }
+}
+
 export function updateKnowledge(id: string, patch: KnowledgePatch): KnowledgeEntry | null {
   const db = getDb()
   const existing = getKnowledge(id)
