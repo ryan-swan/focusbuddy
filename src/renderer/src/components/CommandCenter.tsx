@@ -17,6 +17,7 @@ import { useEditorCommandStore } from '../stores/editorCommands'
 import { useDocumentsStore } from '../stores/documents'
 import { useQuickCreate } from '../stores/quickCreate'
 import { recencyRank } from '../lib/viewRecency'
+import { createShowcaseDesk } from '../lib/createShowcaseDesk'
 
 interface Props {
   onOpenBodyDouble: () => void
@@ -253,6 +254,18 @@ export default function CommandCenter({
       run: () => {
         closePalette()
         window.dispatchEvent(new CustomEvent('fb:onboarding-hub'))
+      }
+    })
+    items.push({
+      id: 'create-showcase',
+      label: 'Create Wire & Agent Showcase desk',
+      hint: '10 worked connect + agent examples',
+      icon: 'bolt',
+      kind: 'action',
+      score: matchScore('wire agent showcase demo connections automation examples sample desk transform', q),
+      run: () => {
+        closePalette()
+        void createShowcaseDesk()
       }
     })
     // Relate this desk to others so the brain reads them together. Only when a
