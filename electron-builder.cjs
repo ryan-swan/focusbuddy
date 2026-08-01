@@ -70,7 +70,11 @@ module.exports = {
   asarUnpack: [
     // Native modules must live outside the asar archive so Node can load them.
     'node_modules/better-sqlite3/**/*',
-    'node_modules/node-mac-haptics/**/*'
+    'node_modules/node-mac-haptics/**/*',
+    // pdf-parse resolves its pdfjs worker relative to its own dist on disk, which
+    // asar packing would break — keep it unpacked so PDF text extraction works in
+    // the packaged app (not just the unpacked dev build).
+    'node_modules/pdf-parse/**/*'
   ],
 
   publish: {

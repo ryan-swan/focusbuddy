@@ -8,8 +8,14 @@ import { launchApp, type LaunchedApp, waitForReady } from './_helpers'
 //       coerceToWidgetContent having no case for 'doc'.
 //   (b) a mirror wire into a target that can't hold text (a timer) now ends
 //       in a LOUD, visible error instead of doing nothing.
-//   (c) a mirror wire FROM an unreadable binary source (a pdf) now ends in a
-//       LOUD, visible error instead of silently feeding the target a URL.
+//   (c) a mirror wire FROM a pdf source now ends in a LOUD, visible error
+//       instead of silently feeding the target a URL. Updated for the PDF
+//       text-extraction feature (plexi-4.0): a PDF's text IS now readable
+//       (via the main-side extractor), but only through a Transform wire —
+//       a Mirror would just copy the raw file reference, so it steers the
+//       user to Transform instead of the old "can't read a PDF" message
+//       (removed; extractFileText/pdf-parse supersede it — see fileText.ts
+//       and tests/e2e/fileTextExtraction.spec.ts for the extraction itself).
 //
 // All driven with MIRROR wires (deterministic copy, no AI key needed), via
 // window.api + the exposed __fbWidgets store handle — same seam
@@ -194,7 +200,7 @@ test('(b) a mirror wire into a timer ends in a loud, visible error — not a sil
   await expect(badge).toHaveAttribute('data-wire-fresh', 'error')
 })
 
-// ── (c) mirror wire FROM an unreadable binary source (pdf) errors loudly ───
+// ── (c) mirror wire FROM a pdf source errors loudly (steers to Transform) ──
 
 test('(c) a mirror wire from a pdf source ends in a loud error — not a silent no-op feeding a URL', async () => {
   launched = await launchApp()
@@ -235,11 +241,15 @@ test('(c) a mirror wire from a pdf source ends in a loud error — not a silent 
 
   await expect
     .poll(async () => linkOf(window, seeded.taskId, seeded.linkId), { timeout: 6_000, intervals: [200, 300, 500] })
-    .toEqual(expect.objectContaining({ lastError: expect.stringContaining("can't read") }))
+    .toEqual(expect.objectContaining({ lastError: expect.stringContaining('Transform wire') }))
 
   const link = await linkOf(window, seeded.taskId, seeded.linkId)
-  expect(link?.lastError).toContain("PlexiDesk can't read")
+  // PDF text IS now readable (see fileTextExtraction.spec.ts) — but only via a
+  // Transform wire, which runs it through the main-side extractor. A Mirror
+  // would just copy the raw file reference, so it steers here instead.
+  expect(link?.lastError).toContain('make this a Transform wire')
   expect(link?.lastError).toContain('PDF')
+  expect(link?.lastError).not.toContain("can't read")
 
   // The note must NOT have been silently filled with the pdf's URL.
   const noteContent = await window.evaluate(

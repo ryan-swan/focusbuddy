@@ -797,6 +797,9 @@ const api = {
     }): Promise<FbFile> => ipcRenderer.invoke('files:ingestBuffer', input),
     get: (id: string): Promise<FbFile | null> => ipcRenderer.invoke('files:get', id),
     delete: (id: string): Promise<boolean> => ipcRenderer.invoke('files:delete', id),
+    // Extract readable text from a file (PDF/Word/spreadsheet/text); null if binary.
+    extractText: (id: string): Promise<string | null> =>
+      ipcRenderer.invoke('files:extractText', id),
     // Read raw bytes back — used for previews that can't reference a file://
     // URL directly (e.g. images with content-security-policy restrictions).
     read: (

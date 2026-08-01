@@ -174,15 +174,12 @@ async function runWire(wireId: string, gen: number): Promise<void> {
 
   const runStore = useWireRunStore.getState()
 
-  // Honest guard: PlexiDesk can't read binary media text yet (no PDF/image/video
-  // extractor anywhere in the app — confirmed by files:suggestTags treating binary
-  // files as name-only). So a wire from one has nothing real to send; say so on the
-  // wire instead of feeding the AI a URL and producing a hollow result.
-  if (source.kind === 'pdf' || source.kind === 'image' || source.kind === 'video') {
-    const label = source.kind === 'pdf' ? "a PDF's" : `a ${source.kind}'s`
+  // Images and video have no text to read, ever — say so honestly. (PDFs, Word and
+  // spreadsheets ARE read now, in main, via a Transform wire — see below.)
+  if (source.kind === 'image' || source.kind === 'video') {
     runStore.setError(
       wire.id,
-      `PlexiDesk can't read ${label} text yet, so there's nothing to send. Use a Browser, Note, Page, Document or Table as the source.`
+      `An ${source.kind} has no text to send. Use a text file (PDF, Word, spreadsheet), a Browser, Note, Page, Document or Table as the source.`
     )
     return
   }
@@ -199,6 +196,16 @@ async function runWire(wireId: string, gen: number): Promise<void> {
   const deliverDirect =
     wire.type === 'mirror' || (source.kind === 'agent' && wire.type !== 'transform')
   if (deliverDirect) {
+    // A file/PDF only yields its text through the main-side extractor, which the
+    // TRANSFORM path uses. A mirror would just copy the file reference, so steer
+    // the user to a Transform wire instead of doing something useless.
+    if (source.kind === 'pdf' || source.kind === 'file') {
+      runStore.setError(
+        wire.id,
+        "To use a file's contents, make this a Transform wire — it reads the text (PDF/Word/spreadsheet) with AI. A Mirror only copies text as-is."
+      )
+      return
+    }
     const src = effectiveContent(source)
 
     // Table target: build it via the table AI (typed columns + rows), exactly

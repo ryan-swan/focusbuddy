@@ -220,6 +220,7 @@ import {
   unfiledDocuments,
   locateDocument
 } from '../db/files'
+import { extractFileText } from '../fileText'
 import { extractDocText, retrieveSources, relatedDocuments } from '../workspaceSearch'
 import {
   openExternalUrl,
@@ -1630,6 +1631,10 @@ export function registerIpcHandlers(): void {
       return { ok: true as const, path: filePath }
     }
   )
+  // Extract readable plain text from a file (PDF/Word/spreadsheet/text). Used by
+  // wires + desk agents + the brain to read file CONTENTS; also lets the UI show
+  // "what's in this file". Returns null for a binary with no text.
+  ipcMain.handle('files:extractText', (_e, id: string) => extractFileText(id))
   ipcMain.handle('files:read', (_e, id: string) => {
     const r = readFileBytes(id)
     if (!r) return null
