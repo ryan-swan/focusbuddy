@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import type { FileEntry } from '@shared/fields'
+import { nudgeSync } from '../lib/syncNudge'
 
 // State for the file/folder manager view. The current folder (cwd, null = root)
 // drives the listing; view mode and sort are persisted so the manager opens the
@@ -98,6 +99,9 @@ interface FileManagerStore {
   createFolder: (name: string) => Promise<void>
   rename: (id: string, name: string) => Promise<void>
   move: (id: string, newParentId: string | null) => Promise<void>
+  // Share a file/folder (and its contents) with an org — re-scopes the subtree so
+  // it syncs, bytes and all, to every member.
+  moveToOrg: (id: string, orgId: string) => Promise<void>
   remove: (id: string) => Promise<void>
   importFiles: () => Promise<void>
   ingestBuffers: (files: Array<{ buffer: ArrayBuffer; originalName: string; mimeType: string }>) => Promise<void>
@@ -278,6 +282,15 @@ export const useFileManagerStore = create<FileManagerStore>((set, get) => ({
       }
     })
     await get().refresh()
+  },
+  moveToOrg: async (id, orgId) => {
+    const moved = await window.api.fileManager.moveToOrg(id, orgId)
+    if (!moved?.length) return
+    // The item left the active (personal) org; refresh drops it from this view.
+    // It now belongs to the team org and appears when that org is active, and the
+    // nudge pushes it (metadata + file bytes) to every member right away.
+    await get().refresh()
+    nudgeSync()
   },
   remove: async (id) => {
     const ids = await window.api.fileManager.delete(id)

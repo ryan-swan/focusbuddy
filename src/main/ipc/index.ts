@@ -222,7 +222,8 @@ import {
   locateDocument,
   hasFileBytes,
   readFileBytesForSync,
-  writeSyncedFileBytes
+  writeSyncedFileBytes,
+  moveFileToOrg
 } from '../db/files'
 import { extractFileText } from '../fileText'
 import { ingestWorkspaceIntoBrain } from '../brainIngest'
@@ -1693,6 +1694,9 @@ export function registerIpcHandlers(): void {
   )
   ipcMain.handle('fileManager:rename', (_e, id: string, name: string) => renameFileEntry(id, name))
   ipcMain.handle('fileManager:move', (_e, id: string, newParentId: string | null) => moveFileEntry(id, newParentId))
+  ipcMain.handle('fileManager:moveToOrg', (_e, id: string, orgId: string) =>
+    moveFileToOrg(String(id || ''), String(orgId || ''))
+  )
   ipcMain.handle('fileManager:delete', (_e, id: string) => deleteFileEntry(id))
   ipcMain.handle('fileManager:restore', (_e, ids: string[]) => restoreFileEntries(ids))
   ipcMain.handle('fileManager:listTrashed', () => listTrashedFileEntries())

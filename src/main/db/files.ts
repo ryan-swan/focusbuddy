@@ -201,6 +201,36 @@ export function writeSyncedFileBytes(id: string, bytes: Uint8Array): boolean {
   }
 }
 
+// Share a personal file/folder/drive (and everything inside it) with an org — the
+// Drive equivalent of moving a desk to the team. Re-scopes the fb_files subtree's
+// org_id + sync bookkeeping (sync_rev reset for the org keyspace) so the org loop
+// pushes the metadata and, for real files, uploads the bytes to every member.
+// Passing the drive root's children shares the whole drive. Returns affected ids.
+//
+// Note: kind 'doc' pointers inside a shared folder are re-scoped but not pushed by
+// the org loop (documents sync as their own 'document' item); share the document
+// itself to bring it across. Real files and folders travel in full.
+export function moveFileToOrg(rootId: string, orgId: string): string[] {
+  const db = getDb()
+  if (!orgId) return []
+  const exists = db.prepare('SELECT id FROM fb_files WHERE id = ? AND trashed_at IS NULL').get(rootId)
+  if (!exists) return []
+  const ids: string[] = []
+  const collect = (fid: string): void => {
+    ids.push(fid)
+    const kids = db.prepare('SELECT id FROM fb_files WHERE parent_id = ? AND trashed_at IS NULL').all(fid) as Array<{
+      id: string
+    }>
+    for (const k of kids) collect(k.id)
+  }
+  collect(rootId)
+  const setFile = db.prepare('UPDATE fb_files SET org_id = ?, needs_sync = 1, sync_rev = 0 WHERE id = ?')
+  db.transaction(() => {
+    for (const i of ids) setFile.run(orgId, i)
+  })()
+  return ids
+}
+
 // ── File/folder manager ──────────────────────────────────────────────────────
 // fb_files doubles as the manager's tree: folders (kind 'folder'), imported
 // external files (kind 'file'), and references to internal documents filed into

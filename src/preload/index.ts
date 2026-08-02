@@ -914,6 +914,8 @@ const api = {
       ipcRenderer.invoke('fileManager:rename', id, name),
     move: (id: string, newParentId: string | null): Promise<boolean> =>
       ipcRenderer.invoke('fileManager:move', id, newParentId),
+    moveToOrg: (id: string, orgId: string): Promise<string[]> =>
+      ipcRenderer.invoke('fileManager:moveToOrg', id, orgId),
     // Soft-delete: returns the ids trashed (entry + subtree) so the caller can undo.
     delete: (id: string): Promise<string[]> => ipcRenderer.invoke('fileManager:delete', id),
     restore: (ids: string[]): Promise<boolean> => ipcRenderer.invoke('fileManager:restore', ids),

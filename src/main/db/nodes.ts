@@ -222,12 +222,31 @@ export function moveNodeToOrg(rootId: string, orgId: string): string[] {
     for (const k of kids) collect(k.id)
   }
   collect(rootId)
+  // Tables backing any table widget on the moved desks must travel too, or the
+  // widget lands on the other member pointing at a table that never synced (blank
+  // "Loading table…"). A table widget stores its fb_tables id in widget.content.
+  const tableIds = (
+    db
+      .prepare(
+        `SELECT DISTINCT content AS id FROM widgets
+         WHERE task_id IN (${ids.map(() => '?').join(',')})
+           AND kind = 'table' AND content IS NOT NULL AND content != ''`
+      )
+      .all(...ids) as Array<{ id: string }>
+  ).map((r) => r.id)
+
   const setNode = db.prepare('UPDATE nodes SET org_id = ?, needs_sync = 1, sync_rev = 0 WHERE id = ?')
   const setWidgets = db.prepare('UPDATE widgets SET needs_sync = 1, sync_rev = 0 WHERE task_id = ?')
+  const setTable = db.prepare('UPDATE fb_tables SET org_id = ?, needs_sync = 1, sync_rev = 0 WHERE id = ?')
+  const setRows = db.prepare('UPDATE fb_rows SET needs_sync = 1, sync_rev = 0 WHERE table_id = ?')
   db.transaction(() => {
     for (const i of ids) {
       setNode.run(orgId, i)
       setWidgets.run(i)
+    }
+    for (const t of tableIds) {
+      setTable.run(orgId, t)
+      setRows.run(t)
     }
   })()
   return ids
