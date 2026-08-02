@@ -117,6 +117,8 @@ const api = {
     // Soft-delete: returns the trashed ids (the node + its subtree) for undo.
     delete: (id: string): Promise<string[]> => ipcRenderer.invoke('nodes:delete', id),
     restore: (ids: string[]): Promise<boolean> => ipcRenderer.invoke('nodes:restore', ids),
+    moveToOrg: (id: string, orgId: string): Promise<string[]> =>
+      ipcRenderer.invoke('nodes:moveToOrg', id, orgId),
     move: (
       id: string,
       newParentId: string | null,

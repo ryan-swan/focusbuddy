@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import type { PinZone, Widget, WidgetDraft, WidgetPatch } from '@shared/types'
 import { recordTrail } from '../lib/trail'
+import { nudgeSync } from '../lib/syncNudge'
 import { sectionCreate, widgetOpen } from '../lib/audioBeep'
 import { notifyWireSource } from '../lib/wireEngine'
 import { notifyAgentInputChanged } from '../lib/deskAgentEngine'
@@ -338,11 +339,13 @@ export const useWidgetStore = create<WidgetStore>((set, get) => ({
     if (!widget) return null // task vanished before the create landed; clean no-op
     set({ widgets: [...get().widgets, widget] })
     recordSnapshotSoon(widget.taskId)
+    nudgeSync()
     return widget
   },
   create: async (draft) => {
     const widget = await window.api.widgets.create(draft)
     set({ widgets: [...get().widgets, widget] })
+    nudgeSync()
     // Undo a freshly-added widget by trashing it; redo restores it (same id, so
     // its links survive). We re-add the captured object locally to avoid a fetch.
     recordAction({
@@ -422,6 +425,7 @@ export const useWidgetStore = create<WidgetStore>((set, get) => ({
     if (Object.keys(dbPatch as Record<string, unknown>).length > 0) {
       updated = await window.api.widgets.update(id, dbPatch)
       if (!updated) return
+      nudgeSync()
       const server = updated
       // Reconcile with the server copy, then re-assert any overlay-destined
       // geometry so the server's (unchanged) base geometry never clobbers the
@@ -516,6 +520,7 @@ export const useWidgetStore = create<WidgetStore>((set, get) => ({
     const removedTaskId = widget?.taskId
     await window.api.widgets.delete(id) // soft-delete (trashed, recoverable)
     set({ widgets: get().widgets.filter((w) => w.id !== id) })
+    nudgeSync()
     // Don't prune links: they survive the soft-delete so they return on restore.
     // The overlay skips links whose endpoint widget isn't present, so a trashed
     // widget's lines simply hide until it's restored.

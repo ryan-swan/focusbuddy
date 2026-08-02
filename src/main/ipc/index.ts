@@ -82,6 +82,7 @@ import { getModelClient } from '../ai/modelClient'
 import {
   createNode,
   deleteNode,
+  moveNodeToOrg,
   restoreNodes,
   getNode,
   listNodes,
@@ -666,6 +667,9 @@ export function registerIpcHandlers(): void {
     return removed
   })
   ipcMain.handle('nodes:restore', (_e, ids: string[]) => restoreNodes(ids))
+  ipcMain.handle('nodes:moveToOrg', (_e, id: string, orgId: string) =>
+    moveNodeToOrg(String(id || ''), String(orgId || ''))
+  )
   // User-driven desk relatedness (see db/nodeRelations.ts). The legacy table stays
   // the UI's source of truth; each edge is ALSO mirrored into the knowledge graph
   // as a confirmed Relationship so Context Health can propagate across it.

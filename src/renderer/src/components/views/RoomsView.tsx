@@ -1,13 +1,14 @@
 import { useMemo } from 'react'
 import type { FbNode, Widget } from '@shared/types'
 import { useNodeStore } from '../../stores/nodes'
+import { useOrgStore, PERSONAL_ORG_ID } from '../../stores/org'
 import { useViewStore } from '../../stores/view'
 import { useMessagingStore } from '../../stores/messaging'
 import { useDeskWidgets } from '../../lib/useDeskWidgets'
 import { formatRelativeTime } from '../../lib/changelog'
 import RoomThumb from '../RoomThumb'
 import Icon from '../Icon'
-import { promptText } from '../plexi/PromptDialog'
+import { promptText, confirmDialog } from '../plexi/PromptDialog'
 import RoomsDesksIndex, { type IndexConfig } from './RoomsDesksIndex'
 
 // The All Rooms index. A Room is a folder node — a place desks live. Clicking a
@@ -23,6 +24,12 @@ export default function RoomsView(): JSX.Element {
   const move = useNodeStore((s) => s.move)
   const create = useNodeStore((s) => s.create)
   const update = useNodeStore((s) => s.update)
+  const moveToOrg = useNodeStore((s) => s.moveToOrg)
+  const activeOrgId = useOrgStore((s) => s.activeOrgId)
+  const sharedOrgs = useOrgStore((s) => s.orgs.filter((o) => !o.personal))
+  // A room is shared by moving it (and its desks/widgets) into a team org. Offered
+  // only from the Personal workspace and only when a team org exists to move it to.
+  const shareTarget = activeOrgId === PERSONAL_ORG_ID && sharedOrgs.length > 0 ? sharedOrgs[0] : null
   const goDesks = useViewStore((s) => s.goDesks)
   const openObjectChannel = useMessagingStore((s) => s.openObjectChannel)
 
@@ -170,6 +177,25 @@ export default function RoomsView(): JSX.Element {
     },
     actions: (r) => (
       <div className="flex items-center gap-1">
+        {shareTarget ? (
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              void (async () => {
+                const ok = await confirmDialog({
+                  title: `Share “${r.title || 'this room'}” with ${shareTarget.name}?`,
+                  body: `Everyone in ${shareTarget.name} will see this room and its desks, and can edit them. It moves out of your Personal workspace.`,
+                  confirmLabel: 'Share with team'
+                })
+                if (ok) await moveToOrg(r.id, shareTarget.id)
+              })()
+            }}
+            title={`Share with ${shareTarget.name}`}
+            className="inline-flex items-center justify-center h-6 w-6 rounded-md bg-[var(--surface-raised)]/90 border border-[var(--edge-firm)] text-[var(--ink-60)] hover:text-[var(--ink-100)]"
+          >
+            <Icon name="group_add" size={14} />
+          </button>
+        ) : null}
         <button
           onClick={(e) => {
             e.stopPropagation()

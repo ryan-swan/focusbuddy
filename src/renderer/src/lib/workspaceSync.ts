@@ -10,6 +10,7 @@ import { useTablesStore } from '../stores/tables'
 import { useFileManagerStore } from '../stores/fileManager'
 import { useOrgStore, PERSONAL_ORG_ID } from '../stores/org'
 import { setOrgWorkspaceChangedHandler } from './messagingSocket'
+import { registerSyncNudge } from './syncNudge'
 
 // Every item type carried over the sync transport. The personal loop has always
 // carried node and widget; rung 2 added document, table and row alongside the
@@ -554,6 +555,10 @@ export function startWorkspaceSync(): void {
   initPreviewGuard()
   if (timer != null) return
   setOrgWorkspaceChangedHandler(onOrgWorkspaceChanged)
+  // Local edits nudge an immediate (debounced) push so a change reaches teammates
+  // in ~1-2s instead of waiting up to a full poll interval. The interval below
+  // stays as the backstop.
+  registerSyncNudge(() => void syncWorkspaceOnce())
   void syncWorkspaceOnce()
   timer = window.setInterval(() => void syncWorkspaceOnce(), SYNC_INTERVAL_MS)
 }
@@ -561,6 +566,7 @@ export function startWorkspaceSync(): void {
 export function stopWorkspaceSync(): void {
   useSyncStatus.getState().setDisabled()
   setOrgWorkspaceChangedHandler(null)
+  registerSyncNudge(null)
   if (pushDebounce != null) {
     window.clearTimeout(pushDebounce)
     pushDebounce = null

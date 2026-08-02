@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import type { DocType, DocumentMeta, FbDocument } from '@shared/types'
 import { pullCloudDocs, pushCloudDoc, pushCloudDelete } from '../lib/cloudDocsSync'
+import { nudgeSync } from '../lib/syncNudge'
 import { recordActionWithToast } from './actionHistory'
 import { useMessagingStore } from './messaging'
 
@@ -102,6 +103,7 @@ export const useDocumentsStore = create<DocumentsStore>((set, get) => ({
     const doc = await window.api.documents.create({ docType, title })
     void pushCloudDoc(doc).catch(() => {})
     await get().refresh()
+    nudgeSync()
     return doc
   },
 
@@ -148,6 +150,7 @@ export const useDocumentsStore = create<DocumentsStore>((set, get) => ({
       try {
         await window.api.documents.update(cur.id, { body: cur.body })
         set({ saving: false, saveError: false })
+        nudgeSync()
       } catch (err) {
         // Never lose work silently: keep the in-memory edit, drop the stuck
         // "Saving" state, and flag the error so the editor shows a banner. The
@@ -172,6 +175,7 @@ export const useDocumentsStore = create<DocumentsStore>((set, get) => ({
     await window.api.documents.update(a.id, { title })
     void pushCloudDoc(next).catch(() => {})
     await get().refresh()
+    nudgeSync()
   },
 
   refreshTrashed: async () => {

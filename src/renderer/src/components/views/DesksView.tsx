@@ -1,12 +1,13 @@
 import { useMemo } from 'react'
 import type { FbNode } from '@shared/types'
 import { useNodeStore } from '../../stores/nodes'
+import { useOrgStore, PERSONAL_ORG_ID } from '../../stores/org'
 import { useViewStore } from '../../stores/view'
 import { useDeskWidgets, realWidgetCount } from '../../lib/useDeskWidgets'
 import { formatRelativeTime } from '../../lib/changelog'
 import DeskMiniature from '../DeskMiniature'
 import Icon from '../Icon'
-import { promptText } from '../plexi/PromptDialog'
+import { promptText, confirmDialog } from '../plexi/PromptDialog'
 import RoomsDesksIndex, { type IndexConfig } from './RoomsDesksIndex'
 
 // The All Desks index. A Desk is a task node (a canvas). Optionally scoped to a
@@ -35,6 +36,13 @@ export default function DesksView({ roomId }: { roomId?: string }): JSX.Element 
   const setActive = useNodeStore((s) => s.setActive)
   const create = useNodeStore((s) => s.create)
   const update = useNodeStore((s) => s.update)
+  const moveToOrg = useNodeStore((s) => s.moveToOrg)
+  const activeOrgId = useOrgStore((s) => s.activeOrgId)
+  const sharedOrgs = useOrgStore((s) => s.orgs.filter((o) => !o.personal))
+  // Sharing a desk = moving it into a team org. Only offered from the Personal
+  // workspace (desks already in a team org are shared), and only when the user
+  // actually belongs to a team org to move it to.
+  const shareTarget = activeOrgId === PERSONAL_ORG_ID && sharedOrgs.length > 0 ? sharedOrgs[0] : null
   const goTask = useViewStore((s) => s.goTask)
   const goRooms = useViewStore((s) => s.goRooms)
 
@@ -174,25 +182,46 @@ export default function DesksView({ roomId }: { roomId?: string }): JSX.Element 
       })()
     },
     actions: (d) => (
-      <button
-        onClick={(e) => {
-          e.stopPropagation()
-          void (async () => {
-            const next = await promptText({
-              title: 'Rename desk',
-              label: 'Desk name',
-              initial: d.title || '',
-              confirmLabel: 'Rename'
-            })
-            const trimmed = next?.trim()
-            if (trimmed && trimmed !== (d.title || '')) await update(d.id, { title: trimmed })
-          })()
-        }}
-        title="Rename desk"
-        className="inline-flex items-center justify-center h-6 w-6 rounded-md bg-[var(--surface-raised)]/90 border border-[var(--edge-firm)] text-[var(--ink-60)] hover:text-[var(--ink-100)]"
-      >
-        <Icon name="edit" size={14} />
-      </button>
+      <>
+        {shareTarget ? (
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              void (async () => {
+                const ok = await confirmDialog({
+                  title: `Share “${d.title || 'this desk'}” with ${shareTarget.name}?`,
+                  body: `Everyone in ${shareTarget.name} will see this desk and its widgets, and can edit it. It moves out of your Personal workspace.`,
+                  confirmLabel: 'Share with team'
+                })
+                if (ok) await moveToOrg(d.id, shareTarget.id)
+              })()
+            }}
+            title={`Share with ${shareTarget.name}`}
+            className="inline-flex items-center justify-center h-6 w-6 rounded-md bg-[var(--surface-raised)]/90 border border-[var(--edge-firm)] text-[var(--ink-60)] hover:text-[var(--ink-100)]"
+          >
+            <Icon name="group_add" size={14} />
+          </button>
+        ) : null}
+        <button
+          onClick={(e) => {
+            e.stopPropagation()
+            void (async () => {
+              const next = await promptText({
+                title: 'Rename desk',
+                label: 'Desk name',
+                initial: d.title || '',
+                confirmLabel: 'Rename'
+              })
+              const trimmed = next?.trim()
+              if (trimmed && trimmed !== (d.title || '')) await update(d.id, { title: trimmed })
+            })()
+          }}
+          title="Rename desk"
+          className="inline-flex items-center justify-center h-6 w-6 rounded-md bg-[var(--surface-raised)]/90 border border-[var(--edge-firm)] text-[var(--ink-60)] hover:text-[var(--ink-100)]"
+        >
+          <Icon name="edit" size={14} />
+        </button>
+      </>
     ),
     headerActions: roomId ? (
       <button

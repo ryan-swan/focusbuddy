@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import type { FbNode, NodeDraft, NodePatch } from '@shared/types'
 import { recordAction, recordActionWithToast } from './actionHistory'
 import { recordTrail } from '../lib/trail'
+import { nudgeSync } from '../lib/syncNudge'
 import { taskComplete } from '../lib/audioBeep'
 import { hapticSuccess } from '../lib/haptics'
 import { canCreateMore, limitFor } from '../lib/gating'
@@ -38,6 +39,9 @@ interface NodeStore {
   remove: (id: string) => Promise<void>
   // Atomic reparent + reorder. beforeId=null appends to end of new parent.
   move: (id: string, newParentId: string | null, beforeId: string | null) => Promise<void>
+  // Share a personal room/desk (and everything under it) with an org. Re-scopes the
+  // subtree + its widgets to orgId so the org sync loop pushes it to every member.
+  moveToOrg: (id: string, orgId: string) => Promise<string[]>
   setActive: (id: string | null) => void
   toggleExpand: (id: string) => void
   expand: (id: string, on: boolean) => void
@@ -96,6 +100,7 @@ export const useNodeStore = create<NodeStore>((set, get) => ({
     }
     const node = await window.api.nodes.create(draft)
     set({ nodes: [...get().nodes, node] })
+    nudgeSync()
     if (draft.parentId) set({ expanded: { ...get().expanded, [draft.parentId]: true } })
     // Undo a creation by trashing it; redo restores exactly what was trashed
     // (it may have gained children by the time you undo).
@@ -118,6 +123,7 @@ export const useNodeStore = create<NodeStore>((set, get) => ({
     const updated = await window.api.nodes.update(id, patch)
     if (!updated) return
     set({ nodes: get().nodes.map((n) => (n.id === id ? updated : n)) })
+    nudgeSync()
     // Record an undo only for user-meaningful field edits (not programmatic
     // patches like resume autosave or timers), restoring the prior values.
     const UNDOABLE = ['title', 'description', 'status', 'priority', 'interest', 'importance', 'dueDate'] as const
@@ -164,6 +170,7 @@ export const useNodeStore = create<NodeStore>((set, get) => ({
       nodes: get().nodes.filter((n) => !ids.includes(n.id)),
       activeTaskId: ids.includes(get().activeTaskId ?? '') ? null : get().activeTaskId
     })
+    nudgeSync()
     // Best-effort: archive the deleted room/desk's chat channel (keeps history,
     // hides it from lists). No-op if the object never had a channel.
     if (target) {
@@ -185,6 +192,16 @@ export const useNodeStore = create<NodeStore>((set, get) => ({
       })
     }
   },
+  moveToOrg: async (id, orgId) => {
+    const ids = await window.api.nodes.moveToOrg(id, orgId)
+    if (!ids.length) return ids
+    // The subtree left the active (personal) org; refresh drops it from this view.
+    // It now belongs to the target org and appears when that org is active, and the
+    // nudge pushes it to every member right away.
+    await get().refresh()
+    nudgeSync()
+    return ids
+  },
   move: async (id, newParentId, beforeId) => {
     // Capture the node's current slot so undo can put it back exactly.
     const before = get().nodes.find((n) => n.id === id)
@@ -199,6 +216,7 @@ export const useNodeStore = create<NodeStore>((set, get) => ({
     // Refresh from server so sort_order on every sibling is correct in one fetch
     const fresh = await window.api.nodes.list()
     set({ nodes: fresh })
+    nudgeSync()
     // Auto-expand the destination parent so the moved node is visible after drop
     if (newParentId) set({ expanded: { ...get().expanded, [newParentId]: true } })
     if (prevParentId !== newParentId || prevBeforeId !== beforeId) {
