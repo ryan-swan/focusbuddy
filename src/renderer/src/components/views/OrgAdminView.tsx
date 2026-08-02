@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import Icon from '../Icon'
 import { DashboardHeader, StatTile, PLEXI_CARD } from '../plexi'
+import { confirmDialog } from '../plexi/PromptDialog'
 import { personDisplayName } from '../../lib/personName'
 import { useAccountStore } from '../../stores/account'
 import { useOrgStore } from '../../stores/org'
@@ -183,7 +184,26 @@ export default function OrgAdminView(): JSX.Element {
   }
   async function doInvite(): Promise<void> {
     if (!token || !selId || !inviteEmail.includes('@')) return
-    const res = await inviteMember(token, selId, inviteEmail.trim(), inviteRole)
+    const email = inviteEmail.trim().toLowerCase()
+    // Warn before granting access to someone external to the organisation — either
+    // an explicit guest, or an email outside the org's domain.
+    const domain = email.split('@')[1] ?? ''
+    const orgDomain = invitePolicy.domain?.toLowerCase() ?? null
+    const isExternal = inviteRole === 'guest' || (orgDomain ? domain !== orgDomain : false)
+    if (isExternal) {
+      const ok = await confirmDialog({
+        title: `Invite ${email}?`,
+        body: `${email} is external to this organisation${orgDomain ? ` (${orgDomain})` : ''}. ${
+          inviteRole === 'guest'
+            ? 'As a guest they get read-only access to everything shared with this organisation.'
+            : 'They will join as a full member with access to shared content.'
+        }`,
+        confirmLabel: 'Invite external person',
+        danger: true
+      })
+      if (!ok) return
+    }
+    const res = await inviteMember(token, selId, email, inviteRole)
     setMsg(res.ok ? (res.added ? 'Added to the organization.' : 'Invite sent — they join when they sign up.') : res.error ?? 'Could not invite.')
     if (res.ok) {
       setInviteEmail('')
