@@ -14,7 +14,7 @@ import { useViewStore } from '../../stores/view'
 import { useAccountStore } from '../../stores/account'
 import { useOrgStore, PERSONAL_ORG_ID } from '../../stores/org'
 import { promoteFolderToLive } from '../../lib/liveFolderMirror'
-import { confirmDialog } from '../plexi/PromptDialog'
+import { shareToOrgOrGroup } from '../../lib/shareScope'
 import Icon from '../Icon'
 import CanvasContextMenu, { type CtxMenuItem } from '../CanvasContextMenu'
 
@@ -102,13 +102,12 @@ export default function FilesView(): JSX.Element {
   const sessionToken = useAccountStore((s) => s.sessionToken)
   const activeOrgId = useOrgStore((s) => s.activeOrgId)
   const orgs = useOrgStore((s) => s.orgs)
-  // Sharing a file/folder = moving it into a team org. Offered only from the
-  // Personal Drive and only when a team org exists. useMemo over the stable orgs
-  // array (a filtering selector returns a new array each render -> React #185).
-  const shareTarget = useMemo(() => {
-    const shared = orgs.filter((o) => !o.personal)
-    return activeOrgId === PERSONAL_ORG_ID && shared.length > 0 ? shared[0] : null
-  }, [orgs, activeOrgId])
+  // Sharing a file/folder = moving it into a team org, optionally narrowed to a
+  // group. Offered only from the Personal Drive when a team org exists. useMemo
+  // over the stable orgs array (a filtering selector returns a new array each
+  // render -> React #185).
+  const sharedOrgs = useMemo(() => orgs.filter((o) => !o.personal), [orgs])
+  const canShare = activeOrgId === PERSONAL_ORG_ID && sharedOrgs.length > 0
   const undo = useFileManagerStore((s) => s.undo)
   const redo = useFileManagerStore((s) => s.redo)
   const [renaming, setRenaming] = useState<string | null>(null)
@@ -181,21 +180,19 @@ export default function FilesView(): JSX.Element {
     if (entry.kind === 'file') {
       items.push({ label: 'Reveal in Finder', icon: 'folder_open', onClick: () => void window.api.fileManager.reveal(entry.id) })
     }
-    // Share a file or folder (and its contents) with the team org. Doc pointers
-    // sync as their own document, so sharing them here would be a no-op — omit.
-    if (shareTarget && entry.kind !== 'doc') {
+    // Share a file or folder (and its contents) with the team, optionally a group.
+    // Doc pointers sync as their own document, so sharing them here is a no-op — omit.
+    if (canShare && entry.kind !== 'doc') {
       items.push({
-        label: `Share with ${shareTarget.name}`,
+        label: 'Share with team or group',
         icon: 'group_add',
         onClick: () => {
-          void (async () => {
-            const ok = await confirmDialog({
-              title: `Share “${entry.name}” with ${shareTarget.name}?`,
-              body: `Everyone in ${shareTarget.name} will see ${entry.kind === 'folder' ? 'this folder and its contents' : 'this file'}, and it moves out of your Personal Drive.`,
-              confirmLabel: 'Share with team'
-            })
-            if (ok) await store.moveToOrg(entry.id, shareTarget.id)
-          })()
+          void shareToOrgOrGroup({
+            name: entry.name,
+            kindLabel: entry.kind === 'folder' ? 'folder and its contents' : 'file',
+            sharedOrgs,
+            move: (org, team) => store.moveToOrg(entry.id, org, team)
+          })
         }
       })
     }

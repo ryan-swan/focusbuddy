@@ -57,6 +57,22 @@ export async function listTeams(token: string): Promise<Team[]> {
   return json?.teams ?? []
 }
 
+// The teams the account belongs to in a SPECIFIC org — used by the share-scope
+// picker, which needs the target org's groups even while the active org is
+// Personal. Sets x-plexi-org explicitly (the interceptor now respects it, and the
+// server re-validates membership). Returns [] on any error.
+export async function listTeamsForOrg(token: string, orgId: string): Promise<Team[]> {
+  try {
+    const res = await fetch(urlFor('/teams'), {
+      headers: { Authorization: `Bearer ${token}`, 'x-plexi-org': orgId }
+    })
+    const json = (await res.json().catch(() => null)) as { ok?: boolean; teams?: Team[] } | null
+    return json?.teams ?? []
+  } catch {
+    return []
+  }
+}
+
 export async function createTeam(token: string, name: string): Promise<Team | null> {
   const { json } = await call<{ ok: boolean; team?: Team }>('POST', '/teams', token, { name })
   return json?.team ?? null

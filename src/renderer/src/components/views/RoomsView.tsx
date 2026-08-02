@@ -8,7 +8,8 @@ import { useDeskWidgets } from '../../lib/useDeskWidgets'
 import { formatRelativeTime } from '../../lib/changelog'
 import RoomThumb from '../RoomThumb'
 import Icon from '../Icon'
-import { promptText, confirmDialog } from '../plexi/PromptDialog'
+import { promptText } from '../plexi/PromptDialog'
+import { shareToOrgOrGroup } from '../../lib/shareScope'
 import RoomsDesksIndex, { type IndexConfig } from './RoomsDesksIndex'
 
 // The All Rooms index. A Room is a folder node — a place desks live. Clicking a
@@ -29,12 +30,11 @@ export default function RoomsView(): JSX.Element {
   // Stable selector + useMemo: filtering inside the selector returns a new array
   // each render, which sends Zustand into an infinite re-render (React #185).
   const orgs = useOrgStore((s) => s.orgs)
-  // A room is shared by moving it (and its desks/widgets) into a team org. Offered
-  // only from the Personal workspace and only when a team org exists to move it to.
-  const shareTarget = useMemo(() => {
-    const shared = orgs.filter((o) => !o.personal)
-    return activeOrgId === PERSONAL_ORG_ID && shared.length > 0 ? shared[0] : null
-  }, [orgs, activeOrgId])
+  // A room is shared by moving it (and its desks/widgets) into a team org,
+  // optionally narrowed to a group. Offered only from the Personal workspace when a
+  // team org exists.
+  const sharedOrgs = useMemo(() => orgs.filter((o) => !o.personal), [orgs])
+  const canShare = activeOrgId === PERSONAL_ORG_ID && sharedOrgs.length > 0
   const goDesks = useViewStore((s) => s.goDesks)
   const openObjectChannel = useMessagingStore((s) => s.openObjectChannel)
 
@@ -182,20 +182,18 @@ export default function RoomsView(): JSX.Element {
     },
     actions: (r) => (
       <div className="flex items-center gap-1">
-        {shareTarget ? (
+        {canShare ? (
           <button
             onClick={(e) => {
               e.stopPropagation()
-              void (async () => {
-                const ok = await confirmDialog({
-                  title: `Share “${r.title || 'this room'}” with ${shareTarget.name}?`,
-                  body: `Everyone in ${shareTarget.name} will see this room and its desks, and can edit them. It moves out of your Personal workspace.`,
-                  confirmLabel: 'Share with team'
-                })
-                if (ok) await moveToOrg(r.id, shareTarget.id)
-              })()
+              void shareToOrgOrGroup({
+                name: r.title || 'this room',
+                kindLabel: 'room and its desks',
+                sharedOrgs,
+                move: (org, team) => moveToOrg(r.id, org, team)
+              })
             }}
-            title={`Share with ${shareTarget.name}`}
+            title="Share with your team or a group"
             className="inline-flex items-center justify-center h-6 w-6 rounded-md bg-[var(--surface-raised)]/90 border border-[var(--edge-firm)] text-[var(--ink-60)] hover:text-[var(--ink-100)]"
           >
             <Icon name="group_add" size={14} />

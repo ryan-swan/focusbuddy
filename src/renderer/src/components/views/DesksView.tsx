@@ -7,7 +7,8 @@ import { useDeskWidgets, realWidgetCount } from '../../lib/useDeskWidgets'
 import { formatRelativeTime } from '../../lib/changelog'
 import DeskMiniature from '../DeskMiniature'
 import Icon from '../Icon'
-import { promptText, confirmDialog } from '../plexi/PromptDialog'
+import { promptText } from '../plexi/PromptDialog'
+import { shareToOrgOrGroup } from '../../lib/shareScope'
 import RoomsDesksIndex, { type IndexConfig } from './RoomsDesksIndex'
 
 // The All Desks index. A Desk is a task node (a canvas). Optionally scoped to a
@@ -42,13 +43,12 @@ export default function DesksView({ roomId }: { roomId?: string }): JSX.Element 
   // selector returns a fresh array every render, which Zustand treats as a change
   // and re-renders forever (React #185).
   const orgs = useOrgStore((s) => s.orgs)
-  // Sharing a desk = moving it into a team org. Only offered from the Personal
-  // workspace (desks already in a team org are shared), and only when the user
-  // actually belongs to a team org to move it to.
-  const shareTarget = useMemo(() => {
-    const shared = orgs.filter((o) => !o.personal)
-    return activeOrgId === PERSONAL_ORG_ID && shared.length > 0 ? shared[0] : null
-  }, [orgs, activeOrgId])
+  // Sharing a desk = moving it into a team org (optionally narrowed to a group).
+  // Only offered from the Personal workspace (desks already in a team org are
+  // shared), and only when the user belongs to a team org. useMemo over the stable
+  // orgs array — a filtering selector returns a new array each render (React #185).
+  const sharedOrgs = useMemo(() => orgs.filter((o) => !o.personal), [orgs])
+  const canShare = activeOrgId === PERSONAL_ORG_ID && sharedOrgs.length > 0
   const goTask = useViewStore((s) => s.goTask)
   const goRooms = useViewStore((s) => s.goRooms)
 
@@ -189,20 +189,18 @@ export default function DesksView({ roomId }: { roomId?: string }): JSX.Element 
     },
     actions: (d) => (
       <>
-        {shareTarget ? (
+        {canShare ? (
           <button
             onClick={(e) => {
               e.stopPropagation()
-              void (async () => {
-                const ok = await confirmDialog({
-                  title: `Share “${d.title || 'this desk'}” with ${shareTarget.name}?`,
-                  body: `Everyone in ${shareTarget.name} will see this desk and its widgets, and can edit it. It moves out of your Personal workspace.`,
-                  confirmLabel: 'Share with team'
-                })
-                if (ok) await moveToOrg(d.id, shareTarget.id)
-              })()
+              void shareToOrgOrGroup({
+                name: d.title || 'this desk',
+                kindLabel: 'desk and its widgets',
+                sharedOrgs,
+                move: (org, team) => moveToOrg(d.id, org, team)
+              })
             }}
-            title={`Share with ${shareTarget.name}`}
+            title="Share with your team or a group"
             className="inline-flex items-center justify-center h-6 w-6 rounded-md bg-[var(--surface-raised)]/90 border border-[var(--edge-firm)] text-[var(--ink-60)] hover:text-[var(--ink-100)]"
           >
             <Icon name="group_add" size={14} />
