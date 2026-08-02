@@ -50,4 +50,35 @@ describe('seedYDocFromPm', () => {
     expect(t).toContain('First')
     expect(t).not.toContain('Second')
   })
+
+  // Re-hydration: a room created before its body had content (empty / lone empty
+  // paragraph) must pick up the real body when reopened — the "shared doc shows
+  // blank" bug — while a room holding real text is still never clobbered.
+  const pmEmpty = { type: 'doc', content: [{ type: 'paragraph' }] }
+  const textOf = (d: Y.Doc): string =>
+    d.getXmlFragment(COLLAB_FIELD).toString().replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim()
+
+  it('re-hydrates a placeholder (empty paragraph) room when the body has content', () => {
+    const d = new Y.Doc()
+    seedYDocFromPm(d, pmEmpty, schema) // room created empty (blank-doc case)
+    expect(textOf(d)).toBe('')
+    seedYDocFromPm(d, pmWith('This is my new document.'), schema) // body gained content
+    expect(textOf(d)).toBe('This is my new document.')
+  })
+
+  it('re-hydration is idempotent — does not double the content', () => {
+    const d = new Y.Doc()
+    seedYDocFromPm(d, pmEmpty, schema)
+    seedYDocFromPm(d, pmWith('Hello Ben'), schema)
+    seedYDocFromPm(d, pmWith('Hello Ben'), schema)
+    expect((textOf(d).match(/Hello Ben/g) || []).length).toBe(1)
+  })
+
+  it('does not re-add a placeholder when both room and body are empty', () => {
+    const d = new Y.Doc()
+    seedYDocFromPm(d, pmEmpty, schema)
+    const len = d.getXmlFragment(COLLAB_FIELD).length
+    seedYDocFromPm(d, pmEmpty, schema)
+    expect(d.getXmlFragment(COLLAB_FIELD).length).toBe(len)
+  })
 })
