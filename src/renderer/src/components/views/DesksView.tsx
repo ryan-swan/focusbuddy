@@ -38,11 +38,17 @@ export default function DesksView({ roomId }: { roomId?: string }): JSX.Element 
   const update = useNodeStore((s) => s.update)
   const moveToOrg = useNodeStore((s) => s.moveToOrg)
   const activeOrgId = useOrgStore((s) => s.activeOrgId)
-  const sharedOrgs = useOrgStore((s) => s.orgs.filter((o) => !o.personal))
+  // Select the stable orgs array and derive with useMemo — filtering inside the
+  // selector returns a fresh array every render, which Zustand treats as a change
+  // and re-renders forever (React #185).
+  const orgs = useOrgStore((s) => s.orgs)
   // Sharing a desk = moving it into a team org. Only offered from the Personal
   // workspace (desks already in a team org are shared), and only when the user
   // actually belongs to a team org to move it to.
-  const shareTarget = activeOrgId === PERSONAL_ORG_ID && sharedOrgs.length > 0 ? sharedOrgs[0] : null
+  const shareTarget = useMemo(() => {
+    const shared = orgs.filter((o) => !o.personal)
+    return activeOrgId === PERSONAL_ORG_ID && shared.length > 0 ? shared[0] : null
+  }, [orgs, activeOrgId])
   const goTask = useViewStore((s) => s.goTask)
   const goRooms = useViewStore((s) => s.goRooms)
 

@@ -26,10 +26,15 @@ export default function RoomsView(): JSX.Element {
   const update = useNodeStore((s) => s.update)
   const moveToOrg = useNodeStore((s) => s.moveToOrg)
   const activeOrgId = useOrgStore((s) => s.activeOrgId)
-  const sharedOrgs = useOrgStore((s) => s.orgs.filter((o) => !o.personal))
+  // Stable selector + useMemo: filtering inside the selector returns a new array
+  // each render, which sends Zustand into an infinite re-render (React #185).
+  const orgs = useOrgStore((s) => s.orgs)
   // A room is shared by moving it (and its desks/widgets) into a team org. Offered
   // only from the Personal workspace and only when a team org exists to move it to.
-  const shareTarget = activeOrgId === PERSONAL_ORG_ID && sharedOrgs.length > 0 ? sharedOrgs[0] : null
+  const shareTarget = useMemo(() => {
+    const shared = orgs.filter((o) => !o.personal)
+    return activeOrgId === PERSONAL_ORG_ID && shared.length > 0 ? shared[0] : null
+  }, [orgs, activeOrgId])
   const goDesks = useViewStore((s) => s.goDesks)
   const openObjectChannel = useMessagingStore((s) => s.openObjectChannel)
 
