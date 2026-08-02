@@ -31,6 +31,9 @@ export interface PendingUpsert {
   itemType: ItemType
   body: Record<string, unknown>
   baseRev: number
+  // Group scope carried alongside the body (not inside it): null/undefined = whole
+  // org, a team id = that group only. widgets/rows inherit their parent's team.
+  teamId?: string | null
 }
 export interface PendingDelete {
   id: string
@@ -43,10 +46,13 @@ export interface RemoteItem {
   body: Record<string, unknown> | null
   rev: number
   deleted: boolean
+  teamId?: string | null
 }
 
-// Columns we never round-trip through the server body (local-only sync bookkeeping).
-const SYNC_COLS = new Set(['sync_rev', 'needs_sync'])
+// Columns we never round-trip through the server body (local-only sync bookkeeping,
+// plus team_id which travels as its own scope field, and the __team_id alias the
+// widget/row joins use to carry the parent's team).
+const SYNC_COLS = new Set(['sync_rev', 'needs_sync', 'team_id', '__team_id'])
 
 function tableCols(table: SyncTable): string[] {
   const db = getDb()
@@ -186,8 +192,12 @@ export function collectPendingOrg(orgId: string): {
   const pushRow = (row: Record<string, unknown>, itemType: ItemType): void => {
     const id = String(row.id)
     const baseRev = Number(row.sync_rev) || 0
+    // Group scope: direct types carry team_id; widgets/rows inherit it from their
+    // parent via the __team_id alias in the join below. Tagging every item at push
+    // time means a team-shared object is never pushed org-wide first (no leak window).
+    const teamId = (row.team_id ?? row.__team_id ?? null) as string | null
     if (row.trashed_at != null) deletes.push({ id, itemType, baseRev })
-    else upserts.push({ id, itemType, body: bodyFromRow(row), baseRev })
+    else upserts.push({ id, itemType, body: bodyFromRow(row), baseRev, teamId })
   }
 
   // Types that carry org_id directly: filter by the column.
@@ -209,7 +219,7 @@ export function collectPendingOrg(orgId: string): {
   // the mirror of the personal collectPending widget filter.
   const widgetRows = db
     .prepare(
-      `SELECT w.* FROM widgets w
+      `SELECT w.*, n.team_id AS __team_id FROM widgets w
        JOIN nodes n ON w.task_id = n.id
        WHERE w.needs_sync = 1 AND n.org_id = ?`
     )
@@ -220,7 +230,7 @@ export function collectPendingOrg(orgId: string): {
   // table's org. The row body still includes table_id for reattachment.
   const rows = db
     .prepare(
-      `SELECT r.* FROM fb_rows r
+      `SELECT r.*, t.team_id AS __team_id FROM fb_rows r
        JOIN fb_tables t ON r.table_id = t.id
        WHERE r.needs_sync = 1 AND t.org_id = ?`
     )
@@ -432,10 +442,16 @@ export function applyRemoteOrg(items: RemoteItem[], orgId: string): { applied: n
       // the row lands in the right bucket. fb_rows has no org_id, so skip it.
       const hasOrgIdCol = cols.includes('org_id')
       if (hasOrgIdCol) params.org_id = orgId
+      // Stamp the group scope on types that have a team_id column (nodes/documents/
+      // files/tables), so a receiver who later edits the object re-pushes it under
+      // the same team. widgets/rows have no column — they re-derive from their parent.
+      const hasTeamIdCol = cols.includes('team_id')
+      if (hasTeamIdCol) params.team_id = item.teamId ?? null
       params.sync_rev = item.rev
       params.needs_sync = 0
       const allCols = [...present]
       if (hasOrgIdCol && !allCols.includes('org_id')) allCols.push('org_id')
+      if (hasTeamIdCol && !allCols.includes('team_id')) allCols.push('team_id')
       allCols.push('sync_rev', 'needs_sync')
       const insertList = allCols.join(', ')
       const valueList = allCols.map((c) => `@${c}`).join(', ')

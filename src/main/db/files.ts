@@ -277,7 +277,7 @@ export function importFolderTree(
 // Note: kind 'doc' pointers inside a shared folder are re-scoped but not pushed by
 // the org loop (documents sync as their own 'document' item); share the document
 // itself to bring it across. Real files and folders travel in full.
-export function moveFileToOrg(rootId: string, orgId: string): string[] {
+export function moveFileToOrg(rootId: string, orgId: string, teamId: string | null = null): string[] {
   const db = getDb()
   if (!orgId) return []
   const exists = db.prepare('SELECT id FROM fb_files WHERE id = ? AND trashed_at IS NULL').get(rootId)
@@ -291,9 +291,10 @@ export function moveFileToOrg(rootId: string, orgId: string): string[] {
     for (const k of kids) collect(k.id)
   }
   collect(rootId)
-  const setFile = db.prepare('UPDATE fb_files SET org_id = ?, needs_sync = 1, sync_rev = 0 WHERE id = ?')
+  // teamId scopes the subtree to a group (null = whole org).
+  const setFile = db.prepare('UPDATE fb_files SET org_id = ?, team_id = ?, needs_sync = 1, sync_rev = 0 WHERE id = ?')
   db.transaction(() => {
-    for (const i of ids) setFile.run(orgId, i)
+    for (const i of ids) setFile.run(orgId, teamId, i)
   })()
   return ids
 }

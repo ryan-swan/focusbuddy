@@ -669,8 +669,8 @@ export function registerIpcHandlers(): void {
     return removed
   })
   ipcMain.handle('nodes:restore', (_e, ids: string[]) => restoreNodes(ids))
-  ipcMain.handle('nodes:moveToOrg', (_e, id: string, orgId: string) =>
-    moveNodeToOrg(String(id || ''), String(orgId || ''))
+  ipcMain.handle('nodes:moveToOrg', (_e, id: string, orgId: string, teamId?: string | null) =>
+    moveNodeToOrg(String(id || ''), String(orgId || ''), teamId ?? null)
   )
   // User-driven desk relatedness (see db/nodeRelations.ts). The legacy table stays
   // the UI's source of truth; each edge is ALSO mirrored into the knowledge graph
@@ -1705,8 +1705,8 @@ export function registerIpcHandlers(): void {
   )
   ipcMain.handle('fileManager:rename', (_e, id: string, name: string) => renameFileEntry(id, name))
   ipcMain.handle('fileManager:move', (_e, id: string, newParentId: string | null) => moveFileEntry(id, newParentId))
-  ipcMain.handle('fileManager:moveToOrg', (_e, id: string, orgId: string) =>
-    moveFileToOrg(String(id || ''), String(orgId || ''))
+  ipcMain.handle('fileManager:moveToOrg', (_e, id: string, orgId: string, teamId?: string | null) =>
+    moveFileToOrg(String(id || ''), String(orgId || ''), teamId ?? null)
   )
   ipcMain.handle('fileManager:delete', (_e, id: string) => deleteFileEntry(id))
   ipcMain.handle('fileManager:restore', (_e, ids: string[]) => restoreFileEntries(ids))

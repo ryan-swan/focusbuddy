@@ -930,6 +930,15 @@ export function getDb(): Database.Database {
   `)
   db.exec('CREATE INDEX IF NOT EXISTS idx_fb_files_needs_sync ON fb_files(needs_sync)')
 
+  // Group/team scope for shared objects. NULL = whole org (or personal); a team id
+  // narrows an org-shared object to that group. Widgets and rows have no column of
+  // their own — they inherit their parent node/table's team at push time (mirroring
+  // how they inherit org scope). The server's changesSince is the isolation point.
+  ensureColumn(db, 'nodes', 'team_id', 'TEXT')
+  ensureColumn(db, 'documents', 'team_id', 'TEXT')
+  ensureColumn(db, 'fb_files', 'team_id', 'TEXT')
+  ensureColumn(db, 'fb_tables', 'team_id', 'TEXT')
+
   // Remaining top-level user-content surfaces get the same per-org scoping so
   // switching organisation shows only that org's automations, reports, apps,
   // forms, meetings, signature requests and saved file views. Existing rows

@@ -50,6 +50,7 @@ interface ServerItem {
   body: Record<string, unknown> | null
   rev: number
   deleted: boolean
+  teamId?: string | null
 }
 
 async function pullChanges(token: string, since: number): Promise<{ items: ServerItem[]; now: number } | null> {
@@ -168,13 +169,16 @@ async function putItemOrg(
   id: string,
   itemType: SyncItemType,
   body: Record<string, unknown>,
-  baseRev: number
+  baseRev: number,
+  teamId?: string | null
 ): Promise<PutResult> {
   try {
     const res = await fetch(urlFor(`/workspace/org/items/${id}`), {
       method: 'PUT',
       headers: { ...orgHeaders(token, orgId), 'Content-Type': 'application/json' },
-      body: JSON.stringify({ itemType, body, baseRev: baseRev || undefined })
+      // Omit teamId entirely when undefined so the server preserves the item's
+      // existing scope (a plain edit must never widen a team item to the whole org).
+      body: JSON.stringify({ itemType, body, baseRev: baseRev || undefined, ...(teamId !== undefined ? { teamId } : {}) })
     })
     if (res.status === 409) {
       const json = (await res.json()) as { item?: ServerItem }
@@ -322,7 +326,7 @@ async function syncOrgWorkspaceOnce(token: string, orgId: string): Promise<numbe
   // ── Push local changes ──
   const pending = await window.api.workspaceSync.pendingOrg(orgId)
   for (const u of pending.upserts) {
-    const res = await putItemOrg(token, orgId, u.id, u.itemType, u.body, u.baseRev)
+    const res = await putItemOrg(token, orgId, u.id, u.itemType, u.body, u.baseRev, u.teamId)
     if (res.ok) {
       await window.api.workspaceSync.markPushed(u.itemType, u.id, res.rev)
       // A file's metadata is now on the server; make sure its bytes are too.
@@ -336,7 +340,8 @@ async function syncOrgWorkspaceOnce(token: string, orgId: string): Promise<numbe
             itemType: res.item.itemType,
             body: res.item.body,
             rev: res.item.rev,
-            deleted: res.item.deleted
+            deleted: res.item.deleted,
+            teamId: res.item.teamId
           }
         ],
         orgId

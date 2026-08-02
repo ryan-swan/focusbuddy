@@ -39,9 +39,10 @@ interface NodeStore {
   remove: (id: string) => Promise<void>
   // Atomic reparent + reorder. beforeId=null appends to end of new parent.
   move: (id: string, newParentId: string | null, beforeId: string | null) => Promise<void>
-  // Share a personal room/desk (and everything under it) with an org. Re-scopes the
-  // subtree + its widgets to orgId so the org sync loop pushes it to every member.
-  moveToOrg: (id: string, orgId: string) => Promise<string[]>
+  // Share a personal room/desk (and everything under it) with an org, optionally
+  // scoped to a single team/group. Re-scopes the subtree + its widgets/tables so
+  // the org sync loop pushes it to the org (or just that group's members).
+  moveToOrg: (id: string, orgId: string, teamId?: string | null) => Promise<string[]>
   setActive: (id: string | null) => void
   toggleExpand: (id: string) => void
   expand: (id: string, on: boolean) => void
@@ -192,8 +193,8 @@ export const useNodeStore = create<NodeStore>((set, get) => ({
       })
     }
   },
-  moveToOrg: async (id, orgId) => {
-    const ids = await window.api.nodes.moveToOrg(id, orgId)
+  moveToOrg: async (id, orgId, teamId) => {
+    const ids = await window.api.nodes.moveToOrg(id, orgId, teamId)
     if (!ids.length) return ids
     // The subtree left the active (personal) org; refresh drops it from this view.
     // It now belongs to the target org and appears when that org is active, and the

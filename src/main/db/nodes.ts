@@ -208,7 +208,7 @@ export function deleteNode(id: string): string[] {
 // Note: fb_tables referenced by table widgets keep their own org_id and are not
 // re-scoped here; a table widget moved to the org still reads its table locally.
 // Moving a desk that owns tables into an org is a follow-up.
-export function moveNodeToOrg(rootId: string, orgId: string): string[] {
+export function moveNodeToOrg(rootId: string, orgId: string, teamId: string | null = null): string[] {
   const db = getDb()
   if (!orgId) return []
   const exists = db.prepare('SELECT id FROM nodes WHERE id = ? AND trashed_at IS NULL').get(rootId)
@@ -235,17 +235,19 @@ export function moveNodeToOrg(rootId: string, orgId: string): string[] {
       .all(...ids) as Array<{ id: string }>
   ).map((r) => r.id)
 
-  const setNode = db.prepare('UPDATE nodes SET org_id = ?, needs_sync = 1, sync_rev = 0 WHERE id = ?')
+  // teamId scopes the subtree to a group (null = whole org). Nodes + tables carry
+  // team_id; widgets/rows inherit it from their parent at push time.
+  const setNode = db.prepare('UPDATE nodes SET org_id = ?, team_id = ?, needs_sync = 1, sync_rev = 0 WHERE id = ?')
   const setWidgets = db.prepare('UPDATE widgets SET needs_sync = 1, sync_rev = 0 WHERE task_id = ?')
-  const setTable = db.prepare('UPDATE fb_tables SET org_id = ?, needs_sync = 1, sync_rev = 0 WHERE id = ?')
+  const setTable = db.prepare('UPDATE fb_tables SET org_id = ?, team_id = ?, needs_sync = 1, sync_rev = 0 WHERE id = ?')
   const setRows = db.prepare('UPDATE fb_rows SET needs_sync = 1, sync_rev = 0 WHERE table_id = ?')
   db.transaction(() => {
     for (const i of ids) {
-      setNode.run(orgId, i)
+      setNode.run(orgId, teamId, i)
       setWidgets.run(i)
     }
     for (const t of tableIds) {
-      setTable.run(orgId, t)
+      setTable.run(orgId, teamId, t)
       setRows.run(t)
     }
   })()

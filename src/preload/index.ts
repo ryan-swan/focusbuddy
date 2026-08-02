@@ -117,8 +117,8 @@ const api = {
     // Soft-delete: returns the trashed ids (the node + its subtree) for undo.
     delete: (id: string): Promise<string[]> => ipcRenderer.invoke('nodes:delete', id),
     restore: (ids: string[]): Promise<boolean> => ipcRenderer.invoke('nodes:restore', ids),
-    moveToOrg: (id: string, orgId: string): Promise<string[]> =>
-      ipcRenderer.invoke('nodes:moveToOrg', id, orgId),
+    moveToOrg: (id: string, orgId: string, teamId?: string | null): Promise<string[]> =>
+      ipcRenderer.invoke('nodes:moveToOrg', id, orgId, teamId ?? null),
     move: (
       id: string,
       newParentId: string | null,
@@ -914,8 +914,8 @@ const api = {
       ipcRenderer.invoke('fileManager:rename', id, name),
     move: (id: string, newParentId: string | null): Promise<boolean> =>
       ipcRenderer.invoke('fileManager:move', id, newParentId),
-    moveToOrg: (id: string, orgId: string): Promise<string[]> =>
-      ipcRenderer.invoke('fileManager:moveToOrg', id, orgId),
+    moveToOrg: (id: string, orgId: string, teamId?: string | null): Promise<string[]> =>
+      ipcRenderer.invoke('fileManager:moveToOrg', id, orgId, teamId ?? null),
     importFolder: (
       parentId: string | null
     ): Promise<{ ok: boolean; canceled?: boolean; files?: number; folders?: number; skipped?: number; rootId?: string | null }> =>
@@ -1501,11 +1501,11 @@ const api = {
     pendingOrg: (
       orgId: string
     ): Promise<{
-      upserts: Array<{ id: string; itemType: 'node' | 'widget' | 'timeblock' | 'document' | 'table' | 'row' | 'file'; body: Record<string, unknown>; baseRev: number }>
+      upserts: Array<{ id: string; itemType: 'node' | 'widget' | 'timeblock' | 'document' | 'table' | 'row' | 'file'; body: Record<string, unknown>; baseRev: number; teamId?: string | null }>
       deletes: Array<{ id: string; itemType: 'node' | 'widget' | 'timeblock' | 'document' | 'table' | 'row' | 'file'; baseRev: number }>
     }> => ipcRenderer.invoke('workspace:pendingOrg', orgId),
     applyRemoteOrg: (
-      items: Array<{ id: string; itemType: 'node' | 'widget' | 'timeblock' | 'document' | 'table' | 'row' | 'file'; body: Record<string, unknown> | null; rev: number; deleted: boolean }>,
+      items: Array<{ id: string; itemType: 'node' | 'widget' | 'timeblock' | 'document' | 'table' | 'row' | 'file'; body: Record<string, unknown> | null; rev: number; deleted: boolean; teamId?: string | null }>,
       orgId: string
     ): Promise<{ applied: number }> => ipcRenderer.invoke('workspace:applyRemoteOrg', items, orgId),
     getCursorOrg: (orgId: string): Promise<number> => ipcRenderer.invoke('workspace:getCursorOrg', orgId),
