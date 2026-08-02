@@ -15,6 +15,8 @@ import { useAccountStore } from '../../stores/account'
 import { useOrgStore, PERSONAL_ORG_ID } from '../../stores/org'
 import { promoteFolderToLive } from '../../lib/liveFolderMirror'
 import { shareToOrgOrGroup } from '../../lib/shareScope'
+import ShareDialog from '../ShareDialog'
+import type { ShareableKind } from '@shared/types'
 import Icon from '../Icon'
 import CanvasContextMenu, { type CtxMenuItem } from '../CanvasContextMenu'
 
@@ -114,6 +116,10 @@ export default function FilesView(): JSX.Element {
   const [ctx, setCtx] = useState<{ x: number; y: number; items: CtxMenuItem[] } | null>(null)
   const [dropActive, setDropActive] = useState(false)
   const [docPicker, setDocPicker] = useState<Array<{ id: string; title: string; docType: string }> | null>(null)
+  // Public share-link target for a Drive entry. A folder shares as a 'docfolder'
+  // (its documents, browser-viewable), an office doc as a 'document', and a raw
+  // file as a 'file' (bytes hosted against the token). null when closed.
+  const [linkTarget, setLinkTarget] = useState<{ kind: ShareableKind; id: string; name: string } | null>(null)
 
   useEffect(() => {
     void store.refresh()
@@ -194,6 +200,19 @@ export default function FilesView(): JSX.Element {
             move: (org, team) => store.moveToOrg(entry.id, org, team)
           })
         }
+      })
+    }
+    // Public link — anyone with the URL views it in the browser. A folder shares
+    // its documents (docfolder), an office doc as itself, a raw file with its
+    // bytes hosted against the token. A doc pointer needs its docId as the entity.
+    const publicKind: ShareableKind | null =
+      entry.kind === 'folder' ? 'docfolder' : entry.kind === 'doc' ? 'document' : 'file'
+    const publicEntityId = entry.kind === 'doc' ? entry.docId ?? null : entry.id
+    if (publicKind && publicEntityId) {
+      items.push({
+        label: 'Create public link',
+        icon: 'link',
+        onClick: () => setLinkTarget({ kind: publicKind, id: publicEntityId, name: entry.name })
       })
     }
     items.push({ separator: true })
@@ -287,6 +306,14 @@ export default function FilesView(): JSX.Element {
       </div>
 
       {ctx && <CanvasContextMenu x={ctx.x} y={ctx.y} items={ctx.items} onClose={() => setCtx(null)} />}
+      {linkTarget && (
+        <ShareDialog
+          kind={linkTarget.kind}
+          entityId={linkTarget.id}
+          label={linkTarget.name}
+          onClose={() => setLinkTarget(null)}
+        />
+      )}
       {docPicker && (
         <DocPickerModal
           docs={docPicker}

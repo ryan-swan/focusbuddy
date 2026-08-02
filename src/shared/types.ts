@@ -994,7 +994,10 @@ export interface BodyDoubleChatMessage {
 // 'document' / 'docfolder' are the office kinds: a single doc/sheet/slides/map,
 // or a Drive folder of them, shared as a read-only browser-renderable snapshot
 // (and importable when the scope is 'copy'). See DocumentSnapshot / DocFolderSnapshot.
-export type ShareableKind = 'folder' | 'task' | 'widget' | 'document' | 'docfolder'
+// 'file' is a raw Drive file (PDF, image, video, arbitrary binary): its metadata
+// rides the snapshot while its bytes are hosted publicly by the share token, so
+// the viewer can preview or download it. See FileSnapshot + the share-blob routes.
+export type ShareableKind = 'folder' | 'task' | 'widget' | 'document' | 'docfolder' | 'file'
 
 // Permission level granted by the share. Two levels in v1 — keeping it
 // simple. "view" = read-only render. "copy" = recipient can sign up and

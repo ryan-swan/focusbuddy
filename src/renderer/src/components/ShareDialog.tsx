@@ -15,8 +15,11 @@ import {
   buildFolderSnapshot,
   buildTaskSnapshot,
   buildWidgetSnapshot,
-  generateAnonymousHandle
+  buildFileSnapshot,
+  generateAnonymousHandle,
+  MAX_PUBLIC_FILE_BYTES
 } from '../lib/shareSnapshot'
+import { buildDocumentSnapshot, buildFolderShareSnapshot } from '../lib/officeShareSnapshot'
 import Icon from './Icon'
 
 // Universal share dialog — opens from a folder, task, or widget right-click.
@@ -168,6 +171,9 @@ export default function ShareDialog({
       // the widget itself. Tables get their schema + rows inlined.
       const fromHandle = generateAnonymousHandle()
       let snapshot: unknown = undefined
+      // For a raw-file share the bytes are hosted publicly against the token, so
+      // they are read here and handed to the store to upload after the mint.
+      let fileBlob: { bytes: ArrayBuffer; mimeType: string; ext: string } | undefined
       try {
         if (kind === 'folder') {
           const nodes = useNodeStore.getState().nodes
@@ -181,6 +187,25 @@ export default function ShareDialog({
           const widgets = useWidgetStore.getState().widgets
           const widget = widgets.find((w) => w.id === entityId)
           if (widget) snapshot = await buildWidgetSnapshot(widget, fromHandle)
+        } else if (kind === 'document') {
+          const doc = await window.api.documents.get(entityId)
+          if (doc) snapshot = buildDocumentSnapshot(doc, fromHandle)
+        } else if (kind === 'docfolder') {
+          snapshot = await buildFolderShareSnapshot(entityId, label, fromHandle)
+        } else if (kind === 'file') {
+          const file = await window.api.files.get(entityId)
+          if (file) {
+            snapshot = buildFileSnapshot(
+              { name: file.originalName, mimeType: file.mimeType, ext: file.ext, sizeBytes: file.sizeBytes },
+              fromHandle
+            )
+            // Read the bytes to host only when within the public cap; oversized
+            // files still resolve to metadata with an honest "too large" note.
+            if (file.sizeBytes > 0 && file.sizeBytes <= MAX_PUBLIC_FILE_BYTES) {
+              const read = await window.api.files.read(entityId)
+              if (read) fileBlob = { bytes: read.buffer, mimeType: read.mimeType || file.mimeType, ext: file.ext }
+            }
+          }
         }
       } catch {
         // Snapshot building failed (e.g. an IPC error fetching widgets).
@@ -199,7 +224,8 @@ export default function ShareDialog({
         scope,
         snapshot,
         fromHandle,
-        createdBy
+        createdBy,
+        fileBlob
       })
       setFresh(created)
       // Auto-copy fresh links so the common path is one click → in
@@ -215,7 +241,8 @@ export default function ShareDialog({
     task: 'task',
     widget: 'desk item',
     document: 'document',
-    docfolder: 'folder'
+    docfolder: 'folder',
+    file: 'file'
   }
 
   return createPortal(

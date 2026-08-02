@@ -139,6 +139,31 @@ export class ShareService {
     return body.byToken ?? {}
   }
 
+  // Upload the bytes for a raw-file share, hosted publicly against the token so
+  // the viewer can preview or download it. Owner-authenticated. Best-effort from
+  // the caller's perspective: a failure leaves the share resolvable with
+  // metadata only (the snapshot's hosted flag still reflects intent), so the
+  // viewer degrades honestly rather than showing a broken embed.
+  async uploadFileBlob(
+    token: string,
+    bytes: ArrayBuffer,
+    mimeType: string,
+    ext: string,
+    sessionToken: string
+  ): Promise<boolean> {
+    try {
+      const qs = `?mime=${encodeURIComponent(mimeType || 'application/octet-stream')}&ext=${encodeURIComponent(ext || '')}`
+      const res = await fetch(`${this.baseUrl}/share/${encodeURIComponent(token)}/blob${qs}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/octet-stream', Authorization: `Bearer ${sessionToken}` },
+        body: bytes
+      })
+      return res.ok
+    } catch {
+      return false
+    }
+  }
+
   // Owner revokes a share. The hosted side stops resolving it but the
   // local share_links row stays (marked revoked) so the share manager
   // shows the audit history.

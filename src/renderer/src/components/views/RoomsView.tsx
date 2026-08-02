@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import type { FbNode, Widget } from '@shared/types'
 import { useNodeStore } from '../../stores/nodes'
 import { useOrgStore, PERSONAL_ORG_ID } from '../../stores/org'
@@ -10,6 +10,7 @@ import RoomThumb from '../RoomThumb'
 import Icon from '../Icon'
 import { promptText } from '../plexi/PromptDialog'
 import { shareToOrgOrGroup } from '../../lib/shareScope'
+import ShareDialog from '../ShareDialog'
 import RoomsDesksIndex, { type IndexConfig } from './RoomsDesksIndex'
 
 // The All Rooms index. A Room is a folder node — a place desks live. Clicking a
@@ -37,6 +38,9 @@ export default function RoomsView(): JSX.Element {
   const canShare = activeOrgId === PERSONAL_ORG_ID && sharedOrgs.length > 0
   const goDesks = useViewStore((s) => s.goDesks)
   const openObjectChannel = useMessagingStore((s) => s.openObjectChannel)
+  // Public share-link target (a room shared as a 'folder' snapshot with its
+  // desks). Opens the universal ShareDialog; null when closed.
+  const [linkTarget, setLinkTarget] = useState<{ id: string; title: string } | null>(null)
 
   const rooms = useMemo(
     () => nodes.filter((n) => n.kind === 'folder' && !n.archived),
@@ -202,6 +206,16 @@ export default function RoomsView(): JSX.Element {
         <button
           onClick={(e) => {
             e.stopPropagation()
+            setLinkTarget({ id: r.id, title: r.title || 'this room' })
+          }}
+          title="Create a public link — anyone with it can view this room"
+          className="inline-flex items-center justify-center h-6 w-6 rounded-md bg-[var(--surface-raised)]/90 border border-[var(--edge-firm)] text-[var(--ink-60)] hover:text-[var(--ink-100)]"
+        >
+          <Icon name="link" size={14} />
+        </button>
+        <button
+          onClick={(e) => {
+            e.stopPropagation()
             void openObjectChannel('room', r.id, r.title || 'Room')
           }}
           title="Chat about this room"
@@ -252,5 +266,17 @@ export default function RoomsView(): JSX.Element {
     )
   }
 
-  return <RoomsDesksIndex config={config} />
+  return (
+    <>
+      <RoomsDesksIndex config={config} />
+      {linkTarget && (
+        <ShareDialog
+          kind="folder"
+          entityId={linkTarget.id}
+          label={linkTarget.title}
+          onClose={() => setLinkTarget(null)}
+        />
+      )}
+    </>
+  )
 }

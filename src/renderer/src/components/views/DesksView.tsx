@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import type { FbNode } from '@shared/types'
 import { useNodeStore } from '../../stores/nodes'
 import { useOrgStore, PERSONAL_ORG_ID } from '../../stores/org'
@@ -9,6 +9,7 @@ import DeskMiniature from '../DeskMiniature'
 import Icon from '../Icon'
 import { promptText } from '../plexi/PromptDialog'
 import { shareToOrgOrGroup } from '../../lib/shareScope'
+import ShareDialog from '../ShareDialog'
 import RoomsDesksIndex, { type IndexConfig } from './RoomsDesksIndex'
 
 // The All Desks index. A Desk is a task node (a canvas). Optionally scoped to a
@@ -51,6 +52,9 @@ export default function DesksView({ roomId }: { roomId?: string }): JSX.Element 
   const canShare = activeOrgId === PERSONAL_ORG_ID && sharedOrgs.length > 0
   const goTask = useViewStore((s) => s.goTask)
   const goRooms = useViewStore((s) => s.goRooms)
+  // Public share-link target (a desk shared as a 'task' snapshot). Opens the
+  // universal ShareDialog; null when closed.
+  const [linkTarget, setLinkTarget] = useState<{ id: string; title: string } | null>(null)
 
   const roomTitleById = useMemo(() => {
     const m = new Map<string, string>()
@@ -209,6 +213,16 @@ export default function DesksView({ roomId }: { roomId?: string }): JSX.Element 
         <button
           onClick={(e) => {
             e.stopPropagation()
+            setLinkTarget({ id: d.id, title: d.title || 'this desk' })
+          }}
+          title="Create a public link — anyone with it can view this desk"
+          className="inline-flex items-center justify-center h-6 w-6 rounded-md bg-[var(--surface-raised)]/90 border border-[var(--edge-firm)] text-[var(--ink-60)] hover:text-[var(--ink-100)]"
+        >
+          <Icon name="link" size={14} />
+        </button>
+        <button
+          onClick={(e) => {
+            e.stopPropagation()
             void (async () => {
               const next = await promptText({
                 title: 'Rename desk',
@@ -237,5 +251,17 @@ export default function DesksView({ roomId }: { roomId?: string }): JSX.Element 
     ) : undefined
   }
 
-  return <RoomsDesksIndex config={config} />
+  return (
+    <>
+      <RoomsDesksIndex config={config} />
+      {linkTarget && (
+        <ShareDialog
+          kind="task"
+          entityId={linkTarget.id}
+          label={linkTarget.title}
+          onClose={() => setLinkTarget(null)}
+        />
+      )}
+    </>
+  )
 }
