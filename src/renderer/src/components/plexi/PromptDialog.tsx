@@ -28,6 +28,9 @@ export interface PromptRequest {
   confirmOnly?: boolean
   /** Styles the confirm button red for destructive confirms. */
   danger?: boolean
+  /** List-picker mode: render these as option buttons; clicking one resolves its
+   * value (no text field, no confirm button). Cancel/Escape still resolve null. */
+  choices?: Array<{ label: string; value: string; hint?: string }>
 }
 
 interface PromptState {
@@ -78,6 +81,18 @@ export function confirmDialog(req: {
     confirmOnly: true,
     danger: req.danger
   }).then((v) => v !== null)
+}
+
+/**
+ * Ask the user to pick one option from a list. Resolves with the chosen value, or
+ * null when they cancel. Used for share-scope choices (whole org vs a group).
+ */
+export function promptChoice(req: {
+  title: string
+  body?: string
+  choices: Array<{ label: string; value: string; hint?: string }>
+}): Promise<string | null> {
+  return promptText({ title: req.title, label: req.body, choices: req.choices })
 }
 
 /**
@@ -168,7 +183,21 @@ export function PromptDialogHost(): JSX.Element | null {
       >
         <div className="text-[14px] font-semibold text-[var(--ink-100)]">{req.title}</div>
         {req.label && <div className="text-[12px] text-[var(--ink-50)] mt-0.5">{req.label}</div>}
-        {req.confirmOnly ? null : req.multiline ? (
+        {req.choices ? (
+          <div className="mt-3 flex flex-col gap-1.5" data-testid="prompt-dialog-choices">
+            {req.choices.map((c) => (
+              <button
+                key={c.value}
+                onClick={() => settle(c.value)}
+                className="w-full text-left px-3 py-2 rounded-lg border border-[var(--edge-firm)] hover:bg-[var(--surface-sunken)]"
+                data-testid={`prompt-choice-${c.value}`}
+              >
+                <div className="text-[13px] font-medium text-[var(--ink-100)]">{c.label}</div>
+                {c.hint && <div className="text-[11px] text-[var(--ink-50)] mt-0.5">{c.hint}</div>}
+              </button>
+            ))}
+          </div>
+        ) : req.confirmOnly ? null : req.multiline ? (
           <textarea
             ref={(el) => (fieldRef.current = el)}
             value={value}
@@ -195,17 +224,19 @@ export function PromptDialogHost(): JSX.Element | null {
           >
             Cancel
           </button>
-          <button
-            onClick={confirm}
-            className={
-              req.danger
-                ? 'px-3 py-1.5 rounded-lg text-[13px] font-medium bg-red-600 text-white hover:bg-red-700'
-                : 'btn-primary'
-            }
-            data-testid="prompt-dialog-confirm"
-          >
-            {req.confirmLabel ?? 'OK'}
-          </button>
+          {req.choices ? null : (
+            <button
+              onClick={confirm}
+              className={
+                req.danger
+                  ? 'px-3 py-1.5 rounded-lg text-[13px] font-medium bg-red-600 text-white hover:bg-red-700'
+                  : 'btn-primary'
+              }
+              data-testid="prompt-dialog-confirm"
+            >
+              {req.confirmLabel ?? 'OK'}
+            </button>
+          )}
         </div>
       </div>
     </div>
