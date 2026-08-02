@@ -3,6 +3,7 @@ import {
   copyFileSync,
   existsSync,
   mkdirSync,
+  readdirSync,
   readFileSync,
   statSync,
   unlinkSync,
@@ -199,6 +200,72 @@ export function writeSyncedFileBytes(id: string, bytes: Uint8Array): boolean {
   } catch {
     return false
   }
+}
+
+// Recursively import a local folder tree into the Drive under `parentId`,
+// mirroring its structure as fb_files folders and ingesting each file (which the
+// brain then indexes on its next sync). Skips hidden entries and the usual heavy
+// build dirs, caps file size and total count so a stray huge tree can't wedge the
+// import, and never throws on a single unreadable entry. Returns what it did.
+export function importFolderTree(
+  sourceDir: string,
+  parentId: string | null,
+  opts?: { maxFiles?: number; maxFileBytes?: number }
+): { files: number; folders: number; skipped: number; rootId: string | null } {
+  const maxFiles = opts?.maxFiles ?? 5000
+  const maxFileBytes = opts?.maxFileBytes ?? 100 * 1024 * 1024
+  const SKIP_DIRS = new Set(['node_modules', '.git', '.svn', '.hg', '__pycache__', '.DS_Store'])
+  const stats = { files: 0, folders: 0, skipped: 0, rootId: null as string | null }
+  if (!existsSync(sourceDir)) return stats
+
+  // Create a top folder named after the imported directory, so the import lands as
+  // one tidy folder rather than dumping its contents into the current view.
+  const root = createFolder(parentId, basename(sourceDir) || 'Imported folder')
+  stats.folders++
+  stats.rootId = root.id
+
+  const walk = (dir: string, parent: string): void => {
+    if (stats.files >= maxFiles) return
+    let entries: string[] = []
+    try {
+      entries = readdirSync(dir)
+    } catch {
+      return
+    }
+    for (const name of entries) {
+      if (stats.files >= maxFiles) return
+      if (name.startsWith('.') || SKIP_DIRS.has(name)) {
+        stats.skipped++
+        continue
+      }
+      const full = join(dir, name)
+      let st: ReturnType<typeof statSync>
+      try {
+        st = statSync(full)
+      } catch {
+        stats.skipped++
+        continue
+      }
+      if (st.isDirectory()) {
+        const folder = createFolder(parent, name)
+        stats.folders++
+        walk(full, folder.id)
+      } else if (st.isFile()) {
+        if (st.size > maxFileBytes) {
+          stats.skipped++
+          continue
+        }
+        try {
+          ingestFromPath(full, { parentId: parent })
+          stats.files++
+        } catch {
+          stats.skipped++
+        }
+      }
+    }
+  }
+  walk(sourceDir, root.id)
+  return stats
 }
 
 // Share a personal file/folder/drive (and everything inside it) with an org — the

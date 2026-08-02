@@ -104,6 +104,8 @@ interface FileManagerStore {
   moveToOrg: (id: string, orgId: string) => Promise<void>
   remove: (id: string) => Promise<void>
   importFiles: () => Promise<void>
+  // Import a whole local folder (recursively) into the Drive + brain.
+  importFolder: () => Promise<{ files: number; folders: number; skipped: number } | null>
   ingestBuffers: (files: Array<{ buffer: ArrayBuffer; originalName: string; mimeType: string }>) => Promise<void>
   fileExistingDocument: (docId: string) => Promise<void>
   undo: () => Promise<void>
@@ -323,6 +325,15 @@ export const useFileManagerStore = create<FileManagerStore>((set, get) => ({
       })
     }
     await get().refresh()
+  },
+  importFolder: async () => {
+    const res = await window.api.fileManager.importFolder(get().cwd)
+    if (!res?.ok) return null
+    await get().refresh()
+    // Fold the freshly-imported files into the brain so they're searchable/graphed
+    // right away, rather than only on the next Brain open.
+    void window.api.brain.ingestWorkspace().catch(() => {})
+    return { files: res.files ?? 0, folders: res.folders ?? 0, skipped: res.skipped ?? 0 }
   },
   ingestBuffers: async (files) => {
     const cwd = get().cwd

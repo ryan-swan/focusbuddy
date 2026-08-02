@@ -234,7 +234,7 @@ export default function FilesView(): JSX.Element {
         setDropActive(false)
       }}
     >
-      <Toolbar onNewFolder={() => void store.createFolder('New folder').then(() => undefined)} onAddFiles={() => void store.importFiles()} onAddDoc={() => void openDocPicker()} />
+      <Toolbar onNewFolder={() => void store.createFolder('New folder').then(() => undefined)} onAddFiles={() => void store.importFiles()} onImportFolder={() => void store.importFolder()} onAddDoc={() => void openDocPicker()} />
 
       <Breadcrumbs crumbs={store.crumbs} onOpen={(id) => void store.openFolder(id)} onMove={(id, target) => void store.move(id, target)} />
 
@@ -305,7 +305,7 @@ export default function FilesView(): JSX.Element {
 }
 
 // ── Toolbar ───────────────────────────────────────────────────────────────────
-function Toolbar({ onNewFolder, onAddFiles, onAddDoc }: { onNewFolder: () => void; onAddFiles: () => void; onAddDoc: () => void }): JSX.Element {
+function Toolbar({ onNewFolder, onAddFiles, onImportFolder, onAddDoc }: { onNewFolder: () => void; onAddFiles: () => void; onImportFolder: () => void; onAddDoc: () => void }): JSX.Element {
   const viewMode = useFileManagerStore((s) => s.viewMode)
   const setViewMode = useFileManagerStore((s) => s.setViewMode)
   const sortKey = useFileManagerStore((s) => s.sortKey)
@@ -330,6 +330,7 @@ function Toolbar({ onNewFolder, onAddFiles, onAddDoc }: { onNewFolder: () => voi
       <span className="w-px h-5 bg-[var(--surface-sunken)] mx-1" />
       <button className={btn} onClick={onNewFolder} data-testid="files-new-folder"><Icon name="create_new_folder" size={16} /> New folder</button>
       <button className={btn} onClick={onAddFiles} data-testid="files-add-files"><Icon name="upload_file" size={16} /> Add files</button>
+      <button className={btn} onClick={onImportFolder} data-testid="files-import-folder"><Icon name="drive_folder_upload" size={16} /> Import folder</button>
       <button className={btn} onClick={onAddDoc} data-testid="files-add-doc"><Icon name="post_add" size={16} /> Add document</button>
 
       <div className="ml-auto flex items-center gap-1">

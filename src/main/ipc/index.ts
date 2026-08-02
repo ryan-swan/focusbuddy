@@ -223,7 +223,8 @@ import {
   hasFileBytes,
   readFileBytesForSync,
   writeSyncedFileBytes,
-  moveFileToOrg
+  moveFileToOrg,
+  importFolderTree
 } from '../db/files'
 import { extractFileText } from '../fileText'
 import { ingestWorkspaceIntoBrain } from '../brainIngest'
@@ -1513,6 +1514,16 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('files:ingestPath', (_e, sourcePath: string) =>
     ingestFromPath(sourcePath)
   )
+  // Recursively import a whole local folder into the Drive under `parentId`, so it
+  // becomes part of the workspace + brain. Shows a directory picker.
+  ipcMain.handle('fileManager:importFolder', async (_e, parentId: string | null) => {
+    const parent = BrowserWindow.getFocusedWindow()
+    const opts = { title: 'Import a folder into your Drive', properties: ['openDirectory' as const] }
+    const open = parent ? await dialog.showOpenDialog(parent, opts) : await dialog.showOpenDialog(opts)
+    if (open.canceled || open.filePaths.length === 0) return { ok: false as const, canceled: true as const }
+    const res = importFolderTree(open.filePaths[0], parentId ?? null)
+    return { ok: true as const, ...res }
+  })
   ipcMain.handle(
     'files:ingestBuffer',
     (
