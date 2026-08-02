@@ -251,7 +251,23 @@ async function seed(ownerToken, orgId) {
         id: 'seed-doc-charter',
         doc_type: 'doc',
         title: 'Team Charter',
-        body: '{}',
+        // Real Tiptap content so the doc opens with visible text (not blank) and
+        // gives you something to co-edit across windows.
+        body: JSON.stringify({
+          type: 'doc',
+          content: [
+            { type: 'heading', attrs: { level: 1 }, content: [{ type: 'text', text: 'Team Charter' }] },
+            {
+              type: 'paragraph',
+              content: [
+                {
+                  type: 'text',
+                  text: 'This is a shared document. Edit it from any window signed in to Plexi Test Org and watch the changes sync to the others.'
+                }
+              ]
+            }
+          ]
+        }),
         archived: 0,
         created_at: now,
         updated_at: now
@@ -269,6 +285,42 @@ async function seed(ownerToken, orgId) {
     if (!r.json?.ok) log(`  ! ${it.itemType} ${it.body.id}: ${JSON.stringify(r.json)}`)
     else log(`  + ${it.itemType}: ${it.body.title}`)
   }
+}
+
+// A fresh org has NO chat channel and members are not auto-enrolled, so a
+// teammate who never creates/joins a channel receives nothing (the real cause of
+// "chats aren't going through"). Seed a #general channel and join every member,
+// using only the public endpoints, so chat is testable out of the box. Idempotent:
+// reuses an existing #general instead of creating duplicates on a re-run.
+async function seedChannel(users, orgId) {
+  const owner = users[0]
+  log('\nSeeding a #general chat channel + joining all members …')
+  let channelId = null
+  const existing = await httpJson(`/orgs/${orgId}/channels`, { token: owner.token })
+  const found = (existing.json?.channels ?? []).find(
+    (c) => (c.name || c.title || '').toLowerCase() === 'general'
+  )
+  if (found) channelId = found.id ?? found.conversationId ?? found.conversation_id ?? null
+  if (!channelId) {
+    const r = await httpJson(`/orgs/${orgId}/channels`, {
+      method: 'POST',
+      token: owner.token,
+      body: { name: 'general' }
+    })
+    channelId = r.json?.conversationId ?? null
+    if (!channelId) {
+      log(`  ! could not create #general: ${JSON.stringify(r.json)}`)
+      return
+    }
+    log(`  + #general created (${channelId})`)
+  } else {
+    log(`  = #general already exists (${channelId})`)
+  }
+  for (const u of users.slice(1)) {
+    const r = await httpJson(`/conversations/${channelId}/join`, { method: 'POST', token: u.token })
+    if (!r.json?.ok) log(`  ! ${u.email} join: ${JSON.stringify(r.json)}`)
+  }
+  log(`  + all members joined #general`)
 }
 
 async function verifySeed(memberToken, orgId) {
@@ -345,6 +397,7 @@ async function cmdSetup() {
   writeState(state)
 
   await seed(users[0].token, orgId)
+  await seedChannel(users, orgId)
   await verifySeed(users[1].token, orgId)
 
   buildApp()
