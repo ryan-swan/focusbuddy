@@ -176,9 +176,12 @@ export const WIDGET_CATALOG: WidgetCatalogEntry[] = [
   {
     kind: 'map',
     category: 'Files',
-    label: 'Map',
+    // Labelled "Flowchart" rather than "Map": go-live persona testing found "Map"
+    // reads as a location/road map, not a diagramming tool, so it wasted a core
+    // slot on a confusing word. Same PlexiMaps editor underneath.
+    label: 'Flowchart',
     icon: 'account_tree',
-    hint: 'A PlexiMaps diagram and workflow map — flowcharts, process maps, org charts, mind maps. Build by hand or generate with AI.',
+    hint: 'Flowcharts, process maps, org charts and mind maps (PlexiMaps) — diagram by hand or generate with AI.',
     defaultWidth: 720,
     defaultHeight: 520,
     defaultContent: '',
@@ -547,8 +550,9 @@ export const ADVANCED_KINDS: ReadonlySet<WidgetKind> = new Set<WidgetKind>([
   'markdown',
   'card',
   'living-doc',
-  // Files — Document/Spreadsheet/Slides/File/Map are core; these are secondary.
-  'drive',
+  // Files — Document/Spreadsheet/Slides/File/Map/Drive are core. Drive (a shared
+  // folder pinned to the desk) is promoted to core per go-live feedback: shared-
+  // file access is a headline promise, so it shouldn't sit behind Advanced.
   'design',
   // Tools/data — Table + Chart are core; these are power or niche.
   'field',

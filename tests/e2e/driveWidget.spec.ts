@@ -49,9 +49,7 @@ test('Drive widget: palette add -> unbound -> bind to folder -> ingest file -> o
   await hoverToolbar(window) // the toolbar only mounts the palette while hovered
   await window.locator('[data-testid="palette-add-button"]').click()
   await window.waitForTimeout(300)
-  // Drive is an Advanced tile now — expand the Advanced section to reach it.
-  await window.locator('[data-testid="palette-advanced-toggle"]').click().catch(() => {})
-  await window.waitForTimeout(150)
+  // Drive is a CORE tile (promoted for go-live) — visible in the default grid.
   const driveTile = window.locator('[data-testid="palette-add-drive"]')
   await expect(driveTile).toBeVisible({ timeout: 3_000 })
   await driveTile.click()
