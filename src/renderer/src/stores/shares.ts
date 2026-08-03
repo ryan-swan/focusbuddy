@@ -53,6 +53,10 @@ interface SharesStore {
     // The sharer's real handle, stamped on the share for "invited by X"
     // attribution. Distinct from fromHandle (the recipient-facing snapshot name).
     createdBy?: string | null
+    // For a raw-file share (kind 'file'): the bytes to host publicly against the
+    // minted token, so the viewer can preview/download the file. Uploaded after
+    // the snapshot mint; a failure is non-fatal (the metadata still resolves).
+    fileBlob?: { bytes: ArrayBuffer; mimeType: string; ext: string }
   }) => Promise<ShareLink>
   // Accept a pasted share link. Fetches the snapshot from the server (when
   // remote is configured) or treats the token as opaque (local-mock).
@@ -126,7 +130,8 @@ export const useSharesStore = create<SharesStore>((set, get) => ({
     expiresAt,
     snapshot,
     fromHandle,
-    createdBy
+    createdBy,
+    fileBlob
   }) => {
     const token = generateShareToken()
     // Local persistence first — this is the audit-of-record for the
@@ -156,6 +161,15 @@ export const useSharesStore = create<SharesStore>((set, get) => ({
           expiresAt: expiresAt ?? null,
           createdBy: createdBy ?? null
         })
+        // A raw-file share hosts its bytes publicly against the token so the
+        // viewer can render/download them. Only after the snapshot mint
+        // succeeded (the token now resolves); a failed upload is non-fatal.
+        if (fileBlob && kind === 'file') {
+          const sessionToken = useAccountStore.getState().sessionToken
+          if (sessionToken) {
+            await service.uploadFileBlob(token, fileBlob.bytes, fileBlob.mimeType, fileBlob.ext, sessionToken)
+          }
+        }
       } catch (err) {
         // eslint-disable-next-line no-console
         console.warn('[SharesStore] remote mint failed:', err)

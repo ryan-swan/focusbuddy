@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { launchApp, waitForReady, type LaunchedApp } from './_helpers'
+import { launchApp, waitForReady, type LaunchedApp, hoverToolbar } from './_helpers'
 
 // Drive widget — a canvas widget bound to a Files folder. Verifies:
 //   1. Adding "Drive (folder)" from the widget palette lands unbound
@@ -46,8 +46,10 @@ test('Drive widget: palette add -> unbound -> bind to folder -> ingest file -> o
   await seedAndOpenCanvas(launched, 'Drive Widget Test')
 
   // ── 1. Add "Drive (folder)" from the palette ────────────────────────────
+  await hoverToolbar(window) // the toolbar only mounts the palette while hovered
   await window.locator('[data-testid="palette-add-button"]').click()
   await window.waitForTimeout(300)
+  // Drive is a CORE tile (promoted for go-live) — visible in the default grid.
   const driveTile = window.locator('[data-testid="palette-add-drive"]')
   await expect(driveTile).toBeVisible({ timeout: 3_000 })
   await driveTile.click()

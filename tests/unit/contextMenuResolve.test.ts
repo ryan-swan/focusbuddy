@@ -234,11 +234,17 @@ describe('resolveMenu — multi-selection', () => {
       clientPoint: { x: 10, y: 10 }
     }
     const items = resolveMenu(ctx)
-    const ls = labels(items)
-    expect(ls).toContain('Copy all text')
-    expect(ls).toContain('Bring all to front')
-    expect(ls).toContain('Delete 2 widgets')
+    // Flatten one level so bulk actions folded under a section parent (Organise
+    // now holds two: the widget-link overhaul added a bulk "Automate N with an
+    // agent" alongside "Bring all to front") are still asserted.
+    const flat = items.flatMap((i) => [i.label, ...(i.children?.map((c) => c.label) ?? [])])
+    expect(flat).toContain('Copy all text')
+    expect(flat).toContain('Bring all to front')
+    // Bulk "Automate with an agent" — wires one agent to all selected widgets.
+    expect(flat).toContain('Automate 2 with an agent')
+    expect(flat).toContain('Delete 2 widgets')
     // No AI Assist or Create on a heterogeneous multi-selection.
+    const ls = labels(items)
     expect(ls).not.toContain('AI Assist')
     expect(ls).not.toContain('Create')
     // Destructive still last.

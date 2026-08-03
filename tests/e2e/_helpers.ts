@@ -268,6 +268,19 @@ export function composer(window: Page): Locator {
   return window.locator('[data-testid="chat-composer"]')
 }
 
+// Reveal the widget palette. The FloatingToolbar collapses to an icon pill and
+// only mounts the palette (data-testid="palette-add-button") while hovered, so any
+// spec that clicks the Add-widget button must hover the toolbar first. Best-effort:
+// if the toolbar isn't present (some layouts show the canvas FAB instead) this is a
+// no-op and the caller falls back to palette-fab-button.
+export async function hoverToolbar(window: Page): Promise<void> {
+  const toolbar = window.locator('[data-testid="floating-toolbar"]').first()
+  if (await toolbar.isVisible().catch(() => false)) {
+    await toolbar.hover().catch(() => {})
+    await window.waitForTimeout(150)
+  }
+}
+
 // Replace the composer's contents by typing, exactly as a user would, so the
 // editor's document is genuinely updated.
 export async function typeInComposer(window: Page, text: string): Promise<void> {

@@ -197,6 +197,63 @@ export function deleteNode(id: string): string[] {
   return ids
 }
 
+// Re-scope a room/desk (and everything under it) into another org — the explicit
+// "share this desk/room with the team" action. Sets org_id on the node and every
+// descendant node, and marks those nodes AND their widgets needs_sync (with
+// sync_rev reset, since the org store is a separate keyspace from the personal one)
+// so the org sync loop pushes the whole subtree under the new org on its next
+// cycle. Widgets carry no org_id of their own — they derive scope from the parent
+// node — so only their sync bookkeeping is touched. Returns the affected node ids.
+//
+// Note: fb_tables referenced by table widgets keep their own org_id and are not
+// re-scoped here; a table widget moved to the org still reads its table locally.
+// Moving a desk that owns tables into an org is a follow-up.
+export function moveNodeToOrg(rootId: string, orgId: string, teamId: string | null = null): string[] {
+  const db = getDb()
+  if (!orgId) return []
+  const exists = db.prepare('SELECT id FROM nodes WHERE id = ? AND trashed_at IS NULL').get(rootId)
+  if (!exists) return []
+  const ids: string[] = []
+  const collect = (nid: string): void => {
+    ids.push(nid)
+    const kids = db.prepare('SELECT id FROM nodes WHERE parent_id = ? AND trashed_at IS NULL').all(nid) as Array<{
+      id: string
+    }>
+    for (const k of kids) collect(k.id)
+  }
+  collect(rootId)
+  // Tables backing any table widget on the moved desks must travel too, or the
+  // widget lands on the other member pointing at a table that never synced (blank
+  // "Loading table…"). A table widget stores its fb_tables id in widget.content.
+  const tableIds = (
+    db
+      .prepare(
+        `SELECT DISTINCT content AS id FROM widgets
+         WHERE task_id IN (${ids.map(() => '?').join(',')})
+           AND kind = 'table' AND content IS NOT NULL AND content != ''`
+      )
+      .all(...ids) as Array<{ id: string }>
+  ).map((r) => r.id)
+
+  // teamId scopes the subtree to a group (null = whole org). Nodes + tables carry
+  // team_id; widgets/rows inherit it from their parent at push time.
+  const setNode = db.prepare('UPDATE nodes SET org_id = ?, team_id = ?, needs_sync = 1, sync_rev = 0 WHERE id = ?')
+  const setWidgets = db.prepare('UPDATE widgets SET needs_sync = 1, sync_rev = 0 WHERE task_id = ?')
+  const setTable = db.prepare('UPDATE fb_tables SET org_id = ?, team_id = ?, needs_sync = 1, sync_rev = 0 WHERE id = ?')
+  const setRows = db.prepare('UPDATE fb_rows SET needs_sync = 1, sync_rev = 0 WHERE table_id = ?')
+  db.transaction(() => {
+    for (const i of ids) {
+      setNode.run(orgId, teamId, i)
+      setWidgets.run(i)
+    }
+    for (const t of tableIds) {
+      setTable.run(orgId, teamId, t)
+      setRows.run(t)
+    }
+  })()
+  return ids
+}
+
 // Restore trashed nodes (undo of a delete, or redo of a create-undo).
 export function restoreNodes(ids: string[]): boolean {
   if (!ids.length) return false

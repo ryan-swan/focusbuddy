@@ -12,7 +12,11 @@ import { setDocDrag } from '../../lib/docMetaCache'
 import { useFileManagerStore, sortEntries, type FileSortKey, type FileViewMode } from '../../stores/fileManager'
 import { useViewStore } from '../../stores/view'
 import { useAccountStore } from '../../stores/account'
+import { useOrgStore, PERSONAL_ORG_ID } from '../../stores/org'
 import { promoteFolderToLive } from '../../lib/liveFolderMirror'
+import { shareToOrgOrGroup } from '../../lib/shareScope'
+import ShareDialog from '../ShareDialog'
+import type { ShareableKind } from '@shared/types'
 import Icon from '../Icon'
 import CanvasContextMenu, { type CtxMenuItem } from '../CanvasContextMenu'
 
@@ -98,12 +102,24 @@ export default function FilesView(): JSX.Element {
   const goDocument = useViewStore((s) => s.goDocument)
   const goLiveFolder = useViewStore((s) => s.goLiveFolder)
   const sessionToken = useAccountStore((s) => s.sessionToken)
+  const activeOrgId = useOrgStore((s) => s.activeOrgId)
+  const orgs = useOrgStore((s) => s.orgs)
+  // Sharing a file/folder = moving it into a team org, optionally narrowed to a
+  // group. Offered only from the Personal Drive when a team org exists. useMemo
+  // over the stable orgs array (a filtering selector returns a new array each
+  // render -> React #185).
+  const sharedOrgs = useMemo(() => orgs.filter((o) => !o.personal), [orgs])
+  const canShare = activeOrgId === PERSONAL_ORG_ID && sharedOrgs.length > 0
   const undo = useFileManagerStore((s) => s.undo)
   const redo = useFileManagerStore((s) => s.redo)
   const [renaming, setRenaming] = useState<string | null>(null)
   const [ctx, setCtx] = useState<{ x: number; y: number; items: CtxMenuItem[] } | null>(null)
   const [dropActive, setDropActive] = useState(false)
   const [docPicker, setDocPicker] = useState<Array<{ id: string; title: string; docType: string }> | null>(null)
+  // Public share-link target for a Drive entry. A folder shares as a 'docfolder'
+  // (its documents, browser-viewable), an office doc as a 'document', and a raw
+  // file as a 'file' (bytes hosted against the token). null when closed.
+  const [linkTarget, setLinkTarget] = useState<{ kind: ShareableKind; id: string; name: string } | null>(null)
 
   useEffect(() => {
     void store.refresh()
@@ -170,6 +186,35 @@ export default function FilesView(): JSX.Element {
     if (entry.kind === 'file') {
       items.push({ label: 'Reveal in Finder', icon: 'folder_open', onClick: () => void window.api.fileManager.reveal(entry.id) })
     }
+    // Share a file or folder (and its contents) with the team, optionally a group.
+    // Doc pointers sync as their own document, so sharing them here is a no-op — omit.
+    if (canShare && entry.kind !== 'doc') {
+      items.push({
+        label: 'Share with team or group',
+        icon: 'group_add',
+        onClick: () => {
+          void shareToOrgOrGroup({
+            name: entry.name,
+            kindLabel: entry.kind === 'folder' ? 'folder and its contents' : 'file',
+            sharedOrgs,
+            move: (org, team) => store.moveToOrg(entry.id, org, team)
+          })
+        }
+      })
+    }
+    // Public link — anyone with the URL views it in the browser. A folder shares
+    // its documents (docfolder), an office doc as itself, a raw file with its
+    // bytes hosted against the token. A doc pointer needs its docId as the entity.
+    const publicKind: ShareableKind | null =
+      entry.kind === 'folder' ? 'docfolder' : entry.kind === 'doc' ? 'document' : 'file'
+    const publicEntityId = entry.kind === 'doc' ? entry.docId ?? null : entry.id
+    if (publicKind && publicEntityId) {
+      items.push({
+        label: 'Create public link',
+        icon: 'link',
+        onClick: () => setLinkTarget({ kind: publicKind, id: publicEntityId, name: entry.name })
+      })
+    }
     items.push({ separator: true })
     items.push({
       label: entry.kind === 'folder' ? 'Delete folder and contents' : entry.kind === 'doc' ? 'Remove from folder' : 'Delete',
@@ -205,7 +250,7 @@ export default function FilesView(): JSX.Element {
         setDropActive(false)
       }}
     >
-      <Toolbar onNewFolder={() => void store.createFolder('New folder').then(() => undefined)} onAddFiles={() => void store.importFiles()} onAddDoc={() => void openDocPicker()} />
+      <Toolbar onNewFolder={() => void store.createFolder('New folder').then(() => undefined)} onAddFiles={() => void store.importFiles()} onImportFolder={() => void store.importFolder()} onAddDoc={() => void openDocPicker()} />
 
       <Breadcrumbs crumbs={store.crumbs} onOpen={(id) => void store.openFolder(id)} onMove={(id, target) => void store.move(id, target)} />
 
@@ -261,6 +306,14 @@ export default function FilesView(): JSX.Element {
       </div>
 
       {ctx && <CanvasContextMenu x={ctx.x} y={ctx.y} items={ctx.items} onClose={() => setCtx(null)} />}
+      {linkTarget && (
+        <ShareDialog
+          kind={linkTarget.kind}
+          entityId={linkTarget.id}
+          label={linkTarget.name}
+          onClose={() => setLinkTarget(null)}
+        />
+      )}
       {docPicker && (
         <DocPickerModal
           docs={docPicker}
@@ -276,7 +329,7 @@ export default function FilesView(): JSX.Element {
 }
 
 // ── Toolbar ───────────────────────────────────────────────────────────────────
-function Toolbar({ onNewFolder, onAddFiles, onAddDoc }: { onNewFolder: () => void; onAddFiles: () => void; onAddDoc: () => void }): JSX.Element {
+function Toolbar({ onNewFolder, onAddFiles, onImportFolder, onAddDoc }: { onNewFolder: () => void; onAddFiles: () => void; onImportFolder: () => void; onAddDoc: () => void }): JSX.Element {
   const viewMode = useFileManagerStore((s) => s.viewMode)
   const setViewMode = useFileManagerStore((s) => s.setViewMode)
   const sortKey = useFileManagerStore((s) => s.sortKey)
@@ -301,6 +354,7 @@ function Toolbar({ onNewFolder, onAddFiles, onAddDoc }: { onNewFolder: () => voi
       <span className="w-px h-5 bg-[var(--surface-sunken)] mx-1" />
       <button className={btn} onClick={onNewFolder} data-testid="files-new-folder"><Icon name="create_new_folder" size={16} /> New folder</button>
       <button className={btn} onClick={onAddFiles} data-testid="files-add-files"><Icon name="upload_file" size={16} /> Add files</button>
+      <button className={btn} onClick={onImportFolder} data-testid="files-import-folder"><Icon name="drive_folder_upload" size={16} /> Import folder</button>
       <button className={btn} onClick={onAddDoc} data-testid="files-add-doc"><Icon name="post_add" size={16} /> Add document</button>
 
       <div className="ml-auto flex items-center gap-1">

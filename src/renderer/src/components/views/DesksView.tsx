@@ -1,12 +1,15 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import type { FbNode } from '@shared/types'
 import { useNodeStore } from '../../stores/nodes'
+import { useOrgStore, PERSONAL_ORG_ID } from '../../stores/org'
 import { useViewStore } from '../../stores/view'
 import { useDeskWidgets, realWidgetCount } from '../../lib/useDeskWidgets'
 import { formatRelativeTime } from '../../lib/changelog'
 import DeskMiniature from '../DeskMiniature'
 import Icon from '../Icon'
 import { promptText } from '../plexi/PromptDialog'
+import { shareToOrgOrGroup } from '../../lib/shareScope'
+import ShareDialog from '../ShareDialog'
 import RoomsDesksIndex, { type IndexConfig } from './RoomsDesksIndex'
 
 // The All Desks index. A Desk is a task node (a canvas). Optionally scoped to a
@@ -35,8 +38,23 @@ export default function DesksView({ roomId }: { roomId?: string }): JSX.Element 
   const setActive = useNodeStore((s) => s.setActive)
   const create = useNodeStore((s) => s.create)
   const update = useNodeStore((s) => s.update)
+  const moveToOrg = useNodeStore((s) => s.moveToOrg)
+  const activeOrgId = useOrgStore((s) => s.activeOrgId)
+  // Select the stable orgs array and derive with useMemo — filtering inside the
+  // selector returns a fresh array every render, which Zustand treats as a change
+  // and re-renders forever (React #185).
+  const orgs = useOrgStore((s) => s.orgs)
+  // Sharing a desk = moving it into a team org (optionally narrowed to a group).
+  // Only offered from the Personal workspace (desks already in a team org are
+  // shared), and only when the user belongs to a team org. useMemo over the stable
+  // orgs array — a filtering selector returns a new array each render (React #185).
+  const sharedOrgs = useMemo(() => orgs.filter((o) => !o.personal), [orgs])
+  const canShare = activeOrgId === PERSONAL_ORG_ID && sharedOrgs.length > 0
   const goTask = useViewStore((s) => s.goTask)
   const goRooms = useViewStore((s) => s.goRooms)
+  // Public share-link target (a desk shared as a 'task' snapshot). Opens the
+  // universal ShareDialog; null when closed.
+  const [linkTarget, setLinkTarget] = useState<{ id: string; title: string } | null>(null)
 
   const roomTitleById = useMemo(() => {
     const m = new Map<string, string>()
@@ -174,25 +192,54 @@ export default function DesksView({ roomId }: { roomId?: string }): JSX.Element 
       })()
     },
     actions: (d) => (
-      <button
-        onClick={(e) => {
-          e.stopPropagation()
-          void (async () => {
-            const next = await promptText({
-              title: 'Rename desk',
-              label: 'Desk name',
-              initial: d.title || '',
-              confirmLabel: 'Rename'
-            })
-            const trimmed = next?.trim()
-            if (trimmed && trimmed !== (d.title || '')) await update(d.id, { title: trimmed })
-          })()
-        }}
-        title="Rename desk"
-        className="inline-flex items-center justify-center h-6 w-6 rounded-md bg-[var(--surface-raised)]/90 border border-[var(--edge-firm)] text-[var(--ink-60)] hover:text-[var(--ink-100)]"
-      >
-        <Icon name="edit" size={14} />
-      </button>
+      <>
+        {canShare ? (
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              void shareToOrgOrGroup({
+                name: d.title || 'this desk',
+                kindLabel: 'desk and its widgets',
+                sharedOrgs,
+                move: (org, team) => moveToOrg(d.id, org, team)
+              })
+            }}
+            title="Share with your team or a group"
+            className="inline-flex items-center justify-center h-6 w-6 rounded-md bg-[var(--surface-raised)]/90 border border-[var(--edge-firm)] text-[var(--ink-60)] hover:text-[var(--ink-100)]"
+          >
+            <Icon name="group_add" size={14} />
+          </button>
+        ) : null}
+        <button
+          onClick={(e) => {
+            e.stopPropagation()
+            setLinkTarget({ id: d.id, title: d.title || 'this desk' })
+          }}
+          title="Create a public link — anyone with it can view this desk"
+          className="inline-flex items-center justify-center h-6 w-6 rounded-md bg-[var(--surface-raised)]/90 border border-[var(--edge-firm)] text-[var(--ink-60)] hover:text-[var(--ink-100)]"
+        >
+          <Icon name="link" size={14} />
+        </button>
+        <button
+          onClick={(e) => {
+            e.stopPropagation()
+            void (async () => {
+              const next = await promptText({
+                title: 'Rename desk',
+                label: 'Desk name',
+                initial: d.title || '',
+                confirmLabel: 'Rename'
+              })
+              const trimmed = next?.trim()
+              if (trimmed && trimmed !== (d.title || '')) await update(d.id, { title: trimmed })
+            })()
+          }}
+          title="Rename desk"
+          className="inline-flex items-center justify-center h-6 w-6 rounded-md bg-[var(--surface-raised)]/90 border border-[var(--edge-firm)] text-[var(--ink-60)] hover:text-[var(--ink-100)]"
+        >
+          <Icon name="edit" size={14} />
+        </button>
+      </>
     ),
     headerActions: roomId ? (
       <button
@@ -204,5 +251,17 @@ export default function DesksView({ roomId }: { roomId?: string }): JSX.Element 
     ) : undefined
   }
 
-  return <RoomsDesksIndex config={config} />
+  return (
+    <>
+      <RoomsDesksIndex config={config} />
+      {linkTarget && (
+        <ShareDialog
+          kind="task"
+          entityId={linkTarget.id}
+          label={linkTarget.title}
+          onClose={() => setLinkTarget(null)}
+        />
+      )}
+    </>
+  )
 }

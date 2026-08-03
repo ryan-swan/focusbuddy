@@ -1,6 +1,7 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import type { FbNode, Widget } from '@shared/types'
 import { useNodeStore } from '../../stores/nodes'
+import { useOrgStore, PERSONAL_ORG_ID } from '../../stores/org'
 import { useViewStore } from '../../stores/view'
 import { useMessagingStore } from '../../stores/messaging'
 import { useDeskWidgets } from '../../lib/useDeskWidgets'
@@ -8,6 +9,8 @@ import { formatRelativeTime } from '../../lib/changelog'
 import RoomThumb from '../RoomThumb'
 import Icon from '../Icon'
 import { promptText } from '../plexi/PromptDialog'
+import { shareToOrgOrGroup } from '../../lib/shareScope'
+import ShareDialog from '../ShareDialog'
 import RoomsDesksIndex, { type IndexConfig } from './RoomsDesksIndex'
 
 // The All Rooms index. A Room is a folder node — a place desks live. Clicking a
@@ -23,8 +26,21 @@ export default function RoomsView(): JSX.Element {
   const move = useNodeStore((s) => s.move)
   const create = useNodeStore((s) => s.create)
   const update = useNodeStore((s) => s.update)
+  const moveToOrg = useNodeStore((s) => s.moveToOrg)
+  const activeOrgId = useOrgStore((s) => s.activeOrgId)
+  // Stable selector + useMemo: filtering inside the selector returns a new array
+  // each render, which sends Zustand into an infinite re-render (React #185).
+  const orgs = useOrgStore((s) => s.orgs)
+  // A room is shared by moving it (and its desks/widgets) into a team org,
+  // optionally narrowed to a group. Offered only from the Personal workspace when a
+  // team org exists.
+  const sharedOrgs = useMemo(() => orgs.filter((o) => !o.personal), [orgs])
+  const canShare = activeOrgId === PERSONAL_ORG_ID && sharedOrgs.length > 0
   const goDesks = useViewStore((s) => s.goDesks)
   const openObjectChannel = useMessagingStore((s) => s.openObjectChannel)
+  // Public share-link target (a room shared as a 'folder' snapshot with its
+  // desks). Opens the universal ShareDialog; null when closed.
+  const [linkTarget, setLinkTarget] = useState<{ id: string; title: string } | null>(null)
 
   const rooms = useMemo(
     () => nodes.filter((n) => n.kind === 'folder' && !n.archived),
@@ -170,6 +186,33 @@ export default function RoomsView(): JSX.Element {
     },
     actions: (r) => (
       <div className="flex items-center gap-1">
+        {canShare ? (
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              void shareToOrgOrGroup({
+                name: r.title || 'this room',
+                kindLabel: 'room and its desks',
+                sharedOrgs,
+                move: (org, team) => moveToOrg(r.id, org, team)
+              })
+            }}
+            title="Share with your team or a group"
+            className="inline-flex items-center justify-center h-6 w-6 rounded-md bg-[var(--surface-raised)]/90 border border-[var(--edge-firm)] text-[var(--ink-60)] hover:text-[var(--ink-100)]"
+          >
+            <Icon name="group_add" size={14} />
+          </button>
+        ) : null}
+        <button
+          onClick={(e) => {
+            e.stopPropagation()
+            setLinkTarget({ id: r.id, title: r.title || 'this room' })
+          }}
+          title="Create a public link — anyone with it can view this room"
+          className="inline-flex items-center justify-center h-6 w-6 rounded-md bg-[var(--surface-raised)]/90 border border-[var(--edge-firm)] text-[var(--ink-60)] hover:text-[var(--ink-100)]"
+        >
+          <Icon name="link" size={14} />
+        </button>
         <button
           onClick={(e) => {
             e.stopPropagation()
@@ -223,5 +266,17 @@ export default function RoomsView(): JSX.Element {
     )
   }
 
-  return <RoomsDesksIndex config={config} />
+  return (
+    <>
+      <RoomsDesksIndex config={config} />
+      {linkTarget && (
+        <ShareDialog
+          kind="folder"
+          entityId={linkTarget.id}
+          label={linkTarget.title}
+          onClose={() => setLinkTarget(null)}
+        />
+      )}
+    </>
+  )
 }

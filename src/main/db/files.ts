@@ -3,6 +3,7 @@ import {
   copyFileSync,
   existsSync,
   mkdirSync,
+  readdirSync,
   readFileSync,
   statSync,
   unlinkSync,
@@ -159,6 +160,143 @@ export function readFileBytes(id: string): { mimeType: string; bytes: Buffer } |
   } catch {
     return null
   }
+}
+
+// ── Cross-member sync byte helpers ───────────────────────────────────────────
+// A file's metadata syncs over the org workspace loop like any other row; these
+// move the actual bytes. readForSync ships a local file's bytes up to the org
+// blob channel; hasBytes tells the pull side whether it still needs to fetch;
+// writeSyncedBytes lands a pulled blob on disk under the same id+ext naming the
+// rest of this module uses, so getFile/readFileBytes/extractFileText find it.
+
+export function hasFileBytes(id: string): boolean {
+  const file = getFile(id)
+  if (!file) return false
+  return existsSync(file.storedPath)
+}
+
+export function readFileBytesForSync(
+  id: string
+): { ext: string; mimeType: string; bytes: Uint8Array } | null {
+  const file = getFile(id)
+  if (!file || !existsSync(file.storedPath)) return null
+  try {
+    return { ext: file.ext, mimeType: file.mimeType, bytes: readFileSync(file.storedPath) }
+  } catch {
+    return null
+  }
+}
+
+export function writeSyncedFileBytes(id: string, bytes: Uint8Array): boolean {
+  const file = getFile(id)
+  // The fb_files row is applied before its bytes are fetched, so it exists here
+  // and gives us the canonical stored path (id + sanitised ext). If it somehow
+  // doesn't, refuse rather than guess a path.
+  if (!file) return false
+  try {
+    mkdirSync(filesDir(), { recursive: true })
+    writeFileSync(file.storedPath, bytes)
+    return true
+  } catch {
+    return false
+  }
+}
+
+// Recursively import a local folder tree into the Drive under `parentId`,
+// mirroring its structure as fb_files folders and ingesting each file (which the
+// brain then indexes on its next sync). Skips hidden entries and the usual heavy
+// build dirs, caps file size and total count so a stray huge tree can't wedge the
+// import, and never throws on a single unreadable entry. Returns what it did.
+export function importFolderTree(
+  sourceDir: string,
+  parentId: string | null,
+  opts?: { maxFiles?: number; maxFileBytes?: number }
+): { files: number; folders: number; skipped: number; rootId: string | null } {
+  const maxFiles = opts?.maxFiles ?? 5000
+  const maxFileBytes = opts?.maxFileBytes ?? 100 * 1024 * 1024
+  const SKIP_DIRS = new Set(['node_modules', '.git', '.svn', '.hg', '__pycache__', '.DS_Store'])
+  const stats = { files: 0, folders: 0, skipped: 0, rootId: null as string | null }
+  if (!existsSync(sourceDir)) return stats
+
+  // Create a top folder named after the imported directory, so the import lands as
+  // one tidy folder rather than dumping its contents into the current view.
+  const root = createFolder(parentId, basename(sourceDir) || 'Imported folder')
+  stats.folders++
+  stats.rootId = root.id
+
+  const walk = (dir: string, parent: string): void => {
+    if (stats.files >= maxFiles) return
+    let entries: string[] = []
+    try {
+      entries = readdirSync(dir)
+    } catch {
+      return
+    }
+    for (const name of entries) {
+      if (stats.files >= maxFiles) return
+      if (name.startsWith('.') || SKIP_DIRS.has(name)) {
+        stats.skipped++
+        continue
+      }
+      const full = join(dir, name)
+      let st: ReturnType<typeof statSync>
+      try {
+        st = statSync(full)
+      } catch {
+        stats.skipped++
+        continue
+      }
+      if (st.isDirectory()) {
+        const folder = createFolder(parent, name)
+        stats.folders++
+        walk(full, folder.id)
+      } else if (st.isFile()) {
+        if (st.size > maxFileBytes) {
+          stats.skipped++
+          continue
+        }
+        try {
+          ingestFromPath(full, { parentId: parent })
+          stats.files++
+        } catch {
+          stats.skipped++
+        }
+      }
+    }
+  }
+  walk(sourceDir, root.id)
+  return stats
+}
+
+// Share a personal file/folder/drive (and everything inside it) with an org — the
+// Drive equivalent of moving a desk to the team. Re-scopes the fb_files subtree's
+// org_id + sync bookkeeping (sync_rev reset for the org keyspace) so the org loop
+// pushes the metadata and, for real files, uploads the bytes to every member.
+// Passing the drive root's children shares the whole drive. Returns affected ids.
+//
+// Note: kind 'doc' pointers inside a shared folder are re-scoped but not pushed by
+// the org loop (documents sync as their own 'document' item); share the document
+// itself to bring it across. Real files and folders travel in full.
+export function moveFileToOrg(rootId: string, orgId: string, teamId: string | null = null): string[] {
+  const db = getDb()
+  if (!orgId) return []
+  const exists = db.prepare('SELECT id FROM fb_files WHERE id = ? AND trashed_at IS NULL').get(rootId)
+  if (!exists) return []
+  const ids: string[] = []
+  const collect = (fid: string): void => {
+    ids.push(fid)
+    const kids = db.prepare('SELECT id FROM fb_files WHERE parent_id = ? AND trashed_at IS NULL').all(fid) as Array<{
+      id: string
+    }>
+    for (const k of kids) collect(k.id)
+  }
+  collect(rootId)
+  // teamId scopes the subtree to a group (null = whole org).
+  const setFile = db.prepare('UPDATE fb_files SET org_id = ?, team_id = ?, needs_sync = 1, sync_rev = 0 WHERE id = ?')
+  db.transaction(() => {
+    for (const i of ids) setFile.run(orgId, teamId, i)
+  })()
+  return ids
 }
 
 // ── File/folder manager ──────────────────────────────────────────────────────

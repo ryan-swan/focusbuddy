@@ -40,14 +40,18 @@ export function installSignalOrgHeader(): void {
       const host = new URL(rawUrl, window.location.href).host
       if (host === signalHost) {
         const orgId = useOrgStore.getState().activeOrgId || 'personal'
+        // Stamp the active org as a DEFAULT only — a caller that set x-plexi-org
+        // explicitly (the per-org sync loop, or a cross-org team listing) keeps its
+        // value. Safe: the server independently re-validates membership for the
+        // requested org, so an explicit header can never widen access.
         if (input instanceof Request) {
           // A Request carries its own headers; clone it with the header added.
           const headers = new Headers(input.headers)
-          headers.set('x-plexi-org', orgId)
+          if (!headers.has('x-plexi-org')) headers.set('x-plexi-org', orgId)
           return orig(new Request(input, { headers }), init)
         }
         const headers = new Headers(init?.headers)
-        headers.set('x-plexi-org', orgId)
+        if (!headers.has('x-plexi-org')) headers.set('x-plexi-org', orgId)
         return orig(input, { ...init, headers })
       }
     } catch {

@@ -24,6 +24,13 @@ export interface DeskLayout {
   scroll: { x: number; y: number }
   selectedObjectIds: string[]
   zoom: number // viewport zoom level, persisted + restored (PLX-PRD-002)
+  // Opt-in per-device object-geometry customisation (PLX-APP-010 Phase 2,
+  // ADR-0006). When true, `objects` is authoritative for this user on this
+  // device class and wins over the shared base; when false or absent, only the
+  // camera + selection restore (Phase 1) and the Desk follows the shared base
+  // geometry, unchanged. Gates all Phase 2 routing so the default path is never
+  // affected.
+  customLayout?: boolean
 }
 
 // A Desk persists its COMPLETE visual layout — object positions/sizes/z-order,

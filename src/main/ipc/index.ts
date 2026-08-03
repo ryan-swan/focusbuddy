@@ -63,6 +63,9 @@ import { searchAll, setMailSearchCache } from '../db/search'
 // fires once per message per app run (the renderer polls mail:list).
 const announcedMailUids = new Set<number>()
 import { getActiveOrgId, setActiveOrgId } from '../db/activeOrg'
+import { getDb } from '../db/database'
+import { createDeskLayoutStore } from '../db/deskLayoutStore'
+import type { DeskLayout, DeviceClass } from '@shared/deskLayout'
 import { generateDocument, processMeetingEnd, generateDesignContent, generateDesignVariations, setConversationSnapshot } from '../ai/anthropic'
 import { generateImage } from '../imageGen'
 import { exportDesign } from '../designExport'
@@ -80,6 +83,7 @@ import { getModelClient } from '../ai/modelClient'
 import {
   createNode,
   deleteNode,
+  moveNodeToOrg,
   restoreNodes,
   getNode,
   listNodes,
@@ -94,6 +98,12 @@ import {
   relatedObjectIds as ceRelatedObjectIds,
   healthFor as ceHealthFor,
   markReviewed as ceMarkReviewed,
+  decisionImpactForObject as ceDecisionImpactForObject,
+  createDecision as ceCreateDecision,
+  cancelDecision as ceCancelDecision,
+  listDecisions as ceListDecisions,
+  decisionsForObject as ceDecisionsForObject,
+  backfillWidgetLinkRelations as ceBackfillWidgetLinkRelations,
   liveResumeForDesk as ceLiveResumeForDesk
 } from '../context/engine'
 import { plexiId } from '@shared/plexiId'
@@ -112,10 +122,17 @@ import { getLaunchInfo } from '../launchVersion'
 import {
   createLink,
   deleteLink,
+  getLink,
   listLinksByTask,
   updateLink,
   type WireUpdate
 } from '../db/widgetLinks'
+import {
+  recordWireRun,
+  listWireRunsByWire,
+  listWireRunsByTask,
+  type WireRunInput
+} from '../db/wireRuns'
 import {
   branchSnapshot,
   createSnapshot,
@@ -203,8 +220,15 @@ import {
   smartFolderEntries as fileSmartFolderEntries,
   fileDocument,
   unfiledDocuments,
-  locateDocument
+  locateDocument,
+  hasFileBytes,
+  readFileBytesForSync,
+  writeSyncedFileBytes,
+  moveFileToOrg,
+  importFolderTree
 } from '../db/files'
+import { extractFileText } from '../fileText'
+import { ingestWorkspaceIntoBrain } from '../brainIngest'
 import { extractDocText, retrieveSources, relatedDocuments } from '../workspaceSearch'
 import {
   isBrainEnabled,
@@ -476,6 +500,7 @@ import {
   suggestPageContent,
   suggestSetupWidgets,
   suggestFileTags,
+  groupWidgetsByTopic,
   askWorkspace,
   askWorkspaceStream,
   suggestWorkspaceActions,
@@ -582,6 +607,48 @@ function materialityForNode(node: {
   }
 }
 
+// Materiality inputs for a Widget (Object). A change scores as material when the
+// widget is referenced by a live Decision or has confirmed relations, so a
+// content change to a decision-linked or well-connected widget can escalate its
+// Context Health, while an isolated note stays a quiet "changed".
+function materialityForWidget(widget: {
+  id: string
+  kind: string
+  parentSectionId: string | null
+}): MaterialityInput {
+  const related = ceRelatedObjectIds(widget.id).length
+  const decisionImpact = ceDecisionImpactForObject(widget.id)
+  return {
+    affectedObjectCount: related,
+    decisionImpact,
+    relationshipDepth: related > 0 ? 1 : 0,
+    organisationalReach: 'desk',
+    userRole: 'owner',
+    workflowStage: 'active',
+    historicalSignificance: decisionImpact === 'high' ? 0.6 : 0.2
+  }
+}
+
+// Context Health for any object id, resolving whether it is a node (Desk/Room) or
+// a widget and applying the matching materiality. Shared by context:health and the
+// decisions risk report.
+function objectHealth(id: string): ReturnType<typeof ceHealthFor> {
+  const node = getNode(id)
+  if (node) return ceHealthFor(id, materialityForNode(node))
+  const widget = getWidget(id)
+  if (widget) return ceHealthFor(id, materialityForWidget(widget))
+  return { objectId: id, state: 'current', materiality: null, changedEventCount: 0, decisionsAtRisk: [] }
+}
+
+// Lazily-constructed desk-layout overlay store, bound to the app DB on first use
+// (getDb() is ready by the time any IPC handler fires). Its constructor creates
+// the desk_layouts table if absent.
+let _deskLayoutStore: ReturnType<typeof createDeskLayoutStore> | null = null
+function deskLayoutStore(): ReturnType<typeof createDeskLayoutStore> {
+  if (!_deskLayoutStore) _deskLayoutStore = createDeskLayoutStore(getDb())
+  return _deskLayoutStore
+}
+
 export function registerIpcHandlers(): void {
   // ── Body-double cross-window relay ──────────────────────────────────────
   // BroadcastChannel is per-renderer-process — fine for two browser tabs,
@@ -650,12 +717,15 @@ export function registerIpcHandlers(): void {
     return removed
   })
   ipcMain.handle('nodes:restore', (_e, ids: string[]) => restoreNodes(ids))
+  ipcMain.handle('nodes:moveToOrg', (_e, id: string, orgId: string, teamId?: string | null) =>
+    moveNodeToOrg(String(id || ''), String(orgId || ''), teamId ?? null)
+  )
   // User-driven desk relatedness (see db/nodeRelations.ts). The legacy table stays
   // the UI's source of truth; each edge is ALSO mirrored into the knowledge graph
   // as a confirmed Relationship so Context Health can propagate across it.
   ipcMain.handle('nodes:relate', (_e, a: string, b: string) => {
     relateNodes(a, b)
-    mirrorUserRelation(a, b, plexiId())
+    mirrorUserRelation(a, b, plexiId(), 'user linked these desks')
     return listRelatedNodeIds(a)
   })
   ipcMain.handle('nodes:unrelate', (_e, a: string, b: string) => {
@@ -669,13 +739,39 @@ export function registerIpcHandlers(): void {
   // Confirmed relationship neighbours of an object — "surfaces with relations".
   ipcMain.handle('context:related', (_e, id: string) => ceRelatedObjectIds(id))
   // Per-(user, object) Context Health, honest against the user's last review point.
-  ipcMain.handle('context:health', (_e, id: string) => {
-    const node = getNode(id)
-    if (!node) return { objectId: id, state: 'current', materiality: null, changedEventCount: 0, decisionsAtRisk: [] }
-    return ceHealthFor(id, materialityForNode(node))
-  })
+  // Per-(user, object) Context Health. Widgets are first-class objects too, so
+  // this frames a widget that changed while away, not just a desk.
+  ipcMain.handle('context:health', (_e, id: string) => objectHealth(id))
   ipcMain.handle('context:markReviewed', (_e, id: string) => {
     ceMarkReviewed(id)
+    return true
+  })
+  // Decisions (spec §37). A human-owned Decision references Objects/Desks so a
+  // later material change raises Decision Risk against them (the red widget frame
+  // + desk decisions-at-risk). Creating one is the entry point that activates the
+  // whole decision-risk surface.
+  ipcMain.handle(
+    'decisions:create',
+    (_e, input: { title: string; decisionStatement?: string; relatedObjectIds?: string[]; affectedDeskIds?: string[] }) =>
+      ceCreateDecision(input)
+  )
+  ipcMain.handle('decisions:list', () => ceListDecisions())
+  ipcMain.handle('decisions:forObject', (_e, objectId: string) => ceDecisionsForObject(objectId))
+  // Live risk report for the decisions panel: each live Decision with whether any
+  // Object it references has a material change since review (so it is at risk).
+  ipcMain.handle('decisions:withRisk', () => {
+    return ceListDecisions()
+      .filter((d) => d.state !== 'superseded' && d.state !== 'cancelled')
+      .map((d) => {
+        const riskyObjectIds = d.relatedObjectIds.filter((oid) => {
+          const s = objectHealth(oid).state
+          return s === 'attention-required' || s === 'decision-risk'
+        })
+        return { decision: d, atRisk: riskyObjectIds.length > 0, riskyObjectIds }
+      })
+  })
+  ipcMain.handle('decisions:cancel', (_e, id: string) => {
+    ceCancelDecision(id)
     return true
   })
   // Live catch-up Resume with an AI summary (degrades to deterministic without a key).
@@ -689,13 +785,70 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('widgets:get', (_e, id: string) => getWidget(id))
   ipcMain.handle('widgets:listByTask', (_e, taskId: string) => listWidgetsByTask(taskId))
   ipcMain.handle('widgets:listByKind', (_e, kind: Widget['kind']) => listWidgetsByKind(kind))
-  ipcMain.handle('widgets:create', (_e, draft: WidgetDraft) => createWidget(draft))
+  ipcMain.handle('widgets:create', (_e, draft: WidgetDraft) => {
+    const widget = createWidget(draft)
+    // Widgets are first-class Context-Engine objects (PLX-APP-002): a real create
+    // emits an Event on the widget's object id so its Context Health can be derived.
+    emitObjectEvent({
+      eventType: 'WidgetCreated',
+      category: 'user',
+      objectId: widget.id,
+      deskId: widget.taskId ?? null,
+      currentState: { kind: widget.kind, title: widget.title ?? null },
+      changeSummary: `Added ${widget.kind}${widget.title ? ` "${widget.title}"` : ''}`
+    })
+    // You created it, so you have seen it: baseline past the creation so a brand-new
+    // widget does not report itself as "changed since your last visit".
+    ceMarkReviewed(widget.id)
+    return widget
+  })
   // Tolerant variant for auto-spawned chrome (minimap): no-op if the task is gone.
+  // Chrome is not user content, so it emits no Object Event.
   ipcMain.handle('widgets:createOptional', (_e, draft: WidgetDraft) => createWidgetIfTaskExists(draft))
-  ipcMain.handle('widgets:update', (_e, id: string, patch: WidgetPatch) => updateWidget(id, patch))
-  ipcMain.handle('widgets:delete', (_e, id: string) => deleteWidget(id))
+  ipcMain.handle('widgets:update', (_e, id: string, patch: WidgetPatch) => {
+    const widget = updateWidget(id, patch)
+    // Emit only for content-meaningful changes. Pure geometry/layout moves are not
+    // "changed since your last visit" content and must never flood the log or
+    // flicker a health frame on every drag.
+    if (widget && ('content' in patch || 'title' in patch)) {
+      emitObjectEvent({
+        eventType: 'WidgetUpdated',
+        category: 'user',
+        objectId: widget.id,
+        deskId: widget.taskId ?? null,
+        currentState: { kind: widget.kind, title: widget.title ?? null },
+        changeSummary: `Updated ${widget.kind}${widget.title ? ` "${widget.title}"` : ''}`
+      })
+    }
+    return widget
+  })
+  ipcMain.handle('widgets:delete', (_e, id: string) => {
+    const before = getWidget(id)
+    const removed = deleteWidget(id)
+    if (before) {
+      emitObjectEvent({
+        eventType: 'WidgetDeleted',
+        category: 'user',
+        objectId: id,
+        deskId: before.taskId ?? null,
+        currentState: { kind: before.kind, trashed: true },
+        changeSummary: `Removed ${before.kind}${before.title ? ` "${before.title}"` : ''}`
+      })
+    }
+    return removed
+  })
   ipcMain.handle('widgets:restore', (_e, id: string) => restoreWidget(id))
   ipcMain.handle('widgets:bringToFront', (_e, id: string) => bringToFront(id))
+
+  // Desk layout overlay (PLX-APP-010 / UX-032, ADR-0006). Per-(user, Desk,
+  // device class) camera + selection, persisted and restored on Desk open. The
+  // store lazily creates its own table; instantiate once against the app DB.
+  ipcMain.handle('deskLayout:load', (_e, userId: string, deskId: string, deviceClass: DeviceClass) =>
+    deskLayoutStore().load(userId, deskId, deviceClass)
+  )
+  ipcMain.handle('deskLayout:save', (_e, layout: DeskLayout) =>
+    deskLayoutStore().save(layout, new Date().toISOString())
+  )
 
   ipcMain.handle('widgetLinks:listByTask', (_e, taskId: string) => listLinksByTask(taskId))
 
@@ -819,13 +972,82 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle(
     'widgetLinks:create',
-    (_e, sourceWidgetId: string, targetWidgetId: string, taskId: string, type?: WireType) =>
-      createLink(sourceWidgetId, targetWidgetId, taskId, type ?? 'context')
+    (_e, sourceWidgetId: string, targetWidgetId: string, taskId: string, type?: WireType) => {
+      const link = createLink(sourceWidgetId, targetWidgetId, taskId, type ?? 'context')
+      // A link the user drew IS a relationship: mirror it into the graph as a
+      // confirmed RelatedTo, so the connection feeds context.related, decision-risk
+      // propagation and Assemble's related-surfacing (widget-link-owner approved,
+      // all wire types). Idempotent; self-loops already blocked by createLink.
+      if (link) {
+        mirrorUserRelation(link.sourceWidgetId, link.targetWidgetId, link.id, 'user linked these widgets')
+      }
+      return link
+    }
   )
+  // updateLink only changes wire behaviour (enable/disable/retype); the
+  // relationship exists as long as the link does, so the mirror is untouched here.
   ipcMain.handle('widgetLinks:update', (_e, id: string, patch: WireUpdate) =>
     updateLink(id, patch)
   )
-  ipcMain.handle('widgetLinks:delete', (_e, id: string) => deleteLink(id))
+  ipcMain.handle('widgetLinks:delete', (_e, id: string) => {
+    const link = getLink(id)
+    const ok = deleteLink(id)
+    // Remove the mirrored relationship only when no other link still connects the
+    // pair in EITHER direction (widget_links allows independent A->B and B->A).
+    if (link) {
+      const a = link.sourceWidgetId
+      const b = link.targetWidgetId
+      const stillLinked = listLinksByTask(link.taskId).some(
+        (l) =>
+          (l.sourceWidgetId === a && l.targetWidgetId === b) ||
+          (l.sourceWidgetId === b && l.targetWidgetId === a)
+      )
+      if (!stillLinked) unmirrorUserRelation(a, b)
+    }
+    return ok
+  })
+  // Wire run history — durable before/after of every reactive-wire write, so the
+  // user can see what an automation did and revert it (the trust layer).
+  ipcMain.handle('wireRuns:record', (_e, input: WireRunInput) => recordWireRun(input))
+  ipcMain.handle('wireRuns:listByWire', (_e, wireId: string, limit?: number) =>
+    listWireRunsByWire(wireId, limit)
+  )
+  ipcMain.handle('wireRuns:listByTask', (_e, taskId: string, limit?: number) =>
+    listWireRunsByTask(taskId, limit)
+  )
+  // Outbound webhook POST (Lever 3, Phase 0). Runs in main so there's no CORS and
+  // the desk's data goes straight out to the user's URL. https/http only; bounded
+  // by a timeout so a dead endpoint can't hang a wire. Returns an honest result —
+  // never a fabricated success — so the wire's run status reflects reality.
+  ipcMain.handle(
+    'webhooks:send',
+    async (
+      _e,
+      input: { url: string; method?: string; body?: string; contentType?: string }
+    ): Promise<{ ok: boolean; status?: number; error?: string }> => {
+      const url = (input.url ?? '').trim()
+      if (!/^https?:\/\//i.test(url)) return { ok: false, error: 'Enter a valid http(s) URL.' }
+      const controller = new AbortController()
+      const timer = setTimeout(() => controller.abort(), 15000)
+      try {
+        const res = await fetch(url, {
+          method: input.method?.toUpperCase() === 'PUT' ? 'PUT' : 'POST',
+          headers: { 'content-type': input.contentType || 'application/json' },
+          body: input.body ?? '',
+          signal: controller.signal
+        })
+        return { ok: res.ok, status: res.status, error: res.ok ? undefined : `HTTP ${res.status}` }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return { ok: false, error: controller.signal.aborted ? 'Request timed out.' : msg }
+      } finally {
+        clearTimeout(timer)
+      }
+    }
+  )
+  // One-time-ish: mirror widget links that existed before links fed the graph, so
+  // historical connections also surface as related. Idempotent, non-fatal.
+  ceBackfillWidgetLinkRelations()
 
   // Desk time-travel snapshots.
   ipcMain.handle('snapshots:create', (_e, taskId: string, label?: string) =>
@@ -1375,6 +1597,16 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('files:ingestPath', (_e, sourcePath: string) =>
     ingestFromPath(sourcePath)
   )
+  // Recursively import a whole local folder into the Drive under `parentId`, so it
+  // becomes part of the workspace + brain. Shows a directory picker.
+  ipcMain.handle('fileManager:importFolder', async (_e, parentId: string | null) => {
+    const parent = BrowserWindow.getFocusedWindow()
+    const opts = { title: 'Import a folder into your Drive', properties: ['openDirectory' as const] }
+    const open = parent ? await dialog.showOpenDialog(parent, opts) : await dialog.showOpenDialog(opts)
+    if (open.canceled || open.filePaths.length === 0) return { ok: false as const, canceled: true as const }
+    const res = importFolderTree(open.filePaths[0], parentId ?? null)
+    return { ok: true as const, ...res }
+  })
   ipcMain.handle(
     'files:ingestBuffer',
     (
@@ -1502,6 +1734,13 @@ export function registerIpcHandlers(): void {
       return { ok: true as const, path: filePath }
     }
   )
+  // Extract readable plain text from a file (PDF/Word/spreadsheet/text). Used by
+  // wires + desk agents + the brain to read file CONTENTS; also lets the UI show
+  // "what's in this file". Returns null for a binary with no text.
+  ipcMain.handle('files:extractText', (_e, id: string) => extractFileText(id))
+  // Sync the whole workspace (desks, documents, notes/pages, Drive files) into the
+  // PlexiBrain knowledge base. Idempotent; returns honest counts.
+  ipcMain.handle('brain:ingestWorkspace', () => ingestWorkspaceIntoBrain())
   ipcMain.handle('files:read', (_e, id: string) => {
     const r = readFileBytes(id)
     if (!r) return null
@@ -1549,6 +1788,9 @@ export function registerIpcHandlers(): void {
   )
   ipcMain.handle('fileManager:rename', (_e, id: string, name: string) => renameFileEntry(id, name))
   ipcMain.handle('fileManager:move', (_e, id: string, newParentId: string | null) => moveFileEntry(id, newParentId))
+  ipcMain.handle('fileManager:moveToOrg', (_e, id: string, orgId: string, teamId?: string | null) =>
+    moveFileToOrg(String(id || ''), String(orgId || ''), teamId ?? null)
+  )
   ipcMain.handle('fileManager:delete', (_e, id: string) => deleteFileEntry(id))
   ipcMain.handle('fileManager:restore', (_e, ids: string[]) => restoreFileEntries(ids))
   ipcMain.handle('fileManager:listTrashed', () => listTrashedFileEntries())
@@ -1589,6 +1831,16 @@ export function registerIpcHandlers(): void {
     recordAiCall()
     return suggestFileTags(content, existingTags)
   })
+  // Topic grouping for the Columns view: label each desk object with a short topic
+  // so the view can lay them out as topical columns. Suggest-only; honest
+  // degradation (needsApiKey) when no AI is configured.
+  ipcMain.handle(
+    'ai:groupByTopic',
+    async (_e, items: Array<{ id: string; title: string; text: string }>) => {
+      recordAiCall()
+      return groupWidgetsByTopic(items)
+    }
+  )
   // Ask-your-workspace: retrieve the most relevant documents for the question,
   // then answer grounded in them with citations. Returns the answer plus the
   // source documents (with snippet + whether each was cited) for the UI.
@@ -2620,7 +2872,7 @@ export function registerIpcHandlers(): void {
   // signal URL + token); these expose the local-DB half: what to push, what to
   // mark pushed, applying pulled rows, and the pull cursor.
   ipcMain.handle('workspace:pending', () => collectPending())
-  ipcMain.handle('workspace:markPushed', (_e, itemType: 'node' | 'widget' | 'timeblock' | 'document' | 'table' | 'row', id: string, rev: number) =>
+  ipcMain.handle('workspace:markPushed', (_e, itemType: 'node' | 'widget' | 'timeblock' | 'document' | 'table' | 'row' | 'file', id: string, rev: number) =>
     markPushed(itemType, id, rev)
   )
   ipcMain.handle('workspace:applyRemote', (_e, items: RemoteItem[]) =>
@@ -2888,6 +3140,16 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('workspace:getCursorOrg', (_e, orgId: string) => getSyncCursorOrg(String(orgId || '')))
   ipcMain.handle('workspace:setCursorOrg', (_e, orgId: string, n: number) =>
     setSyncCursorOrg(String(orgId || ''), typeof n === 'number' ? n : 0)
+  )
+
+  // Cross-member Drive file bytes. A file's metadata syncs over the org loop
+  // above; these move the actual bytes. The renderer reads a local file's bytes to
+  // upload, checks whether a pulled file's bytes are already on disk, and lands
+  // downloaded bytes under the canonical id+ext path.
+  ipcMain.handle('workspace:fileBytesForPush', (_e, id: string) => readFileBytesForSync(String(id || '')))
+  ipcMain.handle('workspace:hasLocalFileBytes', (_e, id: string) => hasFileBytes(String(id || '')))
+  ipcMain.handle('workspace:writeSyncedFileBytes', (_e, id: string, bytes: Uint8Array) =>
+    writeSyncedFileBytes(String(id || ''), bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes))
   )
 
   // Validate the stored key by sending a 1-token "ping" prompt. Costs

@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { launchApp, type LaunchedApp } from './_helpers'
+import { launchApp, type LaunchedApp, hoverToolbar } from './_helpers'
 
 // In-app runtime proof that the capability matrix gates the desktop UI.
 //
@@ -50,10 +50,12 @@ test('Free tier: Table widget is locked in the palette, Note is not', async () =
   await bootAndOpenCanvas(launched)
   const { window } = launched
 
+  await hoverToolbar(window) // the toolbar only mounts the palette while hovered
   await window.locator('[data-testid="palette-add-button"]').first().click()
 
-  // Ungated widget → normal add button present.
-  await expect(window.locator('[data-testid="palette-add-note"]').first()).toBeVisible()
+  // Ungated widget → normal add button present. Use a CORE ungated widget
+  // (Sticky) so this gating check doesn't depend on the Advanced expander.
+  await expect(window.locator('[data-testid="palette-add-sticky"]').first()).toBeVisible()
 
   // Gated widget (widget_table=false on free) → locked variant present,
   // and the normal add button for it is absent.
@@ -66,6 +68,7 @@ test('Clicking a locked widget opens the upgrade prompt', async () => {
   await bootAndOpenCanvas(launched)
   const { window } = launched
 
+  await hoverToolbar(window) // the toolbar only mounts the palette while hovered
   await window.locator('[data-testid="palette-add-button"]').first().click()
   await window.locator('[data-testid="palette-locked-table"]').first().click()
 

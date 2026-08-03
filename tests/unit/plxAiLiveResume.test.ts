@@ -69,4 +69,38 @@ describe('live resume summary — governance behaviour', () => {
     expect(prompt).toContain('Do not invent')
     expect(prompt).toContain('desk-1')
   })
+
+  it('test_plx_perf_072_ai_operation_has_deterministic_fallback_meeting_non_ai_path', async () => {
+    // PERF-072: an operation with an AI component MUST have a deterministic
+    // fallback that meets the corresponding non-AI target, so AI latency can never
+    // breach a user-facing budget. The resume summary is such an operation. With AI
+    // unavailable, it returns the deterministic Resume (no model round-trip, so no
+    // AI-latency exposure), and that fallback is identical to the non-AI pipeline
+    // output — the fast path is always reachable regardless of AI health.
+    const a = resumeFixture()
+    const withAi = await generateResumeSummaryLive(a.resume, {
+      cache: createSummaryCache(a.db),
+      now: 't',
+      invoke: async () => 'AI-written catch-up',
+      keyAvailable: () => true
+    })
+    expect(withAi.degraded).toBe(false)
+
+    // Fresh fixture (own empty cache) so the outage path cannot hit the cached
+    // AI text the successful path above just stored.
+    const b = resumeFixture()
+    const resume = b.resume
+    const fallback = await generateResumeSummaryLive(resume, {
+      cache: createSummaryCache(b.db),
+      now: 't',
+      invoke: async () => { throw new Error('AI latency / outage') },
+      keyAvailable: () => true
+    })
+    // The deterministic fallback is returned with no AI content, and it is exactly
+    // the non-AI deterministic Resume the operation would produce on its own.
+    expect(fallback.degraded).toBe(true)
+    expect(fallback.resume.aiSummary).toBeNull()
+    expect(fallback.resume.summary).toBe(resume.summary)
+    expect(fallback.resume.summary.length).toBeGreaterThan(0)
+  })
 })

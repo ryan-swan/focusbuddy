@@ -57,6 +57,60 @@ export async function listTeams(token: string): Promise<Team[]> {
   return json?.teams ?? []
 }
 
+// The teams the account belongs to in a SPECIFIC org — used by the share-scope
+// picker, which needs the target org's groups even while the active org is
+// Personal. Sets x-plexi-org explicitly (the interceptor now respects it, and the
+// server re-validates membership). Returns [] on any error.
+export async function listTeamsForOrg(token: string, orgId: string): Promise<Team[]> {
+  try {
+    const res = await fetch(urlFor('/teams'), {
+      headers: { Authorization: `Bearer ${token}`, 'x-plexi-org': orgId }
+    })
+    const json = (await res.json().catch(() => null)) as { ok?: boolean; teams?: Team[] } | null
+    return json?.teams ?? []
+  } catch {
+    return []
+  }
+}
+
+// Create a team in a SPECIFIC org (explicit x-plexi-org) — used to make the ad-hoc
+// group behind "share with specific people" while the active org is Personal.
+export async function createTeamForOrg(token: string, name: string, orgId: string): Promise<Team | null> {
+  try {
+    const res = await fetch(urlFor('/teams'), {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'x-plexi-org': orgId, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name })
+    })
+    const json = (await res.json().catch(() => null)) as { ok?: boolean; team?: Team } | null
+    return json?.team ?? null
+  } catch {
+    return null
+  }
+}
+
+// Add a member (by handle) to a team, resolving the handle within a SPECIFIC org
+// (explicit x-plexi-org) so a target-org member is found while the active org is
+// Personal. Idempotent server-side.
+export async function addTeamMemberForOrg(
+  token: string,
+  teamId: string,
+  handle: string,
+  orgId: string
+): Promise<boolean> {
+  try {
+    const res = await fetch(urlFor(`/teams/${teamId}/members`), {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'x-plexi-org': orgId, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ handle })
+    })
+    const json = (await res.json().catch(() => null)) as { ok?: boolean } | null
+    return !!json?.ok
+  } catch {
+    return false
+  }
+}
+
 export async function createTeam(token: string, name: string): Promise<Team | null> {
   const { json } = await call<{ ok: boolean; team?: Team }>('POST', '/teams', token, { name })
   return json?.team ?? null

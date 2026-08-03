@@ -156,6 +156,14 @@ registerEventSchema('DeskCreated', 1, s(['title', 'kind']))
 registerEventSchema('DeskUpdated', 1, s(['title', 'status']))
 registerEventSchema('DeskCompleted', 1, s(['title', 'status']))
 registerEventSchema('DeskDeleted', 1, s(['trashed'], { trashed: { type: 'boolean' } }))
+
+// Object (Widget) lifecycle. Widgets are first-class Context-Engine objects
+// (PLX-APP-002): a content-meaningful create/change/delete emits an Event on the
+// widget's object id so its Context Health can be derived. Pure geometry moves do
+// NOT emit (they are not "changed since your last visit" content).
+registerEventSchema('WidgetCreated', 1, s(['kind']))
+registerEventSchema('WidgetUpdated', 1, s(['kind']))
+registerEventSchema('WidgetDeleted', 1, s(['trashed'], { trashed: { type: 'boolean' } }))
 // Relationship lifecycle (full snapshot under `relationship`).
 for (const t of ['RelationshipProposed', 'RelationshipConfirmed', 'RelationshipRejected', 'RelationshipConfidenceChanged']) {
   registerEventSchema(t, 1, s(['relationship'], { relationship: { type: 'object' } }))
@@ -172,6 +180,7 @@ registerEventSchema('SubjectErased', 1, s(['subjectId', 'mechanism'], { subjectI
 // coverage test asserts every one has a registered schema (PLX-EVT-043 CI gate).
 export const PRODUCED_EVENT_TYPES = [
   'RoomCreated', 'DeskCreated', 'DeskUpdated', 'DeskCompleted', 'DeskDeleted',
+  'WidgetCreated', 'WidgetUpdated', 'WidgetDeleted',
   'RelationshipProposed', 'RelationshipConfirmed', 'RelationshipRejected', 'RelationshipConfidenceChanged',
   'ContextHealthChanged', 'MaterialityScored', 'MaterialityWeightsRetuned', 'DecisionSuperseded',
   'AiChangeProposed', 'SubjectErased'

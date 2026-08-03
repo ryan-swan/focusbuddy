@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react'
-import type { WidgetLink, WireType } from '@shared/types'
+import { useCallback, useEffect, useState } from 'react'
+import type { WidgetLink, WireType, WireRun, WidgetKind } from '@shared/types'
+import { recipesForSource } from '../lib/wireRecipes'
 import { useLinksStore } from '../stores/links'
 import { useWidgetStore } from '../stores/widgets'
 import { runWireNow, useWireRunStore } from '../lib/wireEngine'
@@ -13,6 +14,41 @@ const WIRE_META: Record<WireType, { icon: string; label: string; dash: string | 
   context: { icon: 'link', label: 'Context', dash: '5 5' },
   transform: { icon: 'auto_awesome', label: 'Transform', dash: undefined },
   mirror: { icon: 'sync', label: 'Mirror', dash: undefined }
+}
+
+// Per-wire freshness, shown on the badge so a reactive wire is never a mystery:
+// you can tell at a glance whether it is live, stale (source changed since it
+// last ran), never-run, off, running, or errored. Context wires are passive and
+// have no freshness. States are mutually exclusive, most-urgent first.
+type WireFreshness = 'error' | 'running' | 'disabled' | 'stale' | 'never-run' | 'ok'
+
+function wireFreshness(
+  link: WidgetLink,
+  sourceUpdatedAt: number | undefined,
+  running: boolean,
+  hasError: boolean,
+  // A wire into an outbound webhook is reactive even though its type is 'context'
+  // (it POSTs on source change), so it gets freshness like transform/mirror.
+  targetIsWebhook = false
+): WireFreshness | null {
+  if (link.type !== 'transform' && link.type !== 'mirror' && !targetIsWebhook) return null
+  if (hasError) return 'error'
+  if (running) return 'running'
+  if (!link.enabled) return 'disabled'
+  const last = link.lastRunAt ?? null
+  if (last == null) return 'never-run'
+  if (sourceUpdatedAt != null && sourceUpdatedAt > last) return 'stale'
+  return 'ok'
+}
+
+function relAgo(at: number): string {
+  const s = Math.max(0, Math.round((Date.now() - at) / 1000))
+  if (s < 45) return 'just now'
+  const m = Math.round(s / 60)
+  if (m < 60) return `${m}m ago`
+  const h = Math.round(m / 60)
+  if (h < 24) return `${h}h ago`
+  return `${Math.round(h / 24)}d ago`
 }
 
 // Spatial backlinks rendered as bezier curves between widget centres.
@@ -43,8 +79,22 @@ export interface LinkDragGhost {
   cursorScreenY: number
 }
 
+// A link that was just drawn and is awaiting the user's intent choice. The link
+// already exists as a passive `context` wire (created synchronously on drop); the
+// picker only upgrades its type. Anchored in RAW viewport coords (the drop point).
+export interface PendingLinkPick {
+  linkId: string
+  x: number
+  y: number
+}
+
 interface Props {
   ghost: LinkDragGhost | null
+  // Set right after a link is drawn, to offer "how should this connect?" at the
+  // drop point. Null when no pick is pending.
+  pendingPick: PendingLinkPick | null
+  // Clear the pending pick (dismiss or after a choice is made). Should be stable.
+  onPendingPickDone: () => void
 }
 
 interface Bounds {
@@ -156,7 +206,7 @@ interface Segment {
   my: number
 }
 
-export default function LinkOverlay({ ghost }: Props): JSX.Element | null {
+export default function LinkOverlay({ ghost, pendingPick, onPendingPickDone }: Props): JSX.Element | null {
   const links = useLinksStore((s) => s.links)
   const remove = useLinksStore((s) => s.remove)
   const updateWire = useLinksStore((s) => s.update)
@@ -170,7 +220,7 @@ export default function LinkOverlay({ ghost }: Props): JSX.Element | null {
   // changes, and widget store updates. The DOM-read approach is robust to
   // stale dragOverride but still needs to re-render when widgets are
   // added, removed, archived, etc.
-  useWidgetStore((s) => s.widgets)
+  const allWidgets = useWidgetStore((s) => s.widgets)
   useWidgetStore((s) => s.panX)
   useWidgetStore((s) => s.panY)
   useWidgetStore((s) => s.zoom)
@@ -279,6 +329,42 @@ export default function LinkOverlay({ ghost }: Props): JSX.Element | null {
     return () => document.removeEventListener('mousedown', onDown)
   }, [selectedLinkId])
 
+  // Intent picker: dismiss on Escape or an outside-of-popover click. Dismissing
+  // is non-destructive — the link stays a passive `context` wire (widget-link-owner:
+  // never cancel-to-nothing, the gesture already produced a real connection).
+  useEffect(() => {
+    if (!pendingPick) return
+    function onDown(e: MouseEvent): void {
+      const target = e.target as HTMLElement
+      if (target.closest('[data-link-popover]')) return
+      onPendingPickDone()
+    }
+    function onKey(e: KeyboardEvent): void {
+      if (e.key === 'Escape') onPendingPickDone()
+    }
+    document.addEventListener('mousedown', onDown)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onDown)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [pendingPick, onPendingPickDone])
+
+  // Self-heal a stale pick whose link has since vanished (task switch, concurrent
+  // delete). Keeps Canvas's pendingPick state from getting stuck.
+  useEffect(() => {
+    if (pendingPick && !links.some((l) => l.id === pendingPick.linkId)) onPendingPickDone()
+  }, [pendingPick, links, onPendingPickDone])
+
+  // A newly-armed pick dismisses any open wire editor — the reciprocal of
+  // handleClickLine's clear, so the two popovers can never both be on screen.
+  useEffect(() => {
+    if (pendingPick) {
+      setSelectedLinkId(null)
+      setPopoverPos(null)
+    }
+  }, [pendingPick])
+
   // Build the segment list from live DOM positions. Any link whose
   // endpoint isn't currently in the DOM (e.g. archived widget) gets
   // silently skipped — its row stays in SQLite but doesn't render.
@@ -304,10 +390,30 @@ export default function LinkOverlay({ ghost }: Props): JSX.Element | null {
   }
 
   const selectedLink = selectedLinkId ? links.find((l) => l.id === selectedLinkId) ?? null : null
+  const pickLink = pendingPick ? links.find((l) => l.id === pendingPick.linkId) ?? null : null
 
   function handleClickLine(link: WidgetLink, mid: { x: number; y: number }): void {
+    // Opening the wire editor dismisses any pending intent picker — only one
+    // wire popover is ever on screen at a time (widget-link-owner invariant).
+    if (pendingPick) onPendingPickDone()
     setSelectedLinkId(link.id)
     setPopoverPos(mid)
+  }
+
+  // Resolve the intent picker: set the chosen wire type and close. For Transform,
+  // hand off to the full wire editor (anchored where the picker was) so the user
+  // can type the instruction. updateWire is safe on a since-deleted link (returns
+  // null, never throws) — widget-link-owner invariant.
+  function handlePickIntent(type: WireType): void {
+    if (!pendingPick) return
+    const linkId = pendingPick.linkId
+    const pos = { x: pendingPick.x, y: pendingPick.y }
+    void updateWire(linkId, { type })
+    onPendingPickDone()
+    if (type === 'transform') {
+      setSelectedLinkId(linkId)
+      setPopoverPos(pos)
+    }
   }
 
   function handleDelete(): void {
@@ -506,20 +612,44 @@ export default function LinkOverlay({ ghost }: Props): JSX.Element | null {
       {segments.map((seg) => {
         const meta = WIRE_META[seg.link.type]
         const isRunning = !!running[seg.link.id]
-        const hasError = !!wireErrors[seg.link.id]
+        // Error is durable: a transient run error OR a persisted last_error (so a
+        // failure still shows after a reload until the next successful run).
+        const hasError = !!wireErrors[seg.link.id] || !!seg.link.lastError
+        const source = allWidgets.find((w) => w.id === seg.link.sourceWidgetId)
+        const targetIsWebhook =
+          allWidgets.find((w) => w.id === seg.link.targetWidgetId)?.kind === 'webhook'
         const reactiveOff =
-          (seg.link.type === 'transform' || seg.link.type === 'mirror') && !seg.link.enabled
+          (seg.link.type === 'transform' || seg.link.type === 'mirror' || targetIsWebhook) &&
+          !seg.link.enabled
+        const fresh = wireFreshness(seg.link, source?.updatedAt, isRunning, hasError, targetIsWebhook)
+        const errText = wireErrors[seg.link.id] ?? seg.link.lastError ?? ''
+        const ranText = seg.link.lastRunAt ? ` (ran ${relAgo(seg.link.lastRunAt)})` : ''
+        const title =
+          fresh === 'error'
+            ? `${meta.label} — last run failed${errText ? `: ${errText}` : ''}`
+            : fresh === 'running'
+              ? `${meta.label} — running…`
+              : fresh === 'disabled'
+                ? `${meta.label} — off`
+                : fresh === 'stale'
+                  ? `${meta.label} — stale, source changed since it last ran${ranText}`
+                  : fresh === 'never-run'
+                    ? `${meta.label} — hasn't run yet`
+                    : fresh === 'ok'
+                      ? `${meta.label} wire${ranText}`
+                      : `${meta.label} wire`
         return (
           <button
             key={`badge-${seg.link.id}`}
             data-link-popover
             data-testid={`wire-badge-${seg.link.id}`}
+            data-wire-fresh={fresh ?? undefined}
             onMouseDown={(e) => e.stopPropagation()}
             onClick={(e) => {
               e.stopPropagation()
               handleClickLine(seg.link, { x: seg.mx, y: seg.my })
             }}
-            title={`${meta.label} wire`}
+            title={title}
             style={{
               position: 'absolute',
               left: seg.mx,
@@ -527,7 +657,7 @@ export default function LinkOverlay({ ghost }: Props): JSX.Element | null {
               transform: 'translate(-50%, -50%)',
               pointerEvents: 'auto'
             }}
-            className={`inline-flex items-center justify-center h-5 w-5 rounded-full border shadow-sm transition-colors ${
+            className={`relative inline-flex items-center justify-center h-5 w-5 rounded-full border shadow-sm transition-colors ${
               hasError
                 ? 'bg-red-500 border-red-400 text-white'
                 : reactiveOff
@@ -536,9 +666,28 @@ export default function LinkOverlay({ ghost }: Props): JSX.Element | null {
             } ${isRunning ? 'fb-breathing' : ''}`}
           >
             <Icon name={hasError ? 'error' : meta.icon} size={11} />
+            {/* Freshness dot — amber = stale (source changed since last run),
+                sky = never run. Positioned inside the already-anchored badge, so
+                no separate coordinate tracking (widget-link-owner invariant). */}
+            {(fresh === 'stale' || fresh === 'never-run') && (
+              <span
+                aria-hidden
+                data-testid={`wire-fresh-dot-${seg.link.id}`}
+                className={`absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full border border-[var(--surface-raised)] ${
+                  fresh === 'stale' ? 'bg-amber-400' : 'bg-sky-400'
+                }`}
+              />
+            )}
           </button>
         )
       })}
+      {pendingPick && pickLink && (
+        <LinkIntentPicker
+          pos={{ x: pendingPick.x, y: pendingPick.y }}
+          onPick={handlePickIntent}
+          onDismiss={onPendingPickDone}
+        />
+      )}
       {popoverPos && selectedLink && (
         <div
           data-link-popover
@@ -552,6 +701,7 @@ export default function LinkOverlay({ ghost }: Props): JSX.Element | null {
         >
           <WireEditor
             link={selectedLink}
+            sourceKind={allWidgets.find((w) => w.id === selectedLink.sourceWidgetId)?.kind}
             error={wireErrors[selectedLink.id]}
             running={!!running[selectedLink.id]}
             onChange={(patch) => void updateWire(selectedLink.id, patch)}
@@ -568,11 +718,70 @@ export default function LinkOverlay({ ghost }: Props): JSX.Element | null {
   )
 }
 
+// The intent picker shown at the drop point the moment a connection is drawn.
+// It puts the "what should this connection DO?" decision at the moment of intent
+// instead of hiding it behind a tiny badge the user has to discover later. The
+// link already exists as a passive context wire; choosing here just upgrades it.
+function LinkIntentPicker({
+  pos,
+  onPick,
+  onDismiss
+}: {
+  pos: { x: number; y: number }
+  onPick: (type: WireType) => void
+  onDismiss: () => void
+}): JSX.Element {
+  const CHOICES: Array<{ value: WireType; label: string; icon: string; hint: string }> = [
+    { value: 'context', label: 'Feed in as context', icon: 'link', hint: 'Use it as background for the target’s AI.' },
+    { value: 'transform', label: 'Transform it', icon: 'auto_awesome', hint: 'Run an instruction on it and write the result into the target.' },
+    { value: 'mirror', label: 'Keep in sync', icon: 'sync', hint: 'Copy it into the target whenever it changes.' }
+  ]
+  return (
+    <div
+      data-link-popover
+      data-testid="link-intent-picker"
+      onMouseDown={(e) => e.stopPropagation()}
+      style={{
+        position: 'absolute',
+        left: pos.x,
+        top: pos.y + 12,
+        transform: 'translate(-50%, 0)',
+        pointerEvents: 'auto'
+      }}
+      className="w-60 rounded-lg bg-[var(--surface-raised)] border border-[var(--edge-soft)] shadow-xl text-[11px] overflow-hidden"
+    >
+      <div className="flex items-center justify-between px-2.5 py-1.5 border-b border-[var(--edge-soft)]">
+        <span className="font-semibold text-[var(--ink-70)]">How should this connect?</span>
+        <button onClick={onDismiss} className="text-[var(--ink-40)] hover:text-[var(--ink-70)]" aria-label="Dismiss">
+          <Icon name="close" size={12} />
+        </button>
+      </div>
+      <div className="p-1.5">
+        {CHOICES.map((c) => (
+          <button
+            key={c.value}
+            onClick={() => onPick(c.value)}
+            data-testid={`link-intent-${c.value}`}
+            className="w-full flex items-start gap-2 px-2 py-1.5 rounded text-left hover:bg-[var(--surface-sunken)] transition-colors"
+          >
+            <Icon name={c.icon} size={15} className="text-accent mt-0.5 shrink-0" />
+            <span className="flex flex-col">
+              <span className="text-[11px] font-medium text-[var(--ink-100)]">{c.label}</span>
+              <span className="text-[10px] text-[var(--ink-50)] leading-snug">{c.hint}</span>
+            </span>
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 // The wire editor popover. Turns a dead line into a live wire: pick the type,
 // give a transform its instruction, toggle the kill switch, run it on demand,
 // or unlink. Compact so it doesn't dominate the canvas.
 function WireEditor({
   link,
+  sourceKind,
   error,
   running,
   onChange,
@@ -581,6 +790,7 @@ function WireEditor({
   onClose
 }: {
   link: WidgetLink
+  sourceKind?: WidgetKind
   error?: string
   running: boolean
   onChange: (patch: { type?: WireType; verb?: string; enabled?: boolean }) => void
@@ -590,6 +800,27 @@ function WireEditor({
 }): JSX.Element {
   const [verb, setVerb] = useState(link.verb)
   useEffect(() => setVerb(link.verb), [link.verb])
+  const recipes = recipesForSource(sourceKind)
+
+  // Recent activity — durable before/after of what this wire has written, so the
+  // user can see what the automation did and revert any write in one click.
+  const [runs, setRuns] = useState<WireRun[]>([])
+  const loadRuns = useCallback(() => {
+    void window.api.wireRuns.listByWire(link.id, 6).then(setRuns)
+  }, [link.id])
+  // Reload on open and whenever a run finishes (running falls back to false).
+  useEffect(() => {
+    if (!running) loadRuns()
+  }, [running, loadRuns])
+  const revertRun = useCallback(
+    (run: WireRun) => {
+      void useWidgetStore
+        .getState()
+        .update(run.targetWidgetId, { content: run.prevContent })
+        .then(loadRuns)
+    },
+    [loadRuns]
+  )
 
   const TYPES: Array<{ value: WireType; label: string; icon: string; hint: string }> = [
     { value: 'context', label: 'Context', icon: 'link', hint: 'Passive — feeds the target’s AI as related background.' },
@@ -634,6 +865,31 @@ function WireEditor({
 
         {link.type === 'transform' && (
           <div>
+            {recipes.length > 0 && (
+              <div className="mb-1.5" data-testid="wire-recipes">
+                <div className="text-[9px] uppercase tracking-[0.1em] text-[var(--ink-40)] mb-1">
+                  {verb.trim() ? 'Recipes' : 'Pick a recipe, or type your own'}
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {recipes.map((r) => (
+                    <button
+                      key={r.id}
+                      data-testid={`wire-recipe-${r.id}`}
+                      title={r.verb}
+                      onClick={() => {
+                        setVerb(r.verb)
+                        onChange({ verb: r.verb })
+                        onRunNow()
+                      }}
+                      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full border border-[var(--edge-soft)] text-[10px] text-[var(--ink-70)] hover:border-accent hover:text-accent transition-colors"
+                    >
+                      <Icon name={r.icon} size={11} />
+                      {r.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
             <input
               type="text"
               value={verb}
@@ -691,6 +947,43 @@ function WireEditor({
         )}
 
         {error && <p className="text-[10px] text-red-600 dark:text-red-400 leading-snug">{error}</p>}
+
+        {runs.length > 0 && (
+          <div className="border-t border-[var(--edge-soft)] pt-2" data-testid="wire-activity">
+            <div className="text-[10px] font-semibold text-[var(--ink-50)] mb-1">Recent activity</div>
+            <ul className="space-y-1 max-h-40 overflow-y-auto">
+              {runs.map((run) => (
+                <li
+                  key={run.id}
+                  data-testid={`wire-run-${run.id}`}
+                  className="rounded border border-[var(--edge-soft)] bg-[var(--surface-sunken)] px-2 py-1"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[10px] text-[var(--ink-70)] truncate">
+                      {run.wireType === 'mirror' ? 'Copied from' : run.wireType === 'transform' ? 'Wrote from' : 'Delivered from'}{' '}
+                      <span className="text-[var(--ink-100)]">{run.sourceLabel}</span>
+                    </span>
+                    <span className="text-[9px] text-[var(--ink-40)] shrink-0">{relAgo(run.at)}</span>
+                  </div>
+                  {run.nextContent.trim() && (
+                    <div className="mt-0.5 text-[9px] text-[var(--ink-50)] leading-snug line-clamp-2 break-words">
+                      {run.nextContent.slice(0, 120)}
+                    </div>
+                  )}
+                  <button
+                    onClick={() => revertRun(run)}
+                    data-testid={`wire-run-revert-${run.id}`}
+                    className="mt-1 inline-flex items-center gap-1 text-[9px] text-[var(--ink-50)] hover:text-accent transition-colors"
+                    title="Restore the target's content from just before this write"
+                  >
+                    <Icon name="undo" size={11} />
+                    Revert this write
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         <button
           onClick={onUnlink}

@@ -169,7 +169,7 @@ export default function StickyWidget({ widget, inline = false }: Props): JSX.Ele
   const rendered = (
     <div
       className={`fb-sticky-rendered w-full flex-1 font-hand text-stone-900 cursor-text whitespace-pre-wrap ${
-        inline ? 'text-2xl' : 'text-lg'
+        'fb-body'
       }`}
       onMouseDown={(e) => {
         // Let a checkbox click through; otherwise a click drops into edit mode.
@@ -270,7 +270,7 @@ export default function StickyWidget({ widget, inline = false }: Props): JSX.Ele
       // field-sizing: content (fb-sticky-textarea, globals.css) grows the
       // textarea with its text so the sticky auto-grows instead of scrolling.
       className={`fb-sticky-textarea w-full min-h-[2.5rem] resize-none bg-transparent text-stone-900 font-hand focus:outline-none placeholder:text-stone-700/40 ${
-        inline ? 'text-2xl' : 'text-lg'
+        'fb-body'
       }`}
     />
   )

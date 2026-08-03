@@ -19,15 +19,61 @@ import type { Schema } from 'prosemirror-model'
 
 // The Y.XmlFragment name @tiptap/extension-collaboration binds to by default.
 export const COLLAB_FIELD = 'default'
-// Any fixed value works; it must be the same for every client's seed.
+// Pinned clientIDs so two clients seeding identical content produce byte-identical
+// items that merge idempotently. The initial seed and the re-hydration seed use
+// DIFFERENT ids: after a placeholder is deleted, reusing the initial id+clock would
+// make Yjs treat the fresh content as items it has already seen (and deleted), so
+// the content would vanish. A distinct id keeps re-hydrated content live while
+// staying deterministic across clients.
 const SEED_CLIENT_ID = 1
+const REHYDRATE_CLIENT_ID = 2
 
-// Idempotently seed `target`'s collab fragment from a ProseMirror document JSON.
-// A no-op if the fragment already has content (already seeded, or being edited).
-export function seedYDocFromPm(target: Y.Doc, pmJSON: object, schema: Schema): void {
-  if (target.getXmlFragment(COLLAB_FIELD).length > 0) return
+// True if the ProseMirror JSON carries real (non-whitespace) text anywhere.
+function pmHasText(node: unknown): boolean {
+  if (!node || typeof node !== 'object') return false
+  const n = node as { type?: string; text?: string; content?: unknown[] }
+  if (n.type === 'text' && typeof n.text === 'string' && n.text.trim().length > 0) return true
+  return Array.isArray(n.content) && n.content.some(pmHasText)
+}
+
+// True if the collab fragment holds real text (someone's actual content) — as
+// opposed to being empty or holding only a placeholder empty paragraph. Strips the
+// XML tags from the fragment's serialization; any remaining non-whitespace is text.
+function fragmentHasText(frag: Y.XmlFragment): boolean {
+  return frag.toString().replace(/<[^>]*>/g, '').replace(/\s+/g, '').length > 0
+}
+
+function seedInto(target: Y.Doc, pmJSON: object, schema: Schema, clientId: number): void {
   const seed = new Y.Doc()
-  seed.clientID = SEED_CLIENT_ID
+  seed.clientID = clientId
   prosemirrorJSONToYXmlFragment(schema, pmJSON, seed.getXmlFragment(COLLAB_FIELD))
   Y.applyUpdate(target, Y.encodeStateAsUpdate(seed))
+}
+
+// Idempotently seed `target`'s collab fragment from a ProseMirror document JSON.
+//
+// Never touches a fragment that already holds real text — that would risk
+// clobbering or doubling a teammate's live content. But a fragment that is empty,
+// or holds only a placeholder empty paragraph (a room created before its body had
+// content — e.g. a doc seeded/imported/shared while empty, then given content
+// out-of-band), IS re-hydrated: the placeholder is cleared and the body's real
+// content seeded in under a distinct pinned clientID.
+export function seedYDocFromPm(target: Y.Doc, pmJSON: object, schema: Schema): void {
+  const frag = target.getXmlFragment(COLLAB_FIELD)
+  // Real content already present: leave it strictly alone.
+  if (fragmentHasText(frag)) return
+  // Body itself is empty: only seed a truly-empty fragment (don't re-add a
+  // placeholder paragraph on top of an existing one every open).
+  if (!pmHasText(pmJSON)) {
+    if (frag.length === 0) seedInto(target, pmJSON, schema, SEED_CLIENT_ID)
+    return
+  }
+  // Fragment is a placeholder (empty or lone empty paragraph) but the body has real
+  // content: clear the placeholder, then re-seed with the distinct re-hydrate id.
+  if (frag.length > 0) {
+    target.transact(() => frag.delete(0, frag.length))
+    seedInto(target, pmJSON, schema, REHYDRATE_CLIENT_ID)
+  } else {
+    seedInto(target, pmJSON, schema, SEED_CLIENT_ID)
+  }
 }

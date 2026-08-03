@@ -11,6 +11,8 @@ interface WidgetLinkRow {
   type: string | null
   verb: string | null
   enabled: number | null
+  last_run_at: number | null
+  last_error: string | null
 }
 
 function rowToLink(row: WidgetLinkRow): WidgetLink {
@@ -24,7 +26,9 @@ function rowToLink(row: WidgetLinkRow): WidgetLink {
     type: type === 'transform' || type === 'mirror' ? type : 'context',
     verb: row.verb ?? '',
     // SQLite has no booleans; legacy rows with NULL default to enabled.
-    enabled: row.enabled === null ? true : row.enabled !== 0
+    enabled: row.enabled === null ? true : row.enabled !== 0,
+    lastRunAt: row.last_run_at ?? null,
+    lastError: row.last_error ?? null
   }
 }
 
@@ -33,6 +37,22 @@ export function listLinksByTask(taskId: string): WidgetLink[] {
   const rows = db
     .prepare('SELECT * FROM widget_links WHERE task_id = ? ORDER BY created_at ASC')
     .all(taskId) as WidgetLinkRow[]
+  return rows.map(rowToLink)
+}
+
+// A single link by id. Needed on delete so the caller can read the endpoints
+// before the row is gone (e.g. to remove the mirrored graph relationship).
+export function getLink(id: string): WidgetLink | null {
+  const db = getDb()
+  const row = db.prepare('SELECT * FROM widget_links WHERE id = ?').get(id) as WidgetLinkRow | undefined
+  return row ? rowToLink(row) : null
+}
+
+// Every link across all tasks. Used to backfill the relationship graph from links
+// that already existed before links began mirroring into it.
+export function listAllLinks(): WidgetLink[] {
+  const db = getDb()
+  const rows = db.prepare('SELECT * FROM widget_links').all() as WidgetLinkRow[]
   return rows.map(rowToLink)
 }
 
@@ -70,7 +90,9 @@ export function createLink(
     createdAt: now,
     type,
     verb: '',
-    enabled: true
+    enabled: true,
+    lastRunAt: null,
+    lastError: null
   }
 }
 
@@ -78,10 +100,15 @@ export interface WireUpdate {
   type?: WireType
   verb?: string
   enabled?: boolean
+  // Durable run state, written by the wire engine after each run. `lastError`
+  // accepts null/'' to clear a prior error on a successful run.
+  lastRunAt?: number | null
+  lastError?: string | null
 }
 
-// Update a wire's live-wire fields. Returns the updated link or null if the id
-// is unknown. Only the three live-wire fields are mutable; endpoints are fixed.
+// Update a wire's mutable fields (the three live-wire fields plus durable run
+// state). Returns the updated link or null if the id is unknown. Endpoints are
+// fixed. Only the fields present in `patch` change; the rest are preserved.
 export function updateLink(id: string, patch: WireUpdate): WidgetLink | null {
   const db = getDb()
   const row = db.prepare('SELECT * FROM widget_links WHERE id = ?').get(id) as
@@ -92,13 +119,13 @@ export function updateLink(id: string, patch: WireUpdate): WidgetLink | null {
   const type = patch.type ?? next.type
   const verb = patch.verb ?? next.verb
   const enabled = patch.enabled ?? next.enabled
-  db.prepare('UPDATE widget_links SET type = ?, verb = ?, enabled = ? WHERE id = ?').run(
-    type,
-    verb,
-    enabled ? 1 : 0,
-    id
-  )
-  return { ...next, type, verb, enabled }
+  const lastRunAt = 'lastRunAt' in patch ? patch.lastRunAt ?? null : next.lastRunAt ?? null
+  // Empty string clears the error; undefined leaves it untouched.
+  const lastError = 'lastError' in patch ? (patch.lastError ? patch.lastError : null) : next.lastError ?? null
+  db.prepare(
+    'UPDATE widget_links SET type = ?, verb = ?, enabled = ?, last_run_at = ?, last_error = ? WHERE id = ?'
+  ).run(type, verb, enabled ? 1 : 0, lastRunAt, lastError, id)
+  return { ...next, type, verb, enabled, lastRunAt, lastError }
 }
 
 export function deleteLink(id: string): boolean {

@@ -426,6 +426,45 @@ export async function createSchedule(
   return json?.ok ? json.schedule ?? null : null
 }
 
+// External inbound webhooks (Lever 3). These 404 against a signal server that
+// hasn't been deployed with the /webhooks routes yet, in which case `req` returns
+// null and the caller shows an honest "not available yet" state — never a fake URL.
+export interface WebhookHookClient {
+  id: string
+  token: string
+  ownerAccountId: string
+  orgId: string | null
+  targetKind: string
+  targetId: string
+  label: string
+  enabled: boolean
+  createdAt: number
+  lastTriggeredAt: number | null
+}
+
+export async function createWebhookHook(
+  token: string,
+  input: { targetKind: string; targetId: string; label?: string }
+): Promise<WebhookHookClient | null> {
+  const json = await req<{ ok: boolean; hook?: WebhookHookClient }>('POST', '/webhooks', token, input)
+  return json?.ok ? json.hook ?? null : null
+}
+
+export async function listWebhookHooks(token: string): Promise<WebhookHookClient[] | null> {
+  const json = await req<{ ok: boolean; hooks?: WebhookHookClient[] }>('GET', '/webhooks', token)
+  return json?.ok ? json.hooks ?? [] : null
+}
+
+export async function deleteWebhookHook(token: string, id: string): Promise<boolean> {
+  const json = await req<{ ok: boolean }>('DELETE', `/webhooks/${id}`, token)
+  return !!json?.ok
+}
+
+// The public URL an external caller POSTs to, built from the signal http base.
+export function webhookUrlForToken(hookToken: string): string {
+  return `${signalConfig.httpUrl.replace(/\/+$/, '')}/hooks/${hookToken}`
+}
+
 export async function setScheduleEnabled(
   token: string,
   conversationId: string,

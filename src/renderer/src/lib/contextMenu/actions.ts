@@ -7,9 +7,10 @@
 
 import type { PinZone, WidgetKind } from '@shared/types'
 import { useWidgetStore } from '../../stores/widgets'
+import { recordActionWithToast } from '../../stores/actionHistory'
 import { useAiAssistPreview } from '../../stores/aiAssistPreview'
 import { catalogFor } from '../widgetCatalog'
-import { createConnectedTool } from '../createConnectedTool'
+import { createConnectedTool, createAgentFromSources } from '../createConnectedTool'
 import type { MenuContext } from './types'
 
 // The text a context can offer for seeding or AI work: the selection if there
@@ -96,6 +97,48 @@ export async function bringToFront(ctx: MenuContext): Promise<void> {
 export async function ejectFromSection(ctx: MenuContext): Promise<void> {
   const w = sourceWidget(ctx)
   if (w) await useWidgetStore.getState().update(w.id, { parentSectionId: null })
+}
+
+// Flag a widget as a Decision (spec §37): create a human-owned Decision that
+// references this widget and its desk, so a later material change to the widget
+// raises Decision Risk against it (the red health frame) and the desk shows it in
+// decisions-at-risk. Undoable: undo cancels the Decision. This is the entry point
+// that activates the decision-risk surface.
+export async function flagAsDecision(ctx: MenuContext): Promise<void> {
+  const w = sourceWidget(ctx)
+  if (!w) return
+  const api = window.api?.decisions
+  if (!api?.create) return
+  const title = w.title && w.title.trim() ? w.title.trim() : `Decision on ${w.kind}`
+  const related = [w.id, ctx.taskId].filter((x): x is string => !!x)
+  const affected = ctx.taskId ? [ctx.taskId] : []
+  const create = async (): Promise<string | null> => {
+    const d = await api.create({ title, relatedObjectIds: related, affectedDeskIds: affected })
+    return d?.id ?? null
+  }
+  let id = await create()
+  if (!id) return
+  recordActionWithToast({
+    label: 'Flagged as a decision',
+    undo: async () => {
+      if (id) await api.cancel?.(id)
+    },
+    redo: async () => {
+      id = await create()
+    }
+  })
+}
+
+// Bulk "Automate with an agent" for a multi-selection: spawn one agent and wire
+// every selected widget into it, so the agent runs its instruction over all of
+// them at once. Undo is provided by the underlying create + link actions (each
+// records its own history entry), matching the single-widget create-and-connect
+// flow — no separate composite wrapper.
+export async function automateWithAgent(ctx: MenuContext): Promise<void> {
+  if (ctx.object.type !== 'multi') return
+  const ids = ctx.object.widgets.map((w) => w.id)
+  if (ids.length === 0) return
+  await createAgentFromSources(ids)
 }
 
 // ── Share ────────────────────────────────────────────────────────────────────

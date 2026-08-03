@@ -501,6 +501,26 @@ CREATE TABLE IF NOT EXISTS canvas_snapshots (
 );
 CREATE INDEX IF NOT EXISTS idx_canvas_snapshots_task ON canvas_snapshots(task_id, at DESC);
 
+-- ── Wire run history ─────────────────────────────────────────────────────────
+-- One row per reactive-wire write into a text target (transform / mirror). Stores
+-- the target's content before and after so the user can see what an automation
+-- did and revert it in one click. Pruned to the most recent per wire.
+CREATE TABLE IF NOT EXISTS wire_runs (
+  id TEXT PRIMARY KEY,
+  wire_id TEXT NOT NULL REFERENCES widget_links(id) ON DELETE CASCADE,
+  task_id TEXT NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
+  source_widget_id TEXT NOT NULL REFERENCES widgets(id) ON DELETE CASCADE,
+  target_widget_id TEXT NOT NULL REFERENCES widgets(id) ON DELETE CASCADE,
+  source_label TEXT NOT NULL DEFAULT '',
+  wire_type TEXT NOT NULL,
+  verb TEXT NOT NULL DEFAULT '',
+  at INTEGER NOT NULL,
+  prev_content TEXT NOT NULL,
+  next_content TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_wire_runs_wire ON wire_runs(wire_id, at DESC);
+CREATE INDEX IF NOT EXISTS idx_wire_runs_task ON wire_runs(task_id, at DESC);
+
 -- ── Outgoing share links ────────────────────────────────────────────────────
 -- Each row is a link the local user minted to share one of their folders /
 -- tasks / widgets. Tokens are opaque and URL-safe. revoked=1 soft-deletes
@@ -626,6 +646,7 @@ export function getDb(): Database.Database {
   // connector links; we trash instead (hidden + recoverable, links survive and
   // the overlay skips trashed endpoints), purged after 7 days.
   ensureColumn(db, 'widgets', 'trashed_at', 'INTEGER')
+  ensureColumn(db, 'widgets', 'status', 'TEXT')
   ensureColumn(db, 'widgets', 'pinned', 'INTEGER NOT NULL DEFAULT 0')
   ensureColumn(db, 'widgets', 'pinned_screen_x', 'INTEGER')
   ensureColumn(db, 'widgets', 'pinned_screen_y', 'INTEGER')
@@ -671,6 +692,17 @@ export function getDb(): Database.Database {
   ensureColumn(db, 'widget_links', 'type', "TEXT NOT NULL DEFAULT 'context'")
   ensureColumn(db, 'widget_links', 'verb', "TEXT NOT NULL DEFAULT ''")
   ensureColumn(db, 'widget_links', 'enabled', 'INTEGER NOT NULL DEFAULT 1')
+  // Durable run state for a reactive wire, so freshness (live / stale / errored)
+  // and last-ran survive a reload and feed both the wire badge and the desk
+  // Automations panel from one source of truth. Null until the wire first runs.
+  ensureColumn(db, 'widget_links', 'last_run_at', 'INTEGER')
+  ensureColumn(db, 'widget_links', 'last_error', 'TEXT')
+  // Provenance for brain entries auto-ingested from the workspace (a desk,
+  // document, widget or file). Null = a manually-authored entry. The pair is the
+  // idempotency key so re-syncing updates in place instead of duplicating, and
+  // lets a future "clear synced entries" leave hand-written ones untouched.
+  ensureColumn(db, 'fb_knowledge', 'source_kind', 'TEXT')
+  ensureColumn(db, 'fb_knowledge', 'source_id', 'TEXT')
   // Render mode for local-app-launcher widgets: 'launcher' (icon + click-to-open)
   // vs 'mirror' (punch-through live view of the real native app window). Null for
   // any other widget kind.
@@ -1030,6 +1062,28 @@ export function getDb(): Database.Database {
     BEGIN UPDATE fb_rows SET needs_sync = 1 WHERE id = NEW.id; END;
   `)
   db.exec('CREATE INDEX IF NOT EXISTS idx_fb_rows_needs_sync ON fb_rows(needs_sync)')
+
+  // Drive files + folders join cross-member org sync (metadata over the org loop;
+  // a file's BYTES ride the separate org-file-blob channel). Same guarded dirty
+  // trigger as the other synced tables; new rows default needs_sync = 1 so a file
+  // uploaded today is picked up on the next org cycle.
+  ensureColumn(db, 'fb_files', 'sync_rev', 'INTEGER NOT NULL DEFAULT 0')
+  ensureColumn(db, 'fb_files', 'needs_sync', 'INTEGER NOT NULL DEFAULT 1')
+  db.exec(`
+    CREATE TRIGGER IF NOT EXISTS fb_files_mark_dirty AFTER UPDATE ON fb_files
+    WHEN NEW.needs_sync = OLD.needs_sync AND NEW.sync_rev = OLD.sync_rev AND OLD.needs_sync = 0
+    BEGIN UPDATE fb_files SET needs_sync = 1 WHERE id = NEW.id; END;
+  `)
+  db.exec('CREATE INDEX IF NOT EXISTS idx_fb_files_needs_sync ON fb_files(needs_sync)')
+
+  // Group/team scope for shared objects. NULL = whole org (or personal); a team id
+  // narrows an org-shared object to that group. Widgets and rows have no column of
+  // their own — they inherit their parent node/table's team at push time (mirroring
+  // how they inherit org scope). The server's changesSince is the isolation point.
+  ensureColumn(db, 'nodes', 'team_id', 'TEXT')
+  ensureColumn(db, 'documents', 'team_id', 'TEXT')
+  ensureColumn(db, 'fb_files', 'team_id', 'TEXT')
+  ensureColumn(db, 'fb_tables', 'team_id', 'TEXT')
 
   // Remaining top-level user-content surfaces get the same per-org scoping so
   // switching organisation shows only that org's automations, reports, apps,

@@ -7,15 +7,17 @@ import { useWidgetStore } from '../stores/widgets'
 import { useTimeBlockStore } from '../stores/timeBlocks'
 import { useDocumentsStore } from '../stores/documents'
 import { useTablesStore } from '../stores/tables'
+import { useFileManagerStore } from '../stores/fileManager'
 import { useOrgStore, PERSONAL_ORG_ID } from '../stores/org'
 import { setOrgWorkspaceChangedHandler } from './messagingSocket'
+import { registerSyncNudge } from './syncNudge'
 
 // Every item type carried over the sync transport. The personal loop has always
 // carried node and widget; rung 2 added document, table and row alongside the
 // rung-1 timeblock, and rung 3 routes node and widget down the org loop too. The
 // transport is type-agnostic (a JSON body plus this discriminator), so the union
 // already covers every type either loop sends.
-type SyncItemType = 'node' | 'widget' | 'timeblock' | 'document' | 'table' | 'row'
+type SyncItemType = 'node' | 'widget' | 'timeblock' | 'document' | 'table' | 'row' | 'file'
 
 // Renderer half of multi-device workspace sync. It owns the network (it has the
 // signal URL + session token); the main process owns the local SQLite and exposes
@@ -48,6 +50,7 @@ interface ServerItem {
   body: Record<string, unknown> | null
   rev: number
   deleted: boolean
+  teamId?: string | null
 }
 
 async function pullChanges(token: string, since: number): Promise<{ items: ServerItem[]; now: number } | null> {
@@ -166,13 +169,16 @@ async function putItemOrg(
   id: string,
   itemType: SyncItemType,
   body: Record<string, unknown>,
-  baseRev: number
+  baseRev: number,
+  teamId?: string | null
 ): Promise<PutResult> {
   try {
     const res = await fetch(urlFor(`/workspace/org/items/${id}`), {
       method: 'PUT',
       headers: { ...orgHeaders(token, orgId), 'Content-Type': 'application/json' },
-      body: JSON.stringify({ itemType, body, baseRev: baseRev || undefined })
+      // Omit teamId entirely when undefined so the server preserves the item's
+      // existing scope (a plain edit must never widen a team item to the whole org).
+      body: JSON.stringify({ itemType, body, baseRev: baseRev || undefined, ...(teamId !== undefined ? { teamId } : {}) })
     })
     if (res.status === 409) {
       const json = (await res.json()) as { item?: ServerItem }
@@ -214,6 +220,104 @@ async function deleteItemOrg(
   }
 }
 
+// ── Org file bytes (cross-member Drive files) ────────────────────────────────
+// A file's metadata rides the org item loop; its bytes move here. Every call is
+// member-gated server-side via the same x-plexi-org resolution. Bytes are read
+// from / written to the local files store through main (window.api.workspaceSync).
+
+// Does the server already hold this file's bytes? Used to skip re-uploading a blob
+// on a metadata-only change (rename/move); a missing/failed probe returns false so
+// we err toward (re)uploading rather than stranding a file with no bytes.
+async function orgBlobExists(token: string, orgId: string, id: string): Promise<boolean> {
+  try {
+    const res = await fetch(urlFor(`/workspace/org/files/${id}?meta=1`), { headers: orgHeaders(token, orgId) })
+    if (!res.ok) return false
+    const json = (await res.json()) as { ok?: boolean; exists?: boolean }
+    return !!json.exists
+  } catch {
+    return false
+  }
+}
+
+async function uploadOrgBlob(
+  token: string,
+  orgId: string,
+  id: string,
+  ext: string,
+  mime: string,
+  bytes: Uint8Array
+): Promise<boolean> {
+  try {
+    const qs = `?ext=${encodeURIComponent(ext || '')}&mime=${encodeURIComponent(mime || 'application/octet-stream')}`
+    // Copy into a fresh ArrayBuffer-backed view so the body is a clean octet-stream.
+    const body = new Uint8Array(bytes)
+    const res = await fetch(urlFor(`/workspace/org/files/${id}${qs}`), {
+      method: 'PUT',
+      headers: { ...orgHeaders(token, orgId), 'Content-Type': 'application/octet-stream' },
+      body
+    })
+    if (!res.ok) {
+      noteServerError()
+      return false
+    }
+    return true
+  } catch {
+    noteOffline()
+    return false
+  }
+}
+
+async function downloadOrgBlob(token: string, orgId: string, id: string): Promise<Uint8Array | null> {
+  try {
+    const res = await fetch(urlFor(`/workspace/org/files/${id}`), { headers: orgHeaders(token, orgId) })
+    if (res.status === 404) return null // bytes not on the server yet; a later cycle retries
+    if (!res.ok) {
+      noteServerError()
+      return null
+    }
+    return new Uint8Array(await res.arrayBuffer())
+  } catch {
+    noteOffline()
+    return null
+  }
+}
+
+async function deleteOrgBlob(token: string, orgId: string, id: string): Promise<void> {
+  try {
+    await fetch(urlFor(`/workspace/org/files/${id}`), { method: 'DELETE', headers: orgHeaders(token, orgId) })
+  } catch {
+    // best-effort; an orphaned blob is harmless (member-gated) and prunes on org delete
+  }
+}
+
+// After a file's metadata pushes, make sure its bytes are on the server. Only real
+// files (kind 'file') have bytes; folders don't. Skips the upload when the server
+// already has the blob (metadata-only change), so a rename doesn't re-ship bytes.
+async function ensureOrgBlobUploaded(
+  token: string,
+  orgId: string,
+  id: string,
+  body: Record<string, unknown>
+): Promise<void> {
+  if (body.kind !== 'file') return
+  if (await orgBlobExists(token, orgId, id)) return
+  const local = await window.api.workspaceSync.fileBytesForPush(id)
+  if (!local || !local.bytes || local.bytes.length === 0) return
+  await uploadOrgBlob(token, orgId, id, local.ext, local.mimeType, local.bytes)
+}
+
+// After a batch of org items applies, fetch the bytes for any pulled file we don't
+// have locally yet, so the file actually opens (and the brain can read it).
+async function fetchMissingOrgBlobs(token: string, orgId: string, items: ServerItem[]): Promise<void> {
+  for (const it of items) {
+    if (it.itemType !== 'file' || it.deleted || !it.body) continue
+    if (it.body.kind !== 'file') continue
+    if (await window.api.workspaceSync.hasLocalFileBytes(it.id)) continue
+    const bytes = await downloadOrgBlob(token, orgId, it.id)
+    if (bytes && bytes.length > 0) await window.api.workspaceSync.writeSyncedFileBytes(it.id, bytes)
+  }
+}
+
 // One full push+pull cycle against the ORG endpoint for the active shared org.
 // Mirrors the personal cycle. As of rung 3 the org-shared set is nodes, widgets,
 // time blocks, documents, tables and rows, so every surface the personal loop
@@ -222,9 +326,12 @@ async function syncOrgWorkspaceOnce(token: string, orgId: string): Promise<numbe
   // ── Push local changes ──
   const pending = await window.api.workspaceSync.pendingOrg(orgId)
   for (const u of pending.upserts) {
-    const res = await putItemOrg(token, orgId, u.id, u.itemType, u.body, u.baseRev)
-    if (res.ok) await window.api.workspaceSync.markPushed(u.itemType, u.id, res.rev)
-    else if (res.conflict) {
+    const res = await putItemOrg(token, orgId, u.id, u.itemType, u.body, u.baseRev, u.teamId)
+    if (res.ok) {
+      await window.api.workspaceSync.markPushed(u.itemType, u.id, res.rev)
+      // A file's metadata is now on the server; make sure its bytes are too.
+      if (u.itemType === 'file') await ensureOrgBlobUploaded(token, orgId, u.id, u.body)
+    } else if (res.conflict) {
       // Server is newer: take its copy (last-write-wins, server wins).
       await window.api.workspaceSync.applyRemoteOrg(
         [
@@ -233,16 +340,22 @@ async function syncOrgWorkspaceOnce(token: string, orgId: string): Promise<numbe
             itemType: res.item.itemType,
             body: res.item.body,
             rev: res.item.rev,
-            deleted: res.item.deleted
+            deleted: res.item.deleted,
+            teamId: res.item.teamId
           }
         ],
         orgId
       )
+      if (res.item.itemType === 'file') await fetchMissingOrgBlobs(token, orgId, [res.item])
     }
   }
   for (const d of pending.deletes) {
     const res = await deleteItemOrg(token, orgId, d.id)
-    if (res.ok) await window.api.workspaceSync.markPushed(d.itemType, d.id, res.rev || d.baseRev)
+    if (res.ok) {
+      await window.api.workspaceSync.markPushed(d.itemType, d.id, res.rev || d.baseRev)
+      // Reclaim the server blob when a file is tombstoned (best-effort).
+      if (d.itemType === 'file') await deleteOrgBlob(token, orgId, d.id)
+    }
   }
 
   // ── Pull remote changes ──
@@ -257,6 +370,9 @@ async function syncOrgWorkspaceOnce(token: string, orgId: string): Promise<numbe
   if (pulled.items.length > 0) {
     const r = await window.api.workspaceSync.applyRemoteOrg(pulled.items, orgId)
     applied = r.applied
+    // Metadata for pulled files has landed; fetch the bytes for any we don't have
+    // yet so the file opens and the brain can read it on the next ingest.
+    await fetchMissingOrgBlobs(token, orgId, pulled.items)
   }
   await window.api.workspaceSync.setCursorOrg(orgId, pulled.now)
 
@@ -278,6 +394,11 @@ async function syncOrgWorkspaceOnce(token: string, orgId: string): Promise<numbe
     await useTimeBlockStore.getState().reload()
     await useDocumentsStore.getState().refresh().catch(() => {})
     await refreshCachedTables()
+    // Refresh the Drive view when files/folders were among the pulled items, so a
+    // teammate's file appears without reopening the manager.
+    if (pulled.items.some((it) => it.itemType === 'file')) {
+      await useFileManagerStore.getState().refresh().catch(() => {})
+    }
   }
   return applied
 }
@@ -439,6 +560,10 @@ export function startWorkspaceSync(): void {
   initPreviewGuard()
   if (timer != null) return
   setOrgWorkspaceChangedHandler(onOrgWorkspaceChanged)
+  // Local edits nudge an immediate (debounced) push so a change reaches teammates
+  // in ~1-2s instead of waiting up to a full poll interval. The interval below
+  // stays as the backstop.
+  registerSyncNudge(() => void syncWorkspaceOnce())
   void syncWorkspaceOnce()
   timer = window.setInterval(() => void syncWorkspaceOnce(), SYNC_INTERVAL_MS)
 }
@@ -446,6 +571,7 @@ export function startWorkspaceSync(): void {
 export function stopWorkspaceSync(): void {
   useSyncStatus.getState().setDisabled()
   setOrgWorkspaceChangedHandler(null)
+  registerSyncNudge(null)
   if (pushDebounce != null) {
     window.clearTimeout(pushDebounce)
     pushDebounce = null

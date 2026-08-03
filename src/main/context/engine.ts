@@ -15,7 +15,10 @@ import { createDecisionStore, type DecisionStore } from '../db/decisionStore'
 import { graphFromRelationships } from './propagation'
 import { buildTransitions } from './contextHealthService'
 import type { DecisionAtRisk } from '../../shared/contextHealth'
-import type { MaterialityInput } from './materiality'
+import type { MaterialityInput, DecisionImpact } from './materiality'
+import type { Decision, ActorRef } from '../../shared/decision'
+import { plexiId } from '../../shared/plexiId'
+import { listAllLinks } from '../db/widgetLinks'
 import { deriveHealthSnapshot, ensureReviewSchema, recordReview, reviewPointSeq, type HealthSnapshot } from './health'
 import { generateResume } from '../resume/resume'
 import { createSummaryCache, type SummaryCache } from '../ai/summaryCache'
@@ -95,7 +98,12 @@ export function emitObjectEvent(input: Omit<AppendInput, 'organisationId' | 'act
 // Mirror a user-created desk relation into the knowledge graph as a CONFIRMED
 // RelatedTo edge (the user linked them, so it is confirmed, not provisional —
 // PLX-PRD-051). Idempotent against an existing active edge. Non-fatal on failure.
-export function mirrorUserRelation(a: string, b: string, correlationId: string): void {
+export function mirrorUserRelation(
+  a: string,
+  b: string,
+  correlationId: string,
+  excerpt = 'user linked these'
+): void {
   if (!a || !b || a === b) return
   try {
     const e = getContextEngine()
@@ -111,7 +119,7 @@ export function mirrorUserRelation(a: string, b: string, correlationId: string):
       directed: false,
       strength: 0.8,
       confidence: 1,
-      evidence: [{ kind: 'event', ref: correlationId, excerpt: 'user linked these desks', weight: 1 }],
+      evidence: [{ kind: 'event', ref: correlationId, excerpt, weight: 1 }],
       discoveryMethod: 'user',
       correlationId,
       confirmedBy: actor
@@ -136,6 +144,19 @@ export function unmirrorUserRelation(a: string, b: string): void {
   }
 }
 
+// One-time-ish backfill: mirror every existing widget link into the relationship
+// graph, so connections drawn before links began mirroring still surface as
+// related. Idempotent (mirrorUserRelation no-ops on an existing edge) and non-fatal.
+export function backfillWidgetLinkRelations(): void {
+  try {
+    for (const l of listAllLinks()) {
+      mirrorUserRelation(l.sourceWidgetId, l.targetWidgetId, l.id, 'user linked these widgets')
+    }
+  } catch (err) {
+    console.warn('[context-engine] widget-link relation backfill failed (non-fatal):', (err as Error).message)
+  }
+}
+
 // The confirmed neighbours of an Object — "surfaces with relations", read live.
 export function relatedObjectIds(objectId: string): string[] {
   try {
@@ -143,6 +164,72 @@ export function relatedObjectIds(objectId: string): string[] {
     return e.relationships.activeFor(objectId).map((r) => (r.sourceEntityId === objectId ? r.targetEntityId : r.sourceEntityId))
   } catch {
     return []
+  }
+}
+
+export interface FlagDecisionInput {
+  title: string
+  decisionStatement?: string
+  relatedObjectIds?: string[]
+  affectedDeskIds?: string[]
+}
+
+// Create a human-owned Decision (PLX-DOM-040) that references the given Objects and
+// Desks, so a later material change to a linked Object raises Decision Risk against
+// it (the red widget frame / desk decisions-at-risk). The owner is always the local
+// human principal; an agent can never own a Decision.
+export function createDecision(input: FlagDecisionInput): Decision {
+  const e = getContextEngine()
+  const email = loadAccountState().cachedEmail
+  const owner: ActorRef = { kind: 'user', id: localUserId(), displayName: email ?? undefined }
+  return e.decisions.create({
+    organisationId: getActiveOrgId() || 'local',
+    title: input.title,
+    decisionStatement: input.decisionStatement?.trim() || input.title,
+    decisionOwner: owner,
+    relatedObjectIds: input.relatedObjectIds ?? [],
+    affectedDeskIds: input.affectedDeskIds ?? [],
+    correlationId: plexiId()
+  })
+}
+
+// Cancel a Decision (supersede with no successor), so it no longer puts any Object
+// at risk. Used to undo a "flag as a decision". Human actor, emits DecisionSuperseded.
+export function cancelDecision(id: string): void {
+  const e = getContextEngine()
+  const email = loadAccountState().cachedEmail
+  const owner: ActorRef = { kind: 'user', id: localUserId(), displayName: email ?? undefined }
+  e.decisions.supersede(id, null, owner, e.events, new Date().toISOString())
+}
+
+// All Decisions for the active org (live + superseded), newest-first as stored.
+export function listDecisions(): Decision[] {
+  try {
+    return getContextEngine().decisions.all()
+  } catch {
+    return []
+  }
+}
+
+// Live Decisions that reference an Object — what puts that Object at decision risk.
+export function decisionsForObject(objectId: string): Decision[] {
+  return listDecisions().filter(
+    (d) => d.state !== 'superseded' && d.state !== 'cancelled' && d.relatedObjectIds.includes(objectId)
+  )
+}
+
+// Whether any live Decision references this Object, expressed as a materiality
+// DecisionImpact. Used so a change to an Object a Decision depends on scores as
+// material and can escalate to decision-risk (Context Health state machine).
+export function decisionImpactForObject(objectId: string): DecisionImpact {
+  try {
+    const e = getContextEngine()
+    const referenced = e.decisions
+      .all()
+      .some((d) => d.state !== 'superseded' && d.state !== 'cancelled' && d.relatedObjectIds.includes(objectId))
+    return referenced ? 'high' : 'none'
+  } catch {
+    return 'none'
   }
 }
 

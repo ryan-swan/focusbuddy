@@ -15,7 +15,7 @@
 //      reason-aware tooltip, while the Docs tile stays a normal, clickable tile.
 
 import { test, expect, type Page } from '@playwright/test'
-import { launchApp, waitForReady, type LaunchedApp } from './_helpers'
+import { launchApp, waitForReady, type LaunchedApp, hoverToolbar } from './_helpers'
 import { CAPABILITY_DEFAULTS, type CapabilityValue } from '../../src/renderer/src/lib/capabilityDefaults'
 
 let launched: LaunchedApp | null = null
@@ -152,7 +152,11 @@ test('GUARDRAIL — with product_office OFF, a Note widget can still be added to
 
   const before = await window.evaluate(() => document.querySelectorAll('[data-widget-id]').length)
 
+  await hoverToolbar(window) // the toolbar only mounts the palette while hovered
   await window.locator('[data-testid="palette-add-button"]').first().click()
+  // Note is an Advanced tile now — expand the Advanced section to reach it.
+  await window.locator('[data-testid="palette-advanced-toggle"]').first().click().catch(() => {})
+  await window.waitForTimeout(150)
   const addNote = window.locator('[data-testid="palette-add-note"]').first()
   await expect(addNote, 'Note widget must be creatable with Office off').toBeVisible()
   await addNote.click()

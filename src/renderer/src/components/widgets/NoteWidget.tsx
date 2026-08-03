@@ -113,7 +113,7 @@ export default function NoteWidget({ widget, inline = false }: Props): JSX.Eleme
   const rendered = (
     <div
       className={`fb-note-rendered w-full h-full whitespace-pre-wrap text-[var(--ink-100)] leading-relaxed font-serif cursor-text ${
-        inline ? 'text-base' : 'text-sm'
+        'fb-body'
       }`}
       onClick={enterEdit}
     >
@@ -177,7 +177,7 @@ export default function NoteWidget({ widget, inline = false }: Props): JSX.Eleme
         setCtxMenu({ x: e.clientX, y: e.clientY, selectionText: sel })
       }}
       className={`w-full h-full resize-none bg-transparent text-[var(--ink-100)] leading-relaxed focus:outline-none placeholder:text-[var(--ink-50)]/40 font-serif ${
-        inline ? 'text-base' : 'text-sm'
+        'fb-body'
       }`}
     />
   )

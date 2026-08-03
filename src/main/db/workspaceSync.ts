@@ -8,22 +8,32 @@ import { PERSONAL_ORG_ID } from './activeOrg'
 // dirty state in needs_sync (set by the DB triggers in database.ts on any content
 // write, cleared here after a push or an applied pull).
 
-type SyncTable = 'nodes' | 'widgets' | 'time_blocks' | 'documents' | 'fb_tables' | 'fb_rows'
-type ItemType = 'node' | 'widget' | 'timeblock' | 'document' | 'table' | 'row'
+type SyncTable = 'nodes' | 'widgets' | 'time_blocks' | 'documents' | 'fb_tables' | 'fb_rows' | 'fb_files'
+type ItemType = 'node' | 'widget' | 'timeblock' | 'document' | 'table' | 'row' | 'file'
 const TABLE: Record<ItemType, SyncTable> = {
   node: 'nodes',
   widget: 'widgets',
   timeblock: 'time_blocks',
   document: 'documents',
   table: 'fb_tables',
-  row: 'fb_rows'
+  row: 'fb_rows',
+  file: 'fb_files'
 }
+
+// fb_files rows that are pointers to internal documents (kind 'doc') are NOT
+// synced here — the document itself already travels as a 'document' item, and
+// syncing the pointer would race the document and churn the Drive tree. Only real
+// files and folders cross members over the org loop.
+const SYNCED_FILE_KINDS = "('file','folder')"
 
 export interface PendingUpsert {
   id: string
   itemType: ItemType
   body: Record<string, unknown>
   baseRev: number
+  // Group scope carried alongside the body (not inside it): null/undefined = whole
+  // org, a team id = that group only. widgets/rows inherit their parent's team.
+  teamId?: string | null
 }
 export interface PendingDelete {
   id: string
@@ -36,10 +46,13 @@ export interface RemoteItem {
   body: Record<string, unknown> | null
   rev: number
   deleted: boolean
+  teamId?: string | null
 }
 
-// Columns we never round-trip through the server body (local-only sync bookkeeping).
-const SYNC_COLS = new Set(['sync_rev', 'needs_sync'])
+// Columns we never round-trip through the server body (local-only sync bookkeeping,
+// plus team_id which travels as its own scope field, and the __team_id alias the
+// widget/row joins use to carry the parent's team).
+const SYNC_COLS = new Set(['sync_rev', 'needs_sync', 'team_id', '__team_id'])
 
 function tableCols(table: SyncTable): string[] {
   const db = getDb()
@@ -179,8 +192,12 @@ export function collectPendingOrg(orgId: string): {
   const pushRow = (row: Record<string, unknown>, itemType: ItemType): void => {
     const id = String(row.id)
     const baseRev = Number(row.sync_rev) || 0
+    // Group scope: direct types carry team_id; widgets/rows inherit it from their
+    // parent via the __team_id alias in the join below. Tagging every item at push
+    // time means a team-shared object is never pushed org-wide first (no leak window).
+    const teamId = (row.team_id ?? row.__team_id ?? null) as string | null
     if (row.trashed_at != null) deletes.push({ id, itemType, baseRev })
-    else upserts.push({ id, itemType, body: bodyFromRow(row), baseRev })
+    else upserts.push({ id, itemType, body: bodyFromRow(row), baseRev, teamId })
   }
 
   // Types that carry org_id directly: filter by the column.
@@ -202,7 +219,7 @@ export function collectPendingOrg(orgId: string): {
   // the mirror of the personal collectPending widget filter.
   const widgetRows = db
     .prepare(
-      `SELECT w.* FROM widgets w
+      `SELECT w.*, n.team_id AS __team_id FROM widgets w
        JOIN nodes n ON w.task_id = n.id
        WHERE w.needs_sync = 1 AND n.org_id = ?`
     )
@@ -213,12 +230,20 @@ export function collectPendingOrg(orgId: string): {
   // table's org. The row body still includes table_id for reattachment.
   const rows = db
     .prepare(
-      `SELECT r.* FROM fb_rows r
+      `SELECT r.*, t.team_id AS __team_id FROM fb_rows r
        JOIN fb_tables t ON r.table_id = t.id
        WHERE r.needs_sync = 1 AND t.org_id = ?`
     )
     .all(orgId) as Array<Record<string, unknown>>
   for (const row of rows) pushRow(row, 'row')
+
+  // Drive files + folders (fb_files carries org_id directly). Doc-pointer rows are
+  // excluded (their document syncs as a 'document'); a file's bytes are uploaded
+  // separately by the renderer after its metadata pushes.
+  const fileRows = db
+    .prepare(`SELECT * FROM fb_files WHERE needs_sync = 1 AND org_id = ? AND kind IN ${SYNCED_FILE_KINDS}`)
+    .all(orgId) as Array<Record<string, unknown>>
+  for (const row of fileRows) pushRow(row, 'file')
 
   return { upserts, deletes }
 }
@@ -327,45 +352,57 @@ export function applyRemote(items: RemoteItem[]): { applied: number } {
 export function orderOrgItemsForApply(items: RemoteItem[]): RemoteItem[] {
   const rank = (t: ItemType): number => (t === 'node' ? 0 : t === 'widget' ? 1 : t === 'row' ? 2 : 0)
   const ordered = [...items].sort((a, b) => rank(a.itemType) - rank(b.itemType))
-  const nodeIdx: number[] = []
+  // Self-referential types carry a parent_id into the SAME table, so within their
+  // rank slots each parent must be emitted before its children in a single pass:
+  // nodes (parent_id -> nodes.id, a Room before a Desk nested in it) and Drive
+  // files/folders (fb_files.parent_id -> fb_files.id, a folder before its files).
+  // A file's parent is never a node, so the two groups sort independently.
+  topoSortSelfReferential(ordered, 'node')
+  topoSortSelfReferential(ordered, 'file')
+  return ordered
+}
+
+// Reorder just the items of `itemType` so a parent (by body.parent_id, referencing
+// the same table) always precedes its children, leaving every other item exactly
+// where rank placed it. Pure over the batch; a node/file whose parent is not in the
+// batch keeps its slot (the parent is already in the DB, or a genuine orphan the
+// per-row retry handles).
+function topoSortSelfReferential(ordered: RemoteItem[], itemType: ItemType): void {
+  const slots: number[] = []
   const idToPos = new Map<string, number>()
   ordered.forEach((it, i) => {
-    if (it.itemType !== 'node') return
-    nodeIdx.push(i)
+    if (it.itemType !== itemType) return
+    slots.push(i)
     if (typeof it.id === 'string') idToPos.set(it.id, i)
   })
-  if (nodeIdx.length > 1) {
-    const parentOf = (i: number): string | null => {
-      const b = ordered[i].body as Record<string, unknown> | null | undefined
-      const p = b && typeof b === 'object' ? b['parent_id'] : null
-      return typeof p === 'string' ? p : null
-    }
-    const emitted = new Set<number>()
-    const out: number[] = []
-    const visit = (i: number, stack: Set<number>): void => {
-      if (emitted.has(i) || stack.has(i)) return
-      stack.add(i)
-      const p = parentOf(i)
-      if (p != null) {
-        const pi = idToPos.get(p)
-        if (pi != null && pi !== i) visit(pi, stack)
-      }
-      stack.delete(i)
-      if (!emitted.has(i)) {
-        emitted.add(i)
-        out.push(i)
-      }
-    }
-    for (const i of nodeIdx) visit(i, new Set())
-    // Splice the topologically ordered node items back into the node slots, leaving
-    // every non-node item exactly where rank placed it. Snapshot the reordered
-    // items before writing so an overwritten slot is never read back.
-    const reordered = out.map((i) => ordered[i])
-    nodeIdx.forEach((slot, k) => {
-      ordered[slot] = reordered[k]
-    })
+  if (slots.length <= 1) return
+  const parentOf = (i: number): string | null => {
+    const b = ordered[i].body as Record<string, unknown> | null | undefined
+    const p = b && typeof b === 'object' ? b['parent_id'] : null
+    return typeof p === 'string' ? p : null
   }
-  return ordered
+  const emitted = new Set<number>()
+  const out: number[] = []
+  const visit = (i: number, stack: Set<number>): void => {
+    if (emitted.has(i) || stack.has(i)) return
+    stack.add(i)
+    const p = parentOf(i)
+    if (p != null) {
+      const pi = idToPos.get(p)
+      if (pi != null && pi !== i) visit(pi, stack)
+    }
+    stack.delete(i)
+    if (!emitted.has(i)) {
+      emitted.add(i)
+      out.push(i)
+    }
+  }
+  for (const i of slots) visit(i, new Set())
+  // Snapshot the reordered items before writing so an overwritten slot is never read back.
+  const reordered = out.map((i) => ordered[i])
+  slots.forEach((slot, k) => {
+    ordered[slot] = reordered[k]
+  })
 }
 
 export function applyRemoteOrg(items: RemoteItem[], orgId: string): { applied: number } {
@@ -405,10 +442,16 @@ export function applyRemoteOrg(items: RemoteItem[], orgId: string): { applied: n
       // the row lands in the right bucket. fb_rows has no org_id, so skip it.
       const hasOrgIdCol = cols.includes('org_id')
       if (hasOrgIdCol) params.org_id = orgId
+      // Stamp the group scope on types that have a team_id column (nodes/documents/
+      // files/tables), so a receiver who later edits the object re-pushes it under
+      // the same team. widgets/rows have no column — they re-derive from their parent.
+      const hasTeamIdCol = cols.includes('team_id')
+      if (hasTeamIdCol) params.team_id = item.teamId ?? null
       params.sync_rev = item.rev
       params.needs_sync = 0
       const allCols = [...present]
       if (hasOrgIdCol && !allCols.includes('org_id')) allCols.push('org_id')
+      if (hasTeamIdCol && !allCols.includes('team_id')) allCols.push('team_id')
       allCols.push('sync_rev', 'needs_sync')
       const insertList = allCols.join(', ')
       const valueList = allCols.map((c) => `@${c}`).join(', ')

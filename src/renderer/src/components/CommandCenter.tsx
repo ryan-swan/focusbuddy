@@ -6,7 +6,7 @@ import { useRelatedDesksStore } from '../stores/relatedDesks'
 import { useViewStore } from '../stores/view'
 import { useWidgetStore } from '../stores/widgets'
 import type { WidgetKind, SearchHit } from '@shared/types'
-import { WIDGET_CATALOG } from '../lib/widgetCatalog'
+import { WIDGET_CATALOG, isAdvancedKind } from '../lib/widgetCatalog'
 import { getNavPrefs, setNavPrefs } from '../lib/navPrefs'
 import Icon from './Icon'
 import { useCapabilityEnabled, useCapabilityStore } from '../stores/capabilities'
@@ -17,6 +17,7 @@ import { useEditorCommandStore } from '../stores/editorCommands'
 import { useDocumentsStore } from '../stores/documents'
 import { useQuickCreate } from '../stores/quickCreate'
 import { recencyRank } from '../lib/viewRecency'
+import { createShowcaseDesk } from '../lib/createShowcaseDesk'
 
 interface Props {
   onOpenBodyDouble: () => void
@@ -253,6 +254,30 @@ export default function CommandCenter({
       run: () => {
         closePalette()
         window.dispatchEvent(new CustomEvent('fb:onboarding-hub'))
+      }
+    })
+    items.push({
+      id: 'create-showcase',
+      label: 'Create Wire & Agent Showcase desk',
+      hint: '10 worked connect + agent examples',
+      icon: 'bolt',
+      kind: 'action',
+      score: matchScore('wire agent showcase demo connections automation examples sample desk transform', q),
+      run: () => {
+        closePalette()
+        void createShowcaseDesk()
+      }
+    })
+    items.push({
+      id: 'sync-brain',
+      label: 'Sync workspace to Brain',
+      hint: 'Index every desk, document & file',
+      icon: 'hub',
+      kind: 'action',
+      score: matchScore('sync workspace brain knowledge index ingest everything drive documents files graph', q),
+      run: () => {
+        closePalette()
+        void window.api.brain.ingestWorkspace().then(() => goPlexiBrain())
       }
     })
     // Relate this desk to others so the brain reads them together. Only when a
@@ -524,6 +549,10 @@ export default function CommandCenter({
       // is shown in the row and works directly on the canvas.
       for (const entry of WIDGET_CATALOG) {
         if (entry.hideFromPicker) continue
+        // Match the picker's core/Advanced tiering: at an empty query only the
+        // CORE kinds show, keeping the default palette uncluttered; Advanced kinds
+        // stay fully reachable the moment the user types (scored below).
+        if (q === '' && isAdvancedKind(entry.kind)) continue
         const sc = effectiveQuickAddMap()[entry.kind]
         items.push({
           id: `add-${entry.kind}`,

@@ -15,9 +15,13 @@ test.afterEach(async () => {
 })
 
 async function openBrain(window: LaunchedApp['window']): Promise<void> {
-  // Click the PlexiBrain sidebar entry (neurology icon, label "PlexiBrain").
-  const btn = window.locator('button').filter({ hasText: 'PlexiBrain' }).first()
-  await btn.click()
+  // Reaching the knowledge view is two clicks. First the Brain entry in the
+  // always-visible sidebar segment switcher (labelled "Brain", kind
+  // 'plexibrain'; the testid is the stable handle, not the visible text) — that
+  // lands on the Brain segment's app-tile home, not the knowledge view. Then the
+  // "Ask Brain" app tile, which renders KnowledgeView ([data-testid="plexibrain-view"]).
+  await window.locator('[data-testid="switch-plexibrain"]').first().click()
+  await window.locator('[data-testid="segment-app-ask"]').first().click()
   await window.waitForSelector('[data-testid="plexibrain-view"]', { timeout: 8_000 })
 }
 
@@ -221,9 +225,9 @@ test('6 — PlexiBrain shows as ready in the PlexiSuite launcher (full colour, n
   const { window } = launched
   await waitForReady(window)
 
-  // Open PlexiSuite home.
-  const suiteBtn = window.locator('button').filter({ hasText: 'PlexiSuite' }).first()
-  await suiteBtn.click()
+  // A fresh launch uses an isolated userData dir with no saved view, so the app
+  // boots straight onto the PlexiSuite home (view store defaults to kind:'suite').
+  // No navigation click needed — just confirm we're there.
   await window.waitForSelector('[data-testid="plexisuite-home"]', { timeout: 8_000 })
 
   // PlexiBrain tile.

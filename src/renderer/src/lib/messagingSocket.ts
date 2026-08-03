@@ -1,5 +1,6 @@
 import { signalConfig } from './signalConfig'
 import type { ChatMessage } from './messagingClient'
+import { useWidgetStore } from '../stores/widgets'
 
 // A persistent, authenticated WebSocket for real-time message delivery. Opened
 // once the user is signed in; authenticates with the account session token so
@@ -311,6 +312,24 @@ function open(): void {
     ) {
       // PlexiMeet multi-party room signaling → the meeting store.
       onMeetingCb?.({ type: msg.type, payload: msg.payload } as MeetingSocketEvent)
+    } else if (msg.type === 'webhookReceived') {
+      // An external POST hit one of this account's inbound-hook URLs; the server
+      // relayed the opaque payload. Land it in the target widget's lastPayload
+      // (preserving its { hookId, url } config) so wires drawn OUT of it fire.
+      const p = msg.payload as { targetKind?: string; targetId?: string; payload?: string }
+      if (p?.targetKind === 'widget' && p.targetId) {
+        const store = useWidgetStore.getState()
+        const w = store.widgets.find((x) => x.id === p.targetId)
+        if (w && w.kind === 'inbound-hook') {
+          let cfg: Record<string, unknown> = {}
+          try {
+            cfg = JSON.parse(w.content || '{}')
+          } catch {
+            cfg = {}
+          }
+          void store.update(p.targetId, { content: JSON.stringify({ ...cfg, lastPayload: p.payload ?? '' }) })
+        }
+      }
     } else if (msg.type === 'authenticated') {
       // Socket is live again (initial connect or after a reconnect) — let the
       // Yjs provider re-join its room and presence re-announce itself.

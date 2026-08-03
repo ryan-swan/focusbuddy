@@ -681,7 +681,11 @@ function FocusModeInner(): JSX.Element | null {
     <div
       ref={overlayRef}
       tabIndex={-1}
-      className="fixed inset-0 z-50 flex flex-col bg-stone-900/50 backdrop-blur-md outline-none"
+      // z-[90]: a full-screen focus takeover must sit above the desk Columns
+      // overlay (z-[60]) so focusing an object from column mode shows the pane
+      // rather than staying hidden behind the columns; still below the dialog /
+      // popover layer (z-100+). Was z-50 (fine on the canvas, too low for columns).
+      className="fixed inset-0 z-[90] flex flex-col bg-stone-900/50 backdrop-blur-md outline-none"
       data-testid="widget-focus-mode"
       onMouseDown={onOverlayMouseDown}
       onWheel={onWheelNav}

@@ -4,6 +4,7 @@ import {
   CATEGORIES,
   DRAG_MIME,
   entriesByCategory,
+  isAdvancedKind,
   type WidgetCatalogEntry
 } from '../lib/widgetCatalog'
 import { canCreateWidget } from '../lib/gating'
@@ -41,6 +42,9 @@ export default function WidgetPalette({
 }: Props): JSX.Element {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
+  // The picker shows a small CORE set by default; the rest live behind this
+  // expander so a first-run user isn't faced with the whole catalog at once.
+  const [showAdvanced, setShowAdvanced] = useState(false)
   const buttonRef = useRef<HTMLButtonElement | null>(null)
   const popoverRef = useRef<HTMLDivElement | null>(null)
   const searchRef = useRef<HTMLInputElement | null>(null)
@@ -98,6 +102,7 @@ export default function WidgetPalette({
   useEffect(() => {
     if (!open) {
       setQuery('')
+      setShowAdvanced(false)
       return
     }
     const id = window.setTimeout(() => searchRef.current?.focus(), 20)
@@ -118,6 +123,52 @@ export default function WidgetPalette({
   // resolves falsy for this user renders locked + opens the upgrade prompt
   // instead of creating. This is what makes the matrix gate the app.
   const caps = useCapabilityStore((s) => s.capabilities)
+
+  // One catalog tile (locked -> upgrade prompt, else add/drag). Shared by the core
+  // grid, the Advanced grid and the search results so they stay identical.
+  function renderEntry(entry: WidgetCatalogEntry): JSX.Element {
+    const locked = !canCreateWidget(caps, entry.kind)
+    if (locked) {
+      return (
+        <button
+          key={entry.kind}
+          title={`${entry.label} is a Pro feature — click to upgrade`}
+          onClick={() => {
+            promptUpgrade(`The ${entry.label} widget is a Pro feature.`)
+            setOpen(false)
+          }}
+          className="relative flex flex-col items-center gap-1 px-2 py-2 rounded-md border border-[var(--edge-soft)] bg-[var(--surface-sunken)] text-[var(--ink-40)] text-[10px] leading-tight cursor-pointer transition-colors hover:border-accent/40"
+          data-testid={`palette-locked-${entry.kind}`}
+        >
+          <span className="absolute top-1 right-1 text-accent">
+            <Icon name="lock" size={10} />
+          </span>
+          <Icon name={entry.icon} size={18} className="opacity-50" />
+          <span className="font-medium text-center opacity-70">{entry.label}</span>
+        </button>
+      )
+    }
+    return (
+      <button
+        key={entry.kind}
+        title={entry.hint}
+        draggable
+        onClick={() => {
+          onAdd(entry)
+          setOpen(false)
+        }}
+        onDragStart={(e) => {
+          e.dataTransfer.setData(DRAG_MIME, entry.kind)
+          e.dataTransfer.effectAllowed = 'copy'
+        }}
+        className="flex flex-col items-center gap-1 px-2 py-2 rounded-md border border-[var(--edge-soft)] bg-[var(--surface-raised)] hover:border-accent hover:bg-accent/5 dark:hover:bg-accent/10 text-[var(--ink-70)] text-[10px] leading-tight cursor-grab active:cursor-grabbing transition-colors"
+        data-testid={`palette-add-${entry.kind}`}
+      >
+        <Icon name={entry.icon} size={18} className="text-[var(--ink-70)]" />
+        <span className="font-medium text-center">{entry.label}</span>
+      </button>
+    )
+  }
 
   return (
     <>
@@ -200,62 +251,60 @@ export default function WidgetPalette({
             </div>
           </div>
           <div className="p-3 flex flex-col gap-3">
+            {/* Category sections. When searching, every match (core + advanced)
+                shows. Otherwise the default view shows only the CORE set per
+                category, with the rest tucked under the Advanced expander below. */}
             {CATEGORIES.map((cat) => {
-              const items = grouped[cat].filter(matches)
+              const items = grouped[cat].filter(
+                (entry) => matches(entry) && (q ? true : !isAdvancedKind(entry.kind))
+              )
               if (items.length === 0) return null
               return (
                 <div key={cat}>
                   <div className="text-[9px] uppercase tracking-[0.14em] text-[var(--ink-50)] font-semibold mb-1.5">
                     {cat}
                   </div>
-                  <div className="grid grid-cols-3 gap-1.5">
-                    {items.map((entry) => {
-                      const locked = !canCreateWidget(caps, entry.kind)
-                      if (locked) {
-                        return (
-                          <button
-                            key={entry.kind}
-                            title={`${entry.label} is a Pro feature — click to upgrade`}
-                            onClick={() => {
-                              promptUpgrade(`The ${entry.label} widget is a Pro feature.`)
-                              setOpen(false)
-                            }}
-                            className="relative flex flex-col items-center gap-1 px-2 py-2 rounded-md border border-[var(--edge-soft)] bg-[var(--surface-sunken)] text-[var(--ink-40)] text-[10px] leading-tight cursor-pointer transition-colors hover:border-accent/40"
-                            data-testid={`palette-locked-${entry.kind}`}
-                          >
-                            <span className="absolute top-1 right-1 text-accent">
-                              <Icon name="lock" size={10} />
-                            </span>
-                            <Icon name={entry.icon} size={18} className="opacity-50" />
-                            <span className="font-medium text-center opacity-70">{entry.label}</span>
-                          </button>
-                        )
-                      }
-                      return (
-                        <button
-                          key={entry.kind}
-                          title={entry.hint}
-                          draggable
-                          onClick={() => {
-                            onAdd(entry)
-                            setOpen(false)
-                          }}
-                          onDragStart={(e) => {
-                            e.dataTransfer.setData(DRAG_MIME, entry.kind)
-                            e.dataTransfer.effectAllowed = 'copy'
-                          }}
-                          className="flex flex-col items-center gap-1 px-2 py-2 rounded-md border border-[var(--edge-soft)] bg-[var(--surface-raised)] hover:border-accent hover:bg-accent/5 dark:hover:bg-accent/10 text-[var(--ink-70)] text-[10px] leading-tight cursor-grab active:cursor-grabbing transition-colors"
-                          data-testid={`palette-add-${entry.kind}`}
-                        >
-                          <Icon name={entry.icon} size={18} className="text-[var(--ink-70)]" />
-                          <span className="font-medium text-center">{entry.label}</span>
-                        </button>
-                      )
-                    })}
-                  </div>
+                  <div className="grid grid-cols-3 gap-1.5">{items.map(renderEntry)}</div>
                 </div>
               )
             })}
+
+            {/* Advanced expander — only in the default (non-search) view, and only
+                when advanced widgets exist. Keeps the first-run surface small while
+                every widget stays one tap away (nothing is removed). */}
+            {!q && CATEGORIES.some((c) => grouped[c].some((e) => isAdvancedKind(e.kind))) && (
+              <div className="border-t border-[var(--edge-soft)] pt-2">
+                <button
+                  onClick={() => setShowAdvanced((v) => !v)}
+                  className="w-full flex items-center gap-1.5 text-[9px] uppercase tracking-[0.14em] text-[var(--ink-50)] font-semibold hover:text-[var(--ink-80)]"
+                  data-testid="palette-advanced-toggle"
+                  aria-expanded={showAdvanced}
+                >
+                  <Icon name={showAdvanced ? 'expand_more' : 'chevron_right'} size={14} />
+                  <span>Advanced</span>
+                  <span className="ml-auto normal-case tracking-normal text-[var(--ink-40)] font-normal">
+                    {showAdvanced ? 'hide' : 'more objects'}
+                  </span>
+                </button>
+                {showAdvanced && (
+                  <div className="mt-2 flex flex-col gap-3" data-testid="palette-advanced-section">
+                    {CATEGORIES.map((cat) => {
+                      const items = grouped[cat].filter((e) => isAdvancedKind(e.kind))
+                      if (items.length === 0) return null
+                      return (
+                        <div key={cat}>
+                          <div className="text-[9px] uppercase tracking-[0.14em] text-[var(--ink-50)] font-semibold mb-1.5">
+                            {cat}
+                          </div>
+                          <div className="grid grid-cols-3 gap-1.5">{items.map(renderEntry)}</div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+
             {q && !CATEGORIES.some((c) => grouped[c].some(matches)) && (
               <div className="text-[12px] text-[var(--ink-50)] text-center py-4" data-testid="palette-no-results">
                 No widgets or objects match “{query}”.

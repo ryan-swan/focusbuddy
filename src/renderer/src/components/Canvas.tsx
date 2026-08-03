@@ -46,6 +46,7 @@ import '../lib/contextMenu'
 import FloatingToolbar, { type ToolbarAction } from './FloatingToolbar'
 import MinimapWidget from './widgets/MinimapWidget'
 import CanvasMinimapFAB from './CanvasMinimapFAB'
+import AutomationsFAB from './AutomationsFAB'
 import DeskSuggestionChip from './DeskSuggestionChip'
 import DeskGallery from './DeskGallery'
 import ColumnsView from './ColumnsView'
@@ -58,6 +59,8 @@ import ShapeWidget from './widgets/ShapeWidget'
 import CardWidget from './widgets/CardWidget'
 import CustomBlockWidget from './widgets/CustomBlockWidget'
 import AgentWidget from './widgets/AgentWidget'
+import WebhookWidget from './widgets/WebhookWidget'
+import InboundHookWidget from './widgets/InboundHookWidget'
 import PortalWidget from './widgets/PortalWidget'
 import ZoomControls from './ZoomControls'
 import CanvasEdgeIndicators from './CanvasEdgeIndicators'
@@ -118,9 +121,15 @@ import {
   AI_RAIL_WIDTH,
   useAIRailCollapsed
 } from '../lib/chromeState'
-import LinkOverlay from './LinkOverlay'
+import LinkOverlay, { type PendingLinkPick } from './LinkOverlay'
+import { tidyPositions, type TidyOptions } from '../lib/autoArrange'
 import { useLinksStore } from '../stores/links'
+import { useAccountStore } from '../stores/account'
+import { currentDeviceClass } from '../lib/deviceClass'
+import { serializeOverlayObjects } from '../lib/deskLayoutOverlay'
+import { useContextHealthStore } from '../stores/contextHealth'
 import { LinkDragContext } from '../lib/linkDragContext'
+import { computeVisibleObjectIds, type VirtualizationBox } from '../lib/canvasVirtualization'
 import type {
   ContextMenuPayload,
   SectionLayout,
@@ -147,6 +156,9 @@ const CATEGORY_COLOR: Record<WidgetCategory, string> = {
   Layout: '#737373'
 }
 
+// Stable empty overlay-objects reference so the layout-save effect does not
+// re-arm while a Desk is not opted into per-device layout (PLX-APP-010 Phase 2).
+const EMPTY_OVERLAY_OBJECTS: never[] = []
 const WEB_KINDS: WidgetKind[] = ['webview', 'pdf', 'gdoc', 'gsheet', 'gslide', 'email']
 const isWebKind = (k: WidgetKind): boolean => WEB_KINDS.includes(k)
 
@@ -210,6 +222,10 @@ function renderWidget(w: Widget): JSX.Element | null {
       return <CustomBlockWidget widget={w} />
     case 'agent':
       return <AgentWidget widget={w} />
+    case 'webhook':
+      return <WebhookWidget widget={w} />
+    case 'inbound-hook':
+      return <InboundHookWidget widget={w} />
     case 'portal':
       return <PortalWidget widget={w} />
     case 'living-doc':
@@ -307,12 +323,21 @@ export default function Canvas(): JSX.Element {
   // toolbar (position:fixed) uses this to dock beside the assistant instead of
   // sliding under it when it opens or is resized.
   const [toolbarRightInset, setToolbarRightInset] = useState(0)
+  // Live canvas viewport size in screen px, tracked so off-viewport
+  // virtualisation (PLX-APP-012) can recompute the mounted-Object set when the
+  // window or side panels resize. Zero until first measure = "not measured yet".
+  const [viewportSize, setViewportSize] = useState<{ w: number; h: number }>({ w: 0, h: 0 })
   useEffect(() => {
     const el = dropRef.current
     if (!el) return
     const measure = (): void => {
       const rect = el.getBoundingClientRect()
       setToolbarRightInset(Math.max(0, Math.round(window.innerWidth - rect.right)))
+      setViewportSize((prev) => {
+        const w = Math.round(rect.width)
+        const h = Math.round(rect.height)
+        return prev.w === w && prev.h === h ? prev : { w, h }
+      })
     }
     measure()
     const ro = new ResizeObserver(measure)
@@ -414,13 +439,182 @@ export default function Canvas(): JSX.Element {
   const loadLinksForTask = useLinksStore((s) => s.loadForTask)
   const clearLinks = useLinksStore((s) => s.clear)
   const createLink = useLinksStore((s) => s.create)
+  const links = useLinksStore((s) => s.links)
+  const dragOverride = useWidgetStore((s) => s.dragOverride)
+  const layoutHydratedFor = useWidgetStore((s) => s.layoutHydratedFor)
+  const customLayout = useWidgetStore((s) => s.customLayout)
+  const setDeskCustomLayout = useWidgetStore((s) => s.setDeskCustomLayout)
+  const accountId = useAccountStore((s) => s.account?.id ?? null)
   const [linkSourceId, setLinkSourceId] = useState<string | null>(null)
   const [ghostCursor, setGhostCursor] = useState<{ x: number; y: number } | null>(null)
+  // A freshly-drawn link awaiting the user's "how should this connect?" choice,
+  // anchored at the drop point (raw viewport coords). See LinkOverlay's picker.
+  const [pendingLinkPick, setPendingLinkPick] = useState<PendingLinkPick | null>(null)
+  const clearPendingLinkPick = useCallback(() => setPendingLinkPick(null), [])
+
+  // Off-viewport virtualisation (PLX-APP-012). `visibleObjectIds` is the set of
+  // top-level Objects the render loop mounts this frame; null means "cull nothing"
+  // (Columns view or before the viewport is measured). `visibleIdsRef` feeds the
+  // previous-frame set back into the hysteresis + freeze logic, and the key ref
+  // lets us commit a new set only when membership actually changes, mirroring the
+  // marquee hit-test pattern so pans don't force a re-render every frame.
+  const [visibleObjectIds, setVisibleObjectIds] = useState<Set<string> | null>(null)
+  const visibleIdsRef = useRef<Set<string> | null>(null)
+  const visibleKeyRef = useRef<string>('')
 
   useEffect(() => {
     if (activeTaskId) void loadForTask(activeTaskId)
     else clearWidgets()
   }, [activeTaskId, loadForTask, clearWidgets])
+
+  // Per-widget Context Health frames (plexi-4.0, UX-022 at the Object level). Once
+  // a desk's widgets have loaded, baseline each one's "changed since your last
+  // visit" health so the frames reflect what moved while the user was away. Runs
+  // once per desk open; the ref guards against re-running on later widget edits.
+  const reviewedWidgetsForRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (!activeTaskId || layoutHydratedFor !== activeTaskId) return
+    if (reviewedWidgetsForRef.current === activeTaskId) return
+    reviewedWidgetsForRef.current = activeTaskId
+    const ids = widgets
+      .filter((w) => !w.archived && w.parentSectionId === null && w.kind !== 'section')
+      .map((w) => w.id)
+    void useContextHealthStore.getState().reviewWidgets(ids)
+  }, [activeTaskId, layoutHydratedFor, widgets])
+
+  // PLX-APP-010 Phase 1 / UX-032 — persist this user's camera + selection for the
+  // active Desk and device class, debounced, on user action. Gated on
+  // layoutHydratedFor so the reset-to-origin and the restore itself never save a
+  // spurious layout before hydration. Object geometry stays in the shared base
+  // (widgets) per ADR-0006, so objects is empty here; Phase 2 fills it. The last
+  // sub-600ms camera nudge before a fast Desk switch may not persist, which
+  // self-heals on the next visit.
+  // PLX-APP-010 Phase 2 — when the Desk is opted into per-device layout, the
+  // overlay carries eligible Objects' position/size too; otherwise it stays empty
+  // and only camera + selection persist (Phase 1). Recomputed from widgets so a
+  // geometry change re-arms the debounced save; a no-op stable value when off.
+  const overlayObjects = useMemo(
+    () => (customLayout ? serializeOverlayObjects(widgets) : EMPTY_OVERLAY_OBJECTS),
+    [customLayout, widgets]
+  )
+  useEffect(() => {
+    if (!activeTaskId || layoutHydratedFor !== activeTaskId) return
+    const layout = {
+      userId: accountId ?? 'local',
+      deskId: activeTaskId,
+      deviceClass: currentDeviceClass(),
+      customLayout,
+      objects: overlayObjects,
+      scroll: { x: panX, y: panY },
+      selectedObjectIds: selectedIds,
+      zoom
+    }
+    const t = window.setTimeout(() => void window.api.deskLayout.save(layout), 600)
+    return () => window.clearTimeout(t)
+  }, [activeTaskId, layoutHydratedFor, accountId, panX, panY, zoom, selectedIds, customLayout, overlayObjects])
+
+  // PLX-APP-012 — world-space bounding boxes for every top-level Object the two
+  // render maps iterate. Camera-independent, so this recomputes only when the
+  // Object set changes, never on a pan frame. Section children are excluded here
+  // and mount through their parent section.
+  const virtualizationBoxes = useMemo<VirtualizationBox[]>(() => {
+    const boxes: VirtualizationBox[] = []
+    for (const w of widgets) {
+      if (w.archived || w.pinned) continue
+      if (w.parentSectionId !== null) continue
+      if (w.kind === 'section') {
+        const children = widgets.filter((c) => c.parentSectionId === w.id)
+        const frame = computeSectionFrame(children, effectiveLayout(w.layout))
+        boxes.push({ id: w.id, x: w.x, y: w.y, width: frame.width, height: frame.height })
+      } else {
+        boxes.push({ id: w.id, x: w.x, y: w.y, width: w.width, height: w.height })
+      }
+    }
+    return boxes
+  }, [widgets])
+
+  // PLX-APP-012 — ids that must never be culled regardless of geometry: the
+  // active, focused and link-armed Object, the whole selection, every stateful
+  // web-kind Object (unmounting a <webview> reloads it), and every link endpoint.
+  // Any exempt Object that lives inside a section also keeps that section mounted,
+  // so the child renders and its DOM node exists for LinkOverlay (linking to
+  // section children is permitted today, so this promotion is load-bearing).
+  // Camera-independent, and deliberately excludes the per-frame drag signal (see
+  // dragExemptIds) so an active drag never rebuilds this Set every frame.
+  const virtualizationExempt = useMemo<Set<string>>(() => {
+    const exempt = new Set<string>()
+    if (activeId) exempt.add(activeId)
+    if (focusedId) exempt.add(focusedId)
+    if (linkSourceId) exempt.add(linkSourceId)
+    for (const id of selectedIds) exempt.add(id)
+    for (const w of widgets) if (isWebKind(w.kind)) exempt.add(w.id)
+    for (const l of links) {
+      exempt.add(l.sourceWidgetId)
+      exempt.add(l.targetWidgetId)
+    }
+    const byId = new Map(widgets.map((w) => [w.id, w]))
+    for (const id of Array.from(exempt)) {
+      const parent = byId.get(id)?.parentSectionId
+      if (parent) exempt.add(parent)
+    }
+    return exempt
+  }, [widgets, links, selectedIds, activeId, focusedId, linkSourceId])
+
+  // PLX-APP-012 — the currently-dragged Object (and its parent section) as a tiny
+  // side channel. `dragOverride` changes x/y every drag frame, but the dragged
+  // *id* is stable for the whole drag, so keying on the id means this recomputes
+  // once per drag rather than per frame, and the heavy exempt Set above is never
+  // rebuilt mid-drag. Passed to computeVisibleObjectIds as extraExemptIds.
+  const draggingId = dragOverride?.widgetId ?? null
+  const dragExemptIds = useMemo<string[] | undefined>(() => {
+    if (!draggingId) return undefined
+    const w = widgets.find((x) => x.id === draggingId)
+    return w?.parentSectionId ? [draggingId, w.parentSectionId] : [draggingId]
+  }, [draggingId, widgets])
+
+  // PLX-APP-012 — recompute the mounted-Object set when the camera or the derived
+  // box/exempt inputs change. Per pan frame only the pure intersection runs, and
+  // the set is committed only when membership actually changes (sorted-key compare,
+  // the marquee hit-test pattern), so a pan that reveals nothing new never forces a
+  // re-render. Hysteresis + the animation freeze come from the pure module.
+  useEffect(() => {
+    if (deskViewMode === 'columns' || viewportSize.w === 0 || viewportSize.h === 0) {
+      // Columns view mounts through its own overlay, and before the first measure
+      // we have no viewport to test against — render everything in both cases.
+      if (visibleIdsRef.current !== null || visibleKeyRef.current !== '') {
+        visibleIdsRef.current = null
+        visibleKeyRef.current = ''
+        setVisibleObjectIds(null)
+      }
+      return
+    }
+    const next = computeVisibleObjectIds(
+      virtualizationBoxes,
+      { panX, panY, zoom, viewportWidth: viewportSize.w, viewportHeight: viewportSize.h },
+      {
+        exemptIds: virtualizationExempt,
+        extraExemptIds: dragExemptIds,
+        previousVisible: visibleIdsRef.current ?? undefined,
+        freezeUnmounts: animatingPan
+      }
+    )
+    const key = Array.from(next).sort().join(',')
+    if (key !== visibleKeyRef.current) {
+      visibleKeyRef.current = key
+      visibleIdsRef.current = next
+      setVisibleObjectIds(next)
+    }
+  }, [
+    virtualizationBoxes,
+    virtualizationExempt,
+    dragExemptIds,
+    panX,
+    panY,
+    zoom,
+    animatingPan,
+    viewportSize,
+    deskViewMode
+  ])
 
   useEffect(() => {
     if (activeTaskId) void loadLinksForTask(activeTaskId)
@@ -490,10 +684,9 @@ export default function Canvas(): JSX.Element {
         endArm()
         return
       }
-      if (from.pinned || to.pinned) {
-        endArm()
-        return
-      }
+      // Pinned widgets are valid endpoints too (widget-link-owner invariant 5):
+      // their rect is read in the same viewport coords as every other widget, so
+      // a line to/from a screen-anchored pinned tool renders correctly.
       // Linking widgets inside sections — and to sections themselves — is
       // now permitted. The visual link is drawn between the actual
       // rendered widget rects (LinkOverlay reads getBoundingClientRect on
@@ -502,8 +695,17 @@ export default function Canvas(): JSX.Element {
       // section produces a line that anchors to the section's outer
       // frame. The persisted row in widget_links stores source + target
       // widget ids regardless of section membership.
-      void createLink(sourceId, toId, activeTaskId)
+      //
+      // The link is created immediately as a passive `context` wire (so the
+      // gesture never silently produces nothing), then we offer the intent
+      // picker at the drop point to upgrade its type. Capture the drop coords
+      // BEFORE endArm resets gesture state (widget-link-owner design).
+      const dropX = e.clientX
+      const dropY = e.clientY
       endArm()
+      void createLink(sourceId, toId, activeTaskId).then((link) => {
+        if (link) setPendingLinkPick({ linkId: link.id, x: dropX, y: dropY })
+      })
     }
     function onKey(e: KeyboardEvent): void {
       if (e.key === 'Escape') endArm()
@@ -1450,9 +1652,32 @@ export default function Canvas(): JSX.Element {
           onClick: () => void groupByType(true)
         },
         {
-          label: 'Clean up (Tidy)',
+          // Tidy modes — every mode keeps linked widgets clustered together.
+          label: 'Tidy',
           icon: 'grid_view',
-          onClick: () => void handleAutoArrange()
+          children: [
+            { label: 'Square grid', icon: 'grid_view', onClick: () => void handleAutoArrange({ mode: 'square' }) },
+            { label: 'Single column (vertical)', icon: 'view_agenda', onClick: () => void handleAutoArrange({ mode: 'vertical' }) },
+            { label: 'Single row (horizontal)', icon: 'view_column', onClick: () => void handleAutoArrange({ mode: 'horizontal' }) },
+            { label: 'Mosaic', icon: 'dashboard', onClick: () => void handleAutoArrange({ mode: 'mosaic' }) },
+            { label: 'Rows of the canvas (flow)', icon: 'reorder', onClick: () => void handleAutoArrange({ mode: 'flow' }) },
+            {
+              label: 'Columns…',
+              icon: 'view_week',
+              children: [2, 3, 4, 5, 6].map((c) => ({
+                label: `${c} columns`,
+                onClick: () => void handleAutoArrange({ mode: 'custom', cols: c })
+              }))
+            },
+            {
+              label: 'Rows…',
+              icon: 'table_rows',
+              children: [2, 3, 4, 5, 6].map((r) => ({
+                label: `${r} rows`,
+                onClick: () => void handleAutoArrange({ mode: 'custom', rows: r })
+              }))
+            }
+          ]
         }
       ]
     }
@@ -1472,6 +1697,18 @@ export default function Canvas(): JSX.Element {
         icon: 'center_focus_strong',
         shortcut: '⌘0',
         onClick: () => resetView()
+      },
+      { separator: true },
+      {
+        // Per-device layout customisation (PLX-APP-010 Phase 2, ADR-0006). Off by
+        // default: the Desk follows the shared arrangement. On: this device keeps
+        // its own object positions and sizes, private to this user, and they are
+        // restored on reopen. A checkbox icon signals the toggle state.
+        label: customLayout
+          ? "Stop customising this device's layout"
+          : "Customise this device's layout",
+        icon: customLayout ? 'check_box' : 'check_box_outline_blank',
+        onClick: () => void setDeskCustomLayout(!customLayout)
       }
     ]
   }
@@ -1828,7 +2065,7 @@ export default function Canvas(): JSX.Element {
     setTimeout(() => centerOnHome(), 100)
   }
 
-  async function handleAutoArrange(): Promise<void> {
+  async function handleAutoArrange(opts: TidyOptions = { mode: 'flow' }): Promise<void> {
     if (widgets.length === 0 || !dropRef.current) return
     const rect = dropRef.current.getBoundingClientRect()
     const visibleW = rect.width / zoom
@@ -1917,22 +2154,18 @@ export default function Canvas(): JSX.Element {
       return composite(a) - composite(b) // same cluster → baseline order within
     })
 
-    let cursorX = PADDING
-    let cursorY = PADDING
-    let rowMaxH = 0
-    const positions = new Map<string, { x: number; y: number }>()
-    for (const item of items) {
-      if (cursorX !== PADDING && cursorX + item.w > PADDING + visibleW) {
-        cursorX = PADDING
-        cursorY += rowMaxH + GAP
-        rowMaxH = 0
-      }
-      positions.set(item.id, { x: Math.round(cursorX), y: Math.round(cursorY) })
-      cursorX += item.w + GAP
-      rowMaxH = Math.max(rowMaxH, item.h)
-    }
-    for (const [id, pos] of positions) {
-      await updateWidget(id, { x: pos.x, y: pos.y })
+    // `items` is already ordered (category baseline + linked-cluster contiguity);
+    // the chosen mode only decides the geometry. Linked widgets therefore stay
+    // adjacent in every mode, so wires stay short.
+    const placed = tidyPositions(
+      items.map((it) => ({ id: it.id, w: it.w, h: it.h })),
+      opts,
+      visibleW,
+      GAP,
+      PADDING
+    )
+    for (const p of placed) {
+      await updateWidget(p.id, { x: p.x, y: p.y })
     }
     bumpLayoutVersion()
   }
@@ -2226,6 +2459,9 @@ export default function Canvas(): JSX.Element {
             {deskViewMode !== 'columns' && widgets.map((w) => {
               if (w.archived) return null
               if (w.pinned || w.kind !== 'section') return null
+              // PLX-APP-012: skip sections fully outside the viewport (a section is
+              // exempt when it holds a linked child, so its children's links hold).
+              if (visibleObjectIds && !visibleObjectIds.has(w.id)) return null
               return (
                 <div key={w.id}>{renderWidget(w)}</div>
               )
@@ -2237,6 +2473,10 @@ export default function Canvas(): JSX.Element {
               // For web kinds, fully UNMOUNT the focused widget so its unmount-flush
               // commits the latest URL before focus mode's separate WebViewWidget mounts.
               if (focusedId === w.id && isWebKind(w.kind)) return null
+              // PLX-APP-012: skip Objects fully outside the viewport. Web kinds and
+              // link/active/selected Objects are exempt (kept in visibleObjectIds),
+              // so this only ever culls cheap, off-screen, unconnected Objects.
+              if (visibleObjectIds && !visibleObjectIds.has(w.id)) return null
               return (
                 <div key={w.id}>
                   {renderWidget(w)}
@@ -2253,8 +2493,9 @@ export default function Canvas(): JSX.Element {
               transformed container. It reads each linked widget's actual
               rendered position via getBoundingClientRect on every frame
               during a drag, so lines can never visually detach from the
-              widget they're attached to. Pinned widgets and section
-              children are excluded from linking in v1. */}
+              widget they're attached to. Widgets in sections, sections
+              themselves, and pinned widgets are all valid link endpoints;
+              arming from a section child is the one remaining exception. */}
           <LinkOverlay
             ghost={
               linkSourceId && ghostCursor
@@ -2265,13 +2506,22 @@ export default function Canvas(): JSX.Element {
                   }
                 : null
             }
+            pendingPick={pendingLinkPick}
+            onPendingPickDone={clearPendingLinkPick}
           />
           </LinkDragContext.Provider>
           {/* Pinned-widget layer: screen-space, in front of the transformed canvas.
               Zone-pinned widgets have their position computed here and provided
               via PinLayoutContext so any nested WidgetFrame can look up its
-              docked rect without prop-drilling through every widget kind. */}
-          <PinnedLayer widgets={widgets} focusedId={focusedId} renderWidget={renderWidget} />
+              docked rect without prop-drilling through every widget kind.
+              It renders OUTSIDE the canvas's LinkDragContext.Provider (it's a
+              screen-space sibling), so it needs its own provider wired to the
+              same controller — otherwise pinned WidgetFrames read a null
+              linkDrag and their "connect" hub button never appears, and a pinned
+              widget can't be a link source (dropping onto one already works). */}
+          <LinkDragContext.Provider value={linkDragController}>
+            <PinnedLayer widgets={widgets} focusedId={focusedId} renderWidget={renderWidget} />
+          </LinkDragContext.Provider>
           <FloatingToolbar
             onAddWidget={handleClickAdd}
             onImport={() => setSyncPickerOpen(true)}
@@ -2375,6 +2625,9 @@ export default function Canvas(): JSX.Element {
           />
           {/* Minimap FAB — always-present in the canvas bottom-right. */}
           {activeTaskId && <CanvasMinimapFAB />}
+          {/* Automations FAB — stacked above the minimap: the desk's "what runs
+              on its own" list (reactive wires + agents) with on/off + jump-to. */}
+          {activeTaskId && <AutomationsFAB />}
           {activeTaskId && <DeskSuggestionChip />}
           {/* Zoom + pan controls — bottom-left. Mirrors the 2.0 mockup. */}
           <ZoomControls />

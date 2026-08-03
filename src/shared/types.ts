@@ -130,6 +130,18 @@ export type WidgetKind =
   // when source widgets change (see livingPageScheduler). content is serialized
   // Tiptap JSON, system-owned (never hand-edited). Reuses the living* fields.
   | 'living-doc'
+  // Webhook (outbound) — an endpoint tool. Wire a widget INTO it and, on every
+  // source change, the source's content is POSTed to the configured URL (main
+  // process, so no CORS). content holds { url, method } as JSON. The wire's own
+  // run status (freshness / error) reports the last send. This is the outbound
+  // half of external webhooks (Lever 3); the inbound trigger is a separate kind.
+  | 'webhook'
+  // Inbound webhook (trigger) — the receiving half. It self-registers a hook with
+  // the signal server and shows a unique URL; when an external system POSTs there,
+  // the server relays the payload here and it lands in this widget's content,
+  // firing any wire drawn OUT of it. content holds { hookId, url } as JSON. You
+  // wire OUT of this (it's a source) — the mirror of the outbound 'webhook'.
+  | 'inbound-hook'
 
 export type ContextMenuAction =
   | 'createStickyFromSelection'
@@ -288,6 +300,10 @@ export interface Widget {
   height: number
   zIndex: number
   color: string | null
+  // Optional workflow status, used by the Columns view's status board (To sort /
+  // In progress / Done / Reference). null = unset (reads as "To sort"). A real
+  // synced field so a board means the same thing on every device.
+  status: string | null
   pinned: boolean
   pinnedScreenX: number | null
   pinnedScreenY: number | null
@@ -362,6 +378,7 @@ export interface WidgetPatch {
   height?: number
   zIndex?: number
   color?: string | null
+  status?: string | null
   pinned?: boolean
   pinnedScreenX?: number | null
   pinnedScreenY?: number | null
@@ -976,6 +993,34 @@ export interface WidgetLink {
   verb: string
   // Kill switch — a disabled reactive wire stays drawn but never fires.
   enabled: boolean
+  // Durable run state (reactive wires only). lastRunAt is when the engine last
+  // fired this wire (including a checked-but-nothing-to-write no-op), so the
+  // badge can show live / stale / just-ran and it survives a reload. lastError
+  // is the last failure message, cleared on the next successful run.
+  lastRunAt?: number | null
+  lastError?: string | null
+}
+
+// A durable record of one reactive-wire WRITE into a target — captured whenever a
+// transform or mirror wire overwrites a text target's content. It stores the
+// before and after so the user can see exactly what an automation did and revert
+// it in one click (the trust core). Table-target writes are structurally
+// different (row-level) and are not recorded here. Pruned per-wire.
+export interface WireRun {
+  id: string
+  wireId: string
+  taskId: string
+  sourceWidgetId: string
+  targetWidgetId: string
+  // Human label for the source (its title or kind) so the activity list reads in
+  // plain language without a second lookup.
+  sourceLabel: string
+  wireType: WireType
+  // The transform instruction, if any (empty for a mirror copy).
+  verb: string
+  at: number
+  prevContent: string
+  nextContent: string
 }
 
 // Result of a living-page regeneration. ok=true → returns freshly-generated
@@ -1077,7 +1122,10 @@ export interface BodyDoubleChatMessage {
 // 'document' / 'docfolder' are the office kinds: a single doc/sheet/slides/map,
 // or a Drive folder of them, shared as a read-only browser-renderable snapshot
 // (and importable when the scope is 'copy'). See DocumentSnapshot / DocFolderSnapshot.
-export type ShareableKind = 'folder' | 'task' | 'widget' | 'document' | 'docfolder'
+// 'file' is a raw Drive file (PDF, image, video, arbitrary binary): its metadata
+// rides the snapshot while its bytes are hosted publicly by the share token, so
+// the viewer can preview or download it. See FileSnapshot + the share-blob routes.
+export type ShareableKind = 'folder' | 'task' | 'widget' | 'document' | 'docfolder' | 'file'
 
 // Permission level granted by the share. Two levels in v1 — keeping it
 // simple. "view" = read-only render. "copy" = recipient can sign up and

@@ -70,8 +70,23 @@ module.exports = {
   asarUnpack: [
     // Native modules must live outside the asar archive so Node can load them.
     'node_modules/better-sqlite3/**/*',
-    'node_modules/node-mac-haptics/**/*'
+    'node_modules/node-mac-haptics/**/*',
+    // pdf-parse resolves its pdfjs worker relative to its own dist on disk, which
+    // asar packing would break — keep it unpacked so PDF text extraction works in
+    // the packaged app (not just the unpacked dev build).
+    'node_modules/pdf-parse/**/*',
+    // Offline OCR for scanned PDFs. tesseract.js loads its worker script + WASM
+    // core from disk, pdf-to-png-converter renders via @napi-rs/canvas (a native
+    // .node addon) and its own pdfjs — all break inside an asar, so unpack them.
+    'node_modules/tesseract.js/**/*',
+    'node_modules/tesseract.js-core/**/*',
+    'node_modules/pdf-to-png-converter/**/*',
+    'node_modules/@napi-rs/**/*'
   ],
+
+  // Bundle the English OCR training data (offline, on-device — no CDN fetch).
+  // Copied into the app's Resources so ocr.ts can read it via process.resourcesPath.
+  extraResources: [{ from: 'resources/tessdata', to: 'tessdata' }],
 
   publish: {
     provider: 'github',

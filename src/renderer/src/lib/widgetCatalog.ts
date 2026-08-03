@@ -116,8 +116,10 @@ export const WIDGET_CATALOG: WidgetCatalogEntry[] = [
     label: 'Table',
     icon: 'table_chart',
     hint: 'Airtable-style database — rows + columns of typed fields',
-    defaultWidth: 560,
-    defaultHeight: 360,
+    // Open wide enough that several typed columns + the add-row control are all
+    // usable without a resize (N3: size scales with the real estate a kind needs).
+    defaultWidth: 680,
+    defaultHeight: 440,
     defaultContent: '',
     isWebBased: false
   },
@@ -127,8 +129,8 @@ export const WIDGET_CATALOG: WidgetCatalogEntry[] = [
     label: 'Chart',
     icon: 'bar_chart',
     hint: 'PlexiDash — bar, line, area, pie or KPI charts from a table. Several on a desk make a dashboard.',
-    defaultWidth: 440,
-    defaultHeight: 320,
+    defaultWidth: 520,
+    defaultHeight: 380,
     defaultContent: '',
     isWebBased: false
   },
@@ -138,8 +140,10 @@ export const WIDGET_CATALOG: WidgetCatalogEntry[] = [
     label: 'Document',
     icon: 'article',
     hint: 'A Word-class document. Create new, open a .docx, or place an existing one.',
-    defaultWidth: 640,
-    defaultHeight: 520,
+    // Word-class: needs the toolbar + a full page width (~816px page) usable on
+    // open. Sized so the page and ribbon are readable without a resize.
+    defaultWidth: 860,
+    defaultHeight: 760,
     defaultContent: '',
     isWebBased: false
   },
@@ -149,8 +153,10 @@ export const WIDGET_CATALOG: WidgetCatalogEntry[] = [
     label: 'Spreadsheet',
     icon: 'grid_on',
     hint: 'An Excel-class spreadsheet with formulas. Create new, import .xlsx/.csv, or place an existing one.',
-    defaultWidth: 640,
-    defaultHeight: 460,
+    // Excel-class: formula bar + toolbar + enough columns/rows to be usable at a
+    // glance without a resize.
+    defaultWidth: 880,
+    defaultHeight: 580,
     defaultContent: '',
     isWebBased: false
   },
@@ -160,17 +166,22 @@ export const WIDGET_CATALOG: WidgetCatalogEntry[] = [
     label: 'Slides',
     icon: 'slideshow',
     hint: 'A PowerPoint-class deck. Create new, import .pptx, or place an existing one.',
-    defaultWidth: 720,
-    defaultHeight: 480,
+    // PowerPoint-class: a 16:9 slide + the thumbnail rail + toolbar all usable on
+    // open.
+    defaultWidth: 900,
+    defaultHeight: 600,
     defaultContent: '',
     isWebBased: false
   },
   {
     kind: 'map',
     category: 'Files',
-    label: 'Map',
+    // Labelled "Flowchart" rather than "Map": go-live persona testing found "Map"
+    // reads as a location/road map, not a diagramming tool, so it wasted a core
+    // slot on a confusing word. Same PlexiMaps editor underneath.
+    label: 'Flowchart',
     icon: 'account_tree',
-    hint: 'A PlexiMaps diagram and workflow map — flowcharts, process maps, org charts, mind maps. Build by hand or generate with AI.',
+    hint: 'Flowcharts, process maps, org charts and mind maps (PlexiMaps) — diagram by hand or generate with AI.',
     defaultWidth: 720,
     defaultHeight: 520,
     defaultContent: '',
@@ -478,6 +489,28 @@ export const WIDGET_CATALOG: WidgetCatalogEntry[] = [
     isWebBased: false
   },
   {
+    kind: 'webhook',
+    category: 'Tools',
+    label: 'Send to a URL',
+    icon: 'webhook',
+    hint: 'An outbound webhook. Wire a tool into it and its content is POSTed to your URL whenever it changes — send desk data out to Slack, Zapier or any HTTP endpoint',
+    defaultWidth: 320,
+    defaultHeight: 180,
+    defaultContent: '',
+    isWebBased: false
+  },
+  {
+    kind: 'inbound-hook',
+    category: 'Tools',
+    label: 'Receive from a URL',
+    icon: 'call_received',
+    hint: 'An inbound webhook. Gives you a unique URL — when an external system (Stripe, a form, curl) POSTs to it, the payload lands here and fires any wire drawn OUT of this tool',
+    defaultWidth: 340,
+    defaultHeight: 200,
+    defaultContent: '',
+    isWebBased: false
+  },
+  {
     kind: 'portal',
     category: 'Layout',
     label: 'Portal',
@@ -503,6 +536,52 @@ export const WIDGET_CATALOG: WidgetCatalogEntry[] = [
 
 export function catalogFor(kind: WidgetKind): WidgetCatalogEntry | null {
   return WIDGET_CATALOG.find((e) => e.kind === kind) ?? null
+}
+
+// Go-live simplification: a brand-new user should meet a small, obvious CORE set,
+// not the full catalog. Everything below is still fully creatable — it just lives
+// under the picker's "Advanced" expander (one tap away) instead of the first-run
+// grid. This is a demotion, NOT a removal: no functionality is lost, and the
+// command palette still lists every kind. (Truly duplicate kinds — pdf/gdoc/etc,
+// and diagram/mindmap once Map covers them — use hideFromPicker instead.)
+export const ADVANCED_KINDS: ReadonlySet<WidgetKind> = new Set<WidgetKind>([
+  // Notes — Sticky + Page are the core two; these are variants/styles or AI docs.
+  'note',
+  'markdown',
+  'card',
+  'living-doc',
+  // Files — Document/Spreadsheet/Slides/File/Map/Drive are core. Drive (a shared
+  // folder pinned to the desk) is promoted to core per go-live feedback: shared-
+  // file access is a headline promise, so it shouldn't sit behind Advanced.
+  'design',
+  // Tools/data — Table + Chart are core; these are power or niche.
+  'field',
+  'custom-block',
+  'calculator',
+  'color',
+  'scratchpad',
+  'streamdeck',
+  // Automation — powerful but intimidating first-run.
+  'agent',
+  'webhook',
+  'inbound-hook',
+  // Layout/canvas depth — Section is core; these are advanced placements.
+  'shape',
+  'task-link',
+  'portal',
+  'local-app-launcher',
+  // Diagramming — Map is the one CORE diagram tool. Diagram + Mind map are demoted
+  // here rather than folded away: the Map owner confirmed Map does NOT cover two of
+  // their capabilities (Diagram's image/icon-upload node type; Mind map's per-node
+  // Agent-OS agents with proposal apply/undo), so hiding them would lose real
+  // functionality. Kept fully creatable under Advanced; existing ones render as
+  // normal (rendering is keyed on widget.kind, independent of this list).
+  'diagram',
+  'mindmap'
+])
+
+export function isAdvancedKind(kind: WidgetKind): boolean {
+  return ADVANCED_KINDS.has(kind)
 }
 
 // Single-key quick-add shortcuts (no modifier) for the most common widgets,

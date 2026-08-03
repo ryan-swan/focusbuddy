@@ -17,7 +17,7 @@
  */
 
 import { test, expect } from '@playwright/test'
-import { launchApp, waitForReady } from './_helpers'
+import { launchApp, waitForReady, hoverToolbar } from './_helpers'
 
 test('DWK-1 — API-seeded design widget provisions docType=design and mounts DesignEditor', async () => {
   const { window, dispose } = await launchApp()
@@ -97,11 +97,8 @@ test('DWK-2 — palette exposes Design; clicking it creates a design widget via 
     await window.waitForTimeout(300)
 
     // The palette lives inside the FloatingToolbar and only mounts once the
-    // toolbar is hovered (see FloatingToolbar.tsx's hovered-gated
-    // AnimatePresence). Hover the toolbar first to reveal it.
-    const toolbar = window.locator('[data-floating-menu]').first()
-    await expect(toolbar).toBeVisible({ timeout: 8_000 })
-    await toolbar.hover()
+    // toolbar is hovered (see FloatingToolbar.tsx's hovered-gated AnimatePresence).
+    await hoverToolbar(window)
 
     // Open the Add-widget palette.
     const addBtn = window.locator('[data-testid="palette-add-button"], [data-testid="palette-fab-button"]').first()
@@ -109,6 +106,9 @@ test('DWK-2 — palette exposes Design; clicking it creates a design widget via 
     await addBtn.click()
     await window.waitForSelector('[role="dialog"][aria-label="Desk objects"]', { timeout: 4_000 })
 
+    // Design is an Advanced tile now — expand the Advanced section to reach it.
+    await window.locator('[data-testid="palette-advanced-toggle"]').click().catch(() => {})
+    await window.waitForTimeout(150)
     // The catalog must expose a Design entry.
     const designEntry = window.locator('[data-testid="palette-add-design"]')
     await expect(designEntry).toBeVisible({ timeout: 4_000 })

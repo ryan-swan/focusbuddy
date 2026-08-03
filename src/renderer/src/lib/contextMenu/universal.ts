@@ -16,6 +16,8 @@ import {
   duplicateWidget,
   archiveWidget,
   deleteWidget,
+  flagAsDecision,
+  automateWithAgent,
   sourceWidget,
   workingText,
   pinWidgetToZone,
@@ -88,9 +90,21 @@ export function buildOrganise(ctx: MenuContext): MenuContribution[] {
   if (ctx.object.type === 'multi') {
     return [
       {
-        id: 'core/organise/front-many',
+        // Wire every selected widget into one new agent — the multi-select
+        // counterpart to the single-widget "Automate with an agent". Listed
+        // first because turning a selection into an automation is the headline
+        // action here, not a housekeeping one.
+        id: 'core/organise/automate-many',
         section: MenuSection.Organise,
         priority: 0,
+        label: `Automate ${ctx.object.widgets.length} with an agent`,
+        icon: 'smart_toy',
+        onSelect: (c) => void automateWithAgent(c)
+      },
+      {
+        id: 'core/organise/front-many',
+        section: MenuSection.Organise,
+        priority: 1,
         label: 'Bring all to front',
         icon: 'flip_to_front',
         onSelect: (c) => bringToFront(c)
@@ -107,6 +121,16 @@ export function buildOrganise(ctx: MenuContext): MenuContribution[] {
       label: 'Bring to front',
       icon: 'flip_to_front',
       onSelect: (c) => bringToFront(c)
+    },
+    {
+      // Flag as a Decision: the entry point that activates the decision-risk
+      // surface. A later material change to this widget then lights its red frame.
+      id: 'core/organise/flag-decision',
+      section: MenuSection.Organise,
+      priority: 6,
+      label: 'Flag as a decision',
+      icon: 'gavel',
+      onSelect: (c) => void flagAsDecision(c)
     }
   ]
   if (w.parentSectionId) {

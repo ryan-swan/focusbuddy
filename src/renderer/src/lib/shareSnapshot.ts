@@ -71,12 +71,30 @@ export interface DocFolderSnapshot extends ShareSnapshotBase {
   items: DocFolderEntry[]
 }
 
+// A raw Drive file (PDF, image, video, arbitrary binary) shared by link. The
+// bytes are NOT embedded here (they'd blow the share POST body limit and bloat
+// every resolve); they are hosted publicly against the share token and fetched
+// by the viewer from `${signal}/share/<token>/blob`. This snapshot carries only
+// the metadata the viewer needs to choose how to render (image/pdf/video/audio
+// inline, else a download button) and to label the file. `hosted` is false when
+// the file exceeded the public-share size cap, in which case the viewer shows an
+// honest "too large to preview" note rather than a broken embed.
+export interface FileSnapshot extends ShareSnapshotBase {
+  kind: 'file'
+  name: string
+  mimeType: string
+  ext: string
+  sizeBytes: number
+  hosted: boolean
+}
+
 export type ShareSnapshot =
   | FolderSnapshot
   | TaskSnapshot
   | WidgetSnapshot
   | DocumentSnapshot
   | DocFolderSnapshot
+  | FileSnapshot
 
 // Trim-down of FbNode — the snapshot only keeps display-relevant fields.
 // Internal tracking (sortOrder, axis values, resume markdown if empty,
@@ -297,6 +315,34 @@ export async function buildWidgetSnapshot(
     fromHandle,
     capturedAt: Date.now(),
     widget: base
+  }
+}
+
+// Largest raw file we host on a public link. Matches the server's
+// MAX_LIVE_FILE_BYTES so a file that fits the org-blob path also fits a public
+// link. Files above this share their metadata (name/type/size) with hosted:false
+// and the viewer explains they are too large to preview publicly.
+export const MAX_PUBLIC_FILE_BYTES = 50 * 1024 * 1024
+
+// Build a metadata snapshot for a raw Drive file. The bytes themselves are
+// uploaded separately (by the shares store, against the minted token) so they
+// never ride this JSON. `hosted` reflects whether the bytes will be served: true
+// for files within the cap, false for oversized ones.
+export function buildFileSnapshot(
+  file: { name: string; mimeType: string | null; ext: string | null; sizeBytes: number | null },
+  fromHandle: string
+): FileSnapshot {
+  const size = file.sizeBytes ?? 0
+  return {
+    _version: SHARE_SNAPSHOT_VERSION,
+    kind: 'file',
+    fromHandle,
+    capturedAt: Date.now(),
+    name: file.name || 'File',
+    mimeType: file.mimeType || 'application/octet-stream',
+    ext: (file.ext || '').replace(/^\./, ''),
+    sizeBytes: size,
+    hosted: size > 0 && size <= MAX_PUBLIC_FILE_BYTES
   }
 }
 

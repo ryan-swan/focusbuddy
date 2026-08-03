@@ -64,7 +64,8 @@ import type {
   SearchHit,
   WidgetLink,
   WidgetPatch,
-  WireType
+  WireType,
+  WireRun
 } from '@shared/types'
 import type {
   FbFile,
@@ -77,6 +78,8 @@ import type {
   FbTablePatch
 } from '@shared/fields'
 import type { KnowledgeEntry, KnowledgeDraft, KnowledgePatch } from '@shared/knowledge'
+import type { DeskLayout, DeviceClass } from '@shared/deskLayout'
+import type { Decision } from '@shared/decision'
 
 // Local-document comment row as returned by the docComments IPC.
 interface DocCommentDto {
@@ -118,6 +121,8 @@ const api = {
     // Soft-delete: returns the trashed ids (the node + its subtree) for undo.
     delete: (id: string): Promise<string[]> => ipcRenderer.invoke('nodes:delete', id),
     restore: (ids: string[]): Promise<boolean> => ipcRenderer.invoke('nodes:restore', ids),
+    moveToOrg: (id: string, orgId: string, teamId?: string | null): Promise<string[]> =>
+      ipcRenderer.invoke('nodes:moveToOrg', id, orgId, teamId ?? null),
     move: (
       id: string,
       newParentId: string | null,
@@ -153,6 +158,24 @@ const api = {
     ): Promise<{ summary: string; aiSummary: string | null; degraded: boolean; cacheHit: boolean; changedEventCount: number }> =>
       ipcRenderer.invoke('context:resumeSummary', deskId)
   },
+  // Decisions (spec §37). Human-owned records that reference Objects/Desks; a
+  // change to a referenced Object raises Decision Risk against it. Creating one is
+  // what activates the decision-risk surface (red widget frame + desk alerts).
+  decisions: {
+    create: (input: {
+      title: string
+      decisionStatement?: string
+      relatedObjectIds?: string[]
+      affectedDeskIds?: string[]
+    }): Promise<Decision> => ipcRenderer.invoke('decisions:create', input),
+    list: (): Promise<Decision[]> => ipcRenderer.invoke('decisions:list'),
+    forObject: (objectId: string): Promise<Decision[]> => ipcRenderer.invoke('decisions:forObject', objectId),
+    // Each live Decision with whether an Object it references has a material change
+    // since review (drives the decisions panel's at-risk status).
+    withRisk: (): Promise<Array<{ decision: Decision; atRisk: boolean; riskyObjectIds: string[] }>> =>
+      ipcRenderer.invoke('decisions:withRisk'),
+    cancel: (id: string): Promise<boolean> => ipcRenderer.invoke('decisions:cancel', id)
+  },
   widgets: {
     // Fetch one widget by id. Needed to answer "which desk is this on?" when all
     // you have is the widget — a cited source names the widget, not its canvas.
@@ -183,10 +206,34 @@ const api = {
       ipcRenderer.invoke('widgetLinks:create', sourceWidgetId, targetWidgetId, taskId, type),
     update: (
       id: string,
-      patch: { type?: WireType; verb?: string; enabled?: boolean }
+      patch: {
+        type?: WireType
+        verb?: string
+        enabled?: boolean
+        lastRunAt?: number | null
+        lastError?: string | null
+      }
     ): Promise<WidgetLink | null> => ipcRenderer.invoke('widgetLinks:update', id, patch),
     delete: (id: string): Promise<boolean> =>
       ipcRenderer.invoke('widgetLinks:delete', id)
+  },
+  wireRuns: {
+    record: (input: Omit<WireRun, 'id'>): Promise<WireRun> =>
+      ipcRenderer.invoke('wireRuns:record', input),
+    listByWire: (wireId: string, limit?: number): Promise<WireRun[]> =>
+      ipcRenderer.invoke('wireRuns:listByWire', wireId, limit),
+    listByTask: (taskId: string, limit?: number): Promise<WireRun[]> =>
+      ipcRenderer.invoke('wireRuns:listByTask', taskId, limit)
+  },
+  webhooks: {
+    // Outbound POST from the main process (no CORS). Returns an honest result.
+    send: (input: {
+      url: string
+      method?: string
+      body?: string
+      contentType?: string
+    }): Promise<{ ok: boolean; status?: number; error?: string }> =>
+      ipcRenderer.invoke('webhooks:send', input)
   },
   snapshots: {
     create: (taskId: string, label?: string): Promise<SnapshotMeta> =>
@@ -317,6 +364,13 @@ const api = {
     setCachedEmail: (email: string | null): Promise<void> =>
       ipcRenderer.invoke('account:setCachedEmail', email)
   },
+  // Desk layout overlay (PLX-APP-010 / UX-032). Per-(user, Desk, device class)
+  // camera + selection, saved on user action and restored on Desk open.
+  deskLayout: {
+    load: (userId: string, deskId: string, deviceClass: DeviceClass): Promise<DeskLayout | null> =>
+      ipcRenderer.invoke('deskLayout:load', userId, deskId, deviceClass),
+    save: (layout: DeskLayout): Promise<void> => ipcRenderer.invoke('deskLayout:save', layout)
+  },
   chat: {
     send: (req: ChatRequest): Promise<ChatResponse> => ipcRenderer.invoke('chat:send', req),
     hasApiKey: (): Promise<boolean> => ipcRenderer.invoke('chat:hasApiKey'),
@@ -446,6 +500,16 @@ const api = {
     // process prompt builder can offer real conversation ids to post-chat.
     setConversationSnapshot: (convs: Array<{ id: string; label: string }>): Promise<boolean> =>
       ipcRenderer.invoke('ai:setConversationSnapshot', convs),
+    // Label each desk object with a short topic so the Columns view can lay them
+    // out as topical columns. Honest degradation (needsApiKey) when no AI is set.
+    groupByTopic: (
+      items: Array<{ id: string; title: string; text: string }>
+    ): Promise<{
+      ok: boolean
+      topicByWidget?: Record<string, string>
+      needsApiKey?: boolean
+      error?: string
+    }> => ipcRenderer.invoke('ai:groupByTopic', items),
     // Raw single-turn completion for the command bar's intent router. The caller
     // supplies the system prompt and receives the model's text verbatim (no
     // workspace-build envelope parsing), so the router's small intent JSON
@@ -833,6 +897,9 @@ const api = {
     }): Promise<FbFile> => ipcRenderer.invoke('files:ingestBuffer', input),
     get: (id: string): Promise<FbFile | null> => ipcRenderer.invoke('files:get', id),
     delete: (id: string): Promise<boolean> => ipcRenderer.invoke('files:delete', id),
+    // Extract readable text from a file (PDF/Word/spreadsheet/text); null if binary.
+    extractText: (id: string): Promise<string | null> =>
+      ipcRenderer.invoke('files:extractText', id),
     // Read raw bytes back — used for previews that can't reference a file://
     // URL directly (e.g. images with content-security-policy restrictions).
     read: (
@@ -923,6 +990,26 @@ const api = {
   // searches exactly as v3.8.0. These let a UI enable it per-org, pick the embed
   // backend (DEC-015 local/openai), build the chunk index, and read status.
   brain: {
+    // ── Merged 2026-08-03 (M1) ────────────────────────────────────────────────
+    // `main` shipped its own `brain:` preload namespace holding exactly one method,
+    // ingestWorkspace. Two `brain` keys in one object literal is a TS1117 error, so
+    // the two are folded together HERE rather than either being dropped: the
+    // renderer call sites that main brought with it (fileManager, CommandCenter,
+    // BrainMapView) keep calling `window.api.brain.ingestWorkspace()` unchanged, and
+    // our P0 retrieval API keeps its shape. No behaviour changes on either side.
+    //
+    // What that ingest writes is a SEPARATE question, answered in the knowledge
+    // connector (M2): it mirrors desks/documents/widgets/files into fb_knowledge,
+    // and a mirror of an object we already index directly is a duplicate, not truth.
+    // We do not disable it — we are immune to it. See connectors/knowledge.ts.
+    ingestWorkspace: (): Promise<{
+      desks: number
+      documents: number
+      widgets: number
+      files: number
+      created: number
+      updated: number
+    }> => ipcRenderer.invoke('brain:ingestWorkspace'),
     status: (): Promise<{
       enabled: boolean
       stage: number
@@ -1116,6 +1203,12 @@ const api = {
       ipcRenderer.invoke('fileManager:rename', id, name),
     move: (id: string, newParentId: string | null): Promise<boolean> =>
       ipcRenderer.invoke('fileManager:move', id, newParentId),
+    moveToOrg: (id: string, orgId: string, teamId?: string | null): Promise<string[]> =>
+      ipcRenderer.invoke('fileManager:moveToOrg', id, orgId, teamId ?? null),
+    importFolder: (
+      parentId: string | null
+    ): Promise<{ ok: boolean; canceled?: boolean; files?: number; folders?: number; skipped?: number; rootId?: string | null }> =>
+      ipcRenderer.invoke('fileManager:importFolder', parentId),
     // Soft-delete: returns the ids trashed (entry + subtree) so the caller can undo.
     delete: (id: string): Promise<string[]> => ipcRenderer.invoke('fileManager:delete', id),
     restore: (ids: string[]): Promise<boolean> => ipcRenderer.invoke('fileManager:restore', ids),
@@ -1682,31 +1775,42 @@ const api = {
   // local DB. These expose the local half (collect changes, apply pulls, cursor).
   workspaceSync: {
     pending: (): Promise<{
-      upserts: Array<{ id: string; itemType: 'node' | 'widget' | 'timeblock' | 'document' | 'table' | 'row'; body: Record<string, unknown>; baseRev: number }>
-      deletes: Array<{ id: string; itemType: 'node' | 'widget' | 'timeblock' | 'document' | 'table' | 'row'; baseRev: number }>
+      upserts: Array<{ id: string; itemType: 'node' | 'widget' | 'timeblock' | 'document' | 'table' | 'row' | 'file'; body: Record<string, unknown>; baseRev: number }>
+      deletes: Array<{ id: string; itemType: 'node' | 'widget' | 'timeblock' | 'document' | 'table' | 'row' | 'file'; baseRev: number }>
     }> => ipcRenderer.invoke('workspace:pending'),
-    markPushed: (itemType: 'node' | 'widget' | 'timeblock' | 'document' | 'table' | 'row', id: string, rev: number): Promise<void> =>
+    markPushed: (itemType: 'node' | 'widget' | 'timeblock' | 'document' | 'table' | 'row' | 'file', id: string, rev: number): Promise<void> =>
       ipcRenderer.invoke('workspace:markPushed', itemType, id, rev),
     applyRemote: (
-      items: Array<{ id: string; itemType: 'node' | 'widget' | 'timeblock' | 'document' | 'table' | 'row'; body: Record<string, unknown> | null; rev: number; deleted: boolean }>
+      items: Array<{ id: string; itemType: 'node' | 'widget' | 'timeblock' | 'document' | 'table' | 'row' | 'file'; body: Record<string, unknown> | null; rev: number; deleted: boolean }>
     ): Promise<{ applied: number }> => ipcRenderer.invoke('workspace:applyRemote', items),
     getCursor: (): Promise<number> => ipcRenderer.invoke('workspace:getCursor'),
     setCursor: (n: number): Promise<void> => ipcRenderer.invoke('workspace:setCursor', n),
-    // Org-shared variants (cross-member time blocks). The active org id selects
-    // the scope and its own cursor; markPushed is shared (it keys by id only).
+    // Org-shared variants (cross-member sync). The active org id selects the scope
+    // and its own cursor; markPushed is shared (it keys by id only).
     pendingOrg: (
       orgId: string
     ): Promise<{
-      upserts: Array<{ id: string; itemType: 'node' | 'widget' | 'timeblock' | 'document' | 'table' | 'row'; body: Record<string, unknown>; baseRev: number }>
-      deletes: Array<{ id: string; itemType: 'node' | 'widget' | 'timeblock' | 'document' | 'table' | 'row'; baseRev: number }>
+      upserts: Array<{ id: string; itemType: 'node' | 'widget' | 'timeblock' | 'document' | 'table' | 'row' | 'file'; body: Record<string, unknown>; baseRev: number; teamId?: string | null }>
+      deletes: Array<{ id: string; itemType: 'node' | 'widget' | 'timeblock' | 'document' | 'table' | 'row' | 'file'; baseRev: number }>
     }> => ipcRenderer.invoke('workspace:pendingOrg', orgId),
     applyRemoteOrg: (
-      items: Array<{ id: string; itemType: 'node' | 'widget' | 'timeblock' | 'document' | 'table' | 'row'; body: Record<string, unknown> | null; rev: number; deleted: boolean }>,
+      items: Array<{ id: string; itemType: 'node' | 'widget' | 'timeblock' | 'document' | 'table' | 'row' | 'file'; body: Record<string, unknown> | null; rev: number; deleted: boolean; teamId?: string | null }>,
       orgId: string
     ): Promise<{ applied: number }> => ipcRenderer.invoke('workspace:applyRemoteOrg', items, orgId),
     getCursorOrg: (orgId: string): Promise<number> => ipcRenderer.invoke('workspace:getCursorOrg', orgId),
     setCursorOrg: (orgId: string, n: number): Promise<void> =>
-      ipcRenderer.invoke('workspace:setCursorOrg', orgId, n)
+      ipcRenderer.invoke('workspace:setCursorOrg', orgId, n),
+    // Cross-member Drive file bytes. Metadata rides the loops above; these move the
+    // bytes: read a local file to upload, check whether a pulled file's bytes are
+    // already here, and write downloaded bytes to disk.
+    fileBytesForPush: (
+      id: string
+    ): Promise<{ ext: string; mimeType: string; bytes: Uint8Array } | null> =>
+      ipcRenderer.invoke('workspace:fileBytesForPush', id),
+    hasLocalFileBytes: (id: string): Promise<boolean> =>
+      ipcRenderer.invoke('workspace:hasLocalFileBytes', id),
+    writeSyncedFileBytes: (id: string, bytes: Uint8Array): Promise<boolean> =>
+      ipcRenderer.invoke('workspace:writeSyncedFileBytes', id, bytes)
   },
   // Mail (IMAP) — the user's own mailbox, connected straight from the desktop.
   // The password never crosses this boundary on read; the renderer only ever
