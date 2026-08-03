@@ -17,6 +17,13 @@ export interface KnowledgeEntry {
   pinned: boolean
   createdAt: number
   updatedAt: number
+  // PROVENANCE (M2). null = a human authored this entry — curated truth, which is
+  // what fb_knowledge is for. Non-null = the row is a MIRROR written by
+  // main/brainIngest.ts's workspace sync ('document' | 'node' | 'widget' | 'file'):
+  // a copy of an object that already has its own source table and its own connector.
+  // Retrieval indexes the original and skips the mirror — one object, one path into
+  // the index. See connectors/knowledge.ts + tests/unit/knowledgeMirrorImmunity.test.ts.
+  sourceKind: string | null
 }
 
 export interface KnowledgeDraft {

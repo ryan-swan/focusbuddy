@@ -17,6 +17,10 @@ interface KnowledgeRow {
   pinned: number
   created_at: number
   updated_at: number
+  // Written by main/brainIngest.ts's workspace sync; null for hand-authored entries.
+  // Already returned by every `SELECT *` below — M2 simply stops discarding it, so the
+  // retrieval layer can tell curated truth from a mirror of an object it already indexes.
+  source_kind: string | null
 }
 
 function parseTags(raw: string): string[] {
@@ -36,7 +40,10 @@ function rowToEntry(row: KnowledgeRow): KnowledgeEntry {
     tags: parseTags(row.tags_json),
     pinned: row.pinned === 1,
     createdAt: row.created_at,
-    updatedAt: row.updated_at
+    updatedAt: row.updated_at,
+    // `?? null` normalises the pre-migration shape: rows written before main added the
+    // column read back undefined, and undefined must mean "hand-authored", not "unknown".
+    sourceKind: row.source_kind ?? null
   }
 }
 
