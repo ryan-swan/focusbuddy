@@ -409,15 +409,125 @@ export interface ChatAttachment {
   text: string
 }
 
+// ── @-mentions (Phase 4) ────────────────────────────────────────────────────
+// A typed, id-bearing reference to a real workspace object that the user named
+// with "@" (or by clicking it). Deliberately NOT lib/mentions.ts's @handle text
+// tokens, which live in PlexiChat, mean "notify this person", and carry no id —
+// a text token can make no honest claim about what rode the request.
+//
+// This is the WIRE shape: what the main process needs to resolve the reference.
+// The renderer's MentionRef adds an icon and the conversation it belongs to,
+// both of which are presentation/state and stop at the IPC boundary.
+export type ChatMentionKind =
+  | 'document'
+  | 'desk'
+  | 'room'
+  | 'widget'
+  | 'file'
+  | 'knowledge'
+  | 'person'
+
+export interface ChatMentionRef {
+  kind: ChatMentionKind
+  id: string
+  title: string
+  // The desk that owns a widget reference — what lets the resolver read a
+  // widget on a desk the user is not currently looking at. (The renderer's own
+  // attachment gathering stops at the current desk; this is what mentions add.)
+  taskId?: string | null
+}
+
+// What a reference ACTUALLY produced, reported back so the renderer can be
+// honest about it. A reference that resolved to nothing must never render as
+// though the assistant read it.
+export interface ChatMentionResolved {
+  kind: ChatMentionKind
+  id: string
+  title: string
+  // True only when real text was extracted AND genuinely reached the prompt.
+  resolved: boolean
+  // How many characters actually rode, after every cap.
+  chars: number
+  // The prompt budget cut this reference short. Stated, never silent.
+  truncated: boolean
+  // Why it did not resolve, when it did not. Null when it did.
+  reason: string | null
+}
+
 export interface ChatRequest {
   taskId: string | null
   messages: ChatMessage[]
   // Live content the user has open on the canvas, gathered by the renderer.
   attachments?: ChatAttachment[]
+  // Workspace objects the user explicitly referenced for this conversation
+  // (Phase 4). Additive and optional, exactly like pinnedWidgetId before it, so
+  // every surface that does not offer mentions is untouched. Their content is
+  // force-included ahead of retrieved material, and the prompt claims a
+  // reference ONLY when its text genuinely rendered (see chatMentions.ts).
+  mentions?: ChatMentionRef[]
   // Layer-1 structural index of the whole workspace (ids + titles, no bodies),
   // gathered by the renderer so the assistant knows what exists and can act on
   // real items. Optional: absent for callers that don't provide it.
   workspace?: WorkspaceSnapshot
+  // The calling surface can render a structured follow-up question card. Only
+  // then does the system prompt teach the ask-protocol — chat:send is shared
+  // by surfaces (focus chat, dashboard cards, field editor) that have no card
+  // to render, and a model taught to ask there produces turns that dead-end.
+  supportsQuestions?: boolean
+  // The widget the user clicked-to-pin as this conversation's primary
+  // reference (Phase 3a.1). Additive and optional: surfaces with no pin
+  // affordance never set it. The prompt claims a pin only when the id resolves
+  // to an attachment that genuinely rendered (see chatAttachments).
+  pinnedWidgetId?: string
+}
+
+// A retrieved workspace document the assistant was grounded on. Slimmed from
+// the main process's WorkspaceSource: the renderer needs enough to label, order
+// and open a citation — not the full extracted body that went to the model.
+export interface ChatSource {
+  // 1-based citation number. Matches the [n] markers the model is told to use
+  // inline in its reply, so a marker and its chip always refer to the same doc.
+  n: number
+  docId: string
+  title: string
+  docType: string
+  snippet: string
+}
+
+// One action the assistant prepared, surfaced in the retrieval trace the moment
+// its JSON object completes in the stream — before the whole response lands.
+// Deliberately NOT an ActionProposal: this is read off the raw envelope ahead of
+// sanitisation, so `kind` is whatever the model wrote and the entry is a record
+// of what happened, not a promise that a card will appear.
+export interface ChatToolTrace {
+  // 0-based order of arrival within this response.
+  index: number
+  kind: string
+  // The line the trace draws, e.g. "Email draft → Ryan".
+  label: string
+}
+
+// Fired the moment retrieval returns, carrying what it found and how long it
+// actually took. An empty `sources` array is a real result — it means the
+// workspace had nothing relevant, which the trace shows honestly rather than
+// hiding.
+export interface ChatRetrievalTrace {
+  sources: ChatSource[]
+  elapsedMs: number
+}
+
+// A structured follow-up the assistant asks instead of guessing — rendered as
+// a choice card above the composer. Emitted by the model inside the
+// {reply, question, actions} envelope, and only ever taught to surfaces that
+// declared supportsQuestions on the request. Single-select; answering sends
+// the chosen option (or the user's own words) as a normal user turn.
+export interface ChatQuestion {
+  prompt: string
+  // 2–5 short, mutually exclusive choices.
+  options: string[]
+  // Whether typing in the composer is a valid answer ("Or, describe it…").
+  // False means only the listed options make sense.
+  allowFreeText: boolean
 }
 
 export interface ChatResponse {
@@ -429,6 +539,19 @@ export interface ChatResponse {
   // it WOULD do; the renderer shows each as a confirmable card and only
   // executes those the user accepts. Empty/undefined for plain chat replies.
   proposals?: ActionProposal[]
+  // The workspace material this answer was grounded on. Retrieval already ran on
+  // every message to build the prompt; returning it lets the renderer show what
+  // the answer stands on instead of discarding it.
+  sources?: ChatSource[]
+  // A follow-up question the model asked instead of acting on a guess. Present
+  // only when the model actually emitted one — the renderer must never invent
+  // or show a question the model did not ask.
+  question?: ChatQuestion
+  // What each @-mention on the request actually produced (Phase 4). Present
+  // only when the request carried mentions. This is the sole source of truth
+  // for the trace's "Mentioned" lane and for marking a chip broken — the
+  // renderer may not assume a reference resolved just because it was sent.
+  mentions?: ChatMentionResolved[]
 }
 
 // ── Action proposals (AI → workspace actions, gated by user confirmation) ───
@@ -2051,12 +2174,37 @@ export interface FocusClusterDraft {
 // ── Persisted AI-chat history (local, free-standing conversations) ──────────
 // Ported from Caleb's Focus-Mode branch. Backs the aiChat DB module + the
 // Focus-Mode chat surface. ActionProposal / ChatRole already exist on this line.
+// Where a conversation was started (Phase 4.5). Before unification the
+// assistant re-threaded per screen, so "which screen" WAS the conversation;
+// after it, a conversation remembers its origin and keeps it while you walk
+// away (plan D4). Null on conversations written before unification — they
+// genuinely do not know, and the UI says nothing rather than guessing.
+export interface AiChatConversationContext {
+  kind: string
+  label: string
+  title: string
+  icon: string
+}
+
+// The retrieval trace as persisted. Deliberately NOT the live AssistantTrace:
+// the renderer clock stamps that drive the progressive reveal describe one
+// session's animation, not a durable fact. What survives is what the assistant
+// actually did.
+export interface StoredTrace {
+  sources: ChatSource[]
+  tools: ChatToolTrace[]
+  mentions: ChatMentionResolved[]
+  retrievalMs: number | null
+  error: string | null
+}
+
 export interface AiChatConversationMeta {
   id: string
   taskId: string | null
   title: string
   createdAt: number
   updatedAt: number
+  context?: AiChatConversationContext | null
   // Number of messages — for the history list preview. Populated by the list
   // query; not stored on the row.
   messageCount?: number
@@ -2074,6 +2222,16 @@ export interface AiChatStoredMessage {
   proposals: ActionProposal[]
   // Approved-card state keyed by proposal id.
   applied: Record<string, AppliedProposal>
+  // Phase 4.5 — what the panel always showed and persistence used to drop.
+  // Citations this answer stands on.
+  sources: ChatSource[]
+  // The follow-up the model asked on this turn, if it asked one.
+  question: ChatQuestion | null
+  // What the assistant actually did to produce this turn.
+  trace: StoredTrace | null
+  // The references the USER's turn was sent with, so the transcript can redraw
+  // its chips exactly where they were typed.
+  mentions: ChatMentionRef[]
 }
 export interface AiChatConversation {
   meta: AiChatConversationMeta
@@ -2167,3 +2325,7 @@ export type ChatBlock =
   | { kind: 'widget-card'; widgetId?: string; documentId?: string; title: string; widgetKind?: WidgetKind }
   | { kind: 'link'; href: string; label: string; external?: boolean }
   | { kind: 'connector-action'; connector: string; label: string; proposal: ActionProposal }
+  // What the answer was grounded on. Rendered as a row of numbered chips under
+  // the reply, matching the [n] markers inside it.
+  | { kind: 'mentions'; mentions: ChatMentionResolved[] }
+  | { kind: 'sources'; sources: ChatSource[] }

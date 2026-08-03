@@ -24,6 +24,14 @@ export function collectTiptapText(node: unknown): string {
   return block ? inner + '\n' : inner
 }
 
+// The ceiling extractDocText applies to every document body. Exported — purely
+// additive, no behaviour change — so callers that must be honest about
+// truncation can tell "this document is exactly this long" from "this is merely
+// where the cut fell". @-mention resolution needs that distinction: quoting
+// 12000 as a document's full length when it is only the cap would state a
+// number that is not true.
+export const DOC_TEXT_CAP = 12000
+
 export function extractDocText(docType: string, body: unknown): string {
   try {
     const b = (body ?? {}) as Record<string, unknown>

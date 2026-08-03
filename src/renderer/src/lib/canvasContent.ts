@@ -16,6 +16,7 @@ import {
   widgetToText,
   contentToPlainText,
   docBodyToText,
+  ATTACHABLE_WIDGET_KINDS,
   type WidgetTextResolvers,
   type ResolvedTable
 } from '@shared/widgetText'
@@ -23,15 +24,10 @@ import {
 const WEBVIEW_KINDS = new Set<WidgetKind>(['webview', 'pdf', 'gdoc', 'gsheet', 'gslide', 'email'])
 const OFFICE_KINDS = new Set<WidgetKind>(['doc', 'sheet', 'slides', 'map', 'design'])
 
-// Kinds worth sending as a FULL-text attachment (the deep channel). Chrome-only
-// kinds (section, minimap, timers, colours) are excluded here; they still appear
-// in the assistant's prompt summary via the same extractor.
-const ATTACH_KINDS = new Set<WidgetKind>([
-  'note', 'sticky', 'markdown', 'page', 'living-doc', 'card', 'custom-block',
-  'webview', 'pdf', 'gdoc', 'gsheet', 'gslide', 'email',
-  'doc', 'sheet', 'slides', 'map', 'design',
-  'table', 'chart', 'diagram', 'mindmap', 'agent', 'field'
-])
+// Kinds worth sending as a FULL-text attachment (the deep channel). Canonical
+// list lives beside the shared extractor (ATTACHABLE_WIDGET_KINDS) so the
+// assistant's click-to-pin rule and this gathering agree on what can ride.
+const ATTACH_KINDS = ATTACHABLE_WIDGET_KINDS
 
 const MAX_WIDGETS = 8
 const PER_WIDGET = 8000
@@ -48,7 +44,13 @@ function wireRelationship(link: WidgetLink): string {
   return 'is linked as context to'
 }
 
-export async function gatherCanvasAttachments(taskId: string | null): Promise<ChatAttachment[]> {
+export async function gatherCanvasAttachments(
+  taskId: string | null,
+  // A widget the user explicitly pinned as the conversation's primary reference
+  // (Phase 3a.1). It outranks even the focused widget, so it always survives
+  // the MAX_WIDGETS cut and rides the request first.
+  pinnedWidgetId?: string
+): Promise<ChatAttachment[]> {
   const state = useWidgetStore.getState()
   const focusedId = state.focusedWidgetId
   const all = state.widgets.filter((w) => (taskId ? w.taskId === taskId : true))
@@ -68,8 +70,10 @@ export async function gatherCanvasAttachments(taskId: string | null): Promise<Ch
     }
   }
 
-  // Order: focused first, then widgets linked to it, then the rest.
-  const rank = (w: { id: string }): number => (w.id === focusedId ? 0 : linkedRel.has(w.id) ? 1 : 2)
+  // Order: pinned first, then focused, then widgets linked to the focused one,
+  // then the rest.
+  const rank = (w: { id: string }): number =>
+    w.id === pinnedWidgetId ? 0 : w.id === focusedId ? 1 : linkedRel.has(w.id) ? 2 : 3
   candidates.sort((a, b) => rank(a) - rank(b))
   const chosen = candidates.slice(0, MAX_WIDGETS)
 

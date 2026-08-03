@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, it, expect } from 'vitest'
 import { memSqlDb } from './_memdb'
 import { createEventStore } from '../../src/main/db/eventStore'

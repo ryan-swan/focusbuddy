@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, it, expect } from 'vitest'
 import { writeFileSync, mkdirSync } from 'node:fs'
 import { memSqlDb } from './_memdb'

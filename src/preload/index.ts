@@ -6,8 +6,12 @@ import type {
   AiBuildResponse,
   BodyDoubleResponse,
   BrowsingHistoryEntry,
+  ChatQuestion,
   ChatRequest,
   ChatResponse,
+  ChatMentionResolved,
+  ChatRetrievalTrace,
+  ChatToolTrace,
   ConnectedApp,
   ConnectedAppDraft,
   ConnectedAppPatch,
@@ -173,6 +177,8 @@ const api = {
     cancel: (id: string): Promise<boolean> => ipcRenderer.invoke('decisions:cancel', id)
   },
   widgets: {
+    // Fetch one widget by id. Needed to answer "which desk is this on?" when all
+    // you have is the widget — a cited source names the widget, not its canvas.
     get: (id: string): Promise<Widget | null> => ipcRenderer.invoke('widgets:get', id),
     listByTask: (taskId: string): Promise<Widget[]> =>
       ipcRenderer.invoke('widgets:listByTask', taskId),
@@ -381,7 +387,89 @@ const api = {
     send: (req: ChatRequest): Promise<ChatResponse> => ipcRenderer.invoke('chat:send', req),
     hasApiKey: (): Promise<boolean> => ipcRenderer.invoke('chat:hasApiKey'),
     proactiveWelcome: (taskId: string): Promise<ChatResponse> =>
-      ipcRenderer.invoke('chat:proactiveWelcome', taskId)
+      ipcRenderer.invoke('chat:proactiveWelcome', taskId),
+    // Streaming variant — the caller mints a requestId and listens on the
+    // per-request channel, so several sends can be in flight without their
+    // events crossing. Returns a cleanup function to unsubscribe.
+    //
+    // `sources` fires the moment retrieval returns, `reply` when the prose
+    // lands whole, `question` if (and only if) the model asked one, `tool`
+    // once per action the model finishes writing, then exactly one of
+    // `complete` / `error`. The `complete` payload is the same ChatResponse
+    // `send` returns — the streamed events are the trace, this is the result
+    // (it carries the question too, so missing the event loses only earliness).
+    sendStream: (
+      req: ChatRequest & { requestId: string },
+      callbacks: {
+        onMentions?: (mentions: ChatMentionResolved[]) => void
+        onSources?: (trace: ChatRetrievalTrace) => void
+        onReply?: (text: string) => void
+        onTool?: (tool: ChatToolTrace) => void
+        onQuestion?: (question: ChatQuestion) => void
+        onError?: (error: { ok: false; error: string; needsApiKey?: boolean }) => void
+        onComplete?: (response: ChatResponse) => void
+      }
+    ): (() => void) => {
+      const channel = `chat:stream:${req.requestId}`
+      type Event =
+        | { type: 'mentions'; payload: ChatMentionResolved[] }
+        | { type: 'sources'; payload: ChatRetrievalTrace }
+        | { type: 'reply'; payload: string }
+        | { type: 'tool'; payload: ChatToolTrace }
+        | { type: 'question'; payload: ChatQuestion }
+        | { type: 'error'; payload: { ok: false; error: string; needsApiKey?: boolean } }
+        | { type: 'complete'; payload: ChatResponse }
+      // Whether a terminal event (complete | error) has already been delivered.
+      // Guards the invoke-rejection backstop below from firing a second one.
+      let settled = false
+      const handler = (_: unknown, ev: Event): void => {
+        switch (ev.type) {
+          case 'mentions':
+            callbacks.onMentions?.(ev.payload)
+            break
+          case 'sources':
+            callbacks.onSources?.(ev.payload)
+            break
+          case 'reply':
+            callbacks.onReply?.(ev.payload)
+            break
+          case 'tool':
+            callbacks.onTool?.(ev.payload)
+            break
+          case 'question':
+            callbacks.onQuestion?.(ev.payload)
+            break
+          case 'error':
+            settled = true
+            callbacks.onError?.(ev.payload)
+            break
+          case 'complete':
+            settled = true
+            callbacks.onComplete?.(ev.payload)
+            break
+        }
+      }
+      ipcRenderer.on(channel, handler)
+      // Same fire-and-forget shape as voiceCommand.runStream: the events carry
+      // the result. The one thing we watch is the invoke itself rejecting — if
+      // the main handler dies before emitting anything, no terminal event is
+      // coming and the caller would wait forever. Synthesise the error so a dead
+      // handler surfaces as a failure, not a stuck spinner.
+      void ipcRenderer.invoke('chat:sendStream', req).catch((e: unknown) => {
+        if (settled) return
+        settled = true
+        callbacks.onError?.({
+          ok: false,
+          error: e instanceof Error ? e.message : 'The assistant request stopped unexpectedly.'
+        })
+      })
+      // Braces so the cleanup arrow returns void — ipcRenderer.removeListener
+      // returns the IpcRenderer instance, which a `(): void =>` concise body
+      // would otherwise try (and fail) to return.
+      return (): void => {
+        ipcRenderer.removeListener(channel, handler)
+      }
+    }
   },
   // Focus-Mode clusters (split "groups") — per-desk saved split layouts.
   clusters: {
@@ -1636,8 +1724,22 @@ const api = {
       ipcRenderer.invoke('documents:reindex'),
     semanticActive: (): Promise<boolean> => ipcRenderer.invoke('documents:semanticActive')
   },
+  // People the app has fetched, published to the main process so an @-mention
+  // can resolve one. Coverage is honestly partial: whatever the renderer has
+  // actually loaded, never a promise of the whole directory.
+  people: {
+    setDirectory: (
+      people: Array<{
+        accountId: string
+        handle: string
+        firstName: string | null
+        lastName: string | null
+        role: string
+      }>
+    ): Promise<void> => ipcRenderer.invoke('people:setDirectory', people)
+  },
   // Persisted AI-assistant chat history (local, free-standing conversations) —
-  // backs the Focus-Mode chat surface.
+  // backs the assistant's one conversation system.
   aiChat: {
     listConversations: (): Promise<import('@shared/types').AiChatConversationMeta[]> =>
       ipcRenderer.invoke('aiChat:listConversations'),
@@ -1646,6 +1748,7 @@ const api = {
     createConversation: (input: {
       taskId: string | null
       title?: string
+      context?: import('@shared/types').AiChatConversationContext | null
     }): Promise<import('@shared/types').AiChatConversationMeta> =>
       ipcRenderer.invoke('aiChat:createConversation', input),
     appendMessage: (
@@ -1656,6 +1759,10 @@ const api = {
         ts: number
         proposals?: import('@shared/types').ActionProposal[]
         applied?: Record<string, import('@shared/types').AppliedProposal>
+        sources?: import('@shared/types').ChatSource[]
+        question?: import('@shared/types').ChatQuestion | null
+        trace?: import('@shared/types').StoredTrace | null
+        mentions?: import('@shared/types').ChatMentionRef[]
       }
     ): Promise<import('@shared/types').AiChatStoredMessage> =>
       ipcRenderer.invoke('aiChat:appendMessage', conversationId, message),

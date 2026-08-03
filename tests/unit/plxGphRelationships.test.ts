@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, it, expect } from 'vitest'
 import { memSqlDb } from './_memdb'
 import { createRelationshipStore, relationshipConfirmedEvent, type ProposeInput } from '../../src/main/db/relationshipStore'

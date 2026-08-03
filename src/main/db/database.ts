@@ -853,6 +853,21 @@ export function getDb(): Database.Database {
     );
     CREATE INDEX IF NOT EXISTS idx_ai_chat_msg_conv ON ai_chat_messages (conversation_id, ts ASC);
   `)
+  // Phase 4.5 — unification. The panel held four things per turn that the
+  // persisted focus chat never did (citations, a follow-up question, the
+  // retrieval trace, the @-mentions it was sent with). With ONE conversation
+  // system behind both surfaces, leaving them out would make persistence a
+  // regression against what the panel already showed. All additive: existing
+  // rows stay valid, nothing is rewritten at rest, and a NULL simply means the
+  // turn had none.
+  ensureColumn(db, 'ai_chat_messages', 'sources_json', 'TEXT')
+  ensureColumn(db, 'ai_chat_messages', 'question_json', 'TEXT')
+  ensureColumn(db, 'ai_chat_messages', 'trace_json', 'TEXT')
+  ensureColumn(db, 'ai_chat_messages', 'mentions_json', 'TEXT')
+  // What screen a conversation was started from, so it can say so later. The
+  // assistant used to re-thread per screen; after unification a conversation
+  // REMEMBERS its context instead of being replaced by it (plan D4).
+  ensureColumn(db, 'ai_chat_conversations', 'context_json', 'TEXT')
   // Multi-org tenancy for the remaining user-data surfaces so switching org
   // isolates the calendar, vault, knowledge and tables too, not just desks and
   // documents. Added at the end where every table exists; existing rows backfill

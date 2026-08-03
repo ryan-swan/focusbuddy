@@ -89,3 +89,58 @@ describe('salvageEnvelope', () => {
     expect((out!.actions[0] as { content: string }).content).toBe('a } b ] c {')
   })
 })
+
+describe('salvageEnvelope — question', () => {
+  const Q = '{"prompt":"Which desk?","options":["Marketing","A new desk"],"allowFreeText":true}'
+
+  it('keeps a complete question when the actions were cut off', () => {
+    const truncated =
+      `{"reply":"One thing first.","question":${Q},"actions":[{"kind":"create-table","ti`
+    const out = salvageEnvelope(truncated)
+    expect(out).not.toBeNull()
+    expect(out!.reply).toBe('One thing first.')
+    expect(out!.question).toEqual(JSON.parse(Q))
+    expect(out!.actions).toHaveLength(0)
+  })
+
+  it('a complete question alone is worth salvaging — a turn that asks carries no actions', () => {
+    const truncated = `{"reply":"One thing first.","question":${Q},"actions":[`
+    const out = salvageEnvelope(truncated)
+    expect(out).not.toBeNull()
+    expect(out!.question).toEqual(JSON.parse(Q))
+  })
+
+  it('keeps the question even when the cutoff landed inside the "actions" key itself', () => {
+    const truncated = `{"reply":"One thing first.","question":${Q},"act`
+    const out = salvageEnvelope(truncated)
+    expect(out).not.toBeNull()
+    expect(out!.question).toEqual(JSON.parse(Q))
+    expect(out!.actions).toHaveLength(0)
+  })
+
+  it('drops a question that was cut off mid-object', () => {
+    const truncated = '{"reply":"x","question":{"prompt":"cut","options":["a","b'
+    expect(salvageEnvelope(truncated)).toBeNull()
+  })
+
+  it('omits the key entirely when the envelope had no question', () => {
+    const truncated =
+      '{"reply":"x","actions":[{"kind":"create-todo-list","title":"Gates"},{"kind":"create-table","ti'
+    const out = salvageEnvelope(truncated)
+    expect(out).not.toBeNull()
+    expect('question' in out!).toBe(false)
+  })
+
+  it('does not mistake a question spelled inside the reply prose for the field', () => {
+    // The reply QUOTES a question-shaped fragment; the real envelope has no
+    // question field. Salvaging one out of the prose would render a question
+    // the model never asked.
+    const truncated =
+      '{"reply":"Write \\"question\\": {\\"prompt\\": \\"fake\\", \\"options\\": [\\"a\\", \\"b\\"]} in your config.",' +
+      '"actions":[{"kind":"create-todo-list","title":"Gates"},{"kind":"create-table","ti'
+    const out = salvageEnvelope(truncated)
+    expect(out).not.toBeNull()
+    expect('question' in out!).toBe(false)
+    expect(out!.actions).toHaveLength(1)
+  })
+})

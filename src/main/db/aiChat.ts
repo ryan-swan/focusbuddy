@@ -4,10 +4,15 @@ import { getActiveOrgId } from './activeOrg'
 import type {
   ActionProposal,
   AiChatConversation,
+  AiChatConversationContext,
   AiChatConversationMeta,
   AiChatStoredMessage,
   AppliedProposal,
-  ChatRole
+  ChatMentionRef,
+  ChatQuestion,
+  ChatRole,
+  ChatSource,
+  StoredTrace
 } from '@shared/types'
 
 // Local persistence for the AI-assistant chat: free-standing conversations and
@@ -23,6 +28,10 @@ interface ConversationRow {
   title: string
   created_at: number
   updated_at: number
+  // Phase 4.5: the screen this conversation was started from. NULL on every row
+  // written before unification, which is honest — those conversations genuinely
+  // do not know, and the UI says nothing rather than guessing.
+  context_json: string | null
 }
 
 interface MessageRow {
@@ -33,6 +42,12 @@ interface MessageRow {
   ts: number
   proposals_json: string | null
   applied_json: string | null
+  // Phase 4.5 — the four things the panel held per turn that persistence did
+  // not. NULL means the turn genuinely had none.
+  sources_json: string | null
+  question_json: string | null
+  trace_json: string | null
+  mentions_json: string | null
   created_at: number
 }
 
@@ -46,6 +61,7 @@ function rowToMeta(
     title: row.title,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    context: safeParse<AiChatConversationContext | null>(row.context_json, null),
     messageCount: extras?.messageCount,
     preview: extras?.preview
   }
@@ -87,7 +103,11 @@ function rowToMessage(row: MessageRow): AiChatStoredMessage {
     content: row.content,
     ts: row.ts,
     proposals: safeParse<ActionProposal[]>(row.proposals_json, []),
-    applied: safeParse<Record<string, AppliedProposal>>(row.applied_json, {})
+    applied: safeParse<Record<string, AppliedProposal>>(row.applied_json, {}),
+    sources: safeParse<ChatSource[]>(row.sources_json, []),
+    question: safeParse<ChatQuestion | null>(row.question_json, null),
+    trace: safeParse<StoredTrace | null>(row.trace_json, null),
+    mentions: safeParse<ChatMentionRef[]>(row.mentions_json, [])
   }
 }
 
@@ -97,7 +117,7 @@ export function listConversations(): AiChatConversationMeta[] {
   const org = getActiveOrgId()
   const rows = db
     .prepare(
-      `SELECT id, org_id, task_id, title, created_at, updated_at
+      `SELECT id, org_id, task_id, title, created_at, updated_at, context_json
        FROM ai_chat_conversations WHERE org_id = ? ORDER BY updated_at DESC`
     )
     .all(org) as ConversationRow[]
@@ -121,14 +141,15 @@ export function getConversation(id: string): AiChatConversation | null {
   const org = getActiveOrgId()
   const row = db
     .prepare(
-      `SELECT id, org_id, task_id, title, created_at, updated_at
+      `SELECT id, org_id, task_id, title, created_at, updated_at, context_json
        FROM ai_chat_conversations WHERE id = ? AND org_id = ?`
     )
     .get(id, org) as ConversationRow | undefined
   if (!row) return null
   const msgRows = db
     .prepare(
-      `SELECT id, conversation_id, role, content, ts, proposals_json, applied_json, created_at
+      `SELECT id, conversation_id, role, content, ts, proposals_json, applied_json,
+              sources_json, question_json, trace_json, mentions_json, created_at
        FROM ai_chat_messages WHERE conversation_id = ? ORDER BY ts ASC`
     )
     .all(id) as MessageRow[]
@@ -139,20 +160,26 @@ export function getConversation(id: string): AiChatConversation | null {
 export function createConversation(input: {
   taskId: string | null
   title?: string
+  // Where this conversation was started. Optional so callers that genuinely do
+  // not know (a fresh chat opened from nowhere) record nothing rather than a
+  // placeholder.
+  context?: AiChatConversationContext | null
 }): AiChatConversationMeta {
   const db = getDb()
   const id = randomUUID()
   const now = Date.now()
   db.prepare(
-    `INSERT INTO ai_chat_conversations (id, org_id, task_id, title, created_at, updated_at)
-     VALUES (@id, @org_id, @task_id, @title, @created_at, @updated_at)`
+    `INSERT INTO ai_chat_conversations
+      (id, org_id, task_id, title, created_at, updated_at, context_json)
+     VALUES (@id, @org_id, @task_id, @title, @created_at, @updated_at, @context_json)`
   ).run({
     id,
     org_id: getActiveOrgId(),
     task_id: input.taskId,
     title: input.title?.trim() || '',
     created_at: now,
-    updated_at: now
+    updated_at: now,
+    context_json: input.context ? JSON.stringify(input.context) : null
   })
   return {
     id,
@@ -160,6 +187,7 @@ export function createConversation(input: {
     title: input.title?.trim() || '',
     createdAt: now,
     updatedAt: now,
+    context: input.context ?? null,
     messageCount: 0
   }
 }
@@ -173,6 +201,10 @@ export function appendMessage(
     ts: number
     proposals?: ActionProposal[]
     applied?: Record<string, AppliedProposal>
+    sources?: ChatSource[]
+    question?: ChatQuestion | null
+    trace?: StoredTrace | null
+    mentions?: ChatMentionRef[]
   }
 ): AiChatStoredMessage {
   const db = getDb()
@@ -184,8 +216,10 @@ export function appendMessage(
   const now = Date.now()
   db.prepare(
     `INSERT INTO ai_chat_messages
-      (id, conversation_id, role, content, ts, proposals_json, applied_json, created_at)
-     VALUES (@id, @conversation_id, @role, @content, @ts, @proposals_json, @applied_json, @created_at)`
+      (id, conversation_id, role, content, ts, proposals_json, applied_json,
+       sources_json, question_json, trace_json, mentions_json, created_at)
+     VALUES (@id, @conversation_id, @role, @content, @ts, @proposals_json, @applied_json,
+             @sources_json, @question_json, @trace_json, @mentions_json, @created_at)`
   ).run({
     id,
     conversation_id: conversationId,
@@ -198,6 +232,11 @@ export function appendMessage(
       message.applied && Object.keys(message.applied).length
         ? JSON.stringify(message.applied)
         : null,
+    sources_json: message.sources && message.sources.length ? JSON.stringify(message.sources) : null,
+    question_json: message.question ? JSON.stringify(message.question) : null,
+    trace_json: message.trace ? JSON.stringify(message.trace) : null,
+    mentions_json:
+      message.mentions && message.mentions.length ? JSON.stringify(message.mentions) : null,
     created_at: now
   })
   db.prepare(`UPDATE ai_chat_conversations SET updated_at = ? WHERE id = ?`).run(now, conversationId)
@@ -207,7 +246,11 @@ export function appendMessage(
     content: message.content,
     ts: message.ts,
     proposals: message.proposals ?? [],
-    applied: message.applied ?? {}
+    applied: message.applied ?? {},
+    sources: message.sources ?? [],
+    question: message.question ?? null,
+    trace: message.trace ?? null,
+    mentions: message.mentions ?? []
   }
 }
 
