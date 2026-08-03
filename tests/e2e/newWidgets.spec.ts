@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { launchApp, type LaunchedApp, waitForReady } from './_helpers'
+import { launchApp, type LaunchedApp, waitForReady, hoverToolbar } from './_helpers'
 
 // Shape / Card / Custom-block widgets — they appear in the catalog, mount on the
 // canvas, and persist their JSON content through a reload.
@@ -48,6 +48,7 @@ test('catalog exposes shape, card and custom-block tiles', async () => {
   launched = await launchApp()
   const { window } = launched
   await seedAndOpen(launched, 'sticky', 's')
+  await hoverToolbar(window) // the toolbar only mounts the palette while hovered
   await window.locator('[data-testid="palette-add-button"]').click()
   await window.waitForTimeout(300)
   // shape / card / custom-block are Advanced tiles (go-live picker simplification),

@@ -146,6 +146,7 @@ export default function FloatingToolbar({
       <div
         {...sharedWrapper}
         data-floating-menu
+        data-testid="floating-toolbar"
         className="fixed z-[45] flex flex-row items-stretch fb-glass-chrome rounded-2xl overflow-hidden cursor-grab active:cursor-grabbing shadow-[0_4px_24px_rgba(0,0,0,0.14)] ring-1 ring-black/[0.07] dark:ring-white/[0.07]"
       >
         {/* Header: drag + icon in a single compact row */}
@@ -217,6 +218,7 @@ export default function FloatingToolbar({
     <div
       {...sharedWrapper}
       data-floating-menu
+      data-testid="floating-toolbar"
       className="fixed z-[45] flex flex-col items-stretch fb-glass-chrome rounded-2xl overflow-hidden cursor-grab active:cursor-grabbing shadow-[0_4px_24px_rgba(0,0,0,0.14)] ring-1 ring-black/[0.07] dark:ring-white/[0.07]"
     >
       {/* Header: drag handle + construction icon stacked */}
