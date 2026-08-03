@@ -512,6 +512,16 @@ const api = {
     // process prompt builder can offer real conversation ids to post-chat.
     setConversationSnapshot: (convs: Array<{ id: string; label: string }>): Promise<boolean> =>
       ipcRenderer.invoke('ai:setConversationSnapshot', convs),
+    // Label each desk object with a short topic so the Columns view can lay them
+    // out as topical columns. Honest degradation (needsApiKey) when no AI is set.
+    groupByTopic: (
+      items: Array<{ id: string; title: string; text: string }>
+    ): Promise<{
+      ok: boolean
+      topicByWidget?: Record<string, string>
+      needsApiKey?: boolean
+      error?: string
+    }> => ipcRenderer.invoke('ai:groupByTopic', items),
     // Raw single-turn completion for the command bar's intent router. The caller
     // supplies the system prompt and receives the model's text verbatim (no
     // workspace-build envelope parsing), so the router's small intent JSON

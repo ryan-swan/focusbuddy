@@ -14,6 +14,7 @@ interface WidgetRow {
   height: number
   z_index: number
   color: string | null
+  status: string | null
   pinned: number | null
   pinned_screen_x: number | null
   pinned_screen_y: number | null
@@ -44,6 +45,7 @@ function rowToWidget(row: WidgetRow): Widget {
     height: row.height,
     zIndex: row.z_index,
     color: row.color,
+    status: row.status ?? null,
     pinned: row.pinned === 1,
     pinnedScreenX: row.pinned_screen_x,
     pinnedScreenY: row.pinned_screen_y,
@@ -167,6 +169,7 @@ export function updateWidget(id: string, patch: WidgetPatch): Widget | null {
     ['height', 'height'],
     ['zIndex', 'z_index'],
     ['color', 'color'],
+    ['status', 'status'],
     ['pinnedScreenX', 'pinned_screen_x'],
     ['pinnedScreenY', 'pinned_screen_y'],
     ['parentSectionId', 'parent_section_id'],

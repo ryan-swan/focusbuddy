@@ -460,6 +460,7 @@ import {
   suggestPageContent,
   suggestSetupWidgets,
   suggestFileTags,
+  groupWidgetsByTopic,
   askWorkspace,
   askWorkspaceStream,
   suggestWorkspaceActions,
@@ -1790,6 +1791,16 @@ export function registerIpcHandlers(): void {
     recordAiCall()
     return suggestFileTags(content, existingTags)
   })
+  // Topic grouping for the Columns view: label each desk object with a short topic
+  // so the view can lay them out as topical columns. Suggest-only; honest
+  // degradation (needsApiKey) when no AI is configured.
+  ipcMain.handle(
+    'ai:groupByTopic',
+    async (_e, items: Array<{ id: string; title: string; text: string }>) => {
+      recordAiCall()
+      return groupWidgetsByTopic(items)
+    }
+  )
   // Ask-your-workspace: retrieve the most relevant documents for the question,
   // then answer grounded in them with citations. Returns the answer plus the
   // source documents (with snippet + whether each was cited) for the UI.

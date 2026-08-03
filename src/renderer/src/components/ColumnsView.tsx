@@ -1,9 +1,11 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { Widget } from '@shared/types'
+import { contentToPlainText } from '@shared/widgetText'
 import { renderWidgetInline } from '../lib/renderWidgetInline'
 import { widgetDisplayName } from '../lib/widgetDisplayName'
 import {
   buildColumns,
+  columnsEligible,
   itemCardHeight,
   loadColumnsConfig,
   naturalItemWidth,
@@ -12,38 +14,105 @@ import {
   type GroupBy
 } from '../lib/deskColumns'
 import { useWidgetStore } from '../stores/widgets'
+import { useLinksStore } from '../stores/links'
 import { useDeskViewStore } from '../stores/deskView'
 import Icon from './Icon'
 
-// The desk Columns view: the same desk objects laid out as vertical, each
-// independently scrolling, walls. The whole set scrolls horizontally. Columns
-// are hand-made (Freeform, drag cards between them) or derived from a grouping
-// key (Type or Colour). Each column is exactly as wide as its widest object, so
-// documents and spreadsheets get room while stickies and calculators stay
-// compact, with narrower items centred.
+// The desk Columns view: the same desk objects laid out as vertical, independently
+// scrolling walls, the whole set scrolling horizontally. Columns are hand-made
+// (Freeform — drag cards between them), a real board keyed off each object's status
+// (drag a card to change its status), or derived from a grouping key (Type, Colour,
+// Connections, Sections, Recency, or an AI-produced Topic). Each column is as wide
+// as its widest object, so documents get room while stickies stay compact.
 
 const GROUPS: Array<{ value: GroupBy; label: string; icon: string }> = [
   { value: 'freeform', label: 'Freeform', icon: 'view_column' },
+  { value: 'status', label: 'Status', icon: 'checklist' },
   { value: 'kind', label: 'Type', icon: 'category' },
-  { value: 'color', label: 'Colour', icon: 'palette' }
+  { value: 'color', label: 'Colour', icon: 'palette' },
+  { value: 'connections', label: 'Connections', icon: 'hub' },
+  { value: 'section', label: 'Sections', icon: 'dashboard' },
+  { value: 'recency', label: 'Recency', icon: 'schedule' },
+  { value: 'topic', label: 'Topic', icon: 'auto_awesome' }
 ]
+
+interface TopicState {
+  map: Record<string, string>
+  loading: boolean
+  error: string | null
+  needsKey: boolean
+  ranForSignature: string | null
+}
 
 export default function ColumnsView({ taskId, widgets }: { taskId: string; widgets: Widget[] }): JSX.Element {
   const [cfg, setCfgState] = useState<DeskColumnsConfig>(() => loadColumnsConfig(taskId))
   const [dragId, setDragId] = useState<string | null>(null)
   const setActive = useWidgetStore((s) => s.setActive)
+  const updateWidget = useWidgetStore((s) => s.update)
   const setViewMode = useDeskViewStore((s) => s.set)
+
+  // Wire graph — only needed by the Connections mode; loaded lazily when selected.
+  const links = useLinksStore((s) => s.links)
+  const loadLinks = useLinksStore((s) => s.loadForTask)
+  useEffect(() => {
+    if (cfg.groupBy === 'connections') void loadLinks(taskId)
+  }, [cfg.groupBy, taskId, loadLinks])
+
+  // AI topic labels — computed on demand for the Topic mode.
+  const [topic, setTopic] = useState<TopicState>({ map: {}, loading: false, error: null, needsKey: false, ranForSignature: null })
+
+  // A signature of the eligible objects, so Topic auto-runs once per meaningful
+  // change (objects added/removed or their text edited) rather than every render.
+  const eligible = useMemo(() => columnsEligible(widgets), [widgets])
+  const topicSignature = useMemo(
+    () => eligible.map((w) => `${w.id}:${(w.title || '').length}:${(w.content || '').length}`).sort().join('|'),
+    [eligible]
+  )
+
+  async function runTopic(): Promise<void> {
+    const items = eligible.map((w) => ({
+      id: w.id,
+      title: widgetDisplayName(w),
+      text: contentToPlainText(w.content).slice(0, 400)
+    }))
+    if (items.length === 0) {
+      setTopic({ map: {}, loading: false, error: null, needsKey: false, ranForSignature: topicSignature })
+      return
+    }
+    setTopic((t) => ({ ...t, loading: true, error: null, needsKey: false }))
+    const res = await window.api.ai.groupByTopic(items)
+    if (res.ok) {
+      setTopic({ map: res.topicByWidget ?? {}, loading: false, error: null, needsKey: false, ranForSignature: topicSignature })
+    } else {
+      setTopic({ map: {}, loading: false, error: res.error ?? 'Could not group by topic.', needsKey: !!res.needsApiKey, ranForSignature: topicSignature })
+    }
+  }
+
+  // Auto-run topic grouping when the mode is first selected (or the objects change).
+  useEffect(() => {
+    if (cfg.groupBy !== 'topic') return
+    if (topic.loading) return
+    if (topic.ranForSignature === topicSignature) return
+    void runTopic()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cfg.groupBy, topicSignature])
 
   function update(next: DeskColumnsConfig): void {
     setCfgState(next)
     saveColumnsConfig(taskId, next)
   }
 
-  const columns = useMemo(() => buildColumns(widgets, cfg), [widgets, cfg])
+  const columns = useMemo(
+    () => buildColumns(widgets, cfg, { links, topicByWidget: topic.map }),
+    [widgets, cfg, links, topic.map]
+  )
   const isFreeform = cfg.groupBy === 'freeform'
+  const isStatus = cfg.groupBy === 'status'
+  // Both Freeform and Status accept drops: Freeform records the placement locally,
+  // Status writes the object's real status field (the column id is the status).
+  const canDrag = isFreeform || isStatus
 
   function assignTo(widgetId: string, columnId: string): void {
-    // Drop at the end of the target column.
     const maxOrder = Object.entries(cfg.order)
       .filter(([id]) => cfg.assign[id] === columnId)
       .reduce((m, [, o]) => Math.max(m, o), 0)
@@ -52,6 +121,11 @@ export default function ColumnsView({ taskId, widgets }: { taskId: string; widge
       assign: { ...cfg.assign, [widgetId]: columnId },
       order: { ...cfg.order, [widgetId]: maxOrder + 1 }
     })
+  }
+
+  function dropOn(columnId: string, widgetId: string): void {
+    if (isStatus) void updateWidget(widgetId, { status: columnId })
+    else if (isFreeform) assignTo(widgetId, columnId)
   }
 
   function addColumn(): void {
@@ -74,6 +148,15 @@ export default function ColumnsView({ taskId, widgets }: { taskId: string; widge
     setViewMode(taskId, 'canvas')
   }
 
+  const modeHint =
+    isFreeform
+      ? 'Drag cards between columns; rename a column, or add and remove your own.'
+      : isStatus
+        ? 'Drag a card into a lane to set its status. Lanes are the same everywhere this desk is open.'
+        : cfg.groupBy === 'topic'
+          ? 'Columns proposed by AI from each object’s content.'
+          : 'Grouped automatically. Switch to Freeform or Status to arrange by hand.'
+
   return (
     <div className="absolute inset-0 flex flex-col bg-[var(--surface-sunken)]" data-testid="columns-view" data-desk-view="columns">
       {/* Control bar */}
@@ -86,7 +169,7 @@ export default function ColumnsView({ taskId, widgets }: { taskId: string; widge
               key={g.value}
               onClick={() => update({ ...cfg, groupBy: g.value })}
               data-testid={`columns-groupby-${g.value}`}
-              className={`inline-flex items-center gap-1 px-2.5 h-7 text-[12px] ${
+              className={`inline-flex items-center gap-1 px-2.5 h-7 text-[12px] whitespace-nowrap ${
                 cfg.groupBy === g.value
                   ? 'bg-[rgb(var(--accent))] text-white'
                   : 'text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]'
@@ -101,14 +184,23 @@ export default function ColumnsView({ taskId, widgets }: { taskId: string; widge
           <button
             onClick={addColumn}
             data-testid="columns-add"
-            className="ml-auto inline-flex items-center gap-1 h-7 px-2.5 rounded-lg border border-dashed border-[var(--edge-firm)] text-[12px] text-[var(--ink-70)] hover:text-[rgb(var(--accent))] hover:border-[rgb(var(--accent)/0.5)]"
+            className="ml-2 inline-flex items-center gap-1 h-7 px-2.5 rounded-lg border border-dashed border-[var(--edge-firm)] text-[12px] text-[var(--ink-70)] hover:text-[rgb(var(--accent))] hover:border-[rgb(var(--accent)/0.5)]"
           >
             <Icon name="add" size={14} /> Add column
           </button>
         )}
-        {!isFreeform && (
-          <span className="ml-2 text-[11px] text-[var(--ink-40)]">Grouped automatically. Switch to Freeform to arrange by hand.</span>
+        {cfg.groupBy === 'topic' && (
+          <button
+            onClick={() => void runTopic()}
+            disabled={topic.loading}
+            data-testid="columns-topic-regroup"
+            className="ml-2 inline-flex items-center gap-1 h-7 px-2.5 rounded-lg border border-[var(--edge-soft)] text-[12px] text-[var(--ink-70)] hover:bg-[var(--surface-sunken)] disabled:opacity-50"
+          >
+            <Icon name={topic.loading ? 'autorenew' : 'auto_awesome'} size={13} className={topic.loading ? 'animate-spin' : ''} />
+            {topic.loading ? 'Grouping…' : 'Regroup'}
+          </button>
         )}
+        <span className="ml-2 text-[11px] text-[var(--ink-40)] hidden md:inline">{modeHint}</span>
         <button
           onClick={() => setViewMode(taskId, 'canvas')}
           data-testid="columns-to-canvas"
@@ -119,6 +211,15 @@ export default function ColumnsView({ taskId, widgets }: { taskId: string; widge
         </button>
       </div>
 
+      {/* Topic honest states: needs a key, or an error. Never fabricated columns. */}
+      {cfg.groupBy === 'topic' && (topic.needsKey || topic.error) && (
+        <div className="shrink-0 px-4 py-2 text-[12px] border-b border-[var(--edge-soft)] bg-[var(--surface-raised)] text-[var(--ink-60)]">
+          {topic.needsKey
+            ? 'Topic grouping needs AI. Add an Anthropic key in Settings → AI, then press Regroup.'
+            : topic.error}
+        </div>
+      )}
+
       {/* Horizontally scrolling set of columns */}
       <div className="flex-1 min-h-0 overflow-x-auto overflow-y-hidden">
         <div className="h-full flex gap-4 p-4 items-stretch">
@@ -128,13 +229,13 @@ export default function ColumnsView({ taskId, widgets }: { taskId: string; widge
               data-testid={`column-${col.id}`}
               style={{ width: col.width }}
               className="shrink-0 h-full flex flex-col rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-raised)] overflow-hidden"
-              onDragOver={isFreeform ? (e) => e.preventDefault() : undefined}
+              onDragOver={canDrag ? (e) => e.preventDefault() : undefined}
               onDrop={
-                isFreeform
+                canDrag
                   ? (e) => {
                       e.preventDefault()
                       const id = e.dataTransfer.getData('text/plain') || dragId
-                      if (id) assignTo(id, col.id)
+                      if (id) dropOn(col.id, id)
                       setDragId(null)
                     }
                   : undefined
@@ -171,30 +272,38 @@ export default function ColumnsView({ taskId, widgets }: { taskId: string; widge
               <div className="flex-1 min-h-0 overflow-y-auto px-3 py-3 flex flex-col gap-3">
                 {col.items.length === 0 ? (
                   <div className="text-[11px] text-[var(--ink-40)] text-center py-6">
-                    {isFreeform ? 'Drag objects here' : 'Empty'}
+                    {canDrag ? 'Drag objects here' : 'Empty'}
                   </div>
                 ) : (
                   col.items.map((w) => (
                     <div
                       key={w.id}
-                      draggable={isFreeform}
-                      onDragStart={
-                        isFreeform
-                          ? (e) => {
-                              e.dataTransfer.setData('text/plain', w.id)
-                              e.dataTransfer.effectAllowed = 'move'
-                              setDragId(w.id)
-                            }
-                          : undefined
-                      }
-                      onDragEnd={() => setDragId(null)}
                       style={{ width: naturalItemWidth(w) }}
                       className={`mx-auto shrink-0 rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-raised)] overflow-hidden shadow-sm ${
-                        isFreeform ? 'cursor-grab active:cursor-grabbing' : ''
-                      } ${dragId === w.id ? 'opacity-50' : ''}`}
+                        dragId === w.id ? 'opacity-50' : ''
+                      }`}
                       data-testid={`column-card-${w.id}`}
                     >
                       <div className="flex items-center gap-1.5 px-2.5 py-1.5 border-b border-[var(--edge-soft)] bg-[var(--surface-sunken)]">
+                        {/* Dedicated drag handle — grabbing here always starts the drag,
+                            even when the card body is a live, interactive widget that
+                            would otherwise swallow the gesture. */}
+                        {canDrag && (
+                          <span
+                            draggable
+                            onDragStart={(e) => {
+                              e.dataTransfer.setData('text/plain', w.id)
+                              e.dataTransfer.effectAllowed = 'move'
+                              setDragId(w.id)
+                            }}
+                            onDragEnd={() => setDragId(null)}
+                            title="Drag to move"
+                            className="shrink-0 -ml-1 px-0.5 cursor-grab active:cursor-grabbing text-[var(--ink-30)] hover:text-[var(--ink-60)]"
+                            data-testid={`column-drag-${w.id}`}
+                          >
+                            <Icon name="drag_indicator" size={14} />
+                          </span>
+                        )}
                         {w.color && <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ background: w.color }} />}
                         <span className="flex-1 min-w-0 truncate text-[12px] font-medium text-[var(--ink-90)]">
                           {widgetDisplayName(w)}

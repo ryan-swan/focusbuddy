@@ -300,6 +300,10 @@ export interface Widget {
   height: number
   zIndex: number
   color: string | null
+  // Optional workflow status, used by the Columns view's status board (To sort /
+  // In progress / Done / Reference). null = unset (reads as "To sort"). A real
+  // synced field so a board means the same thing on every device.
+  status: string | null
   pinned: boolean
   pinnedScreenX: number | null
   pinnedScreenY: number | null
@@ -374,6 +378,7 @@ export interface WidgetPatch {
   height?: number
   zIndex?: number
   color?: string | null
+  status?: string | null
   pinned?: boolean
   pinnedScreenX?: number | null
   pinnedScreenY?: number | null

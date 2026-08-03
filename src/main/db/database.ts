@@ -520,6 +520,7 @@ export function getDb(): Database.Database {
   // connector links; we trash instead (hidden + recoverable, links survive and
   // the overlay skips trashed endpoints), purged after 7 days.
   ensureColumn(db, 'widgets', 'trashed_at', 'INTEGER')
+  ensureColumn(db, 'widgets', 'status', 'TEXT')
   ensureColumn(db, 'widgets', 'pinned', 'INTEGER NOT NULL DEFAULT 0')
   ensureColumn(db, 'widgets', 'pinned_screen_x', 'INTEGER')
   ensureColumn(db, 'widgets', 'pinned_screen_y', 'INTEGER')

@@ -1707,6 +1707,73 @@ export async function suggestFileTags(
   }
 }
 
+// Group a desk's objects into a small set of topical columns. Given each object's
+// id, title and a snippet of its text, the model assigns every object a short
+// topic label; the Columns view's Topic mode turns those labels into columns.
+// Honest degradation: no key -> needsApiKey, and objects it can't place are labelled
+// "Uncategorised" rather than guessed. Never fabricates content.
+export async function groupWidgetsByTopic(
+  items: Array<{ id: string; title: string; text: string }>
+): Promise<{ ok: boolean; topicByWidget?: Record<string, string>; needsApiKey?: boolean; error?: string }> {
+  const c = getClient()
+  if (!c) return { ok: false, needsApiKey: true, error: 'No Anthropic API key set. Open Settings → AI · API keys to paste one.' }
+  const clean = (items ?? []).filter((i) => i && i.id).slice(0, 60)
+  if (!clean.length) return { ok: true, topicByWidget: {} }
+  const system =
+    'You organise a desk of objects into a small set of topical columns for PlexiDesk. Your only job is to label each object with a topic.\n\n' +
+    'Rules:\n' +
+    '- Assign every object a short topic label: 1-3 words, Title Case, a reusable noun phrase (e.g. "Pricing", "Onboarding", "Research").\n' +
+    '- Aim for 2 to 6 topics total across all objects; reuse the same label for related objects so the columns are meaningful.\n' +
+    '- Base the label ONLY on the title and text provided. If an object has too little to tell, label it "Uncategorised".\n' +
+    '- Never invent content you were not given.\n' +
+    '- Return ONLY one valid JSON object. No prose, no markdown fences. The first character must be { and the last must be }.\n' +
+    'Schema: {"assignments":[{"id":"string","topic":"string"}]}'
+  const lines = clean
+    .map(
+      (i) =>
+        `- id=${i.id} · title="${(i.title || '').slice(0, 80)}" · text="${(i.text || '').replace(/\s+/g, ' ').slice(0, 300)}"`
+    )
+    .join('\n')
+  const userMsg = `Objects:\n${lines}\n\nReturn the JSON now.`
+  try {
+    const resp = await c.messages.create({
+      model: resolveModel('file_tag'),
+      max_tokens: 2048,
+      system,
+      messages: [{ role: 'user', content: userMsg }]
+    })
+    if ((resp.stop_reason as string) === 'refusal') return { ok: false, error: 'Claude declined this request.' }
+    if ((resp.stop_reason as string) === 'model_context_window_exceeded')
+      return { ok: false, error: 'Too many objects to analyse at once.' }
+    const out = resp.content
+      .filter((b) => b.type === 'text')
+      .map((b) => ('text' in b ? b.text : ''))
+      .join('\n')
+      .trim()
+    const jsonStr = extractJson(out)
+    if (!jsonStr) return { ok: false, error: 'AI did not return JSON' }
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(jsonStr)
+    } catch (e) {
+      return { ok: false, error: 'AI returned invalid JSON: ' + (e as Error).message }
+    }
+    const arr = (parsed as { assignments?: unknown[] }).assignments
+    if (!Array.isArray(arr)) return { ok: false, error: 'AI response missing "assignments" array' }
+    const valid = new Set(clean.map((i) => i.id))
+    const topicByWidget: Record<string, string> = {}
+    for (const item of arr) {
+      const obj = item as { id?: unknown; topic?: unknown }
+      const id = (obj.id ?? '').toString()
+      const topic = (obj.topic ?? '').toString().trim().slice(0, 40)
+      if (id && valid.has(id) && topic) topicByWidget[id] = topic
+    }
+    return { ok: true, topicByWidget }
+  } catch (e) {
+    return { ok: false, error: (e as Error).message }
+  }
+}
+
 export async function suggestSetupWidgets(taskId: string): Promise<SetupSuggestResponse> {
   const c = getClient()
   if (!c) return { ok: false, needsApiKey: true, error: 'No Anthropic API key set. Open Settings → AI · API keys to paste one.' }

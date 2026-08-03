@@ -30,7 +30,7 @@ let suppressWidgetUndo = false
 // Geometry / colour / section-membership are the structural widget edits worth
 // undoing. Text content + title have their own native editing undo, and
 // internal fields (sync group, url, pin) aren't user "actions".
-const UNDOABLE_WIDGET_KEYS: Array<keyof WidgetPatch> = ['x', 'y', 'width', 'height', 'color', 'parentSectionId']
+const UNDOABLE_WIDGET_KEYS: Array<keyof WidgetPatch> = ['x', 'y', 'width', 'height', 'color', 'status', 'parentSectionId']
 
 interface WidgetStore {
   widgets: Widget[]
@@ -387,11 +387,13 @@ export const useWidgetStore = create<WidgetStore>((set, get) => ({
         ;(prevPatch as Record<string, unknown>)[k] = (w as unknown as Record<string, unknown>)[k]
         ;(redoPatch as Record<string, unknown>)[k] = (patch as unknown as Record<string, unknown>)[k]
       }
-      const label = touched.includes('color')
-        ? 'Recolour widget'
-        : touched.includes('width') || touched.includes('height')
-          ? 'Resize widget'
-          : 'Move widget'
+      const label = touched.includes('status')
+        ? 'Change status'
+        : touched.includes('color')
+          ? 'Recolour widget'
+          : touched.includes('width') || touched.includes('height')
+            ? 'Resize widget'
+            : 'Move widget'
       return { prevPatch, redoPatch, label }
     })()
     // Optimistic local update — applies the patch immediately so consumers (Canvas,
