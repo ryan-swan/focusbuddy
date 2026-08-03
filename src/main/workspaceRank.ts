@@ -44,39 +44,124 @@ export function extractDocText(docType: string, body: unknown): string {
       return collectTiptapText(root).trim().slice(0, 12000)
     }
     if (docType === 'sheet') {
-      const sheets = (b.sheets as Array<{ columns?: string[]; rows?: string[][] }>) ?? []
-      return sheets
-        .map((t) => {
-          const header = (t.columns ?? []).join(' | ')
-          const rows = (t.rows ?? []).slice(0, 40).map((r) => (r ?? []).join(' | ')).join('\n')
-          return `${header}\n${rows}`
-        })
-        .join('\n')
-        .trim()
-        .slice(0, 12000)
+      // TWO SHAPES EXIST IN THE LIVE CORPUS and only V2 was ever read. 18 of the operator's 22
+      // sheets are V1 — headers and rows at the TOP level rather than inside a `sheets` array — so
+      // they extracted to '' and were unfindable. Five of those hold real content (342k · 29k ·
+      // 563 · 560 · 399 chars); the other 13 are blank 100x48 default grids and must keep
+      // extracting to nothing (locked in documentExtractCoverage.test.ts).
+      //
+      // V2 is the newer authority: where both shapes are present it wins outright rather than the
+      // two being concatenated, so a migrated document is never counted twice.
+      const tabs = (b.sheets as Array<{ columns?: string[]; rows?: string[][] }> | undefined) ?? [
+        { columns: b.columns as string[] | undefined, rows: b.rows as string[][] | undefined }
+      ]
+      return arr(tabs).map(sheetTabText).join('\n').trim().slice(0, DOC_TEXT_CAP)
     }
     if (docType === 'slides') {
-      const slides =
-        (b.slides as Array<{
-          notes?: string
-          elements?: Array<{ type?: string; paragraphs?: Array<{ runs?: Array<{ text?: string }> }> }>
-        }>) ?? []
+      // A real deck carries most of its text in `title` and `bullets`; the previous arm read only
+      // `elements`, so those were dropped. Every deck in the live corpus is currently a single
+      // "Title slide" scaffold, which stays correctly unadmissible.
+      const slides = arr(b.slides) as Array<{
+        title?: string
+        bullets?: unknown
+        notes?: string
+        elements?: ElementList
+      }>
       return slides
-        .map((s) => {
-          const text = (s.elements ?? [])
-            .filter((e) => e.type === 'text')
-            .map((e) => (e.paragraphs ?? []).map((p) => (p.runs ?? []).map((r) => r.text ?? '').join('')).join(' '))
-            .join(' ')
-          return s.notes ? `${text}\n${s.notes}` : text
-        })
+        .map((s) =>
+          joinParts([
+            typeof s?.title === 'string' ? s.title : '',
+            arr(s?.bullets).filter((x): x is string => typeof x === 'string').join('\n'),
+            elementsText(s?.elements),
+            typeof s?.notes === 'string' ? s.notes : ''
+          ])
+        )
         .join('\n')
         .trim()
-        .slice(0, 12000)
+        .slice(0, DOC_TEXT_CAP)
+    }
+    if (docType === 'design') {
+      // The same element/paragraph/run shape slides use, plus an optional `pages` array. Was
+      // returning '' for every design document.
+      const pages = arr(b.pages) as Array<{ elements?: ElementList }>
+      return joinParts([elementsText(b.elements as ElementList), ...pages.map((p) => elementsText(p?.elements))])
+        .trim()
+        .slice(0, DOC_TEXT_CAP)
+    }
+    if (docType === 'map') {
+      // A map is a labelled graph: node labels ARE the content, and an edge label carries the
+      // relationship between them. Every map in the live corpus is a single "Start" node, which
+      // the admission gate rejects — the extractor is correct, the documents are empty.
+      const labelled = [...arr(b.nodes), ...arr(b.edges)] as Array<{ label?: string }>
+      return joinParts(labelled.map((n) => (typeof n?.label === 'string' ? n.label : '')))
+        .trim()
+        .slice(0, DOC_TEXT_CAP)
     }
   } catch {
     /* best-effort */
   }
   return ''
+}
+
+type ElementList = Array<{ type?: string; paragraphs?: unknown }> | undefined
+
+// Defensive array coercion. This runs over every document at index time, so a malformed body must
+// degrade to empty rather than throw (locked: "malformed bodies degrade to empty").
+function arr(v: unknown): unknown[] {
+  return Array.isArray(v) ? v : []
+}
+
+// Drop empty parts before joining, and drop parts already seen. De-duplication matters because a
+// slide's title is commonly ALSO rendered as a text element: counting it twice states one fact as
+// two, the same error the V1/V2 sheet rule avoids. It also has a useful second-order effect — a
+// default deck collapses from "Title slide\nTitle slide" to "Title slide", which falls below the
+// admission floor on its own, with no need to special-case the words anywhere.
+function joinParts(parts: string[]): string {
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const p of parts) {
+    const t = p.trim()
+    if (t.length === 0 || seen.has(t)) continue
+    seen.add(t)
+    out.push(p)
+  }
+  return out.join('\n')
+}
+
+// One spreadsheet tab: the header row plus up to 40 data rows, pipe-joined.
+//
+// A tab with NO filled data cell yields nothing at all. Measured on the live corpus: 13 of the
+// operator's sheets are default grids whose "headers" are the column LETTERS (A, B, C … AV) over
+// 100 empty rows. Emitting those produced ~6,000 characters of "A | B | C | …" per document, which
+// passed the admission gate on sheer length and would have put pure chrome into search results.
+// A spreadsheet's content is its DATA — headers describe data that is not there. This is DEC-022's
+// "a blank-spreadsheet grid is not an answer", enforced at the extractor rather than left to the
+// gate to notice.
+function sheetTabText(t: unknown): string {
+  const tab = (t ?? {}) as { columns?: unknown; rows?: unknown }
+  const rows = arr(tab.rows).slice(0, 40)
+  const hasData = rows.some((r) => arr(r).some((cell) => String(cell ?? '').trim().length > 0))
+  if (!hasData) return ''
+  const header = arr(tab.columns).join(' | ')
+  return `${header}\n${rows.map((r) => arr(r).join(' | ')).join('\n')}`
+}
+
+// element → paragraph → run text, shared by slides and design. Runs are joined WITHOUT a separator:
+// they are styling spans inside one sentence, so "Primary " + "navy" is one phrase, not two tokens.
+function elementsText(elements: ElementList): string {
+  return joinParts(
+    arr(elements)
+      .filter((e) => Boolean(e) && (e as { type?: string }).type === 'text')
+      .map((e) =>
+        joinParts(
+          arr((e as { paragraphs?: unknown }).paragraphs).map((p) =>
+            arr((p as { runs?: unknown })?.runs)
+              .map((r) => (r as { text?: string })?.text ?? '')
+              .join('')
+          )
+        )
+      )
+  )
 }
 
 // A short excerpt around the first matching term, for showing under a citation.
