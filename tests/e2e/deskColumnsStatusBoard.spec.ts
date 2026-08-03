@@ -72,6 +72,32 @@ async function goToDesk(window: import('@playwright/test').Page, taskId: string)
   await window.waitForTimeout(500)
 }
 
+// A real pointer drag from a card's drag handle to a target column. ColumnsView
+// uses pointer-based dragging (not HTML5 DnD), so this drives the genuine gesture.
+async function pointerDragTo(
+  window: import('@playwright/test').Page,
+  handle: import('@playwright/test').Locator,
+  targetCol: import('@playwright/test').Locator
+): Promise<void> {
+  const hb = await handle.boundingBox()
+  const cb = await targetCol.boundingBox()
+  if (!hb || !cb) throw new Error('pointerDragTo: missing bounding box')
+  await window.mouse.move(hb.x + hb.width / 2, hb.y + hb.height / 2)
+  await window.mouse.down()
+  const tx = cb.x + cb.width / 2
+  const ty = cb.y + Math.min(140, cb.height / 2)
+  await window.mouse.move(tx, ty, { steps: 14 })
+  await window.mouse.move(tx, ty) // settle so onMove records the target column
+  await window.mouse.up()
+  await window.waitForTimeout(250)
+}
+
+async function colWidth(window: import('@playwright/test').Page, colId: string): Promise<number> {
+  return window
+    .locator(`[data-testid="column-${colId}"]`)
+    .evaluate((el) => (el as HTMLElement).getBoundingClientRect().width)
+}
+
 test('Columns view: all 8 group-by modes render, status board drags+persists, freeform CRUD, drag-handle reliability, honest topic degradation', async () => {
   test.setTimeout(120_000)
   launched = await launchApp()
@@ -142,41 +168,14 @@ test('Columns view: all 8 group-by modes render, status board drags+persists, fr
   // All 3 widgets start with no status -> all land in "To sort" (todo).
   await expect(window.locator(`[data-testid="column-todo"] [data-testid="column-card-${stickyId}"]`)).toBeVisible()
 
-  // Drag the sticky's card via its dedicated drag handle from todo -> doing.
+  // Drag the sticky's card via its dedicated drag handle from todo -> doing, using
+  // a REAL pointer drag (mousedown/move/up). ColumnsView now uses pointer-based
+  // dragging, not HTML5 DnD, so Playwright can drive it genuinely end to end.
   const stickyHandle = window.locator(`[data-testid="column-drag-${stickyId}"]`)
   const doingLane = window.locator('[data-testid="column-doing"]')
   await expect(stickyHandle).toBeVisible()
-  let statusDragWorked = false
-  try {
-    await stickyHandle.dragTo(doingLane, { timeout: 5000 })
-    await window.waitForTimeout(400)
-    statusDragWorked = await window
-      .locator(`[data-testid="column-doing"] [data-testid="column-card-${stickyId}"]`)
-      .isVisible()
-      .catch(() => false)
-  } catch {
-    statusDragWorked = false
-  }
-  if (!statusDragWorked) {
-    // Harness fallback: drive the exact same contract dropOn() calls
-    // (`updateWidget(widgetId, { status: columnId })` from useWidgetStore, the
-    // same store instance the mounted ColumnsView reads from) via the
-    // __fbWidgets debug handle, since HTML5 DnD simulation can be unreliable
-    // under Electron/CDP. Using the store's own action (not a raw IPC call)
-    // matters here — it keeps the in-memory widgets array the mounted view
-    // reads from in sync, exactly like a real drop would.
-    await window.evaluate(
-      async ({ id }) => {
-        const store = (window as unknown as { __fbWidgets: { getState: () => { update: (id: string, patch: Record<string, unknown>) => Promise<void> } } }).__fbWidgets
-        await store.getState().update(id, { status: 'doing' })
-      },
-      { id: stickyId }
-    )
-    await window.waitForTimeout(300)
-    console.log('[status-drag] UI-driven HTML5 DnD did not land reliably in this harness; verified the identical status-write contract via the widget store\'s update() action instead.')
-  } else {
-    console.log('[status-drag] UI-driven drag moved the sticky card from To sort -> In progress.')
-  }
+  await pointerDragTo(window, stickyHandle, doingLane)
+  console.log('[status-drag] real pointer drag moved the sticky card from To sort -> In progress.')
   await expect(window.locator(`[data-testid="column-doing"] [data-testid="column-card-${stickyId}"]`)).toBeVisible()
 
   // Confirm the underlying widget record actually has status='doing' persisted
@@ -220,27 +219,18 @@ test('Columns view: all 8 group-by modes render, status board drags+persists, fr
     ''
   )
   expect(lastColId).not.toBe(firstColId)
+  const colIds = await window
+    .locator('[data-testid^="column-col-"]')
+    .evaluateAll((els) => els.map((e) => e.getAttribute('data-testid')!.replace('column-', '')))
 
-  // Drag handle on the note card moves it from the first column to the last.
+  // Drag handle on the note card moves it from the first column to the last, via a
+  // real pointer drag.
   const noteHandle = window.locator(`[data-testid="column-drag-${noteId}"]`)
   const lastCol = window.locator(`[data-testid="column-${lastColId}"]`)
   await expect(noteHandle).toBeVisible()
-  let freeformDragWorked = false
-  try {
-    await noteHandle.dragTo(lastCol, { timeout: 5000 })
-    await window.waitForTimeout(400)
-    freeformDragWorked = await window
-      .locator(`[data-testid="column-${lastColId}"] [data-testid="column-card-${noteId}"]`)
-      .isVisible()
-      .catch(() => false)
-  } catch {
-    freeformDragWorked = false
-  }
-  if (!freeformDragWorked) {
-    console.log('[freeform-drag] UI-driven HTML5 DnD did not land reliably in this harness (known Playwright/Electron limitation) — verifying persistence shape instead.')
-  } else {
-    console.log('[freeform-drag] UI-driven drag reassigned the note card to the new column.')
-  }
+  await pointerDragTo(window, noteHandle, lastCol)
+  await expect(window.locator(`[data-testid="column-${lastColId}"] [data-testid="column-card-${noteId}"]`)).toBeVisible()
+  console.log('[freeform-drag] real pointer drag reassigned the note card to the new column.')
 
   // Rename the first column's title.
   const firstColTitleInput = window.locator(`[data-testid="column-${firstColId}"] input`)
@@ -258,23 +248,38 @@ test('Columns view: all 8 group-by modes render, status board drags+persists, fr
     console.log('[freeform-remove] column removed successfully; items reassigned to first column.')
   }
 
-  // ── 4. Drag reliability: the drag handle exists and is a distinct
-  // draggable element from the interactive widget body, even for the
-  // calculator (an interactive widget whose body would otherwise swallow
-  // pointer/drag gestures). Confirm the handle is draggable and sits
-  // outside the widget's own interactive surface.
+  // ── 4. Drag reliability for an interactive widget: a real pointer drag of the
+  // calculator card (whose body would otherwise swallow the gesture) still moves it,
+  // because the drag starts on the dedicated handle and the body is made
+  // pointer-transparent during the drag.
   await window.locator('[data-testid="columns-groupby-freeform"]').click()
   await window.waitForTimeout(200)
   const calcHandle = window.locator(`[data-testid="column-drag-${calcId}"]`)
   await expect(calcHandle).toBeVisible()
-  const isDraggable = await calcHandle.getAttribute('draggable')
-  expect(isDraggable).toBe('true')
-  // The handle is not inside the calculator's own rendered widget body.
-  const handleInsideWidgetBody = await calcHandle.evaluate((el) => {
-    const card = el.closest('[data-testid^="column-card-"]')
-    const body = card?.querySelector('div[style*="overflow: hidden"]')
-    return !!body && body.contains(el)
-  })
-  expect(handleInsideWidgetBody).toBe(false)
-  console.log('[drag-handle] dedicated drag handle for the calculator card is draggable and structurally separate from the interactive widget body.')
+  const calcFromCol = await window.evaluate((id) => {
+    const card = document.querySelector(`[data-testid="column-card-${id}"]`)
+    return card?.closest('[data-col-id]')?.getAttribute('data-col-id') ?? null
+  }, calcId)
+  const calcTargetColId = colIds.find((c) => c !== calcFromCol) ?? lastColId
+  await pointerDragTo(window, calcHandle, window.locator(`[data-testid="column-${calcTargetColId}"]`))
+  await expect(window.locator(`[data-testid="column-${calcTargetColId}"] [data-testid="column-card-${calcId}"]`)).toBeVisible()
+  console.log('[drag-handle] real pointer drag moved the interactive calculator card via its handle.')
+
+  // ── 5. Manual column resize: dragging a column's resize handle changes its width
+  // and the new width persists (localStorage widths map).
+  const resizeTargetCol = colIds[0]
+  const beforeW = await colWidth(window, resizeTargetCol)
+  const rh = window.locator(`[data-testid="column-resize-${resizeTargetCol}"]`)
+  await expect(rh).toBeVisible()
+  const rb = await rh.boundingBox()
+  if (rb) {
+    await window.mouse.move(rb.x + rb.width / 2, rb.y + rb.height / 2)
+    await window.mouse.down()
+    await window.mouse.move(rb.x + 140, rb.y + rb.height / 2, { steps: 10 })
+    await window.mouse.up()
+    await window.waitForTimeout(150)
+  }
+  const afterW = await colWidth(window, resizeTargetCol)
+  expect(afterW).toBeGreaterThan(beforeW + 40)
+  console.log(`[resize] column widened ${Math.round(beforeW)} -> ${Math.round(afterW)}px via the resize handle.`)
 })

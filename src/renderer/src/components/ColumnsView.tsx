@@ -8,8 +8,9 @@ import {
   columnsEligible,
   itemCardHeight,
   loadColumnsConfig,
-  naturalItemWidth,
   saveColumnsConfig,
+  COLUMN_MIN_W,
+  COLUMN_MAX_W,
   type DeskColumnsConfig,
   type GroupBy
 } from '../lib/deskColumns'
@@ -21,10 +22,15 @@ import CanvasContextMenu, { type CtxMenuItem } from './CanvasContextMenu'
 
 // The desk Columns view: the same desk objects laid out as vertical, independently
 // scrolling walls, the whole set scrolling horizontally. Columns are hand-made
-// (Freeform — drag cards between them), a real board keyed off each object's status
-// (drag a card to change its status), or derived from a grouping key (Type, Colour,
-// Connections, Sections, Recency, or an AI-produced Topic). Each column is as wide
-// as its widest object, so documents get room while stickies stay compact.
+// (Freeform), a real status board (drag a card to change its status), or derived
+// from a grouping key (Type, Colour, Connections, Sections, Recency, AI Topic).
+//
+// Card dragging is POINTER-based (mousedown/move/up), not HTML5 drag-and-drop:
+// DnD is unreliable in Electron over live widget bodies (drops silently fail), so
+// this mirrors how the canvas drags widgets — and it's genuinely testable. While
+// dragging, the view edge-scrolls (like the canvas edge-pan) so off-screen columns
+// and cards are reachable. Columns are manually resizable and cards fill the column
+// width, growing and shrinking with it.
 
 const GROUPS: Array<{ value: GroupBy; label: string; icon: string }> = [
   { value: 'freeform', label: 'Freeform', icon: 'view_column' },
@@ -48,29 +54,23 @@ interface TopicState {
 export default function ColumnsView({ taskId, widgets }: { taskId: string; widgets: Widget[] }): JSX.Element {
   const [cfg, setCfgState] = useState<DeskColumnsConfig>(() => loadColumnsConfig(taskId))
   const [dragId, setDragId] = useState<string | null>(null)
-  // The column the pointer is currently over during a drag, for a visible drop
-  // highlight (and proof the drop zone is registering the gesture).
   const [dragOverCol, setDragOverCol] = useState<string | null>(null)
-  // Click-to-move menu: a drag-free way to move a card between columns/lanes, so
-  // reorganising never depends on a drag gesture landing.
+  // A floating label that follows the cursor during a card drag (pointer-based
+  // dragging has no native drag image).
+  const [ghost, setGhost] = useState<{ x: number; y: number; name: string } | null>(null)
   const [moveMenu, setMoveMenu] = useState<{ x: number; y: number; widgetId: string; fromCol: string } | null>(null)
   const setActive = useWidgetStore((s) => s.setActive)
   const setFocused = useWidgetStore((s) => s.setFocused)
   const updateWidget = useWidgetStore((s) => s.update)
   const setViewMode = useDeskViewStore((s) => s.set)
 
-  // Wire graph — only needed by the Connections mode; loaded lazily when selected.
   const links = useLinksStore((s) => s.links)
   const loadLinks = useLinksStore((s) => s.loadForTask)
   useEffect(() => {
     if (cfg.groupBy === 'connections') void loadLinks(taskId)
   }, [cfg.groupBy, taskId, loadLinks])
 
-  // AI topic labels — computed on demand for the Topic mode.
   const [topic, setTopic] = useState<TopicState>({ map: {}, loading: false, error: null, needsKey: false, ranForSignature: null })
-
-  // A signature of the eligible objects, so Topic auto-runs once per meaningful
-  // change (objects added/removed or their text edited) rather than every render.
   const eligible = useMemo(() => columnsEligible(widgets), [widgets])
   const topicSignature = useMemo(
     () => eligible.map((w) => `${w.id}:${(w.title || '').length}:${(w.content || '').length}`).sort().join('|'),
@@ -96,7 +96,6 @@ export default function ColumnsView({ taskId, widgets }: { taskId: string; widge
     }
   }
 
-  // Auto-run topic grouping when the mode is first selected (or the objects change).
   useEffect(() => {
     if (cfg.groupBy !== 'topic') return
     if (topic.loading) return
@@ -116,8 +115,6 @@ export default function ColumnsView({ taskId, widgets }: { taskId: string; widge
   )
   const isFreeform = cfg.groupBy === 'freeform'
   const isStatus = cfg.groupBy === 'status'
-  // Both Freeform and Status accept drops: Freeform records the placement locally,
-  // Status writes the object's real status field (the column id is the status).
   const canDrag = isFreeform || isStatus
 
   function assignTo(widgetId: string, columnId: string): void {
@@ -136,29 +133,23 @@ export default function ColumnsView({ taskId, widgets }: { taskId: string; widge
     else if (isFreeform) assignTo(widgetId, columnId)
   }
 
-  // ── Edge navigation during a card drag ──────────────────────────────────────
-  // Mirrors the canvas edge-pan: while dragging a card near an edge, auto-scroll
-  // the horizontal column strip (left/right) or the hovered column's card stack
-  // (top/bottom), so you can reach off-screen columns and cards mid-drag. Driven by
-  // the latest pointer position captured on dragover; runs on a rAF loop for the
-  // life of the drag.
+  // ── Edge navigation during a card drag (canvas-style edge-pan) ───────────────
   const scrollRef = useRef<HTMLDivElement>(null)
   const pointerRef = useRef<{ x: number; y: number } | null>(null)
   const edgeRafRef = useRef<number | null>(null)
+  const dragSrcRef = useRef<string | null>(null)
 
   function startEdgeScroll(): void {
     if (edgeRafRef.current != null) return
-    const EDGE = 64 // px from an edge where auto-scroll kicks in
-    const MAX = 22 // px per frame at the very edge
+    const EDGE = 64
+    const MAX = 22
     const step = (): void => {
       const cont = scrollRef.current
       const p = pointerRef.current
       if (cont && p) {
         const r = cont.getBoundingClientRect()
-        // Horizontal: scroll the whole column strip to reach off-screen columns.
         if (p.x < r.left + EDGE) cont.scrollLeft -= MAX * Math.min(1, (r.left + EDGE - p.x) / EDGE)
         else if (p.x > r.right - EDGE) cont.scrollLeft += MAX * Math.min(1, (p.x - (r.right - EDGE)) / EDGE)
-        // Vertical: scroll the card stack the pointer is currently over.
         const bodies = cont.querySelectorAll<HTMLElement>('[data-col-scroll]')
         for (const b of bodies) {
           const br = b.getBoundingClientRect()
@@ -173,7 +164,6 @@ export default function ColumnsView({ taskId, widgets }: { taskId: string; widge
     }
     edgeRafRef.current = requestAnimationFrame(step)
   }
-
   function stopEdgeScroll(): void {
     if (edgeRafRef.current != null) {
       cancelAnimationFrame(edgeRafRef.current)
@@ -182,8 +172,81 @@ export default function ColumnsView({ taskId, widgets }: { taskId: string; widge
     pointerRef.current = null
   }
 
-  // Safety net: stop the loop if the component unmounts mid-drag.
+  // Which column's box contains a screen point (rect-based, so it works even with
+  // the card bodies made pointer-transparent during a drag).
+  function columnAtPoint(x: number, y: number): string | null {
+    const cont = scrollRef.current
+    if (!cont) return null
+    for (const s of cont.querySelectorAll<HTMLElement>('[data-col-id]')) {
+      const r = s.getBoundingClientRect()
+      if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) return s.getAttribute('data-col-id')
+    }
+    return null
+  }
+
+  // Pointer-based card drag. Reliable where HTML5 DnD is not, and drives the same
+  // dropOn() commit path (status field / freeform assignment).
+  function beginCardDrag(w: Widget, e: React.MouseEvent): void {
+    if (!canDrag || e.button !== 0) return
+    e.preventDefault()
+    e.stopPropagation()
+    dragSrcRef.current = w.id
+    setDragId(w.id)
+    pointerRef.current = { x: e.clientX, y: e.clientY }
+    setGhost({ x: e.clientX, y: e.clientY, name: widgetDisplayName(w) })
+    setDragOverCol(columnAtPoint(e.clientX, e.clientY))
+    startEdgeScroll()
+    const onMove = (ev: MouseEvent): void => {
+      pointerRef.current = { x: ev.clientX, y: ev.clientY }
+      setGhost({ x: ev.clientX, y: ev.clientY, name: widgetDisplayName(w) })
+      setDragOverCol(columnAtPoint(ev.clientX, ev.clientY))
+    }
+    const onUp = (ev: MouseEvent): void => {
+      window.removeEventListener('mousemove', onMove)
+      const target = columnAtPoint(ev.clientX, ev.clientY)
+      const src = dragSrcRef.current
+      if (src && target) dropOn(target, src)
+      dragSrcRef.current = null
+      setDragId(null)
+      setDragOverCol(null)
+      setGhost(null)
+      stopEdgeScroll()
+    }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp, { once: true })
+  }
+
+  // Pointer-based column resize (drag the right edge). Persists on release.
+  function beginResize(colId: string, startWidth: number, e: React.MouseEvent): void {
+    e.preventDefault()
+    e.stopPropagation()
+    const startX = e.clientX
+    const onMove = (ev: MouseEvent): void => {
+      const next = Math.max(COLUMN_MIN_W, Math.min(COLUMN_MAX_W, Math.round(startWidth + (ev.clientX - startX))))
+      setCfgState((c) => ({ ...c, widths: { ...(c.widths ?? {}), [colId]: next } }))
+    }
+    const onUp = (): void => {
+      window.removeEventListener('mousemove', onMove)
+      setCfgState((c) => {
+        saveColumnsConfig(taskId, c)
+        return c
+      })
+    }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp, { once: true })
+  }
+
+  // Stop any active drag loop if the component unmounts mid-gesture.
   useEffect(() => () => stopEdgeScroll(), [])
+
+  function focusObject(w: Widget): void {
+    setActive(w.id)
+    setFocused(w.id)
+  }
+  function openOnCanvas(w: Widget): void {
+    setActive(w.id)
+    setViewMode(taskId, 'canvas')
+  }
 
   function addColumn(): void {
     const id = 'col-' + Math.random().toString(36).slice(2, 8)
@@ -200,30 +263,20 @@ export default function ColumnsView({ taskId, widgets }: { taskId: string; widge
     update({ ...cfg, columns: cfg.columns.filter((c) => c.id !== id), assign })
   }
 
-  // Focus an object the same way the canvas does: open it full-pane in focus mode
-  // (WidgetFocusMode reads focusedWidgetId), staying in column mode underneath so
-  // exiting focus returns here — NOT escaping to the canvas.
-  function focusObject(w: Widget): void {
-    setActive(w.id)
-    setFocused(w.id)
-  }
-
-  function openOnCanvas(w: Widget): void {
-    setActive(w.id)
-    setViewMode(taskId, 'canvas')
-  }
-
-  const modeHint =
-    isFreeform
-      ? 'Drag cards between columns; rename a column, or add and remove your own.'
-      : isStatus
-        ? 'Drag a card into a lane to set its status. Lanes are the same everywhere this desk is open.'
-        : cfg.groupBy === 'topic'
-          ? 'Columns proposed by AI from each object’s content.'
-          : 'Grouped automatically. Switch to Freeform or Status to arrange by hand.'
+  const modeHint = isFreeform
+    ? 'Drag cards between columns; rename a column, or add and remove your own. Drag a column edge to resize.'
+    : isStatus
+      ? 'Drag a card into a lane to set its status. Drag a column edge to resize.'
+      : cfg.groupBy === 'topic'
+        ? 'Columns proposed by AI from each object’s content.'
+        : 'Grouped automatically. Switch to Freeform or Status to arrange by hand.'
 
   return (
-    <div className="absolute inset-0 flex flex-col bg-[var(--surface-sunken)]" data-testid="columns-view" data-desk-view="columns">
+    <div
+      className={`absolute inset-0 flex flex-col bg-[var(--surface-sunken)] ${dragId ? 'cursor-grabbing select-none' : ''}`}
+      data-testid="columns-view"
+      data-desk-view="columns"
+    >
       {/* Control bar */}
       <div className="shrink-0 flex items-center gap-2 px-4 py-2 border-b border-[var(--edge-soft)] bg-[var(--surface-raised)]">
         <Icon name="view_column" size={16} className="text-[var(--ink-50)]" />
@@ -276,7 +329,6 @@ export default function ColumnsView({ taskId, widgets }: { taskId: string; widge
         </button>
       </div>
 
-      {/* Topic honest states: needs a key, or an error. Never fabricated columns. */}
       {cfg.groupBy === 'topic' && (topic.needsKey || topic.error) && (
         <div className="shrink-0 px-4 py-2 text-[12px] border-b border-[var(--edge-soft)] bg-[var(--surface-raised)] text-[var(--ink-60)]">
           {topic.needsKey
@@ -286,49 +338,19 @@ export default function ColumnsView({ taskId, widgets }: { taskId: string; widge
       )}
 
       {/* Horizontally scrolling set of columns */}
-      <div
-        ref={scrollRef}
-        className="flex-1 min-h-0 overflow-x-auto overflow-y-hidden"
-        // Capture the live pointer position during a drag so the edge-scroll loop
-        // can auto-pan toward off-screen columns/cards. preventDefault keeps the
-        // gap between columns a valid drag surface too.
-        onDragOver={canDrag ? (e) => {
-          if (dragId) pointerRef.current = { x: e.clientX, y: e.clientY }
-        } : undefined}
-      >
+      <div ref={scrollRef} className="flex-1 min-h-0 overflow-x-auto overflow-y-hidden">
         <div className="h-full flex gap-4 p-4 items-stretch">
           {columns.map((col) => (
             <section
               key={col.id}
               data-testid={`column-${col.id}`}
+              data-col-id={col.id}
               style={{ width: col.width }}
-              className={`shrink-0 h-full flex flex-col rounded-xl border bg-[var(--surface-raised)] overflow-hidden transition-colors ${
-                dragOverCol === col.id
+              className={`relative shrink-0 h-full flex flex-col rounded-xl border bg-[var(--surface-raised)] overflow-hidden transition-[border-color,box-shadow] ${
+                dragOverCol === col.id && dragId
                   ? 'border-[rgb(var(--accent))] ring-2 ring-[rgb(var(--accent)/0.35)]'
                   : 'border-[var(--edge-soft)]'
               }`}
-              // Enter + Over must BOTH preventDefault AND set dropEffect for Chromium
-              // to actually FIRE the drop (preventDefault alone shows the highlight but
-              // the drop is silently rejected if dropEffect doesn't match effectAllowed).
-              onDragEnter={canDrag ? (e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDragOverCol(col.id) } : undefined}
-              onDragOver={canDrag ? (e) => {
-                e.preventDefault()
-                e.dataTransfer.dropEffect = 'move'
-                pointerRef.current = { x: e.clientX, y: e.clientY }
-                if (dragOverCol !== col.id) setDragOverCol(col.id)
-              } : undefined}
-              onDrop={
-                canDrag
-                  ? (e) => {
-                      e.preventDefault()
-                      const id = e.dataTransfer.getData('text/plain') || dragId
-                      if (id) dropOn(col.id, id)
-                      setDragId(null)
-                      setDragOverCol(null)
-                      stopEdgeScroll()
-                    }
-                  : undefined
-              }
             >
               {/* Column header */}
               <div className="shrink-0 flex items-center gap-2 px-3 py-2 border-b border-[var(--edge-soft)]">
@@ -368,31 +390,15 @@ export default function ColumnsView({ taskId, widgets }: { taskId: string; widge
                   col.items.map((w) => (
                     <div
                       key={w.id}
-                      style={{ width: naturalItemWidth(w) }}
-                      className={`mx-auto shrink-0 rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-raised)] overflow-hidden shadow-sm ${
-                        dragId === w.id ? 'opacity-50' : ''
+                      className={`w-full shrink-0 rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-raised)] overflow-hidden shadow-sm ${
+                        dragId === w.id ? 'opacity-40' : ''
                       }`}
                       data-testid={`column-card-${w.id}`}
                     >
                       <div className="flex items-center gap-1.5 px-2.5 py-1.5 border-b border-[var(--edge-soft)] bg-[var(--surface-sunken)]">
-                        {/* Dedicated drag handle — grabbing here always starts the drag,
-                            even when the card body is a live, interactive widget that
-                            would otherwise swallow the gesture. */}
                         {canDrag && (
                           <span
-                            draggable
-                            onDragStart={(e) => {
-                              e.dataTransfer.setData('text/plain', w.id)
-                              e.dataTransfer.effectAllowed = 'move'
-                              setDragId(w.id)
-                              pointerRef.current = { x: e.clientX, y: e.clientY }
-                              startEdgeScroll()
-                            }}
-                            onDragEnd={() => {
-                              setDragId(null)
-                              setDragOverCol(null)
-                              stopEdgeScroll()
-                            }}
+                            onMouseDown={(e) => beginCardDrag(w, e)}
                             title="Drag to move"
                             className="shrink-0 -ml-1 px-0.5 cursor-grab active:cursor-grabbing text-[var(--ink-30)] hover:text-[var(--ink-60)]"
                             data-testid={`column-drag-${w.id}`}
@@ -434,11 +440,8 @@ export default function ColumnsView({ taskId, widgets }: { taskId: string; widge
                           <Icon name="my_location" size={13} />
                         </button>
                       </div>
-                      {/* While a drag is in progress, make the live widget body
-                          transparent to pointer events so the column beneath
-                          receives dragover/drop — otherwise an interactive body
-                          (iframe/webview/inputs) swallows the gesture and the drop
-                          never registers. */}
+                      {/* Card body fills the column width and is made pointer-transparent
+                          during a drag so it never intercepts the gesture. */}
                       <div
                         style={{ height: itemCardHeight(w) }}
                         className={`overflow-hidden relative ${dragId ? 'pointer-events-none' : ''}`}
@@ -449,10 +452,28 @@ export default function ColumnsView({ taskId, widgets }: { taskId: string; widge
                   ))
                 )}
               </div>
+
+              {/* Resize handle on the right edge — drag to set this column's width. */}
+              <div
+                onMouseDown={(e) => beginResize(col.id, col.width, e)}
+                title="Drag to resize this column"
+                data-testid={`column-resize-${col.id}`}
+                className="absolute top-0 right-0 h-full w-1.5 cursor-col-resize hover:bg-[rgb(var(--accent)/0.4)]"
+              />
             </section>
           ))}
         </div>
       </div>
+
+      {/* Floating drag label (pointer drag has no native drag image). */}
+      {ghost && (
+        <div
+          className="fixed z-[80] pointer-events-none px-2 py-1 rounded-md bg-[rgb(var(--accent))] text-white text-[11px] font-medium shadow-lg max-w-[220px] truncate"
+          style={{ left: ghost.x + 12, top: ghost.y + 12 }}
+        >
+          {ghost.name}
+        </div>
+      )}
 
       {moveMenu && (
         <CanvasContextMenu

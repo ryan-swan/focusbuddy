@@ -53,7 +53,15 @@ export interface DeskColumnsConfig {
   columns: DeskColumn[]
   assign: Record<string, string> // widgetId -> columnId
   order: Record<string, number> // widgetId -> sort order within its column
+  // Manual per-column width override (columnId -> px). When absent for a column,
+  // its width is content-driven (widest item + padding). Applies across modes,
+  // keyed by the column id each mode produces.
+  widths?: Record<string, number>
 }
+
+// Bounds for a manually-resized column.
+export const COLUMN_MIN_W = 220
+export const COLUMN_MAX_W = 960
 
 const KEY_PREFIX = 'fb.deskColumns.v1.'
 
@@ -66,7 +74,8 @@ export function defaultColumnsConfig(): DeskColumnsConfig {
       { id: 'col-3', title: 'Reference' }
     ],
     assign: {},
-    order: {}
+    order: {},
+    widths: {}
   }
 }
 
@@ -80,7 +89,8 @@ export function loadColumnsConfig(taskId: string): DeskColumnsConfig {
       groupBy: parsed.groupBy ?? base.groupBy,
       columns: Array.isArray(parsed.columns) && parsed.columns.length > 0 ? parsed.columns : base.columns,
       assign: parsed.assign ?? {},
-      order: parsed.order ?? {}
+      order: parsed.order ?? {},
+      widths: parsed.widths ?? {}
     }
   } catch {
     return defaultColumnsConfig()
@@ -216,8 +226,12 @@ function recencyBucket(createdAt: number, now: number): { id: string; label: str
 export function buildColumns(widgets: Widget[], cfg: DeskColumnsConfig, ctx: BuildColumnsCtx = {}): BuiltColumn[] {
   const items = columnsEligible(widgets)
   const withWidth = (id: string, title: string, list: Widget[], swatch?: string | null): BuiltColumn => {
+    // A manual width override wins; otherwise the column is as wide as its widest
+    // item plus padding.
+    const override = cfg.widths?.[id]
     const maxW = list.reduce((m, w) => Math.max(m, naturalItemWidth(w)), ITEM_MIN_W)
-    return { id, title, items: list, width: maxW + COLUMN_PADDING, swatch }
+    const width = override != null ? override : maxW + COLUMN_PADDING
+    return { id, title, items: list, width, swatch }
   }
 
   // Status board: every object sits in the column matching its status field, with

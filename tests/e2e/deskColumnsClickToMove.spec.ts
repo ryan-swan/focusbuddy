@@ -198,9 +198,10 @@ test('Columns click-to-move: move button + context menu reorganise cards via rea
   expect(cfg.assign[noteId]).toBe(targetColId)
 
   // ── 5. Structural: drag handle + Add/rename/remove still present ───────
+  // The handle is pointer-based (mousedown), not HTML5 draggable — just confirm
+  // it's present and grabbable.
   const calcHandle = window.locator(`[data-testid="column-drag-${calcId}"]`)
   await expect(calcHandle).toBeVisible()
-  expect(await calcHandle.getAttribute('draggable')).toBe('true')
 
   const addBtn = window.locator('[data-testid="columns-add"]')
   await expect(addBtn).toBeVisible()
