@@ -17,6 +17,7 @@ import { useWidgetStore } from '../stores/widgets'
 import { useLinksStore } from '../stores/links'
 import { useDeskViewStore } from '../stores/deskView'
 import Icon from './Icon'
+import CanvasContextMenu, { type CtxMenuItem } from './CanvasContextMenu'
 
 // The desk Columns view: the same desk objects laid out as vertical, independently
 // scrolling walls, the whole set scrolling horizontally. Columns are hand-made
@@ -47,6 +48,9 @@ interface TopicState {
 export default function ColumnsView({ taskId, widgets }: { taskId: string; widgets: Widget[] }): JSX.Element {
   const [cfg, setCfgState] = useState<DeskColumnsConfig>(() => loadColumnsConfig(taskId))
   const [dragId, setDragId] = useState<string | null>(null)
+  // Click-to-move menu: a drag-free way to move a card between columns/lanes, so
+  // reorganising never depends on a drag gesture landing.
+  const [moveMenu, setMoveMenu] = useState<{ x: number; y: number; widgetId: string; fromCol: string } | null>(null)
   const setActive = useWidgetStore((s) => s.setActive)
   const updateWidget = useWidgetStore((s) => s.update)
   const setViewMode = useDeskViewStore((s) => s.set)
@@ -308,6 +312,19 @@ export default function ColumnsView({ taskId, widgets }: { taskId: string; widge
                         <span className="flex-1 min-w-0 truncate text-[12px] font-medium text-[var(--ink-90)]">
                           {widgetDisplayName(w)}
                         </span>
+                        {canDrag && columns.length > 1 && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setMoveMenu({ x: e.clientX, y: e.clientY, widgetId: w.id, fromCol: col.id })
+                            }}
+                            title={isStatus ? 'Move to another lane' : 'Move to another column'}
+                            data-testid={`column-move-${w.id}`}
+                            className="icon-btn h-6 w-6 text-[var(--ink-40)] hover:text-[rgb(var(--accent))]"
+                          >
+                            <Icon name="drive_file_move" size={13} />
+                          </button>
+                        )}
                         <button
                           onClick={() => openOnCanvas(w)}
                           title="Open on the canvas"
@@ -327,6 +344,23 @@ export default function ColumnsView({ taskId, widgets }: { taskId: string; widge
           ))}
         </div>
       </div>
+
+      {moveMenu && (
+        <CanvasContextMenu
+          x={moveMenu.x}
+          y={moveMenu.y}
+          items={columns
+            .filter((c) => c.id !== moveMenu.fromCol)
+            .map(
+              (c): CtxMenuItem => ({
+                label: `Move to ${c.title}`,
+                icon: 'arrow_forward',
+                onClick: () => dropOn(c.id, moveMenu.widgetId)
+              })
+            )}
+          onClose={() => setMoveMenu(null)}
+        />
+      )}
     </div>
   )
 }
