@@ -109,6 +109,9 @@ test('DWK-2 — palette exposes Design; clicking it creates a design widget via 
     await addBtn.click()
     await window.waitForSelector('[role="dialog"][aria-label="Desk objects"]', { timeout: 4_000 })
 
+    // Design is an Advanced tile now — expand the Advanced section to reach it.
+    await window.locator('[data-testid="palette-advanced-toggle"]').click().catch(() => {})
+    await window.waitForTimeout(150)
     // The catalog must expose a Design entry.
     const designEntry = window.locator('[data-testid="palette-add-design"]')
     await expect(designEntry).toBeVisible({ timeout: 4_000 })

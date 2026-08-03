@@ -535,6 +535,51 @@ export function catalogFor(kind: WidgetKind): WidgetCatalogEntry | null {
   return WIDGET_CATALOG.find((e) => e.kind === kind) ?? null
 }
 
+// Go-live simplification: a brand-new user should meet a small, obvious CORE set,
+// not the full catalog. Everything below is still fully creatable — it just lives
+// under the picker's "Advanced" expander (one tap away) instead of the first-run
+// grid. This is a demotion, NOT a removal: no functionality is lost, and the
+// command palette still lists every kind. (Truly duplicate kinds — pdf/gdoc/etc,
+// and diagram/mindmap once Map covers them — use hideFromPicker instead.)
+export const ADVANCED_KINDS: ReadonlySet<WidgetKind> = new Set<WidgetKind>([
+  // Notes — Sticky + Page are the core two; these are variants/styles or AI docs.
+  'note',
+  'markdown',
+  'card',
+  'living-doc',
+  // Files — Document/Spreadsheet/Slides/File/Map are core; these are secondary.
+  'drive',
+  'design',
+  // Tools/data — Table + Chart are core; these are power or niche.
+  'field',
+  'custom-block',
+  'calculator',
+  'color',
+  'scratchpad',
+  'streamdeck',
+  // Automation — powerful but intimidating first-run.
+  'agent',
+  'webhook',
+  'inbound-hook',
+  // Layout/canvas depth — Section is core; these are advanced placements.
+  'shape',
+  'task-link',
+  'portal',
+  'local-app-launcher',
+  // Diagramming — Map is the one CORE diagram tool. Diagram + Mind map are demoted
+  // here rather than folded away: the Map owner confirmed Map does NOT cover two of
+  // their capabilities (Diagram's image/icon-upload node type; Mind map's per-node
+  // Agent-OS agents with proposal apply/undo), so hiding them would lose real
+  // functionality. Kept fully creatable under Advanced; existing ones render as
+  // normal (rendering is keyed on widget.kind, independent of this list).
+  'diagram',
+  'mindmap'
+])
+
+export function isAdvancedKind(kind: WidgetKind): boolean {
+  return ADVANCED_KINDS.has(kind)
+}
+
 // Single-key quick-add shortcuts (no modifier) for the most common widgets,
 // fired on the canvas when a desk is active and the user is not typing. The
 // command palette shows these next to each "Add" command. Kept to memorable,

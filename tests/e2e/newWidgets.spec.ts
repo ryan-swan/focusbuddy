@@ -50,6 +50,10 @@ test('catalog exposes shape, card and custom-block tiles', async () => {
   await seedAndOpen(launched, 'sticky', 's')
   await window.locator('[data-testid="palette-add-button"]').click()
   await window.waitForTimeout(300)
+  // shape / card / custom-block are Advanced tiles (go-live picker simplification),
+  // so expand the Advanced section before asserting they're present.
+  await window.locator('[data-testid="palette-advanced-toggle"]').click().catch(() => {})
+  await window.waitForTimeout(150)
   for (const kind of ['shape', 'card', 'custom-block']) {
     const present = await window.evaluate(
       (k) =>

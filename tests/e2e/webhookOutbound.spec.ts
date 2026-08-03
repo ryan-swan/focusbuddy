@@ -316,6 +316,9 @@ test('(a2) "Send to a URL" is offered from the palette and the right-click creat
   const paletteButton = window.locator('[data-testid="palette-add-button"]')
   await expect(paletteButton).toBeVisible({ timeout: 3_000 })
   await paletteButton.click()
+  // Webhook is an Advanced tile now — expand the Advanced section to reach it.
+  await window.locator('[data-testid="palette-advanced-toggle"]').click().catch(() => {})
+  await window.waitForTimeout(150)
   await expect(window.locator('[data-testid="palette-add-webhook"]')).toBeVisible({ timeout: 3_000 })
   await expect(window.locator('[data-testid="palette-add-webhook"]')).toContainText('Send to a URL')
   await window.keyboard.press('Escape')

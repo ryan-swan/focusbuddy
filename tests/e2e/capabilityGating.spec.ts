@@ -52,8 +52,9 @@ test('Free tier: Table widget is locked in the palette, Note is not', async () =
 
   await window.locator('[data-testid="palette-add-button"]').first().click()
 
-  // Ungated widget → normal add button present.
-  await expect(window.locator('[data-testid="palette-add-note"]').first()).toBeVisible()
+  // Ungated widget → normal add button present. Use a CORE ungated widget
+  // (Sticky) so this gating check doesn't depend on the Advanced expander.
+  await expect(window.locator('[data-testid="palette-add-sticky"]').first()).toBeVisible()
 
   // Gated widget (widget_table=false on free) → locked variant present,
   // and the normal add button for it is absent.
