@@ -48,10 +48,14 @@ interface TopicState {
 export default function ColumnsView({ taskId, widgets }: { taskId: string; widgets: Widget[] }): JSX.Element {
   const [cfg, setCfgState] = useState<DeskColumnsConfig>(() => loadColumnsConfig(taskId))
   const [dragId, setDragId] = useState<string | null>(null)
+  // The column the pointer is currently over during a drag, for a visible drop
+  // highlight (and proof the drop zone is registering the gesture).
+  const [dragOverCol, setDragOverCol] = useState<string | null>(null)
   // Click-to-move menu: a drag-free way to move a card between columns/lanes, so
   // reorganising never depends on a drag gesture landing.
   const [moveMenu, setMoveMenu] = useState<{ x: number; y: number; widgetId: string; fromCol: string } | null>(null)
   const setActive = useWidgetStore((s) => s.setActive)
+  const setFocused = useWidgetStore((s) => s.setFocused)
   const updateWidget = useWidgetStore((s) => s.update)
   const setViewMode = useDeskViewStore((s) => s.set)
 
@@ -147,6 +151,14 @@ export default function ColumnsView({ taskId, widgets }: { taskId: string; widge
     update({ ...cfg, columns: cfg.columns.filter((c) => c.id !== id), assign })
   }
 
+  // Focus an object the same way the canvas does: open it full-pane in focus mode
+  // (WidgetFocusMode reads focusedWidgetId), staying in column mode underneath so
+  // exiting focus returns here — NOT escaping to the canvas.
+  function focusObject(w: Widget): void {
+    setActive(w.id)
+    setFocused(w.id)
+  }
+
   function openOnCanvas(w: Widget): void {
     setActive(w.id)
     setViewMode(taskId, 'canvas')
@@ -232,8 +244,15 @@ export default function ColumnsView({ taskId, widgets }: { taskId: string; widge
               key={col.id}
               data-testid={`column-${col.id}`}
               style={{ width: col.width }}
-              className="shrink-0 h-full flex flex-col rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-raised)] overflow-hidden"
-              onDragOver={canDrag ? (e) => e.preventDefault() : undefined}
+              className={`shrink-0 h-full flex flex-col rounded-xl border bg-[var(--surface-raised)] overflow-hidden transition-colors ${
+                dragOverCol === col.id
+                  ? 'border-[rgb(var(--accent))] ring-2 ring-[rgb(var(--accent)/0.35)]'
+                  : 'border-[var(--edge-soft)]'
+              }`}
+              // Enter + Over must BOTH preventDefault for Chromium to accept a drop
+              // anywhere in the column, including over a card.
+              onDragEnter={canDrag ? (e) => { e.preventDefault(); setDragOverCol(col.id) } : undefined}
+              onDragOver={canDrag ? (e) => { e.preventDefault(); if (dragOverCol !== col.id) setDragOverCol(col.id) } : undefined}
               onDrop={
                 canDrag
                   ? (e) => {
@@ -241,6 +260,7 @@ export default function ColumnsView({ taskId, widgets }: { taskId: string; widge
                       const id = e.dataTransfer.getData('text/plain') || dragId
                       if (id) dropOn(col.id, id)
                       setDragId(null)
+                      setDragOverCol(null)
                     }
                   : undefined
               }
@@ -300,7 +320,10 @@ export default function ColumnsView({ taskId, widgets }: { taskId: string; widge
                               e.dataTransfer.effectAllowed = 'move'
                               setDragId(w.id)
                             }}
-                            onDragEnd={() => setDragId(null)}
+                            onDragEnd={() => {
+                              setDragId(null)
+                              setDragOverCol(null)
+                            }}
                             title="Drag to move"
                             className="shrink-0 -ml-1 px-0.5 cursor-grab active:cursor-grabbing text-[var(--ink-30)] hover:text-[var(--ink-60)]"
                             data-testid={`column-drag-${w.id}`}
@@ -326,14 +349,31 @@ export default function ColumnsView({ taskId, widgets }: { taskId: string; widge
                           </button>
                         )}
                         <button
-                          onClick={() => openOnCanvas(w)}
-                          title="Open on the canvas"
+                          onClick={() => focusObject(w)}
+                          title="Open in focus mode"
+                          data-testid={`column-focus-${w.id}`}
                           className="icon-btn h-6 w-6 text-[var(--ink-40)] hover:text-[rgb(var(--accent))]"
                         >
                           <Icon name="open_in_full" size={13} />
                         </button>
+                        <button
+                          onClick={() => openOnCanvas(w)}
+                          title="Show on the canvas"
+                          data-testid={`column-reveal-${w.id}`}
+                          className="icon-btn h-6 w-6 text-[var(--ink-40)] hover:text-[rgb(var(--accent))]"
+                        >
+                          <Icon name="my_location" size={13} />
+                        </button>
                       </div>
-                      <div style={{ height: itemCardHeight(w) }} className="overflow-hidden relative">
+                      {/* While a drag is in progress, make the live widget body
+                          transparent to pointer events so the column beneath
+                          receives dragover/drop — otherwise an interactive body
+                          (iframe/webview/inputs) swallows the gesture and the drop
+                          never registers. */}
+                      <div
+                        style={{ height: itemCardHeight(w) }}
+                        className={`overflow-hidden relative ${dragId ? 'pointer-events-none' : ''}`}
+                      >
                         {renderWidgetInline(w)}
                       </div>
                     </div>
