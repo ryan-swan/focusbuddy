@@ -9,9 +9,19 @@
 //
 //   score(d) = Σ_over_legs  weight_L / (k + rank_L(d))
 //
-// Three responsibilities live here, all pure so they are unit-locked in isolation
-// (tests/unit/rrf.test.ts), the same posture as chunker.ts and spineRerank.ts:
+// Four responsibilities live here, all pure so they are unit-locked in isolation
+// (tests/unit/rrf.test.ts, tests/unit/plxSchBrainPermissionFloor.test.ts), the same posture as
+// chunker.ts and spineRerank.ts:
 //
+//   0. THE PERMISSION FLOOR (U1a · PLX-SCH-001/002 · invariant U-4) — the FIRST stage, ahead of
+//      admission and ahead of any rank, score or count. RRF scores by RANK, so an unpermitted
+//      candidate that occupies a rank slot shifts every survivor below it and CHANGES THEIR
+//      SCORES: the withheld item becomes inferable from the numbers of the items that were
+//      returned. Filtering after fusion cannot repair that — the slot is already spent. This is
+//      the only point in the pipeline where the invariant can hold, which is exactly why
+//      PLX-SCH-001 requires the filter "at the index or query layer, not as a post-filter over
+//      returned results". The predicate is INJECTED (4.0's SEC-020 posture): this layer is the
+//      enforcement point and knows nothing about the membership model that answers it.
 //   1. FUSION — combine each leg's ranked ids into one fused ordering.
 //   2. THE ADMISSION GATE (D6 / DEC-022) — a filler chunk (a default title "Untitled"/
 //      "New desk", a one-word sticky, a blank-spreadsheet grid) is not an answer. BM25
@@ -60,6 +70,19 @@ export interface FusionOpts {
   /** Per-leg weight (default 1.0 each). A leg at weight 0 contributes nothing — the
    *  mechanism by which the graph leg "ships at weight 0" (F-5) until its fixture passes. */
   legWeights?: Record<string, number>
+  /** The permission floor (PLX-SCH-001/002 · U-4). Returns whether the asking principal may read
+   *  this candidate. Applied FIRST — before admission, before any rank, score or count — so a
+   *  withheld candidate never consumes a rank slot and is therefore not inferable from any
+   *  survivor's score, from the result order, or from the count.
+   *
+   *  Deliberately a bare predicate, not a Principal: the membership model that answers it is
+   *  injected by the caller (SEC-020). Omitted ⇒ permit all, so every pre-U1a caller is
+   *  behaviourally unchanged.
+   *
+   *  ⚠ U1a shipped the POSITION of this filter. The production membership model behind it is U1b
+   *  and is NOT built — `retrieveViaBrain` currently passes no predicate. Do not read the presence
+   *  of this option as "the brain enforces multi-user permission". It does not yet. */
+  canRead?: (id: string) => boolean
 }
 
 export interface FusedResult {
@@ -89,12 +112,24 @@ export function fuseCandidates(
   const k = opts.k ?? DEFAULT_RRF_K
   const legWeights = opts.legWeights ?? {}
 
-  // ── The admission gate (D6 / DEC-022): only chunks that clear admitChunk — the SAME
-  // rarity+length+signal gate ingest applies — are eligible to be fused. One definition,
-  // two sites (shared/admission.ts). ──────────────────────────────────────────────
+  // ── STAGE 0 — THE PERMISSION FLOOR (PLX-SCH-001/002 · U-4), then the admission gate
+  // (D6 / DEC-022): only chunks the principal may read AND that clear admitChunk — the SAME
+  // rarity+length+signal gate ingest applies — are eligible to be fused. One definition of
+  // filler, two sites (shared/admission.ts).
+  //
+  // ORDER IS NORMATIVE, not stylistic. PLX-SCH-001 makes permission the FIRST stage, so an
+  // unreadable candidate is never assessed for quality — the system does not decide whether
+  // content the principal may not read is "good enough to rank". Both predicates are evaluated
+  // (no short-circuit past canRead) so the floor applies uniformly.
+  //
+  // Because eligibility is what the leg loop below re-densifies over, a withheld candidate never
+  // takes a rank slot — the same mechanism that already stops gated filler from taking one. That
+  // is what makes U-4 structural here rather than a convention someone must remember.
+  const canRead = opts.canRead ?? ((): boolean => true)
   const eligible = new Map<string, FusionCandidate>()
   for (const c of candidates) {
-    if (admitChunk(c.text)) eligible.set(c.id, c)
+    const permitted = canRead(c.id) // stage 0 — always evaluated, always first
+    if (permitted && admitChunk(c.text)) eligible.set(c.id, c)
   }
   if (eligible.size === 0) return []
 

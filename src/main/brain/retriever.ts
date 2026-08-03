@@ -120,13 +120,25 @@ export async function reorderAsync(sources: WorkspaceSource[], _query: string): 
  * AI-free: one local query embed + one local FTS read are the only compute (I1); no-key still
  * returns current-truth via the lexical leg (DEC-012).
  *
+ * U1a — the PERMISSION FLOOR (PLX-SCH-001/002 · U-4) is stage 0, inside fuseCandidates, ahead of
+ * every rank, score and count. It has to live there rather than here: RRF scores by RANK, so an
+ * unpermitted candidate that takes a rank slot changes the scores of everything below it, and no
+ * amount of filtering afterwards can undo that. See shared/rrf.ts responsibility 0.
+ *
+ * ⚠ SCOPE — U1a shipped the POSITION of the filter and the injected seam. It did NOT ship
+ * multi-user permission. There is no production membership model to answer `canRead` yet, so when
+ * `opts.canRead` is omitted the floor permits everything and behaviour is byte-identical to
+ * pre-U1a. Wiring it to the real room/desk/widget sharing model is U1b, held pending that model.
+ * Do not read "the brain has a permission filter" as "the brain enforces permissions".
+ *
  * @param opts.roomId  active room aperture (null = org-wide, no room gate)
  * @param opts.allowRestricted  permit restricted-sensitivity items (default false)
+ * @param opts.canRead  permission floor predicate over chunk ids; omitted = permit all (U1b)
  */
 export async function retrieveViaBrain(
   query: string,
   limit = 6,
-  opts: { roomId?: string | null; allowRestricted?: boolean } = {}
+  opts: { roomId?: string | null; allowRestricted?: boolean; canRead?: (id: string) => boolean } = {}
 ): Promise<WorkspaceSource[]> {
   const q = query.trim()
   if (!q) return []
@@ -192,7 +204,13 @@ export async function retrieveViaBrain(
       importance: importanceSignal(c)
     })
   }
-  const fused = fuseCandidates(fusionCandidates, { vector: vectorRanked, fts: ftsRanked }, { k: DEFAULT_RRF_K })
+  const fused = fuseCandidates(fusionCandidates, { vector: vectorRanked, fts: ftsRanked }, {
+    k: DEFAULT_RRF_K,
+    // Stage 0 — the permission floor, applied before any rank/score/count is derived (U-4).
+    // Threaded straight through: this file is the impure orchestration, so it carries the
+    // predicate but never decides it (SEC-020 — the enforcement point is not the membership model).
+    canRead: opts.canRead
+  })
   if (fused.length === 0) return [] // nothing eligible (e.g. no embed + no lexical tokens)
 
   // The fused, gated, de-duplicated candidate list (best-first). Carries each survivor's
